@@ -215,7 +215,9 @@ The phase writes credential-free ownership/results to `test-result/hub-sas.json`
 before mutations. Cleanup operates only on those IDs, checks ownership, observes
 already-Deleting resources without repeating DELETE, and reports incomplete
 cleanup as failure. Constructor failure cannot trigger another creation attempt.
-The six cases retain their 900-second item deadlines and have no scenario reruns.
+Cases use 900-second item deadlines, except event monitoring, which allows 2,700
+seconds to include its bounded 30-minute wait for exact query-cohort visibility.
+There are no scenario reruns, and cleanup deadlines remain unchanged.
 Background cleanup is bounded; a worker still running prevents resource deletion.
 Forced process termination can prevent finalizers: consult the ownership receipt
 and obtain explicit authorization for any remaining resource cleanup.

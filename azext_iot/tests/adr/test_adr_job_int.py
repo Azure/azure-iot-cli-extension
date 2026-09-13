@@ -73,7 +73,9 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 cleanup.register(
                     "namespace",
-                    lambda: _delete_test_namespace(self, namespace_name, rg),
+                    lambda: _delete_test_namespace(
+                        self, namespace_name, rg, jobs=(job_name,), groups=(group_name,),
+                    ),
                 )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
@@ -235,7 +237,7 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             )
             cleanup.register(
                 "namespace",
-                lambda: _delete_test_namespace(self, namespace_name, rg),
+                lambda: _delete_test_namespace(self, namespace_name, rg, jobs=(job_name,)),
             )
             self.cmd(
                 f"iot adr ns job create -n {job_name} --ns {namespace_name} -g {rg} "
@@ -308,7 +310,9 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 cleanup.register(
                     "namespace",
-                    lambda: _delete_test_namespace(self, namespace_name, rg),
+                    lambda: _delete_test_namespace(
+                        self, namespace_name, rg, jobs=(job_name,), groups=(group_name,),
+                    ),
                 )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "

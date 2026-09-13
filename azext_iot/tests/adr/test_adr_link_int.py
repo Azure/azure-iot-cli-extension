@@ -30,6 +30,10 @@ What is intentionally NOT covered here (covered by unit tests):
 - Failed-Hub retry without DPS (requires deliberately inducing a backend link failure)
 - MI mutually-exclusive rejection
 - Invalid DPS resource id rejection
+
+Owned Hub adds allow up to 240 seconds each for actual namespace/endpoint
+readiness, including read-authorization propagation recovery via link update.
+This is not a generic Failed/403 retry and does not extend SU readiness.
 """
 
 import os
@@ -52,6 +56,7 @@ from azext_iot.tests.adr._helpers import (
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
+from azext_iot.tests.adr._readiness import HUB_LINK_READINESS_TIMEOUT, link_hub_with_readiness
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -155,6 +160,10 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     Cleanup deletes only the namespace, targets and identity created by this test.
     """
 
+    # Retain the suite's existing 900s for three-Hub setup, lifecycle and cleanup.
+    # Reserve a separate bounded readiness window for each of the two Hub adds;
+    # do not spend their propagation retries out of the existing cleanup allowance.
+    @pytest.mark.timeout(900 + 2 * HUB_LINK_READINESS_TIMEOUT, func_only=False)
     def test_adr_link_lifecycle(self):
         _log(LogKind.TEST, "test_adr_link_lifecycle")
         rg = TEST_RG
@@ -288,14 +297,15 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--availability Available --weight 1"
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
-                self.cmd(add_cmd)
-                _wait_for_linking_succeeded(
-                    self,
-                    "hub",
-                    namespace_name,
-                    rg,
-                    secondary_endpoint,
-                    expected_identity_type="UserAssigned",
+                link_hub_with_readiness(
+                    self, add_cmd, namespace_name, rg, secondary_endpoint,
+                    {
+                        "resourceId": hub_id,
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned", "userAssignedIdentity": identity_resource_id,
+                        },
+                        "provisioning": {"availability": "Available", "allocationWeight": 1},
+                    },
                 )
                 self.cmd(
                     f"iot adr ns link hub wait -n {secondary_endpoint} "
@@ -432,14 +442,13 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--availability Available --weight 2"
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
-                self.cmd(add_cmd)
-                _wait_for_linking_succeeded(
-                    self,
-                    "hub",
-                    namespace_name,
-                    rg,
-                    tertiary_endpoint,
-                    expected_identity_type="SystemAssigned",
+                link_hub_with_readiness(
+                    self, add_cmd, namespace_name, rg, tertiary_endpoint,
+                    {
+                        "resourceId": tertiary_hub_id,
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                        "provisioning": {"availability": "Available", "allocationWeight": 2},
+                    },
                 )
                 with pytest.raises(
                     ArgumentUsageError, match="active ADR link"

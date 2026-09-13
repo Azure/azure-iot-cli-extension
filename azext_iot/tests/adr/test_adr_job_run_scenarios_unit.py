@@ -17,6 +17,7 @@ from azure.cli.core import MainCommandsLoader
 from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, ResourceNotFoundError
 from azure.cli.core.mock import DummyCli
 from azure.core.exceptions import HttpResponseError, ResourceExistsError
+from azure.core.rest import HttpRequest
 from knack.util import CLIError
 
 from azext_iot import IoTExtCommandsLoader
@@ -26,6 +27,7 @@ from azext_iot.adr import (
 from azext_iot.adr.providers.wait import wait_for_resource
 from azext_iot.tests.adr import test_adr_job_run_int as runs
 from azext_iot.tests.adr import test_adr_job_int as jobs
+from azext_iot.tests.adr import _readiness as readiness
 from azext_iot.tests.adr._helpers import CleanupLedger
 
 
@@ -68,7 +70,13 @@ class _CliScenario:
 
     def cmd(self, command, expect_failure=False):
         self.commands.append(command)
-        code = self.cli.invoke(shlex.split(command), out_file=StringIO())
+        try:
+            code = self.cli.invoke(shlex.split(command), out_file=StringIO())
+        except SystemExit as error:
+            # Match testsdk's expected-failure handling for native show 404s.
+            if not expect_failure or error.code != 3:
+                raise
+            code = error.code
         if expect_failure:
             assert code != 0, command
         elif code:
@@ -139,30 +147,55 @@ def resources(mocker):
         "updateId": {"provider": "Contoso", "name": "gateway-firmware", "version": "1.2.3"},
     }
     group.show.return_value = {"properties": {"membershipState": "Ready"}}
-    for provider in (namespace, group, job):
+
+    def delete_resource(provider, kind):
+        def delete(**kwargs):
+            resource_id = (
+                f"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/{kwargs['resource_group_name']}"
+                f"/providers/Microsoft.DeviceRegistry/namespaces/{kwargs['namespace_name']}"
+            )
+            if kind:
+                resource_id += f"/{kind}s/{kwargs[kind + '_name']}"
+            provider.show.side_effect = _resource_missing(resource_id)
+        return delete
+
+    for provider, kind in ((namespace, None), (group, "group"), (job, "job")):
         provider.create.return_value = {}
-        provider.delete.return_value = None
+        provider.delete.side_effect = delete_resource(provider, kind)
     return SimpleNamespace(namespace=namespace, group=group, job=job, instance=instance, update=update)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def namespace_cleanup_clock(mocker):
     now = [0]
-    wait = runs.wait_for_condition
+    deadline = readiness._Deadline
 
     def sleep(delay):
         now[0] += delay
 
-    mocker.patch.object(runs, "wait_for_condition", side_effect=lambda *args, **kwargs: wait(
-        *args, **kwargs, clock=lambda: now[0], sleeper=sleep,
+    mocker.patch.object(readiness, "_Deadline", side_effect=lambda timeout, _clock, _sleeper, description: deadline(
+        timeout, lambda: now[0], sleep, description,
     ))
     return now
+
+
+def _resource_missing(resource_id):
+    missing = HttpResponseError(message="(ResourceNotFound) deleted owned resource")
+    missing.status_code = 404
+    missing.response = SimpleNamespace(
+        status_code=404,
+        request=HttpRequest("GET", f"https://management.azure.com{resource_id}?api-version=2026-11-02-preview"),
+    )
+    return missing
 
 
 def _namespace_delete_error(code="CannotDeleteResource"):
     error = ResourceExistsError(message=f"{code}: nested resource index")
     error.status_code = 409
     error.error = SimpleNamespace(code=code, message=str(error), target=None, details=[])
+    error.response = SimpleNamespace(
+        status_code=409, request=HttpRequest("DELETE", "https://management.azure.com" + NAMESPACE_ID),
+    )
     return error
 
 
@@ -171,6 +204,10 @@ def test_namespace_cleanup_retries_only_verified_empty_child_index(
 ):
     scenario, provider = cli_scenario
     resources.namespace.delete.side_effect = [_namespace_delete_error(), None]
+    missing = _resource_missing(NAMESPACE_ID)
+    resources.namespace.show.side_effect = [
+        resources.namespace.show.return_value, resources.namespace.show.return_value, missing,
+    ]
     resources.job.list.return_value = []
     resources.group.list.return_value = []
 
@@ -179,7 +216,7 @@ def test_namespace_cleanup_retries_only_verified_empty_child_index(
     assert resources.namespace.delete.call_count == 2
     resources.job.list.assert_called_once()
     resources.group.list.assert_called_once()
-    assert namespace_cleanup_clock == [10]
+    assert namespace_cleanup_clock == [20]
     provider.cancel.assert_not_called()
     resources.job.delete.assert_not_called()
     resources.group.delete.assert_not_called()
@@ -220,10 +257,10 @@ def test_namespace_cleanup_stale_index_has_bounded_deadline(cli_scenario, resour
     resources.job.list.return_value = []
     resources.group.list.return_value = []
 
-    with pytest.raises(AssertionError, match="CannotDeleteResource despite empty job/group lists"):
+    with pytest.raises(AssertionError, match="namespace child-index rejection after owned child GET HTTP 404"):
         runs._delete_test_namespace(scenario, "namespace", "rg")
     assert namespace_cleanup_clock == [120]
-    assert resources.namespace.delete.call_count == 13
+    assert resources.namespace.delete.call_count == 12
 
 
 def test_namespace_cleanup_child_lookup_error_is_not_ignored(cli_scenario, resources):

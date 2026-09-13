@@ -7,6 +7,7 @@
 import pytest
 
 from azext_iot.tests.adr import _helpers as helpers
+from azext_iot.tests.adr import _readiness as readiness
 from azext_iot.tests.adr import test_adr_certificate_authority_int as ca
 from azext_iot.tests.adr import test_adr_link_int as links
 from azext_iot.tests.adr import test_adr_update_instance_int as instances
@@ -28,9 +29,17 @@ def test_cold_su_scenarios_include_existing_readiness_and_cleanup_budgets(scenar
 
 @pytest.mark.parametrize("scenario", [
     instances.TestADRUpdateInstanceValidation.test_update_instance_validation_negatives,
-    links.TestADRLinkLifecycle.test_adr_link_lifecycle,
     links.TestADRLinkBundledAdd.test_adr_link_bundled_add,
     ca.TestADRCertificateAuthorityLifecycle.test_adr_certificate_authority_lifecycle,
 ])
 def test_ordinary_adr_scenarios_keep_the_default_timeout(scenario):
     assert not any(mark.name == "timeout" for mark in getattr(scenario, "pytestmark", []))
+
+
+def test_owned_hub_link_lifecycle_includes_bounded_recovery_and_cleanup():
+    assert readiness.HUB_LINK_READINESS_TIMEOUT == 240
+    scenario = links.TestADRLinkLifecycle.test_adr_link_lifecycle
+    markers = [mark for mark in getattr(scenario, "pytestmark", []) if mark.name == "timeout"]
+    assert len(markers) == 1
+    assert markers[0].args == (900 + 2 * readiness.HUB_LINK_READINESS_TIMEOUT,)
+    assert markers[0].kwargs == {"func_only": False}
