@@ -1421,7 +1421,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         ).get_output_in_json()
         assert purge_result["deviceId"] == device_ids[0]
         assert purge_result["totalMessagesPurged"] == num_messages
-        assert not purge_result["moduleId"]
+        assert not purge_result.get("moduleId")
 
         # Errors with multiple ack arguments
         self.cmd(

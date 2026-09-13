@@ -53,7 +53,8 @@ SCHEMAS = {
         statusUpdateTime="date", lastActivityTime="date",
     ),
     "Configuration": _fields(
-        "id schemaVersion labels targetCondition priority etag",
+        "id schemaVersion labels targetCondition etag",
+        priority="int",
         content=_CONTENT, metrics=_METRICS, systemMetrics=_METRICS,
         createdTimeUtc="date", lastUpdatedTimeUtc="date",
     ),
@@ -85,6 +86,9 @@ SCHEMAS["ExportImportDevice"] = _fields(
 
 
 def _project(value, schema):
+    if schema == "int":
+        # CLI priorities can be strings; retain the legacy modeled integer serialization.
+        return Serializer().serialize_data(value, "int")
     if schema == "date":
         return Serializer().serialize_data(Deserializer.deserialize_iso(value), "iso-8601")
     if schema is None:
