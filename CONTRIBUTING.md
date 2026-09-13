@@ -194,6 +194,10 @@ requires local authentication to be disabled.
 
 `HubSAS-int` runs six existing HTTP, messaging, monitoring and file-upload cases
 serially against a separate, generated S1 Hub with `disableLocalAuth=false`.
+This opt-in phase supports Linux and macOS only, with POSIX interval timers on
+the main thread. Unsupported platforms or missing timer capabilities are rejected
+before credentials, network calls or ownership receipt creation; ordinary CLI
+commands and regular integration suites retain their existing platform support.
 The exact node list and upload-first order are checked before unittest
 constructors can provision resources. Resource pins, parallel workers,
 selection filters, scenario reruns and uncaptured output are rejected.

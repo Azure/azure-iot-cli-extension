@@ -40,6 +40,7 @@ STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 
 def pytest_configure(config):
     if _sas_phase.enabled():
+        _sas_phase.require_posix_timers()
         _sas_phase.validate_selection(config)
         runtime = _sas_phase.HubSasPhase(config, ENTITY_NAME, DYNAMIC_STORAGE, ENTITY_RG, HUB_TEST_LOCATION)
         _sas_phase.ACTIVE = runtime

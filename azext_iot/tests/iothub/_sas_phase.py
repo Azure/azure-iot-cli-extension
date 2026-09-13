@@ -12,6 +12,7 @@ import os
 import re
 import threading
 import signal
+import sys
 import traceback
 from contextlib import contextmanager
 from pathlib import Path
@@ -47,6 +48,10 @@ ACTIVE = None
 
 class HubSasError(RuntimeError):
     """A phase prerequisite or owned operation failed."""
+
+
+class HubSasCleanupTimeout(BaseException):
+    """Escape SDK/CLI and per-resource error handlers at the hard deadline."""
 
 
 def enabled():
@@ -88,6 +93,40 @@ def validate_selection(config):
         raise pytest.UsageError("HubSAS cannot borrow externally pinned resources.")
     if config.getoption("reruns", default=0):
         raise pytest.UsageError("HubSAS does not permit scenario reruns.")
+
+
+def require_posix_timers():
+    alarm = getattr(signal, "SIGALRM", None)
+    timer = getattr(signal, "ITIMER_REAL", None)
+    get_timer = getattr(signal, "getitimer", None)
+    set_timer = getattr(signal, "setitimer", None)
+    if (
+        sys.platform not in ("linux", "darwin") or alarm is None or timer is None
+        or not callable(get_timer) or not callable(set_timer)
+        or threading.current_thread() is not threading.main_thread()
+    ):
+        raise pytest.UsageError("HubSAS requires Linux or macOS with POSIX interval timers on the main thread.")
+    return alarm, timer, get_timer, set_timer
+
+
+@contextmanager
+def cleanup_timeout(timeout=690):
+    alarm, timer, get_timer, set_timer = require_posix_timers()
+
+    def expired(_signum, _frame):
+        raise HubSasCleanupTimeout("HubSAS final cleanup exceeded its hard deadline.")
+
+    previous_timer = get_timer(timer)
+    previous = signal.signal(alarm, expired)
+    start = monotonic()
+    try:
+        # One shared worker drain plus resource cleanup; never extend an outer deadline.
+        set_timer(timer, min(timeout, previous_timer[0] or timeout))
+        yield
+    finally:
+        signal.signal(alarm, previous)
+        remaining = max(0.0001, previous_timer[0] - (monotonic() - start)) if previous_timer[0] else 0
+        set_timer(timer, remaining, previous_timer[1])
 
 
 class BackgroundTasks:
@@ -162,6 +201,7 @@ class HubSasPhase:
         self.scoped_contexts = []
         self.cli = None
         self.hub_client = None
+        self.arm_clients = {}
         self.cleanup_deadline = None
         self.cleanup_failures = {}
         self.device_ids = []
@@ -305,6 +345,14 @@ class HubSasPhase:
             )
         return self.hub_client.iot_hub_resource
 
+    def arm_client(self, resource_type):
+        from azure.cli.core.commands.client_factory import get_mgmt_service_client
+        if resource_type not in self.arm_clients:
+            self.arm_clients[resource_type] = get_mgmt_service_client(
+                self.get_cli().az_cli, resource_type, subscription_id=self.subscription,
+            )
+        return self.arm_clients[resource_type]
+
     @contextmanager
     def scoped_cleanup_cli(self):
         from azext_iot.tests import helpers
@@ -330,28 +378,41 @@ class HubSasPhase:
         return result.as_json()
 
     def read(self, kind):
+        from azure.cli.core.profiles import ResourceType
+        # Keep native ARM wire names (including properties/provisioningState)
+        # across both legacy and TypeSpec-generated Storage/Authorization models.
+        options = {"cls": lambda response, _model, _headers: json.loads(response.http_response.text())}
         if kind == "hub":
-            # The CLI show handler first checks name availability and turns
-            # absence into an untyped CLIError. Preserve native ARM GET errors.
-            operations = self.hub_operations()
-            try:
-                return operations.get(resource_group_name=self.group, resource_name=self.hub)
-            except HttpResponseError as error:
-                if error.status_code == 404:
-                    return None
-                raise
-        try:
+            operation = self.hub_operations().get
+            options = {"resource_group_name": self.group, "resource_name": self.hub}
+        elif kind in ("storage", "container"):
+            client = self.arm_client(ResourceType.MGMT_STORAGE)
+            options.update(resource_group_name=self.group, account_name=self.storage)
             if kind == "storage":
-                return self.command(f"storage account show -n {self.storage} -g {self.group}")
-            if kind == "container":
-                return self.command(
-                    f"storage container-rm show -n devices --storage-account {self.storage} -g {self.group}"
-                )
-            return next((role for role in self.command(
-                f'role assignment list --scope "{self.ids["hub"]}" --fill-role-definition-name false'
-            ) if role["id"].casefold() == self.ids["role"].casefold()), None)
-        except (AzCLIError, HttpResponseError, CloudError) as error:
-            if is_not_found(error):
+                operation = client.storage_accounts.get_properties
+            else:
+                operation = client.blob_containers.get
+                options["container_name"] = "devices"
+        elif kind == "role":
+            operation = self.arm_client(ResourceType.MGMT_AUTHORIZATION).role_assignments.get_by_id
+            options["role_assignment_id"] = self.ids["role"]
+        else:
+            raise HubSasError(f"Unknown owned resource kind: {kind}")
+        native_response = None
+
+        def observe_response(response):
+            nonlocal native_response
+            native_response = response.http_response
+
+        options["raw_response_hook"] = observe_response
+        # Factories and eager credential acquisition remain outside this catch.
+        # CLI show wrappers may turn a native 404 into SystemExit, not an ARM error.
+        try:
+            return operation(**options)
+        except HttpResponseError as error:
+            # Lazy token acquisition can also raise HTTP404 during pipeline.run.
+            # Only the response from this resource GET proves absence.
+            if error.status_code == 404 and error.response is not None and error.response is native_response:
                 return None
             raise
 
@@ -365,7 +426,7 @@ class HubSasPhase:
         self.started = True
         if scenario._testMethodName != "test_device_upload_file":  # pylint: disable=protected-access
             raise HubSasError("File-upload setup must create the cohort first.")
-        if any(self.read(kind) is not None for kind in ("hub", "storage", "role")):
+        if any(self.read(kind) is not None for kind in self.ids):
             raise HubSasError("A planned HubSAS ID already exists; refusing adoption or cleanup.")
         self.command(
             f"storage account create -n {self.storage} -g {self.group} --location {self.location} "
@@ -505,29 +566,19 @@ class HubSasPhase:
     def pytest_sessionfinish(self, session):
         if self.config.getoption("collectonly"):
             return
-
-        def expired(_signum, _frame):
-            raise HubSasError("HubSAS final cleanup exceeded its hard deadline.")
-
-        previous = signal.signal(signal.SIGALRM, expired)
-        previous_timer = signal.getitimer(signal.ITIMER_REAL)
-        start = monotonic()
-        # One shared worker drain plus resource cleanup; never extend an outer deadline.
-        signal.setitimer(signal.ITIMER_REAL, min(690, previous_timer[0] or 690))
-        try:
+        with cleanup_timeout():
             try:
                 self.cleanup()
-            except Exception as error:  # Never print an unsanitized command failure from a session hook.
+            except (Exception, HubSasCleanupTimeout) as error:  # Sanitize failures only at the owning session boundary.
                 session.exitstatus = pytest.ExitCode.TESTS_FAILED
                 reporter = self.config.pluginmanager.getplugin("terminalreporter")
                 if reporter:
                     reporter.write_line(
                         "HubSAS cleanup failed: " + sanitize("".join(traceback.format_exception(error))), red=True,
                     )
-        finally:
-            signal.signal(signal.SIGALRM, previous)
-            remaining = max(0.0001, previous_timer[0] - (monotonic() - start)) if previous_timer[0] else 0
-            signal.setitimer(signal.ITIMER_REAL, remaining, previous_timer[1])
+        self.check_results(session)
+
+    def check_results(self, session):
         required = {"PUT " + resource_id.casefold() for resource_id in self.ids.values()}
         if (
             self.bad_report or self.passed != set(NODES) or self.absent != set(self.ids)
