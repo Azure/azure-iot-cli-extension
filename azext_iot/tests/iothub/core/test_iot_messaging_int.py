@@ -1105,22 +1105,17 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             device_include_string
         )
 
-        self.command_execute_assert(
+        query_output = self.command_execute_assert(
             'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 8 -y -p sys anno app'.format(
                 self.entity_name, self.entity_rg, query_string, enqueued_time
             ),
             device_subset_include,
         )
 
-        # Expect failure for excluded devices
+        # Verify exclusion in the same successful capture. A second command
+        # failing for any reason is not proof that device filtering worked.
         device_subset_exclude = device_ids[device_count // 2 :]
-        with pytest.raises(Exception):
-            self.command_execute_assert(
-                'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 8 -y -p sys anno app'.format(
-                    self.entity_name, self.entity_rg, query_string, enqueued_time
-                ),
-                device_subset_exclude,
-            )
+        assert all(device_id not in query_output for device_id in device_subset_exclude)
 
         # Expect failure when message count is negative
         with pytest.raises(Exception):

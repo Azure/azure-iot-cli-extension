@@ -13,6 +13,7 @@ import sys
 import shlex
 import threading
 from contextlib import nullcontext
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -20,7 +21,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 import responses
-from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError
+from azure.cli.core.azclierror import CLIInternalError, ForbiddenError, ResourceNotFoundError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from knack.util import CLIError
@@ -280,7 +281,8 @@ def cleanup_resource(phase, monkeypatch, *, deleting=False):
     monkeypatch.setattr(phase, "read", lambda kind: next(reads) if kind == "storage" else None)
     monkeypatch.setattr(subject, "sleep", lambda _seconds: None)
 
-    def delete(_command):
+    def delete(_command, *, expect_json):
+        assert not expect_json
         phase.sent.add("DELETE " + phase.ids["storage"].casefold())
 
     phase.command.side_effect = delete
@@ -474,6 +476,63 @@ def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
     assert sends[1][sends[1].index("--auth-type") + 1] == "login"
     assert "--login" in sends[2] and "--auth-type" not in sends[2]
     messaging.sleep.assert_called_once_with(30)
+
+
+@pytest.mark.parametrize("leak_excluded", [False, True])
+def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(leak_excluded, mocker):
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+    devices = [f"device-{index}" for index in range(10)]
+    scenario = SimpleNamespace(
+        entity_name="hub", entity_rg="rg", cli_ctx=Mock(), connection_string="unit",
+        addCleanup=Mock(), cmd=Mock(), check=Mock(), start_background=Mock(),
+        generate_device_names=Mock(return_value=devices),
+    )
+    mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    queries = []
+
+    def monitor(command, expected):
+        if "--device-query" in command:
+            queries.append(command)
+            assert expected == devices[:5]
+            return "\n".join(devices if leak_excluded else devices[:5])
+        if "--mc -5" in command:
+            raise CLIError("Message count must be greater than 0.")
+        if "--login" in command:
+            raise RuntimeError("Offline proof stops after query filter")
+        return ""
+
+    scenario.command_execute_assert = monitor
+    if leak_excluded:
+        with pytest.raises(AssertionError):
+            messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+    else:
+        with pytest.raises(RuntimeError, match="Offline proof stops"):
+            messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+    assert len(queries) == 1
+
+
+@pytest.mark.parametrize("expect_json", [False, True])
+@pytest.mark.parametrize("error", [ForbiddenError("Denied"), None])
+def test_phase_command_preserves_failure_even_without_json(phase, mocker, expect_json, error):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    embedded = EmbeddedCLI()
+    embedded.error_code = 1
+    embedded.az_cli = SimpleNamespace(result=SimpleNamespace(error=error))
+    invoke = mocker.patch.object(embedded, "invoke", return_value=embedded)
+    mocker.patch.object(phase, "get_cli", return_value=embedded)
+    with pytest.raises(type(error) if error else subject.HubSasError):
+        subject.HubSasPhase.command(phase, "owned-delete", expect_json=expect_json)
+    invoke.assert_called_once_with("owned-delete", subscription=phase.subscription, capture_stderr=True)
+
+
+def test_phase_command_still_requires_json_unless_explicitly_void(phase, mocker):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    embedded = EmbeddedCLI()
+    mocker.patch.object(embedded, "invoke", return_value=embedded)
+    mocker.patch.object(phase, "get_cli", return_value=embedded)
+    with pytest.raises(CLIInternalError, match="Issue parsing"):
+        subject.HubSasPhase.command(phase, "required-json")
+    assert subject.HubSasPhase.command(phase, "owned-delete", expect_json=False) is None
 
 
 @pytest.mark.parametrize("passed,bad", [(subject.NODES[:-1], False), (subject.NODES, True), (subject.NODES, False)])
@@ -930,19 +989,38 @@ def test_native_preflight_reaches_one_recorded_write_after_all_fresh404s(phase, 
     assert phase.command.call_count == 1
 
 
-def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(phase, native_resources, monkeypatch):
+@pytest.mark.parametrize("delete_status", [200, 204])
+def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(
+    phase, native_resources, monkeypatch, delete_status,
+):
+    from azure.cli.command_modules.role import custom as role_commands
+    from azext_iot.common.embedded_cli import EmbeddedCLI
     storage, authorization = native_resources
     phase.sent = {"PUT " + resource_id.casefold() for resource_id in phase.ids.values()}
     phase.install()
-    monkeypatch.setattr(subject, "sleep", Mock())
+    clock = [0]
+    monkeypatch.setattr(subject, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(subject, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(role_commands, "_auth_client_factory", Mock(return_value=authorization))
 
-    def delete(command):
-        if command.startswith("role assignment delete --ids"):
-            return authorization.role_assignments.delete_by_id(phase.ids["role"])
-        assert command.startswith("storage account delete")
-        return storage.storage_accounts.delete(resource_group_name=phase.group, account_name=phase.storage)
+    def delete(args, out_file):
+        assert args[args.index("--subscription") + 1] == phase.subscription
+        assert out_file.getvalue() == ""
+        if args[:3] == ["role", "assignment", "delete"]:
+            assert role_commands.delete_role_assignments(
+                SimpleNamespace(cli_ctx=embedded.az_cli), ids=[phase.ids["role"]],
+            ) is None
+        else:
+            assert args[:3] == ["storage", "account", "delete"]
+            storage.storage_accounts.delete(resource_group_name=phase.group, account_name=phase.storage)
+        embedded.az_cli.result = SimpleNamespace(error=None)
+        return 0  # Successful CLI DELETEs have no JSON output, even for HTTP200.
 
-    phase.command.side_effect = delete
+    embedded = EmbeddedCLI()
+    embedded.az_cli = phase.cli.az_cli
+    monkeypatch.setattr(embedded.az_cli, "invoke", Mock(side_effect=delete))
+    phase.cli = embedded
+    monkeypatch.setattr(phase, "command", partial(subject.HubSasPhase.command, phase))
     with responses.RequestsMock() as wire:
         for kind, resource_id in phase.ids.items():
             root = "https://centraluseuap.management.azure.com" if kind == "hub" else "https://management.azure.com"
@@ -950,13 +1028,23 @@ def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(phase, na
             wire.add("GET", root + resource_id, json=resource, status=200)
             wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
             if kind != "container":
-                wire.add("DELETE", root + resource_id, status=204)
+                if kind == "role" and delete_status == 200:
+                    # Authorization returns a model on HTTP200; the CLI delete
+                    # handler discards it and still produces no output.
+                    wire.add("DELETE", root + resource_id, json=resource, status=200)
+                else:
+                    wire.add("DELETE", root + resource_id, status=204 if kind == "hub" else delete_status)
         phase.cleanup(timeout=30)
         assert [call.request.method for call in wire.calls] == [
             "GET", "DELETE", "GET", "DELETE", "GET", "DELETE", "GET", "GET", "GET", "GET", "GET",
         ]
+        phase.cleanup(timeout=30)
+        assert [call.request.method for call in wire.calls[-4:]] == ["GET"] * 4
+        assert sum(call.request.method == "DELETE" for call in wire.calls) == 3
     assert phase.absent == set(phase.ids)
-    assert phase.command.call_count == 2
+    for kind in ("role", "storage"):
+        assert phase.statuses["DELETE " + phase.ids[kind].casefold()] == delete_status
+    assert embedded.az_cli.invoke.call_count == 2
     assert phase.cleanup_failures == {}
 
 
@@ -1017,7 +1105,8 @@ def test_uncertain_hub_does_not_starve_known_storage_cleanup(phase, monkeypatch,
         events.append(("read", kind, clock[0]))
         return storage if kind == "storage" and not deleted[0] else None
 
-    def delete(command):
+    def delete(command, *, expect_json):
+        assert not expect_json
         assert command.startswith("storage account delete")
         events.append(("delete", "storage", clock[0]))
         phase.sent.add("DELETE " + phase.ids["storage"].casefold())
@@ -1193,7 +1282,8 @@ def test_cleanup_error_does_not_stop_other_owned_deletions(phase, monkeypatch):
             return {"id": phase.ids["storage"], "tags": {"runUid": subject.UID}, "properties": {}}
         return None
 
-    def delete(command):
+    def delete(command, *, expect_json):
+        assert not expect_json
         assert command.startswith("storage account delete")
         phase.sent.add("DELETE " + phase.ids["storage"].casefold())
         storage_deleted[0] = True
