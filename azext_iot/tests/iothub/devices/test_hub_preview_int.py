@@ -72,6 +72,14 @@ class TestHubPreview(IoTLiveScenarioTest):
             actual = _fingerprint(swapped["authentication"]["symmetricKey"]["secondaryKey"])
             assert expected == actual
             assert swapped["attributes"] == attributes and swapped["parentScopes"] == parented["parentScopes"]
+            # Isolate module CRUD from the disabled-status roundtrip, without undoing
+            # the key swap or hiding a service authorization failure.
+            enabled = command(f"iot hub device-identity update -d {device} --status enabled").get_output_in_json()
+            assert enabled["status"] == "enabled"
+            auth_enabled = _fingerprint(enabled["authentication"])
+            auth_swapped = _fingerprint(swapped["authentication"])
+            assert auth_enabled == auth_swapped
+            assert enabled["attributes"] == attributes and enabled["parentScopes"] == parented["parentScopes"]
             module_before = command(f"iot hub module-identity create -d {device} -m {module}").get_output_in_json()
             auth_before = _fingerprint(module_before["authentication"])
             module_after = command(

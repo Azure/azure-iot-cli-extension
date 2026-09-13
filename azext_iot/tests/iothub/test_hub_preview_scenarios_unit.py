@@ -63,7 +63,8 @@ def _scenario(mocker):
     return scenario, calls
 
 
-def test_identity_scenario_executes_each_required_authentication(preview, mocker):
+@pytest.mark.parametrize("reenable_damage", [None, "status", "authentication", "attributes", "parentScopes"])
+def test_identity_scenario_executes_each_required_authentication(preview, mocker, reenable_damage):
     module, expected = preview
     scenario, calls = _scenario(mocker)
     scenario.generate_device_names.return_value = ["parent", "device"]
@@ -74,22 +75,29 @@ def test_identity_scenario_executes_each_required_authentication(preview, mocker
         args = _arguments(text)
         identifier = args[args.index("-d") + 1]
         if args[2] == "module-identity":
+            if args[3] == "create":
+                assert identities[identifier]["status"] == "enabled", "Module CRUD must not inherit the disabled-device phase."
             identifier = "module"
         action = args[3]
         if action == "create":
             identities[identifier] = {
                 "authentication": deepcopy(authentication), "attributes": {},
-                "deviceScope": identifier + "-scope", "parentScopes": [],
+                "deviceScope": identifier + "-scope", "parentScopes": [], "status": "enabled",
             }
         elif action == "update":
             if any(flag in text for flag in (
                 "--set adrDeviceProperties", "--remove adrDeviceProperties", "--add adrDeviceProperties",
             )):
                 raise InvalidArgumentValueError("Service-owned property")
-            attributes = next(arg.removeprefix("attributes=") for arg in args if arg.startswith("attributes="))
-            identities[identifier].update({
-                "attributes": json.loads(attributes), "status": "disabled", "statusReason": "preview",
-            })
+            attributes = next((arg.removeprefix("attributes=") for arg in args if arg.startswith("attributes=")), None)
+            if attributes is not None:
+                identities[identifier]["attributes"] = json.loads(attributes)
+            if "--status" in args:
+                identities[identifier]["status"] = args[args.index("--status") + 1]
+                if identities[identifier]["status"] == "enabled" and reenable_damage:
+                    identities[identifier][reenable_damage] = "unexpected change"
+            if "--status-reason" in args:
+                identities[identifier]["statusReason"] = args[args.index("--status-reason") + 1]
         elif action == "parent":
             identities[identifier]["parentScopes"] = [identities["parent"]["deviceScope"]]
         elif action == "renew-key":
@@ -100,6 +108,11 @@ def test_identity_scenario_executes_each_required_authentication(preview, mocker
         return _result(identities[identifier])
 
     scenario.cmd.side_effect = command
+    if reenable_damage:
+        with pytest.raises(AssertionError):
+            module.TestHubPreview.test_identity_roundtrip(scenario)
+        assert not any("module-identity create" in text for _, text in calls)
+        return
     module.TestHubPreview.test_identity_roundtrip(scenario)
 
     assert tuple(dict.fromkeys(phase for phase, _ in calls)) == expected
@@ -108,6 +121,10 @@ def test_identity_scenario_executes_each_required_authentication(preview, mocker
         assert any("device-identity renew-key" in text for text in commands)
         assert any("device-identity parent set" in text for text in commands)
         assert any("module-identity update" in text for text in commands)
+        enabled_index = next(index for index, text in enumerate(commands) if "--status enabled" in text)
+        module_index = next(index for index, text in enumerate(commands) if "module-identity create" in text)
+        swap_index = next(index for index, text in enumerate(commands) if "device-identity renew-key" in text)
+        assert swap_index < enabled_index < module_index
 
 
 def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
