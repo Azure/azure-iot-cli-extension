@@ -11,7 +11,10 @@ registration, parameter registration and help registration code across all
 service command groups (command_map.py, params.py, _help.py).
 """
 
+from pathlib import Path
+
 import pytest
+import yaml
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands.events import EVENT_INVOKER_PRE_LOAD_ARGUMENTS
 from azure.cli.core.mock import DummyCli
@@ -55,6 +58,11 @@ _LINK_PARSER_CASES = {
     ],
     "iot adr ns link wait": _NAMESPACE_ARGUMENTS,
 }
+_PNP_PARSER_CASES = {
+    "iot hub digital-twin show": [],
+    "iot hub digital-twin update": ["--patch", "[]"],
+    "iot hub digital-twin invoke-command": ["--cn", "noop"],
+}
 for _kind, _resource_option, _resource_id in (
     ("hub", "--hub-resource-id", _HUB_ID),
     ("dps", "--dps-resource-id", _DPS_ID),
@@ -97,7 +105,7 @@ def management_command_parser():
     loader = cli_ctx.commands_loader
     loader.skip_applicability = True
     loader.load_command_table(None)
-    names = [*_LINK_PARSER_CASES, "iot hub create", "iot dps create"]
+    names = [*_LINK_PARSER_CASES, *_PNP_PARSER_CASES, "iot hub create", "iot dps create"]
     loader.command_table = {
         name: loader.command_table[name]
         for name in names
@@ -116,6 +124,31 @@ def management_command_parser():
     parser = AzCliCommandParser(cli_ctx=cli_ctx)
     parser.load_command_table(loader)
     return parser
+
+
+@pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)
+@pytest.mark.parametrize("auth_type", ["key", "login"])
+def test_pnp_standard_authentication_options(management_command_parser, command_name, auth_type):
+    parsed = management_command_parser.parse_args([
+        *command_name.split(), "-n", "hub", "-d", "device",
+        "--auth-type", auth_type, *_PNP_PARSER_CASES[command_name],
+    ])
+    assert parsed.auth_type_dataplane == auth_type
+
+
+def test_pnp_update_authentication_default_has_only_the_standard_linter_exception(management_command_parser):
+    parsed = management_command_parser.parse_args([
+        "iot", "hub", "digital-twin", "update", "-n", "hub", "-d", "device", "--patch", "[]",
+    ])
+    assert parsed.auth_type_dataplane == "key"
+    exclusions = yaml.safe_load(
+        (Path(__file__).parents[2] / "linter_exclusions.yml").read_text(encoding="utf-8")
+    )
+    assert exclusions["iot hub digital-twin update"] == exclusions["iot hub device-twin update"] == {
+        "parameters": {
+            "auth_type_dataplane": {"rule_exclusions": ["no_parameter_defaults_for_update_commands"]},
+        },
+    }
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
