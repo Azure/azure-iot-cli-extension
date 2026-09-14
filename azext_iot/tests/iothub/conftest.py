@@ -15,12 +15,18 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker
+from azext_iot.tests.helpers import (
+    assign_role_assignment,
+    clean_up_iothub_device_config,
+    get_closest_marker,
+    wait_for_iothub_query_ready,
+)
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, settings as iothub_settings
+import azext_iot.tests.iothub as iothub_test
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
+HUB_PROVISION_ATTEMPTS = 3
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
@@ -67,18 +73,20 @@ def _cleanup_dynamic_hub():
     the same hub on the same worker).
     """
     yield
-    if not iothub_settings.env.azext_iot_testhub:
-        logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
+    if not iothub_test.settings.env.azext_iot_testhub:
+        logger.info("Deleting dynamically created hub: %s", iothub_test.DYNAMIC_HUB.name)
         from time import sleep
         for attempt in range(3):
-            delete_result = cli.invoke(f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}")
+            delete_result = cli.invoke(
+                f"iot hub delete --name {iothub_test.DYNAMIC_HUB.name} --resource-group {iothub_test.ENTITY_RG}"
+            )
             if delete_result.success():
                 break
             if attempt < 2:
                 logger.warning("Hub deletion attempt %s failed, retrying...", attempt + 1)
                 sleep(30)
         else:
-            logger.error("Failed to delete hub %s after 3 attempts.", ENTITY_NAME)
+            logger.error("Failed to delete hub %s after 3 attempts.", iothub_test.DYNAMIC_HUB.name)
 
 
 @pytest.fixture()
@@ -258,7 +266,10 @@ def provisioned_iot_hubs_with_storage_user_module(
     request, provisioned_user_identity_module, provisioned_storage_module
 ) -> dict:
     result = _iot_hubs_provisioner(
-        request, provisioned_user_identity_module, provisioned_storage_module
+        request,
+        provisioned_user_identity_module,
+        provisioned_storage_module,
+        query_ready=True,
     )
     yield result
     if result:
@@ -281,7 +292,12 @@ def provisioned_only_iot_hubs_module(request) -> dict:
         _iot_hubs_removal(result)
 
 
-def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
+def _iot_hubs_provisioner(
+    request,
+    provisioned_user_identity=None,
+    provisioned_storage=None,
+    query_ready=False,
+):
     hub_marker = get_closest_marker(request)
     desired_location = None
     desired_tags = None
@@ -300,27 +316,43 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
 
     hub_results = []
     for _ in range(desired_count):
-        name = generate_hub_id()
-        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
-        if desired_sys_identity:
-            base_create_command += " --mi-system-assigned"
-        if desired_user_identity and provisioned_user_identity:
-            user_identity_id = provisioned_user_identity["id"]
-            base_create_command += f" --mi-user-assigned {user_identity_id}"
-        if desired_tags:
-            base_create_command += f" --tags {desired_tags}"
-        if desired_location:
-            base_create_command += f" -l {desired_location}"
-        if desired_storage and provisioned_storage:
-            storage_cstring = provisioned_storage["connectionString"]
-            base_create_command += f" --fcs {storage_cstring} --fc fileupload"
+        attempts = HUB_PROVISION_ATTEMPTS if query_ready else 1
+        for attempt in range(attempts):
+            name = generate_hub_id()
+            base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+            if desired_sys_identity:
+                base_create_command += " --mi-system-assigned"
+            if desired_user_identity and provisioned_user_identity:
+                user_identity_id = provisioned_user_identity["id"]
+                base_create_command += f" --mi-user-assigned {user_identity_id}"
+            if desired_tags:
+                base_create_command += f" --tags {desired_tags}"
+            if desired_location:
+                base_create_command += f" -l {desired_location}"
+            if desired_storage and provisioned_storage:
+                storage_cstring = provisioned_storage["connectionString"]
+                base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        hub_obj = cli.invoke(base_create_command).as_json()
+            hub_obj = cli.invoke(base_create_command).as_json()
+            connection_string = _get_hub_connection_string(name, RG)
+            if not query_ready:
+                break
+            try:
+                wait_for_iothub_query_ready(name, RG)
+                break
+            except AssertionError:
+                logger.warning("Replacing IoT Hub %s because its query index did not become ready.", name)
+                delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
+                if not delete_result.success():
+                    raise RuntimeError(f"Failed to delete query-unready IoT Hub {name}.")
+                if attempt == attempts - 1:
+                    raise
+
         hub_results.append({
             "hub": hub_obj,
             "name": name,
             "rg": RG,
-            "connectionString": _get_hub_connection_string(name, RG),
+            "connectionString": connection_string,
             "storage": provisioned_storage
         })
     return hub_results

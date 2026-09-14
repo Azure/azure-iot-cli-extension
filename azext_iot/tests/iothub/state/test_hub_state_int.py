@@ -16,6 +16,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role, generate_hub_id
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import clean_up_iothub_device_config, wait_for_assertion
 from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.iothub import (
@@ -47,6 +48,7 @@ def generate_device_names(count, edge=False):
 
 
 def _setup_hub_dataplane_state(cstring):
+    expected_device_ids = []
     # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
     labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
     labels = json.dumps(labels)
@@ -90,6 +92,7 @@ def _setup_hub_dataplane_state(cstring):
     for device_type in DEVICE_TYPES:
         device_count = 3
         device_ids = generate_device_names(device_count, edge=device_type == "edge")
+        expected_device_ids.extend(device_ids)
         module_id = generate_device_names(1)[0]
         edge_enabled = "--edge-enabled" if device_type == "edge" else ""
 
@@ -174,19 +177,39 @@ def _setup_hub_dataplane_state(cstring):
                 f" --tags '{patch_tags}'"
             )
 
+    return expected_device_ids
+
+
+def _wait_for_device_query(cstring, expected_device_ids):
+    def check():
+        devices = cli.invoke(f"iot hub device-identity list -l {cstring}").as_json()
+        assert {device["deviceId"] for device in devices} == set(expected_device_ids)
+        assert all("authenticationType" in device and "x509Thumbprint" in device for device in devices)
+        assert all(device.get("tags") and device.get("properties", {}).get("desired", {}).get("testProp") for device in devices)
+        assert sum(bool(device.get("parentScopes")) for device in devices) == 2
+
+    wait_for_assertion(check)
+
 
 @pytest.fixture()
 def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module):
     """Fixture to setup hubs with dataplane aspects."""
+    hubs = [hub for hub in provisioned_iot_hubs_with_storage_user_module if hub.get("hub")]
     filename = generate_generic_id() + ".json"
-    provisioned_iot_hubs_with_storage_user_module[0]["filename"] = filename
-    assign_iot_hub_dataplane_rbac_role(provisioned_iot_hubs_with_storage_user_module)
-    _setup_hub_dataplane_state(provisioned_iot_hubs_with_storage_user_module[0]["connectionString"])
-    # let dataplane state in hub catch up
-    time.sleep(5)
-    yield provisioned_iot_hubs_with_storage_user_module
-    if os.path.isfile(filename):
-        os.remove(filename)
+    origin_hub = hubs[0]
+    origin_hub["filename"] = filename
+    assign_iot_hub_dataplane_rbac_role(hubs)
+    try:
+        for hub in hubs:
+            clean_up_iothub_device_config(hub["name"], hub["rg"])
+        expected_device_ids = _setup_hub_dataplane_state(origin_hub["connectionString"])
+        _wait_for_device_query(origin_hub["connectionString"], expected_device_ids)
+        yield hubs
+    finally:
+        if os.path.isfile(filename):
+            os.remove(filename)
+        for hub in hubs:
+            clean_up_iothub_device_config(hub["name"], hub["rg"])
 
 
 @pytest.fixture()
@@ -224,33 +247,6 @@ def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
     os.remove(arm_file)
 
 
-def clean_up_hub_dataplane(cstring):
-    dest_hub_configs = cli.invoke(
-        f"iot hub configuration list -l {cstring}"
-    ).as_json()
-
-    dest_hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {cstring}"
-    ).as_json()
-
-    for config in dest_hub_configs + dest_hub_deploys:
-        cli.invoke(
-            "iot hub configuration delete -c {} -l {}".format(config["id"], cstring)
-        )
-
-    dest_hub_identities = cli.invoke(
-        f"iot hub device-identity list -l {cstring}"
-    ).as_json()
-
-    for device in dest_hub_identities:
-        cli.invoke(
-            "iot hub device-identity delete -d {} -l {}".format(device["deviceId"], cstring)
-        )
-
-    # gives the api enough time to update
-    time.sleep(1)
-
-
 def delete_system_endpoints(hub_name, rg):
     # delete is a no-op
     cli.invoke(
@@ -285,6 +281,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
     origin_rg = setup_hub_states_dataplane[0]["rg"]
     origin_cstring = setup_hub_states_dataplane[0]["connectionString"]
     dest_name = setup_hub_states_dataplane[1]["name"]
+    dest_rg = setup_hub_states_dataplane[1]["rg"]
     dest_cstring = setup_hub_states_dataplane[1]["connectionString"]
     for auth_phase in DATAPLANE_AUTH_TYPES:
         if auth_phase == "cstring":
@@ -302,9 +299,8 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
                 )
             )
 
-        time.sleep(1)  # gives the hub time to update before the checks
-        compare_hubs_dataplane(origin_cstring, dest_cstring)
-        clean_up_hub_dataplane(dest_cstring)
+        wait_for_assertion(lambda: compare_hubs_dataplane(origin_cstring, dest_cstring))
+        clean_up_iothub_device_config(dest_name, dest_rg)
 
 
 @pytest.mark.hub_infrastructure(
@@ -452,8 +448,7 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
         compare_hub_dataplane_to_file(filename, hub_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        clean_up_hub_dataplane(hub_cstring)
-        time.sleep(5)
+        clean_up_iothub_device_config(hub_name, hub_rg)
         cli.invoke(
             set_cmd_auth_type(
                 f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
@@ -461,8 +456,7 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
                 cstring=hub_cstring
             )
         )
-        time.sleep(10)  # gives the hub time to update before the checks
-        compare_hub_dataplane_to_file(filename, hub_cstring)
+        wait_for_assertion(lambda: compare_hub_dataplane_to_file(filename, hub_cstring))
 
 
 @pytest.mark.hub_infrastructure(count=0)
@@ -520,6 +514,7 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         except AssertionError:
             tries += 1
             time.sleep(1)
+    compare_configs(orig_hub_configs, dest_hub_configs)
 
     # compare edge deployments
     tries = 0
@@ -536,6 +531,7 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         except AssertionError:
             tries += 1
             time.sleep(1)
+    compare_configs(orig_hub_deploys, dest_hub_deploys)
 
     # compare devices
     tries = 0
@@ -635,6 +631,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         except AssertionError:
             tries += 1
             time.sleep(1)
+    compare_configs(file_configs, hub_configs)
 
     # compare edge deployments
     file_deploys = list(hub_info["configurations"]["edgeDeployments"].values())
@@ -649,6 +646,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         except AssertionError:
             tries += 1
             time.sleep(1)
+    compare_configs(file_deploys, hub_deploys)
 
     # compare devices
     file_devices = hub_info["devices"]
