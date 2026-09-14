@@ -783,6 +783,37 @@ class TestHierarchyCreateConfig:
                 config_file="device_configs/nested_edge_config.yml"
             )
 
+    @pytest.mark.parametrize("query_scopes", [
+        [],
+        [{"deviceId": "unrelated", "deviceScope": "wrong-scope"}],
+        [{"deviceId": "device_1", "deviceScope": ""}],
+    ])
+    def test_edge_parent_scopes_do_not_depend_on_query_contents(
+        self, fixture_cmd, service_client, set_cwd, query_scopes,
+    ):
+        def query_response(request):
+            query = json.loads(request.body)["query"]
+            rows = [] if query == "SELECT deviceId FROM devices" else query_scopes
+            return 200, {"Content-Type": "application/json"}, json.dumps(rows)
+
+        service_client.remove(responses.POST, f"https://{hub_entity}/devices/query")
+        service_client.add_callback(
+            responses.POST, f"https://{hub_entity}/devices/query", callback=query_response,
+        )
+        subject.iot_edge_devices_create(
+            cmd=fixture_cmd, devices=None, config_file="device_configs/nested_edge_config.yml", visualize=False,
+        )
+        queries = [
+            json.loads(item.request.body)["query"] for item in service_client.calls
+            if item.request.method == "POST" and "/query" in item.request.url
+        ]
+        assert queries == ["SELECT deviceId FROM devices"]
+        updates = [
+            json.loads(item.request.body) for item in service_client.calls if item.request.method == "PUT"
+        ]
+        parents = [device["parentScopes"] for device in updates if device.get("parentScopes")]
+        assert parents and all(scopes == ["registry-scope"] for scopes in parents)
+
 
 class TestEdgeHierarchyConfigFunctions:
     def create_test_root_cert(self, path):

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
 from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
 
@@ -89,12 +90,14 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             _log_job_device_statistics(tag_job, device_count)
 
             for device_id in device_ids_twin_tags:
-                self.cmd(
-                    self.set_cmd_auth_type(
-                        f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
-                        auth_type=auth_phase,
-                    ),
-                    checks=[self.check("tags", json.loads(self.kwargs["twin_patch_tags"])["tags"])],
+                wait_for_assertion(
+                    lambda device_id=device_id: self.cmd(
+                        self.set_cmd_auth_type(
+                            f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
+                            auth_type=auth_phase,
+                        ),
+                        checks=[self.check("tags", json.loads(self.kwargs["twin_patch_tags"])["tags"])],
+                    )
                 )
 
             # Update twin desired properties

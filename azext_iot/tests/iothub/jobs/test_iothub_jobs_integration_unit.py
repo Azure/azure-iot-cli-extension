@@ -7,12 +7,14 @@
 import json
 import logging
 from functools import partial
+from itertools import count
 
 import pytest
 from azure.core.exceptions import HttpResponseError, ServiceRequestError
 
 from azext_iot.tests.iothub._integration_helpers import wait_for_query_ids
 from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as subject
+from azext_iot.tests import helpers
 
 
 @pytest.mark.parametrize("statistics", [
@@ -124,3 +126,39 @@ def test_unready_or_failed_query_prevents_that_job_submission(job_scenario, coho
     assert not any(f"--job-id {blocked} " in call.args[0] for call in creates)
     assert len(creates) == (0 if cohort == "tags" else 1)
     assert scenario.statistics.call_count == (0 if cohort == "tags" else 1)
+
+
+@pytest.mark.parametrize("outcome", ["lag", "exhaustion", "service"])
+def test_twin_tag_readback_polling_never_replays_a_job(job_scenario, mocker, outcome):
+    scenario = job_scenario
+    observations = []
+    error = HttpResponseError("Read-back failed") if outcome == "service" else AssertionError("Tags still stale")
+
+    def command(command, **_kwargs):
+        if "device-twin show -d tag-one " in command:
+            observations.append(command)
+            if outcome != "lag" or len(observations) == 1:
+                raise error
+        return scenario.cmd.return_value
+
+    scenario.cmd.side_effect = command
+    mocker.patch.object(helpers, "monotonic", side_effect=count())
+    sleep = mocker.patch.object(helpers, "sleep")
+    mocker.patch.object(
+        subject, "wait_for_assertion", side_effect=partial(helpers.wait_for_assertion, timeout=3),
+    )
+    if outcome == "lag":
+        subject.TestIoTHubJobs.test_jobs(scenario)
+        assert len(observations) == 2
+        sleep.assert_called_once()
+    else:
+        with pytest.raises(type(error)) as raised:
+            subject.TestIoTHubJobs.test_jobs(scenario)
+        assert raised.value is error
+        if outcome == "service":
+            sleep.assert_not_called()
+            assert len(observations) == 1
+    creates = [call.args[0] for call in scenario.cmd.call_args_list if "iot hub job create" in call.args[0]]
+    assert sum("--job-id tag-job " in command for command in creates) == 1
+    if outcome != "lag":
+        assert len(creates) == 1
