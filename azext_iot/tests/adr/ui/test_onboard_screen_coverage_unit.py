@@ -227,6 +227,14 @@ def test_apply_confirmation_freezes_commands_and_only_approval_executes_then_rel
     monkeypatch.setattr(rbac, "permissions_at_scope", check)
 
     async def scenario(app, pilot, screen):
+        namespace_applied = asyncio.Event()
+        apply_namespace = screen._apply_namespace
+
+        def on_namespace_applied(namespace, generation=None):
+            apply_namespace(namespace, generation)
+            namespace_applied.set()
+
+        monkeypatch.setattr(screen, "_apply_namespace", on_namespace_applied)
         invoke = Mock(return_value=None)
         live = resource(properties={"outboundIdentity": {"type": "SystemAssigned"}, "provisioning": {"endpoints": {"dps": {}}}})
         provider = SimpleNamespace(show=Mock(return_value=live))
@@ -250,6 +258,8 @@ def test_apply_confirmation_freezes_commands_and_only_approval_executes_then_rel
         invoke.assert_not_called()
         if approve:
             app.screen.query_one("#run", Button).press()
+            # Execution completion starts another worker; wait for its UI callback, not a worker snapshot.
+            await asyncio.wait_for(namespace_applied.wait(), timeout=30)
         else:
             await pilot.press("escape")
         await settle(app, pilot)

@@ -39,6 +39,13 @@ async def settle(app, pilot):
     await pilot.pause()
 
 
+async def settle_layout(screen):
+    """Observe geometry only after queued view and focus changes have been laid out."""
+    refreshed = asyncio.Event()
+    assert screen.call_after_refresh(refreshed.set)
+    await asyncio.wait_for(refreshed.wait(), timeout=30)
+
+
 def drive(coro_fn):
     """Run an async pilot interaction from a synchronous test.
 
@@ -1570,14 +1577,17 @@ def test_auto_advance_keeps_rail_highlight_and_detail_on_the_same_step():
             screen.refresh_view()
             screen._paint_candidates()
             screen.query_one("#candidates", DataTable).focus()
+            await settle_layout(screen)
             work_region = screen.query_one("#work-pane").region
             await pilot.press("enter")
             await pilot.pause()
+            await settle_layout(app.screen)
             identity_region = app.screen.query_one("#identity-dialog").region
             assert identity_region == work_region
             # Selecting a resource asks for its caller identity; SAMI is the default.
             await pilot.press("enter")
             await pilot.pause()
+            await settle_layout(screen)
             active = screen.active_step()
             rail = screen.query_one("#step-list")
             heading = screen.query_one("#step-heading").render()
