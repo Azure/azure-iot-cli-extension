@@ -65,15 +65,16 @@ def test_invalid_file_precedes_every_destination_mutation(restore, tmp_path, con
 
 @pytest.mark.parametrize("failure", ["missing", "encoding", "permission", "directory"])
 def test_unreadable_file_precedes_every_destination_mutation(restore, tmp_path, mocker, failure):
-    path = tmp_path / "state.json"
+    path = tmp_path / "state [0].json"
     if failure == "encoding":
         path.write_bytes(b"\xff")
     elif failure == "permission":
         mocker.patch("builtins.open", side_effect=PermissionError("denied"))
     elif failure == "directory":
         path.mkdir()
-    with pytest.raises(FileOperationError, match=str(path)):
+    with pytest.raises(FileOperationError) as error:
         restore.upload_state(str(path), replace=True, hub_aspects=["devices"])
+    assert str(path) in str(error.value)
     restore.delete_aspects.assert_not_called()
     restore.upload_hub_from_dict.assert_not_called()
 
