@@ -35,13 +35,26 @@ def test_service_scenarios_use_login_without_removing_auth_helper_coverage():
     assert helpers.set_cmd_auth_type("command", "cstring", "cs") == "command --login cs"
 
 
-def test_hub_cleanup_uses_login(mocker):
+@pytest.fixture
+def cleanup_registry(mocker):
+    provider = mocker.patch("azext_iot.iothub.providers.device_identity.DeviceIdentityProvider")
+    provider.return_value.service_sdk.devices.get_devices.side_effect = [[{"deviceId": "device"}], []]
+    return provider
+
+
+def test_hub_cleanup_uses_login(mocker, cleanup_registry):
     invoke = mocker.patch.object(helpers.cli, "invoke")
     invoke.return_value.success.return_value = True
     invoke.return_value.as_json.side_effect = [
-        [{"deviceId": "device"}], [{"id": "deployment"}], [{"id": "configuration"}],
+        [{"id": "deployment"}], [{"id": "configuration"}], [], [],
     ]
     helpers.clean_up_iothub_device_config("hub", "rg")
+    options = cleanup_registry.call_args.kwargs
+    assert options["cmd"].cli_ctx is helpers.cli.az_cli
+    assert options["auth_type_dataplane"] == "login"
+    devices = cleanup_registry.return_value.service_sdk.devices
+    devices.delete_identity.assert_called_once_with(id="device", if_match="*")
+    assert devices.get_devices.call_count == 2
     assert invoke.call_count == 6
     for call in invoke.call_args_list:
         assert call.args[0].endswith("--auth-type login")
@@ -49,7 +62,7 @@ def test_hub_cleanup_uses_login(mocker):
 
 @pytest.mark.parametrize("status", [404, 403, 409, 500])
 @pytest.mark.parametrize("error_type", ["legacy", "modern"])
-def test_hub_cleanup_does_not_retry_missing_targets_or_hide_other_errors(mocker, status, error_type):
+def test_hub_registry_cleanup_does_not_replay_deletes_or_hide_errors(mocker, cleanup_registry, status, error_type):
     from azure.core.exceptions import HttpResponseError
     from msrestazure.azure_exceptions import CloudError
 
@@ -59,28 +72,33 @@ def test_hub_cleanup_does_not_retry_missing_targets_or_hide_other_errors(mocker,
     error = CloudError(response, error="cleanup failure") if error_type == "legacy" else HttpResponseError(response=response)
     listed = mocker.Mock()
     listed.success.return_value = True
-    listed.as_json.side_effect = [[{"deviceId": "stale-device"}], [], []]
-    invoke = mocker.patch.object(helpers.cli, "invoke", side_effect=[listed, listed, listed, error, error, error])
-    sleep = mocker.patch("time.sleep")
+    listed.as_json.return_value = []
+    invoke = mocker.patch.object(helpers.cli, "invoke", return_value=listed)
+    devices = cleanup_registry.return_value.service_sdk.devices
+    devices.delete_identity.side_effect = error
+    sleep = mocker.patch.object(helpers, "sleep")
     if status == 404:
         helpers.clean_up_iothub_device_config("hub", "rg")
         assert invoke.call_count == 4
-        sleep.assert_not_called()
     else:
         with pytest.raises(type(error)) as caught:
             helpers.clean_up_iothub_device_config("hub", "rg")
         assert caught.value is error
-        assert invoke.call_count == 6
-        assert sleep.call_count == 2
-    assert all(call.kwargs["capture_stderr"] for call in invoke.call_args_list[3:])
+        assert invoke.call_count == 2
+    devices.delete_identity.assert_called_once_with(id="device", if_match="*")
+    assert devices.get_devices.call_count == (2 if status == 404 else 1)
+    sleep.assert_not_called()
+    assert all(" list " in call.args[0] and call.args[0].endswith("--auth-type login") for call in invoke.call_args_list)
 
 
 @pytest.mark.parametrize("error_type", ["missing", "cli", "transport"])
 @pytest.mark.parametrize("returned_error", [False, True])
-def test_hub_cleanup_recognizes_translated_absence_and_continues(mocker, error_type, returned_error):
+def test_hub_configuration_cleanup_recognizes_translated_absence_and_continues(
+    mocker, cleanup_registry, error_type, returned_error,
+):
     from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
 
-    message = '{"Message": "ErrorCode:DeviceNotFound;404"}'
+    message = '{"Message": "ErrorCode:ConfigurationNotFound;404"}'
     errors = {
         "missing": ResourceNotFoundError(message),
         "cli": CLIInternalError(message),
@@ -90,7 +108,7 @@ def test_hub_cleanup_recognizes_translated_absence_and_continues(mocker, error_t
     listed = mocker.Mock()
     listed.success.return_value = True
     listed.as_json.side_effect = [
-        [{"deviceId": "already-deleted"}], [{"id": "deployment"}], [{"id": "configuration"}],
+        [{"id": "deployment"}], [{"id": "configuration"}], [], [],
     ]
     deleted = mocker.Mock()
     deleted.success.return_value = True
@@ -101,27 +119,32 @@ def test_hub_cleanup_recognizes_translated_absence_and_continues(mocker, error_t
         failure.get_error.return_value = error
 
     def _invoke(command, **_kwargs):
-        if command.startswith("iot hub device-identity delete"):
+        if command.startswith("iot edge deployment delete"):
             if returned_error:
                 return failure
             raise error
         return deleted if " delete " in command else listed
 
     invoke = mocker.patch.object(helpers.cli, "invoke", side_effect=_invoke)
-    sleep = mocker.patch("time.sleep")
+    sleep = mocker.patch.object(helpers, "sleep")
 
     if error_type == "missing":
         helpers.clean_up_iothub_device_config("hub", "rg")
         sleep.assert_not_called()
-        assert invoke.call_args_list[-2].args[0].startswith("iot edge deployment delete")
-        assert invoke.call_args_list[-1].args[0].startswith("iot hub configuration delete")
+        assert invoke.call_count == 6
+        assert invoke.call_args_list[2].args[0].startswith("iot edge deployment delete")
+        assert invoke.call_args_list[3].args[0].startswith("iot hub configuration delete")
     else:
         with pytest.raises(type(error)) as caught:
             helpers.clean_up_iothub_device_config("hub", "rg")
         assert caught.value is error
         assert sleep.call_count == 2
-    assert invoke.call_count == 6
-    assert all(call.kwargs["capture_stderr"] for call in invoke.call_args_list[3:])
+        assert invoke.call_count == 5
+        assert not any(call.args[0].startswith("iot hub configuration delete") for call in invoke.call_args_list)
+    cleanup_registry.return_value.service_sdk.devices.delete_identity.assert_called_once_with(id="device", if_match="*")
+    deletes = [call for call in invoke.call_args_list if " delete " in call.args[0]]
+    assert all(call.kwargs["capture_stderr"] for call in deletes)
+    assert all(call.args[0].endswith("--auth-type login") for call in invoke.call_args_list)
 
 
 @pytest.mark.parametrize("location", [None, "centraluseuap"])
