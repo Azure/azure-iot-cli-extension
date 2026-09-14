@@ -17,6 +17,7 @@ import os
 import responses
 import re
 from argparse import Namespace
+from copy import deepcopy
 from azext_iot._validators import process_top
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content
@@ -2732,14 +2733,15 @@ class TestDeviceDistributedTracing:
         self, mocker, fixture_ghcs, fixture_sas, request
     ):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
         if request.param[1] == 0:
-            mock_target["location"] = "westus"
+            target["location"] = "westus"
         if request.param[1] == 1:
-            mock_target["sku_tier"] = "Basic"
+            target["sku_tier"] = "Basic"
         if request.param[1] == 2:
-            twin_kvp.setdefault("capabilities", {"iotEdge": True})
+            twin_kvp["capabilities"] = {"iotEdge": True}
         test_side_effect = [
             build_mock_response(
                 mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp)
@@ -2766,10 +2768,11 @@ class TestDeviceDistributedTracing:
     @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
     def sc_distributed_tracing_update(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
-        mock_target["location"] = "westus2"
-        mock_target["sku_tier"] = "Standard"
+        target["location"] = "westus2"
+        target["sku_tier"] = "Standard"
         if request.param[1] == 0:
             twin_kvp.setdefault(
                 "properties",
@@ -2831,14 +2834,15 @@ class TestDeviceDistributedTracing:
         self, mocker, fixture_ghcs, fixture_sas, request
     ):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
         if request.param[1] == 0:
-            mock_target["location"] = "westus"
+            target["location"] = "westus"
         if request.param[1] == 1:
-            mock_target["sku_tier"] = "Basic"
+            target["sku_tier"] = "Basic"
         if request.param[1] == 2:
-            twin_kvp.setdefault("capabilities", {"iotEdge": True})
+            twin_kvp["capabilities"] = {"iotEdge": True}
         test_side_effect = [
             build_mock_response(
                 mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp)

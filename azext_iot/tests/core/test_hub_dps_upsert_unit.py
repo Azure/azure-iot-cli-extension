@@ -10,6 +10,7 @@ from datetime import timedelta
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, CLIInternalError
 from azure.core import MatchConditions
+from azure.core.polling import PollingMethod
 
 from azext_iot.common import arm
 from azext_iot.core import custom
@@ -69,6 +70,63 @@ def test_upsert_preserves_unknowns_and_merges_all_explicit_settings(preview_mgmt
     assert properties["minTlsVersion"] == "1.2"
 
 
+@pytest.mark.parametrize("arguments,path,value", [
+    ({"location": "westus"}, (), None),
+    ({"partition_count": 8}, ("eventHubEndpoints", "events", "partitionCount"), 8),
+    ({"retention_day": 3}, ("eventHubEndpoints", "events", "retentionTimeInDays"), 3),
+    ({"c2d_ttl": 2}, ("cloudToDevice", "defaultTtlAsIso8601"), timedelta(hours=2)),
+    ({"c2d_max_delivery_count": 3}, ("cloudToDevice", "maxDeliveryCount"), 3),
+    ({"feedback_lock_duration": 4}, ("cloudToDevice", "feedback", "lockDurationAsIso8601"), timedelta(seconds=4)),
+    ({"feedback_ttl": 5}, ("cloudToDevice", "feedback", "ttlAsIso8601"), timedelta(hours=5)),
+    ({"feedback_max_delivery_count": 6}, ("cloudToDevice", "feedback", "maxDeliveryCount"), 6),
+    ({"fileupload_notification_lock_duration": 7},
+     ("messagingEndpoints", "fileNotifications", "lockDurationAsIso8601"), timedelta(seconds=7)),
+    ({"fileupload_notification_max_delivery_count": 8},
+     ("messagingEndpoints", "fileNotifications", "maxDeliveryCount"), 8),
+    ({"fileupload_notification_ttl": 9},
+     ("messagingEndpoints", "fileNotifications", "ttlAsIso8601"), timedelta(hours=9)),
+    ({"fileupload_sas_ttl": 10}, ("storageEndpoints", "$default", "sasTtlAsIso8601"), timedelta(hours=10)),
+    ({"fileupload_storage_authentication_type": "keyBased"},
+     ("storageEndpoints", "$default", "authenticationType"), "keyBased"),
+])
+def test_upsert_individual_options_preserve_other_settings(preview_mgmt, arguments, path, value):
+    cmd, client, hub, _, _ = preview_mgmt
+    hub["properties"] = {
+        "eventHubEndpoints": {"events": {"retentionTimeInDays": 1, "partitionCount": 4}},
+        "cloudToDevice": {
+            "maxDeliveryCount": 10, "defaultTtlAsIso8601": timedelta(hours=1),
+            "feedback": {
+                "lockDurationAsIso8601": timedelta(seconds=5),
+                "ttlAsIso8601": timedelta(hours=1), "maxDeliveryCount": 10,
+            },
+        },
+        "messagingEndpoints": {"fileNotifications": {
+            "lockDurationAsIso8601": timedelta(seconds=5),
+            "ttlAsIso8601": timedelta(hours=1), "maxDeliveryCount": 10,
+        }},
+        "storageEndpoints": {"$default": {
+            "connectionString": "existing", "containerName": "uploads",
+            "sasTtlAsIso8601": timedelta(hours=1),
+        }},
+        "future": {"keep": True},
+    }
+    original = deepcopy(hub)
+    expected = deepcopy(hub["properties"])
+    if path:
+        target = expected
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+
+    custom.iot_hub_create(cmd, client, "hub", "rg", **arguments)
+
+    written = client.iot_hub_resource.begin_create_or_update.call_args.kwargs
+    assert written["iot_hub_description"]["properties"] == expected
+    assert written["iot_hub_description"]["location"] == "westus"
+    assert written["etag"] == "hub-etag"
+    assert hub == original
+
+
 def test_upsert_rejects_role_assignment_without_system_identity(preview_mgmt):
     cmd, client, hub, _, _ = preview_mgmt
     hub["identity"] = {"type": "UserAssigned"}
@@ -77,12 +135,13 @@ def test_upsert_rejects_role_assignment_without_system_identity(preview_mgmt):
     client.iot_hub_resource.begin_create_or_update.assert_not_called()
 
 
-def test_create_role_callback_requires_returned_principal(preview_mgmt):
+def test_create_role_callback_requires_returned_principal(preview_mgmt, mocker):
     cmd, client, _, _, _ = preview_mgmt
     poller = custom.iot_hub_create(cmd, client, "hub", "rg", identity_role="Reader", identity_scopes=["/scope"])
-    poller.resource.return_value = {"identity": {}}
+    polling_method = mocker.Mock(spec=PollingMethod)
+    polling_method.resource.return_value = {"identity": {}}
     with pytest.raises(CLIInternalError, match="principalId"):
-        poller.add_done_callback.call_args.args[0](poller)
+        poller.add_done_callback.call_args.args[0](polling_method)
 
 
 @pytest.mark.parametrize("has_system", [False, True])

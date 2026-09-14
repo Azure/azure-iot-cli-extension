@@ -448,8 +448,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         except Exception as x:
             raise CLIInternalError(x)
         finally:
-            if cancellation_token:
-                cancellation_token.set()
+            cancellation_token.set()
 
     def device_upload_file(
         self,
