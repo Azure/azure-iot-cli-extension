@@ -149,17 +149,18 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
-def test_dps_workflow_runs_two_serial_complete_phases_with_existing_redaction_and_gate():
+def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_and_gate():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert '"DPS|azext_iot/tests/dps|DPS-int|90"' in matrix["run"]
+    assert '"DPS|azext_iot/tests/dps|DPS-int|120"' in matrix["run"]
     setup = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in jobs["int-test"]["steps"] if step.get("id") == "run_tests")
     assert ".tox/DPS-phases/bin/python scripts/run_dps_phases.py" in step["run"]
     assert ".tox/DPS-int/bin/python scripts/run_dps_phases.py" not in step["run"]
     assert "certificate coverage is not configured in this workflow" in step["run"]
+    assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "${{ env.TEST_SUBSCRIPTION_ID }}"' in step["run"]
     assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
     assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
@@ -209,7 +210,7 @@ def test_hub_sas_uses_existing_service_result_gate(tmp_path, status):
     assert bool(errors) == (status != "success")
 
 
-def test_hub_sas_tox_uses_exact_six_nodes_without_changing_other_auth_defaults():
+def test_hub_sas_tox_uses_exact_nodes_without_changing_other_auth_defaults():
     from azext_iot.tests.iothub._sas_phase import NODES
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     selected = re.findall(r"HubSAS:\s+(azext_iot/tests/iothub/\S+::\S+::\S+)", content)

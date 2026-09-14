@@ -8,7 +8,7 @@ Release History
 **Hub/DPS child SDK and command consolidation**
 
 * General Hub management now uses ``2026-10-01-preview`` and DPS management uses ``2026-06-01-preview`` on the Central US EUAP ARM endpoint. ADR target and identity-safety reads use the same canary endpoint, native API overrides, target-subscription credentials, and fail-closed resource-ID validation.
-* DPS service and device REST clients use ``2026-11-02-preview``. Hub service REST ``2024-03-31`` and device REST ``2019-10-01`` are unchanged; no unsupported data-plane version bump is made.
+* Modeless DPS service and device REST clients use ``2026-11-02-preview``. Modeless Hub service and device REST clients use ``2026-11-01-preview``.
 * Recovered modeless management CRUD/upsert, conditional Hub writes, read-only projection removal, partial identity merging, Fabric endpoint/routes/state behavior, and service/device hostname discovery. Hub upserts preserve unspecified settings and active ADR-link identities.
 * DPS enrollment retains unknown JSON fields and supports canonical ``--adr-namespace``, ``--adr-ca-name``, and ``--adr-cert-policy-name`` plus ``--namespace-name``, ``--certificate-authority-name``, and ``--certificate-policy-name`` aliases. Legacy credential-policy aliases remain deprecated. Set all three reference options to empty strings to clear an existing reference. Names and incomplete references are validated explicitly.
 * Modeless DPS queries follow continuation headers, reject repeated tokens and malformed pages, honor zero-item limits, and preserve service error codes and conditional ETags. CLI ``--top -1`` remains the unlimited compatibility spelling.
@@ -20,7 +20,7 @@ Release History
 **Inherited ADR SDK and target endpoint alignment**
 
 * Replaced the ADR/CMS and Software Updates control/data clients with three pinned TypeSpec-generated ``1.0.0b1`` clients. These ADR-owned clients are modeless and synchronous-only; their generated ``models`` and ``aio`` packages are intentionally absent.
-* ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint. ADR target lookup and identity-safety reads reuse preview's native modeless Hub/DPS management clients with explicit ``2026-10-01-preview`` (Hub) and ``2026-06-01-preview`` (DPS) contracts. Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
+* ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint. ADR target lookup and identity-safety reads reuse the native modeless Hub/DPS management clients with explicit ``2026-10-01-preview`` (Hub) and ``2026-06-01-preview`` (DPS) contracts. Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
 * The inherited ADR-only base separated general Hub/DPS upgrades; the child consolidation above restores them while retaining this branch's Registry Device commands and refreshed ADR SDK.
 * Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. This supersedes the b9 ``Azure-AsyncOperation`` polling change because that service host is not usable.
 
@@ -146,20 +146,39 @@ Release History
 * Preserved the ``preview`` branch's IoT Hub management ``2026-05-01-preview``, IoT Hub service data ``2024-03-31``, and DPS service data ``2025-07-01-preview`` SDKs.
 * Restricted ``az iot adr ns`` to April-compatible namespace operations, migration, simple messaging configuration, and system-assigned identity management. Unsupported certificate, policy, device, registry-device, group, job, report, linking, and new ADR Software Updates command groups are not exposed.
 * Removed DPS namespace-association options because ``deviceRegistryNamespace`` is not part of the stable DPS contract. DPS linked-hub managed-identity authentication remains supported.
+* Removed the preview Certificate Management Service (CMS) command groups.
+* Raised the minimum supported Azure CLI core version from ``2.70.0`` to ``2.73.0``.
+* Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
 
-**Authentication and diagnostics**
+**IoT Hub Device Provisioning Service (DPS) updates**
 
-* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
-* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
-
-0.32.0b2 (Preview)
-++++++++++++++++++
+* Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
 
 **DPS bug fixes**
 
 * ``az iot dps linked-hub update`` no longer fails with ``(400309) hostName is required when connectionString is not provided`` when switching a pre-existing linked hub to ``SystemAssigned`` or ``UserAssigned`` authentication.
 
 * ``az iot dps linked-hub update --authentication-type KeyBased`` no longer raises ``KeyError: 'hostName'`` when refreshing the key of, or switching back to, one of those same links.
+
+**Authentication and diagnostics**
+
+* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
+* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
+
+0.31.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Minimum supported Azure CLI core version bumped from 2.67.0 to 2.73.0.
+
+* Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
+
+**IoT Hub Device Provisioning Service (DPS) updates**
+
+* Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
+
+* Updated the DPS control plane SDK to API version ``2026-08-31``.
 
 0.32.0b1 (Preview)
 ++++++++++++++++++

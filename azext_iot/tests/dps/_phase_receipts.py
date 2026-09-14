@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Optional, narrow receipts for the serial runner's two DPS fixtures and shared Hub."""
+"""Optional, narrow ownership receipts for each isolated DPS phase."""
 
 import json
 import os
@@ -78,8 +78,9 @@ def before_create(name, resource_group, run_uid, kind):
     if not config:
         return
     _, uid, subscription, expected_group = config
-    expected_uid = uid if _phase.get_phase() == _phase.REGULAR else f"{uid}-service-sas"
-    if run_uid != expected_uid or kind not in ("h", "nh", "hub") or resource_group != expected_group:
+    phase = _phase.get_phase()
+    expected_uid = uid if phase == _phase.REGULAR else f"{uid}-{phase}"
+    if run_uid != expected_uid or kind not in _phase.resource_kinds(phase) or resource_group != expected_group:
         raise RuntimeError("Resource create does not match this phase's run UID/kind/resource group.")
     resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
     write(f"owned-{kind}.json", {

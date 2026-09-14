@@ -91,8 +91,23 @@ def assert_retained_requests(mocked_response):
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "property_args,expected_properties",
+    [
+        ({}, {}),
+        (
+            {"disable_local_auth": True, "enable_data_residency": False},
+            {"disableLocalAuth": True, "enableDataResidency": False},
+        ),
+        (
+            {"disable_local_auth": False, "enable_data_residency": True},
+            {"disableLocalAuth": False, "enableDataResidency": True},
+        ),
+    ],
+)
 def test_create_serializes_retained_resource(
-    fixture_cmd, stable_client, mocked_response, dps_resource, identity_args, expected_identity
+    fixture_cmd, stable_client, mocked_response, dps_resource, identity_args, expected_identity,
+    property_args, expected_properties,
 ):
     mocked_response.add(
         "POST", f"{BASE_URL}/providers/Microsoft.Devices/checkProvisioningServiceNameAvailability",
@@ -101,7 +116,7 @@ def test_create_serializes_retained_resource(
     mocked_response.add("PUT", RESOURCE_URL, json=dps_resource)
 
     result = custom.iot_dps_create(
-        fixture_cmd, stable_client, "test-dps", "test-rg", location="westus2", **identity_args
+        fixture_cmd, stable_client, "test-dps", "test-rg", location="westus2", **identity_args, **property_args
     ).result()
 
     assert result == dps_resource
@@ -109,12 +124,12 @@ def test_create_serializes_retained_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {"disableLocalAuth": True}
+    assert body["properties"] == expected_properties
+    assert "tags" not in body
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body
     assert "deviceRegistryNamespace" not in body["properties"]
-    assert body["properties"]["disableLocalAuth"] is True
     assert_retained_requests(mocked_response)
 
 

@@ -50,6 +50,7 @@ def _json(path, payload):
 def _execution(command, env, log, _runtime, cleanup, _cancelled):
     assert command[1:] == ["-m", "tox", "r", "-e", "DPS-int", "--skip-pkg-install"]
     phase = env["azext_iot_dps_test_phase"]
+    assert env["azext_iot_dps_workers"] == ("0" if phase == "local-auth-toggle" else "7")
     uid = env["azext_iot_dps_run_uid"]
     nodeids = sorted(RUNNER["MANIFEST"]["expected_nodeids"](phase))
     count = len(nodeids)
@@ -57,13 +58,13 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
     metadata = {"phase": phase, "run_uid": uid, "subscription": SUB}
     _json(directory / "started.json", dict(metadata, started=True))
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
-    for kind in ("h", "nh", "hub"):
+    for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
         name = f"owned-{uid[:8]}-{kind}"
         resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         resource_id = PREFIX + resource_type + "/" + name
         _json(directory / f"owned-{kind}.json", dict(
             metadata, kind=kind, name=name, resource_group=GROUP, id=resource_id, create_attempted=True,
-            tags={"intTest": "true", "runUid": uid if phase == "regular" else uid + "-service-sas", "kind": kind},
+            tags={"intTest": "true", "runUid": uid if phase == "regular" else uid + "-" + phase, "kind": kind},
         ))
         _json(directory / f"created-{kind}.json", {"id": resource_id, "create_completed": True})
     suite = ET.Element("testsuite")
@@ -82,6 +83,7 @@ def isolated_environment(monkeypatch):
     for name in (
         "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_testhub", "azext_iot_dps_test_phase", "azext_iot_dps_run_uid",
         "azext_iot_dps_phase_receipts", "azext_iot_dps_junit", "azext_iot_dps_interrupt_timeout",
+        "azext_iot_dps_workers",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -91,15 +93,75 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["capacity"]["count"] == 3  # Neither hardcoded eight nor assumed empty.
-    assert reader.inventories == 4  # Baseline, cleanup, fresh pre-SAS, final cleanup.
-    assert len(reader.gets) == 9  # Exact regular IDs are checked again immediately before phase two.
+    assert reader.inventories == 6  # Baseline, each cleanup, and both pre-phase gates.
+    assert len(reader.gets) == 13  # Three IDs per old phase, rechecked before the next; one toggle DPS.
     assert not GATE(tmp_path)
-    for phase in ("regular", "service-sas"):
+    for phase in RUNNER["MANIFEST"]["PHASE_NAMES"]:
         folder = tmp_path / "dps-phases" / phase
         assert (folder / "output.log").is_file()
         assert "UNSAFE_CAPTURED_CREDENTIAL" not in (folder / "junit.xml").read_text()
     with pytest.raises(FileExistsError):
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
+
+
+@pytest.mark.parametrize("defect", ["cleanup", "reappeared", "unrelated-capacity"])
+def test_toggle_waits_for_immediately_previous_sas_cleanup_and_uses_one_slot(tmp_path, defect):
+    reader = Reader()
+
+    def execute(*args):
+        result = _execution(*args)
+        env = args[1]
+        if env["azext_iot_dps_test_phase"] == "service-sas":
+            directory = Path(env["azext_iot_dps_phase_receipts"])
+            if defect == "cleanup":
+                (directory / "created-h.json").unlink()
+            elif defect == "reappeared":
+                previous = reader.get
+                reads = []
+
+                def get(record):
+                    reads.append(record)
+                    previous(record)
+                    return {"id": record["id"], "state": "Deleting"} if len(reads) > 3 else None
+                reader.get = get
+            else:
+                reader.resources = Reader(9).resources
+        return result
+
+    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    toggle = summary["phases"][2]
+    if defect == "unrelated-capacity":
+        assert status == 0 and not GATE(tmp_path)
+        assert toggle["gate"]["capacity"]["required"] == 1
+        assert toggle["gate"]["capacity"]["count"] == 9
+    else:
+        assert status == 1 and GATE(tmp_path)
+        assert toggle["status"] == "blocked"
+
+
+@pytest.mark.parametrize("defect", ["missing", "skip", "failed", "ownership", "gate"])
+def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    summary_path = tmp_path / "dps-phases.json"
+    summary = json.loads(summary_path.read_text())
+    toggle = summary["phases"][2]
+    folder = tmp_path / "dps-phases/local-auth-toggle"
+    if defect == "missing":
+        summary["phases"].pop()
+    elif defect == "ownership":
+        (folder / "receipts/owned-dla.json").unlink()
+    elif defect == "skip":
+        tree = ET.parse(folder / "junit.xml")
+        ET.SubElement(next(tree.getroot().iter("testcase")), "skipped")
+        tree.write(folder / "junit.xml")
+    elif defect == "failed":
+        toggle["exit_code"] = 1
+    else:
+        toggle["gate"]["capacity"]["ready"] = False
+    _json(summary_path, summary)
+    _json(folder / "result.json", toggle)
+    assert GATE(tmp_path)
 
 
 @pytest.mark.parametrize("defect", [
@@ -167,7 +229,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     phases = summary["phases"]
     if defect in ("exit", "timeout", "interrupt", "missing-junit", "missing-selection",
                   "five-regular", "regular-skips", "wrong-identity"):
-        assert [phase["status"] for phase in phases] == ["failed", "passed"]
+        assert [phase["status"] for phase in phases] == ["failed", "passed", "passed"]
     else:
         assert phases[1]["status"] == "blocked"
         if defect == "reappeared":
@@ -176,6 +238,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
 
 @pytest.mark.parametrize("pin", [
     "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_testhub", "azext_iot_dps_test_phase", "azext_iot_dps_run_uid",
+    "azext_iot_dps_workers",
 ])
 def test_incompatible_pins_fail_before_inventory_or_execution(tmp_path, monkeypatch, mocker, pin):
     monkeypatch.setenv(pin, "supplied-do-not-clear")

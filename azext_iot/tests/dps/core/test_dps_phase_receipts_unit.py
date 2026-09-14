@@ -49,11 +49,14 @@ def test_receipts_are_optional_without_orchestration(monkeypatch):
     assert receipts.before_delete("name")
 
 
-@pytest.mark.parametrize("phase", [_phase.REGULAR, _phase.SERVICE_SAS])
-@pytest.mark.parametrize("kind", ["h", "nh", "hub"])
+@pytest.mark.parametrize("phase,kind", [
+    (phase, kind)
+    for phase in (_phase.REGULAR, _phase.SERVICE_SAS, _phase.LOCAL_AUTH_TOGGLE)
+    for kind in _phase.resource_kinds(phase)
+])
 def test_create_receipt_precedes_mutation_and_refuses_replay(receipt_directory, monkeypatch, phase, kind):
     monkeypatch.setenv(_phase.PHASE_ENV, phase)
-    uid = UID if phase == _phase.REGULAR else UID + "-service-sas"
+    uid = UID if phase == _phase.REGULAR else UID + "-" + phase
     receipts.before_create("owned", "group", uid, kind)
     path = receipt_directory / f"owned-{kind}.json"
     record = json.loads(path.read_text())
