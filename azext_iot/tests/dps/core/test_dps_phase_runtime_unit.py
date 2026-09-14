@@ -27,7 +27,7 @@ from azure.core.pipeline import Pipeline
 from azure.core.pipeline.policies import HTTPPolicy
 from azure.core.pipeline.transport import RequestsTransport
 from azure.core.pipeline.transport import HttpRequest
-from filelock import FileLock
+from filelock import FileLock, Timeout as LockTimeout
 
 from azext_iot import _factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -555,7 +555,8 @@ def test_fixture_role_zero_budget_never_creates_or_sleeps(scope, mocker):
     pause.assert_not_called()
 
 
-def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker):
+@pytest.mark.parametrize("unlink_on_release", [False, True])
+def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker, unlink_on_release):
     from azext_iot.tests import helpers
     from azext_iot.tests.dps import conftest as fixtures
 
@@ -563,11 +564,27 @@ def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker):
     resource = {"name": "owned", "id": owned, "location": fixtures.HUB_TEST_LOCATION}
     lock = scope / "shared.lock"
     state = scope / "shared.json"
+
+    class SharedLock(FileLock):
+        def release(self, *args, **kwargs):
+            super().release(*args, **kwargs)
+            if unlink_on_release and not self.is_locked:
+                lock.unlink(missing_ok=True)
+
+    mocker.patch.object(fixtures, "FileLock", SharedLock)
     mocker.patch.object(fixtures, "_state_paths", return_value=(str(lock), str(state)))
     mocker.patch.object(fixtures, "_get_run_uid", return_value=UID)
     mocker.patch.object(fixtures.settings.env, "azext_iot_testdps_hub", None)
     mocker.patch.object(fixtures, "_assert_local_auth_policy")
-    create_hub = mocker.patch.object(fixtures, "_create_managed_hub", return_value=("owned", resource))
+
+    def create_owned_hub(run_uid, kind):
+        assert run_uid == UID and kind == "hub"
+        with pytest.raises(LockTimeout):
+            with FileLock(str(lock), timeout=0):
+                pass
+        return "owned", resource
+
+    create_hub = mocker.patch.object(fixtures, "_create_managed_hub", side_effect=create_owned_hub)
     mocker.patch.object(fixtures, "_find_hub_by_name", return_value=resource)
     mocker.patch.object(fixtures, "sleep")
     mocker.patch.object(runtime, "sleep")
@@ -585,8 +602,9 @@ def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker):
     create_hub.assert_called_once()
     create_role.assert_called_once()
     assert reads.call_count == 2
-    assert lock.exists()
     assert json.loads(state.read_text())["refcount"] == 3  # Controller plus both callers.
+    with FileLock(str(lock), timeout=0):
+        pass
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Receipt-enabled DPS workers require Linux.")
