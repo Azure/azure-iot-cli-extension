@@ -6,6 +6,7 @@
 
 import json
 import shlex
+import threading
 from contextlib import nullcontext
 from functools import partial
 from types import SimpleNamespace
@@ -499,6 +500,453 @@ def test_device_receiver_uses_device_credentials_and_always_shuts_down(mocker):
     factory.assert_called_once_with("device-connection-string")
     client.connect.assert_called_once_with()
     client.shutdown.assert_called_once_with()
+
+
+@pytest.fixture
+def method_responder_scenario(mocker):
+    from azext_iot.tests.iothub._sas_phase import BackgroundTasks
+
+    factory = mocker.patch("azure.iot.device.IoTHubDeviceClient.create_from_connection_string")
+    client = factory.return_value
+    client.connected = False
+    client.connect.side_effect = lambda: setattr(client, "connected", True)
+    client.shutdown.side_effect = lambda: setattr(client, "connected", False)
+    tasks = BackgroundTasks()
+    scenario = SimpleNamespace(
+        device_host_name="device-host.example",
+        get_device_cstring=Mock(return_value="HostName=device-host.example;DeviceId=device;SharedAccessKey=unit"),
+        start_background=tasks.start,
+        stop_background=tasks.finish,
+    )
+    yield scenario, client, tasks
+    tasks.finish(timeout=2)
+
+
+def test_device_messaging_drains_feedback_simulator_before_method_invocation(mocker, method_responder_scenario):
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+
+    scenario, client, _ = method_responder_scenario
+    scenario.entity_name, scenario.entity_rg, scenario.cli_ctx = "hub", "rg", Mock()
+    scenario.connection_string = "service-connection-string"
+    scenario.kwargs = {}
+    scenario.generate_device_names = Mock(return_value=["device"])
+    scenario.is_empty = Mock()
+    scenario._remove_newlines_spaces = partial(messaging.TestIoTHubMessaging._remove_newlines_spaces, scenario)
+    mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    start, stop = scenario.start_background, scenario.stop_background
+    simulations = []
+    active = []
+    sends = []
+
+    def start_background(**kwargs):
+        if kwargs["method"].__name__ == "iot_simulate_device":
+            simulations.append(kwargs)
+            active.append(kwargs)
+            return None
+        return start(**kwargs)
+
+    def stop_background():
+        active.clear()
+        stop()
+
+    def invoke(command, **kwargs):
+        for key, replacement in scenario.kwargs.items():
+            command = command.replace("{" + key + "}", replacement)
+        args = shlex.split(command)
+        result = {}
+        if kwargs.get("expect_failure"):
+            return SimpleNamespace(get_output_in_json=lambda: result)
+        if args[:4] == ["iot", "device", "c2d-message", "send"]:
+            sends.append(args)
+        elif args[:4] == ["iot", "device", "c2d-message", "receive"]:
+            sent = sends[-1]
+
+            def value(flag, default=None):
+                return sent[sent.index(flag) + 1] if flag in sent else default
+
+            data = value("--data")
+            if "--dfp" in sent:
+                path = value("--dfp")
+                data = (
+                    messaging.NON_DECODABLE_PAYLOAD if path == messaging.messaging_non_unicodable_data_path
+                    else messaging.read_file_content(path)
+                )
+            result = {
+                "data": data, "etag": "etag",
+                "properties": {
+                    "system": {
+                        "content-encoding": value("--ce"), "content-type": value("--ct"),
+                        "iothub-correlationid": value("--cid"), "iothub-messageid": value("--mid"),
+                        "iothub-expiry": value("--expiry"), "iothub-to": "/devices/device/messages/devicebound",
+                        "iothub-ack": value("--ack", "none"),
+                    },
+                    "app": dict(pair.split("=") for pair in value("--props").split(";")),
+                },
+            }
+        elif args[:3] == ["iot", "hub", "invoke-device-method"]:
+            assert not active, "Finite feedback simulator still owns the method responder"
+            assert client.connected, "Method invocation preceded connected responder readiness"
+            assert "--login" in args and "--method-response-timeout" not in args
+            request = SimpleNamespace(
+                request_id="1", name=args[args.index("--method-name") + 1],
+                payload=json.loads(args[args.index("--method-payload") + 1]),
+            )
+            client.on_method_request_received(request)
+            response = client.send_method_response.call_args.args[0]
+            result = {"status": response.status, "payload": response.payload}
+        return SimpleNamespace(get_output_in_json=lambda: result)
+
+    scenario.start_background, scenario.stop_background, scenario.cmd = start_background, stop_background, invoke
+    messaging.TestIoTHubMessaging.test_device_messaging(scenario)
+    assert not active and not client.connected
+    assert [(sim["args"]["protocol_type"], sim["args"]["msg_count"], sim["max_runs"]) for sim in simulations] == [
+        ("mqtt", 10, 10), ("http", 6, 6),
+    ]
+    assert all(sim["args"]["msg_interval"] == 5 for sim in simulations)
+    assert sum("--wait" in send and send[send.index("--ack") + 1] == "full" for send in sends) == 2
+    client.shutdown.assert_called_once_with()
+
+
+@pytest.mark.parametrize("failure_stage", ["handler", "send"])
+@pytest.mark.parametrize("service_failed", [False, True])
+def test_method_responder_surfaces_original_callback_failure(
+    mocker, method_responder_scenario, failure_stage, service_failed
+):
+    scenario, client, _ = method_responder_scenario
+    failure = ValueError("Original callback failure")
+    service_error = TimeoutError("Service did not receive a method response")
+    if failure_stage == "handler":
+        mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider.method_request_handler", side_effect=failure)
+    else:
+        client.send_method_response.side_effect = failure
+    request = SimpleNamespace(request_id="1", name="Test_Method_1", payload={"data": "value"})
+    with pytest.raises(ValueError) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            callback = threading.Thread(target=lambda: client.on_method_request_received(request))
+            callback.start()
+            callback.join(2)
+            assert not callback.is_alive()
+            if service_failed:
+                raise service_error
+    assert raised.value is failure
+    if service_failed:
+        assert raised.value.__cause__ is service_error
+    client.shutdown.assert_called_once_with()
+
+
+def test_method_responder_preserves_underlying_device_error_cause(mocker, method_responder_scenario):
+    scenario, client, _ = method_responder_scenario
+    root_cause = ValueError("Underlying device failure")
+    failure = RuntimeError("Device response failed")
+    service_error = TimeoutError("Service did not receive a method response")
+    log_error = mocker.spy(integration_helpers.logger, "error")
+
+    def send(_response):
+        raise failure from root_cause
+
+    client.send_method_response.side_effect = send
+    with pytest.raises(RuntimeError) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            request = SimpleNamespace(request_id="1", name="method", payload={})
+            callback = threading.Thread(target=lambda: client.on_method_request_received(request))
+            callback.start()
+            callback.join(2)
+            assert not callback.is_alive()
+            raise service_error
+    assert raised.value is failure
+    assert raised.value.__cause__ is root_cause
+    assert any(call.kwargs["exc_info"][1] is service_error for call in log_error.call_args_list)
+    client.shutdown.assert_called_once_with()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_method_responder_connects_and_drains_the_actual_cli_handler(mocker, method_responder_scenario, cancel):
+    from azure.iot.device import IoTHubDeviceClient, MethodResponse
+    from azext_iot.iothub.providers.mqtt import MQTTProvider
+
+    scenario, client, tasks = method_responder_scenario
+    handler = mocker.spy(MQTTProvider, "method_request_handler")
+    entered, release = threading.Event(), threading.Event()
+    order = []
+
+    def connect():
+        order.append("connected")
+        client.connected = True
+
+    def send(response):
+        assert client.connected
+        assert isinstance(response, MethodResponse)
+        assert response.request_id == "1"
+        assert response.status == 200
+        assert response.payload == {
+            "methodName": "Test_Method_1", "methodRequestId": "1",
+            "methodRequestPayload": {"payload_data1": "payload_value1"},
+        }
+        order.append("callback started")
+        entered.set()
+        assert release.wait(2)
+        assert client.connected
+        order.append("response completed")
+
+    def shutdown():
+        assert order[-1] == "response completed"
+        client.connected = False
+        order.append("shutdown")
+
+    def finish():
+        # The service may return before the SDK callback finishes unwinding.
+        # Enter teardown with a send still in flight, then let it complete.
+        assert entered.is_set()
+        client.shutdown.assert_not_called()
+        order.append("draining")
+        release.set()
+        tasks.finish(timeout=2)
+
+    client.connect.side_effect, client.send_method_response.side_effect, client.shutdown.side_effect = connect, send, shutdown
+    scenario.stop_background = finish
+    request = SimpleNamespace(request_id="1", name="Test_Method_1", payload={"payload_data1": "payload_value1"})
+    callback = None
+    cancellation = KeyboardInterrupt()
+    try:
+        with pytest.raises(KeyboardInterrupt) if cancel else nullcontext() as raised:
+            with integration_helpers.device_method_responder(scenario, "device"):
+                assert order == ["connected"]
+                assert client.connected
+                callback = threading.Thread(target=lambda: client.on_method_request_received(request))
+                callback.start()
+                assert entered.wait(2)
+                if cancel:
+                    raise cancellation
+    finally:
+        release.set()
+        if callback:
+            callback.join(2)
+    assert not callback.is_alive()
+    if cancel:
+        assert raised.value is cancellation
+    assert order == ["connected", "callback started", "draining", "response completed", "shutdown"]
+    handler.assert_called_once()
+    assert handler.call_args.args[1] is request
+    IoTHubDeviceClient.create_from_connection_string.assert_called_once_with(
+        scenario.get_device_cstring.return_value, websockets=True, product_info=None,
+    )
+    scenario.get_device_cstring.assert_called_once_with("device")
+    client.connect.assert_called_once_with()
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+@pytest.mark.parametrize("failure_type", [ValueError, KeyboardInterrupt])
+def test_method_responder_never_yields_after_connect_failure(method_responder_scenario, failure_type):
+    scenario, client, tasks = method_responder_scenario
+    failure = failure_type("Connect failed")
+    client.connect.side_effect = failure
+    with pytest.raises(type(failure)) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            pytest.fail("Invocation must not run without connected readiness")
+    assert raised.value is failure
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+@pytest.mark.parametrize("failure_type", [RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_method_responder_preserves_invocation_failure_and_cancellation(
+    method_responder_scenario, failure_type, cleanup_fails
+):
+    scenario, client, tasks = method_responder_scenario
+    failure = failure_type("Invocation failed")
+    cleanup_error = ValueError("Shutdown failed")
+    if cleanup_fails:
+        client.shutdown.side_effect = cleanup_error
+    with pytest.raises(type(failure)) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            raise failure
+    assert raised.value is failure
+    if cleanup_fails:
+        assert raised.value.__cause__ is cleanup_error
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+def test_method_responder_shutdown_failure_cannot_pass(method_responder_scenario):
+    scenario, client, tasks = method_responder_scenario
+    failure = RuntimeError("Shutdown failed")
+    client.shutdown.side_effect = failure
+    with pytest.raises(RuntimeError) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            client.on_method_request_received(SimpleNamespace(request_id="1", name="method", payload={}))
+    assert raised.value is failure
+    client.send_method_response.assert_called_once()
+    assert not tasks.tasks
+
+
+def test_method_responder_requires_a_request_even_if_invocation_appeared_successful(method_responder_scenario):
+    scenario, client, _ = method_responder_scenario
+    with pytest.raises(AssertionError, match="No direct method request"):
+        with integration_helpers.device_method_responder(scenario, "device"):
+            pass
+    client.shutdown.assert_called_once_with()
+    client.send_method_response.assert_not_called()
+
+
+def test_method_responder_readiness_timeout_cancels_and_drains_worker(method_responder_scenario):
+    scenario, client, tasks = method_responder_scenario
+    connecting, release = threading.Event(), threading.Event()
+    finish = tasks.finish
+
+    def start(**kwargs):
+        handle = tasks.start(**kwargs)
+        assert connecting.wait(2)
+        return handle
+
+    def connect():
+        connecting.set()
+        assert release.wait(2)
+        client.connected = True
+
+    def drain():
+        assert connecting.wait(2)
+        release.set()
+        finish(timeout=2)
+
+    client.connect.side_effect = connect
+    scenario.start_background = start
+    scenario.stop_background = drain
+    try:
+        with pytest.raises(TimeoutError, match="readiness budget"):
+            with integration_helpers.device_method_responder(scenario, "device", readiness_timeout=0):
+                pytest.fail("Invocation must not run before connect returns")
+    finally:
+        release.set()
+    client.shutdown.assert_called_once_with()
+    assert not client.connected
+    assert not tasks.tasks
+
+
+@pytest.mark.parametrize("late_failure", [False, True])
+def test_method_responder_stuck_callback_is_bounded_without_disconnecting(method_responder_scenario, late_failure):
+    from azext_iot.tests.iothub._sas_phase import HubSasError
+
+    scenario, client, tasks = method_responder_scenario
+    entered, release = threading.Event(), threading.Event()
+    callback = None
+
+    def send(_response):
+        entered.set()
+        assert release.wait(2)
+        assert client.connected
+        if late_failure:
+            raise ValueError("Late send failure")
+
+    client.send_method_response.side_effect = send
+    # Exercise the existing task manager's deadline without a real 90-second wait.
+    scenario.stop_background = partial(tasks.finish, timeout=0)
+    try:
+        with pytest.raises(HubSasError, match="must not be deleted yet"):
+            with integration_helpers.device_method_responder(scenario, "device"):
+                request = SimpleNamespace(request_id="1", name="method", payload={})
+                callback = threading.Thread(target=lambda: client.on_method_request_received(request))
+                callback.start()
+                assert entered.wait(2)
+        assert len(tasks.tasks) == 1
+        assert tasks.tasks[0][1].is_alive()
+        client.shutdown.assert_not_called()
+        assert client.connected
+    finally:
+        release.set()
+        if callback:
+            callback.join(2)
+        if late_failure:
+            with pytest.raises(HubSasError, match="ValueError: Late send failure"):
+                tasks.finish(timeout=2)
+        else:
+            tasks.finish(timeout=2)
+    assert not callback.is_alive()
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+def test_method_responder_stuck_connect_remains_owned_after_readiness_timeout(method_responder_scenario):
+    from azext_iot.tests.iothub._sas_phase import HubSasError
+
+    scenario, client, tasks = method_responder_scenario
+    connecting, release = threading.Event(), threading.Event()
+
+    def start(**kwargs):
+        handle = tasks.start(**kwargs)
+        assert connecting.wait(2)
+        return handle
+
+    def connect():
+        connecting.set()
+        assert release.wait(2)
+        client.connected = True
+
+    client.connect.side_effect = connect
+    scenario.start_background = start
+    scenario.stop_background = partial(tasks.finish, timeout=0)
+    try:
+        with pytest.raises(TimeoutError, match="readiness budget") as raised:
+            with integration_helpers.device_method_responder(scenario, "device", readiness_timeout=0):
+                pytest.fail("Invocation must not run before connect returns")
+        assert isinstance(raised.value.__cause__, HubSasError)
+        assert connecting.wait(2)
+        assert len(tasks.tasks) == 1 and tasks.tasks[0][1].is_alive()
+        client.shutdown.assert_not_called()
+    finally:
+        release.set()
+        tasks.finish(timeout=2)
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+def test_method_responder_stuck_shutdown_remains_owned(method_responder_scenario):
+    from azext_iot.tests.iothub._sas_phase import HubSasError
+
+    scenario, client, tasks = method_responder_scenario
+    shutting_down, release = threading.Event(), threading.Event()
+
+    def shutdown():
+        shutting_down.set()
+        assert release.wait(2)
+        client.connected = False
+
+    client.shutdown.side_effect = shutdown
+    scenario.stop_background = partial(tasks.finish, timeout=0)
+    try:
+        with pytest.raises(HubSasError, match="must not be deleted yet"):
+            with integration_helpers.device_method_responder(scenario, "device"):
+                client.on_method_request_received(SimpleNamespace(request_id="1", name="method", payload={}))
+        assert shutting_down.wait(2)
+        assert len(tasks.tasks) == 1 and tasks.tasks[0][1].is_alive()
+    finally:
+        release.set()
+        tasks.finish(timeout=2)
+    client.shutdown.assert_called_once_with()
+    assert not tasks.tasks
+
+
+@pytest.mark.parametrize("send_failed", [False, True])
+def test_method_responder_closes_callback_gate_before_sdk_shutdown(method_responder_scenario, send_failed):
+    scenario, client, _ = method_responder_scenario
+    request = SimpleNamespace(request_id="1", name="method", payload={})
+    failure = ValueError("Original send failure")
+    if send_failed:
+        client.send_method_response.side_effect = failure
+    # SDK shutdown joins callback threads. A queued late callback must be able to
+    # finish, but must not start another response against the shutting-down client.
+    client.shutdown.side_effect = lambda: client.on_method_request_received(request)
+    with pytest.raises(
+        ValueError if send_failed else RuntimeError,
+        match="Original send failure" if send_failed else "after responder closure",
+    ) as raised:
+        with integration_helpers.device_method_responder(scenario, "device"):
+            client.on_method_request_received(request)
+    if send_failed:
+        assert raised.value is failure
+    client.shutdown.assert_called_once_with()
+    client.send_method_response.assert_called_once()
 
 
 @pytest.mark.parametrize("id_key", [None, "deviceId", "moduleId"])
