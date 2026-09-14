@@ -26,7 +26,7 @@ def nested_scenario(mocker):
         ["child-b"], ["child-b"],
         ["child-a"], ["edge-a", "child-a", "child-c"],
         ["child-a", "child-c"], [],
-        [],
+        ["stale-child"], [],
     ])
     scenario.events = []
 
@@ -56,7 +56,7 @@ def test_remove_all_waits_for_complete_targets_then_an_empty_view(mocker, nested
     mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", [auth_phase])
     subject.TestIoTHubNestedEdge.test_iothub_nested_edge(scenario)
     assert [call.args[1] for call in scenario.wait.call_args_list] == [
-        ["child-b"], ["edge-a", "child-a", "child-c"], [],
+        ["child-b"], ["edge-a", "child-a", "child-c"], [], [],
     ]
     assert scenario.events == [
         ("query", "edge-a"), ("query", "edge-a"),
@@ -65,6 +65,7 @@ def test_remove_all_waits_for_complete_targets_then_an_empty_view(mocker, nested
         ("remove-all", "edge-b", False),
         ("query", "edge-b"), ("query", "edge-b"),
         ("remove-all", "edge-b", True),
+        ("query", "edge-b"),
         ("query", "edge-b"),
     ]
     assert all(call.kwargs["auth_type"] == auth_phase for call in scenario.set_cmd_auth_type.call_args_list)

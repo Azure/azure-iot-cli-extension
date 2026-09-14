@@ -13,6 +13,7 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as Co
 from requests import Response
 
 from azext_iot.tests.iothub import conftest as fixtures
+from azext_iot.tests import helpers
 
 
 def _cli_outcomes(mocker, outcomes):
@@ -155,3 +156,159 @@ def test_dynamic_hub_cleanup_has_bounded_retries_and_truthful_result(
     assert client.invoke.call_count == attempts
     assert sleep.call_count == attempts - 1
     assert all(call.args == (30,) for call in sleep.call_args_list)
+
+
+@pytest.fixture
+def registry_cleanup(mocker):
+    context = object()
+    client = mocker.Mock(az_cli=context)
+    client.invoke.return_value.success.return_value = True
+    client.invoke.return_value.as_json.return_value = []
+    mocker.patch.object(helpers, "cli", client)
+    provider = mocker.patch("azext_iot.iothub.providers.device_identity.DeviceIdentityProvider")
+    devices = provider.return_value.service_sdk.devices
+    devices.get_devices.return_value = []
+    clock = [0]
+    mocker.patch.object(helpers, "monotonic", side_effect=lambda: clock[0])
+    sleep = mocker.patch.object(helpers, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    return SimpleNamespace(client=client, provider=provider, devices=devices, clock=clock, sleep=sleep)
+
+
+@pytest.mark.parametrize("shape", ["model", "dict", "mixed"])
+def test_registry_cleanup_preserves_login_context_and_identity_shapes(registry_cleanup, shape):
+    fixture = registry_cleanup
+    rows = [
+        {"deviceId": "first"} if shape != "model" else SimpleNamespace(device_id="first"),
+        SimpleNamespace(device_id="second") if shape != "dict" else {"deviceId": "second"},
+    ]
+    fixture.devices.get_devices.side_effect = [rows, []]
+    helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    options = fixture.provider.call_args.kwargs
+    assert options["cmd"].cli_ctx is fixture.client.az_cli
+    assert {key: value for key, value in options.items() if key != "cmd"} == {
+        "hub_name": "owned-hub", "rg": "owned-rg", "auth_type_dataplane": "login",
+    }
+    assert [call.kwargs for call in fixture.devices.delete_identity.call_args_list] == [
+        {"id": "first", "if_match": "*"}, {"id": "second", "if_match": "*"},
+    ]
+    assert fixture.devices.get_devices.call_count == 2
+    assert all(call.kwargs == {"top": 1000} for call in fixture.devices.get_devices.call_args_list)
+    commands = [call.args[0] for call in fixture.client.invoke.call_args_list]
+    assert len(commands) == 4
+    assert all(command.endswith("--auth-type login") for command in commands)
+    assert not any("connection-string" in command or "device-twin" in command for command in commands)
+
+
+def test_registry_cleanup_drains_an_extra_batch_before_claiming_success(registry_cleanup):
+    fixture = registry_cleanup
+    fixture.devices.get_devices.side_effect = [
+        [{"deviceId": f"device-{index}"} for index in range(1000)],
+        [{"deviceId": "last-device"}],
+        [],
+    ]
+    helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    assert fixture.devices.delete_identity.call_count == 1001
+    fixture.devices.delete_identity.assert_called_with(id="last-device", if_match="*")
+    assert fixture.devices.get_devices.call_count == 3
+
+
+@pytest.mark.parametrize("after_delete", [False, True])
+def test_registry_cleanup_read_errors_cannot_claim_success(registry_cleanup, after_delete):
+    fixture = registry_cleanup
+    error = _http_error(403)
+    fixture.devices.get_devices.side_effect = ([[{"deviceId": "owned"}]] if after_delete else []) + [error]
+    with pytest.raises(HttpResponseError) as raised:
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    assert raised.value is error
+    assert fixture.devices.delete_identity.call_count == int(after_delete)
+    fixture.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("error,absent", [
+    (ResourceNotFoundError("absent"), True),
+    (CoreResourceNotFoundError("absent"), True),
+    (_legacy_error(404), True),
+    (_http_error(404), True),
+    (_legacy_error(403), False),
+    (_http_error(502), False),
+    (RuntimeError("not found is only text"), False),
+])
+def test_registry_cleanup_only_ignores_confirmed_delete_absence(registry_cleanup, error, absent):
+    fixture = registry_cleanup
+    fixture.devices.get_devices.side_effect = [[{"deviceId": "owned"}], []]
+    fixture.devices.delete_identity.side_effect = error
+    if absent:
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+        assert fixture.devices.get_devices.call_count == 2
+    else:
+        with pytest.raises(type(error)) as raised:
+            helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+        assert raised.value is error
+    fixture.devices.delete_identity.assert_called_once_with(id="owned", if_match="*")
+
+
+def test_registry_cleanup_visibility_wait_never_replays_deletes(registry_cleanup):
+    fixture = registry_cleanup
+    fixture.devices.get_devices.return_value = [{"deviceId": "still-visible"}]
+    with pytest.raises(CLIInternalError, match="deadline exhausted"):
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    fixture.devices.delete_identity.assert_called_once_with(id="still-visible", if_match="*")
+    assert fixture.clock[0] == 60
+    assert all(call.args[0] == 2 for call in fixture.sleep.call_args_list)
+
+
+def test_registry_cleanup_charges_read_time_and_rejects_late_empty_result(registry_cleanup):
+    fixture = registry_cleanup
+
+    def late_read(**_kwargs):
+        fixture.clock[0] = 61
+        return []
+
+    fixture.devices.get_devices.side_effect = late_read
+    with pytest.raises(CLIInternalError, match="deadline exhausted"):
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    fixture.devices.delete_identity.assert_not_called()
+
+
+@pytest.mark.parametrize("rows", [None, {}, [{}], [SimpleNamespace()], [{"deviceId": ""}], [{"deviceId": 12}]])
+def test_registry_cleanup_invalid_listing_fails_before_deleting(registry_cleanup, rows):
+    fixture = registry_cleanup
+    fixture.devices.get_devices.return_value = rows
+    with pytest.raises(CLIInternalError):
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    fixture.devices.delete_identity.assert_not_called()
+
+
+def test_cleanup_configuration_listing_exhaustion_cannot_mean_empty(registry_cleanup):
+    fixture = registry_cleanup
+    fixture.client.invoke.return_value.success.return_value = False
+    fixture.client.invoke.return_value.error_code = 7
+    with pytest.raises(RuntimeError, match="exit code 7"):
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    assert fixture.client.invoke.call_count == 3
+    assert fixture.clock[0] == 60
+    fixture.devices.delete_identity.assert_not_called()
+
+
+@pytest.mark.parametrize("rows", [None, {}, False, "", 0])
+@pytest.mark.parametrize("observation", [False, True])
+def test_cleanup_malformed_configuration_listing_cannot_mean_empty(registry_cleanup, rows, observation):
+    fixture = registry_cleanup
+    fixture.client.invoke.return_value.as_json.side_effect = ([[], []] if observation else []) + [rows, [], []]
+    with pytest.raises(CLIInternalError, match="invalid configuration listing"):
+        helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    assert fixture.client.invoke.call_count == (3 if observation else 1)
+    fixture.devices.delete_identity.assert_not_called()
+    fixture.sleep.assert_not_called()
+
+
+def test_cleanup_observes_configuration_deletion_without_replaying_it(registry_cleanup):
+    fixture = registry_cleanup
+    fixture.client.invoke.return_value.as_json.side_effect = [
+        [{"id": "owned-deployment"}], [], [{"id": "owned-deployment"}], [], [],
+    ]
+    helpers.clean_up_iothub_device_config("owned-hub", "owned-rg")
+    commands = [call.args[0] for call in fixture.client.invoke.call_args_list]
+    assert sum("deployment delete" in command for command in commands) == 1
+    assert sum("deployment list" in command for command in commands) == 3
+    assert fixture.clock[0] == 2

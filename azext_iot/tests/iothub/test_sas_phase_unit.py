@@ -1325,16 +1325,27 @@ def test_real_shared_cleanup_helper_uses_b_at_factory_and_profile_boundaries(pha
         assert client._config.subscription_id == phase.subscription
         _, subscription, _ = Profile(cli_ctx=scoped.az_cli).get_raw_token(resource="https://iothubs.azure.net")
         observed.append((args[:4], subscription))
-        result = [{"deviceId": "owned-device"}] if args[:4] == ["iot", "hub", "device-twin", "list"] else []
         scoped.az_cli.result = SimpleNamespace(error=None)
-        out_file.write(json.dumps(result))
+        out_file.write("[]")
         return 0
 
     mocker.patch.object(scoped.az_cli, "invoke", side_effect=execute)
-    phase.cleanup_devices()
+    target = {
+        "id": phase.ids["hub"], "name": phase.hub, "location": "centraluseuap",
+        "properties": {"hostName": "hub.azure-devices.net", "disableLocalAuth": False},
+        "sku": {"name": "S1", "tier": "Standard", "capacity": 1},
+    }
+    with responses.RequestsMock() as wire:
+        wire.add("GET", "https://centraluseuap.management.azure.com" + phase.ids["hub"], json=target, status=200)
+        wire.add("GET", "https://hub.azure-devices.net/devices", json=[{"deviceId": "owned-device"}], status=200)
+        wire.add("DELETE", "https://hub.azure-devices.net/devices/owned-device", status=204)
+        wire.add("GET", "https://hub.azure-devices.net/devices", json=[], status=200)
+        phase.cleanup_devices()
+        assert [call.request.method for call in wire.calls] == ["GET", "GET", "DELETE", "GET"]
+        assert all(call.request.headers["Authorization"].startswith("Bearer ") for call in wire.calls[1:])
     assert helpers.cli is original
     assert len(observed) == 4 and all(subscription == phase.subscription for _, subscription in observed)
-    assert observed[-1][0] == ["iot", "hub", "device-identity", "delete"]
+    assert all("list" in command for command, _ in observed)
     assert set(subscription_profiles.selected) == {phase.subscription}
     subscription_profiles.persistent.assert_not_called()
 

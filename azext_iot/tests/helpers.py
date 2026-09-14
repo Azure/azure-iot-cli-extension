@@ -10,7 +10,8 @@ import os
 from contextlib import contextmanager
 from functools import wraps
 from inspect import getsourcefile
-from time import sleep
+from time import monotonic, sleep
+from types import SimpleNamespace
 from unittest.mock import patch
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -326,13 +327,76 @@ def delete_role_assignment(
     )
 
 
+def wait_for_assertion(check, timeout=60, poll_interval=5):
+    """Poll read-back assertions, never replaying service errors or mutations."""
+    deadline = monotonic() + timeout
+    while True:
+        try:
+            result = check()
+            assert monotonic() <= deadline, "Assertion check completed after its deadline."
+            return result
+        except AssertionError:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise
+            sleep(min(poll_interval, remaining))
+            if monotonic() >= deadline:
+                raise
+
+
+def _clean_up_registry_devices(devices, timeout=60, poll_interval=2):
+    """Drain registry batches on an already-authorized cleanup target.
+
+    A batch limit is not proof of an empty registry. Observe after deletion,
+    without resubmitting deletes while their results become visible. All reads,
+    batches and sleeps share one finite budget; transport timeouts still apply.
+    """
+    from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
+    from msrestazure.azure_exceptions import CloudError
+
+    deadline = monotonic() + timeout
+    deleted = set()
+    while True:
+        if monotonic() >= deadline:
+            raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before confirming an empty registry.")
+        rows = devices.get_devices(top=1000)
+        if not isinstance(rows, list):
+            raise CLIInternalError("IoT Hub cleanup received an invalid registry listing.")
+        ids = [row.get("deviceId") if isinstance(row, dict) else getattr(row, "device_id", None) for row in rows]
+        if any(not isinstance(device_id, str) or not device_id for device_id in ids):
+            raise CLIInternalError("IoT Hub cleanup received a registry identity without a device ID.")
+        if monotonic() >= deadline:
+            raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before confirming an empty registry.")
+        if not ids:
+            return
+        pending = set(ids).difference(deleted)
+        for device_id in dict.fromkeys(ids):
+            if device_id not in pending:
+                continue
+            if monotonic() >= deadline:
+                raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before deleting remaining identities.")
+            try:
+                devices.delete_identity(id=device_id, if_match="*")
+            except (ResourceNotFoundError, CloudError, HttpResponseError) as error:
+                response = getattr(error, "response", None)
+                if not (
+                    isinstance(error, (ResourceNotFoundError, CoreResourceNotFoundError))
+                    or getattr(response, "status_code", None) == 404
+                    or isinstance(error, HttpResponseError) and error.status_code == 404
+                ):
+                    raise
+            deleted.add(device_id)
+        if not pending:
+            sleep(min(poll_interval, max(0, deadline - monotonic())))
+
+
 def clean_up_iothub_device_config(
     hub_name: str,
     rg: str
 ):
     from azure.core.exceptions import HttpResponseError
     from msrestazure.azure_exceptions import CloudError
-    from time import sleep
+    from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
     import logging
     logger = logging.getLogger(__name__)
 
@@ -343,13 +407,17 @@ def clean_up_iothub_device_config(
                 result = cli.invoke(f"{command} --auth-type login")
                 if not result.success():
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
-                return result.as_json()
+                rows = result.as_json()
             except Exception as e:
                 last_exc = e
                 if attempt < retries - 1:
                     sleep(delay)
+            else:
+                if not isinstance(rows, list):
+                    raise CLIInternalError("IoT Hub cleanup received an invalid configuration listing.")
+                return rows
         logger.warning("List command failed after %d retries: %s — %s", retries, command, last_exc)
-        return []
+        raise last_exc
 
     def _delete_with_retry(command, retries=3, delay=30):
         last_exc = None
@@ -375,11 +443,14 @@ def clean_up_iothub_device_config(
         logger.warning("Delete command failed after %d retries: %s — %s", retries, command, last_exc)
         raise last_exc
 
-    device_list = [
-        d["deviceId"] for d in _list_with_retry(
-            f"iot hub device-twin list -n {hub_name} -g {rg}"
-        )
-    ]
+    # Keep the caller's cleanup/ownership gates and scoped EmbeddedCLI context.
+    # In particular, never acquire an iothubowner key for local-auth-disabled hubs.
+    devices = DeviceIdentityProvider(
+        cmd=SimpleNamespace(cli_ctx=cli.az_cli),
+        hub_name=hub_name,
+        rg=rg,
+        auth_type_dataplane="login",
+    ).service_sdk.devices
 
     deployment_list = [
         c["id"] for c in _list_with_retry(
@@ -393,12 +464,7 @@ def clean_up_iothub_device_config(
         )
     ]
 
-    for device in device_list:
-        _delete_with_retry(
-            "iot hub device-identity delete -d {} -n {} -g {}".format(
-                device, hub_name, rg
-            )
-        )
+    _clean_up_registry_devices(devices)
 
     for deployment in deployment_list:
         _delete_with_retry(
@@ -413,6 +479,12 @@ def clean_up_iothub_device_config(
                 config, hub_name, rg
             )
         )
+
+    def assert_configurations_deleted():
+        assert not _list_with_retry(f"iot edge deployment list -n {hub_name} -g {rg}", delay=2)
+        assert not _list_with_retry(f"iot hub configuration list -n {hub_name} -g {rg}", delay=2)
+
+    wait_for_assertion(assert_configurations_deleted, timeout=60, poll_interval=2)
 
 
 def create_test_cert(

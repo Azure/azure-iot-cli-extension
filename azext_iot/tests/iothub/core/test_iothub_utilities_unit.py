@@ -10,6 +10,60 @@ from knack.cli import CLIError
 from azure.cli.core.azclierror import ArgumentUsageError, CLIInternalError
 from azext_iot.operations import hub as subject
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests import helpers
+
+
+def test_wait_for_assertion_returns_the_successful_read(mocker):
+    check = mocker.Mock(side_effect=[AssertionError("lagging"), "ready"])
+    sleep = mocker.patch.object(helpers, "sleep")
+    assert helpers.wait_for_assertion(check) == "ready"
+    assert check.call_count == 2
+    sleep.assert_called_once()
+
+
+def test_wait_for_assertion_preserves_exhausted_assertion(mocker):
+    error = AssertionError("not ready")
+    check = mocker.Mock(side_effect=error)
+    mocker.patch.object(helpers, "monotonic", side_effect=[0, 60])
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(AssertionError) as raised:
+        helpers.wait_for_assertion(check)
+    assert raised.value is error
+    check.assert_called_once()
+    sleep.assert_not_called()
+
+
+def test_wait_for_assertion_does_not_retry_service_errors(mocker):
+    error = CLIError("service failed")
+    check = mocker.Mock(side_effect=error)
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(CLIError) as raised:
+        helpers.wait_for_assertion(check)
+    assert raised.value is error
+    check.assert_called_once()
+    sleep.assert_not_called()
+
+
+def test_wait_for_assertion_charges_reads_and_clamps_the_last_sleep(mocker):
+    error = AssertionError("not ready")
+    check = mocker.Mock(side_effect=error)
+    mocker.patch.object(helpers, "monotonic", side_effect=[0, 59, 60])
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(AssertionError) as raised:
+        helpers.wait_for_assertion(check)
+    assert raised.value is error
+    check.assert_called_once()
+    sleep.assert_called_once_with(1)
+
+
+def test_wait_for_assertion_rejects_a_late_success(mocker):
+    check = mocker.Mock(return_value="too late")
+    mocker.patch.object(helpers, "monotonic", side_effect=[0, 61, 61])
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(AssertionError, match="after its deadline"):
+        helpers.wait_for_assertion(check)
+    check.assert_called_once()
+    sleep.assert_not_called()
 
 
 def generate_valid_cs(validate_pairs=[]):

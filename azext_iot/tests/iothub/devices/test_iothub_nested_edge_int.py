@@ -18,7 +18,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubNestedEdge, self).__init__(test_case)
 
-    @pytest.mark.timeout(900 + 3 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
+    @pytest.mark.timeout(900 + 4 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
     def test_iothub_nested_edge(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 3
@@ -293,13 +293,16 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             )
 
             # List child devices of edge device which doesn't have any children
-            output = self.cmd(
-                self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
-                    auth_type=auth_phase,
-                )
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [],
             )
-            assert output.get_output_in_json() == []
 
     def test_iothub_device_scope_on_create(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
