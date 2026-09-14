@@ -14,7 +14,7 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot import _factory
 from azext_iot.core import custom
-from azext_iot.tests.test_factory_unit import CLOUD_CONFIGS, _build_cli_ctx
+from azext_iot.tests.test_factory_unit import CLOUD_CONFIGS, PUBLIC_CLOUD_CONFIGS, _build_cli_ctx
 
 
 CANARY = "https://centraluseuap.management.azure.com"
@@ -32,7 +32,7 @@ TARGETS = [
 ]
 
 
-@pytest.mark.parametrize("cloud", CLOUD_CONFIGS, ids=lambda value: value["id"])
+@pytest.mark.parametrize("cloud", PUBLIC_CLOUD_CONFIGS, ids=lambda value: value["id"])
 @pytest.mark.parametrize("target", TARGETS, ids=lambda value: value[0])
 @pytest.mark.parametrize("adr", [False, True], ids=["general", "adr"])
 @pytest.mark.parametrize("subscription", [None, "target-sub"])
