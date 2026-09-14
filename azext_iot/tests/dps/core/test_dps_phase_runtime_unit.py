@@ -555,6 +555,58 @@ def test_fixture_role_zero_budget_never_creates_or_sleeps(scope, mocker):
     pause.assert_not_called()
 
 
+@pytest.mark.parametrize("create_attempted", [False, True])
+def test_role_grant_slow_lookup_reports_the_actual_failure_stage(scope, mocker, create_attempted):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    clock = [0]
+    mocker.patch.object(runtime, "monotonic", side_effect=lambda: clock[0])
+
+    def read(**_kwargs):
+        if not create_attempted or create.called:
+            clock[0] += 130
+        return []
+
+    def advance(duration):
+        clock[0] += duration
+
+    reads = mocker.patch.object(helpers, "get_role_assignments", side_effect=read)
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_A}
+    pause = mocker.patch.object(runtime, "sleep", side_effect=advance)
+
+    with pytest.raises(runtime.ScopeError) as raised:
+        runtime.assign_role_assignment_once("role", owned, "synthetic-private-alias")
+
+    message = str(raised.value)
+    assert "last_lookup_seconds=130.000" in message
+    assert "returned_assignments=0" in message
+    assert f"create_attempted={create_attempted}" in message
+    for private_value in ("synthetic-private-alias", SUB_A, owned):
+        assert private_value not in message
+    if create_attempted:
+        assert "was not visible before its read-only verification bound" in message
+        assert "lookups=2" in message
+        assert "elapsed_seconds=140.000" in message
+        assert reads.call_count == 2
+        create.assert_called_once()
+        pause.assert_called_once_with(10)
+        record = json.loads(next(scope.glob("role-grant-*.json")).read_text(encoding="utf-8"))
+        assert record["create_attempted"] is True
+        assert record["verified"] is False
+        assert record["principal_id"] == SUB_A
+    else:
+        assert "preflight" in message
+        assert "before any create attempt" in message
+        assert "lookups=1" in message
+        assert "elapsed_seconds=130.000" in message
+        reads.assert_called_once()
+        create.assert_not_called()
+        pause.assert_not_called()
+        assert not list(scope.glob("role-grant-*.json"))
+
+
 @pytest.mark.parametrize("unlink_on_release", [False, True])
 def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker, unlink_on_release):
     from azext_iot.tests import helpers
