@@ -446,7 +446,6 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     provider = MagicMock()
     for method_name in (
         "show",
-        "auth_show",
         "hub_show",
         "dps_show",
         "su_show",
@@ -459,7 +458,6 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
         "NamespaceProvider",
         "CertificateAuthorityProvider",
         "CertificatePolicyProvider",
-        "RegistryDeviceProvider",
         "GroupProvider",
         "JobProvider",
         "JobRunProvider",
@@ -489,21 +487,6 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     assert (
         commands_wait.adr_ca_policy_wait(
             cmd, "policy", "ca", "ns", "rg"
-        )
-        is resource
-    )
-    assert (
-        commands_wait.adr_registry_device_wait(
-            cmd,
-            "ns",
-            "rg",
-            external_device_id="external-42",
-        )
-        is resource
-    )
-    assert (
-        commands_wait.adr_registry_device_auth_wait(
-            cmd, "default", "device", "ns", "rg"
         )
         is resource
     )
@@ -554,15 +537,12 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
         cmd, "job", "run", "ns", "rg"
     ) is resource
 
-    assert len(captured_conditions) == 14
+    assert len(captured_conditions) == 12
     assert all(result.complete for result in captured_conditions)
     provider.show.assert_any_call("ns", "rg")
     provider.show.assert_any_call("ca", "ns", "rg")
     provider.show.assert_any_call("policy", "ca", "ns", "rg")
     provider.show.assert_any_call("instance", "rg")
-    provider.auth_show.assert_called_once_with(
-        "default", "device", "ns", "rg"
-    )
     assert provider._get_namespace.call_count == 4
     assert provider_types["LinkProvider"].call_args_list == [
         call(cmd, client=namespace_client),

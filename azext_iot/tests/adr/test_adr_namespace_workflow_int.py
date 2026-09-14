@@ -55,7 +55,12 @@ class TestADRNamespaceWorkflow(
                 for item in plan["items"]
             )
 
-            applied = self.cmd(f"{setup} --yes").get_output_in_json()
+            applied = self.create_owned_resource(
+                f"{setup} --yes",
+                kind="namespace",
+                name=namespace_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
             assert applied["state"] == "Succeeded"
 
             checked = self.cmd(
@@ -72,29 +77,34 @@ class TestADRNamespaceWorkflow(
                 for item in resumed["items"]
             )
         finally:
-            self.cmd(
-                f"iot adr ns delete -n {namespace_name} -g {TEST_RG} --yes",
-                checks=[],
-            )
+            self.cleanup_full_infra()
 
     def test_namespace_setup_links_dps(self):
         namespace_name = generate_adr_namespace_name()
         dps_name = generate_dps_name()
-        dps = self.cmd(
-            f"iot dps create -n {dps_name} -g {TEST_RG} "
-            f"-l {TEST_LOCATION} --system-assigned-mi"
-        ).get_output_in_json()
-        setup = (
-            f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
-            f"-l {TEST_LOCATION} "
-            "--namespace-outbound-identity system-assigned "
-            f"--dps endpoint=dps-primary resource-id={dps['id']} "
-            "identity=system-assigned"
-        )
         try:
+            dps = self.create_owned_resource(
+                f"iot dps create -n {dps_name} -g {TEST_RG} "
+                f"-l {TEST_LOCATION} --system-assigned-mi",
+                kind="dps",
+                name=dps_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
+            setup = (
+                f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
+                f"-l {TEST_LOCATION} "
+                "--namespace-outbound-identity system-assigned "
+                f"--dps endpoint=dps-primary resource-id={dps['id']} "
+                "identity=system-assigned"
+            )
             plan = self.cmd(f"{setup} --plan-only").get_output_in_json()
             assert plan["state"] == "Planned"
-            applied = self.cmd(f"{setup} --yes").get_output_in_json()
+            applied = self.create_owned_resource(
+                f"{setup} --yes",
+                kind="namespace",
+                name=namespace_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
             assert applied["state"] == "Succeeded"
             linked = self.cmd(
                 f"iot adr ns link dps show -n dps-primary "
@@ -107,40 +117,45 @@ class TestADRNamespaceWorkflow(
             ).get_output_in_json()
             assert checked["state"] == "Succeeded"
         finally:
-            self.cleanup_full_infra(
-                resource_group=TEST_RG,
-                namespace_name=namespace_name,
-                dps_name=dps_name,
-            )
+            self.cleanup_full_infra()
 
     def test_namespace_setup_links_hub_after_dps(self):
         namespace_name = generate_adr_namespace_name()
         dps_name = generate_dps_name()
         hub_name = generate_hub_name()
-        dps = self.cmd(
-            f"iot dps create -n {dps_name} -g {TEST_RG} "
-            f"-l {TEST_LOCATION} --system-assigned-mi"
-        ).get_output_in_json()
-        hub = self.cmd(
-            f"iot hub create -n {hub_name} -g {TEST_RG} "
-            f"-l {TEST_LOCATION} --sku S1 --system-assigned-mi "
-            "--disable-local-auth true"
-        ).get_output_in_json()
-        dps_setup = (
-            f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
-            f"-l {TEST_LOCATION} "
-            "--namespace-outbound-identity system-assigned "
-            f"--dps endpoint=dps-primary resource-id={dps['id']} "
-            "identity=system-assigned"
-        )
-        hub_setup = (
-            f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
-            f"--hub endpoint=hub-primary resource-id={hub['id']} "
-            "identity=system-assigned"
-        )
         try:
-            assert self.cmd(
-                f"{dps_setup} --yes"
+            dps = self.create_owned_resource(
+                f"iot dps create -n {dps_name} -g {TEST_RG} "
+                f"-l {TEST_LOCATION} --system-assigned-mi",
+                kind="dps",
+                name=dps_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
+            hub = self.create_owned_resource(
+                f"iot hub create -n {hub_name} -g {TEST_RG} "
+                f"-l {TEST_LOCATION} --sku S1 --system-assigned-mi "
+                "--disable-local-auth true",
+                kind="hub",
+                name=hub_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
+            dps_setup = (
+                f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
+                f"-l {TEST_LOCATION} "
+                "--namespace-outbound-identity system-assigned "
+                f"--dps endpoint=dps-primary resource-id={dps['id']} "
+                "identity=system-assigned"
+            )
+            hub_setup = (
+                f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
+                f"--hub endpoint=hub-primary resource-id={hub['id']} "
+                "identity=system-assigned"
+            )
+            assert self.create_owned_resource(
+                f"{dps_setup} --yes",
+                kind="namespace",
+                name=namespace_name,
+                resource_group=TEST_RG,
             ).get_output_in_json()["state"] == "Succeeded"
             plan = self.cmd(
                 f"{hub_setup} --plan-only"
@@ -154,12 +169,7 @@ class TestADRNamespaceWorkflow(
             ).get_output_in_json()
             assert linked["linkingState"] == "Succeeded"
         finally:
-            self.cleanup_full_infra(
-                resource_group=TEST_RG,
-                hub_name=hub_name,
-                namespace_name=namespace_name,
-                dps_name=dps_name,
-            )
+            self.cleanup_full_infra()
 
     def test_namespace_setup_links_software_updates(self):
         namespace_name = generate_adr_namespace_name()
@@ -170,10 +180,13 @@ class TestADRNamespaceWorkflow(
             "/providers/Microsoft.DeviceUpdate/updateInstances/"
             f"{update_instance_name}"
         )
-        setup = (
+        namespace_setup = (
             f"iot adr ns setup -n {namespace_name} -g {TEST_RG} "
             f"-l {TEST_LOCATION} "
-            "--namespace-outbound-identity system-assigned "
+            "--namespace-outbound-identity system-assigned"
+        )
+        setup = (
+            f"{namespace_setup} "
             "--software-updates endpoint=su-primary "
             f"resource-id={update_instance_id} identity=system-assigned "
             "create-if-missing=true"
@@ -181,7 +194,21 @@ class TestADRNamespaceWorkflow(
         try:
             plan = self.cmd(f"{setup} --plan-only").get_output_in_json()
             assert plan["state"] == "Planned"
-            applied = self.cmd(f"{setup} --yes").get_output_in_json()
+            # Create the namespace separately so each setup mutation has its
+            # own absence check and ownership record before it can create.
+            namespace = self.create_owned_resource(
+                f"{namespace_setup} --yes",
+                kind="namespace",
+                name=namespace_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
+            assert namespace["state"] == "Succeeded"
+            applied = self.create_owned_resource(
+                f"{setup} --yes",
+                kind="su",
+                name=update_instance_name,
+                resource_group=TEST_RG,
+            ).get_output_in_json()
             assert applied["state"] == "Succeeded"
             linked = self.cmd(
                 f"iot adr ns link su show -n su-primary "
@@ -189,23 +216,4 @@ class TestADRNamespaceWorkflow(
             ).get_output_in_json()
             assert linked["linkingState"] == "Succeeded"
         finally:
-            try:
-                links = self.cmd(
-                    f"iot adr ns link su list --ns {namespace_name} "
-                    f"-g {TEST_RG}"
-                ).get_output_in_json()
-                if "su-primary" in {
-                    item.get("name") for item in links or []
-                }:
-                    self.cmd(
-                        f"iot adr ns link su delete -n su-primary "
-                        f"--ns {namespace_name} -g {TEST_RG} --yes"
-                    )
-                else:
-                    self.cmd(
-                        "iot adr ns su instance delete "
-                        f"-n {update_instance_name} -g {TEST_RG} --yes"
-                    )
-            except Exception:  # noqa: BLE001 - continue namespace cleanup
-                pass
-            self.cleanup_namespace(namespace_name, TEST_RG)
+            self.cleanup_full_infra()

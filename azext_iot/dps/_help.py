@@ -3,60 +3,57 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
-"""Help for DPS device registration."""
+"""
+Help definitions for IoT Hub commands.
+"""
 
 from knack.help_files import helps
 
 
 def load_deviceprovisioningservice_help():
     helps["iot device registration"] = """
-  type: group
-  short-summary: Run DPS 2026-11-02 device registration.
-  long-summary: |
-    Calls the service-derived DPS device endpoint using symmetric-key or X.509
-    device authentication. Service enrollment records and registration-state
-    administration remain under `az iot dps`.
-  """
+        type: group
+        short-summary: Manage IoT device registrations for the IoT Device Provisioning Service.
+        long-summary: Use `az iot dps enrollment registration` or `az iot dps enrollment-group registration` to view and delete registrations.
+    """
 
     helps["iot device registration create"] = """
-  type: command
-  short-summary: Register a device and optionally issue its operational certificate.
-  long-summary: |
-    Uses RegisterDeviceAndIssueCertificate. The response includes issuedCertificateChain
-    and connectionProfile when returned by DPS, plus registryDeviceExternalId to correlate
-    the result with `az iot adr ns registry-device show`. Supply --symmetric-key
-    (optionally --compute-key and --group-id), or an X.509 --certificate-file-path
-    and --key-file-path pair. When DPS credentials are available, symmetric
-    attestation material can be retrieved as before. A 202 response is polled,
-    honoring Retry-After, until DPS returns 200 or the bounded client wait expires;
-    operation-status remains available for explicit follow-up.
-    The generated 2026-11-02-preview contract describes issuedCertificateChain
-    only as an array of bytes and does not define its wire encoding or certificate
-    order. Consequently, this command preserves that field in JSON output but does
-    not offer a certificate-file output option; writing a guessed chain could
-    produce a non-TLS-ready or incorrectly ordered bundle.
-    --endorsement-key and --storage-root-key are retained as advanced request-schema
-    fields, but TPM-only authentication is explicitly unsupported because this
-    contract provides no client TPM challenge protocol.
-  examples:
-    - name: Register and issue a certificate from a PEM CSR
-      text: |
-        az iot device registration create --dps-name MyDps --registration-id device-01 \\
-          --symmetric-key DEVICE_KEY --csr ./device-01.csr
-    - name: Register with an X.509 device certificate
-      text: |
-        az iot device registration create --id-scope 0ne00000000 \\
-          --registration-id device-01 --certificate-file-path ./device.pem \\
-          --key-file-path ./device-key.pem --passphrase SECRET
-  """
-
-    helps["iot device registration operation-status"] = """
-  type: command
-  short-summary: Show the status of a DPS device registration operation.
-  examples:
-    - name: Show registration status
-      text: |
-        az iot device registration operation-status --dps-name MyDps \\
-          --registration-id device-01 --operation-id 00000000-0000-0000-0000-000000000000
-  """
+        type: command
+        short-summary: Register an IoT device with the IoT Device Provisioning Service.
+        long-summary: |
+          The following attestation mechanisms are supported:
+          - Symmetric key
+          - x509 certificate
+          If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
+        examples:
+        - name: Register an IoT device using an individual enrollment.
+          text: az iot device registration create -n {dps_name} --rid {registration_id}
+        - name: Register an IoT device using a group enrollment.
+          text: az iot device registration create -n {dps_name} --rid {registration_id} --gid {group_enrollment_id}
+        - name: Register an IoT device using an individual enrollment, the Device Provisioning Service
+            ID Scope, and given symmetric key. This will bypass retrieving the ID Scope and individal
+            enrollment symmetric key.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --key {symmetric_key}
+        - name: Register an IoT device using a group enrollment, the Device Provisioning Service ID Scope,
+            and given enrollment group symmetric key. This will bypass retrieving the ID Scope and
+            enrollment-group symmetric key. The symmetric key used for the device registration will be
+            computed from the given symmetric key.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --gid {group_enrollment_id} --key {symmetric_key} --ck
+        - name: Register an IoT device using a group enrollment, the Device Provisioning Service ID Scope,
+            and given symmetric key. This will bypass retrieving the ID Scope. Note that since the symmetric key
+            should be the computed device key, the enrollment group id is not needed.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --key {symmetric_key}
+        - name: Register an IoT device using an individual enrollment, the Device Provisioning Service
+            ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+        - name: Register an IoT device using an individual enrollment, the Device Provisioning Service
+            ID Scope, and given certificate and key files and passphrase for the key file. This will
+            bypass retrieving the ID Scope.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+            --pass {passphrase}
+        - name: Register an IoT device using a group enrollment, the Device Provisioning Service
+            ID Scope, and given certificate and key files. This will bypass retrieving the ID Scope.
+            Note that the group enrollment id is not needed for x509 attestations and the subject of
+            the certificate file is the registration id.
+          text: az iot device registration create --id-scope {id_scope} --rid {registration_id} --cp {certificate_file} --kp {key_file}
+    """

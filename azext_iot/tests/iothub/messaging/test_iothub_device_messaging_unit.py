@@ -10,6 +10,8 @@ from types import SimpleNamespace
 import pytest
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AuthenticationError,
+    AzureConnectionError,
     CLIInternalError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
@@ -228,15 +230,48 @@ class TestC2DMessageSend:
 
 
 class TestDeviceSendMessage:
+    @pytest.mark.parametrize("operation", ["device_send_message", "simulate_device"])
+    @pytest.mark.parametrize("x509", [False, True])
+    @pytest.mark.parametrize("error_name,cli_error", [
+        ("CredentialError", AuthenticationError),
+        ("ConnectionFailedError", AzureConnectionError),
+    ])
+    def test_sdk_failure_cleans_up_and_uses_device_endpoint(
+        self, mocker, operation, x509, error_name, cli_error,
+    ):
+        from azure.iot.device import exceptions
+
+        p = _provider(mocker)
+        p.target["deviceHostName"] = "device-endpoint.example"
+        build = mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
+        sdk = mocker.patch("azure.iot.device.IoTHubDeviceClient")
+        mocker.patch("azure.iot.device.X509")
+        mocker.patch("azext_iot.iothub.providers.mqtt.ensure_azure_namespace_path")
+        factory = sdk.create_from_x509_certificate if x509 else sdk.create_from_connection_string
+        error = getattr(exceptions, error_name)("SDK failure")
+        factory.return_value.send_message.side_effect = error
+        auth = {"certificate_file": "cert.pem", "key_file": "key.pem"} if x509 else {
+            "device_symmetric_key": "key"
+        }
+
+        with pytest.raises(cli_error) as raised:
+            getattr(p, operation)(msg_count=1, **auth)
+
+        assert raised.value.__cause__ is error
+        assert "device-endpoint.example" in str(raised.value)
+        assert build.call_args.kwargs["hostname_override"] == "device-endpoint.example"
+        factory.return_value.shutdown.assert_called_once()
+
     def test_send_message_symmetric(self, mocker):
         p = _provider(mocker)
         mqtt_cls = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        mqtt_cls.return_value.__enter__.return_value = mqtt_cls.return_value
         mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
         p.device_send_message(
             data="hi", device_symmetric_key="key", properties="a=b", msg_count=2
         )
         assert mqtt_cls.return_value.send_d2c_message.call_count == 2
-        mqtt_cls.return_value.shutdown.assert_called_once()
+        mqtt_cls.return_value.__exit__.assert_called_once_with(None, None, None)
 
 
 class TestDeviceAuthProps:
@@ -330,6 +365,26 @@ class TestHandleC2DMsg:
 
 
 class TestSimulateDevice:
+    @pytest.mark.parametrize("operation", ["simulate_device", "device_send_message"])
+    @pytest.mark.parametrize("auth_args", [
+        {"certificate_file": "certificate.pem"},
+        {"key_file": "key.pem"},
+        {"passphrase": "passphrase"},
+    ])
+    def test_incomplete_x509_auth_preserves_validation_error(self, mocker, operation, auth_args):
+        p = _provider(mocker)
+        mqtt = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        lookup = mocker.patch(f"{dm_path}._iot_device_show")
+
+        with pytest.raises(
+            RequiredArgumentMissingError,
+            match="Both 'certificate-file' and 'key-file' required",
+        ):
+            getattr(p, operation)(**auth_args)
+
+        mqtt.assert_not_called()
+        lookup.assert_not_called()
+
     def test_simulate_mqtt_invalid_settle(self, mocker):
         p = _provider(mocker)
         with pytest.raises(InvalidArgumentValueError):
@@ -373,6 +428,7 @@ class TestSimulateDevice:
     def test_simulate_mqtt_success(self, mocker):
         p = _provider(mocker)
         mqtt_cls = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        mqtt_cls.return_value.__enter__.return_value = mqtt_cls.return_value
         mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
         mocker.patch.object(p, "_d2c_get_device_auth_props", return_value={"authentication": {}})
         p.simulate_device(
@@ -383,7 +439,7 @@ class TestSimulateDevice:
             init_reported_properties="{}",
         )
         mqtt_cls.return_value.execute.assert_called_once()
-        mqtt_cls.return_value.shutdown.assert_called_once()
+        mqtt_cls.return_value.__exit__.assert_called_once_with(None, None, None)
 
     def test_simulate_http_success(self, mocker):
         p = _provider(mocker)

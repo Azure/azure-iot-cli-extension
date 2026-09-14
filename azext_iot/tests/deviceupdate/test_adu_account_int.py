@@ -102,6 +102,13 @@ def test_account_list(provisioned_accounts: Dict[str, dict]):
         assert acct_name in group_acct_map
 
 
+@pytest.mark.skip(
+    reason="Service-side regression in eastus2euap: the DeviceUpdate RP"
+    " rejects the privateEndpointConnections PUT with ResourceCreationValidateFailed/BadRequest unless"
+    " privateLinkServiceConnectionState.actionsRequired is sent, though the REST spec marks it optional."
+    " The identical request succeeds in westus2, so there is no CLI-side defect and no CLI change is being"
+    " made. Re-enable when the RP fix is deployed."
+)
 @pytest.mark.adu_infrastructure(location="eastus2euap")
 def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[str, dict]):
     target_account_name = list(provisioned_accounts["accounts"].keys())[0]

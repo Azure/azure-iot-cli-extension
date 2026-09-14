@@ -7,7 +7,8 @@
 # Changes may cause incorrect behavior and will be lost if the code is regenerated.
 # --------------------------------------------------------------------------
 from collections.abc import MutableMapping
-from typing import Any, Callable, Iterator, Optional, TypeVar, Union, cast
+from io import IOBase
+from typing import Any, Callable, IO, Iterator, Optional, TypeVar, Union, cast, overload
 import urllib.parse
 
 from azure.core import PipelineClient
@@ -30,11 +31,11 @@ from azure.core.utils import case_insensitive_dict
 from azure.mgmt.core.exceptions import ARMErrorFormat
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
-from .. import types as _types
 from .._configuration import DeviceRegistryMgmtClientConfiguration
 from .._utils.serialization import Deserializer, Serializer
 from .._validation import api_version_validation
 
+JSON = MutableMapping[str, Any]
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, dict[str, Any]], Any]]
 List = list
@@ -147,12 +148,12 @@ def build_assets_get_request(
 
 
 def build_assets_create_or_replace_request(
-    resource_group_name: str, asset_name: str, subscription_id: str, *, json: _types.Asset, **kwargs: Any
+    resource_group_name: str, asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -170,19 +171,20 @@ def build_assets_create_or_replace_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_assets_update_request(
-    resource_group_name: str, asset_name: str, subscription_id: str, *, json: _types.AssetUpdate, **kwargs: Any
+    resource_group_name: str, asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -200,10 +202,11 @@ def build_assets_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_assets_delete_request(
@@ -312,17 +315,12 @@ def build_asset_endpoint_profiles_get_request(  # pylint: disable=name-too-long
 
 
 def build_asset_endpoint_profiles_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    asset_endpoint_profile_name: str,
-    subscription_id: str,
-    *,
-    json: _types.AssetEndpointProfile,
-    **kwargs: Any
+    resource_group_name: str, asset_endpoint_profile_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -340,24 +338,20 @@ def build_asset_endpoint_profiles_create_or_replace_request(  # pylint: disable=
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_asset_endpoint_profiles_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    asset_endpoint_profile_name: str,
-    subscription_id: str,
-    *,
-    json: _types.AssetEndpointProfileUpdate,
-    **kwargs: Any
+    resource_group_name: str, asset_endpoint_profile_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -375,10 +369,11 @@ def build_asset_endpoint_profiles_update_request(  # pylint: disable=name-too-lo
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_asset_endpoint_profiles_delete_request(  # pylint: disable=name-too-long
@@ -538,12 +533,12 @@ def build_namespaces_get_request(
 
 
 def build_namespaces_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str, namespace_name: str, subscription_id: str, *, json: _types.Namespace, **kwargs: Any
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -561,19 +556,20 @@ def build_namespaces_create_or_replace_request(  # pylint: disable=name-too-long
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespaces_update_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, *, json: _types.NamespaceUpdate, **kwargs: Any
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -591,10 +587,11 @@ def build_namespaces_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespaces_delete_request(
@@ -673,17 +670,12 @@ def build_namespaces_list_by_subscription_request(  # pylint: disable=name-too-l
 
 
 def build_namespaces_migrate_request(
-    resource_group_name: str,
-    namespace_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceMigrateRequest,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -701,22 +693,21 @@ def build_namespaces_migrate_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespaces_generate_report_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, *, json: _types.ReportSelector, **kwargs: Any
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/generateReport"
     path_format_arguments = {
@@ -731,19 +722,19 @@ def build_namespaces_generate_report_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespaces_get_latest_report_request(  # pylint: disable=name-too-long
-    resource_group_name: str, namespace_name: str, subscription_id: str, *, json: _types.ReportSelector, **kwargs: Any
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -761,10 +752,11 @@ def build_namespaces_get_latest_report_request(  # pylint: disable=name-too-long
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_assets_get_request(
@@ -797,18 +789,12 @@ def build_namespace_assets_get_request(
 
 
 def build_namespace_assets_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    asset_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceAsset,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -827,25 +813,20 @@ def build_namespace_assets_create_or_replace_request(  # pylint: disable=name-to
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_assets_update_request(
-    resource_group_name: str,
-    namespace_name: str,
-    asset_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceAssetUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -864,10 +845,11 @@ def build_namespace_assets_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_assets_delete_request(
@@ -922,18 +904,12 @@ def build_namespace_assets_list_by_namespace_request(  # pylint: disable=name-to
 
 
 def build_namespace_assets_execute_action_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    asset_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceAssetExecuteActionRequest,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -952,10 +928,11 @@ def build_namespace_assets_execute_action_request(  # pylint: disable=name-too-l
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_devices_get_request(
@@ -988,18 +965,12 @@ def build_namespace_devices_get_request(
 
 
 def build_namespace_devices_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDevice,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1018,25 +989,20 @@ def build_namespace_devices_create_or_replace_request(  # pylint: disable=name-t
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_devices_update_request(
-    resource_group_name: str,
-    namespace_name: str,
-    device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDeviceUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1055,10 +1021,11 @@ def build_namespace_devices_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_devices_delete_request(
@@ -1142,18 +1109,12 @@ def build_namespace_discovered_assets_get_request(  # pylint: disable=name-too-l
 
 
 def build_namespace_discovered_assets_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    discovered_asset_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDiscoveredAsset,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, discovered_asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1172,25 +1133,20 @@ def build_namespace_discovered_assets_create_or_replace_request(  # pylint: disa
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_discovered_assets_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    discovered_asset_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDiscoveredAssetUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, discovered_asset_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1209,10 +1165,11 @@ def build_namespace_discovered_assets_update_request(  # pylint: disable=name-to
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_discovered_assets_delete_request(  # pylint: disable=name-too-long
@@ -1296,18 +1253,12 @@ def build_namespace_discovered_devices_get_request(  # pylint: disable=name-too-
 
 
 def build_namespace_discovered_devices_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    discovered_device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDiscoveredDevice,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, discovered_device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1326,25 +1277,20 @@ def build_namespace_discovered_devices_create_or_replace_request(  # pylint: dis
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_discovered_devices_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    discovered_device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.NamespaceDiscoveredDeviceUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, discovered_device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1363,10 +1309,11 @@ def build_namespace_discovered_devices_update_request(  # pylint: disable=name-t
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_namespace_discovered_devices_delete_request(  # pylint: disable=name-too-long
@@ -1449,17 +1396,12 @@ def build_schema_registries_get_request(
 
 
 def build_schema_registries_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    schema_registry_name: str,
-    subscription_id: str,
-    *,
-    json: _types.SchemaRegistry,
-    **kwargs: Any
+    resource_group_name: str, schema_registry_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1477,24 +1419,20 @@ def build_schema_registries_create_or_replace_request(  # pylint: disable=name-t
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_schema_registries_update_request(
-    resource_group_name: str,
-    schema_registry_name: str,
-    subscription_id: str,
-    *,
-    json: _types.SchemaRegistryUpdate,
-    **kwargs: Any
+    resource_group_name: str, schema_registry_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1512,10 +1450,11 @@ def build_schema_registries_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_schema_registries_delete_request(
@@ -1623,18 +1562,12 @@ def build_schemas_get_request(
 
 
 def build_schemas_create_or_replace_request(
-    resource_group_name: str,
-    schema_registry_name: str,
-    schema_name: str,
-    subscription_id: str,
-    *,
-    json: _types.Schema,
-    **kwargs: Any
+    resource_group_name: str, schema_registry_name: str, schema_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1653,10 +1586,11 @@ def build_schemas_create_or_replace_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_schemas_delete_request(
@@ -1751,14 +1685,12 @@ def build_schema_versions_create_or_replace_request(  # pylint: disable=name-too
     schema_name: str,
     schema_version_name: str,
     subscription_id: str,
-    *,
-    json: _types.SchemaVersion,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1778,10 +1710,11 @@ def build_schema_versions_create_or_replace_request(  # pylint: disable=name-too
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_schema_versions_delete_request(
@@ -1872,18 +1805,12 @@ def build_certificate_authorities_get_request(  # pylint: disable=name-too-long
 
 
 def build_certificate_authorities_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    certificate_authority_name: str,
-    subscription_id: str,
-    *,
-    json: _types.CertificateAuthority,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, certificate_authority_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1902,10 +1829,11 @@ def build_certificate_authorities_create_or_replace_request(  # pylint: disable=
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificate_authorities_delete_request(  # pylint: disable=name-too-long
@@ -1932,18 +1860,12 @@ def build_certificate_authorities_delete_request(  # pylint: disable=name-too-lo
 
 
 def build_certificate_authorities_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    certificate_authority_name: str,
-    subscription_id: str,
-    *,
-    json: _types.CertificateAuthorityUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, certificate_authority_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -1962,10 +1884,11 @@ def build_certificate_authorities_update_request(  # pylint: disable=name-too-lo
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificate_authorities_list_by_namespace_request(  # pylint: disable=name-too-long
@@ -1997,18 +1920,12 @@ def build_certificate_authorities_list_by_namespace_request(  # pylint: disable=
 
 
 def build_certificate_authorities_activate_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    certificate_authority_name: str,
-    subscription_id: str,
-    *,
-    json: _types.ActivateCertificateAuthorityRequest,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, certificate_authority_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/certificateAuthorities/{certificateAuthorityName}/activate"
@@ -2025,9 +1942,10 @@ def build_certificate_authorities_activate_request(  # pylint: disable=name-too-
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificate_authorities_revoke_and_rotate_request(  # pylint: disable=name-too-long
@@ -2094,14 +2012,12 @@ def build_certificate_policies_create_or_replace_request(  # pylint: disable=nam
     certificate_authority_name: str,
     certificate_policy_name: str,
     subscription_id: str,
-    *,
-    json: _types.CertificatePolicy,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2121,10 +2037,11 @@ def build_certificate_policies_create_or_replace_request(  # pylint: disable=nam
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificate_policies_delete_request(  # pylint: disable=name-too-long
@@ -2162,14 +2079,12 @@ def build_certificate_policies_update_request(  # pylint: disable=name-too-long
     certificate_authority_name: str,
     certificate_policy_name: str,
     subscription_id: str,
-    *,
-    json: _types.CertificatePolicyUpdate,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2189,10 +2104,11 @@ def build_certificate_policies_update_request(  # pylint: disable=name-too-long
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificate_policies_list_by_certificate_authority_request(  # pylint: disable=name-too-long
@@ -2254,18 +2170,12 @@ def build_groups_get_request(
 
 
 def build_groups_create_or_replace_request(
-    resource_group_name: str,
-    namespace_name: str,
-    group_name: str,
-    subscription_id: str,
-    *,
-    json: _types.Group,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2284,25 +2194,20 @@ def build_groups_create_or_replace_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_groups_update_request(
-    resource_group_name: str,
-    namespace_name: str,
-    group_name: str,
-    subscription_id: str,
-    *,
-    json: _types.GroupUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2321,10 +2226,11 @@ def build_groups_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_groups_delete_request(
@@ -2431,18 +2337,12 @@ def build_groups_count_members_request(
 
 
 def build_groups_list_members_request(
-    resource_group_name: str,
-    namespace_name: str,
-    group_name: str,
-    subscription_id: str,
-    *,
-    json: _types.GroupListMembersRequest,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2461,10 +2361,11 @@ def build_groups_list_members_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_jobs_get_request(
@@ -2497,18 +2398,12 @@ def build_jobs_get_request(
 
 
 def build_jobs_create_or_replace_request(
-    resource_group_name: str,
-    namespace_name: str,
-    job_name: str,
-    subscription_id: str,
-    *,
-    json: _types.Job,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, job_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2527,25 +2422,20 @@ def build_jobs_create_or_replace_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_jobs_update_request(
-    resource_group_name: str,
-    namespace_name: str,
-    job_name: str,
-    subscription_id: str,
-    *,
-    json: _types.JobTagsUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, job_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2564,10 +2454,11 @@ def build_jobs_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_jobs_delete_request(
@@ -2622,19 +2513,12 @@ def build_jobs_list_by_namespace_request(
 
 
 def build_job_runs_create_or_replace_request(
-    resource_group_name: str,
-    namespace_name: str,
-    job_name: str,
-    run_name: str,
-    subscription_id: str,
-    *,
-    json: _types.JobRun,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, job_name: str, run_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2654,10 +2538,11 @@ def build_job_runs_create_or_replace_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_job_runs_get_request(
@@ -2785,19 +2670,12 @@ def build_job_runs_get_summary_request(
 
 
 def build_job_runs_list_results_request(
-    resource_group_name: str,
-    namespace_name: str,
-    job_name: str,
-    run_name: str,
-    subscription_id: str,
-    *,
-    json: _types.JobRunResultsRequest,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, job_name: str, run_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2817,10 +2695,11 @@ def build_job_runs_list_results_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_job_runs_cancel_request(
@@ -2915,18 +2794,12 @@ def build_registry_devices_get_request(
 
 
 def build_registry_devices_create_or_replace_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    namespace_name: str,
-    registry_device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.RegistryDevice,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, registry_device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2945,25 +2818,20 @@ def build_registry_devices_create_or_replace_request(  # pylint: disable=name-to
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_registry_devices_update_request(
-    resource_group_name: str,
-    namespace_name: str,
-    registry_device_name: str,
-    subscription_id: str,
-    *,
-    json: _types.RegistryDeviceUpdate,
-    **kwargs: Any
+    resource_group_name: str, namespace_name: str, registry_device_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -2982,10 +2850,11 @@ def build_registry_devices_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_registry_devices_delete_request(
@@ -3080,14 +2949,12 @@ def build_registry_device_attributes_create_or_replace_request(  # pylint: disab
     registry_device_name: str,
     attribute_name: str,
     subscription_id: str,
-    *,
-    json: _types.RegistryDeviceAttribute,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-02-preview"))
     accept = _headers.pop("Accept", "application/json")
 
@@ -3107,10 +2974,11 @@ def build_registry_device_attributes_create_or_replace_request(  # pylint: disab
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_registry_device_attributes_delete_request(  # pylint: disable=name-too-long
@@ -3299,7 +3167,7 @@ def build_registry_device_authentication_profiles_list_by_device_request(  # pyl
     return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
 
 
-def build_registry_device_authentication_profiles_get_keys_request(  # pylint: disable=name-too-long
+def build_registry_device_authentication_profiles_list_keys_request(  # pylint: disable=name-too-long
     resource_group_name: str,
     namespace_name: str,
     registry_device_name: str,
@@ -3314,7 +3182,7 @@ def build_registry_device_authentication_profiles_get_keys_request(  # pylint: d
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/registryDevices/{registryDeviceName}/authenticationProfiles/{authenticationProfileName}/getKeys"
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/registryDevices/{registryDeviceName}/authenticationProfiles/{authenticationProfileName}/listKeys"
     path_format_arguments = {
         "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
         "resourceGroupName": _SERIALIZER.url("resource_group_name", resource_group_name, "str"),
@@ -3381,11 +3249,11 @@ class Operations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, **kwargs: Any) -> ItemPaged["_types.Operation"]:
+    def list(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List the operations for the provider.
 
-        :return: An iterator like instance of Operation
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Operation]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3408,7 +3276,7 @@ class Operations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Operation]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -3476,11 +3344,7 @@ class Operations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -3505,15 +3369,15 @@ class OperationStatusOperations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(self, location: str, operation_id: str, **kwargs: Any) -> _types.OperationStatusResult:
+    def get(self, location: str, operation_id: str, **kwargs: Any) -> JSON:
         """Returns the current status of an async operation.
 
         :param location: The location name. Required.
         :type location: str
         :param operation_id: The ID of an ongoing async operation. Required.
         :type operation_id: str
-        :return: OperationStatusResult
-        :rtype: ~azext_iot.sdk.deviceregistry.types.OperationStatusResult
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3558,7 +3422,7 @@ class OperationStatusOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.OperationStatusResult] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_operation_status_get_request(
             location=location,
@@ -3588,11 +3452,7 @@ class OperationStatusOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -3603,9 +3463,9 @@ class OperationStatusOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
 class AsyncOperationStatusOperations:  # pylint: disable=docstring-missing-param
@@ -3631,15 +3491,15 @@ class AsyncOperationStatusOperations:  # pylint: disable=docstring-missing-param
         params_added_on={"2026-11-01": ["api_version", "subscription_id", "location", "operation_id", "accept"]},
         api_versions_list=["2026-11-01", "2026-11-02-preview"],
     )
-    def get(self, location: str, operation_id: str, **kwargs: Any) -> _types.OperationStatusResult:
+    def get(self, location: str, operation_id: str, **kwargs: Any) -> JSON:
         """Returns the current status of an async operation.
 
         :param location: The location name. Required.
         :type location: str
         :param operation_id: The ID of an ongoing async operation. Required.
         :type operation_id: str
-        :return: OperationStatusResult
-        :rtype: ~azext_iot.sdk.deviceregistry.types.OperationStatusResult
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3684,7 +3544,7 @@ class AsyncOperationStatusOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.OperationStatusResult] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_async_operation_status_get_request(
             location=location,
@@ -3714,11 +3574,7 @@ class AsyncOperationStatusOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -3729,9 +3585,9 @@ class AsyncOperationStatusOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
 class AssetsOperations:  # pylint: disable=docstring-missing-param
@@ -3752,7 +3608,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(self, resource_group_name: str, asset_name: str, **kwargs: Any) -> _types.Asset:
+    def get(self, resource_group_name: str, asset_name: str, **kwargs: Any) -> JSON:
         """Get a Asset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -3760,8 +3616,8 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param asset_name: Asset name parameter. Required.
         :type asset_name: str
-        :return: Asset
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Asset
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3890,7 +3746,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.Asset] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_assets_get_request(
             resource_group_name=resource_group_name,
@@ -3920,11 +3776,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -3935,12 +3787,12 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     def _create_or_replace_initial(
-        self, resource_group_name: str, asset_name: str, resource: _types.Asset, **kwargs: Any
+        self, resource_group_name: str, asset_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -3953,10 +3805,16 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_assets_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -3965,6 +3823,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -3987,11 +3846,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -4003,14 +3858,20 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_create_or_replace(
-        self, resource_group_name: str, asset_name: str, resource: _types.Asset, **kwargs: Any
-    ) -> LROPoller[_types.Asset]:
+        self,
+        resource_group_name: str,
+        asset_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Create a Asset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4019,9 +3880,400 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         :param asset_name: Asset name parameter. Required.
         :type asset_name: str
         :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.Asset
-        :return: An instance of LROPoller that returns Asset
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.Asset]
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "assetEndpointProfileRef": "str",
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ],
+                            "events": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "version": 0
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "assetEndpointProfileRef": "str",
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ],
+                            "events": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "version": 0
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        asset_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Asset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_name: Asset name parameter. Required.
+        :type asset_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "assetEndpointProfileRef": "str",
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ],
+                            "events": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "version": 0
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_create_or_replace(
+        self, resource_group_name: str, asset_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Asset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_name: Asset name parameter. Required.
+        :type asset_name: str
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4254,8 +4506,8 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Asset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4274,6 +4526,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -4295,18 +4548,16 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.Asset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.Asset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _update_initial(
-        self, resource_group_name: str, asset_name: str, properties: _types.AssetUpdate, **kwargs: Any
+        self, resource_group_name: str, asset_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4319,10 +4570,16 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_assets_update_request(
             resource_group_name=resource_group_name,
@@ -4331,6 +4588,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -4353,11 +4611,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -4367,14 +4621,20 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_update(
-        self, resource_group_name: str, asset_name: str, properties: _types.AssetUpdate, **kwargs: Any
-    ) -> LROPoller[_types.Asset]:
+        self,
+        resource_group_name: str,
+        asset_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Update a Asset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4383,9 +4643,347 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         :param asset_name: Asset name parameter. Required.
         :type asset_name: str
         :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.AssetUpdate
-        :return: An instance of LROPoller that returns Asset
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.Asset]
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "assetEndpointProfileRef": "str",
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ],
+                            "events": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "version": 0
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        asset_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a Asset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_name: Asset name parameter. Required.
+        :type asset_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "assetEndpointProfileRef": "str",
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "observabilityMode": "str"
+                                    }
+                                ],
+                                "datasetConfiguration": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultEventsConfiguration": "str",
+                        "defaultTopic": {
+                            "path": "str",
+                            "retain": "str"
+                        },
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "events": [
+                            {
+                                "eventNotifier": "str",
+                                "name": "str",
+                                "eventConfiguration": "str",
+                                "observabilityMode": "str",
+                                "topic": {
+                                    "path": "str",
+                                    "retain": "str"
+                                }
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ],
+                            "events": [
+                                {
+                                    "name": "str",
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "version": 0
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self, resource_group_name: str, asset_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a Asset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_name: Asset name parameter. Required.
+        :type asset_name: str
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4565,8 +5163,8 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Asset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4585,6 +5183,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -4606,15 +5205,13 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.Asset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.Asset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _delete_initial(self, resource_group_name: str, asset_name: str, **kwargs: Any) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -4657,11 +5254,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -4671,9 +5264,9 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     def begin_delete(self, resource_group_name: str, asset_name: str, **kwargs: Any) -> LROPoller[None]:
@@ -4733,14 +5326,14 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged["_types.Asset"]:
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List Asset resources by resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of Asset
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Asset]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4861,7 +5454,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Asset]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4931,22 +5524,18 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.Asset"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List Asset resources by subscription ID.
 
-        :return: An iterator like instance of Asset
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Asset]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5067,7 +5656,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Asset]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5136,11 +5725,7 @@ class AssetsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -5165,9 +5750,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(
-        self, resource_group_name: str, asset_endpoint_profile_name: str, **kwargs: Any
-    ) -> _types.AssetEndpointProfile:
+    def get(self, resource_group_name: str, asset_endpoint_profile_name: str, **kwargs: Any) -> JSON:
         """Get a AssetEndpointProfile.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5175,8 +5758,8 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         :type resource_group_name: str
         :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
         :type asset_endpoint_profile_name: str
-        :return: AssetEndpointProfile
-        :rtype: ~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5242,7 +5825,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.AssetEndpointProfile] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_asset_endpoint_profiles_get_request(
             resource_group_name=resource_group_name,
@@ -5272,11 +5855,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5287,15 +5866,15 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     def _create_or_replace_initial(
         self,
         resource_group_name: str,
         asset_endpoint_profile_name: str,
-        resource: _types.AssetEndpointProfile,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -5309,10 +5888,16 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_asset_endpoint_profiles_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -5321,6 +5906,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5343,11 +5929,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -5359,18 +5941,20 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_create_or_replace(
         self,
         resource_group_name: str,
         asset_endpoint_profile_name: str,
-        resource: _types.AssetEndpointProfile,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[_types.AssetEndpointProfile]:
+    ) -> LROPoller[JSON]:
         """Create a AssetEndpointProfile.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5379,9 +5963,215 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
         :type asset_endpoint_profile_name: str
         :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile
-        :return: An instance of LROPoller that returns AssetEndpointProfile
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile]
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "endpointProfileType": "str",
+                        "targetAddress": "str",
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "discoveredAssetEndpointProfileRef": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ]
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "endpointProfileType": "str",
+                        "targetAddress": "str",
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "discoveredAssetEndpointProfileRef": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ]
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        asset_endpoint_profile_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a AssetEndpointProfile.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
+        :type asset_endpoint_profile_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "endpointProfileType": "str",
+                        "targetAddress": "str",
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "discoveredAssetEndpointProfileRef": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ]
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        asset_endpoint_profile_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a AssetEndpointProfile.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
+        :type asset_endpoint_profile_name: str
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5488,8 +6278,8 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.AssetEndpointProfile] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -5508,6 +6298,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -5529,21 +6320,19 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.AssetEndpointProfile].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.AssetEndpointProfile](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _update_initial(
         self,
         resource_group_name: str,
         asset_endpoint_profile_name: str,
-        properties: _types.AssetEndpointProfileUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -5557,10 +6346,16 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_asset_endpoint_profiles_update_request(
             resource_group_name=resource_group_name,
@@ -5569,6 +6364,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5591,11 +6387,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -5605,18 +6397,20 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_update(
         self,
         resource_group_name: str,
         asset_endpoint_profile_name: str,
-        properties: _types.AssetEndpointProfileUpdate,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[_types.AssetEndpointProfile]:
+    ) -> LROPoller[JSON]:
         """Update a AssetEndpointProfile.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5625,9 +6419,188 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
         :type asset_endpoint_profile_name: str
         :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.AssetEndpointProfileUpdate
-        :return: An instance of LROPoller that returns AssetEndpointProfile
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile]
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "endpointProfileType": "str",
+                        "targetAddress": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "endpointProfileType": "str",
+                        "targetAddress": "str",
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "discoveredAssetEndpointProfileRef": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ]
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        asset_endpoint_profile_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a AssetEndpointProfile.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
+        :type asset_endpoint_profile_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "endpointProfileType": "str",
+                        "targetAddress": "str",
+                        "additionalConfiguration": "str",
+                        "authentication": {
+                            "method": "str",
+                            "usernamePasswordCredentials": {
+                                "passwordSecretName": "str",
+                                "usernameSecretName": "str"
+                            },
+                            "x509Credentials": {
+                                "certificateSecretName": "str"
+                            }
+                        },
+                        "discoveredAssetEndpointProfileRef": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "errors": [
+                                {
+                                    "code": 0,
+                                    "message": "str"
+                                }
+                            ]
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self,
+        resource_group_name: str,
+        asset_endpoint_profile_name: str,
+        properties: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a AssetEndpointProfile.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param asset_endpoint_profile_name: Asset Endpoint Profile name parameter. Required.
+        :type asset_endpoint_profile_name: str
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5707,8 +6680,8 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.AssetEndpointProfile] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -5727,6 +6700,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -5748,15 +6722,13 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.AssetEndpointProfile].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.AssetEndpointProfile](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _delete_initial(
         self, resource_group_name: str, asset_endpoint_profile_name: str, **kwargs: Any
@@ -5801,11 +6773,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -5815,9 +6783,9 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     def begin_delete(
@@ -5879,16 +6847,14 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list_by_resource_group(
-        self, resource_group_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.AssetEndpointProfile"]:
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List AssetEndpointProfile resources by resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of AssetEndpointProfile
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5946,7 +6912,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.AssetEndpointProfile]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6016,22 +6982,18 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.AssetEndpointProfile"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List AssetEndpointProfile resources by subscription ID.
 
-        :return: An iterator like instance of AssetEndpointProfile
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.AssetEndpointProfile]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6089,7 +7051,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.AssetEndpointProfile]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6158,11 +7120,7 @@ class AssetEndpointProfilesOperations:  # pylint: disable=docstring-missing-para
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -6202,13 +7160,13 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(self, billing_container_name: str, **kwargs: Any) -> _types.BillingContainer:
+    def get(self, billing_container_name: str, **kwargs: Any) -> JSON:
         """Get a BillingContainer.
 
         :param billing_container_name: Name of the billing container. Required.
         :type billing_container_name: str
-        :return: BillingContainer
-        :rtype: ~azext_iot.sdk.deviceregistry.types.BillingContainer
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6244,7 +7202,7 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.BillingContainer] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_billing_containers_get_request(
             billing_container_name=billing_container_name,
@@ -6273,11 +7231,7 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6288,9 +7242,9 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -6308,11 +7262,11 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.BillingContainer"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List BillingContainer resources by subscription ID.
 
-        :return: An iterator like instance of BillingContainer
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.BillingContainer]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6340,7 +7294,7 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.BillingContainer]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6409,11 +7363,7 @@ class BillingContainersOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -6453,7 +7403,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> _types.Namespace:
+    def get(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> JSON:
         """Get a Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -6461,8 +7411,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: Namespace
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Namespace
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6596,7 +7546,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.Namespace] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_namespaces_get_request(
             resource_group_name=resource_group_name,
@@ -6626,11 +7576,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6641,9 +7587,9 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -6668,7 +7614,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def _create_or_replace_initial(
-        self, resource_group_name: str, namespace_name: str, resource: _types.Namespace, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6681,10 +7627,16 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_namespaces_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -6693,6 +7645,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -6715,11 +7668,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -6731,9 +7680,420 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "provisioningState": "str",
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "provisioningState": "str",
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "provisioningState": "str",
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -6759,8 +8119,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def begin_create_or_replace(
-        self, resource_group_name: str, namespace_name: str, resource: _types.Namespace, **kwargs: Any
-    ) -> LROPoller[_types.Namespace]:
+        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Create a Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -6768,10 +8128,11 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.Namespace
-        :return: An instance of LROPoller that returns Namespace
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.Namespace]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7014,8 +8375,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Namespace] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -7034,6 +8395,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -7055,15 +8417,13 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.Namespace].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.Namespace](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -7088,7 +8448,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def _update_initial(
-        self, resource_group_name: str, namespace_name: str, properties: _types.NamespaceUpdate, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -7101,10 +8461,16 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_namespaces_update_request(
             resource_group_name=resource_group_name,
@@ -7113,6 +8479,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -7135,11 +8502,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -7149,9 +8512,406 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        }
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "provisioningState": "str",
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "management": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "messaging": {
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "deviceAddress": "str",
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "provisioning": {
+                                        "allocationWeight": 0,
+                                        "availability": "str"
+                                    },
+                                    "resourceId": "str"
+                                }
+                            }
+                        },
+                        "observability": {
+                            "enabled": bool,
+                            "endpoints": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "resourceId": "str",
+                                    "scopeId": "str"
+                                }
+                            }
+                        },
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioning": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str"
+                                }
+                            }
+                        },
+                        "provisioningState": "str",
+                        "updating": {
+                            "endpoints": {
+                                "str": {
+                                    "endpointType": "str",
+                                    "inboundCallerIdentity": {
+                                        "type": "str",
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "resourceId": "str",
+                                    "linkingError": {
+                                        "code": "str",
+                                        "message": "str"
+                                    },
+                                    "linkingState": "str",
+                                    "serviceAddress": "str"
+                                }
+                            }
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -7177,8 +8937,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def begin_update(
-        self, resource_group_name: str, namespace_name: str, properties: _types.NamespaceUpdate, **kwargs: Any
-    ) -> LROPoller[_types.Namespace]:
+        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Update a Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -7186,10 +8946,11 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.NamespaceUpdate
-        :return: An instance of LROPoller that returns Namespace
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.Namespace]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7418,8 +9179,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Namespace] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -7438,6 +9199,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -7459,15 +9221,13 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.Namespace].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.Namespace](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -7525,11 +9285,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -7539,9 +9295,9 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -7629,14 +9385,14 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged["_types.Namespace"]:
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List Namespace resources by resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of Namespace
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Namespace]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7762,7 +9518,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Namespace]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -7832,11 +9588,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -7856,11 +9608,11 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.Namespace"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List Namespace resources by subscription ID.
 
-        :return: An iterator like instance of Namespace
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Namespace]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7986,7 +9738,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Namespace]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -8055,11 +9807,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -8088,7 +9836,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def _migrate_initial(
-        self, resource_group_name: str, namespace_name: str, body: _types.NamespaceMigrateRequest, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -8101,10 +9849,16 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_namespaces_migrate_request(
             resource_group_name=resource_group_name,
@@ -8113,6 +9867,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -8135,11 +9890,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -8152,9 +9903,74 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_migrate(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Migrate the resources into Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "resourceIds": [
+                        "str"
+                    ],
+                    "scope": "str"
+                }
+        """
+
+    @overload
+    def begin_migrate(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Migrate the resources into Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -8180,7 +9996,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def begin_migrate(
-        self, resource_group_name: str, namespace_name: str, body: _types.NamespaceMigrateRequest, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> LROPoller[None]:
         """Migrate the resources into Namespace.
 
@@ -8189,8 +10005,9 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.NamespaceMigrateRequest
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -8209,7 +10026,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[None] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
@@ -8262,13 +10079,12 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 "resource_group_name",
                 "namespace_name",
                 "content_type",
-                "accept",
             ]
         },
         api_versions_list=["2026-11-02-preview"],
     )
     def _generate_report_initial(
-        self, resource_group_name: str, namespace_name: str, body: _types.ReportSelector, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -8281,10 +10097,16 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_namespaces_generate_report_request(
             resource_group_name=resource_group_name,
@@ -8293,6 +10115,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -8309,17 +10132,13 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
 
         response = pipeline_response.http_response
 
-        if response.status_code not in [200, 202]:
+        if response.status_code not in [202, 204]:
             try:
                 response.read()  # Load the body in memory and close the socket
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -8332,9 +10151,92 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_generate_report(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Generate a report for a namespace. The generated report is retrieved separately via the
+        getLatestReport action.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The input is polymorphic. The following are possible polymorphic inputs based off
+                  discriminator "reportType":
+
+                # JSON input template for discriminator value "GroupBestUpdatesComplianceReport":
+                report_selector = {
+                    "reportTarget": "str",
+                    "reportType": "GroupBestUpdatesComplianceReport"
+                }
+
+                # JSON input template for discriminator value "GroupInstallableUpdatesReport":
+                report_selector = {
+                    "reportTarget": "str",
+                    "reportType": "GroupInstallableUpdatesReport"
+                }
+
+                # JSON input template for discriminator value "NamespaceUpdateComplianceReport":
+                report_selector = {
+                    "reportType": "NamespaceUpdateComplianceReport",
+                    "reportTarget": "str"
+                }
+
+                # JSON input template you can fill out and use as your body input.
+                body = report_selector
+        """
+
+    @overload
+    def begin_generate_report(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Generate a report for a namespace. The generated report is retrieved separately via the
+        getLatestReport action.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -8346,23 +10248,24 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 "resource_group_name",
                 "namespace_name",
                 "content_type",
-                "accept",
             ]
         },
         api_versions_list=["2026-11-02-preview"],
     )
     def begin_generate_report(
-        self, resource_group_name: str, namespace_name: str, body: _types.ReportSelector, **kwargs: Any
+        self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> LROPoller[None]:
-        """Generate a report for a namespace.
+        """Generate a report for a namespace. The generated report is retrieved separately via the
+        getLatestReport action.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.ReportSelector
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -8397,7 +10300,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[None] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
@@ -8441,6 +10344,230 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             )
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
+    @overload
+    def get_latest_report(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Get the most recently generated report of the given type and target without triggering a new
+        report generation.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The input is polymorphic. The following are possible polymorphic inputs based off
+                  discriminator "reportType":
+
+                # JSON input template for discriminator value "GroupBestUpdatesComplianceReport":
+                report_selector = {
+                    "reportTarget": "str",
+                    "reportType": "GroupBestUpdatesComplianceReport"
+                }
+
+                # JSON input template for discriminator value "GroupInstallableUpdatesReport":
+                report_selector = {
+                    "reportTarget": "str",
+                    "reportType": "GroupInstallableUpdatesReport"
+                }
+
+                # JSON input template for discriminator value "NamespaceUpdateComplianceReport":
+                report_selector = {
+                    "reportType": "NamespaceUpdateComplianceReport",
+                    "reportTarget": "str"
+                }
+
+                # JSON input template you can fill out and use as your body input.
+                body = report_selector
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportType":
+
+                # JSON input template for discriminator value "GroupBestUpdatesComplianceReport":
+                report = {
+                    "bestUpdates": [
+                        {
+                            "devicesNotOnBestUpdateCount": 0,
+                            "targetDevices": {
+                                "agentProfile": 0,
+                                "compatProperties": {
+                                    "str": "str"
+                                }
+                            },
+                            "updateResourceId": "str"
+                        }
+                    ],
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "reportTarget": "str",
+                    "reportType": "GroupBestUpdatesComplianceReport",
+                    "updateCompliance": {
+                        "bestUpdateAvailableDeviceCount": 0,
+                        "devicesInProgressOnBestUpdate": 0,
+                        "onBestUpdateDeviceCount": 0,
+                        "totalNotUpdateableDeviceCount": 0,
+                        "totalUpdateableDeviceCount": 0
+                    }
+                }
+
+                # JSON input template for discriminator value "GroupInstallableUpdatesReport":
+                report = {
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "installableUpdatesAndTargetDevices": [
+                        {
+                            "installableUpdates": [
+                                {
+                                    "updateResourceId": "str"
+                                }
+                            ],
+                            "targetDevices": {
+                                "agentProfile": 0,
+                                "compatProperties": {
+                                    "str": "str"
+                                }
+                            }
+                        }
+                    ],
+                    "reportTarget": "str",
+                    "reportType": "GroupInstallableUpdatesReport"
+                }
+
+                # JSON input template for discriminator value "NamespaceUpdateComplianceReport":
+                report = {
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "newUpdatesAvailableDeviceCount": 0,
+                    "onLatestUpdateDeviceCount": 0,
+                    "reportType": "NamespaceUpdateComplianceReport",
+                    "totalNotUpdateableDeviceCount": 0,
+                    "totalUpdateableDeviceCount": 0,
+                    "updatesInProgressDeviceCount": 0,
+                    "reportTarget": "str"
+                }
+
+                # response body for status code(s): 200
+                response == report
+        """
+
+    @overload
+    def get_latest_report(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Get the most recently generated report of the given type and target without triggering a new
+        report generation.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportType":
+
+                # JSON input template for discriminator value "GroupBestUpdatesComplianceReport":
+                report = {
+                    "bestUpdates": [
+                        {
+                            "devicesNotOnBestUpdateCount": 0,
+                            "targetDevices": {
+                                "agentProfile": 0,
+                                "compatProperties": {
+                                    "str": "str"
+                                }
+                            },
+                            "updateResourceId": "str"
+                        }
+                    ],
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "reportTarget": "str",
+                    "reportType": "GroupBestUpdatesComplianceReport",
+                    "updateCompliance": {
+                        "bestUpdateAvailableDeviceCount": 0,
+                        "devicesInProgressOnBestUpdate": 0,
+                        "onBestUpdateDeviceCount": 0,
+                        "totalNotUpdateableDeviceCount": 0,
+                        "totalUpdateableDeviceCount": 0
+                    }
+                }
+
+                # JSON input template for discriminator value "GroupInstallableUpdatesReport":
+                report = {
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "installableUpdatesAndTargetDevices": [
+                        {
+                            "installableUpdates": [
+                                {
+                                    "updateResourceId": "str"
+                                }
+                            ],
+                            "targetDevices": {
+                                "agentProfile": 0,
+                                "compatProperties": {
+                                    "str": "str"
+                                }
+                            }
+                        }
+                    ],
+                    "reportTarget": "str",
+                    "reportType": "GroupInstallableUpdatesReport"
+                }
+
+                # JSON input template for discriminator value "NamespaceUpdateComplianceReport":
+                report = {
+                    "expiresAt": "2020-02-20 00:00:00",
+                    "generatedAt": "2020-02-20 00:00:00",
+                    "newUpdatesAvailableDeviceCount": 0,
+                    "onLatestUpdateDeviceCount": 0,
+                    "reportType": "NamespaceUpdateComplianceReport",
+                    "totalNotUpdateableDeviceCount": 0,
+                    "totalUpdateableDeviceCount": 0,
+                    "updatesInProgressDeviceCount": 0,
+                    "reportTarget": "str"
+                }
+
+                # response body for status code(s): 200
+                response == report
+        """
+
     @distributed_trace
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -8457,8 +10584,8 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         api_versions_list=["2026-11-02-preview"],
     )
     def get_latest_report(
-        self, resource_group_name: str, namespace_name: str, body: _types.ReportSelector, **kwargs: Any
-    ) -> _types.Report:
+        self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> JSON:
         """Get the most recently generated report of the given type and target without triggering a new
         report generation.
 
@@ -8467,10 +10594,11 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.ReportSelector
-        :return: Report
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Report
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -8580,10 +10708,16 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Report] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_namespaces_get_latest_report_request(
             resource_group_name=resource_group_name,
@@ -8592,6 +10726,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -8615,11 +10750,7 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -8630,9 +10761,9 @@ class NamespacesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
 class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
@@ -8675,9 +10806,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, asset_name: str, **kwargs: Any
-    ) -> _types.NamespaceAsset:
+    def get(self, resource_group_name: str, namespace_name: str, asset_name: str, **kwargs: Any) -> JSON:
         """Get a NamespaceAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -8687,8 +10816,8 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param asset_name: The name of the asset. Required.
         :type asset_name: str
-        :return: NamespaceAsset
-        :rtype: ~azext_iot.sdk.deviceregistry.types.NamespaceAsset
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -8977,7 +11106,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.NamespaceAsset] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_namespace_assets_get_request(
             resource_group_name=resource_group_name,
@@ -9008,11 +11137,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -9023,9 +11148,9 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -9055,7 +11180,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        resource: _types.NamespaceAsset,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -9069,10 +11194,16 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_namespace_assets_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -9082,6 +11213,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -9104,11 +11236,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -9120,9 +11248,891 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "eventGroups": [
+                                {
+                                    "name": "str",
+                                    "events": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "healthState": {
+                                "lastTransitionTime": "str",
+                                "lastUpdateTime": "str",
+                                "message": "str",
+                                "reasonCode": "str",
+                                "status": "str"
+                            },
+                            "managementGroups": [
+                                {
+                                    "name": "str",
+                                    "actions": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                "requestMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            },
+                "responseMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "streams": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ]
+                        },
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "eventGroups": [
+                                {
+                                    "name": "str",
+                                    "events": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "healthState": {
+                                "lastTransitionTime": "str",
+                                "lastUpdateTime": "str",
+                                "message": "str",
+                                "reasonCode": "str",
+                                "status": "str"
+                            },
+                            "managementGroups": [
+                                {
+                                    "name": "str",
+                                    "actions": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                "requestMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            },
+                "responseMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "streams": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ]
+                        },
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "eventGroups": [
+                                {
+                                    "name": "str",
+                                    "events": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "healthState": {
+                                "lastTransitionTime": "str",
+                                "lastUpdateTime": "str",
+                                "message": "str",
+                                "reasonCode": "str",
+                                "status": "str"
+                            },
+                            "managementGroups": [
+                                {
+                                    "name": "str",
+                                    "actions": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                "requestMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            },
+                "responseMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "streams": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ]
+                        },
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -9153,9 +12163,9 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        resource: _types.NamespaceAsset,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceAsset]:
+    ) -> LROPoller[JSON]:
         """Create a NamespaceAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -9165,10 +12175,11 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param asset_name: The name of the asset. Required.
         :type asset_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.NamespaceAsset
-        :return: An instance of LROPoller that returns NamespaceAsset
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceAsset]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -9721,8 +12732,8 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceAsset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -9742,6 +12753,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -9763,15 +12775,13 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceAsset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceAsset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -9801,7 +12811,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        properties: _types.NamespaceAssetUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -9815,10 +12825,16 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_namespace_assets_update_request(
             resource_group_name=resource_group_name,
@@ -9828,6 +12844,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -9850,11 +12867,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -9864,9 +12877,730 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "eventGroups": [
+                                {
+                                    "name": "str",
+                                    "events": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "healthState": {
+                                "lastTransitionTime": "str",
+                                "lastUpdateTime": "str",
+                                "message": "str",
+                                "reasonCode": "str",
+                                "status": "str"
+                            },
+                            "managementGroups": [
+                                {
+                                    "name": "str",
+                                    "actions": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                "requestMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            },
+                "responseMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "streams": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ]
+                        },
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "discoveredAssetRefs": [
+                            "str"
+                        ],
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "enabled": bool,
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "datasets": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ],
+                            "eventGroups": [
+                                {
+                                    "name": "str",
+                                    "events": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "healthState": {
+                                "lastTransitionTime": "str",
+                                "lastUpdateTime": "str",
+                                "message": "str",
+                                "reasonCode": "str",
+                                "status": "str"
+                            },
+                            "managementGroups": [
+                                {
+                                    "name": "str",
+                                    "actions": [
+                                        {
+                                            "name": "str",
+                                            "error": {
+                                                "code": "str",
+                                                "details": [
+                                                    {
+                "code": "str",
+                "correlationId": "str",
+                "info": "str",
+                "message": "str"
+                                                    }
+                                                ],
+                                                "message": "str"
+                                            },
+                "requestMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            },
+                "responseMessageSchemaReference": {
+                                                "schemaName": "str",
+                "schemaRegistryNamespace": "str",
+                                                "schemaVersion":
+                                                  "str"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "streams": [
+                                {
+                                    "name": "str",
+                                    "error": {
+                                        "code": "str",
+                                        "details": [
+                                            {
+                                                "code": "str",
+                                                "correlationId":
+                                                  "str",
+                                                "info": "str",
+                                                "message": "str"
+                                            }
+                                        ],
+                                        "message": "str"
+                                    },
+                                    "messageSchemaReference": {
+                                        "schemaName": "str",
+                                        "schemaRegistryNamespace": "str",
+                                        "schemaVersion": "str"
+                                    }
+                                }
+                            ]
+                        },
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -9897,9 +13631,9 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        properties: _types.NamespaceAssetUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceAsset]:
+    ) -> LROPoller[JSON]:
         """Update a NamespaceAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -9909,10 +13643,11 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param asset_name: The name of the asset. Required.
         :type asset_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.NamespaceAssetUpdate
-        :return: An instance of LROPoller that returns NamespaceAsset
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceAsset]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -10304,8 +14039,8 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceAsset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -10325,6 +14060,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -10346,15 +14082,13 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceAsset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceAsset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -10421,11 +14155,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -10435,9 +14165,9 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -10538,9 +14268,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.NamespaceAsset"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List NamespaceAsset resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -10548,8 +14276,8 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of NamespaceAsset
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.NamespaceAsset]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -10830,7 +14558,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.NamespaceAsset]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -10901,11 +14629,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -10931,7 +14655,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        body: _types.NamespaceAssetExecuteActionRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -10945,10 +14669,16 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_namespace_assets_execute_action_request(
             resource_group_name=resource_group_name,
@@ -10958,6 +14688,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -10980,11 +14711,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -10997,9 +14724,81 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_execute_action(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """A long-running resource action.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "managementActionName": "str",
+                    "managementGroupName": "str",
+                    "payload": {
+                        "str": {}
+                    }
+                }
+        """
+
+    @overload
+    def begin_execute_action(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        asset_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """A long-running resource action.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param asset_name: The name of the asset. Required.
+        :type asset_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -11022,7 +14821,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         asset_name: str,
-        body: _types.NamespaceAssetExecuteActionRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> LROPoller[None]:
         """A long-running resource action.
@@ -11034,8 +14833,9 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param asset_name: The name of the asset. Required.
         :type asset_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.NamespaceAssetExecuteActionRequest
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -11055,7 +14855,7 @@ class NamespaceAssetsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[None] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
@@ -11141,9 +14941,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, device_name: str, **kwargs: Any
-    ) -> _types.NamespaceDevice:
+    def get(self, resource_group_name: str, namespace_name: str, device_name: str, **kwargs: Any) -> JSON:
         """Get a NamespaceDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -11153,8 +14951,8 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param device_name: The name of the device. Required.
         :type device_name: str
-        :return: NamespaceDevice
-        :rtype: ~azext_iot.sdk.deviceregistry.types.NamespaceDevice
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -11297,7 +15095,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.NamespaceDevice] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_namespace_devices_get_request(
             resource_group_name=resource_group_name,
@@ -11328,11 +15126,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -11343,9 +15137,9 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -11375,7 +15169,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         device_name: str,
-        resource: _types.NamespaceDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -11389,10 +15183,16 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_namespace_devices_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -11402,6 +15202,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -11424,11 +15225,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -11440,9 +15237,453 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        device_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param device_name: The name of the device. Required.
+        :type device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "etag": "str",
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveredDeviceRef": "str",
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "endpoints": {
+                                "inbound": {
+                                    "str": {
+                                        "error": {
+                                            "code": "str",
+                                            "details": [
+                                                {
+                                                    "code":
+                                                      "str",
+                "correlationId": "str",
+                                                    "info":
+                                                      "str",
+                                                    "message":
+                                                      "str"
+                                                }
+                                            ],
+                                            "message": "str"
+                                        },
+                                        "healthState": {
+                                            "lastTransitionTime": "str",
+                                            "lastUpdateTime": "str",
+                                            "message": "str",
+                                            "reasonCode": "str",
+                                            "status": "str"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveredDeviceRef": "str",
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "endpoints": {
+                                "inbound": {
+                                    "str": {
+                                        "error": {
+                                            "code": "str",
+                                            "details": [
+                                                {
+                                                    "code":
+                                                      "str",
+                "correlationId": "str",
+                                                    "info":
+                                                      "str",
+                                                    "message":
+                                                      "str"
+                                                }
+                                            ],
+                                            "message": "str"
+                                        },
+                                        "healthState": {
+                                            "lastTransitionTime": "str",
+                                            "lastUpdateTime": "str",
+                                            "message": "str",
+                                            "reasonCode": "str",
+                                            "status": "str"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        device_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param device_name: The name of the device. Required.
+        :type device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveredDeviceRef": "str",
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "endpoints": {
+                                "inbound": {
+                                    "str": {
+                                        "error": {
+                                            "code": "str",
+                                            "details": [
+                                                {
+                                                    "code":
+                                                      "str",
+                "correlationId": "str",
+                                                    "info":
+                                                      "str",
+                                                    "message":
+                                                      "str"
+                                                }
+                                            ],
+                                            "message": "str"
+                                        },
+                                        "healthState": {
+                                            "lastTransitionTime": "str",
+                                            "lastUpdateTime": "str",
+                                            "message": "str",
+                                            "reasonCode": "str",
+                                            "status": "str"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -11473,9 +15714,9 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         device_name: str,
-        resource: _types.NamespaceDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDevice]:
+    ) -> LROPoller[JSON]:
         """Create a NamespaceDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -11485,10 +15726,11 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param device_name: The name of the device. Required.
         :type device_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.NamespaceDevice
-        :return: An instance of LROPoller that returns NamespaceDevice
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDevice]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -11749,8 +15991,8 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -11770,6 +16012,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -11791,15 +16034,13 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -11829,7 +16070,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         device_name: str,
-        properties: _types.NamespaceDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -11843,10 +16084,16 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_namespace_devices_update_request(
             resource_group_name=resource_group_name,
@@ -11856,6 +16103,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -11878,11 +16126,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -11892,9 +16136,381 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        device_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param device_name: The name of the device. Required.
+        :type device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "operatingSystemVersion": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveredDeviceRef": "str",
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "endpoints": {
+                                "inbound": {
+                                    "str": {
+                                        "error": {
+                                            "code": "str",
+                                            "details": [
+                                                {
+                                                    "code":
+                                                      "str",
+                "correlationId": "str",
+                                                    "info":
+                                                      "str",
+                                                    "message":
+                                                      "str"
+                                                }
+                                            ],
+                                            "message": "str"
+                                        },
+                                        "healthState": {
+                                            "lastTransitionTime": "str",
+                                            "lastUpdateTime": "str",
+                                            "message": "str",
+                                            "reasonCode": "str",
+                                            "status": "str"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        device_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param device_name: The name of the device. Required.
+        :type device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveredDeviceRef": "str",
+                        "enabled": bool,
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "authentication": {
+                                        "method": "str",
+                                        "usernamePasswordCredentials": {
+                                            "passwordSecretName": "str",
+                                            "usernameSecretName": "str"
+                                        },
+                                        "x509Credentials": {
+                                            "certificateSecretName":
+                                              "str",
+                "intermediateCertificatesSecretName": "str",
+                                            "keySecretName": "str"
+                                        }
+                                    },
+                                    "trustSettings": {
+                                        "trustList": "str"
+                                    },
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                },
+                                "unassigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "lastTransitionTime": "2020-02-20 00:00:00",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str",
+                        "status": {
+                            "config": {
+                                "error": {
+                                    "code": "str",
+                                    "details": [
+                                        {
+                                            "code": "str",
+                                            "correlationId": "str",
+                                            "info": "str",
+                                            "message": "str"
+                                        }
+                                    ],
+                                    "message": "str"
+                                },
+                                "lastTransitionTime": "2020-02-20 00:00:00",
+                                "version": 0
+                            },
+                            "endpoints": {
+                                "inbound": {
+                                    "str": {
+                                        "error": {
+                                            "code": "str",
+                                            "details": [
+                                                {
+                                                    "code":
+                                                      "str",
+                "correlationId": "str",
+                                                    "info":
+                                                      "str",
+                                                    "message":
+                                                      "str"
+                                                }
+                                            ],
+                                            "message": "str"
+                                        },
+                                        "healthState": {
+                                            "lastTransitionTime": "str",
+                                            "lastUpdateTime": "str",
+                                            "message": "str",
+                                            "reasonCode": "str",
+                                            "status": "str"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "uuid": "str",
+                        "version": 0
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -11925,9 +16541,9 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         device_name: str,
-        properties: _types.NamespaceDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDevice]:
+    ) -> LROPoller[JSON]:
         """Update a NamespaceDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -11937,10 +16553,11 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param device_name: The name of the device. Required.
         :type device_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.NamespaceDeviceUpdate
-        :return: An instance of LROPoller that returns NamespaceDevice
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDevice]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -12129,8 +16746,8 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -12150,6 +16767,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -12171,15 +16789,13 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -12246,11 +16862,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -12260,9 +16872,9 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -12363,9 +16975,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.NamespaceDevice"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List NamespaceDevice resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -12373,8 +16983,8 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of NamespaceDevice
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.NamespaceDevice]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -12509,7 +17119,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.NamespaceDevice]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -12580,11 +17190,7 @@ class NamespaceDevicesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -12631,9 +17237,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             "2026-11-02-preview",
         ],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, discovered_asset_name: str, **kwargs: Any
-    ) -> _types.NamespaceDiscoveredAsset:
+    def get(self, resource_group_name: str, namespace_name: str, discovered_asset_name: str, **kwargs: Any) -> JSON:
         """Get a NamespaceDiscoveredAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -12643,8 +17247,8 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         :type namespace_name: str
         :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
-        :return: NamespaceDiscoveredAsset
-        :rtype: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAsset
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -12804,7 +17408,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.NamespaceDiscoveredAsset] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_namespace_discovered_assets_get_request(
             resource_group_name=resource_group_name,
@@ -12835,11 +17439,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -12850,9 +17450,9 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -12882,7 +17482,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         resource_group_name: str,
         namespace_name: str,
         discovered_asset_name: str,
-        resource: _types.NamespaceDiscoveredAsset,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -12896,10 +17496,16 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_namespace_discovered_assets_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -12909,6 +17515,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -12931,11 +17538,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -12947,9 +17550,504 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_asset_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDiscoveredAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_asset_name: The name of the discovered asset. Required.
+        :type discovered_asset_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "version": 0,
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "version": 0,
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_asset_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDiscoveredAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_asset_name: The name of the discovered asset. Required.
+        :type discovered_asset_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "version": 0,
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -12980,9 +18078,9 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         resource_group_name: str,
         namespace_name: str,
         discovered_asset_name: str,
-        resource: _types.NamespaceDiscoveredAsset,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDiscoveredAsset]:
+    ) -> LROPoller[JSON]:
         """Create a NamespaceDiscoveredAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -12992,11 +18090,11 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         :type namespace_name: str
         :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAsset
-        :return: An instance of LROPoller that returns NamespaceDiscoveredAsset
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAsset]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -13291,8 +18389,8 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDiscoveredAsset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -13312,6 +18410,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -13333,15 +18432,13 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDiscoveredAsset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDiscoveredAsset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -13371,7 +18468,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         resource_group_name: str,
         namespace_name: str,
         discovered_asset_name: str,
-        properties: _types.NamespaceDiscoveredAssetUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -13385,10 +18482,16 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_namespace_discovered_assets_update_request(
             resource_group_name=resource_group_name,
@@ -13398,6 +18501,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -13420,11 +18524,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -13434,9 +18534,486 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_asset_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDiscoveredAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_asset_name: The name of the discovered asset. Required.
+        :type discovered_asset_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "version": 0
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "version": 0,
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_asset_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDiscoveredAsset.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_asset_name: The name of the discovered asset. Required.
+        :type discovered_asset_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "deviceRef": {
+                            "deviceName": "str",
+                            "endpointName": "str"
+                        },
+                        "discoveryId": "str",
+                        "version": 0,
+                        "assetTypeRefs": [
+                            "str"
+                        ],
+                        "attributes": {
+                            "str": {}
+                        },
+                        "datasets": [
+                            {
+                                "name": "str",
+                                "dataPoints": [
+                                    {
+                                        "dataSource": "str",
+                                        "name": "str",
+                                        "dataPointConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "datasetConfiguration": "str",
+                                "destinations": [
+                                    dataset_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "defaultDatasetsConfiguration": "str",
+                        "defaultDatasetsDestinations": [
+                            dataset_destination
+                        ],
+                        "defaultEventsConfiguration": "str",
+                        "defaultEventsDestinations": [
+                            event_destination
+                        ],
+                        "defaultManagementGroupsConfiguration": "str",
+                        "defaultStreamsConfiguration": "str",
+                        "defaultStreamsDestinations": [
+                            stream_destination
+                        ],
+                        "description": "str",
+                        "displayName": "str",
+                        "documentationUri": "str",
+                        "eventGroups": [
+                            {
+                                "name": "str",
+                                "dataSource": "str",
+                                "defaultDestinations": [
+                                    event_destination
+                                ],
+                                "eventGroupConfiguration": "str",
+                                "events": [
+                                    {
+                                        "name": "str",
+                                        "dataSource": "str",
+                                        "destinations": [
+                                            event_destination
+                                        ],
+                                        "eventConfiguration": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "typeRef": "str"
+                            }
+                        ],
+                        "externalAssetId": "str",
+                        "hardwareRevision": "str",
+                        "managementGroups": [
+                            {
+                                "name": "str",
+                                "actions": [
+                                    {
+                                        "name": "str",
+                                        "targetUri": "str",
+                                        "actionConfiguration": "str",
+                                        "actionType": "str",
+                                        "lastUpdatedOn": "2020-02-20
+                                          00:00:00",
+                                        "timeoutInSeconds": 0,
+                                        "topic": "str",
+                                        "typeRef": "str"
+                                    }
+                                ],
+                                "dataSource": "str",
+                                "defaultTimeoutInSeconds": 0,
+                                "defaultTopic": "str",
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "managementGroupConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ],
+                        "manufacturer": "str",
+                        "manufacturerUri": "str",
+                        "model": "str",
+                        "productCode": "str",
+                        "provisioningState": "str",
+                        "serialNumber": "str",
+                        "softwareRevision": "str",
+                        "streams": [
+                            {
+                                "name": "str",
+                                "destinations": [
+                                    stream_destination
+                                ],
+                                "lastUpdatedOn": "2020-02-20 00:00:00",
+                                "streamConfiguration": "str",
+                                "typeRef": "str"
+                            }
+                        ]
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -13467,9 +19044,9 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         resource_group_name: str,
         namespace_name: str,
         discovered_asset_name: str,
-        properties: _types.NamespaceDiscoveredAssetUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDiscoveredAsset]:
+    ) -> LROPoller[JSON]:
         """Update a NamespaceDiscoveredAsset.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -13479,11 +19056,11 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         :type namespace_name: str
         :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAssetUpdate
-        :return: An instance of LROPoller that returns NamespaceDiscoveredAsset
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAsset]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -13760,8 +19337,8 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDiscoveredAsset] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -13781,6 +19358,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -13802,15 +19380,13 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDiscoveredAsset].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDiscoveredAsset](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -13877,11 +19453,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -13891,9 +19463,9 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -13994,9 +19566,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
             "2026-11-02-preview",
         ],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.NamespaceDiscoveredAsset"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List NamespaceDiscoveredAsset resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -14004,9 +19574,8 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of NamespaceDiscoveredAsset
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredAsset]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -14158,7 +19727,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.NamespaceDiscoveredAsset]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -14229,11 +19798,7 @@ class NamespaceDiscoveredAssetsOperations:  # pylint: disable=docstring-missing-
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -14280,9 +19845,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             "2026-11-02-preview",
         ],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, discovered_device_name: str, **kwargs: Any
-    ) -> _types.NamespaceDiscoveredDevice:
+    def get(self, resource_group_name: str, namespace_name: str, discovered_device_name: str, **kwargs: Any) -> JSON:
         """Get a NamespaceDiscoveredDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -14292,8 +19855,8 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         :type namespace_name: str
         :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
-        :return: NamespaceDiscoveredDevice
-        :rtype: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDevice
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -14368,7 +19931,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.NamespaceDiscoveredDevice] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_namespace_discovered_devices_get_request(
             resource_group_name=resource_group_name,
@@ -14399,11 +19962,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -14414,9 +19973,9 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -14446,7 +20005,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         resource_group_name: str,
         namespace_name: str,
         discovered_device_name: str,
-        resource: _types.NamespaceDiscoveredDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -14460,10 +20019,16 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_namespace_discovered_devices_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -14473,6 +20038,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -14495,11 +20061,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -14511,9 +20073,249 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_device_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDiscoveredDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_device_name: The name of the discovered device. Required.
+        :type discovered_device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "discoveryId": "str",
+                        "version": 0,
+                        "attributes": {
+                            "str": {}
+                        },
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "discoveryId": "str",
+                        "version": 0,
+                        "attributes": {
+                            "str": {}
+                        },
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_device_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a NamespaceDiscoveredDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_device_name: The name of the discovered device. Required.
+        :type discovered_device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "discoveryId": "str",
+                        "version": 0,
+                        "attributes": {
+                            "str": {}
+                        },
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -14544,9 +20346,9 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         resource_group_name: str,
         namespace_name: str,
         discovered_device_name: str,
-        resource: _types.NamespaceDiscoveredDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDiscoveredDevice]:
+    ) -> LROPoller[JSON]:
         """Create a NamespaceDiscoveredDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -14556,11 +20358,11 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         :type namespace_name: str
         :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDevice
-        :return: An instance of LROPoller that returns NamespaceDiscoveredDevice
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDevice]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -14685,8 +20487,8 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDiscoveredDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -14706,6 +20508,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -14727,15 +20530,13 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDiscoveredDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDiscoveredDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -14765,7 +20566,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         resource_group_name: str,
         namespace_name: str,
         discovered_device_name: str,
-        properties: _types.NamespaceDiscoveredDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -14779,10 +20580,16 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_namespace_discovered_devices_update_request(
             resource_group_name=resource_group_name,
@@ -14792,6 +20599,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -14814,11 +20622,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -14828,9 +20632,229 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_device_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDiscoveredDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_device_name: The name of the discovered device. Required.
+        :type discovered_device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "attributes": {
+                            "str": {}
+                        },
+                        "discoveryId": "str",
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "operatingSystemVersion": "str",
+                        "version": 0
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "discoveryId": "str",
+                        "version": 0,
+                        "attributes": {
+                            "str": {}
+                        },
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        discovered_device_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a NamespaceDiscoveredDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param discovered_device_name: The name of the discovered device. Required.
+        :type discovered_device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "extendedLocation": {
+                        "name": "str",
+                        "type": "str"
+                    },
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "discoveryId": "str",
+                        "version": 0,
+                        "attributes": {
+                            "str": {}
+                        },
+                        "endpoints": {
+                            "inbound": {
+                                "str": {
+                                    "address": "str",
+                                    "endpointType": "str",
+                                    "additionalConfiguration": "str",
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",
+                                    "supportedAuthenticationMethods": [
+                                        "str"
+                                    ],
+                                    "version": "str"
+                                }
+                            },
+                            "outbound": {
+                                "assigned": {
+                                    "str": {
+                                        "address": "str",
+                                        "endpointType": "str"
+                                    }
+                                }
+                            }
+                        },
+                        "externalDeviceId": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "operatingSystem": "str",
+                        "operatingSystemVersion": "str",
+                        "provisioningState": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -14861,9 +20885,9 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         resource_group_name: str,
         namespace_name: str,
         discovered_device_name: str,
-        properties: _types.NamespaceDiscoveredDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.NamespaceDiscoveredDevice]:
+    ) -> LROPoller[JSON]:
         """Update a NamespaceDiscoveredDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -14873,11 +20897,11 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         :type namespace_name: str
         :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDeviceUpdate
-        :return: An instance of LROPoller that returns NamespaceDiscoveredDevice
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDevice]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -14982,8 +21006,8 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.NamespaceDiscoveredDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -15003,6 +21027,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -15024,15 +21049,13 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.NamespaceDiscoveredDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.NamespaceDiscoveredDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-07-01-preview",
@@ -15099,11 +21122,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -15113,9 +21132,9 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -15216,9 +21235,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
             "2026-11-02-preview",
         ],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.NamespaceDiscoveredDevice"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List NamespaceDiscoveredDevice resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -15226,9 +21243,8 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of NamespaceDiscoveredDevice
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.NamespaceDiscoveredDevice]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -15295,7 +21311,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.NamespaceDiscoveredDevice]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -15366,11 +21382,7 @@ class NamespaceDiscoveredDevicesOperations:  # pylint: disable=docstring-missing
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -15417,7 +21429,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(self, resource_group_name: str, schema_registry_name: str, **kwargs: Any) -> _types.SchemaRegistry:
+    def get(self, resource_group_name: str, schema_registry_name: str, **kwargs: Any) -> JSON:
         """Get a SchemaRegistry.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -15425,8 +21437,8 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param schema_registry_name: Schema registry name parameter. Required.
         :type schema_registry_name: str
-        :return: SchemaRegistry
-        :rtype: ~azext_iot.sdk.deviceregistry.types.SchemaRegistry
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -15485,7 +21497,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.SchemaRegistry] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_schema_registries_get_request(
             resource_group_name=resource_group_name,
@@ -15515,11 +21527,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -15530,9 +21538,9 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2024-09-01-preview",
@@ -15558,7 +21566,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def _create_or_replace_initial(
-        self, resource_group_name: str, schema_registry_name: str, resource: _types.SchemaRegistry, **kwargs: Any
+        self, resource_group_name: str, schema_registry_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -15571,10 +21579,16 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_schema_registries_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -15583,6 +21597,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -15605,11 +21620,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -15621,9 +21632,195 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a SchemaRegistry.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "namespace": "str",
+                        "storageAccountContainerUrl": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "namespace": "str",
+                        "storageAccountContainerUrl": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a SchemaRegistry.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "namespace": "str",
+                        "storageAccountContainerUrl": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -15650,8 +21847,8 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def begin_create_or_replace(
-        self, resource_group_name: str, schema_registry_name: str, resource: _types.SchemaRegistry, **kwargs: Any
-    ) -> LROPoller[_types.SchemaRegistry]:
+        self, resource_group_name: str, schema_registry_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Create a SchemaRegistry.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -15659,10 +21856,11 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param schema_registry_name: Schema registry name parameter. Required.
         :type schema_registry_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.SchemaRegistry
-        :return: An instance of LROPoller that returns SchemaRegistry
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.SchemaRegistry]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -15755,8 +21953,8 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.SchemaRegistry] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -15775,6 +21973,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -15796,15 +21995,13 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.SchemaRegistry].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.SchemaRegistry](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2024-09-01-preview",
@@ -15830,11 +22027,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def _update_initial(
-        self,
-        resource_group_name: str,
-        schema_registry_name: str,
-        properties: _types.SchemaRegistryUpdate,
-        **kwargs: Any
+        self, resource_group_name: str, schema_registry_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -15847,10 +22040,16 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_schema_registries_update_request(
             resource_group_name=resource_group_name,
@@ -15859,6 +22058,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -15881,11 +22081,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -15895,9 +22091,179 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a SchemaRegistry.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "properties": {
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        }
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "namespace": "str",
+                        "storageAccountContainerUrl": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a SchemaRegistry.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "identity": {
+                        "type": "str",
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "namespace": "str",
+                        "storageAccountContainerUrl": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "outboundIdentity": {
+                            "type": "str",
+                            "userAssignedIdentity": "str"
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -15924,12 +22290,8 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         ],
     )
     def begin_update(
-        self,
-        resource_group_name: str,
-        schema_registry_name: str,
-        properties: _types.SchemaRegistryUpdate,
-        **kwargs: Any
-    ) -> LROPoller[_types.SchemaRegistry]:
+        self, resource_group_name: str, schema_registry_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Update a SchemaRegistry.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -15937,10 +22299,11 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param schema_registry_name: Schema registry name parameter. Required.
         :type schema_registry_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.SchemaRegistryUpdate
-        :return: An instance of LROPoller that returns SchemaRegistry
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.SchemaRegistry]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -16017,8 +22380,8 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.SchemaRegistry] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -16037,6 +22400,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -16058,15 +22422,13 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.SchemaRegistry].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.SchemaRegistry](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2024-09-01-preview",
@@ -16125,11 +22487,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -16139,9 +22497,9 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -16231,14 +22589,14 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged["_types.SchemaRegistry"]:
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List SchemaRegistry resources by resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of SchemaRegistry
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.SchemaRegistry]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -16289,7 +22647,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.SchemaRegistry]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -16359,11 +22717,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -16384,11 +22738,11 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.SchemaRegistry"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List SchemaRegistry resources by subscription ID.
 
-        :return: An iterator like instance of SchemaRegistry
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.SchemaRegistry]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -16439,7 +22793,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.SchemaRegistry]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -16508,11 +22862,7 @@ class SchemaRegistriesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -16560,9 +22910,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
             "2026-11-02-preview",
         ],
     )
-    def get(
-        self, resource_group_name: str, schema_registry_name: str, schema_name: str, **kwargs: Any
-    ) -> _types.Schema:
+    def get(self, resource_group_name: str, schema_registry_name: str, schema_name: str, **kwargs: Any) -> JSON:
         """Get a Schema.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -16572,8 +22920,8 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         :type schema_registry_name: str
         :param schema_name: Schema name parameter. Required.
         :type schema_name: str
-        :return: Schema
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Schema
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -16616,7 +22964,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.Schema] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_schemas_get_request(
             resource_group_name=resource_group_name,
@@ -16647,11 +22995,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -16662,9 +23006,153 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        schema_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a Schema.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param schema_name: Schema name parameter. Required.
+        :type schema_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "format": "str",
+                        "schemaType": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "provisioningState": "str",
+                        "tags": {
+                            "str": "str"
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "format": "str",
+                        "schemaType": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "provisioningState": "str",
+                        "tags": {
+                            "str": "str"
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        schema_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a Schema.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param schema_name: Schema name parameter. Required.
+        :type schema_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "format": "str",
+                        "schemaType": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "provisioningState": "str",
+                        "tags": {
+                            "str": "str"
+                        },
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -16696,9 +23184,9 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         schema_registry_name: str,
         schema_name: str,
-        resource: _types.Schema,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.Schema:
+    ) -> JSON:
         """Create a Schema.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -16708,10 +23196,11 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         :type schema_registry_name: str
         :param schema_name: Schema name parameter. Required.
         :type schema_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.Schema
-        :return: Schema
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Schema
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -16780,10 +23269,16 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Schema] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_schemas_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -16793,6 +23288,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -16816,11 +23312,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -16831,9 +23323,9 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-10-01",
@@ -16899,11 +23391,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -16913,9 +23401,9 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -17024,7 +23512,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
     )
     def list_by_schema_registry(
         self, resource_group_name: str, schema_registry_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.Schema"]:
+    ) -> ItemPaged[JSON]:
         """List Schema resources by SchemaRegistry.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -17032,8 +23520,8 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param schema_registry_name: Schema registry name parameter. Required.
         :type schema_registry_name: str
-        :return: An iterator like instance of Schema
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Schema]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -17068,7 +23556,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Schema]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -17139,11 +23627,7 @@ class SchemasOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -17199,7 +23683,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         schema_name: str,
         schema_version_name: str,
         **kwargs: Any
-    ) -> _types.SchemaVersion:
+    ) -> JSON:
         """Get a SchemaVersion.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -17211,8 +23695,8 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         :type schema_name: str
         :param schema_version_name: Schema version name parameter. Required.
         :type schema_version_name: str
-        :return: SchemaVersion
-        :rtype: ~azext_iot.sdk.deviceregistry.types.SchemaVersion
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -17251,7 +23735,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.SchemaVersion] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_schema_versions_get_request(
             resource_group_name=resource_group_name,
@@ -17283,11 +23767,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -17298,9 +23778,147 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        schema_name: str,
+        schema_version_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a SchemaVersion.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param schema_name: Schema name parameter. Required.
+        :type schema_name: str
+        :param schema_version_name: Schema version name parameter. Required.
+        :type schema_version_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "schemaContent": "str",
+                        "description": "str",
+                        "hash": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "schemaContent": "str",
+                        "description": "str",
+                        "hash": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        schema_registry_name: str,
+        schema_name: str,
+        schema_version_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a SchemaVersion.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param schema_registry_name: Schema registry name parameter. Required.
+        :type schema_registry_name: str
+        :param schema_name: Schema name parameter. Required.
+        :type schema_name: str
+        :param schema_version_name: Schema version name parameter. Required.
+        :type schema_version_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "schemaContent": "str",
+                        "description": "str",
+                        "hash": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -17334,9 +23952,9 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         schema_registry_name: str,
         schema_name: str,
         schema_version_name: str,
-        resource: _types.SchemaVersion,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.SchemaVersion:
+    ) -> JSON:
         """Create a SchemaVersion.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -17348,10 +23966,11 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         :type schema_name: str
         :param schema_version_name: Schema version name parameter. Required.
         :type schema_version_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.SchemaVersion
-        :return: SchemaVersion
-        :rtype: ~azext_iot.sdk.deviceregistry.types.SchemaVersion
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -17412,10 +24031,16 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.SchemaVersion] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_schema_versions_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -17426,6 +24051,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -17449,11 +24075,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -17464,9 +24086,9 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2025-10-01",
@@ -17539,11 +24161,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -17553,9 +24171,9 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -17674,7 +24292,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
     )
     def list_by_schema(
         self, resource_group_name: str, schema_registry_name: str, schema_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.SchemaVersion"]:
+    ) -> ItemPaged[JSON]:
         """List SchemaVersion resources by Schema.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -17684,8 +24302,8 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         :type schema_registry_name: str
         :param schema_name: Schema name parameter. Required.
         :type schema_name: str
-        :return: An iterator like instance of SchemaVersion
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.SchemaVersion]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -17716,7 +24334,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.SchemaVersion]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -17788,11 +24406,7 @@ class SchemaVersionsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -17833,7 +24447,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
     )
     def get(
         self, resource_group_name: str, namespace_name: str, certificate_authority_name: str, **kwargs: Any
-    ) -> _types.CertificateAuthority:
+    ) -> JSON:
         """Get a CertificateAuthority.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -17843,8 +24457,8 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         :type namespace_name: str
         :param certificate_authority_name: The name of the Certificate Authority resource. Required.
         :type certificate_authority_name: str
-        :return: CertificateAuthority
-        :rtype: ~azext_iot.sdk.deviceregistry.types.CertificateAuthority
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -17921,7 +24535,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.CertificateAuthority] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_certificate_authorities_get_request(
             resource_group_name=resource_group_name,
@@ -17952,11 +24566,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -17967,9 +24577,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -17991,7 +24601,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        resource: _types.CertificateAuthority,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -18005,10 +24615,16 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_certificate_authorities_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -18018,6 +24634,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -18040,11 +24657,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -18056,9 +24669,335 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a CertificateAuthority.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The input is polymorphic. The following are possible polymorphic inputs based off
+                  discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": certificate_authority_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": certificate_authority_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a CertificateAuthority.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": certificate_authority_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -18081,9 +25020,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        resource: _types.CertificateAuthority,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.CertificateAuthority]:
+    ) -> LROPoller[JSON]:
         """Create a CertificateAuthority.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -18093,10 +25032,11 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         :type namespace_name: str
         :param certificate_authority_name: The name of the Certificate Authority resource. Required.
         :type certificate_authority_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.CertificateAuthority
-        :return: An instance of LROPoller that returns CertificateAuthority
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.CertificateAuthority]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -18265,8 +25205,8 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificateAuthority] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -18286,6 +25226,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -18307,15 +25248,13 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.CertificateAuthority].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.CertificateAuthority](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -18374,11 +25313,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -18388,9 +25323,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -18487,7 +25422,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        properties: _types.CertificateAuthorityUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -18501,10 +25436,16 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_certificate_authorities_update_request(
             resource_group_name=resource_group_name,
@@ -18514,6 +25455,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -18536,11 +25478,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -18550,9 +25488,282 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a CertificateAuthority.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": certificate_authority_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a CertificateAuthority.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "certificateAuthorityType":
+
+                # JSON input template for discriminator value "ICA":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "ICA",
+                    "issuer": certificate_authority_issuer,
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # JSON input template for discriminator value "External":
+                certificate_authority_issuer = {
+                    "issuerType": "External",
+                    "certificateSigningRequest": "str",
+                    "status": "str",
+                    "thumbprint": "str"
+                }
+
+                # JSON input template for discriminator value "Microsoft":
+                certificate_authority_issuer = {
+                    "certificateAuthorityResourceId": "str",
+                    "issuerType": "Microsoft"
+                }
+
+                # JSON input template for discriminator value "Root":
+                certificate_authority_properties = {
+                    "certificateAuthorityType": "Root",
+                    "keyType": "str",
+                    "provisioningState": "str",
+                    "subject": "str",
+                    "uuid": "str",
+                    "validityNotAfter": "2020-02-20 00:00:00",
+                    "validityNotBefore": "2020-02-20 00:00:00"
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": certificate_authority_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -18575,9 +25786,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        properties: _types.CertificateAuthorityUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.CertificateAuthority]:
+    ) -> LROPoller[JSON]:
         """Update a CertificateAuthority.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -18587,10 +25798,11 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         :type namespace_name: str
         :param certificate_authority_name: The name of the Certificate Authority resource. Required.
         :type certificate_authority_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.CertificateAuthorityUpdate
-        :return: An instance of LROPoller that returns CertificateAuthority
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.CertificateAuthority]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -18706,8 +25918,8 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificateAuthority] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -18727,6 +25939,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -18748,15 +25961,13 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.CertificateAuthority].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.CertificateAuthority](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -18766,9 +25977,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         },
         api_versions_list=["2026-11-01", "2026-11-02-preview"],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.CertificateAuthority"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List CertificateAuthority resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -18776,8 +25985,8 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of CertificateAuthority
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.CertificateAuthority]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -18846,7 +26055,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.CertificateAuthority]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -18917,11 +26126,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -18946,7 +26151,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        body: _types.ActivateCertificateAuthorityRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -18960,10 +26165,16 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_certificate_authorities_activate_request(
             resource_group_name=resource_group_name,
@@ -18973,6 +26184,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -18995,11 +26207,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -19009,9 +26217,79 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_activate(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Activates a Certificate Authority of type ``ICA`` and issuer type ``External``. If the
+        Certificate Authority is an invalid type, the API responds with HTTP 400.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "certificateChain": "str"
+                }
+        """
+
+    @overload
+    def begin_activate(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Activates a Certificate Authority of type ``ICA`` and issuer type ``External``. If the
+        Certificate Authority is an invalid type, the API responds with HTTP 400.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -19033,7 +26311,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         resource_group_name: str,
         namespace_name: str,
         certificate_authority_name: str,
-        body: _types.ActivateCertificateAuthorityRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> LROPoller[None]:
         """Activates a Certificate Authority of type ``ICA`` and issuer type ``External``. If the
@@ -19046,8 +26324,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         :type namespace_name: str
         :param certificate_authority_name: The name of the Certificate Authority resource. Required.
         :type certificate_authority_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.ActivateCertificateAuthorityRequest
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -19063,7 +26342,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[None] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
@@ -19165,11 +26444,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -19179,9 +26454,9 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -19200,7 +26475,7 @@ class CertificateAuthoritiesOperations:  # pylint: disable=docstring-missing-par
     def begin_revoke_and_rotate(
         self, resource_group_name: str, namespace_name: str, certificate_authority_name: str, **kwargs: Any
     ) -> LROPoller[None]:
-        """Revokes a Certificate Authority of type ``ICA`` and issuer type ``External``. If the
+        """Revokes a Certificate Authority of type ``ICA`` and issuer type ``Microsoft``. If the
         Certificate Authority is an invalid type, the API responds with HTTP 400.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -19300,7 +26575,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         certificate_authority_name: str,
         certificate_policy_name: str,
         **kwargs: Any
-    ) -> _types.CertificatePolicy:
+    ) -> JSON:
         """Get a CertificatePolicy.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -19312,8 +26587,8 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         :type certificate_authority_name: str
         :param certificate_policy_name: The name of the Certificate Policy resource. Required.
         :type certificate_policy_name: str
-        :return: CertificatePolicy
-        :rtype: ~azext_iot.sdk.deviceregistry.types.CertificatePolicy
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -19356,7 +26631,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.CertificatePolicy] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_certificate_policies_get_request(
             resource_group_name=resource_group_name,
@@ -19388,11 +26663,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -19403,9 +26674,9 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -19429,7 +26700,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         certificate_authority_name: str,
         certificate_policy_name: str,
-        resource: _types.CertificatePolicy,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -19443,10 +26714,16 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_certificate_policies_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -19457,6 +26734,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -19479,11 +26757,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -19495,9 +26769,159 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        certificate_policy_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a CertificatePolicy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param certificate_policy_name: The name of the Certificate Policy resource. Required.
+        :type certificate_policy_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        certificate_policy_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a CertificatePolicy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param certificate_policy_name: The name of the Certificate Policy resource. Required.
+        :type certificate_policy_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -19522,9 +26946,9 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         certificate_authority_name: str,
         certificate_policy_name: str,
-        resource: _types.CertificatePolicy,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.CertificatePolicy]:
+    ) -> LROPoller[JSON]:
         """Create a CertificatePolicy.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -19536,10 +26960,11 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         :type certificate_authority_name: str
         :param certificate_policy_name: The name of the Certificate Policy resource. Required.
         :type certificate_policy_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.CertificatePolicy
-        :return: An instance of LROPoller that returns CertificatePolicy
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.CertificatePolicy]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -19600,8 +27025,8 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificatePolicy] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -19622,6 +27047,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -19643,15 +27069,13 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.CertificatePolicy].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.CertificatePolicy](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -19717,11 +27141,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -19731,9 +27151,9 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -19841,7 +27261,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         certificate_authority_name: str,
         certificate_policy_name: str,
-        properties: _types.CertificatePolicyUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -19855,10 +27275,16 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_certificate_policies_update_request(
             resource_group_name=resource_group_name,
@@ -19869,6 +27295,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -19891,11 +27318,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -19905,9 +27328,145 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        certificate_policy_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a CertificatePolicy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param certificate_policy_name: The name of the Certificate Policy resource. Required.
+        :type certificate_policy_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        }
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        certificate_authority_name: str,
+        certificate_policy_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a CertificatePolicy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param certificate_authority_name: The name of the Certificate Authority resource. Required.
+        :type certificate_authority_name: str
+        :param certificate_policy_name: The name of the Certificate Policy resource. Required.
+        :type certificate_policy_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": {
+                            "validityPeriodInDays": 0
+                        },
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -19932,9 +27491,9 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         certificate_authority_name: str,
         certificate_policy_name: str,
-        properties: _types.CertificatePolicyUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.CertificatePolicy]:
+    ) -> LROPoller[JSON]:
         """Update a CertificatePolicy.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -19946,10 +27505,11 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         :type certificate_authority_name: str
         :param certificate_policy_name: The name of the Certificate Policy resource. Required.
         :type certificate_policy_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.CertificatePolicyUpdate
-        :return: An instance of LROPoller that returns CertificatePolicy
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.CertificatePolicy]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -19996,8 +27556,8 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificatePolicy] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -20018,6 +27578,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -20039,15 +27600,13 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.CertificatePolicy].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.CertificatePolicy](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -20066,7 +27625,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
     )
     def list_by_certificate_authority(
         self, resource_group_name: str, namespace_name: str, certificate_authority_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.CertificatePolicy"]:
+    ) -> ItemPaged[JSON]:
         """List CertificatePolicy resources by CertificateAuthority.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -20076,8 +27635,8 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param certificate_authority_name: The name of the Certificate Authority resource. Required.
         :type certificate_authority_name: str
-        :return: An iterator like instance of CertificatePolicy
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.CertificatePolicy]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -20112,7 +27671,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.CertificatePolicy]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -20184,11 +27743,7 @@ class CertificatePoliciesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -20227,7 +27782,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def get(self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any) -> _types.Group:
+    def get(self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any) -> JSON:
         """Get a Group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -20237,8 +27792,8 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :return: Group
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Group
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -20284,7 +27839,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.Group] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_groups_get_request(
             resource_group_name=resource_group_name,
@@ -20315,11 +27870,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -20330,9 +27881,162 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a Group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "groupType": "str",
+                        "queryFilter": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "lastMembershipRefreshTime": "2020-02-20 00:00:00",
+                        "membershipState": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "groupType": "str",
+                        "queryFilter": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "lastMembershipRefreshTime": "2020-02-20 00:00:00",
+                        "membershipState": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a Group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "groupType": "str",
+                        "queryFilter": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "lastMembershipRefreshTime": "2020-02-20 00:00:00",
+                        "membershipState": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -20351,8 +28055,13 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         api_versions_list=["2026-11-02-preview"],
     )
     def create_or_replace(
-        self, resource_group_name: str, namespace_name: str, group_name: str, resource: _types.Group, **kwargs: Any
-    ) -> _types.Group:
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> JSON:
         """Create a Group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -20362,10 +28071,11 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.Group
-        :return: Group
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Group
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -20440,10 +28150,16 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Group] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_groups_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -20453,6 +28169,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -20476,11 +28193,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -20491,9 +28204,144 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Update a Group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "description": "str",
+                        "displayName": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "groupType": "str",
+                        "queryFilter": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "lastMembershipRefreshTime": "2020-02-20 00:00:00",
+                        "membershipState": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Update a Group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "groupType": "str",
+                        "queryFilter": "str",
+                        "description": "str",
+                        "displayName": "str",
+                        "lastMembershipRefreshTime": "2020-02-20 00:00:00",
+                        "membershipState": "str",
+                        "provisioningState": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -20516,9 +28364,9 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         group_name: str,
-        properties: _types.GroupUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.Group:
+    ) -> JSON:
         """Update a Group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -20528,10 +28376,11 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.GroupUpdate
-        :return: Group
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Group
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -20588,10 +28437,16 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Group] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_groups_update_request(
             resource_group_name=resource_group_name,
@@ -20601,6 +28456,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -20624,11 +28480,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -20639,10 +28491,11 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
+    @distributed_trace
     @api_version_validation(
         method_added_on="2026-11-02-preview",
         params_added_on={
@@ -20656,9 +28509,22 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def _delete_initial(
+    def delete(  # pylint: disable=inconsistent-return-statements
         self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any
-    ) -> Iterator[bytes]:
+    ) -> None:
+        """Delete a Group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :return: None
+        :rtype: None
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -20670,7 +28536,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
+        cls: ClsType[None] = kwargs.pop("cls", None)
 
         _request = build_groups_delete_request(
             resource_group_name=resource_group_name,
@@ -20686,112 +28552,19 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         }
         _request.url = self._client.format_url(_request.url, **path_format_arguments)
 
-        _decompress = kwargs.pop("decompress", True)
-        _stream = True
+        _stream = False
         pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
             _request, stream=_stream, **kwargs
         )
 
         response = pipeline_response.http_response
 
-        if response.status_code not in [202, 204]:
-            try:
-                response.read()  # Load the body in memory and close the socket
-            except (StreamConsumedError, StreamClosedError):
-                pass
+        if response.status_code not in [200, 204]:
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        if response.status_code == 202:
-            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        deserialized = response.iter_bytes() if _decompress else response.iter_raw()
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-
-        return deserialized  # type: ignore
-
-    @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-11-02-preview",
-        params_added_on={
-            "2026-11-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "namespace_name",
-                "group_name",
-            ]
-        },
-        api_versions_list=["2026-11-02-preview"],
-    )
-    def begin_delete(
-        self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any
-    ) -> LROPoller[None]:
-        """Delete a Group.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: The name of the namespace. Required.
-        :type namespace_name: str
-        :param group_name: The name of the group. Required.
-        :type group_name: str
-        :return: An instance of LROPoller that returns None
-        :rtype: ~azure.core.polling.LROPoller[None]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._delete_initial(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                group_name=group_name,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-            raw_result.http_response.read()  # type: ignore
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
-            if cls:
-                return cls(pipeline_response, None, {})  # type: ignore
-
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.base_url", self._config.base_url, "str", skip_quote=True),
-        }
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[None].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+            return cls(pipeline_response, None, {})  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -20801,9 +28574,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.Group"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List Group resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -20811,8 +28582,8 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of Group
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Group]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -20850,7 +28621,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Group]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -20921,11 +28692,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -20988,11 +28755,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -21005,9 +28768,9 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -21025,7 +28788,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
     )
     def begin_refresh_members(
         self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any
-    ) -> LROPoller[_types.RefreshGroupMembersResult]:
+    ) -> LROPoller[JSON]:
         """Refreshes the members of this group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21035,9 +28798,8 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :return: An instance of LROPoller that returns RefreshGroupMembersResult
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.RefreshGroupMembersResult]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21075,7 +28837,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RefreshGroupMembersResult] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -21122,15 +28884,13 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.RefreshGroupMembersResult].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.RefreshGroupMembersResult](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -21147,9 +28907,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def count_members(
-        self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any
-    ) -> _types.GroupMemberCountResponse:
+    def count_members(self, resource_group_name: str, namespace_name: str, group_name: str, **kwargs: Any) -> JSON:
         """Returns the current count of members of this group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21159,8 +28917,8 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :return: GroupMemberCountResponse
-        :rtype: ~azext_iot.sdk.deviceregistry.types.GroupMemberCountResponse
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21182,7 +28940,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.GroupMemberCountResponse] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_groups_count_members_request(
             resource_group_name=resource_group_name,
@@ -21213,11 +28971,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -21228,9 +28982,101 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def list_members(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Lists the current members of a namespace group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "pageSize": 0,
+                    "skipToken": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "members": [
+                        {
+                            "id": "str"
+                        }
+                    ],
+                    "skipToken": "str"
+                }
+        """
+
+    @overload
+    def list_members(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        group_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Lists the current members of a namespace group.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param group_name: The name of the group. Required.
+        :type group_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "members": [
+                        {
+                            "id": "str"
+                        }
+                    ],
+                    "skipToken": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -21253,9 +29099,9 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         group_name: str,
-        body: _types.GroupListMembersRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.GroupListMembersResult:
+    ) -> JSON:
         """Lists the current members of a namespace group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21265,10 +29111,11 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param group_name: The name of the group. Required.
         :type group_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.GroupListMembersRequest
-        :return: GroupListMembersResult
-        :rtype: ~azext_iot.sdk.deviceregistry.types.GroupListMembersResult
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21301,10 +29148,16 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.GroupListMembersResult] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_groups_list_members_request(
             resource_group_name=resource_group_name,
@@ -21314,6 +29167,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -21337,11 +29191,7 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -21352,9 +29202,9 @@ class GroupsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
 class JobsOperations:  # pylint: disable=docstring-missing-param
@@ -21389,7 +29239,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def get(self, resource_group_name: str, namespace_name: str, job_name: str, **kwargs: Any) -> _types.Job:
+    def get(self, resource_group_name: str, namespace_name: str, job_name: str, **kwargs: Any) -> JSON:
         """Get a Job.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21399,8 +29249,8 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param job_name: The name of the job. Required.
         :type job_name: str
-        :return: Job
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Job
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21469,7 +29319,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.Job] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_jobs_get_request(
             resource_group_name=resource_group_name,
@@ -21500,11 +29350,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -21515,9 +29361,9 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -21535,7 +29381,12 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         api_versions_list=["2026-11-02-preview"],
     )
     def _create_or_replace_initial(
-        self, resource_group_name: str, namespace_name: str, job_name: str, resource: _types.Job, **kwargs: Any
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -21548,10 +29399,16 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_jobs_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -21561,6 +29418,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -21583,11 +29441,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -21599,9 +29453,295 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Job.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The input is polymorphic. The following are possible polymorphic inputs based off
+                  discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": job_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": job_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a Job.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": job_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -21620,8 +29760,13 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         api_versions_list=["2026-11-02-preview"],
     )
     def begin_create_or_replace(
-        self, resource_group_name: str, namespace_name: str, job_name: str, resource: _types.Job, **kwargs: Any
-    ) -> LROPoller[_types.Job]:
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Create a Job.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21631,10 +29776,11 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param job_name: The name of the job. Required.
         :type job_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.Job
-        :return: An instance of LROPoller that returns Job
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.Job]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21779,8 +29925,8 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Job] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -21800,6 +29946,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -21821,13 +29968,190 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.Job].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.Job](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    @overload
+    def update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Update a Job.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": job_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Update a Job.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "jobType":
+
+                # JSON input template for discriminator value "OnboardingUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "OnboardingUpdate",
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # JSON input template for discriminator value "SoftwareUpdate":
+                job_properties = {
+                    "definition": {
+                        "schedulingType": "str",
+                        "updateResourceId": "str"
+                    },
+                    "jobType": "SoftwareUpdate",
+                    "target": {
+                        "resourceId": "str"
+                    },
+                    "description": "str",
+                    "displayName": "str",
+                    "provisioningState": "str",
+                    "uuid": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": job_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -21850,9 +30174,9 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         job_name: str,
-        properties: _types.JobTagsUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.Job:
+    ) -> JSON:
         """Update a Job.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -21862,10 +30186,11 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param job_name: The name of the job. Required.
         :type job_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.JobTagsUpdate
-        :return: Job
-        :rtype: ~azext_iot.sdk.deviceregistry.types.Job
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -21941,10 +30266,16 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.Job] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_jobs_update_request(
             resource_group_name=resource_group_name,
@@ -21954,6 +30285,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -21977,11 +30309,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -21992,9 +30320,9 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -22053,11 +30381,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -22067,9 +30391,9 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -22154,9 +30478,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.Job"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List Job resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -22164,8 +30486,8 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of Job
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.Job]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -22226,7 +30548,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Job]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -22297,11 +30619,7 @@ class JobsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -22347,7 +30665,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         job_name: str,
         run_name: str,
-        resource: _types.JobRun,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -22361,10 +30679,16 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_job_runs_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -22375,6 +30699,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -22397,11 +30722,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -22413,36 +30734,22 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-11-02-preview",
-        params_added_on={
-            "2026-11-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "namespace_name",
-                "job_name",
-                "run_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-11-02-preview"],
-    )
+    @overload
     def begin_create_or_replace(
         self,
         resource_group_name: str,
         namespace_name: str,
         job_name: str,
         run_name: str,
-        resource: _types.JobRun,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[_types.JobRun]:
+    ) -> LROPoller[JSON]:
         """Create a JobRun.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -22455,9 +30762,12 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         :param run_name: The name of the job run. Required.
         :type run_name: str
         :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.JobRun
-        :return: An instance of LROPoller that returns JobRun
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.JobRun]
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -22470,6 +30780,18 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                     "properties": {
                         "cancellationReason": "str",
                         "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
                         "provisioningState": "str",
                         "scheduledTime": "2020-02-20 00:00:00",
                         "startTime": "2020-02-20 00:00:00",
@@ -22494,6 +30816,210 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                     "properties": {
                         "cancellationReason": "str",
                         "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
+                        "provisioningState": "str",
+                        "scheduledTime": "2020-02-20 00:00:00",
+                        "startTime": "2020-02-20 00:00:00",
+                        "status": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        run_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a JobRun.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param run_name: The name of the job run. Required.
+        :type run_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "cancellationReason": "str",
+                        "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
+                        "provisioningState": "str",
+                        "scheduledTime": "2020-02-20 00:00:00",
+                        "startTime": "2020-02-20 00:00:00",
+                        "status": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    @api_version_validation(
+        method_added_on="2026-11-02-preview",
+        params_added_on={
+            "2026-11-02-preview": [
+                "api_version",
+                "subscription_id",
+                "resource_group_name",
+                "namespace_name",
+                "job_name",
+                "run_name",
+                "content_type",
+                "accept",
+            ]
+        },
+        api_versions_list=["2026-11-02-preview"],
+    )
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        run_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a JobRun.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param run_name: The name of the job run. Required.
+        :type run_name: str
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "cancellationReason": "str",
+                        "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
+                        "provisioningState": "str",
+                        "scheduledTime": "2020-02-20 00:00:00",
+                        "startTime": "2020-02-20 00:00:00",
+                        "status": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "cancellationReason": "str",
+                        "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
                         "provisioningState": "str",
                         "scheduledTime": "2020-02-20 00:00:00",
                         "startTime": "2020-02-20 00:00:00",
@@ -22514,8 +31040,8 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.JobRun] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -22536,6 +31062,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -22557,15 +31084,13 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.JobRun].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.JobRun](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -22583,9 +31108,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, job_name: str, run_name: str, **kwargs: Any
-    ) -> _types.JobRun:
+    def get(self, resource_group_name: str, namespace_name: str, job_name: str, run_name: str, **kwargs: Any) -> JSON:
         """Get a JobRun.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -22597,8 +31120,8 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         :type job_name: str
         :param run_name: The name of the job run. Required.
         :type run_name: str
-        :return: JobRun
-        :rtype: ~azext_iot.sdk.deviceregistry.types.JobRun
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -22611,6 +31134,18 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                     "properties": {
                         "cancellationReason": "str",
                         "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
                         "provisioningState": "str",
                         "scheduledTime": "2020-02-20 00:00:00",
                         "startTime": "2020-02-20 00:00:00",
@@ -22639,7 +31174,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.JobRun] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_job_runs_get_request(
             resource_group_name=resource_group_name,
@@ -22671,11 +31206,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -22686,9 +31217,9 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -22749,11 +31280,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -22763,9 +31290,9 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -22872,7 +31399,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         filter: Optional[str] = None,
         order_by: Optional[str] = None,
         **kwargs: Any
-    ) -> ItemPaged["_types.JobRun"]:
+    ) -> ItemPaged[JSON]:
         """List JobRun resources by Job.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -22884,15 +31411,15 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         :type job_name: str
         :keyword filter: An OData filter expression to restrict results by job run status. Supports
          equality on the status property, e.g. "status eq 'Active'", and the "in" operator for multiple
-         statuses, e.g. "status in ('Active', 'Scheduled')". Accepted status values: Scheduled, Queued,
-         Active, Succeeded, Failed, TimedOut, Canceled. When omitted, all job runs are returned. Default
-         value is None.
+         statuses, e.g. "status in ('Active', 'Scheduled')". Accepted status values: Scheduled, Active,
+         Succeeded, Failed, TimedOut, Canceled. When omitted, all job runs are returned. Default value
+         is None.
         :paramtype filter: str
         :keyword order_by: An OData order by expression to sort the results. For example, "status asc"
          or "status desc". Default value is None.
         :paramtype order_by: str
-        :return: An iterator like instance of JobRun
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.JobRun]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -22905,6 +31432,18 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                     "properties": {
                         "cancellationReason": "str",
                         "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
                         "provisioningState": "str",
                         "scheduledTime": "2020-02-20 00:00:00",
                         "startTime": "2020-02-20 00:00:00",
@@ -22925,7 +31464,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.JobRun]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -22999,11 +31538,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -23027,7 +31562,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
     )
     def get_summary(
         self, resource_group_name: str, namespace_name: str, job_name: str, run_name: str, **kwargs: Any
-    ) -> _types.JobRunSummary:
+    ) -> JSON:
         """Get a summary of the progress of a job run.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -23039,8 +31574,8 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         :type job_name: str
         :param run_name: The name of the job run. Required.
         :type run_name: str
-        :return: JobRunSummary
-        :rtype: ~azext_iot.sdk.deviceregistry.types.JobRunSummary
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -23068,7 +31603,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.JobRunSummary] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_job_runs_get_summary_request(
             resource_group_name=resource_group_name,
@@ -23100,11 +31635,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -23115,9 +31646,160 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def list_results(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        run_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Browse the results of a job run to find individual device statuses.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param run_name: The name of the job run. Required.
+        :type run_name: str
+        :param body: The content of the action request. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "filter": "str",
+                    "orderBy": "str",
+                    "skipToken": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "value": [
+                        {
+                            "installResult": {
+                                "extendedResultCodes": "str",
+                                "failureOrigin": "str",
+                                "outcome": "str",
+                                "resultCode": 0,
+                                "resultDetails": "str",
+                                "stepResults": [
+                                    {
+                                        "extendedResultCodes": "str",
+                                        "failureOrigin": "str",
+                                        "outcome": "str",
+                                        "resultCode": 0,
+                                        "updateId": {
+                                            "name": "str",
+                                            "provider": "str",
+                                            "version": "str"
+                                        },
+                                        "resultDetails": "str"
+                                    }
+                                ]
+                            },
+                            "reason": "str",
+                            "resourceExternalId": "str",
+                            "resourceId": "str",
+                            "resourceType": "str",
+                            "resourceUuid": "str",
+                            "status": "str"
+                        }
+                    ],
+                    "skipToken": "str"
+                }
+        """
+
+    @overload
+    def list_results(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        job_name: str,
+        run_name: str,
+        body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Browse the results of a job run to find individual device statuses.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param job_name: The name of the job. Required.
+        :type job_name: str
+        :param run_name: The name of the job run. Required.
+        :type run_name: str
+        :param body: The content of the action request. Required.
+        :type body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "value": [
+                        {
+                            "installResult": {
+                                "extendedResultCodes": "str",
+                                "failureOrigin": "str",
+                                "outcome": "str",
+                                "resultCode": 0,
+                                "resultDetails": "str",
+                                "stepResults": [
+                                    {
+                                        "extendedResultCodes": "str",
+                                        "failureOrigin": "str",
+                                        "outcome": "str",
+                                        "resultCode": 0,
+                                        "updateId": {
+                                            "name": "str",
+                                            "provider": "str",
+                                            "version": "str"
+                                        },
+                                        "resultDetails": "str"
+                                    }
+                                ]
+                            },
+                            "reason": "str",
+                            "resourceExternalId": "str",
+                            "resourceId": "str",
+                            "resourceType": "str",
+                            "resourceUuid": "str",
+                            "status": "str"
+                        }
+                    ],
+                    "skipToken": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -23142,9 +31824,9 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         namespace_name: str,
         job_name: str,
         run_name: str,
-        body: _types.JobRunResultsRequest,
+        body: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.JobRunResultListResponse:
+    ) -> JSON:
         """Browse the results of a job run to find individual device statuses.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -23156,10 +31838,11 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         :type job_name: str
         :param run_name: The name of the job run. Required.
         :type run_name: str
-        :param body: The content of the action request. Required.
-        :type body: ~azext_iot.sdk.deviceregistry.types.JobRunResultsRequest
-        :return: JobRunResultListResponse
-        :rtype: ~azext_iot.sdk.deviceregistry.types.JobRunResultListResponse
+        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type body: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -23219,10 +31902,16 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.JobRunResultListResponse] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
 
         _request = build_job_runs_list_results_request(
             resource_group_name=resource_group_name,
@@ -23233,6 +31922,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -23256,11 +31946,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -23271,9 +31957,9 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -23334,11 +32020,7 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -23348,9 +32030,9 @@ class JobRunsOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -23473,7 +32155,7 @@ class JobRunsByNamespaceOperations:  # pylint: disable=docstring-missing-param
         filter: Optional[str] = None,
         order_by: Optional[str] = None,
         **kwargs: Any
-    ) -> ItemPaged["_types.JobRun"]:
+    ) -> ItemPaged[JSON]:
         """List job runs by namespace, across all jobs in the namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -23483,15 +32165,15 @@ class JobRunsByNamespaceOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :keyword filter: An OData filter expression to restrict results by job run status. Supports
          equality on the status property, e.g. "status eq 'Active'", and the "in" operator for multiple
-         statuses, e.g. "status in ('Active', 'Scheduled')". Accepted status values: Scheduled, Queued,
-         Active, Succeeded, Failed, TimedOut, Canceled. When omitted, all job runs are returned. Default
-         value is None.
+         statuses, e.g. "status in ('Active', 'Scheduled')". Accepted status values: Scheduled, Active,
+         Succeeded, Failed, TimedOut, Canceled. When omitted, all job runs are returned. Default value
+         is None.
         :paramtype filter: str
         :keyword order_by: An OData order by expression to sort the results. For example, "status asc"
          or "status desc". Default value is None.
         :paramtype order_by: str
-        :return: An iterator like instance of JobRun
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.JobRun]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -23504,6 +32186,18 @@ class JobRunsByNamespaceOperations:  # pylint: disable=docstring-missing-param
                     "properties": {
                         "cancellationReason": "str",
                         "endTime": "2020-02-20 00:00:00",
+                        "error": {
+                            "code": "str",
+                            "details": [
+                                {
+                                    "code": "str",
+                                    "correlationId": "str",
+                                    "info": "str",
+                                    "message": "str"
+                                }
+                            ],
+                            "message": "str"
+                        },
                         "provisioningState": "str",
                         "scheduledTime": "2020-02-20 00:00:00",
                         "startTime": "2020-02-20 00:00:00",
@@ -23524,7 +32218,7 @@ class JobRunsByNamespaceOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.JobRun]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -23597,11 +32291,7 @@ class JobRunsByNamespaceOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -23640,9 +32330,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-01", "2026-11-02-preview"],
     )
-    def get(
-        self, resource_group_name: str, namespace_name: str, registry_device_name: str, **kwargs: Any
-    ) -> _types.RegistryDevice:
+    def get(self, resource_group_name: str, namespace_name: str, registry_device_name: str, **kwargs: Any) -> JSON:
         """Get a RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -23652,8 +32340,8 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :return: RegistryDevice
-        :rtype: ~azext_iot.sdk.deviceregistry.types.RegistryDevice
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -23703,7 +32391,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RegistryDevice] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_registry_devices_get_request(
             resource_group_name=resource_group_name,
@@ -23734,11 +32422,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -23749,9 +32433,9 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -23773,7 +32457,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         registry_device_name: str,
-        resource: _types.RegistryDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -23787,10 +32471,16 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_registry_devices_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -23800,6 +32490,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -23822,11 +32513,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -23838,9 +32525,174 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a RegistryDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "enablementState": "str",
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "externalDeviceId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "provisioningState": "str",
+                        "softwareRevision": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "enablementState": "str",
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "externalDeviceId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "provisioningState": "str",
+                        "softwareRevision": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create a RegistryDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "enablementState": "str",
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "externalDeviceId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "provisioningState": "str",
+                        "softwareRevision": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -23863,9 +32715,9 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         registry_device_name: str,
-        resource: _types.RegistryDevice,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.RegistryDevice]:
+    ) -> LROPoller[JSON]:
         """Create a RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -23875,10 +32727,11 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.RegistryDevice
-        :return: An instance of LROPoller that returns RegistryDevice
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.RegistryDevice]
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -23953,8 +32806,8 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.RegistryDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -23974,6 +32827,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -23995,15 +32849,13 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.RegistryDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.RegistryDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -24025,7 +32877,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         registry_device_name: str,
-        properties: _types.RegistryDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -24039,10 +32891,16 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = properties
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
 
         _request = build_registry_devices_update_request(
             resource_group_name=resource_group_name,
@@ -24052,6 +32910,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -24074,11 +32933,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -24088,9 +32943,158 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a RegistryDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "enablementState": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "softwareRevision": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "enablementState": "str",
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "externalDeviceId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "provisioningState": "str",
+                        "softwareRevision": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update a RegistryDevice.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 202
+                response == {
+                    "location": "str",
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "enablementState": "str",
+                        "deviceTypeRefs": [
+                            "str"
+                        ],
+                        "externalDeviceId": "str",
+                        "hardwareRevision": "str",
+                        "manufacturer": "str",
+                        "model": "str",
+                        "provisioningState": "str",
+                        "softwareRevision": "str",
+                        "uuid": "str"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -24113,9 +33117,9 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         namespace_name: str,
         registry_device_name: str,
-        properties: _types.RegistryDeviceUpdate,
+        properties: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[_types.RegistryDevice]:
+    ) -> LROPoller[JSON]:
         """Update a RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -24125,10 +33129,11 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceUpdate
-        :return: An instance of LROPoller that returns RegistryDevice
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.deviceregistry.types.RegistryDevice]
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -24187,8 +33192,8 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.RegistryDevice] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -24208,6 +33213,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -24229,15 +33235,13 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.RegistryDevice].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.RegistryDevice](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-01",
@@ -24296,11 +33300,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -24310,9 +33310,9 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -24397,9 +33397,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         },
         api_versions_list=["2026-11-01", "2026-11-02-preview"],
     )
-    def list_by_namespace(
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.RegistryDevice"]:
+    def list_by_namespace(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """List RegistryDevice resources by Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -24407,8 +33405,8 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :return: An iterator like instance of RegistryDevice
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.RegistryDevice]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -24450,7 +33448,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.RegistryDevice]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -24521,11 +33519,7 @@ class RegistryDevicesOperations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -24572,7 +33566,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         registry_device_name: str,
         attribute_name: str,
         **kwargs: Any
-    ) -> _types.RegistryDeviceAttribute:
+    ) -> JSON:
         """Get a RegistryDeviceAttribute.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -24584,8 +33578,8 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         :type registry_device_name: str
         :param attribute_name: The name of the device attribute. Required.
         :type attribute_name: str
-        :return: RegistryDeviceAttribute
-        :rtype: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceAttribute
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -24677,7 +33671,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RegistryDeviceAttribute] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_registry_device_attributes_get_request(
             resource_group_name=resource_group_name,
@@ -24709,11 +33703,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -24724,9 +33714,424 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        attribute_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a RegistryDeviceAttribute.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param attribute_name: The name of the device attribute. Required.
+        :type attribute_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The input is polymorphic. The following are possible polymorphic inputs based off
+                  discriminator "reportedBy":
+
+                # JSON input template for discriminator value "Microsoft.DeviceUpdate":
+                device_attribute_properties = {
+                    "reportedBy": "Microsoft.DeviceUpdate",
+                    "agentInfo": {
+                        "agentProfile": 0,
+                        "agentSdkVersion": "str",
+                        "compatibilityProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "agentInfoEtag": "str",
+                    "deviceClassId": "str",
+                    "installedUpdateId": {
+                        "name": "str",
+                        "provider": "str",
+                        "version": "str"
+                    },
+                    "latestUpdateJobInfo": {
+                        "state": "str",
+                        "updateId": {
+                            "name": "str",
+                            "provider": "str",
+                            "version": "str"
+                        },
+                        "workflowId": "str",
+                        "installResult": {
+                            "extendedResultCodes": "str",
+                            "failureOrigin": "str",
+                            "outcome": "str",
+                            "resultCode": 0,
+                            "resultDetails": "str",
+                            "stepResults": [
+                                {
+                                    "extendedResultCodes": "str",
+                                    "failureOrigin": "str",
+                                    "outcome": "str",
+                                    "resultCode": 0,
+                                    "updateId": {
+                                        "name": "str",
+                                        "provider": "str",
+                                        "version": "str"
+                                    },
+                                    "resultDetails": "str"
+                                }
+                            ]
+                        }
+                    },
+                    "schema": "str"
+                }
+
+                # JSON input template for discriminator value "User":
+                device_attribute_properties = {
+                    "reportedBy": "User",
+                    "schema": "str"
+                }
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "id": "str",
+                    "name": "str",
+                    "properties": device_attribute_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportedBy":
+
+                # JSON input template for discriminator value "Microsoft.DeviceUpdate":
+                device_attribute_properties = {
+                    "reportedBy": "Microsoft.DeviceUpdate",
+                    "agentInfo": {
+                        "agentProfile": 0,
+                        "agentSdkVersion": "str",
+                        "compatibilityProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "agentInfoEtag": "str",
+                    "deviceClassId": "str",
+                    "installedUpdateId": {
+                        "name": "str",
+                        "provider": "str",
+                        "version": "str"
+                    },
+                    "latestUpdateJobInfo": {
+                        "state": "str",
+                        "updateId": {
+                            "name": "str",
+                            "provider": "str",
+                            "version": "str"
+                        },
+                        "workflowId": "str",
+                        "installResult": {
+                            "extendedResultCodes": "str",
+                            "failureOrigin": "str",
+                            "outcome": "str",
+                            "resultCode": 0,
+                            "resultDetails": "str",
+                            "stepResults": [
+                                {
+                                    "extendedResultCodes": "str",
+                                    "failureOrigin": "str",
+                                    "outcome": "str",
+                                    "resultCode": 0,
+                                    "updateId": {
+                                        "name": "str",
+                                        "provider": "str",
+                                        "version": "str"
+                                    },
+                                    "resultDetails": "str"
+                                }
+                            ]
+                        }
+                    },
+                    "schema": "str"
+                }
+
+                # JSON input template for discriminator value "User":
+                device_attribute_properties = {
+                    "reportedBy": "User",
+                    "schema": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportedBy":
+
+                # JSON input template for discriminator value "Microsoft.DeviceUpdate":
+                device_attribute_properties = {
+                    "reportedBy": "Microsoft.DeviceUpdate",
+                    "agentInfo": {
+                        "agentProfile": 0,
+                        "agentSdkVersion": "str",
+                        "compatibilityProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "agentInfoEtag": "str",
+                    "deviceClassId": "str",
+                    "installedUpdateId": {
+                        "name": "str",
+                        "provider": "str",
+                        "version": "str"
+                    },
+                    "latestUpdateJobInfo": {
+                        "state": "str",
+                        "updateId": {
+                            "name": "str",
+                            "provider": "str",
+                            "version": "str"
+                        },
+                        "workflowId": "str",
+                        "installResult": {
+                            "extendedResultCodes": "str",
+                            "failureOrigin": "str",
+                            "outcome": "str",
+                            "resultCode": 0,
+                            "resultDetails": "str",
+                            "stepResults": [
+                                {
+                                    "extendedResultCodes": "str",
+                                    "failureOrigin": "str",
+                                    "outcome": "str",
+                                    "resultCode": 0,
+                                    "updateId": {
+                                        "name": "str",
+                                        "provider": "str",
+                                        "version": "str"
+                                    },
+                                    "resultDetails": "str"
+                                }
+                            ]
+                        }
+                    },
+                    "schema": "str"
+                }
+
+                # JSON input template for discriminator value "User":
+                device_attribute_properties = {
+                    "reportedBy": "User",
+                    "schema": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": device_attribute_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_or_replace(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        registry_device_name: str,
+        attribute_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Create a RegistryDeviceAttribute.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param registry_device_name: The name of the new device. Required.
+        :type registry_device_name: str
+        :param attribute_name: The name of the device attribute. Required.
+        :type attribute_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportedBy":
+
+                # JSON input template for discriminator value "Microsoft.DeviceUpdate":
+                device_attribute_properties = {
+                    "reportedBy": "Microsoft.DeviceUpdate",
+                    "agentInfo": {
+                        "agentProfile": 0,
+                        "agentSdkVersion": "str",
+                        "compatibilityProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "agentInfoEtag": "str",
+                    "deviceClassId": "str",
+                    "installedUpdateId": {
+                        "name": "str",
+                        "provider": "str",
+                        "version": "str"
+                    },
+                    "latestUpdateJobInfo": {
+                        "state": "str",
+                        "updateId": {
+                            "name": "str",
+                            "provider": "str",
+                            "version": "str"
+                        },
+                        "workflowId": "str",
+                        "installResult": {
+                            "extendedResultCodes": "str",
+                            "failureOrigin": "str",
+                            "outcome": "str",
+                            "resultCode": 0,
+                            "resultDetails": "str",
+                            "stepResults": [
+                                {
+                                    "extendedResultCodes": "str",
+                                    "failureOrigin": "str",
+                                    "outcome": "str",
+                                    "resultCode": 0,
+                                    "updateId": {
+                                        "name": "str",
+                                        "provider": "str",
+                                        "version": "str"
+                                    },
+                                    "resultDetails": "str"
+                                }
+                            ]
+                        }
+                    },
+                    "schema": "str"
+                }
+
+                # JSON input template for discriminator value "User":
+                device_attribute_properties = {
+                    "reportedBy": "User",
+                    "schema": "str"
+                }
+
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "reportedBy":
+
+                # JSON input template for discriminator value "Microsoft.DeviceUpdate":
+                device_attribute_properties = {
+                    "reportedBy": "Microsoft.DeviceUpdate",
+                    "agentInfo": {
+                        "agentProfile": 0,
+                        "agentSdkVersion": "str",
+                        "compatibilityProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "agentInfoEtag": "str",
+                    "deviceClassId": "str",
+                    "installedUpdateId": {
+                        "name": "str",
+                        "provider": "str",
+                        "version": "str"
+                    },
+                    "latestUpdateJobInfo": {
+                        "state": "str",
+                        "updateId": {
+                            "name": "str",
+                            "provider": "str",
+                            "version": "str"
+                        },
+                        "workflowId": "str",
+                        "installResult": {
+                            "extendedResultCodes": "str",
+                            "failureOrigin": "str",
+                            "outcome": "str",
+                            "resultCode": 0,
+                            "resultDetails": "str",
+                            "stepResults": [
+                                {
+                                    "extendedResultCodes": "str",
+                                    "failureOrigin": "str",
+                                    "outcome": "str",
+                                    "resultCode": 0,
+                                    "updateId": {
+                                        "name": "str",
+                                        "provider": "str",
+                                        "version": "str"
+                                    },
+                                    "resultDetails": "str"
+                                }
+                            ]
+                        }
+                    },
+                    "schema": "str"
+                }
+
+                # JSON input template for discriminator value "User":
+                device_attribute_properties = {
+                    "reportedBy": "User",
+                    "schema": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "id": "str",
+                    "name": "str",
+                    "properties": device_attribute_properties,
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
 
     @distributed_trace
     @api_version_validation(
@@ -24751,9 +34156,9 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         namespace_name: str,
         registry_device_name: str,
         attribute_name: str,
-        resource: _types.RegistryDeviceAttribute,
+        resource: Union[JSON, IO[bytes]],
         **kwargs: Any
-    ) -> _types.RegistryDeviceAttribute:
+    ) -> JSON:
         """Create a RegistryDeviceAttribute.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -24765,10 +34170,11 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         :type registry_device_name: str
         :param attribute_name: The name of the device attribute. Required.
         :type attribute_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceAttribute
-        :return: RegistryDeviceAttribute
-        :rtype: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceAttribute
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -24994,10 +34400,16 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.RegistryDeviceAttribute] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = resource
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
 
         _request = build_registry_device_attributes_create_or_replace_request(
             resource_group_name=resource_group_name,
@@ -25008,6 +34420,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -25031,11 +34444,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -25046,9 +34455,9 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -25125,11 +34534,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
 
         if response.status_code not in [200, 204]:
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
@@ -25151,7 +34556,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
     )
     def list_by_device(
         self, resource_group_name: str, namespace_name: str, registry_device_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.RegistryDeviceAttribute"]:
+    ) -> ItemPaged[JSON]:
         """List RegistryDeviceAttribute resources by RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -25161,9 +34566,8 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :return: An iterator like instance of RegistryDeviceAttribute
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.RegistryDeviceAttribute]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -25247,7 +34651,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.RegistryDeviceAttribute]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -25319,11 +34723,7 @@ class RegistryDeviceAttributesOperations:  # pylint: disable=docstring-missing-p
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -25370,7 +34770,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
         registry_device_name: str,
         capability_name: str,
         **kwargs: Any
-    ) -> _types.RegistryDeviceCapability:
+    ) -> JSON:
         """Get a RegistryDeviceCapability.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -25385,8 +34785,8 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
          Device Provisioning Service, this name corresponds to the IoT Hub endpoint name assigned in
          the Namespace resource. Required.
         :type capability_name: str
-        :return: RegistryDeviceCapability
-        :rtype: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceCapability
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -25438,7 +34838,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RegistryDeviceCapability] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_registry_device_capabilities_get_request(
             resource_group_name=resource_group_name,
@@ -25470,11 +34870,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -25485,9 +34881,9 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -25506,7 +34902,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
     )
     def list_by_device(
         self, resource_group_name: str, namespace_name: str, registry_device_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.RegistryDeviceCapability"]:
+    ) -> ItemPaged[JSON]:
         """List RegistryDeviceCapability resources by RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -25516,9 +34912,8 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :return: An iterator like instance of RegistryDeviceCapability
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.RegistryDeviceCapability]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -25562,7 +34957,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.RegistryDeviceCapability]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -25634,11 +35029,7 @@ class RegistryDeviceCapabilitiesOperations:  # pylint: disable=docstring-missing
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -25685,7 +35076,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         registry_device_name: str,
         authentication_profile_name: str,
         **kwargs: Any
-    ) -> _types.RegistryDeviceAuthenticationProfile:
+    ) -> JSON:
         """Get a RegistryDeviceAuthenticationProfile.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -25697,8 +35088,8 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         :type registry_device_name: str
         :param authentication_profile_name: The name of the device authentication profile. Required.
         :type authentication_profile_name: str
-        :return: RegistryDeviceAuthenticationProfile
-        :rtype: ~azext_iot.sdk.deviceregistry.types.RegistryDeviceAuthenticationProfile
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -25761,7 +35152,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RegistryDeviceAuthenticationProfile] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_registry_device_authentication_profiles_get_request(
             resource_group_name=resource_group_name,
@@ -25793,11 +35184,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -25808,9 +35195,9 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(
@@ -25829,7 +35216,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
     )
     def list_by_device(
         self, resource_group_name: str, namespace_name: str, registry_device_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.RegistryDeviceAuthenticationProfile"]:
+    ) -> ItemPaged[JSON]:
         """List RegistryDeviceAuthenticationProfile resources by RegistryDevice.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -25839,9 +35226,8 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         :type namespace_name: str
         :param registry_device_name: The name of the new device. Required.
         :type registry_device_name: str
-        :return: An iterator like instance of RegistryDeviceAuthenticationProfile
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.deviceregistry.types.RegistryDeviceAuthenticationProfile]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -25896,7 +35282,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.RegistryDeviceAuthenticationProfile]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -25968,11 +35354,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorResponse,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -25994,14 +35376,14 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         },
         api_versions_list=["2026-11-02-preview"],
     )
-    def get_keys(
+    def list_keys(
         self,
         resource_group_name: str,
         namespace_name: str,
         registry_device_name: str,
         authentication_profile_name: str,
         **kwargs: Any
-    ) -> _types.GetDeviceAuthenticationProfileKeysResponse:
+    ) -> JSON:
         """Retrieve the plaintext symmetric keys of a device authentication profile. Only valid when the
         profile's authentication type is SymmetricKey; profiles of any other type return 400 with the
         InvalidAuthenticationType error code.
@@ -26015,8 +35397,8 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         :type registry_device_name: str
         :param authentication_profile_name: The name of the device authentication profile. Required.
         :type authentication_profile_name: str
-        :return: GetDeviceAuthenticationProfileKeysResponse
-        :rtype: ~azext_iot.sdk.deviceregistry.types.GetDeviceAuthenticationProfileKeysResponse
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -26041,9 +35423,9 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.GetDeviceAuthenticationProfileKeysResponse] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _request = build_registry_device_authentication_profiles_get_keys_request(
+        _request = build_registry_device_authentication_profiles_list_keys_request(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
             registry_device_name=registry_device_name,
@@ -26073,11 +35455,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -26088,9 +35466,9 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @api_version_validation(
         method_added_on="2026-11-02-preview",
@@ -26156,11 +35534,7 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorResponse,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -26170,9 +35544,9 @@ class RegistryDeviceAuthenticationProfilesOperations:  # pylint: disable=docstri
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     @api_version_validation(

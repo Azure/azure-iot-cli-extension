@@ -191,13 +191,14 @@ def test_group_show_and_list(fixture_group_provider):
 
 
 def test_group_delete_calls_groups_delete_directly(
-    fixture_group_provider, mock_poller
+    fixture_group_provider, mocker
 ):
-    fixture_group_provider.client.groups.begin_delete.return_value = mock_poller(None)
+    fixture_group_provider.client.groups.delete.return_value = None
+    wait = mocker.patch.object(fixture_group_provider, "_wait")
 
-    fixture_group_provider.delete("group", "namespace", "rg")
+    assert fixture_group_provider.delete("group", "namespace", "rg") is None
 
-    fixture_group_provider.client.groups.begin_delete.assert_called_once_with(
+    fixture_group_provider.client.groups.delete.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         group_name="group",
@@ -205,18 +206,27 @@ def test_group_delete_calls_groups_delete_directly(
     fixture_group_provider.client.jobs.list_by_namespace.assert_not_called()
     fixture_group_provider.client.jobs.begin_delete.assert_not_called()
     fixture_group_provider.client.job_runs.list_by_job.assert_not_called()
+    wait.assert_not_called()
 
 
-def test_group_delete_no_wait(fixture_group_provider, mock_poller):
-    poller = mock_poller(None)
-    fixture_group_provider.client.groups.begin_delete.return_value = poller
+def test_group_delete_no_wait(fixture_group_provider, mocker):
+    fixture_group_provider.client.groups.delete.return_value = None
+    wait = mocker.patch.object(fixture_group_provider, "_wait")
 
     result = fixture_group_provider.delete(
         "group", "namespace", "rg", no_wait=True
     )
 
-    assert result is poller
-    poller.result.assert_not_called()
+    assert result is None
+    fixture_group_provider.client.groups.delete.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+        group_name="group",
+    )
+    fixture_group_provider.client.jobs.list_by_namespace.assert_not_called()
+    fixture_group_provider.client.jobs.begin_delete.assert_not_called()
+    fixture_group_provider.client.job_runs.list_by_job.assert_not_called()
+    wait.assert_not_called()
 
 
 def test_group_refresh(fixture_group_provider, mock_poller):

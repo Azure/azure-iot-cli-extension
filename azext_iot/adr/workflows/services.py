@@ -23,8 +23,8 @@ from azure.mgmt.resource import ResourceManagementClient
 from msrestazure.tools import parse_resource_id
 
 from azext_iot._factory import (
-    iot_hub_service_factory,
-    iot_service_provisioning_factory,
+    adr_iot_hub_service_factory,
+    adr_iot_service_provisioning_factory,
 )
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
@@ -238,7 +238,7 @@ class WorkflowServices:
         if endpoint.kind == "hub":
             if namespace != "microsoft.devices" or resource_type != "iothubs":
                 raise InvalidArgumentValueError("--hub must reference an IoT Hub.")
-            resource = iot_hub_service_factory(
+            resource = adr_iot_hub_service_factory(
                 self.cmd.cli_ctx
             ).iot_hub_resource.get(
                 resource_group_name=resource_group, resource_name=name
@@ -249,7 +249,7 @@ class WorkflowServices:
                 or resource_type != "provisioningservices"
             ):
                 raise InvalidArgumentValueError("--dps must reference a DPS resource.")
-            resource = iot_service_provisioning_factory(
+            resource = adr_iot_service_provisioning_factory(
                 self.cmd.cli_ctx
             ).iot_dps_resource.get(
                 resource_group_name=resource_group,
@@ -274,13 +274,13 @@ class WorkflowServices:
 
     def list_link_targets(self, kind: str, resource_group_name: str):
         if kind == "hub":
-            resources = iot_hub_service_factory(
+            resources = adr_iot_hub_service_factory(
                 self.cmd.cli_ctx
             ).iot_hub_resource.list_by_resource_group(
                 resource_group_name=resource_group_name
             )
         elif kind == "dps":
-            resources = iot_service_provisioning_factory(
+            resources = adr_iot_service_provisioning_factory(
                 self.cmd.cli_ctx
             ).iot_dps_resource.list_by_resource_group(
                 resource_group_name=resource_group_name

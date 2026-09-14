@@ -9,15 +9,23 @@ from typing import Optional, List
 import os
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import AzCLIError, CLIInternalError
+from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, settings as iothub_settings
+from azext_iot.tests.settings import (
+    DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
+)
+from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
+from azext_iot.tests.iothub._integration_helpers import (
+    assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
+)
+from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -28,6 +36,36 @@ RG = settings.env.azext_iot_testrg
 HUB_NAME = settings.env.azext_iot_testhub
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
+
+
+def pytest_configure(config):
+    if _sas_phase.enabled():
+        _sas_phase.require_posix_timers()
+        _sas_phase.validate_selection(config)
+        runtime = _sas_phase.HubSasPhase(config, ENTITY_NAME, DYNAMIC_STORAGE, ENTITY_RG, HUB_TEST_LOCATION)
+        _sas_phase.ACTIVE = runtime
+        runtime.install()
+        config.pluginmanager.register(runtime, "iot-hub-sas-phase")
+
+
+def pytest_unconfigure():
+    _sas_phase.ACTIVE = None
+
+
+def _invoke_fixture(command: str) -> EmbeddedCLI:
+    target_cli = _sas_phase.require_runtime().get_cli() if _sas_phase.enabled() else cli
+    return invoke_checked(target_cli, command, description="IoT Hub fixture command")
+
+
+def _delete_fixture_resource(command: str, name: str):
+    try:
+        target_cli = _sas_phase.require_runtime().get_cli() if _sas_phase.enabled() else cli
+        invoke_checked(target_cli, command, description=f"Deleting test resource '{name}'")
+    except (AzCLIError, CloudError, HttpResponseError) as error:
+        if is_not_found(error):
+            logger.info("Cleanup target is already absent: %s", name)
+            return
+        raise
 
 
 def generate_hub_id() -> str:
@@ -44,17 +82,18 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
         # Only add dataplane roles to the hubs that were not created mid test
         if hub.get("hub"):
             target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show").as_json()
+            account = cli.invoke("account show", capture_stderr=True).as_json()
             user = account["user"]
 
             if user["name"] is None:
                 raise CLIInternalError("User not found")  # pylint: disable=broad-except
 
-            assign_role_assignment(
+            assign_role_with_propagation(
                 assignee=user["name"],
                 scope=target_hub_id,
                 role=USER_ROLE,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+                wait=ROLE_ASSIGNMENT_REFRESH_TIME,
             )
 
 
@@ -75,22 +114,24 @@ def _cleanup_dynamic_hub(request):
         live
         and integration_selected
         and not iothub_settings.env.azext_iot_testhub
+        and not _sas_phase.enabled()
     ):
         logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
-        from time import sleep
         for attempt in range(3):
-            delete_result = cli.invoke(f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}")
-            if delete_result.success():
+            try:
+                _delete_fixture_resource(
+                    f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}", ENTITY_NAME
+                )
                 break
-            if attempt < 2:
+            except (AzCLIError, CloudError, HttpResponseError):
+                if attempt == 2:
+                    raise
                 logger.warning("Hub deletion attempt %s failed, retrying...", attempt + 1)
                 sleep(30)
-        else:
-            logger.error("Failed to delete hub %s after 3 attempts.", ENTITY_NAME)
 
 
 @pytest.fixture()
-def fixture_provision_existing_hub_device_config(request):
+def fixture_provision_existing_hub_device_config(request, fixture_provision_existing_hub_role):
     # Clean up existing devices and configurations
     if settings.env.azext_iot_testhub:
         clean_up_iothub_device_config(
@@ -104,18 +145,19 @@ def fixture_provision_existing_hub_device_config(request):
 def fixture_provision_existing_hub_role(request):
     if settings.env.azext_iot_testhub:
         # Assign Data Contributor role
-        account = cli.invoke("account show").as_json()
+        account = cli.invoke("account show", capture_stderr=True).as_json()
         user = account["user"]
 
         target_hub = cli.invoke(
-            "iot hub show -n {} -g {}".format(HUB_NAME, RG)
+            "iot hub show -n {} -g {}".format(HUB_NAME, RG), capture_stderr=True
         ).as_json()
 
-        assign_role_assignment(
+        assign_role_with_propagation(
             assignee=user["name"],
             scope=target_hub["id"],
             role=USER_ROLE,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+            wait=ROLE_ASSIGNMENT_REFRESH_TIME,
         )
     yield
 
@@ -154,7 +196,8 @@ def setup_hub_controlplane_states(
     cosmosdb_database_name = provisioned_cosmos_db_module["database"]["name"]
     cosmosdb_cstring = provisioned_cosmos_db_module["connectionString"]
 
-    use_system_endpoints = get_closest_marker(request).kwargs.get("system_endpoints", True)
+    hub_marker = get_closest_marker(request)
+    use_system_endpoints = hub_marker.kwargs.get("system_endpoints", True) if hub_marker else True
 
     # add endpoints
     hub_principal_ids = [
@@ -174,61 +217,60 @@ def setup_hub_controlplane_states(
         provisioned_service_bus_module["topic"]["id"]: "Azure Service Bus Data Sender"
     }
     for scope, role in scope_dict.items():
-        assign_role_assignment(
-            assignee=user_principal_id,
-            scope=scope,
-            role=role,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        # The topic endpoint always uses the shared user-assigned identity.
+        principals = (
+            hub_principal_ids
+            if use_system_endpoints and scope != provisioned_service_bus_module["topic"]["id"]
+            else [user_principal_id]
         )
-        if use_system_endpoints:
-            for hub_principal_id in hub_principal_ids:
-                assign_role_assignment(
-                    assignee=hub_principal_id,
-                    scope=scope,
-                    role=role,
-                    max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-                )
+        for principal in principals:
+            assign_role_assignment(
+                assignee=principal,
+                scope=scope,
+                role=role,
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            )
     sleep(30)
 
     suffix = "systemid" if use_system_endpoints else "userid"
     user_identity_parameter = "[system]" if use_system_endpoints else user_id
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create eventhub --en eventhub-{suffix} -g {hub_rg} -n {hub_name} --endpoint-uri "
         f"{eventhub_endpoint_uri} --entity-path {eventhub_name} --identity {user_identity_parameter}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create servicebus-queue --en queue-{suffix} -g {hub_rg} -n {hub_name} "
         f"--endpoint-uri {servicebus_endpoint_uri} --entity-path {servicebus_queue} --identity {user_identity_parameter}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create servicebus-topic --en topic-userid -g {hub_rg} -n {hub_name} --endpoint-uri "
         f"{servicebus_endpoint_uri} --entity-path {servicebus_topic} --identity {user_id}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create storage-container --en storagecontainer-key -g {hub_rg} -n {hub_name} -c "
         f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create storage-container --en storagecontainer-{suffix} -g {hub_rg} -n {hub_name} "
         f"--identity {user_identity_parameter} --endpoint-uri {storage_endpoint_uri} --container {storage_container} "
         "-b 350 -w 250 --encoding json"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create cosmosdb-container --en cosmosdb-key -g {hub_rg} -n {hub_name} --container "
         f"{cosmosdb_container_name} --db {cosmosdb_database_name} -c {cosmosdb_cstring}"
     )
 
     # add routes - prob change one to be custom endpoint
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
         f" --rn {generate_generic_id()} --source devicelifecycleevents --condition false --enabled true"
     )
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
         f" --rn {generate_generic_id()} --source twinchangeevents --condition true --enabled false"
     )
@@ -239,12 +281,13 @@ def setup_hub_controlplane_states(
     with open(cert_file, 'w', encoding='utf-8') as f:
         f.write(cert)
 
-    cli.invoke(
-        f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
-    )
-
-    if os.path.isfile(cert_file):
-        os.remove(cert_file)
+    try:
+        _invoke_fixture(
+            f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
+        )
+    finally:
+        if os.path.isfile(cert_file):
+            os.remove(cert_file)
 
     # # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
     # public_ip = get_agent_public_ip()
@@ -291,7 +334,7 @@ def provisioned_only_iot_hubs_module(request) -> dict:
 
 def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
     hub_marker = get_closest_marker(request)
-    desired_location = None
+    desired_location = HUB_TEST_LOCATION
     desired_tags = None
     desired_sys_identity = False
     desired_user_identity = False
@@ -299,7 +342,9 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
     desired_count = 1
 
     if hub_marker:
-        desired_location = hub_marker.kwargs.get("location")
+        desired_location = hub_marker.kwargs.get("location", HUB_TEST_LOCATION)
+        if desired_location != HUB_TEST_LOCATION:
+            raise ValueError(f"Hub integration resources must use {HUB_TEST_LOCATION}.")
         desired_tags = hub_marker.kwargs.get("desired_tags")
         desired_sys_identity = hub_marker.kwargs.get("sys_identity", False)
         desired_user_identity = hub_marker.kwargs.get("user_identity", False)
@@ -309,7 +354,10 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
     hub_results = []
     for _ in range(desired_count):
         name = generate_hub_id()
-        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+        base_create_command = (
+            f"iot hub create -n {name} -g {RG} --sku S1 "
+            f"--location {desired_location} --disable-local-auth true"
+        )
         if desired_sys_identity:
             base_create_command += " --system-assigned-mi"
         if desired_user_identity and provisioned_user_identity:
@@ -317,18 +365,16 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             base_create_command += f" --user-assigned-mi {user_identity_id}"
         if desired_tags:
             base_create_command += f" --tags {desired_tags}"
-        if desired_location:
-            base_create_command += f" -l {desired_location}"
         if desired_storage and provisioned_storage:
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        hub_obj = cli.invoke(base_create_command).as_json()
+        hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
+        assert_hub_policy(hub_obj)
         hub_results.append({
             "hub": hub_obj,
             "name": name,
             "rg": RG,
-            "connectionString": _get_hub_connection_string(name, RG),
             "storage": provisioned_storage
         })
     return hub_results
@@ -343,11 +389,17 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
 
 
 def _iot_hubs_removal(hub_result):
+    failures = []
     for hub in hub_result:
         name = hub["name"]
-        delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
-        if not delete_result.success():
-            logger.error(f"Failed to delete iot hub resource {name}.")
+        try:
+            _delete_fixture_resource(f"iot hub delete -n {name} -g {RG}", name)
+        except (AzCLIError, CloudError, HttpResponseError) as error:
+            logger.error("Failed to delete IoT Hub resource '%s': %s", name, error)
+            failures.append((name, error))
+    if failures:
+        names = ", ".join(name for name, _ in failures)
+        raise CLIInternalError(f"Failed to delete test IoT Hub resources: {names}.") from failures[0][1]
 
 
 # User Assigned Identity fixtures (UAI)
@@ -362,14 +414,12 @@ def provisioned_user_identity_module() -> dict:
 def _user_identity_provisioner():
     name = generate_hub_depenency_id()
     return cli.invoke(
-        f"identity create -n {name} -g {RG}"
+        f"identity create -n {name} -g {RG} --location {HUB_TEST_LOCATION}"
     ).as_json()
 
 
 def _user_identity_removal(name):
-    delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete user identity resource {name}.")
+    _delete_fixture_resource(f"identity delete -n {name} -g {RG}", name)
 
 
 # Storage Account fixtures
@@ -423,27 +473,16 @@ def _storage_provisioner():
     account_name = generate_hub_depenency_id()
     container_name = generate_hub_depenency_id()
 
-    storage_list = cli.invoke(
-        'storage account list -g "{}"'.format(RG)
+    # The generated name is new; no subscription/RG enumeration is necessary.
+    target_storage = cli.invoke(
+        f"storage account create -n {account_name} -g {RG} --location {HUB_TEST_LOCATION}",
+        capture_stderr=True,
     ).as_json()
-
-    target_storage = None
-    for storage in storage_list:
-        if storage["name"] == account_name:
-            target_storage = storage
-            break
-
-    if not target_storage:
-        target_storage = cli.invoke(
-            "storage account create -n {} -g {}".format(
-                account_name, RG
-            )
-        ).as_json()
 
     storage_cstring = _storage_get_cstring(account_name)
 
     # Will not do anything if container exists.
-    cli.invoke(
+    _invoke_fixture(
         "storage container create -n {} --connection-string '{}'".format(
             container_name, storage_cstring
         ),
@@ -462,9 +501,7 @@ def _storage_provisioner():
 
 
 def _storage_removal(account_name: str):
-    delete_result = cli.invoke(f"storage account delete -g {RG} -n {account_name} -y")
-    if not delete_result.success():
-        logger.error(f"Failed to delete storage account resource {account_name}.")
+    _delete_fixture_resource(f"storage account delete -g {RG} -n {account_name} -y", account_name)
 
 
 # Event Hub fixtures
@@ -517,8 +554,8 @@ def _event_hub_provisioner():
     eventhub_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
     namespace_obj = cli.invoke(
-        "eventhubs namespace create --name {} --resource-group {}".format(
-            namespace_name, RG
+        "eventhubs namespace create --name {} --resource-group {} --location {}".format(
+            namespace_name, RG, HUB_TEST_LOCATION
         )
     ).as_json()
 
@@ -543,9 +580,7 @@ def _event_hub_provisioner():
 
 
 def _event_hub_removal(account_name: str):
-    delete_result = cli.invoke(f"eventhubs namespace delete -g {RG} -n {account_name}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
+    _delete_fixture_resource(f"eventhubs namespace delete -g {RG} -n {account_name}", account_name)
 
 
 # Service Bus fixtures
@@ -621,8 +656,8 @@ def _service_bus_provisioner():
     topic_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
     namespace_obj = cli.invoke(
-        "servicebus namespace create --name {} --resource-group {}".format(
-            namespace_name, RG
+        "servicebus namespace create --name {} --resource-group {} --location {}".format(
+            namespace_name, RG, HUB_TEST_LOCATION
         )
     ).as_json()
 
@@ -664,9 +699,7 @@ def _service_bus_provisioner():
 
 
 def _service_bus_removal(account_name: str):
-    delete_result = cli.invoke(f"servicebus namespace delete -g {RG} -n {account_name}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete servicebus namespace resource {account_name}.")
+    _delete_fixture_resource(f"servicebus namespace delete -g {RG} -n {account_name}", account_name)
 
 
 # Cosmos Db fixtures
@@ -686,7 +719,7 @@ def provisioned_cosmosdb_with_identity_module(
 
 
 def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, rg: str):
-    cli.invoke(
+    _invoke_fixture(
         "cosmosdb sql role assignment create -a {} -g {} --scope '/' -n '{}' -p {}".format(
             cosmos_db_account, rg, role, principal_id
         )
@@ -719,7 +752,7 @@ def _cosmos_db_provisioner():
     database_name = generate_hub_depenency_id()
     collection_name = generate_hub_depenency_id()
     partition_key_path = "/test"
-    location = "westus"
+    location = HUB_TEST_LOCATION
     cosmos_obj = cli.invoke(
         "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
             account_name, RG, location
@@ -747,43 +780,17 @@ def _cosmos_db_provisioner():
 
 
 def _cosmos_db_removal(account_name: str):
-    delete_result = cli.invoke(f"cosmosdb delete -g {RG} -n {account_name} -y")
-    if not delete_result.success():
-        logger.error(f"Failed to delete Cosmos DB resource {account_name}.")
+    _delete_fixture_resource(f"cosmosdb delete -g {RG} -n {account_name} -y", account_name)
 
 
 def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
-    connection_string = cli.invoke(
-        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
-            HUB_NAME, RG, "iothubowner"
+    for device in device_ids or []:
+        _delete_fixture_resource(
+            f"iot hub device-identity delete -d {device} -n {HUB_NAME} -g {RG} --auth-type login",
+            device,
         )
-    ).as_json()["connectionString"]
-    if device_ids:
-        device = device_ids.pop()
-        cli.invoke(
-            "iot hub device-identity delete -d {} --login {}".format(
-                device, connection_string
-            )
+    for config in config_ids or []:
+        _delete_fixture_resource(
+            f"iot hub configuration delete -c {config} -n {HUB_NAME} -g {RG} --auth-type login",
+            config,
         )
-
-        for device in device_ids:
-            cli.invoke(
-                "iot hub device-identity delete -d {} -n {} -g {}".format(
-                    device, HUB_NAME, RG
-                )
-            )
-
-    if config_ids:
-        config = config_ids.pop()
-        cli.invoke(
-            "iot hub configuration delete -c {} --login {}".format(
-                config, connection_string
-            )
-        )
-
-        for config in config_ids:
-            cli.invoke(
-                "iot hub configuration delete -c {} -n {} -g {}".format(
-                    config, HUB_NAME, RG
-                )
-            )

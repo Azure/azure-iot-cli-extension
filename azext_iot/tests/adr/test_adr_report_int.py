@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
     wait_for_condition,
@@ -43,7 +43,7 @@ _REPORT_POLL_INTERVAL_SECONDS = 10
     ),
 )
 @pytest.mark.usefixtures("set_cwd")
-class TestADRReports(CaptureOutputLiveScenarioTest):
+class TestADRReports(ADRLiveScenarioTest):
     def test_adr_namespace_and_group_reports(self):
         namespace_name = _SU_NAMESPACE
         group_name = f"testgrp{generate_generic_id()[:8]}"

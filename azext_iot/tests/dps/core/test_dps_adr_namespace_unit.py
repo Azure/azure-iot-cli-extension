@@ -39,6 +39,16 @@ NS_ID = (
 )
 
 
+@pytest.fixture(autouse=True)
+def authoritative_target(mocker):
+    # Existing identity tests supply authoritative projections directly.
+    # Separate target-adapter tests exercise the real read and fail-closed path.
+    mocker.patch(
+        "azext_iot.core.custom._adr_identity_target",
+        side_effect=lambda cmd, resource, kind: resource,
+    )
+
+
 def _dps():
     return {
         "id": DPS_ID,
@@ -92,6 +102,30 @@ def test_dps_create_does_not_emit_namespace_relationship(mocker):
     ]
     assert "deviceRegistryNamespace" not in body["properties"]
     assert body["identity"]["type"] == "SystemAssigned"
+
+
+@pytest.mark.parametrize("system_assigned", [None, True, False])
+def test_dps_create_omits_unspecified_properties(mocker, system_assigned):
+    mocker.patch("azext_iot.core.custom._check_dps_name_availability")
+    mocker.patch("azext_iot.core.custom._ensure_location", return_value="westus2")
+    client = MagicMock()
+    result = iot_dps_create(
+        MagicMock(), client, "test-dps", "test-rg", mi_system_assigned=system_assigned,
+    )
+    assert result is client.iot_dps_resource.begin_create_or_update.return_value
+    kwargs = client.iot_dps_resource.begin_create_or_update.call_args.kwargs
+    assert kwargs["resource_group_name"] == "test-rg"
+    assert kwargs["provisioning_service_name"] == "test-dps"
+    description = kwargs["iot_dps_description"]
+    assert description["properties"] == {}
+    assert description["location"] == "westus2"
+    assert description["sku"] == {"name": "S1", "capacity": 1}
+    if system_assigned is None:
+        assert "identity" not in description
+    elif system_assigned:
+        assert description["identity"] == {"type": "SystemAssigned", "userAssignedIdentities": None}
+    else:
+        assert description["identity"] is None
 
 
 def test_dps_partial_identity_update_preserves_existing_identities():

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import inspect
+from copy import deepcopy
 from unittest.mock import Mock
 
 import pytest
@@ -16,6 +17,11 @@ from azure.cli.core.azclierror import (
 )
 from azure.core.exceptions import HttpResponseError
 
+from azext_iot.adr.common import (
+    DPS_ENDPOINT_TYPE,
+    IOT_HUB_ENDPOINT_TYPE,
+    SU_ENDPOINT_TYPE,
+)
 from azext_iot.adr.providers.namespace import (
     NamespaceProvider,
     _build_namespace_identity,
@@ -592,7 +598,7 @@ def test_namespace_delete_propagates_unrelated_service_error(
         fixture_namespace_provider.delete("namespace", "rg")
 
 
-def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
+def test_namespace_delete_not_empty_does_not_recommend_deleting_linked_targets(
     fixture_namespace_provider,
 ):
     error = HttpResponseError(
@@ -606,10 +612,10 @@ def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
     message = str(raised.value)
     assert "job run delete" in message
     assert "ca policy delete" in message
-    assert "link hub delete" in message
-    assert "link dps delete" in message
-    assert "link su delete" in message
-    assert "permanently deletes" in message
+    assert "link hub delete" not in message
+    assert "link dps delete" not in message
+    assert "link su delete" not in message
+    assert "Only remove resources you own" in message
 
 
 def test_namespace_create_preserves_existing_observability(
@@ -665,9 +671,30 @@ def test_namespace_create_upsert_preserves_unspecified_namespace_state(
             "provisioningState": "Succeeded",
             "outboundIdentity": {"type": "SystemAssigned"},
             "management": {"endpoints": {"management": {"resourceId": "/management"}}},
-            "provisioning": {"endpoints": {"dps": {"resourceId": "/dps"}}},
-            "messaging": {"endpoints": {"hub": {"resourceId": "/hub"}}},
-            "updating": {"endpoints": {"su": {"resourceId": "/su"}}},
+            "provisioning": {
+                "endpoints": {
+                    "dps": {
+                        "endpointType": DPS_ENDPOINT_TYPE,
+                        "resourceId": "/dps",
+                    }
+                }
+            },
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": IOT_HUB_ENDPOINT_TYPE,
+                        "resourceId": "/hub",
+                    }
+                }
+            },
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "endpointType": SU_ENDPOINT_TYPE,
+                        "resourceId": "/su",
+                    }
+                }
+            },
         },
     }
     fixture_namespace_provider.client.namespaces.get.return_value = existing
@@ -691,6 +718,109 @@ def test_namespace_create_upsert_preserves_unspecified_namespace_state(
         for key, value in existing["properties"].items()
         if key not in {"uuid", "provisioningState"}
     }
+
+
+def test_namespace_create_upsert_projects_endpoints_to_writable_fields(
+    fixture_namespace_provider, mock_poller
+):
+    """F2: the CreateOrReplace PUT drops server-computed endpoint status while
+    retaining every writable field, section, and endpoint name, and does not
+    mutate the caller's input."""
+    existing = {
+        "location": "centraluseuap",
+        "properties": {
+            "uuid": "read-only",
+            "provisioningState": "Succeeded",
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": IOT_HUB_ENDPOINT_TYPE,
+                        "resourceId": "/hub",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                        "provisioning": {
+                            "availability": "Available",
+                            "allocationWeight": 5,
+                        },
+                        "linkingState": "Linked",
+                        "linkingError": {"code": "None"},
+                        "serviceAddress": "sb://hub",
+                        "address": "hub-address",
+                    }
+                }
+            },
+            "provisioning": {
+                "endpoints": {
+                    "dps": {
+                        "endpointType": DPS_ENDPOINT_TYPE,
+                        "resourceId": "/dps",
+                        "linkingState": "Linked",
+                        "deviceAddress": "dps-address",
+                    }
+                }
+            },
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "endpointType": SU_ENDPOINT_TYPE,
+                        "resourceId": "/su",
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned",
+                            "userAssignedIdentity": UAMI_ID,
+                        },
+                        "linkingState": "Linked",
+                        "serviceAddress": "su-address",
+                    }
+                }
+            },
+        },
+    }
+    snapshot = deepcopy(existing)
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create("namespace", "rg")
+
+    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    endpoints = resource["properties"]
+    # Every section and endpoint name is retained.
+    assert set(endpoints) == {"messaging", "provisioning", "updating"}
+    assert endpoints["messaging"]["endpoints"]["hub"] == {
+        "endpointType": IOT_HUB_ENDPOINT_TYPE,
+        "resourceId": "/hub",
+        "inboundCallerIdentity": {"type": "SystemAssigned"},
+        "provisioning": {"availability": "Available", "allocationWeight": 5},
+    }
+    assert endpoints["provisioning"]["endpoints"]["dps"] == {
+        "endpointType": DPS_ENDPOINT_TYPE,
+        "resourceId": "/dps",
+    }
+    assert endpoints["updating"]["endpoints"]["su"] == {
+        "endpointType": SU_ENDPOINT_TYPE,
+        "resourceId": "/su",
+        "inboundCallerIdentity": {
+            "type": "UserAssigned",
+            "userAssignedIdentity": UAMI_ID,
+        },
+    }
+    # No server-computed status/output field survives the projection.
+    for section in endpoints.values():
+        for endpoint in section["endpoints"].values():
+            assert not (
+                {
+                    "linkingState",
+                    "linkingError",
+                    "serviceAddress",
+                    "address",
+                    "deviceAddress",
+                }
+                & set(endpoint)
+            )
+    # The caller's input namespace was not mutated.
+    assert existing == snapshot
 
 
 @pytest.mark.parametrize(

@@ -47,12 +47,10 @@ def fixture_update_endpoint_ops(mocker):
         return defaultdict(lambda: None, name=endpoint_name, authenticationType="keyBased")
 
     hub_mock = {
-        "id": (
-            "/subscriptions/test-sub/resourceGroups/test-rg/providers/"
-            "Microsoft.Devices/IotHubs/test-hub"
-        ),
         "name": "test-hub",
         "etag": "test-etag",
+        "resourcegroup": "test-rg",
+        "subscriptionid": "test-sub",
         "properties": {
             "routing": {
                 "endpoints": {
@@ -94,12 +92,10 @@ def fixture_update_endpoint_backwards_comp_ops(mocker):
         return defaultdict(lambda: None, name=endpoint_name, authenticationType="keyBased")
 
     hub_mock = {
-        "id": (
-            "/subscriptions/test-sub/resourceGroups/test-rg/providers/"
-            "Microsoft.Devices/IotHubs/test-hub"
-        ),
         "name": "test-hub",
         "etag": "test-etag",
+        "resourcegroup": "test-rg",
+        "subscriptionid": "test-sub",
         "properties": {
             "routing": {
                 "endpoints": {
@@ -189,11 +185,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["eventHubs"]
         assert len(endpoints) == 1
         endpoint = endpoints[0]
@@ -328,11 +320,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["serviceBusQueues"]
         assert len(endpoints) == 1
         endpoint = endpoints[0]
@@ -467,11 +455,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["serviceBusTopics"]
         assert len(endpoints) == 1
         endpoint = endpoints[0]
@@ -605,11 +589,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["storageContainers"]
         assert len(endpoints) == 1
         endpoint = endpoints[0]
@@ -792,11 +772,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         # TODO: @vilit fix once service fixes their naming
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"]
         assert len(endpoints) == 1
@@ -1023,11 +999,7 @@ class TestMessageEndpointUpdate:
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
-        hub_resource = fixture_find_resource.call_args[
-            0
-        ][0].client.begin_create_or_update.call_args.kwargs[
-            "iot_hub_description"
-        ]
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
         # TODO: @vilit fix once service fixes their naming
         endpoints = hub_resource["properties"]["routing"]["endpoints"]["cosmosDBSqlCollections"]
         assert len(endpoints) == 1

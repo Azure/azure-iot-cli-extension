@@ -7,7 +7,8 @@
 # Changes may cause incorrect behavior and will be lost if the code is regenerated.
 # --------------------------------------------------------------------------
 from collections.abc import MutableMapping
-from typing import Any, Callable, Iterator, Optional, TypeVar, Union, cast
+from io import IOBase
+from typing import Any, Callable, IO, Iterator, Optional, TypeVar, Union, cast, overload
 import urllib.parse
 
 from azure.core import MatchConditions, PipelineClient
@@ -31,11 +32,11 @@ from azure.core.utils import case_insensitive_dict
 from azure.mgmt.core.exceptions import ARMErrorFormat
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
-from .. import types as _types
 from .._configuration import IotHubClientConfiguration
 from .._utils.serialization import Deserializer, Serializer
 from .._utils.utils import prep_if_match, prep_if_none_match
 
+JSON = MutableMapping[str, Any]
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, dict[str, Any]], Any]]
 List = list
@@ -48,7 +49,7 @@ def build_operations_list_request(**kwargs: Any) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -73,7 +74,7 @@ def build_private_endpoint_connections_get_request(  # pylint: disable=name-too-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -103,15 +104,13 @@ def build_private_endpoint_connections_update_request(  # pylint: disable=name-t
     resource_name: str,
     private_endpoint_connection_name: str,
     subscription_id: str,
-    *,
-    json: _types.PrivateEndpointConnection,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -131,10 +130,11 @@ def build_private_endpoint_connections_update_request(  # pylint: disable=name-t
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_private_endpoint_connections_delete_request(  # pylint: disable=name-too-long
@@ -147,7 +147,7 @@ def build_private_endpoint_connections_delete_request(  # pylint: disable=name-t
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -178,7 +178,7 @@ def build_private_endpoint_connections_list_request(  # pylint: disable=name-too
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -206,7 +206,7 @@ def build_iot_hub_resource_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -233,7 +233,6 @@ def build_iot_hub_resource_create_or_update_request(  # pylint: disable=name-too
     resource_name: str,
     subscription_id: str,
     *,
-    json: _types.IotHubDescription,
     etag: Optional[str] = None,
     match_condition: Optional[MatchConditions] = None,
     **kwargs: Any
@@ -241,8 +240,8 @@ def build_iot_hub_resource_create_or_update_request(  # pylint: disable=name-too
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -259,7 +258,8 @@ def build_iot_hub_resource_create_or_update_request(  # pylint: disable=name-too
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
     if_match = prep_if_match(etag, match_condition)
     if if_match is not None:
@@ -268,17 +268,17 @@ def build_iot_hub_resource_create_or_update_request(  # pylint: disable=name-too
     if if_none_match is not None:
         _headers["if-none-match"] = _SERIALIZER.header("if_none_match", if_none_match, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_update_request(
-    resource_group_name: str, resource_name: str, subscription_id: str, *, json: _types.TagsResource, **kwargs: Any
+    resource_group_name: str, resource_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -295,10 +295,11 @@ def build_iot_hub_resource_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_delete_request(
@@ -307,7 +308,7 @@ def build_iot_hub_resource_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -335,7 +336,7 @@ def build_iot_hub_resource_list_by_resource_group_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -362,7 +363,7 @@ def build_iot_hub_resource_list_by_subscription_request(  # pylint: disable=name
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -388,7 +389,7 @@ def build_iot_hub_resource_get_valid_skus_request(  # pylint: disable=name-too-l
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -416,7 +417,7 @@ def build_iot_hub_resource_list_jobs_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -444,7 +445,7 @@ def build_iot_hub_resource_get_job_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -473,7 +474,7 @@ def build_iot_hub_resource_get_quota_metrics_request(  # pylint: disable=name-to
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -501,7 +502,7 @@ def build_iot_hub_resource_get_endpoint_health_request(  # pylint: disable=name-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -524,13 +525,13 @@ def build_iot_hub_resource_get_endpoint_health_request(  # pylint: disable=name-
 
 
 def build_iot_hub_resource_test_all_routes_request(  # pylint: disable=name-too-long
-    iot_hub_name: str, resource_group_name: str, subscription_id: str, *, json: _types.TestAllRoutesInput, **kwargs: Any
+    iot_hub_name: str, resource_group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -547,20 +548,21 @@ def build_iot_hub_resource_test_all_routes_request(  # pylint: disable=name-too-
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_test_route_request(  # pylint: disable=name-too-long
-    iot_hub_name: str, resource_group_name: str, subscription_id: str, *, json: _types.TestRouteInput, **kwargs: Any
+    iot_hub_name: str, resource_group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -577,10 +579,11 @@ def build_iot_hub_resource_test_route_request(  # pylint: disable=name-too-long
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_list_keys_request(
@@ -589,7 +592,7 @@ def build_iot_hub_resource_list_keys_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -617,7 +620,7 @@ def build_iot_hub_resource_get_keys_for_key_name_request(  # pylint: disable=nam
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -641,18 +644,13 @@ def build_iot_hub_resource_get_keys_for_key_name_request(  # pylint: disable=nam
 
 
 def build_iot_hub_resource_export_devices_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    resource_name: str,
-    subscription_id: str,
-    *,
-    json: _types.ExportDevicesRequest,
-    **kwargs: Any
+    resource_group_name: str, resource_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -669,25 +667,21 @@ def build_iot_hub_resource_export_devices_request(  # pylint: disable=name-too-l
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_import_devices_request(  # pylint: disable=name-too-long
-    resource_group_name: str,
-    resource_name: str,
-    subscription_id: str,
-    *,
-    json: _types.ImportDevicesRequest,
-    **kwargs: Any
+    resource_group_name: str, resource_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -704,10 +698,11 @@ def build_iot_hub_resource_import_devices_request(  # pylint: disable=name-too-l
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_get_stats_request(
@@ -716,7 +711,7 @@ def build_iot_hub_resource_get_stats_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -749,7 +744,7 @@ def build_iot_hub_resource_get_event_hub_consumer_group_request(  # pylint: disa
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -779,15 +774,13 @@ def build_iot_hub_resource_create_event_hub_consumer_group_request(  # pylint: d
     event_hub_endpoint_name: str,
     name: str,
     subscription_id: str,
-    *,
-    json: _types.EventHubConsumerGroupBodyDescription,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -806,10 +799,11 @@ def build_iot_hub_resource_create_event_hub_consumer_group_request(  # pylint: d
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_resource_delete_event_hub_consumer_group_request(  # pylint: disable=name-too-long
@@ -822,7 +816,7 @@ def build_iot_hub_resource_delete_event_hub_consumer_group_request(  # pylint: d
 ) -> HttpRequest:
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/IotHubs/{resourceName}/eventHubEndpoints/{eventHubEndpointName}/ConsumerGroups/{name}"
     path_format_arguments = {
@@ -847,7 +841,7 @@ def build_iot_hub_resource_list_event_hub_consumer_groups_request(  # pylint: di
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -871,13 +865,13 @@ def build_iot_hub_resource_list_event_hub_consumer_groups_request(  # pylint: di
 
 
 def build_iot_hub_resource_check_name_availability_request(  # pylint: disable=name-too-long
-    subscription_id: str, *, json: _types.OperationInputs, **kwargs: Any
+    subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -892,20 +886,21 @@ def build_iot_hub_resource_check_name_availability_request(  # pylint: disable=n
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_iot_hub_manual_failover_request(
-    iot_hub_name: str, resource_group_name: str, subscription_id: str, *, json: _types.FailoverInput, **kwargs: Any
+    iot_hub_name: str, resource_group_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/IotHubs/{iotHubName}/failover"
     path_format_arguments = {
@@ -920,9 +915,10 @@ def build_iot_hub_manual_failover_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificates_get_request(
@@ -931,7 +927,7 @@ def build_certificates_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -960,7 +956,6 @@ def build_certificates_create_or_update_request(  # pylint: disable=name-too-lon
     certificate_name: str,
     subscription_id: str,
     *,
-    json: _types.CertificateDescription,
     etag: Optional[str] = None,
     match_condition: Optional[MatchConditions] = None,
     **kwargs: Any
@@ -968,8 +963,8 @@ def build_certificates_create_or_update_request(  # pylint: disable=name-too-lon
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -987,7 +982,8 @@ def build_certificates_create_or_update_request(  # pylint: disable=name-too-lon
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
     if_match = prep_if_match(etag, match_condition)
     if if_match is not None:
@@ -996,7 +992,7 @@ def build_certificates_create_or_update_request(  # pylint: disable=name-too-lon
     if if_none_match is not None:
         _headers["if-none-match"] = _SERIALIZER.header("if_none_match", if_none_match, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_certificates_delete_request(
@@ -1012,7 +1008,7 @@ def build_certificates_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/IotHubs/{resourceName}/certificates/{certificateName}"
     path_format_arguments = {
@@ -1044,7 +1040,7 @@ def build_certificates_list_by_iot_hub_request(  # pylint: disable=name-too-long
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1079,7 +1075,7 @@ def build_certificates_generate_verification_code_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1116,14 +1112,13 @@ def build_certificates_verify_request(
     *,
     etag: str,
     match_condition: MatchConditions,
-    json: _types.CertificateVerificationDescription,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1141,7 +1136,8 @@ def build_certificates_verify_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
     if_match = prep_if_match(etag, match_condition)
     if if_match is not None:
@@ -1150,7 +1146,7 @@ def build_certificates_verify_request(
     if if_none_match is not None:
         _headers["if-none-match"] = _SERIALIZER.header("if_none_match", if_none_match, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
 def build_private_link_resources_get_request(
@@ -1159,7 +1155,7 @@ def build_private_link_resources_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1188,7 +1184,7 @@ def build_private_link_resources_list_request(  # pylint: disable=name-too-long
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1216,7 +1212,7 @@ def build_resource_provider_common_get_subscription_quota_request(  # pylint: di
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-10-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-05-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1236,7 +1232,7 @@ def build_resource_provider_common_get_subscription_quota_request(  # pylint: di
     return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
 
 
-class Operations:  # pylint: disable=docstring-missing-param
+class Operations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -1254,11 +1250,11 @@ class Operations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, **kwargs: Any) -> ItemPaged["_types.Operation"]:
+    def list(self, **kwargs: Any) -> ItemPaged[JSON]:
         """List the operations for the provider.
 
-        :return: An iterator like instance of Operation
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.Operation]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1278,7 +1274,7 @@ class Operations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.Operation]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -1346,18 +1342,14 @@ class Operations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
 
-class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing-param
+class PrivateEndpointConnectionsOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -1377,7 +1369,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
     @distributed_trace
     def get(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> _types.PrivateEndpointConnection:
+    ) -> JSON:
         """Get private endpoint connection.
 
         Get private endpoint connection properties.
@@ -1389,8 +1381,8 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: PrivateEndpointConnection
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.PrivateEndpointConnection
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1432,7 +1424,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_private_endpoint_connections_get_request(
             resource_group_name=resource_group_name,
@@ -1463,11 +1455,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1478,16 +1466,16 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     def _update_initial(
         self,
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: _types.PrivateEndpointConnection,
+        private_endpoint_connection: Union[JSON, IO[bytes]],
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -1501,10 +1489,16 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = private_endpoint_connection
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(private_endpoint_connection, (IOBase, bytes)):
+            _content = private_endpoint_connection
+        else:
+            _json = private_endpoint_connection
 
         _request = build_private_endpoint_connections_update_request(
             resource_group_name=resource_group_name,
@@ -1514,6 +1508,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -1536,11 +1531,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -1552,19 +1543,21 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_update(
         self,
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: _types.PrivateEndpointConnection,
+        private_endpoint_connection: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[_types.PrivateEndpointConnection]:
+    ) -> LROPoller[JSON]:
         """Update private endpoint connection.
 
         Update the status of a private endpoint connection with the specified name.
@@ -1578,10 +1571,154 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         :type private_endpoint_connection_name: str
         :param private_endpoint_connection: The private endpoint connection with updated properties.
          Required.
-        :type private_endpoint_connection: ~azext_iot.sdk.iothub.mgmt.types.PrivateEndpointConnection
-        :return: An instance of LROPoller that returns PrivateEndpointConnection
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.iothub.mgmt.types.PrivateEndpointConnection]
+        :type private_endpoint_connection: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                private_endpoint_connection = {
+                    "properties": {
+                        "privateLinkServiceConnectionState": {
+                            "description": "str",
+                            "status": "str",
+                            "actionsRequired": "str"
+                        },
+                        "privateEndpoint": {
+                            "id": "str"
+                        }
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "properties": {
+                        "privateLinkServiceConnectionState": {
+                            "description": "str",
+                            "status": "str",
+                            "actionsRequired": "str"
+                        },
+                        "privateEndpoint": {
+                            "id": "str"
+                        }
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        private_endpoint_connection_name: str,
+        private_endpoint_connection: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update private endpoint connection.
+
+        Update the status of a private endpoint connection with the specified name.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT Hub. Required.
+        :type resource_name: str
+        :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
+        :type private_endpoint_connection_name: str
+        :param private_endpoint_connection: The private endpoint connection with updated properties.
+         Required.
+        :type private_endpoint_connection: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "properties": {
+                        "privateLinkServiceConnectionState": {
+                            "description": "str",
+                            "status": "str",
+                            "actionsRequired": "str"
+                        },
+                        "privateEndpoint": {
+                            "id": "str"
+                        }
+                    },
+                    "id": "str",
+                    "name": "str",
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        private_endpoint_connection_name: str,
+        private_endpoint_connection: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update private endpoint connection.
+
+        Update the status of a private endpoint connection with the specified name.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT Hub. Required.
+        :type resource_name: str
+        :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
+        :type private_endpoint_connection_name: str
+        :param private_endpoint_connection: The private endpoint connection with updated properties. Is
+         either a JSON type or a IO[bytes] type. Required.
+        :type private_endpoint_connection: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1640,8 +1777,8 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -1661,6 +1798,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -1682,15 +1820,13 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.PrivateEndpointConnection].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.PrivateEndpointConnection](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _delete_initial(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
@@ -1736,11 +1872,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -1753,14 +1885,14 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
     def begin_delete(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> LROPoller[_types.PrivateEndpointConnection]:
+    ) -> LROPoller[JSON]:
         """Delete private endpoint connection.
 
         Delete private endpoint connection with the specified name.
@@ -1772,9 +1904,8 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: An instance of LROPoller that returns PrivateEndpointConnection
-        :rtype:
-         ~azure.core.polling.LROPoller[~azext_iot.sdk.iothub.mgmt.types.PrivateEndpointConnection]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1808,7 +1939,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -1826,6 +1957,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -1847,20 +1979,16 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.PrivateEndpointConnection].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.PrivateEndpointConnection](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> List[_types.PrivateEndpointConnection]:
+    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> List[JSON]:
         """List private endpoint connections.
 
         List private endpoint connection properties.
@@ -1870,8 +1998,8 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         :type resource_group_name: str
         :param resource_name: The name of the IoT Hub. Required.
         :type resource_name: str
-        :return: list of PrivateEndpointConnection
-        :rtype: list[~azext_iot.sdk.iothub.mgmt.types.PrivateEndpointConnection]
+        :return: list of JSON object
+        :rtype: list[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1915,7 +2043,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.PrivateEndpointConnection]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         _request = build_private_endpoint_connections_list_request(
             resource_group_name=resource_group_name,
@@ -1945,11 +2073,7 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1960,12 +2084,12 @@ class PrivateEndpointConnectionsOperations:  # pylint: disable=docstring-missing
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(List[JSON], deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(List[JSON], deserialized)  # type: ignore
 
 
-class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-many-public-methods
+class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -1983,7 +2107,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _types.IotHubDescription:
+    def get(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
         """Get the non-security related metadata of an IoT hub.
 
         Get the non-security related metadata of an IoT hub.
@@ -1993,8 +2117,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: IotHubDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.IotHubDescription
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2044,25 +2168,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -2123,16 +2232,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
-                                {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
-                                        "str"
-                                    ]
-                                }
-                            ]
-                        },
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -2346,7 +2445,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.IotHubDescription] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_request(
             resource_group_name=resource_group_name,
@@ -2376,11 +2475,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -2391,15 +2486,15 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     def _create_or_update_initial(
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_description: _types.IotHubDescription,
+        iot_hub_description: Union[JSON, IO[bytes]],
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
@@ -2422,10 +2517,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = iot_hub_description
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(iot_hub_description, (IOBase, bytes)):
+            _content = iot_hub_description
+        else:
+            _json = iot_hub_description
 
         _request = build_iot_hub_resource_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -2436,6 +2537,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -2458,11 +2560,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -2474,21 +2572,22 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_create_or_update(
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_description: _types.IotHubDescription,
+        iot_hub_description: JSON,
         *,
+        content_type: str = "application/json",
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> LROPoller[_types.IotHubDescription]:
+    ) -> LROPoller[JSON]:
         """Create or update the metadata of an IoT hub.
 
         Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
@@ -2501,14 +2600,17 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
         :param iot_hub_description: The IoT hub metadata and security metadata. Required.
-        :type iot_hub_description: ~azext_iot.sdk.iothub.mgmt.types.IotHubDescription
+        :type iot_hub_description: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: An instance of LROPoller that returns IotHubDescription
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.iothub.mgmt.types.IotHubDescription]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2558,25 +2660,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -2637,16 +2724,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
-                                {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
-                                        "str"
-                                    ]
-                                }
-                            ]
-                        },
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -2893,25 +2970,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -2972,16 +3034,1015 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
+                        "networkRuleSets": {
+                            "applyToBuiltInEventHubEndpoint": bool,
+                            "ipRules": [
                                 {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
+                                    "filterName": "str",
+                                    "ipMask": "str",
+                                    "action": "str"
+                                }
+                            ],
+                            "defaultAction": "str"
+                        },
+                        "privateEndpointConnections": [
+                            {
+                                "properties": {
+                                    "privateLinkServiceConnectionState": {
+                                        "description": "str",
+                                        "status": "str",
+                                        "actionsRequired": "str"
+                                    },
+                                    "privateEndpoint": {
+                                        "id": "str"
+                                    }
+                                },
+                                "id": "str",
+                                "name": "str",
+                                "systemData": {
+                                    "createdAt": "2020-02-20 00:00:00",
+                                    "createdBy": "str",
+                                    "createdByType": "str",
+                                    "lastModifiedAt": "2020-02-20 00:00:00",
+                                    "lastModifiedBy": "str",
+                                    "lastModifiedByType": "str"
+                                },
+                                "type": "str"
+                            }
+                        ],
+                        "provisioningState": "str",
+                        "publicNetworkAccess": "str",
+                        "restrictOutboundNetworkAccess": bool,
+                        "rootCertificate": {
+                            "enableRootCertificateV2": bool,
+                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"
+                        },
+                        "routing": {
+                            "endpoints": {
+                                "cosmosDBSqlContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "databaseName": "str",
+                                        "endpointUri": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "partitionKeyName": "str",
+                                        "partitionKeyTemplate": "str",
+                                        "primaryKey": "str",
+                                        "resourceGroup": "str",
+                                        "secondaryKey": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventHubs": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventStreams": [
+                                    {
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "eventStreamId": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "sourceId": "str",
+                                        "workspaceId": "str"
+                                    }
+                                ],
+                                "serviceBusQueues": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "serviceBusTopics": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "storageContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "batchFrequencyInSeconds": 0,
+                                        "connectionString": "str",
+                                        "encoding": "str",
+                                        "endpointUri": "str",
+                                        "fileNameFormat": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "maxChunkSizeInBytes": 0,
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ]
+                            },
+                            "enrichments": [
+                                {
+                                    "endpointNames": [
                                         "str"
-                                    ]
+                                    ],
+                                    "key": "str",
+                                    "value": "str"
+                                }
+                            ],
+                            "fallbackRoute": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "source": "str",
+                                "condition": "str",
+                                "name": "str"
+                            },
+                            "routes": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "isEnabled": bool,
+                                    "name": "str",
+                                    "source": "str",
+                                    "condition": "str"
                                 }
                             ]
                         },
+                        "serviceHostName": "str",
+                        "state": "str",
+                        "storageEndpoints": {
+                            "str": {
+                                "connectionString": "str",
+                                "containerName": "str",
+                                "authenticationType": "str",
+                                "identity": {
+                                    "userAssignedIdentity": "str"
+                                },
+                                "sasTtlAsIso8601": "1 day, 0:00:00"
+                            }
+                        }
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_description: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        etag: Optional[str] = None,
+        match_condition: Optional[MatchConditions] = None,
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create or update the metadata of an IoT hub.
+
+        Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
+        retrieve the IoT hub metadata and security metadata, and then combine them with the modified
+        values in a new body to update the IoT hub.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param iot_hub_description: The IoT hub metadata and security metadata. Required.
+        :type iot_hub_description: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
+         None.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Default value is None.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "sku": {
+                        "name": "str",
+                        "capacity": 0,
+                        "tier": "str"
+                    },
+                    "etag": "str",
+                    "id": "str",
+                    "identity": {
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "type": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "allowedFqdnList": [
+                            "str"
+                        ],
+                        "authorizationPolicies": [
+                            {
+                                "keyName": "str",
+                                "rights": "str",
+                                "primaryKey": "str",
+                                "secondaryKey": "str"
+                            }
+                        ],
+                        "cloudToDevice": {
+                            "defaultTtlAsIso8601": "1 day, 0:00:00",
+                            "feedback": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            },
+                            "maxDeliveryCount": 0
+                        },
+                        "comments": "str",
+                        "deviceHostName": "str",
+                        "deviceRegistry": {
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
+                        },
+                        "deviceStreams": {
+                            "streamingEndpoints": [
+                                "str"
+                            ]
+                        },
+                        "disableDeviceSAS": bool,
+                        "disableLocalAuth": bool,
+                        "disableModuleSAS": bool,
+                        "enableDataResidency": bool,
+                        "enableFileUploadNotifications": bool,
+                        "encryption": {
+                            "keySource": "str",
+                            "keyVaultProperties": [
+                                {
+                                    "identity": {
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "keyIdentifier": "str"
+                                }
+                            ]
+                        },
+                        "eventHubEndpoints": {
+                            "str": {
+                                "endpoint": "str",
+                                "partitionCount": 0,
+                                "partitionIds": [
+                                    "str"
+                                ],
+                                "path": "str",
+                                "retentionTimeInDays": 0
+                            }
+                        },
+                        "features": "str",
+                        "hostName": "str",
+                        "iotHubDetails": {
+                            "gatewayVersion": "str"
+                        },
+                        "ipFilterRules": [
+                            {
+                                "action": "str",
+                                "filterName": "str",
+                                "ipMask": "str"
+                            }
+                        ],
+                        "ipVersion": "str",
+                        "locations": [
+                            {
+                                "location": "str",
+                                "role": "str"
+                            }
+                        ],
+                        "messagingEndpoints": {
+                            "str": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            }
+                        },
+                        "minTlsVersion": "str",
+                        "networkRuleSets": {
+                            "applyToBuiltInEventHubEndpoint": bool,
+                            "ipRules": [
+                                {
+                                    "filterName": "str",
+                                    "ipMask": "str",
+                                    "action": "str"
+                                }
+                            ],
+                            "defaultAction": "str"
+                        },
+                        "privateEndpointConnections": [
+                            {
+                                "properties": {
+                                    "privateLinkServiceConnectionState": {
+                                        "description": "str",
+                                        "status": "str",
+                                        "actionsRequired": "str"
+                                    },
+                                    "privateEndpoint": {
+                                        "id": "str"
+                                    }
+                                },
+                                "id": "str",
+                                "name": "str",
+                                "systemData": {
+                                    "createdAt": "2020-02-20 00:00:00",
+                                    "createdBy": "str",
+                                    "createdByType": "str",
+                                    "lastModifiedAt": "2020-02-20 00:00:00",
+                                    "lastModifiedBy": "str",
+                                    "lastModifiedByType": "str"
+                                },
+                                "type": "str"
+                            }
+                        ],
+                        "provisioningState": "str",
+                        "publicNetworkAccess": "str",
+                        "restrictOutboundNetworkAccess": bool,
+                        "rootCertificate": {
+                            "enableRootCertificateV2": bool,
+                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"
+                        },
+                        "routing": {
+                            "endpoints": {
+                                "cosmosDBSqlContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "databaseName": "str",
+                                        "endpointUri": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "partitionKeyName": "str",
+                                        "partitionKeyTemplate": "str",
+                                        "primaryKey": "str",
+                                        "resourceGroup": "str",
+                                        "secondaryKey": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventHubs": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventStreams": [
+                                    {
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "eventStreamId": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "sourceId": "str",
+                                        "workspaceId": "str"
+                                    }
+                                ],
+                                "serviceBusQueues": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "serviceBusTopics": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "storageContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "batchFrequencyInSeconds": 0,
+                                        "connectionString": "str",
+                                        "encoding": "str",
+                                        "endpointUri": "str",
+                                        "fileNameFormat": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "maxChunkSizeInBytes": 0,
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ]
+                            },
+                            "enrichments": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "key": "str",
+                                    "value": "str"
+                                }
+                            ],
+                            "fallbackRoute": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "source": "str",
+                                "condition": "str",
+                                "name": "str"
+                            },
+                            "routes": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "isEnabled": bool,
+                                    "name": "str",
+                                    "source": "str",
+                                    "condition": "str"
+                                }
+                            ]
+                        },
+                        "serviceHostName": "str",
+                        "state": "str",
+                        "storageEndpoints": {
+                            "str": {
+                                "connectionString": "str",
+                                "containerName": "str",
+                                "authenticationType": "str",
+                                "identity": {
+                                    "userAssignedIdentity": "str"
+                                },
+                                "sasTtlAsIso8601": "1 day, 0:00:00"
+                            }
+                        }
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_description: Union[JSON, IO[bytes]],
+        *,
+        etag: Optional[str] = None,
+        match_condition: Optional[MatchConditions] = None,
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Create or update the metadata of an IoT hub.
+
+        Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
+        retrieve the IoT hub metadata and security metadata, and then combine them with the modified
+        values in a new body to update the IoT hub.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param iot_hub_description: The IoT hub metadata and security metadata. Is either a JSON type
+         or a IO[bytes] type. Required.
+        :type iot_hub_description: JSON or IO[bytes]
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
+         None.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Default value is None.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                iot_hub_description = {
+                    "location": "str",
+                    "sku": {
+                        "name": "str",
+                        "capacity": 0,
+                        "tier": "str"
+                    },
+                    "etag": "str",
+                    "id": "str",
+                    "identity": {
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "type": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "allowedFqdnList": [
+                            "str"
+                        ],
+                        "authorizationPolicies": [
+                            {
+                                "keyName": "str",
+                                "rights": "str",
+                                "primaryKey": "str",
+                                "secondaryKey": "str"
+                            }
+                        ],
+                        "cloudToDevice": {
+                            "defaultTtlAsIso8601": "1 day, 0:00:00",
+                            "feedback": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            },
+                            "maxDeliveryCount": 0
+                        },
+                        "comments": "str",
+                        "deviceHostName": "str",
+                        "deviceRegistry": {
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
+                        },
+                        "deviceStreams": {
+                            "streamingEndpoints": [
+                                "str"
+                            ]
+                        },
+                        "disableDeviceSAS": bool,
+                        "disableLocalAuth": bool,
+                        "disableModuleSAS": bool,
+                        "enableDataResidency": bool,
+                        "enableFileUploadNotifications": bool,
+                        "encryption": {
+                            "keySource": "str",
+                            "keyVaultProperties": [
+                                {
+                                    "identity": {
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "keyIdentifier": "str"
+                                }
+                            ]
+                        },
+                        "eventHubEndpoints": {
+                            "str": {
+                                "endpoint": "str",
+                                "partitionCount": 0,
+                                "partitionIds": [
+                                    "str"
+                                ],
+                                "path": "str",
+                                "retentionTimeInDays": 0
+                            }
+                        },
+                        "features": "str",
+                        "hostName": "str",
+                        "iotHubDetails": {
+                            "gatewayVersion": "str"
+                        },
+                        "ipFilterRules": [
+                            {
+                                "action": "str",
+                                "filterName": "str",
+                                "ipMask": "str"
+                            }
+                        ],
+                        "ipVersion": "str",
+                        "locations": [
+                            {
+                                "location": "str",
+                                "role": "str"
+                            }
+                        ],
+                        "messagingEndpoints": {
+                            "str": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            }
+                        },
+                        "minTlsVersion": "str",
+                        "networkRuleSets": {
+                            "applyToBuiltInEventHubEndpoint": bool,
+                            "ipRules": [
+                                {
+                                    "filterName": "str",
+                                    "ipMask": "str",
+                                    "action": "str"
+                                }
+                            ],
+                            "defaultAction": "str"
+                        },
+                        "privateEndpointConnections": [
+                            {
+                                "properties": {
+                                    "privateLinkServiceConnectionState": {
+                                        "description": "str",
+                                        "status": "str",
+                                        "actionsRequired": "str"
+                                    },
+                                    "privateEndpoint": {
+                                        "id": "str"
+                                    }
+                                },
+                                "id": "str",
+                                "name": "str",
+                                "systemData": {
+                                    "createdAt": "2020-02-20 00:00:00",
+                                    "createdBy": "str",
+                                    "createdByType": "str",
+                                    "lastModifiedAt": "2020-02-20 00:00:00",
+                                    "lastModifiedBy": "str",
+                                    "lastModifiedByType": "str"
+                                },
+                                "type": "str"
+                            }
+                        ],
+                        "provisioningState": "str",
+                        "publicNetworkAccess": "str",
+                        "restrictOutboundNetworkAccess": bool,
+                        "rootCertificate": {
+                            "enableRootCertificateV2": bool,
+                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"
+                        },
+                        "routing": {
+                            "endpoints": {
+                                "cosmosDBSqlContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "databaseName": "str",
+                                        "endpointUri": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "partitionKeyName": "str",
+                                        "partitionKeyTemplate": "str",
+                                        "primaryKey": "str",
+                                        "resourceGroup": "str",
+                                        "secondaryKey": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventHubs": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventStreams": [
+                                    {
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "eventStreamId": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "sourceId": "str",
+                                        "workspaceId": "str"
+                                    }
+                                ],
+                                "serviceBusQueues": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "serviceBusTopics": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "storageContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "batchFrequencyInSeconds": 0,
+                                        "connectionString": "str",
+                                        "encoding": "str",
+                                        "endpointUri": "str",
+                                        "fileNameFormat": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "maxChunkSizeInBytes": 0,
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ]
+                            },
+                            "enrichments": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "key": "str",
+                                    "value": "str"
+                                }
+                            ],
+                            "fallbackRoute": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "source": "str",
+                                "condition": "str",
+                                "name": "str"
+                            },
+                            "routes": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "isEnabled": bool,
+                                    "name": "str",
+                                    "source": "str",
+                                    "condition": "str"
+                                }
+                            ]
+                        },
+                        "serviceHostName": "str",
+                        "state": "str",
+                        "storageEndpoints": {
+                            "str": {
+                                "connectionString": "str",
+                                "containerName": "str",
+                                "authenticationType": "str",
+                                "identity": {
+                                    "userAssignedIdentity": "str"
+                                },
+                                "sasTtlAsIso8601": "1 day, 0:00:00"
+                            }
+                        }
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",
+                    "sku": {
+                        "name": "str",
+                        "capacity": 0,
+                        "tier": "str"
+                    },
+                    "etag": "str",
+                    "id": "str",
+                    "identity": {
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "type": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "allowedFqdnList": [
+                            "str"
+                        ],
+                        "authorizationPolicies": [
+                            {
+                                "keyName": "str",
+                                "rights": "str",
+                                "primaryKey": "str",
+                                "secondaryKey": "str"
+                            }
+                        ],
+                        "cloudToDevice": {
+                            "defaultTtlAsIso8601": "1 day, 0:00:00",
+                            "feedback": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            },
+                            "maxDeliveryCount": 0
+                        },
+                        "comments": "str",
+                        "deviceHostName": "str",
+                        "deviceRegistry": {
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
+                        },
+                        "deviceStreams": {
+                            "streamingEndpoints": [
+                                "str"
+                            ]
+                        },
+                        "disableDeviceSAS": bool,
+                        "disableLocalAuth": bool,
+                        "disableModuleSAS": bool,
+                        "enableDataResidency": bool,
+                        "enableFileUploadNotifications": bool,
+                        "encryption": {
+                            "keySource": "str",
+                            "keyVaultProperties": [
+                                {
+                                    "identity": {
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "keyIdentifier": "str"
+                                }
+                            ]
+                        },
+                        "eventHubEndpoints": {
+                            "str": {
+                                "endpoint": "str",
+                                "partitionCount": 0,
+                                "partitionIds": [
+                                    "str"
+                                ],
+                                "path": "str",
+                                "retentionTimeInDays": 0
+                            }
+                        },
+                        "features": "str",
+                        "hostName": "str",
+                        "iotHubDetails": {
+                            "gatewayVersion": "str"
+                        },
+                        "ipFilterRules": [
+                            {
+                                "action": "str",
+                                "filterName": "str",
+                                "ipMask": "str"
+                            }
+                        ],
+                        "ipVersion": "str",
+                        "locations": [
+                            {
+                                "location": "str",
+                                "role": "str"
+                            }
+                        ],
+                        "messagingEndpoints": {
+                            "str": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            }
+                        },
+                        "minTlsVersion": "str",
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -3187,8 +4248,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.IotHubDescription] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3209,6 +4270,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -3230,18 +4292,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.IotHubDescription].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.IotHubDescription](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _update_initial(
-        self, resource_group_name: str, resource_name: str, iot_hub_tags: _types.TagsResource, **kwargs: Any
+        self, resource_group_name: str, resource_name: str, iot_hub_tags: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -3254,10 +4314,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = iot_hub_tags
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(iot_hub_tags, (IOBase, bytes)):
+            _content = iot_hub_tags
+        else:
+            _json = iot_hub_tags
 
         _request = build_iot_hub_resource_update_request(
             resource_group_name=resource_group_name,
@@ -3266,6 +4332,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -3300,14 +4367,20 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_update(
-        self, resource_group_name: str, resource_name: str, iot_hub_tags: _types.TagsResource, **kwargs: Any
-    ) -> LROPoller[_types.IotHubDescription]:
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_tags: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
         """Update an existing IoT Hubs tags.
 
         Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
@@ -3318,9 +4391,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
         :param iot_hub_tags: Updated tag information to set into the iot hub instance. Required.
-        :type iot_hub_tags: ~azext_iot.sdk.iothub.mgmt.types.TagsResource
-        :return: An instance of LROPoller that returns IotHubDescription
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.iothub.mgmt.types.IotHubDescription]
+        :type iot_hub_tags: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3377,25 +4453,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -3456,16 +4517,689 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
+                        "networkRuleSets": {
+                            "applyToBuiltInEventHubEndpoint": bool,
+                            "ipRules": [
                                 {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
+                                    "filterName": "str",
+                                    "ipMask": "str",
+                                    "action": "str"
+                                }
+                            ],
+                            "defaultAction": "str"
+                        },
+                        "privateEndpointConnections": [
+                            {
+                                "properties": {
+                                    "privateLinkServiceConnectionState": {
+                                        "description": "str",
+                                        "status": "str",
+                                        "actionsRequired": "str"
+                                    },
+                                    "privateEndpoint": {
+                                        "id": "str"
+                                    }
+                                },
+                                "id": "str",
+                                "name": "str",
+                                "systemData": {
+                                    "createdAt": "2020-02-20 00:00:00",
+                                    "createdBy": "str",
+                                    "createdByType": "str",
+                                    "lastModifiedAt": "2020-02-20 00:00:00",
+                                    "lastModifiedBy": "str",
+                                    "lastModifiedByType": "str"
+                                },
+                                "type": "str"
+                            }
+                        ],
+                        "provisioningState": "str",
+                        "publicNetworkAccess": "str",
+                        "restrictOutboundNetworkAccess": bool,
+                        "rootCertificate": {
+                            "enableRootCertificateV2": bool,
+                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"
+                        },
+                        "routing": {
+                            "endpoints": {
+                                "cosmosDBSqlContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "databaseName": "str",
+                                        "endpointUri": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "partitionKeyName": "str",
+                                        "partitionKeyTemplate": "str",
+                                        "primaryKey": "str",
+                                        "resourceGroup": "str",
+                                        "secondaryKey": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventHubs": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventStreams": [
+                                    {
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "eventStreamId": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "sourceId": "str",
+                                        "workspaceId": "str"
+                                    }
+                                ],
+                                "serviceBusQueues": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "serviceBusTopics": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "storageContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "batchFrequencyInSeconds": 0,
+                                        "connectionString": "str",
+                                        "encoding": "str",
+                                        "endpointUri": "str",
+                                        "fileNameFormat": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "maxChunkSizeInBytes": 0,
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ]
+                            },
+                            "enrichments": [
+                                {
+                                    "endpointNames": [
                                         "str"
-                                    ]
+                                    ],
+                                    "key": "str",
+                                    "value": "str"
+                                }
+                            ],
+                            "fallbackRoute": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "source": "str",
+                                "condition": "str",
+                                "name": "str"
+                            },
+                            "routes": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "isEnabled": bool,
+                                    "name": "str",
+                                    "source": "str",
+                                    "condition": "str"
                                 }
                             ]
                         },
+                        "serviceHostName": "str",
+                        "state": "str",
+                        "storageEndpoints": {
+                            "str": {
+                                "connectionString": "str",
+                                "containerName": "str",
+                                "authenticationType": "str",
+                                "identity": {
+                                    "userAssignedIdentity": "str"
+                                },
+                                "sasTtlAsIso8601": "1 day, 0:00:00"
+                            }
+                        }
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_tags: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update an existing IoT Hubs tags.
+
+        Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param iot_hub_tags: Updated tag information to set into the iot hub instance. Required.
+        :type iot_hub_tags: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "sku": {
+                        "name": "str",
+                        "capacity": 0,
+                        "tier": "str"
+                    },
+                    "etag": "str",
+                    "id": "str",
+                    "identity": {
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "type": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "allowedFqdnList": [
+                            "str"
+                        ],
+                        "authorizationPolicies": [
+                            {
+                                "keyName": "str",
+                                "rights": "str",
+                                "primaryKey": "str",
+                                "secondaryKey": "str"
+                            }
+                        ],
+                        "cloudToDevice": {
+                            "defaultTtlAsIso8601": "1 day, 0:00:00",
+                            "feedback": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            },
+                            "maxDeliveryCount": 0
+                        },
+                        "comments": "str",
+                        "deviceHostName": "str",
+                        "deviceRegistry": {
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
+                        },
+                        "deviceStreams": {
+                            "streamingEndpoints": [
+                                "str"
+                            ]
+                        },
+                        "disableDeviceSAS": bool,
+                        "disableLocalAuth": bool,
+                        "disableModuleSAS": bool,
+                        "enableDataResidency": bool,
+                        "enableFileUploadNotifications": bool,
+                        "encryption": {
+                            "keySource": "str",
+                            "keyVaultProperties": [
+                                {
+                                    "identity": {
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "keyIdentifier": "str"
+                                }
+                            ]
+                        },
+                        "eventHubEndpoints": {
+                            "str": {
+                                "endpoint": "str",
+                                "partitionCount": 0,
+                                "partitionIds": [
+                                    "str"
+                                ],
+                                "path": "str",
+                                "retentionTimeInDays": 0
+                            }
+                        },
+                        "features": "str",
+                        "hostName": "str",
+                        "iotHubDetails": {
+                            "gatewayVersion": "str"
+                        },
+                        "ipFilterRules": [
+                            {
+                                "action": "str",
+                                "filterName": "str",
+                                "ipMask": "str"
+                            }
+                        ],
+                        "ipVersion": "str",
+                        "locations": [
+                            {
+                                "location": "str",
+                                "role": "str"
+                            }
+                        ],
+                        "messagingEndpoints": {
+                            "str": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            }
+                        },
+                        "minTlsVersion": "str",
+                        "networkRuleSets": {
+                            "applyToBuiltInEventHubEndpoint": bool,
+                            "ipRules": [
+                                {
+                                    "filterName": "str",
+                                    "ipMask": "str",
+                                    "action": "str"
+                                }
+                            ],
+                            "defaultAction": "str"
+                        },
+                        "privateEndpointConnections": [
+                            {
+                                "properties": {
+                                    "privateLinkServiceConnectionState": {
+                                        "description": "str",
+                                        "status": "str",
+                                        "actionsRequired": "str"
+                                    },
+                                    "privateEndpoint": {
+                                        "id": "str"
+                                    }
+                                },
+                                "id": "str",
+                                "name": "str",
+                                "systemData": {
+                                    "createdAt": "2020-02-20 00:00:00",
+                                    "createdBy": "str",
+                                    "createdByType": "str",
+                                    "lastModifiedAt": "2020-02-20 00:00:00",
+                                    "lastModifiedBy": "str",
+                                    "lastModifiedByType": "str"
+                                },
+                                "type": "str"
+                            }
+                        ],
+                        "provisioningState": "str",
+                        "publicNetworkAccess": "str",
+                        "restrictOutboundNetworkAccess": bool,
+                        "rootCertificate": {
+                            "enableRootCertificateV2": bool,
+                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"
+                        },
+                        "routing": {
+                            "endpoints": {
+                                "cosmosDBSqlContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "databaseName": "str",
+                                        "endpointUri": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "partitionKeyName": "str",
+                                        "partitionKeyTemplate": "str",
+                                        "primaryKey": "str",
+                                        "resourceGroup": "str",
+                                        "secondaryKey": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventHubs": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "eventStreams": [
+                                    {
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "eventStreamId": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "sourceId": "str",
+                                        "workspaceId": "str"
+                                    }
+                                ],
+                                "serviceBusQueues": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "serviceBusTopics": [
+                                    {
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "connectionString": "str",
+                                        "endpointUri": "str",
+                                        "entityPath": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ],
+                                "storageContainers": [
+                                    {
+                                        "containerName": "str",
+                                        "name": "str",
+                                        "authenticationType": "str",
+                                        "batchFrequencyInSeconds": 0,
+                                        "connectionString": "str",
+                                        "encoding": "str",
+                                        "endpointUri": "str",
+                                        "fileNameFormat": "str",
+                                        "id": "str",
+                                        "identity": {
+                                            "userAssignedIdentity": "str"
+                                        },
+                                        "maxChunkSizeInBytes": 0,
+                                        "resourceGroup": "str",
+                                        "subscriptionId": "str"
+                                    }
+                                ]
+                            },
+                            "enrichments": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "key": "str",
+                                    "value": "str"
+                                }
+                            ],
+                            "fallbackRoute": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "source": "str",
+                                "condition": "str",
+                                "name": "str"
+                            },
+                            "routes": [
+                                {
+                                    "endpointNames": [
+                                        "str"
+                                    ],
+                                    "isEnabled": bool,
+                                    "name": "str",
+                                    "source": "str",
+                                    "condition": "str"
+                                }
+                            ]
+                        },
+                        "serviceHostName": "str",
+                        "state": "str",
+                        "storageEndpoints": {
+                            "str": {
+                                "connectionString": "str",
+                                "containerName": "str",
+                                "authenticationType": "str",
+                                "identity": {
+                                    "userAssignedIdentity": "str"
+                                },
+                                "sasTtlAsIso8601": "1 day, 0:00:00"
+                            }
+                        }
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "tags": {
+                        "str": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self, resource_group_name: str, resource_name: str, iot_hub_tags: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
+        """Update an existing IoT Hubs tags.
+
+        Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param iot_hub_tags: Updated tag information to set into the iot hub instance. Is either a JSON
+         type or a IO[bytes] type. Required.
+        :type iot_hub_tags: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                iot_hub_tags = {
+                    "tags": {
+                        "str": "str"
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",
+                    "sku": {
+                        "name": "str",
+                        "capacity": 0,
+                        "tier": "str"
+                    },
+                    "etag": "str",
+                    "id": "str",
+                    "identity": {
+                        "principalId": "str",
+                        "tenantId": "str",
+                        "type": "str",
+                        "userAssignedIdentities": {
+                            "str": {
+                                "clientId": "str",
+                                "principalId": "str"
+                            }
+                        }
+                    },
+                    "name": "str",
+                    "properties": {
+                        "allowedFqdnList": [
+                            "str"
+                        ],
+                        "authorizationPolicies": [
+                            {
+                                "keyName": "str",
+                                "rights": "str",
+                                "primaryKey": "str",
+                                "secondaryKey": "str"
+                            }
+                        ],
+                        "cloudToDevice": {
+                            "defaultTtlAsIso8601": "1 day, 0:00:00",
+                            "feedback": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            },
+                            "maxDeliveryCount": 0
+                        },
+                        "comments": "str",
+                        "deviceHostName": "str",
+                        "deviceRegistry": {
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
+                        },
+                        "deviceStreams": {
+                            "streamingEndpoints": [
+                                "str"
+                            ]
+                        },
+                        "disableDeviceSAS": bool,
+                        "disableLocalAuth": bool,
+                        "disableModuleSAS": bool,
+                        "enableDataResidency": bool,
+                        "enableFileUploadNotifications": bool,
+                        "encryption": {
+                            "keySource": "str",
+                            "keyVaultProperties": [
+                                {
+                                    "identity": {
+                                        "userAssignedIdentity": "str"
+                                    },
+                                    "keyIdentifier": "str"
+                                }
+                            ]
+                        },
+                        "eventHubEndpoints": {
+                            "str": {
+                                "endpoint": "str",
+                                "partitionCount": 0,
+                                "partitionIds": [
+                                    "str"
+                                ],
+                                "path": "str",
+                                "retentionTimeInDays": 0
+                            }
+                        },
+                        "features": "str",
+                        "hostName": "str",
+                        "iotHubDetails": {
+                            "gatewayVersion": "str"
+                        },
+                        "ipFilterRules": [
+                            {
+                                "action": "str",
+                                "filterName": "str",
+                                "ipMask": "str"
+                            }
+                        ],
+                        "ipVersion": "str",
+                        "locations": [
+                            {
+                                "location": "str",
+                                "role": "str"
+                            }
+                        ],
+                        "messagingEndpoints": {
+                            "str": {
+                                "lockDurationAsIso8601": "1 day, 0:00:00",
+                                "maxDeliveryCount": 0,
+                                "ttlAsIso8601": "1 day, 0:00:00"
+                            }
+                        },
+                        "minTlsVersion": "str",
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -3671,8 +5405,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.IotHubDescription] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3720,19 +5454,18 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.IotHubDescription].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.IotHubDescription](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     def _delete_initial(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
             409: ResourceExistsError,
             304: ResourceNotModifiedError,
         }
@@ -3770,19 +5503,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = None
-            if response.status_code == 404:
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise ResourceNotFoundError(response=response, model=error, error_format=ARMErrorFormat)
-            else:
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -3795,14 +5516,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
     @distributed_trace
-    def begin_delete(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> LROPoller[_types.IotHubDescription]:
+    def begin_delete(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> LROPoller[JSON]:
         """Delete an IoT hub.
 
         Delete an IoT hub.
@@ -3812,8 +5531,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An instance of LROPoller that returns IotHubDescription
-        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.iothub.mgmt.types.IotHubDescription]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3863,25 +5582,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -3942,16 +5646,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
-                                {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
-                                        "str"
-                                    ]
-                                }
-                            ]
-                        },
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -4157,7 +5851,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.IotHubDescription] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4174,6 +5868,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -4195,18 +5890,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[_types.IotHubDescription].from_continuation_token(
+            return LROPoller[JSON].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[_types.IotHubDescription](
-            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
-        )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged["_types.IotHubDescription"]:
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get all the IoT hubs in a resource group.
 
         Get all the IoT hubs in a resource group.
@@ -4214,8 +5907,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of IotHubDescription
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.IotHubDescription]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4265,25 +5958,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -4344,16 +6022,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
-                                {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
-                                        "str"
-                                    ]
-                                }
-                            ]
-                        },
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -4559,7 +6227,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.IotHubDescription]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4629,24 +6297,20 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.IotHubDescription"]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
         """Get all the IoT hubs in a subscription.
 
         Get all the IoT hubs in a subscription.
 
-        :return: An iterator like instance of IotHubDescription
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.IotHubDescription]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4696,25 +6360,10 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "maxDeliveryCount": 0
                         },
                         "comments": "str",
-                        "connectionProfile": "str",
                         "deviceHostName": "str",
                         "deviceRegistry": {
-                            "dataPlaneHostName": "str",
-                            "identity": {
-                                "type": "str",
-                                "userAssignedIdentity": "str"
-                            },
-                            "linkingProperties": {
-                                "error": {
-                                    "code": "str",
-                                    "details": "str",
-                                    "httpStatusCode": "str",
-                                    "message": "str"
-                                },
-                                "state": "str"
-                            },
-                            "namespaceResourceId": "str",
-                            "namespaceUuid": "str"
+                            "identityResourceId": "str",
+                            "namespaceResourceId": "str"
                         },
                         "deviceStreams": {
                             "streamingEndpoints": [
@@ -4775,16 +6424,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         },
                         "minTlsVersion": "str",
-                        "mqttV5Settings": {
-                            "topicGroups": [
-                                {
-                                    "topicGroupId": "str",
-                                    "topicTemplates": [
-                                        "str"
-                                    ]
-                                }
-                            ]
-                        },
                         "networkRuleSets": {
                             "applyToBuiltInEventHubEndpoint": bool,
                             "ipRules": [
@@ -4990,7 +6629,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.IotHubDescription]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5059,20 +6698,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_valid_skus(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.IotHubSkuDescription"]:
+    def get_valid_skus(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get the list of valid SKUs for an IoT hub.
 
         Get the list of valid SKUs for an IoT hub.
@@ -5082,8 +6715,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of IotHubSkuDescription
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.IotHubSkuDescription]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5108,7 +6741,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.IotHubSkuDescription]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5179,18 +6812,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_jobs(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> ItemPaged["_types.JobResponse"]:
+    def list_jobs(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get a list of all the jobs in an IoT hub. For more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry
         <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry>`_.
@@ -5204,8 +6833,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of JobResponse
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.JobResponse]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5226,7 +6855,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.JobResponse]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5297,18 +6926,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_job(self, resource_group_name: str, resource_name: str, job_id: str, **kwargs: Any) -> _types.JobResponse:
+    def get_job(self, resource_group_name: str, resource_name: str, job_id: str, **kwargs: Any) -> JSON:
         """Get the details of a job from an IoT hub. For more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry
         <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry>`_.
@@ -5324,8 +6949,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param job_id: The job identifier. Required.
         :type job_id: str
-        :return: JobResponse
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.JobResponse
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5354,7 +6979,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.JobResponse] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_job_request(
             resource_group_name=resource_group_name,
@@ -5385,11 +7010,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5400,14 +7021,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
-    def get_quota_metrics(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.IotHubQuotaMetricInfo"]:
+    def get_quota_metrics(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get the quota metrics for an IoT hub.
 
         Get the quota metrics for an IoT hub.
@@ -5417,8 +7036,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of IotHubQuotaMetricInfo
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.IotHubQuotaMetricInfo]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5434,7 +7053,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.IotHubQuotaMetricInfo]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5505,20 +7124,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_endpoint_health(
-        self, resource_group_name: str, iot_hub_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.EndpointHealthData"]:
+    def get_endpoint_health(self, resource_group_name: str, iot_hub_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get the health for routing endpoints.
 
         Get the health for routing endpoints.
@@ -5528,8 +7141,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param iot_hub_name: Required.
         :type iot_hub_name: str
-        :return: An iterator like instance of EndpointHealthData
-        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.EndpointHealthData]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5548,7 +7161,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.EndpointHealthData]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -5619,20 +7232,22 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
-    @distributed_trace
+    @overload
     def test_all_routes(
-        self, iot_hub_name: str, resource_group_name: str, input: _types.TestAllRoutesInput, **kwargs: Any
-    ) -> _types.TestAllRoutesResult:
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
         """Test all routes.
 
         Test all routes configured in this Iot Hub.
@@ -5643,9 +7258,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
          Required.
         :type resource_group_name: str
         :param input: Input for testing all routes. Required.
-        :type input: ~azext_iot.sdk.iothub.mgmt.types.TestAllRoutesInput
-        :return: TestAllRoutesResult
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.TestAllRoutesResult
+        :type input: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5665,16 +7283,121 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                     "routingSource": "str",
                     "twin": {
                         "properties": {
-                            "desired": {
-                                "str": {}
-                            },
-                            "reported": {
-                                "str": {}
-                            }
+                            "desired": {},
+                            "reported": {}
                         },
-                        "tags": {
-                            "str": {}
+                        "tags": {}
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "routes": [
+                        {
+                            "properties": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "name": "str",
+                                "source": "str",
+                                "condition": "str"
+                            }
                         }
+                    ]
+                }
+        """
+
+    @overload
+    def test_all_routes(
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Test all routes.
+
+        Test all routes configured in this Iot Hub.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param input: Input for testing all routes. Required.
+        :type input: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "routes": [
+                        {
+                            "properties": {
+                                "endpointNames": [
+                                    "str"
+                                ],
+                                "isEnabled": bool,
+                                "name": "str",
+                                "source": "str",
+                                "condition": "str"
+                            }
+                        }
+                    ]
+                }
+        """
+
+    @distributed_trace
+    def test_all_routes(
+        self, iot_hub_name: str, resource_group_name: str, input: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> JSON:
+        """Test all routes.
+
+        Test all routes configured in this Iot Hub.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param input: Input for testing all routes. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type input: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                input = {
+                    "message": {
+                        "appProperties": {
+                            "str": "str"
+                        },
+                        "body": "str",
+                        "systemProperties": {
+                            "str": "str"
+                        }
+                    },
+                    "routingSource": "str",
+                    "twin": {
+                        "properties": {
+                            "desired": {},
+                            "reported": {}
+                        },
+                        "tags": {}
                     }
                 }
 
@@ -5706,10 +7429,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.TestAllRoutesResult] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = input
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(input, (IOBase, bytes)):
+            _content = input
+        else:
+            _json = input
 
         _request = build_iot_hub_resource_test_all_routes_request(
             iot_hub_name=iot_hub_name,
@@ -5718,6 +7447,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5741,11 +7471,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5756,14 +7482,20 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def test_route(
-        self, iot_hub_name: str, resource_group_name: str, input: _types.TestRouteInput, **kwargs: Any
-    ) -> _types.TestRouteResult:
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
         """Test the new route.
 
         Test the new route for this Iot Hub.
@@ -5774,9 +7506,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
          Required.
         :type resource_group_name: str
         :param input: Route that needs to be tested. Required.
-        :type input: ~azext_iot.sdk.iothub.mgmt.types.TestRouteInput
-        :return: TestRouteResult
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.TestRouteResult
+        :type input: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5804,16 +7539,141 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                     },
                     "twin": {
                         "properties": {
-                            "desired": {
-                                "str": {}
-                            },
-                            "reported": {
-                                "str": {}
-                            }
+                            "desired": {},
+                            "reported": {}
                         },
-                        "tags": {
-                            "str": {}
+                        "tags": {}
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "details": {
+                        "compilationErrors": [
+                            {
+                                "location": {
+                                    "end": {
+                                        "column": 0,
+                                        "line": 0
+                                    },
+                                    "start": {
+                                        "column": 0,
+                                        "line": 0
+                                    }
+                                },
+                                "message": "str",
+                                "severity": "str"
+                            }
+                        ]
+                    },
+                    "result": "str"
+                }
+        """
+
+    @overload
+    def test_route(
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Test the new route.
+
+        Test the new route for this Iot Hub.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param input: Route that needs to be tested. Required.
+        :type input: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "details": {
+                        "compilationErrors": [
+                            {
+                                "location": {
+                                    "end": {
+                                        "column": 0,
+                                        "line": 0
+                                    },
+                                    "start": {
+                                        "column": 0,
+                                        "line": 0
+                                    }
+                                },
+                                "message": "str",
+                                "severity": "str"
+                            }
+                        ]
+                    },
+                    "result": "str"
+                }
+        """
+
+    @distributed_trace
+    def test_route(
+        self, iot_hub_name: str, resource_group_name: str, input: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> JSON:
+        """Test the new route.
+
+        Test the new route for this Iot Hub.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param input: Route that needs to be tested. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type input: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                input = {
+                    "route": {
+                        "endpointNames": [
+                            "str"
+                        ],
+                        "isEnabled": bool,
+                        "name": "str",
+                        "source": "str",
+                        "condition": "str"
+                    },
+                    "message": {
+                        "appProperties": {
+                            "str": "str"
+                        },
+                        "body": "str",
+                        "systemProperties": {
+                            "str": "str"
                         }
+                    },
+                    "twin": {
+                        "properties": {
+                            "desired": {},
+                            "reported": {}
+                        },
+                        "tags": {}
                     }
                 }
 
@@ -5851,10 +7711,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.TestRouteResult] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = input
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(input, (IOBase, bytes)):
+            _content = input
+        else:
+            _json = input
 
         _request = build_iot_hub_resource_test_route_request(
             iot_hub_name=iot_hub_name,
@@ -5863,6 +7729,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5886,11 +7753,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5901,14 +7764,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
-    def list_keys(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.SharedAccessSignatureAuthorizationRule"]:
+    def list_keys(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> ItemPaged[JSON]:
         """Get the security metadata for an IoT hub. For more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security
         <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security>`_.
@@ -5922,9 +7783,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of SharedAccessSignatureAuthorizationRule
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.SharedAccessSignatureAuthorizationRule]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5941,7 +7801,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.SharedAccessSignatureAuthorizationRule]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6012,20 +7872,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_keys_for_key_name(
-        self, resource_group_name: str, resource_name: str, key_name: str, **kwargs: Any
-    ) -> _types.SharedAccessSignatureAuthorizationRule:
+    def get_keys_for_key_name(self, resource_group_name: str, resource_name: str, key_name: str, **kwargs: Any) -> JSON:
         """Get a shared access policy by name from an IoT hub. For more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security
         <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security>`_.
@@ -6041,8 +7895,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param key_name: The name of the shared access policy. Required.
         :type key_name: str
-        :return: SharedAccessSignatureAuthorizationRule
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.SharedAccessSignatureAuthorizationRule
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6067,7 +7921,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.SharedAccessSignatureAuthorizationRule] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_keys_for_key_name_request(
             resource_group_name=resource_group_name,
@@ -6098,11 +7952,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6113,18 +7963,20 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def export_devices(
         self,
         resource_group_name: str,
         resource_name: str,
-        export_devices_parameters: _types.ExportDevicesRequest,
+        export_devices_parameters: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> _types.JobResponse:
+    ) -> JSON:
         """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
         container. For more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
@@ -6142,9 +7994,122 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param export_devices_parameters: The parameters that specify the export devices operation.
          Required.
-        :type export_devices_parameters: ~azext_iot.sdk.iothub.mgmt.types.ExportDevicesRequest
-        :return: JobResponse
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.JobResponse
+        :type export_devices_parameters: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                export_devices_parameters = {
+                    "excludeKeys": bool,
+                    "exportBlobContainerUri": "str",
+                    "authenticationType": "str",
+                    "configurationsBlobName": "str",
+                    "exportBlobName": "str",
+                    "identity": {
+                        "userAssignedIdentity": "str"
+                    },
+                    "includeConfigurations": bool
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "endTimeUtc": "2020-02-20 00:00:00",
+                    "failureReason": "str",
+                    "jobId": "str",
+                    "parentJobId": "str",
+                    "startTimeUtc": "2020-02-20 00:00:00",
+                    "status": "str",
+                    "statusMessage": "str",
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def export_devices(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        export_devices_parameters: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
+        container. For more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
+        container. For more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param export_devices_parameters: The parameters that specify the export devices operation.
+         Required.
+        :type export_devices_parameters: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "endTimeUtc": "2020-02-20 00:00:00",
+                    "failureReason": "str",
+                    "jobId": "str",
+                    "parentJobId": "str",
+                    "startTimeUtc": "2020-02-20 00:00:00",
+                    "status": "str",
+                    "statusMessage": "str",
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def export_devices(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        export_devices_parameters: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> JSON:
+        """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
+        container. For more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
+        container. For more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param export_devices_parameters: The parameters that specify the export devices operation. Is
+         either a JSON type or a IO[bytes] type. Required.
+        :type export_devices_parameters: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6186,10 +8151,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.JobResponse] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = export_devices_parameters
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(export_devices_parameters, (IOBase, bytes)):
+            _content = export_devices_parameters
+        else:
+            _json = export_devices_parameters
 
         _request = build_iot_hub_resource_export_devices_request(
             resource_group_name=resource_group_name,
@@ -6198,6 +8169,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -6221,11 +8193,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6236,18 +8204,20 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def import_devices(
         self,
         resource_group_name: str,
         resource_name: str,
-        import_devices_parameters: _types.ImportDevicesRequest,
+        import_devices_parameters: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> _types.JobResponse:
+    ) -> JSON:
         """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
         more information, see:
         `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
@@ -6265,9 +8235,123 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param import_devices_parameters: The parameters that specify the import devices operation.
          Required.
-        :type import_devices_parameters: ~azext_iot.sdk.iothub.mgmt.types.ImportDevicesRequest
-        :return: JobResponse
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.JobResponse
+        :type import_devices_parameters: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                import_devices_parameters = {
+                    "inputBlobContainerUri": "str",
+                    "outputBlobContainerUri": "str",
+                    "authenticationType": "str",
+                    "configurationsBlobName": "str",
+                    "identity": {
+                        "userAssignedIdentity": "str"
+                    },
+                    "includeConfigurations": bool,
+                    "inputBlobName": "str",
+                    "outputBlobName": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "endTimeUtc": "2020-02-20 00:00:00",
+                    "failureReason": "str",
+                    "jobId": "str",
+                    "parentJobId": "str",
+                    "startTimeUtc": "2020-02-20 00:00:00",
+                    "status": "str",
+                    "statusMessage": "str",
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def import_devices(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        import_devices_parameters: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
+        more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        Import, update, or delete device identities in the IoT hub identity registry from a blob. For
+        more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param import_devices_parameters: The parameters that specify the import devices operation.
+         Required.
+        :type import_devices_parameters: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "endTimeUtc": "2020-02-20 00:00:00",
+                    "failureReason": "str",
+                    "jobId": "str",
+                    "parentJobId": "str",
+                    "startTimeUtc": "2020-02-20 00:00:00",
+                    "status": "str",
+                    "statusMessage": "str",
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def import_devices(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        import_devices_parameters: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> JSON:
+        """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
+        more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        Import, update, or delete device identities in the IoT hub identity registry from a blob. For
+        more information, see:
+        `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        <https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities>`_.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param import_devices_parameters: The parameters that specify the import devices operation. Is
+         either a JSON type or a IO[bytes] type. Required.
+        :type import_devices_parameters: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6310,10 +8394,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.JobResponse] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = import_devices_parameters
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(import_devices_parameters, (IOBase, bytes)):
+            _content = import_devices_parameters
+        else:
+            _json = import_devices_parameters
 
         _request = build_iot_hub_resource_import_devices_request(
             resource_group_name=resource_group_name,
@@ -6322,6 +8412,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -6345,11 +8436,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6360,12 +8447,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
-    def get_stats(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _types.RegistryStatistics:
+    def get_stats(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
         """Get the statistics from an IoT hub.
 
         Get the statistics from an IoT hub.
@@ -6375,8 +8462,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: Required.
         :type resource_name: str
-        :return: RegistryStatistics
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.RegistryStatistics
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6400,7 +8487,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.RegistryStatistics] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_stats_request(
             resource_group_name=resource_group_name,
@@ -6430,11 +8517,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6445,14 +8528,14 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     def get_event_hub_consumer_group(
         self, resource_group_name: str, resource_name: str, event_hub_endpoint_name: str, name: str, **kwargs: Any
-    ) -> _types.EventHubConsumerGroupInfo:
+    ) -> JSON:
         """Get a consumer group from the Event Hub-compatible device-to-cloud endpoint for an IoT hub.
 
         Get a consumer group from the Event Hub-compatible device-to-cloud endpoint for an IoT hub.
@@ -6466,8 +8549,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type event_hub_endpoint_name: str
         :param name: The name of the consumer group to retrieve. Required.
         :type name: str
-        :return: EventHubConsumerGroupInfo
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.EventHubConsumerGroupInfo
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6503,7 +8586,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.EventHubConsumerGroupInfo] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_event_hub_consumer_group_request(
             resource_group_name=resource_group_name,
@@ -6535,11 +8618,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6550,20 +8629,22 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def create_event_hub_consumer_group(
         self,
         resource_group_name: str,
         resource_name: str,
         event_hub_endpoint_name: str,
         name: str,
-        consumer_group_body: _types.EventHubConsumerGroupBodyDescription,
+        consumer_group_body: JSON,
+        *,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> _types.EventHubConsumerGroupInfo:
+    ) -> JSON:
         """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
 
         Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
@@ -6578,10 +8659,129 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param name: The name of the consumer group to retrieve. Required.
         :type name: str
         :param consumer_group_body: The consumer group to add. Required.
-        :type consumer_group_body:
-         ~azext_iot.sdk.iothub.mgmt.types.EventHubConsumerGroupBodyDescription
-        :return: EventHubConsumerGroupInfo
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.EventHubConsumerGroupInfo
+        :type consumer_group_body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                consumer_group_body = {
+                    "properties": {
+                        "name": "str"
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "str": {}
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_event_hub_consumer_group(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        event_hub_endpoint_name: str,
+        name: str,
+        consumer_group_body: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
+
+        Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param event_hub_endpoint_name: The name of the EventHubEndpoint. Required.
+        :type event_hub_endpoint_name: str
+        :param name: The name of the consumer group to retrieve. Required.
+        :type name: str
+        :param consumer_group_body: The consumer group to add. Required.
+        :type consumer_group_body: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "str": {}
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def create_event_hub_consumer_group(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        event_hub_endpoint_name: str,
+        name: str,
+        consumer_group_body: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> JSON:
+        """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
+
+        Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param event_hub_endpoint_name: The name of the EventHubEndpoint. Required.
+        :type event_hub_endpoint_name: str
+        :param name: The name of the consumer group to retrieve. Required.
+        :type name: str
+        :param consumer_group_body: The consumer group to add. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type consumer_group_body: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6624,10 +8824,16 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.EventHubConsumerGroupInfo] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = consumer_group_body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(consumer_group_body, (IOBase, bytes)):
+            _content = consumer_group_body
+        else:
+            _json = consumer_group_body
 
         _request = build_iot_hub_resource_create_event_hub_consumer_group_request(
             resource_group_name=resource_group_name,
@@ -6638,6 +8844,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -6661,11 +8868,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6676,9 +8879,9 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     def delete_event_hub_consumer_group(  # pylint: disable=inconsistent-return-statements
@@ -6738,11 +8941,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
         if response.status_code not in [200]:
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
@@ -6750,7 +8949,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
     @distributed_trace
     def list_event_hub_consumer_groups(
         self, resource_group_name: str, resource_name: str, event_hub_endpoint_name: str, **kwargs: Any
-    ) -> ItemPaged["_types.EventHubConsumerGroupInfo"]:
+    ) -> ItemPaged[JSON]:
         """Get a list of the consumer groups in the Event Hub-compatible device-to-cloud endpoint in an
         IoT hub.
 
@@ -6764,9 +8963,8 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param event_hub_endpoint_name: The name of the EventHubEndpoint. Required.
         :type event_hub_endpoint_name: str
-        :return: An iterator like instance of EventHubConsumerGroupInfo
-        :rtype:
-         ~azure.core.paging.ItemPaged[~azext_iot.sdk.iothub.mgmt.types.EventHubConsumerGroupInfo]
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6794,7 +8992,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[_types.EventHubConsumerGroupInfo]] = kwargs.pop("cls", None)
+        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -6866,28 +9064,83 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                error = self._deserialize.failsafe_deserialize(
-                    _types.ErrorDetails,
-                    pipeline_response,
-                )
-                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
-    @distributed_trace
+    @overload
     def check_name_availability(
-        self, operation_inputs: _types.OperationInputs, **kwargs: Any
-    ) -> _types.IotHubNameAvailabilityInfo:
+        self, operation_inputs: JSON, *, content_type: str = "application/json", **kwargs: Any
+    ) -> JSON:
         """Check if an IoT hub name is available.
 
         Check if an IoT hub name is available.
 
         :param operation_inputs: The request body. Required.
-        :type operation_inputs: ~azext_iot.sdk.iothub.mgmt.types.OperationInputs
-        :return: IotHubNameAvailabilityInfo
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.IotHubNameAvailabilityInfo
+        :type operation_inputs: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                operation_inputs = {
+                    "name": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "message": "str",
+                    "nameAvailable": bool,
+                    "reason": "str"
+                }
+        """
+
+    @overload
+    def check_name_availability(
+        self, operation_inputs: IO[bytes], *, content_type: str = "application/json", **kwargs: Any
+    ) -> JSON:
+        """Check if an IoT hub name is available.
+
+        Check if an IoT hub name is available.
+
+        :param operation_inputs: The request body. Required.
+        :type operation_inputs: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "message": "str",
+                    "nameAvailable": bool,
+                    "reason": "str"
+                }
+        """
+
+    @distributed_trace
+    def check_name_availability(self, operation_inputs: Union[JSON, IO[bytes]], **kwargs: Any) -> JSON:
+        """Check if an IoT hub name is available.
+
+        Check if an IoT hub name is available.
+
+        :param operation_inputs: The request body. Is either a JSON type or a IO[bytes] type. Required.
+        :type operation_inputs: JSON or IO[bytes]
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -6916,16 +9169,23 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.IotHubNameAvailabilityInfo] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = operation_inputs
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(operation_inputs, (IOBase, bytes)):
+            _content = operation_inputs
+        else:
+            _json = operation_inputs
 
         _request = build_iot_hub_resource_check_name_availability_request(
             subscription_id=self._config.subscription_id,
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -6949,11 +9209,7 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -6964,12 +9220,12 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
-class IotHubOperations:  # pylint: disable=docstring-missing-param
+class IotHubOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -6987,7 +9243,7 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     def _manual_failover_initial(
-        self, iot_hub_name: str, resource_group_name: str, failover_input: _types.FailoverInput, **kwargs: Any
+        self, iot_hub_name: str, resource_group_name: str, failover_input: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -7000,10 +9256,16 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        _json = failover_input
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(failover_input, (IOBase, bytes)):
+            _content = failover_input
+        else:
+            _json = failover_input
 
         _request = build_iot_hub_manual_failover_request(
             iot_hub_name=iot_hub_name,
@@ -7012,6 +9274,7 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -7034,11 +9297,7 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -7051,13 +9310,19 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(Iterator[bytes], deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def begin_manual_failover(
-        self, iot_hub_name: str, resource_group_name: str, failover_input: _types.FailoverInput, **kwargs: Any
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        failover_input: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
     ) -> LROPoller[None]:
         """Manually initiate a failover for the IoT Hub to its secondary region.
 
@@ -7072,7 +9337,74 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         :param failover_input: Region to failover to. Must be the Azure paired region. Get the value
          from the secondary location in the locations property. To learn more, see
          `https://aka.ms/manualfailover/region <https://aka.ms/manualfailover/region>`_. Required.
-        :type failover_input: ~azext_iot.sdk.iothub.mgmt.types.FailoverInput
+        :type failover_input: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                failover_input = {
+                    "failoverRegion": "str"
+                }
+        """
+
+    @overload
+    def begin_manual_failover(
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        failover_input: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[None]:
+        """Manually initiate a failover for the IoT Hub to its secondary region.
+
+        Manually initiate a failover for the IoT Hub to its secondary region. To learn more, see
+        `https://aka.ms/manualfailover <https://aka.ms/manualfailover>`_.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param failover_input: Region to failover to. Must be the Azure paired region. Get the value
+         from the secondary location in the locations property. To learn more, see
+         `https://aka.ms/manualfailover/region <https://aka.ms/manualfailover/region>`_. Required.
+        :type failover_input: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+
+    @distributed_trace
+    def begin_manual_failover(
+        self, iot_hub_name: str, resource_group_name: str, failover_input: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[None]:
+        """Manually initiate a failover for the IoT Hub to its secondary region.
+
+        Manually initiate a failover for the IoT Hub to its secondary region. To learn more, see
+        `https://aka.ms/manualfailover <https://aka.ms/manualfailover>`_.
+
+        :param iot_hub_name: Required.
+        :type iot_hub_name: str
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param failover_input: Region to failover to. Must be the Azure paired region. Get the value
+         from the secondary location in the locations property. To learn more, see
+         `https://aka.ms/manualfailover/region <https://aka.ms/manualfailover/region>`_. Is either a
+         JSON type or a IO[bytes] type. Required.
+        :type failover_input: JSON or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -7088,7 +9420,7 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[None] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
@@ -7133,7 +9465,7 @@ class IotHubOperations:  # pylint: disable=docstring-missing-param
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
 
-class CertificatesOperations:  # pylint: disable=docstring-missing-param
+class CertificatesOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -7151,9 +9483,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(
-        self, resource_group_name: str, resource_name: str, certificate_name: str, **kwargs: Any
-    ) -> _types.CertificateDescription:
+    def get(self, resource_group_name: str, resource_name: str, certificate_name: str, **kwargs: Any) -> JSON:
         """Get the certificate.
 
         Returns the certificate.
@@ -7165,8 +9495,8 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         :type resource_name: str
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
-        :return: CertificateDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.CertificateDescription
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7179,10 +9509,10 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                     "name": "str",
                     "properties": {
                         "certificate": "str",
-                        "certificateAuthorityResourceId": "str",
                         "created": "2020-02-20 00:00:00",
                         "expiry": "2020-02-20 00:00:00",
                         "isVerified": bool,
+                        "policyResourceId": "str",
                         "subject": "str",
                         "thumbprint": "str",
                         "updated": "2020-02-20 00:00:00"
@@ -7209,7 +9539,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.CertificateDescription] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_certificates_get_request(
             resource_group_name=resource_group_name,
@@ -7240,11 +9570,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7255,22 +9581,23 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def create_or_update(
         self,
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_description: _types.CertificateDescription,
+        certificate_description: JSON,
         *,
+        content_type: str = "application/json",
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> _types.CertificateDescription:
+    ) -> JSON:
         """Upload the certificate to the IoT hub.
 
         Adds new or replaces existing certificate.
@@ -7283,14 +9610,17 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
         :param certificate_description: The certificate body. Required.
-        :type certificate_description: ~azext_iot.sdk.iothub.mgmt.types.CertificateDescription
+        :type certificate_description: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: CertificateDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.CertificateDescription
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7303,10 +9633,10 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                     "name": "str",
                     "properties": {
                         "certificate": "str",
-                        "certificateAuthorityResourceId": "str",
                         "created": "2020-02-20 00:00:00",
                         "expiry": "2020-02-20 00:00:00",
                         "isVerified": bool,
+                        "policyResourceId": "str",
                         "subject": "str",
                         "thumbprint": "str",
                         "updated": "2020-02-20 00:00:00"
@@ -7329,10 +9659,169 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                     "name": "str",
                     "properties": {
                         "certificate": "str",
-                        "certificateAuthorityResourceId": "str",
                         "created": "2020-02-20 00:00:00",
                         "expiry": "2020-02-20 00:00:00",
                         "isVerified": bool,
+                        "policyResourceId": "str",
+                        "subject": "str",
+                        "thumbprint": "str",
+                        "updated": "2020-02-20 00:00:00"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def create_or_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        certificate_name: str,
+        certificate_description: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        etag: Optional[str] = None,
+        match_condition: Optional[MatchConditions] = None,
+        **kwargs: Any
+    ) -> JSON:
+        """Upload the certificate to the IoT hub.
+
+        Adds new or replaces existing certificate.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param certificate_name: The name of the certificate. Required.
+        :type certificate_name: str
+        :param certificate_description: The certificate body. Required.
+        :type certificate_description: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
+         None.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Default value is None.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": "str",
+                        "created": "2020-02-20 00:00:00",
+                        "expiry": "2020-02-20 00:00:00",
+                        "isVerified": bool,
+                        "policyResourceId": "str",
+                        "subject": "str",
+                        "thumbprint": "str",
+                        "updated": "2020-02-20 00:00:00"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def create_or_update(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        certificate_name: str,
+        certificate_description: Union[JSON, IO[bytes]],
+        *,
+        etag: Optional[str] = None,
+        match_condition: Optional[MatchConditions] = None,
+        **kwargs: Any
+    ) -> JSON:
+        """Upload the certificate to the IoT hub.
+
+        Adds new or replaces existing certificate.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param certificate_name: The name of the certificate. Required.
+        :type certificate_name: str
+        :param certificate_description: The certificate body. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type certificate_description: JSON or IO[bytes]
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
+         None.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Default value is None.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                certificate_description = {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": "str",
+                        "created": "2020-02-20 00:00:00",
+                        "expiry": "2020-02-20 00:00:00",
+                        "isVerified": bool,
+                        "policyResourceId": "str",
+                        "subject": "str",
+                        "thumbprint": "str",
+                        "updated": "2020-02-20 00:00:00"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": "str",
+                        "created": "2020-02-20 00:00:00",
+                        "expiry": "2020-02-20 00:00:00",
+                        "isVerified": bool,
+                        "policyResourceId": "str",
                         "subject": "str",
                         "thumbprint": "str",
                         "updated": "2020-02-20 00:00:00"
@@ -7365,10 +9854,16 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificateDescription] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = certificate_description
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(certificate_description, (IOBase, bytes)):
+            _content = certificate_description
+        else:
+            _json = certificate_description
 
         _request = build_certificates_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -7380,6 +9875,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -7403,11 +9899,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7418,9 +9910,9 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     def delete(  # pylint: disable=inconsistent-return-statements
@@ -7496,19 +9988,13 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
 
         if response.status_code not in [200, 204]:
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
 
     @distributed_trace
-    def list_by_iot_hub(
-        self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> _types.CertificateListDescription:
+    def list_by_iot_hub(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
         """Get the certificate list.
 
         Returns the list of certificates.
@@ -7518,8 +10004,8 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: CertificateListDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.CertificateListDescription
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7534,10 +10020,10 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                             "name": "str",
                             "properties": {
                                 "certificate": "str",
-                                "certificateAuthorityResourceId": "str",
                                 "created": "2020-02-20 00:00:00",
                                 "expiry": "2020-02-20 00:00:00",
                                 "isVerified": bool,
+                                "policyResourceId": "str",
                                 "subject": "str",
                                 "thumbprint": "str",
                                 "updated": "2020-02-20 00:00:00"
@@ -7566,7 +10052,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.CertificateListDescription] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_certificates_list_by_iot_hub_request(
             resource_group_name=resource_group_name,
@@ -7596,11 +10082,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7611,9 +10093,9 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
     def generate_verification_code(
@@ -7625,7 +10107,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         etag: str,
         match_condition: MatchConditions,
         **kwargs: Any
-    ) -> _types.CertificateWithNonceDescription:
+    ) -> JSON:
         """Generate verification code for proof of possession flow.
 
         Generates verification code for proof of possession flow. The verification code will be used to
@@ -7642,8 +10124,8 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: CertificateWithNonceDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.CertificateWithNonceDescription
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7656,10 +10138,10 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                     "name": "str",
                     "properties": {
                         "certificate": "str",
-                        "certificateAuthorityResourceId": "str",
                         "created": "2020-02-20 00:00:00",
                         "expiry": "2020-02-20 00:00:00",
                         "isVerified": bool,
+                        "policyResourceId": "str",
                         "subject": "str",
                         "thumbprint": "str",
                         "updated": "2020-02-20 00:00:00",
@@ -7685,7 +10167,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.CertificateWithNonceDescription] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_certificates_generate_verification_code_request(
             resource_group_name=resource_group_name,
@@ -7718,11 +10200,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7733,22 +10211,23 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
-    @distributed_trace
+    @overload
     def verify(
         self,
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_verification_body: _types.CertificateVerificationDescription,
+        certificate_verification_body: JSON,
         *,
         etag: str,
         match_condition: MatchConditions,
+        content_type: str = "application/json",
         **kwargs: Any
-    ) -> _types.CertificateDescription:
+    ) -> JSON:
         """Verify certificate's private key possession.
 
         Verifies the certificate's private key possession by providing the leaf cert issued by the
@@ -7762,14 +10241,16 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
         :param certificate_verification_body: The name of the certificate. Required.
-        :type certificate_verification_body:
-         ~azext_iot.sdk.iothub.mgmt.types.CertificateVerificationDescription
+        :type certificate_verification_body: JSON
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: CertificateDescription
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.CertificateDescription
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7787,10 +10268,148 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                     "name": "str",
                     "properties": {
                         "certificate": "str",
-                        "certificateAuthorityResourceId": "str",
                         "created": "2020-02-20 00:00:00",
                         "expiry": "2020-02-20 00:00:00",
                         "isVerified": bool,
+                        "policyResourceId": "str",
+                        "subject": "str",
+                        "thumbprint": "str",
+                        "updated": "2020-02-20 00:00:00"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @overload
+    def verify(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        certificate_name: str,
+        certificate_verification_body: IO[bytes],
+        *,
+        etag: str,
+        match_condition: MatchConditions,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Verify certificate's private key possession.
+
+        Verifies the certificate's private key possession by providing the leaf cert issued by the
+        verifying pre uploaded certificate.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param certificate_name: The name of the certificate. Required.
+        :type certificate_name: str
+        :param certificate_verification_body: The name of the certificate. Required.
+        :type certificate_verification_body: IO[bytes]
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Required.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": "str",
+                        "created": "2020-02-20 00:00:00",
+                        "expiry": "2020-02-20 00:00:00",
+                        "isVerified": bool,
+                        "policyResourceId": "str",
+                        "subject": "str",
+                        "thumbprint": "str",
+                        "updated": "2020-02-20 00:00:00"
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",
+                        "createdBy": "str",
+                        "createdByType": "str",
+                        "lastModifiedAt": "2020-02-20 00:00:00",
+                        "lastModifiedBy": "str",
+                        "lastModifiedByType": "str"
+                    },
+                    "type": "str"
+                }
+        """
+
+    @distributed_trace
+    def verify(
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        certificate_name: str,
+        certificate_verification_body: Union[JSON, IO[bytes]],
+        *,
+        etag: str,
+        match_condition: MatchConditions,
+        **kwargs: Any
+    ) -> JSON:
+        """Verify certificate's private key possession.
+
+        Verifies the certificate's private key possession by providing the leaf cert issued by the
+        verifying pre uploaded certificate.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param resource_name: The name of the IoT hub. Required.
+        :type resource_name: str
+        :param certificate_name: The name of the certificate. Required.
+        :type certificate_name: str
+        :param certificate_verification_body: The name of the certificate. Is either a JSON type or a
+         IO[bytes] type. Required.
+        :type certificate_verification_body: JSON or IO[bytes]
+        :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
+        :paramtype etag: str
+        :keyword match_condition: The match condition to use upon the etag. Required.
+        :paramtype match_condition: ~azure.core.MatchConditions
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                certificate_verification_body = {
+                    "certificate": "str"
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "etag": "str",
+                    "id": "str",
+                    "name": "str",
+                    "properties": {
+                        "certificate": "str",
+                        "created": "2020-02-20 00:00:00",
+                        "expiry": "2020-02-20 00:00:00",
+                        "isVerified": bool,
+                        "policyResourceId": "str",
                         "subject": "str",
                         "thumbprint": "str",
                         "updated": "2020-02-20 00:00:00"
@@ -7823,10 +10442,16 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
-        cls: ClsType[_types.CertificateDescription] = kwargs.pop("cls", None)
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        _json = certificate_verification_body
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(certificate_verification_body, (IOBase, bytes)):
+            _content = certificate_verification_body
+        else:
+            _json = certificate_verification_body
 
         _request = build_certificates_verify_request(
             resource_group_name=resource_group_name,
@@ -7838,6 +10463,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -7861,11 +10487,7 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7876,12 +10498,12 @@ class CertificatesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
-class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
+class PrivateLinkResourcesOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -7899,9 +10521,7 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(
-        self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any
-    ) -> _types.GroupIdInformation:
+    def get(self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any) -> JSON:
         """Get the specified private link resource.
 
         Get the specified private link resource for the given IotHub.
@@ -7913,8 +10533,8 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
         :type resource_name: str
         :param group_id: The name of the private link resource. Required.
         :type group_id: str
-        :return: GroupIdInformation
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.GroupIdInformation
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -7947,7 +10567,7 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.GroupIdInformation] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_private_link_resources_get_request(
             resource_group_name=resource_group_name,
@@ -7978,11 +10598,7 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -7993,12 +10609,12 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
     @distributed_trace
-    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _types.PrivateLinkResources:
+    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
         """List private link resources.
 
         List private link resources for the given IotHub.
@@ -8008,8 +10624,8 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param resource_name: The name of the IoT Hub. Required.
         :type resource_name: str
-        :return: PrivateLinkResources
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.PrivateLinkResources
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -8046,7 +10662,7 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.PrivateLinkResources] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_private_link_resources_list_request(
             resource_group_name=resource_group_name,
@@ -8076,11 +10692,7 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -8091,12 +10703,12 @@ class PrivateLinkResourcesOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore
 
 
-class ResourceProviderCommonOperations:  # pylint: disable=docstring-missing-param
+class ResourceProviderCommonOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
@@ -8114,13 +10726,13 @@ class ResourceProviderCommonOperations:  # pylint: disable=docstring-missing-par
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get_subscription_quota(self, **kwargs: Any) -> _types.UserSubscriptionQuotaListResult:
+    def get_subscription_quota(self, **kwargs: Any) -> JSON:
         """Get the number of iot hubs in the subscription.
 
         Get the number of free and paid iot hubs in the subscription.
 
-        :return: UserSubscriptionQuotaListResult
-        :rtype: ~azext_iot.sdk.iothub.mgmt.types.UserSubscriptionQuotaListResult
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -8155,7 +10767,7 @@ class ResourceProviderCommonOperations:  # pylint: disable=docstring-missing-par
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[_types.UserSubscriptionQuotaListResult] = kwargs.pop("cls", None)
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
 
         _request = build_resource_provider_common_get_subscription_quota_request(
             subscription_id=self._config.subscription_id,
@@ -8183,11 +10795,7 @@ class ResourceProviderCommonOperations:  # pylint: disable=docstring-missing-par
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            error = self._deserialize.failsafe_deserialize(
-                _types.ErrorDetails,
-                pipeline_response,
-            )
-            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -8198,6 +10806,6 @@ class ResourceProviderCommonOperations:  # pylint: disable=docstring-missing-par
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, deserialized, {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
 
-        return deserialized  # type: ignore
+        return cast(JSON, deserialized)  # type: ignore

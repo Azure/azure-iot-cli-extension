@@ -54,10 +54,18 @@ class ReportProvider(ADRProvider):
             namespace_name=namespace_name,
             body=self._build_selector(report_type, group_name),
         )
-        return self._wait(
+        if kwargs.pop("no_wait", False):
+            return poller
+        self._wait(
             poller,
             f"Generating {report_type} for namespace {namespace_name}...",
             **kwargs,
+        )
+        return self.latest(
+            namespace_name=namespace_name,
+            resource_group_name=resource_group_name,
+            report_type=report_type,
+            group_name=group_name,
         )
 
     def latest(

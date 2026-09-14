@@ -64,6 +64,10 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
             c.argument('dps_name', dps_name_type, id_part='name')
 
     with self.argument_context('iot dps create') as c:
+        c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
+                   arg_type=get_three_state_flag(),
+                   help='Disable DPS service scoped SAS keys for authentication. '
+                   'Defaults to true for new resources. Use --auth-type login for service data-plane commands.')
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub Device Provisioning Service. '
                    'Default is the location of target resource group.')
@@ -239,7 +243,9 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable '
-                        'IoT hub scoped SAS keys for authentication.')
+                        'IoT hub scoped SAS keys for authentication. Defaults to true for new Hubs; '
+                        'existing Hub settings are preserved unless specified. '
+                        'Use --auth-type login for service data-plane commands.')
         c.argument('disable_device_sas', options_list=['--disable-device-sas', '--dds'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable all device '

@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._log import LogKind, _log
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -40,7 +40,7 @@ def _cleanup_namespace(test, namespace_name: str) -> None:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRNamespaceIdentity(CaptureOutputLiveScenarioTest):
+class TestADRNamespaceIdentity(ADRLiveScenarioTest):
     def test_namespace_identity_assign_remove_show(self):
         namespace_name = generate_adr_namespace_name()
         missing_namespace = f"missing{generate_generic_id()[:8]}"
@@ -100,7 +100,7 @@ class TestADRNamespaceIdentity(CaptureOutputLiveScenarioTest):
     ),
 )
 @pytest.mark.usefixtures("set_cwd")
-class TestADRNamespaceUAMI(CaptureOutputLiveScenarioTest):
+class TestADRNamespaceUAMI(ADRLiveScenarioTest):
     def test_namespace_uami_idempotent_assign_and_partial_remove(self):
         namespace_name = generate_adr_namespace_name()
 

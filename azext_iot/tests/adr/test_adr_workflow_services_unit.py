@@ -206,8 +206,8 @@ def test_subscription_and_namespace_operations(service_fixture, mocker):
 @pytest.mark.parametrize(
     "kind, resource_id, factory_name, operation",
     [
-        ("hub", HUB_ID, "iot_hub_service_factory", "iot_hub_resource"),
-        ("dps", DPS_ID, "iot_service_provisioning_factory", "iot_dps_resource"),
+        ("hub", HUB_ID, "adr_iot_hub_service_factory", "iot_hub_resource"),
+        ("dps", DPS_ID, "adr_iot_service_provisioning_factory", "iot_dps_resource"),
     ],
 )
 def test_resolve_hub_and_dps(
@@ -225,7 +225,7 @@ def test_resolve_hub_and_dps(
 def test_list_link_targets(service_fixture, mocker):
     service, _, _, update, _ = service_fixture
     hub_client = mocker.patch.object(
-        subject, "iot_hub_service_factory"
+        subject, "adr_iot_hub_service_factory"
     ).return_value
     hub_client.iot_hub_resource.list_by_resource_group.return_value = [{
         "id": HUB_ID,
@@ -240,7 +240,7 @@ def test_list_link_targets(service_fixture, mocker):
     assert hub["principalId"] == "hub-p"
 
     dps_client = mocker.patch.object(
-        subject, "iot_service_provisioning_factory"
+        subject, "adr_iot_service_provisioning_factory"
     ).return_value
     dps_client.iot_dps_resource.list_by_resource_group.return_value = [{
         "id": DPS_ID,

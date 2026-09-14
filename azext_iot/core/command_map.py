@@ -7,7 +7,7 @@
 from azure.cli.core.commands import CliCommandType, LongRunningOperation
 
 from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
-from azext_iot.core.transforms import dps_certificate_response_transform
+from azure.cli.command_modules.iot._utils import _dps_certificate_response_transform
 
 # Command types for both IoT Hub and DPS management operations
 core_ops = CliCommandType(operations_tmpl="azext_iot.core.custom#{}")
@@ -176,7 +176,7 @@ def load_core_commands(self, _):
     with self.command_group('iot dps certificate',
                             command_type=core_ops,
                             client_factory=iot_service_provisioning_factory,
-                            transform=dps_certificate_response_transform) as g:
+                            transform=_dps_certificate_response_transform) as g:
         g.command(
             'list', 'iot_dps_certificate_list',
             table_transformer=(

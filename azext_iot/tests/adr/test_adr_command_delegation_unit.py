@@ -478,14 +478,6 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
     )
 
 
-@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_link_delete_does_not_expose_unsafe_no_wait(kind):
-    parameters = inspect.signature(
-        getattr(commands_link, f"adr_link_{kind}_delete")
-    ).parameters
-    assert "no_wait" not in parameters
-
-
 @pytest.mark.parametrize(
     "command_name,operation_name,kwargs",
     [
@@ -514,15 +506,6 @@ def test_link_delete_does_not_expose_unsafe_no_wait(kind):
         (
             "adr_link_hub_update",
             "hub_update",
-            {
-                "endpoint_name": "hub",
-                "namespace_name": NS,
-                "resource_group_name": RG,
-            },
-        ),
-        (
-            "adr_link_hub_delete",
-            "hub_delete",
             {
                 "endpoint_name": "hub",
                 "namespace_name": NS,
@@ -566,15 +549,6 @@ def test_link_delete_does_not_expose_unsafe_no_wait(kind):
             },
         ),
         (
-            "adr_link_dps_delete",
-            "dps_delete",
-            {
-                "endpoint_name": "dps",
-                "namespace_name": NS,
-                "resource_group_name": RG,
-            },
-        ),
-        (
             "adr_link_dps_show",
             "dps_show",
             {
@@ -604,15 +578,6 @@ def test_link_delete_does_not_expose_unsafe_no_wait(kind):
         (
             "adr_link_su_update",
             "su_update",
-            {
-                "endpoint_name": "su",
-                "namespace_name": NS,
-                "resource_group_name": RG,
-            },
-        ),
-        (
-            "adr_link_su_delete",
-            "su_delete",
             {
                 "endpoint_name": "su",
                 "namespace_name": NS,

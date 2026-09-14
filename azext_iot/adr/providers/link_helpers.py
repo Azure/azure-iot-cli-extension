@@ -6,12 +6,11 @@
 
 """Pure parsing and serialization helpers for namespace links."""
 
-from copy import deepcopy
+from shlex import join
 from typing import Optional
 
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
-    AzureResponseError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
@@ -25,9 +24,11 @@ from azext_iot.adr.common import (
     build_mi_body,
     validate_uami_resource_id,
 )
+# Re-exported so existing link call sites keep importing it from here.
+from azext_iot.adr.topology import endpoint_update_body  # noqa: F401
 from azext_iot.adr.topology import (
+    endpoint_is_type,
     get_endpoints,
-    writable_namespace_properties,
 )
 
 MI_MUTEX_MSG = (
@@ -159,6 +160,64 @@ def get_updating_endpoints(namespace: dict) -> dict:
     return get_endpoints(namespace, "updating")
 
 
+def failed_link_recovery_commands(namespace: dict) -> list:
+    """Render scoped updates only when the persisted link identity is known."""
+    resource_id = namespace.get("id")
+    if not isinstance(resource_id, str) or not is_valid_resource_id(resource_id):
+        return []
+    parsed = parse_resource_id(resource_id)
+    if (
+        parsed.get("namespace", "").casefold() != "microsoft.deviceregistry"
+        or parsed.get("type", "").casefold() != "namespaces"
+        or "child_name_1" in parsed
+        or not all(parsed.get(field) for field in ("subscription", "resource_group", "name"))
+    ):
+        return []
+
+    commands = []
+    for kind, section, endpoint_type in (
+        ("dps", "provisioning", DPS_ENDPOINT_TYPE),
+        ("hub", "messaging", IOT_HUB_ENDPOINT_TYPE),
+        ("su", "updating", SU_ENDPOINT_TYPE),
+    ):
+        endpoints = get_endpoints(namespace, section)
+        if not isinstance(endpoints, dict):
+            continue
+        for name, endpoint in endpoints.items():
+            if not endpoint_is_type(endpoint, endpoint_type):
+                continue
+            status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
+            state = endpoint.get("linkingState") or (
+                status.get("status") if isinstance(status, dict) else None
+            )
+            if str(state).casefold() != "failed":
+                continue
+            identity = endpoint.get("inboundCallerIdentity") or {}
+            if not isinstance(identity, dict):
+                continue
+            if identity.get("type") == IdentityType.system_assigned.value:
+                identity_args = ["--system-assigned-mi"]
+            elif identity.get("type") == IdentityType.user_assigned.value:
+                uami = identity.get("userAssignedIdentity")
+                if not isinstance(uami, str):
+                    continue
+                try:
+                    validate_uami_resource_id(uami)
+                except InvalidArgumentValueError:
+                    continue
+                identity_args = ["--user-assigned-mi", uami]
+            else:
+                continue
+            commands.append(join([
+                "az", "iot", "adr", "ns", "link", kind, "update",
+                "-n", name, "--ns", parsed["name"],
+                "-g", parsed["resource_group"],
+                "--subscription", parsed["subscription"],
+                *identity_args,
+            ]))
+    return commands
+
+
 def build_hub_endpoint_body(
     hub_resource_id: str,
     mi_system_assigned: bool,
@@ -213,26 +272,6 @@ def build_su_endpoint_body(
     }
 
 
-def endpoint_update_body(
-    existing: Optional[dict],
-    inbound_identity: Optional[dict] = None,
-) -> dict:
-    """Serialize a full endpoint identity for an update PATCH."""
-    existing = existing or {}
-    body = {
-        "endpointType": existing.get("endpointType"),
-        "resourceId": existing.get("resourceId"),
-    }
-    current_inbound = existing.get("inboundCallerIdentity")
-    if current_inbound is not None:
-        body["inboundCallerIdentity"] = current_inbound
-    if inbound_identity is not None:
-        body["inboundCallerIdentity"] = inbound_identity
-    if existing.get("provisioning") is not None:
-        body["provisioning"] = deepcopy(existing["provisioning"])
-    return body
-
-
 def sanitize_identity(identity: Optional[dict]) -> Optional[dict]:
     """Return only writable ARM managed-identity fields."""
     if not identity:
@@ -244,27 +283,3 @@ def sanitize_identity(identity: Optional[dict]) -> Optional[dict]:
             resource_id: {} for resource_id in user_assigned
         }
     return result
-
-
-def namespace_replace_body(namespace: dict) -> dict:
-    """Build a namespace PUT body while preserving current writable state."""
-    body = {
-        key: deepcopy(namespace[key])
-        for key in ("location", "tags")
-        if key in namespace
-    }
-    identity = sanitize_identity(namespace.get("identity"))
-    if identity is not None:
-        body["identity"] = identity
-
-    properties = writable_namespace_properties(
-        namespace.get("properties") or {}
-    )
-    if properties:
-        body["properties"] = properties
-    if not body.get("location"):
-        raise AzureResponseError(
-            "The namespace GET response did not contain the location required "
-            "to replace the namespace."
-        )
-    return body

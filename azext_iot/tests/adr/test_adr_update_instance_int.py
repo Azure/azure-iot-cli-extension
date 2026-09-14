@@ -4,18 +4,21 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
+import re
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+import pytest
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
+
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
+    SU_LIFECYCLE_TIMEOUT,
+    SU_PROVISIONING_MAX_POLLS,
+    SU_PROVISIONING_POLL_INTERVAL,
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr.conftest import TEST_LOCATION, TEST_RG
 from azext_iot.tests.generators import generate_generic_id
-
-SU_PROVISIONING_MAX_POLLS = 360
-SU_PROVISIONING_POLL_INTERVAL = 10
 
 
 def _update_instance_name() -> str:
@@ -23,10 +26,12 @@ def _update_instance_name() -> str:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
+class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
+    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT, func_only=False)
     def test_update_instance_lifecycle(self):
         instance_name = _update_instance_name()
         identity_name = f"testsuid{generate_generic_id()[:8]}"
+        second_identity_name = f"testsuid2{generate_generic_id()[:8]}"
         show_command = f"iot adr ns su instance show -n {instance_name} -g {TEST_RG}"
         delete_command = (
             f"iot adr ns su instance delete -n {instance_name} " f"-g {TEST_RG} --yes"
@@ -41,6 +46,17 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
                 "UpdateInstance UAMI",
                 lambda: self.cmd(
                     f"identity delete -n {identity_name} -g {TEST_RG}"
+                ),
+            )
+            second_identity = self.cmd(
+                f"identity create -n {second_identity_name} -g {TEST_RG} "
+                f"--location {TEST_LOCATION}"
+            ).get_output_in_json()
+            second_identity_id = second_identity["id"]
+            cleanup.register(
+                "UpdateInstance UAMI (second)",
+                lambda: self.cmd(
+                    f"identity delete -n {second_identity_name} -g {TEST_RG}"
                 ),
             )
 
@@ -123,6 +139,33 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
                 f"-g {TEST_RG} --user-assigned-mi {identity_id}"
             ).get_output_in_json()
             assert user_only["identity"]["type"] == "UserAssigned"
+
+            both_uami = self.cmd(
+                f"iot adr ns su instance update -n {instance_name} "
+                f"-g {TEST_RG} --user-assigned-mi {identity_id} "
+                f"{second_identity_id}"
+            ).get_output_in_json()
+            both_ids = {
+                resource_id.casefold()
+                for resource_id in (
+                    both_uami["identity"].get("userAssignedIdentities") or {}
+                )
+            }
+            assert {identity_id.casefold(), second_identity_id.casefold()} <= both_ids
+            # Removing one of two attached identities must detach only that one.
+            subset_removed = self.cmd(
+                f"iot adr ns su instance update -n {instance_name} "
+                f"-g {TEST_RG} --user-assigned-mi {identity_id}"
+            ).get_output_in_json()
+            subset_ids = {
+                resource_id.casefold()
+                for resource_id in (
+                    subset_removed["identity"].get("userAssignedIdentities") or {}
+                )
+            }
+            assert identity_id.casefold() in subset_ids
+            assert second_identity_id.casefold() not in subset_ids
+
             uami_upsert = self.cmd(
                 f"iot adr ns su instance create -n {instance_name} "
                 f"-g {TEST_RG}"
@@ -176,14 +219,23 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRUpdateInstanceValidation(CaptureOutputLiveScenarioTest):
+class TestADRUpdateInstanceValidation(ADRLiveScenarioTest):
     def test_update_instance_validation_negatives(self):
-        self.cmd(
-            "iot adr ns su instance update -n missing-instance " f"-g {TEST_RG}",
-            expect_failure=True,
-        )
-        self.cmd(
-            "iot adr ns su instance update -n missing-instance "
-            f"-g {TEST_RG} --user-assigned-mi not-an-arm-id",
-            expect_failure=True,
-        )
+        with pytest.raises(
+            RequiredArgumentMissingError,
+            match="^" + re.escape(
+                "Nothing to update. Provide --tags, --system-assigned-mi, "
+                "or --user-assigned-mi."
+            ) + "$",
+        ):
+            self.cmd(f"iot adr ns su instance update -n missing-instance -g {TEST_RG}")
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="^" + re.escape(
+                "'not-an-arm-id' is not a valid user-assigned managed identity resource ID."
+            ) + "$",
+        ):
+            self.cmd(
+                "iot adr ns su instance update -n missing-instance "
+                f"-g {TEST_RG} --user-assigned-mi not-an-arm-id"
+            )

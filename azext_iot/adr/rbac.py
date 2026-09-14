@@ -14,6 +14,8 @@ from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
 import requests
+from knack.log import get_logger
+from azure.cli.core._profile import Profile
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
@@ -22,8 +24,10 @@ from azure.cli.core.azclierror import (
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
+logger = get_logger(__name__)
 CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
+SU_DATA_ROLE = "Device Update Administrator"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
@@ -43,8 +47,8 @@ class RoleRule:
 
 
 # This is the only service-to-service role matrix. Link runtime, help, and
-# tests consume it directly. User content-management roles intentionally do
-# not appear here and are never granted by link commands.
+# tests consume it directly. Only service identities appear here; link commands
+# never grant roles to the signed-in user.
 LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     "hub": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
@@ -57,6 +61,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
+        RoleRule("namespace", SU_DATA_ROLE, "target"),
         RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
         RoleRule("adu_first_party", CONTRIBUTOR_ROLE, "target"),
     ),
@@ -175,19 +180,20 @@ def resolve_linked_resource_principal(
     )
 
 
-def format_role_requirements(link_type: str) -> str:
+def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
         "linked": f"{link_type.upper()} selected inbound MI",
         "adu_first_party": "ADU first-party app",
     }
     scopes = {"namespace": "namespace", "target": link_type.upper()}
+    return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
+
+
+def format_role_requirements(link_type: str) -> str:
     requirements = []
     for rule in LINK_ROLE_MATRIX[link_type]:
-        requirement = (
-            f"{labels[rule.principal]} -> {rule.role} on "
-            f"{scopes[rule.scope]}"
-        )
+        requirement = _format_role_requirement(link_type, rule)
         if link_type == "hub" and rule.principal == "linked":
             requirement = (
                 "when an inbound identity is selected, " + requirement
@@ -209,8 +215,8 @@ class LinkRbacManager:
         graph_get=None,
         propagation_timeout: int = RBAC_PROPAGATION_TIMEOUT_SECONDS,
     ):
+        self._cli_ctx = cli_ctx
         self.cli = cli or EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
-        self.tenant_cli = cli or EmbeddedCLI(capture_stderr=True)
         self._graph_get = graph_get or requests.get
         self._adu_principal_ids = {}
         self._caller_object_ids = {}
@@ -222,15 +228,9 @@ class LinkRbacManager:
         self,
         command: str,
         subscription: Optional[str] = None,
-        *,
-        tenant: bool = False,
     ):
         try:
-            cli = self.tenant_cli if tenant else self.cli
-            invoke_kwargs = (
-                {} if tenant else {"subscription": subscription}
-            )
-            result = cli.invoke(command, **invoke_kwargs)
+            result = self.cli.invoke(command, subscription=subscription)
             if not result.success():
                 raise AzureResponseError(
                     f"Azure CLI command failed during link RBAC preflight: az {command}"
@@ -245,16 +245,15 @@ class LinkRbacManager:
             ) from error
 
     def _access_token(
-        self, subscription_id: str, resource_type: Optional[str] = None
+        self, subscription_id: str, resource: Optional[str] = None
     ) -> str:
-        command = (
-            "account get-access-token "
-            f"--subscription '{subscription_id}'"
+        # Use the same profile API as `account get-access-token`, without
+        # passing its secret output through EmbeddedCLI's debug logging.
+        # The subscription selects the tenant; None retains the ARM audience.
+        credentials, _, _ = Profile(cli_ctx=self._cli_ctx).get_raw_token(
+            subscription=subscription_id, resource=resource
         )
-        if resource_type:
-            command += f" --resource-type '{resource_type}'"
-        command += " --query accessToken"
-        access_token = self._invoke_json(command, tenant=True)
+        access_token = credentials[1]
         if not isinstance(access_token, str) or not access_token:
             raise AzureResponseError(
                 f"Could not acquire an access token for subscription "
@@ -265,7 +264,8 @@ class LinkRbacManager:
     def _resolve_adu_principal(self, subscription_id: str) -> str:
         if subscription_id not in self._adu_principal_ids:
             access_token = self._access_token(
-                subscription_id, resource_type="ms-graph"
+                subscription_id,
+                resource=self._cli_ctx.cloud.endpoints.microsoft_graph_resource_id,
             )
             try:
                 response = self._graph_get(
@@ -420,6 +420,24 @@ class LinkRbacManager:
             )
         return "\n".join(commands)
 
+    @staticmethod
+    def _assignment_summary(
+        assignments: Iterable[Tuple[str, str, str]],
+        descriptions: Dict[Tuple[str, str, str], str],
+    ) -> str:
+        lines = []
+        for assignment in assignments:
+            principal_id, _, scope = assignment
+            detail = (
+                f"- {descriptions[assignment]}; principalId={principal_id}; "
+                f"scope={scope}"
+            )
+            subscription = _scope_subscription(scope)
+            if subscription:
+                detail += f"; subscription={subscription}"
+            lines.append(detail)
+        return "\n".join(lines)
+
     def ensure(
         self,
         link_type: str,
@@ -443,6 +461,7 @@ class LinkRbacManager:
     def ensure_many(self, requests: Iterable[dict]) -> None:
         """Authorize a complete atomic link plan before creating any assignment."""
         missing = []
+        descriptions = {}
         for request in requests:
             link_type = request["link_type"]
             if link_type not in LINK_ROLE_MATRIX:
@@ -478,6 +497,7 @@ class LinkRbacManager:
                     )
                 ):
                     missing.append(assignment)
+                    descriptions[assignment] = _format_role_requirement(link_type, rule)
 
         if not missing:
             return
@@ -501,6 +521,11 @@ class LinkRbacManager:
                 f"{commands}"
             )
 
+        logger.warning(
+            "Automatic link RBAC setup will request these missing service-role "
+            "assignments before updating the namespace:\n%s",
+            self._assignment_summary(missing, descriptions),
+        )
         created = []
         needs_service_propagation = bool(missing)
         for index, (principal_id, role, scope) in enumerate(missing):
@@ -526,11 +551,24 @@ class LinkRbacManager:
                 if assignment_now_exists:
                     continue
                 remaining = self._manual_commands(missing[index:])
+                completed = (
+                    "Assignment requests completed before the failure:\n"
+                    + self._assignment_summary(created, descriptions)
+                    if created
+                    else "No assignment creation request completed successfully."
+                )
                 raise AzureResponseError(
                     "Automatic link RBAC setup failed before namespace mutation. "
+                    f"{completed}\n"
                     "Complete these exact remediation commands, allow RBAC to "
                     f"propagate, and retry:\n{remaining}\nDetail: {error}"
                 ) from error
+        if created:
+            logger.warning(
+                "Completed these role-assignment creation requests "
+                "(service authorization may still need time to propagate):\n%s",
+                self._assignment_summary(created, descriptions),
+            )
         self._wait_for_assignments(created)
         if needs_service_propagation:
             self._sleep(SERVICE_AUTHORIZATION_PROPAGATION_SECONDS)

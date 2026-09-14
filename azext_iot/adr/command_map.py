@@ -26,11 +26,6 @@ adr_ca_policy_ops = CliCommandType(
     client_factory=adr_service_factory,
 )
 
-adr_registry_device_ops = CliCommandType(
-    operations_tmpl="azext_iot.adr.commands_registry_device#{}",
-    client_factory=adr_service_factory,
-)
-
 adr_link_ops = CliCommandType(
     operations_tmpl="azext_iot.adr.commands_link#{}",
     client_factory=adr_service_factory,
@@ -72,21 +67,6 @@ adr_wait_ops = CliCommandType(
 adr_link_wait_ops = CliCommandType(
     operations_tmpl="azext_iot.adr.commands_wait#{}",
     client_factory=adr_service_factory,
-)
-
-_HUB_DELETE_CONFIRMATION = (
-    "This operation will permanently delete the linked IoT Hub resource and "
-    "update the Device Registry namespace. This cannot be undone. Continue?"
-)
-_DPS_DELETE_CONFIRMATION = (
-    "This operation will permanently delete the linked Device Provisioning "
-    "Service resource and update the Device Registry namespace. This cannot "
-    "be undone. Continue?"
-)
-_SU_DELETE_CONFIRMATION = (
-    "This operation will permanently delete the linked Update Instance "
-    "resource and update the Device Registry namespace. This cannot be "
-    "undone. Continue?"
 )
 
 
@@ -131,68 +111,6 @@ def load_adr_commands(self, _):
             "wait", "adr_ca_policy_wait", command_type=adr_wait_ops
         )
 
-    # Registry Device commands
-    with self.command_group(
-        "iot adr ns registry-device",
-        command_type=adr_registry_device_ops,
-        is_preview=True,
-    ) as cmd_group:
-        cmd_group.command("create", "adr_registry_device_create", supports_no_wait=True)
-        cmd_group.show_command("show", "adr_registry_device_show")
-        cmd_group.command("list", "adr_registry_device_list")
-        cmd_group.command("update", "adr_registry_device_update", supports_no_wait=True)
-        cmd_group.command(
-            "delete",
-            "adr_registry_device_delete",
-            confirmation=True,
-            supports_no_wait=True,
-        )
-        cmd_group.command(
-            "wait", "adr_registry_device_wait", command_type=adr_wait_ops
-        )
-
-    with self.command_group(
-        "iot adr ns registry-device auth",
-        command_type=adr_registry_device_ops,
-        is_preview=True,
-    ) as cmd_group:
-        cmd_group.command("list", "adr_registry_device_auth_list")
-        cmd_group.show_command("show", "adr_registry_device_auth_show")
-        cmd_group.command("show-keys", "adr_registry_device_auth_show_keys")
-        cmd_group.command(
-            "revoke-certs",
-            "adr_registry_device_auth_revoke_certs",
-            confirmation=True,
-            supports_no_wait=True,
-        )
-        cmd_group.command(
-            "wait",
-            "adr_registry_device_auth_wait",
-            command_type=adr_wait_ops,
-        )
-
-    with self.command_group(
-        "iot adr ns registry-device attribute",
-        command_type=adr_registry_device_ops,
-        is_preview=True,
-    ) as cmd_group:
-        cmd_group.command("create", "adr_registry_device_attribute_create")
-        cmd_group.command("list", "adr_registry_device_attribute_list")
-        cmd_group.show_command("show", "adr_registry_device_attribute_show")
-        cmd_group.command(
-            "delete",
-            "adr_registry_device_attribute_delete",
-            confirmation=True,
-        )
-
-    with self.command_group(
-        "iot adr ns registry-device capability",
-        command_type=adr_registry_device_ops,
-        is_preview=True,
-    ) as cmd_group:
-        cmd_group.command("list", "adr_registry_device_capability_list")
-        cmd_group.show_command("show", "adr_registry_device_capability_show")
-
     with self.command_group(
         "iot adr ns identity", command_type=adr_namespace_ops, is_preview=True
     ) as cmd_group:
@@ -217,11 +135,6 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_hub_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_hub_update", supports_no_wait=True)
-        cmd_group.command(
-            "delete",
-            "adr_link_hub_delete",
-            confirmation=_HUB_DELETE_CONFIRMATION,
-        )
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
         cmd_group.command(
@@ -233,11 +146,6 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_dps_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_dps_update", supports_no_wait=True)
-        cmd_group.command(
-            "delete",
-            "adr_link_dps_delete",
-            confirmation=_DPS_DELETE_CONFIRMATION,
-        )
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
         cmd_group.command(
@@ -249,11 +157,6 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_su_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_su_update", supports_no_wait=True)
-        cmd_group.command(
-            "delete",
-            "adr_link_su_delete",
-            confirmation=_SU_DELETE_CONFIRMATION,
-        )
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")
         cmd_group.command(

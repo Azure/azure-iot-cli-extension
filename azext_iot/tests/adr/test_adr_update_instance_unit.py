@@ -6,8 +6,10 @@
 
 import ast
 import inspect
+import json
 from textwrap import dedent
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -16,17 +18,26 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
+from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError
 
 from azext_iot import _factory
 from azext_iot.adr.common import build_managed_service_identity
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
+from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
 from azext_iot.sdk.deviceupdate.duregistry.operations import (
     UpdateInstancesOperations,
 )
 
 RG = "test-rg"
 INSTANCE = "test-update-instance"
+SUBSCRIPTION = "00000000-0000-0000-0000-000000000000"
+API_VERSION = "2026-11-02-preview"
+INSTANCE_WIRE_URL = (
+    f"https://management.azure.com/subscriptions/{SUBSCRIPTION}"
+    f"/resourceGroups/{RG}/providers/Microsoft.DeviceUpdate"
+    f"/updateInstances/{INSTANCE}"
+)
 UAMI_ID = (
     "/subscriptions/sub/resourceGroups/rg/providers/"
     "Microsoft.ManagedIdentity/userAssignedIdentities/identity"
@@ -42,6 +53,24 @@ def update_instance_provider():
         client = Mock()
         factory.return_value = client
         provider = UpdateInstanceProvider(Mock(cli_ctx=Mock()))
+        yield provider
+
+
+@pytest.fixture()
+def wire_update_instance_provider():
+    """Provider backed by a real DeviceUpdateClient over a mocked transport, so
+    identity assertions run against the actual serialized PATCH request."""
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    with patch(
+        "azext_iot.adr.providers.update_instance."
+        "adr_update_instance_service_factory"
+    ):
+        provider = UpdateInstanceProvider(Mock(cli_ctx=Mock()))
+    with DeviceUpdateClient(
+        credential, SUBSCRIPTION, polling_interval=0, retry_total=0
+    ) as client:
+        provider.client = client
         yield provider
 
 
@@ -497,6 +526,135 @@ def test_update_builds_patch_and_waits(update_instance_provider, kwargs, expecte
     )
 
 
+INSTANCE_ID = (
+    "/subscriptions/sub/resourceGroups/rg/providers/"
+    "Microsoft.DeviceUpdate/updateInstances/test-update-instance"
+)
+UAMI_ID_B = (
+    "/subscriptions/sub/resourceGroups/rg/providers/"
+    "Microsoft.ManagedIdentity/userAssignedIdentities/identity-b"
+)
+
+
+@pytest.mark.parametrize(
+    "existing_uamis, kwargs, expected_user_assigned",
+    [
+        # Partial removal: keep A, drop B -> B is explicitly nulled on the wire.
+        ([UAMI_ID, UAMI_ID_B], {"mi_user_assigned": [UAMI_ID]}, {UAMI_ID: {}, UAMI_ID_B: None}),
+        # Mixed-case desired matches existing case-insensitively -> no null.
+        ([UAMI_ID], {"mi_user_assigned": [UAMI_ID.upper()]}, {UAMI_ID.upper(): {}}),
+        ([], {"mi_user_assigned": [UAMI_ID]}, {UAMI_ID: {}}),
+        ([UAMI_ID], {"mi_user_assigned": [UAMI_ID]}, {UAMI_ID: {}}),
+        # Dropping user-assigned entirely relies on the type change, no map.
+        ([UAMI_ID, UAMI_ID_B], {"mi_system_assigned": True}, None),
+        ([UAMI_ID], {"mi_system_assigned": False}, None),
+    ],
+)
+def test_update_patch_wire_nulls_removed_user_assigned_identities(
+    wire_update_instance_provider,
+    mocked_response,
+    existing_uamis,
+    kwargs,
+    expected_user_assigned,
+):
+    mocked_response.add(
+        "GET",
+        INSTANCE_WIRE_URL,
+        json={
+            "id": INSTANCE_ID,
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {uami: {} for uami in existing_uamis},
+            },
+            "properties": {},
+        },
+    )
+    final = {"name": INSTANCE, "properties": {"provisioningState": "Succeeded"}}
+    mocked_response.add("PATCH", INSTANCE_WIRE_URL, json=final, status=200)
+
+    result = wire_update_instance_provider.update(INSTANCE, RG, **kwargs)
+
+    assert result == final
+    calls = mocked_response.calls
+    assert [call.request.method for call in calls] == ["GET", "PATCH"]
+    assert parse_qs(urlsplit(calls[1].request.url).query) == {
+        "api-version": [API_VERSION]
+    }
+    patch_identity = json.loads(calls[1].request.body)["identity"]
+    if expected_user_assigned is None:
+        assert "userAssignedIdentities" not in patch_identity
+    else:
+        assert patch_identity["userAssignedIdentities"] == expected_user_assigned
+
+
+def test_update_blocks_link_bound_removal_before_any_patch(update_instance_provider):
+    """A user-assigned identity selected by an active ADR link must be rejected
+    before the removal null is written (protection runs before projection)."""
+    namespace_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/ns"
+    )
+    operations = update_instance_provider.client.update_instances
+    operations.get.return_value = {
+        "id": INSTANCE_ID,
+        "identity": {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}, UAMI_ID_B: {}},
+        },
+        "properties": {"linking": {"namespaceResourceId": namespace_id}},
+    }
+    registry = Mock()
+    registry.namespaces.get.return_value = {
+        "properties": {
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "resourceId": INSTANCE_ID,
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned",
+                            "userAssignedIdentity": UAMI_ID_B,
+                        },
+                    }
+                }
+            }
+        }
+    }
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        return_value=registry,
+    ), pytest.raises(ArgumentUsageError, match="link su update"):
+        # Keep A, attempt to drop the link-bound B.
+        update_instance_provider.update(INSTANCE, RG, mi_user_assigned=[UAMI_ID])
+    operations.begin_update.assert_not_called()
+
+
+def test_lifecycle_cleans_instance_before_both_identities_after_failure(mocker):
+    from azext_iot.tests.adr import test_adr_update_instance_int as lifecycle
+
+    mocker.patch.object(lifecycle, "_update_instance_name", return_value=INSTANCE)
+    mocker.patch.object(lifecycle, "generate_generic_id", side_effect=["one", "two"])
+    mocker.patch.object(
+        lifecycle, "wait_for_resource_succeeded", side_effect=RuntimeError("provisioning failed")
+    )
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        Mock(get_output_in_json=Mock(return_value={"id": UAMI_ID})),
+        Mock(get_output_in_json=Mock(return_value={"id": UAMI_ID_B})),
+        Mock(get_output_in_json=Mock(return_value={"nameAvailable": True})),
+        None, None, None, None,
+    ]
+
+    with pytest.raises(RuntimeError, match="provisioning failed"):
+        lifecycle.TestADRUpdateInstanceLifecycle.test_update_instance_lifecycle(scenario)
+
+    assert scenario.cmd.call_count == 7
+    assert [call.args[0] for call in scenario.cmd.call_args_list[-3:]] == [
+        f"iot adr ns su instance delete -n {INSTANCE} -g {lifecycle.TEST_RG} --yes",
+        f"identity delete -n testsuid2two -g {lifecycle.TEST_RG}",
+        f"identity delete -n testsuidone -g {lifecycle.TEST_RG}",
+    ]
+
+
 def test_update_rejects_empty_patch(update_instance_provider):
     with pytest.raises(RequiredArgumentMissingError, match="Nothing to update"):
         update_instance_provider.update(INSTANCE, RG)
@@ -531,6 +689,10 @@ def test_delete_waits_and_supports_no_wait(update_instance_provider):
 
 def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
     cli_ctx = Mock()
+    cli_ctx.cloud.endpoints.active_directory = "https://login.microsoftonline.com"
+    cli_ctx.cloud.endpoints.active_directory_resource_id = (
+        "https://management.core.windows.net/"
+    )
     client_path = (
         "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient"
     )
@@ -540,6 +702,9 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
     ), patch(
         "azext_iot._factory._get_credential_scopes",
         return_value=["scope"],
+    ), patch(
+        "azext_iot._factory.get_cli_credential",
+        return_value="credential",
     ), patch(
         client_path
     ) as client_type:
@@ -554,6 +719,7 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
         == "https://centraluseuap.management.azure.com"
     )
     assert client_type.call_args.kwargs["credential_scopes"] == ["scope"]
+    assert client_type.call_args.kwargs["credential"] == "credential"
 
 
 @pytest.mark.parametrize(

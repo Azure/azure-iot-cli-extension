@@ -626,8 +626,12 @@ def test_catalog_provider_name_and_version_discovery(provider):
     )
 
 
-def test_software_update_data_factory_uses_generated_sdk():
+def test_software_update_data_factory_uses_generated_sdk(mocker):
     cli_ctx = MagicMock()
+    credential = mocker.patch(
+        "azext_iot._factory.get_cli_credential",
+        return_value=mocker.sentinel.credential,
+    )
     client_path = (
         "azext_iot.sdk.deviceupdate.duregistrydata."
         "DeviceRegistrySoftwareUpdateClient"
@@ -641,6 +645,10 @@ def test_software_update_data_factory_uses_generated_sdk():
         )
 
     assert client_type.call_args.kwargs["endpoint"] == ENDPOINT
-    assert client_type.call_args.kwargs["credential"] is _factory.AZURE_CLI_CREDENTIAL
+    assert (
+        client_type.call_args.kwargs["credential"]
+        is mocker.sentinel.credential
+    )
+    credential.assert_called_once_with(cli_ctx)
     assert "user_agent_policy" in client_type.call_args.kwargs
     assert "http_logging_policy" in client_type.call_args.kwargs
