@@ -695,7 +695,8 @@ def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocke
         results.close()
 
 
-def test_role_grant_lock_wait_is_bounded_and_does_not_replay(scope, mocker):
+@pytest.mark.parametrize("coarse_clock", [False, True])
+def test_role_grant_lock_wait_is_bounded_and_does_not_replay(scope, mocker, coarse_clock):
     from azext_iot.tests import helpers
 
     owned = _owned("hub").removeprefix(ARM)
@@ -704,11 +705,14 @@ def test_role_grant_lock_wait_is_bounded_and_does_not_replay(scope, mocker):
     with pytest.raises(ServiceResponseError):
         runtime.assign_role_assignment_once("role", owned, "alias", max_tries=1, wait=0)
     receipt = next(scope.glob("role-grant-*.json"))
-    started = time.monotonic()
+    clock = mocker.Mock(side_effect=[749.406, 749.5]) if coarse_clock else time.monotonic
+    resolution = 0.015625 if coarse_clock else time.get_clock_info("monotonic").resolution
+    started = clock()
     with FileLock(str(receipt) + ".grant.lock"):
-        with pytest.raises(runtime.ScopeError, match="cross-worker verification bound"):
+        with pytest.raises(runtime.ScopeError, match="cross-worker verification bound") as raised:
             runtime.assign_role_assignment_once("role", owned, "alias", max_tries=2, wait=0.05)
-    assert 0.1 <= time.monotonic() - started < 2
+    assert max(0, 0.1 - resolution) <= clock() - started < 2
+    assert isinstance(raised.value.__cause__, LockTimeout)
     create.assert_called_once()
     reads.assert_called_once()
 

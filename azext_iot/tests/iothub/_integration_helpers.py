@@ -8,6 +8,7 @@ import shlex
 from contextlib import contextmanager
 from math import isfinite
 from queue import Queue
+from threading import Event, Lock
 from time import monotonic, sleep
 from urllib.parse import parse_qs, urlparse
 
@@ -176,6 +177,114 @@ def device_receiver(connection_string):
         yield messages
     finally:
         client.shutdown()
+
+
+@contextmanager
+def device_method_responder(scenario, device_id, readiness_timeout=15):
+    """Keep the simulator's real method handler connected for one invocation.
+
+    Use the scenario's tracked worker and existing 90-second drain budget. A
+    stuck connect, callback or shutdown therefore prevents resource deletion,
+    rather than disconnecting during a response or abandoning an untracked task.
+    The service invocation retains its own unchanged response timeout.
+    """
+    from azext_iot.iothub.providers.mqtt import MQTTProvider
+
+    connection_string = scenario.get_device_cstring(device_id)
+    ready, closing, received = Event(), Event(), Event()
+    handler_lock = Lock()
+    failures, callback_failures = Queue(), Queue()
+
+    def run():
+        provider = None
+        accepting = True
+        callback_error = None
+
+        def respond(request):
+            nonlocal callback_error
+            with handler_lock:
+                try:
+                    if not accepting:
+                        raise RuntimeError("Direct method arrived after responder closure.")
+                    received.set()
+                    provider.method_request_handler(request)
+                except BaseException as error:  # SDK callback boundary: re-raised on the test thread below.
+                    if callback_error is None:
+                        callback_error = error
+                    callback_failures.put(error)
+
+        try:
+            provider = MQTTProvider(
+                hub_hostname=scenario.device_host_name, device_id=device_id,
+                device_conn_string=connection_string,
+            )
+            provider.device_client.on_method_request_received = respond
+            provider.device_client.connect()
+            ready.set()
+            closing.wait()
+        except BaseException as error:  # Worker boundary: retain the original exception, not the SDK wrapper.
+            failures.put(error)
+            raise
+        finally:
+            ready.set()  # Also wake the owner when setup fails.
+            if provider is not None:
+                # Drain the actual handler (including send_method_response) before
+                # closing the gate. Never hold this lock during SDK shutdown:
+                # shutdown itself joins SDK callback threads.
+                with handler_lock:
+                    accepting = False
+                try:
+                    provider.device_client.shutdown()
+                except BaseException as error:
+                    failures.put(error)
+                    raise
+        # Keep late failures visible to phase teardown if the owner's drain
+        # already timed out. BackgroundTasks must not record a successful worker.
+        if callback_error is not None:
+            raise callback_error
+
+    scenario.start_background(method=run, args={}, max_runs=1, interval=0, return_handle=True)
+    operation_error = None
+    try:
+        if not ready.wait(readiness_timeout):
+            raise TimeoutError("Direct method responder did not become connected within the readiness budget.")
+        if not failures.empty():
+            raise failures.get_nowait()
+        yield
+    except BaseException as error:
+        operation_error = error
+    finally:
+        closing.set()
+        try:
+            scenario.stop_background()
+        except BaseException as error:
+            failures.put(error)
+
+    errors = []
+    while not callback_failures.empty():
+        errors.append(callback_failures.get_nowait())
+    if operation_error is not None:
+        errors.append(operation_error)
+    while not failures.empty():
+        errors.append(failures.get_nowait())
+    if errors:
+        # Preserve cancellation as well as callback/operation identity. Secondary
+        # failures must also remain visible, without converting cleanup into success.
+        if operation_error is not None and not isinstance(operation_error, Exception):
+            errors.remove(operation_error)
+            errors.insert(0, operation_error)
+        # Do not replace an underlying device-SDK cause with the service timeout
+        # or a cleanup error; that cause is needed to diagnose callback failures.
+        chain_secondary = len(errors) > 1 and errors[0].__cause__ is None and errors[0].__context__ is None
+        for secondary in errors[2 if chain_secondary else 1:]:
+            logger.error(
+                "Additional direct method responder failure.",
+                exc_info=(type(secondary), secondary, secondary.__traceback__),
+            )
+        if chain_secondary:
+            raise errors[0] from errors[1]
+        raise errors[0]
+    assert received.is_set(), "No direct method request reached the responder."
 
 
 @contextmanager

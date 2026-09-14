@@ -15,7 +15,8 @@ from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.tests.iothub._integration_helpers import (
-    LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON, QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids,
+    LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON, QUERY_VISIBILITY_TIMEOUT,
+    device_method_responder, wait_for_query_ids,
 )
 from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.tests.iothub.conftest import _delete_fixture_resource
@@ -443,21 +444,22 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], "full", self.connection_string
             )
         )
-
-        # invoke device method without response status and payload
-        res = self.cmd(
-            """iot hub invoke-device-method -d {} --method-name {} --login {} --method-payload '{}'""".format(
-                device_ids[0], test_mn, self.connection_string, "{method_payload_test_data}")).get_output_in_json()
-
-        assert res is not None
-        assert res["status"] == 200
-        assert res["payload"] == {
-            "methodName": test_mn,
-            "methodRequestId": "1",
-            "methodRequestPayload": test_mp
-        }
-
         self.stop_background()
+
+        # Feedback can outlast several finite simulations. Use a separate,
+        # explicitly connected provider, retaining the CLI's default method handler.
+        with device_method_responder(self, device_ids[0]):
+            res = self.cmd(
+                """iot hub invoke-device-method -d {} --method-name {} --login {} --method-payload '{}'""".format(
+                    device_ids[0], test_mn, self.connection_string, "{method_payload_test_data}")).get_output_in_json()
+
+            assert res is not None
+            assert res["status"] == 200
+            assert res["payload"] == {
+                "methodName": test_mn,
+                "methodRequestId": "1",
+                "methodRequestPayload": test_mp
+            }
 
         self.start_background(
             method=iot_simulate_device,
