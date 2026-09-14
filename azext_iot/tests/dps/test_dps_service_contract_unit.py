@@ -79,6 +79,7 @@ def test_reference_create_and_update_preserve_wire(service, group):
         "initialTwin": {"tags": {"site": "factory"}, "properties": {"desired": {"nested": {"values": [1, 2]}}}},
         "allocationPolicy": "hashed", "iotHubs": ["hub-one", "hub-two"], "capabilities": {"iotEdge": True},
         "optionalDeviceInformation": {"manufacturer": "test"}, "customFutureField": {"kept": True},
+        "deviceTypeRefs": ["device-types/one"],
         "createdDateTimeUtc": "server-owned", "lastUpdatedDateTimeUtc": "server-owned",
         **REFERENCES,
     }
@@ -105,7 +106,10 @@ def test_reference_create_and_update_preserve_wire(service, group):
     assert updated["namespaceName"] == REFERENCES["namespaceName"]
     assert updated["certificateAuthorityName"] == REFERENCES["certificateAuthorityName"]
     assert updated["certificatePolicyName"] == "replacement"
-    for key in ("initialTwin", "allocationPolicy", "iotHubs", "capabilities", "optionalDeviceInformation", "customFutureField"):
+    for key in (
+        "initialTwin", "allocationPolicy", "iotHubs", "capabilities",
+        "optionalDeviceInformation", "customFutureField", "deviceTypeRefs",
+    ):
         assert updated[key] == record[key]
     assert "createdDateTimeUtc" not in updated
     assert "lastUpdatedDateTimeUtc" not in updated

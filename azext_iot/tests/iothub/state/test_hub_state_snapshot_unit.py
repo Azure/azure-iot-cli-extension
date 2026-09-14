@@ -92,7 +92,7 @@ def snapshot_service(mocker):
     mocker.patch("azext_iot.sdk.iothub.service.IotHubGatewayServiceAPIs", side_effect=client)
     runtime = SimpleNamespace(
         stores=stores, requests=requests, query_lag="missing-tags", twin_failure=None,
-        wipe_on_parent_update=False, parent_writes=[],
+        wipe_on_parent_update=False, parent_writes=[], read_failure=None,
     )
 
     def respond(request):
@@ -100,6 +100,8 @@ def snapshot_service(mocker):
         hub = url.hostname.split(".")[0]
         parts = url.path.strip("/").split("/")
         store = stores[hub]
+        if hub == "origin" and runtime.read_failure and (request.method, url.path) == runtime.read_failure[:2]:
+            return runtime.read_failure[2], {}, json.dumps({"Message": "offline authoritative read failure"})
         if parts == ["devices", "query"]:
             assert request.method == "POST"
             rows = [deepcopy(value["twin"]) for value in store.values()]
@@ -230,6 +232,53 @@ def test_authoritative_twin_failure_precedes_destination_changes(snapshot_servic
     assert sum(urlsplit(request.url).path == "/twins/parent" for request in runtime.requests) == 1
 
 
+@pytest.mark.parametrize("method,path", [
+    ("POST", "/devices/query"),
+    ("GET", "/twins/parent"),
+    ("GET", "/devices/parent"),
+    ("GET", "/devices/parent/modules"),
+    ("GET", "/devices/parent/modules/module"),
+    ("GET", "/twins/parent/modules/module"),
+])
+@pytest.mark.parametrize("status", [403, 500])
+@pytest.mark.parametrize("operation", ["migrate", "file"])
+def test_every_authoritative_read_failure_precedes_mutation(snapshot_service, tmp_path, method, path, status, operation):
+    runtime = snapshot_service
+    runtime.read_failure = (method, path, status)
+    runtime.stores["destination"]["preexisting"] = deepcopy(runtime.stores["origin"]["parent"])
+    original = deepcopy(runtime.stores)
+    filename = tmp_path / "state.json"
+    filename.write_text("existing snapshot", encoding="utf-8")
+    with pytest.raises(AzCLIError, match="offline authoritative read failure"):
+        if operation == "migrate":
+            runtime.destination.migrate_state(orig_hub="origin", replace=True, hub_aspects=[HubAspects.Devices.value])
+        else:
+            runtime.origin.save_state(str(filename), replace=True, hub_aspects=[HubAspects.Devices.value])
+    assert runtime.stores == original
+    assert filename.read_text(encoding="utf-8") == "existing snapshot"
+    assert all(urlsplit(request.url).hostname == "origin.unit.invalid" for request in runtime.requests)
+    assert sum((request.method, urlsplit(request.url).path) == (method, path) for request in runtime.requests) == 1
+
+
+@pytest.mark.parametrize("operation", ["migrate", "file"])
+@pytest.mark.parametrize("aspects", [[HubAspects.Devices.value], HubAspects.list()])
+def test_basic_source_fails_without_capture_write_or_destination_changes(snapshot_service, tmp_path, operation, aspects):
+    runtime = snapshot_service
+    runtime.origin.target["sku_tier"] = "Basic"
+    runtime.stores["destination"]["preexisting"] = deepcopy(runtime.stores["origin"]["parent"])
+    original = deepcopy(runtime.stores)
+    filename = tmp_path / "state.json"
+    filename.write_text("existing snapshot", encoding="utf-8")
+    with pytest.raises(AzCLIError, match="Basic-tier.*1000"):
+        if operation == "migrate":
+            runtime.destination.migrate_state(orig_hub="origin", replace=True, hub_aspects=aspects)
+        else:
+            runtime.origin.save_state(str(filename), replace=True, hub_aspects=aspects)
+    assert runtime.stores == original
+    assert filename.read_text(encoding="utf-8") == "existing snapshot"
+    assert not runtime.requests
+
+
 @pytest.mark.parametrize("tags", [None, {}], ids=["absent", "explicit-empty"])
 def test_snapshot_keeps_tag_presence_and_does_not_require_query_identity_fields(snapshot_service, tags):
     runtime = snapshot_service
@@ -247,6 +296,17 @@ def test_snapshot_keeps_tag_presence_and_does_not_require_query_identity_fields(
         assert ("tags" in entry["twin"]) == (tags is not None)
         assert "tags" not in entry["identity"]
         assert entry["identity"]["authentication"] == runtime.stores["origin"][device_id]["identity"]["authentication"]
+
+
+def test_no_modules_is_a_successful_empty_read_not_an_error_fallback(snapshot_service):
+    runtime = snapshot_service
+    for device in runtime.stores["origin"].values():
+        device["modules"] = {}
+    original = deepcopy(runtime.stores["origin"])
+    snapshot = runtime.origin.download_devices(runtime.origin.target)
+    assert set(snapshot) == set(original)
+    assert all("modules" not in device for device in snapshot.values())
+    assert runtime.stores["origin"] == original
 
 
 def test_malformed_authoritative_twin_does_not_fall_back_to_query(snapshot_service):

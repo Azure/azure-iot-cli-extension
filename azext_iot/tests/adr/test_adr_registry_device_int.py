@@ -10,6 +10,9 @@ import json
 import os
 
 import pytest
+from azure.core.exceptions import HttpResponseError
+from knack.util import CLIError
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
@@ -20,6 +23,7 @@ from azext_iot.tests.adr._helpers import (
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr._log import LogKind, _log
+from azext_iot.tests.adr._readiness import delete_test_namespace
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -73,19 +77,17 @@ def _create_registry_device(
 
 
 def _cleanup_namespace(test, namespace_name: str, device_name: str) -> None:
-    commands = [
+    command = (
         f"iot adr ns registry-device delete -n {device_name} "
-        f"--ns {namespace_name} -g {TEST_RG} --yes",
-        f"iot adr ns delete -n {namespace_name} -g {TEST_RG} --yes",
-    ]
-    for command in commands:
-        try:
-            test.cmd(command)
-        except Exception as error:  # noqa: BLE001 - attempt all owned cleanup
-            if is_resource_not_found_error(error):
-                _log(LogKind.RESULT, "Cleanup resource already absent: %s", command)
-            else:
-                _log(LogKind.WARN, "Cleanup failed for %s: %s", command, error)
+        f"--ns {namespace_name} -g {TEST_RG} --yes"
+    )
+    try:
+        test.cmd(command)
+    except (HttpResponseError, CloudError, CLIError) as error:
+        if not is_resource_not_found_error(error):
+            raise
+        _log(LogKind.RESULT, "Cleanup DELETE reported not found; verifying absence: %s", command)
+    delete_test_namespace(test, namespace_name, TEST_RG, registry_devices=(device_name,))
 
 
 @pytest.mark.usefixtures("set_cwd")

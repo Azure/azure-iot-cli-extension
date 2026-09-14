@@ -84,6 +84,7 @@ def test_drop_none_and_readonly_enrollment_fields():
         "createdDateTimeUtc": "now",
         "registrationState": {},
         "optional": None,
+        "deviceTypeRefs": ["device-types/one"],
         "attestation": {
             "type": "x509",
             "x509": {
@@ -107,6 +108,7 @@ def test_drop_none_and_readonly_enrollment_fields():
     result = subject._drop_readonly_enrollment(enrollment)
 
     assert {"etag", "createdDateTimeUtc", "registrationState", "optional"}.isdisjoint(result)
+    assert result["deviceTypeRefs"] == ["device-types/one"]
     assert result["attestation"]["x509"]["clientCertificates"]["primary"] == {
         "certificate": "cert", "info": {"version": 3}
     }

@@ -37,6 +37,7 @@ _OWNED_LINK_TYPES = {
     "dps": ("provisioning", DPS_ENDPOINT_TYPE),
 }
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
+_CHILD_COLLECTIONS = {"job": "jobs", "group": "groups", "registry-device": "registryDevices"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 
 
@@ -94,8 +95,8 @@ def _get_resource(scenario, command):
         namespace = parts[parts.index("--namespace") + 1]
         group = parts[parts.index("-g") + 1]
         path = f"/resourceGroups/{group}/providers/Microsoft.DeviceRegistry/namespaces/{namespace}"
-        if parts[3] in {"job", "group"}:
-            path += f"/{parts[3]}s/{parts[parts.index('-n') + 1]}"
+        if parts[3] in _CHILD_COLLECTIONS:
+            path += f"/{_CHILD_COLLECTIONS[parts[3]]}/{parts[parts.index('-n') + 1]}"
         if (
             (not isinstance(error, SystemExit) or error.code == 3)
             and is_resource_not_found_error(error) and status == 404
@@ -143,10 +144,10 @@ def _child_rejection(error):
 
 
 def delete_test_namespace(
-    scenario, namespace_name, resource_group, *, jobs=(), groups=(),
+    scenario, namespace_name, resource_group, *, jobs=(), groups=(), registry_devices=(),
     timeout=120, interval=10, clock=None, sleeper=None,
 ):
-    """Require owned job/group GET 404 before sending the parent's DELETE.
+    """Require owned child GET 404 before sending the parent's DELETE.
 
     Names include children explicitly deleted earlier in the lifecycle. Empty
     lists alone cannot prove their absence. Lists are an additional guard after
@@ -157,7 +158,7 @@ def delete_test_namespace(
     accepted = False
     rejected = None
     while True:
-        for kind, names in (("job", jobs), ("group", groups)):
+        for kind, names in (("job", jobs), ("group", groups), ("registry-device", registry_devices)):
             for name in names:
                 shown = budget.call(_get_resource, scenario, f"iot adr ns {kind} show {scope} -n {shlex.quote(name)}")
                 while shown is not None:
@@ -177,7 +178,7 @@ def delete_test_namespace(
             budget.pause(interval)
             continue
         if rejected is not None:
-            for kind in ("job", "group"):
+            for kind in ("job", "group") + (("registry-device",) if registry_devices else ()):
                 children = budget.call(scenario.cmd, f"iot adr ns {kind} list {scope}").get_output_in_json()
                 if children != []:
                     raise rejected

@@ -397,7 +397,7 @@ class DeviceMessagingProvider(IoTHubProvider):
 
         def http_wrap(generator, msg_interval, msg_count):
             for _ in tqdm(range(0, msg_count), desc='Sending and receiving events via https', ascii=' #'):
-                d = generator.generate(False)
+                d = generator.generate()
                 self.device_send_message_http(d, headers=properties_to_send)
                 if cancellation_token.wait(msg_interval):
                     break
