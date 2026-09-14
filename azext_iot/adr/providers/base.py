@@ -4,7 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, FrozenSet, Optional
+from time import monotonic, sleep
+from typing import Any, Callable, Dict, FrozenSet, Mapping, Optional
 
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -19,7 +20,8 @@ from knack.log import get_logger
 from rich.console import Console
 
 from azext_iot._factory import adr_service_factory
-from azext_iot.constants import LRO_POLL_RETRIES, LRO_POLL_WAIT_SEC
+from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
+from azext_iot.constants import LRO_POLL_WAIT_SEC
 from azext_iot.common.utility import process_json_arg, wait_for_terminal_state
 
 __all__ = ["ADRProvider", "console", "parse_json_object"]
@@ -40,6 +42,11 @@ def parse_json_object(
 ) -> Dict[str, Any]:
     """Parse an inline JSON object or JSON file and validate its top-level keys."""
     if isinstance(value, str):
+        # ADR command help historically showed both ordinary paths and
+        # Azure-CLI-style @path inputs. Keep the common JSON parser unchanged
+        # and normalize exactly one optional marker at this boundary.
+        if value.startswith("@"):
+            value = value[1:]
         try:
             value = process_json_arg(value, argument_name)
         except CLIInternalError as error:
@@ -100,12 +107,69 @@ _PROVISIONING_FAILURES = ("Failed", "Canceled")
 # through their Location header to avoid the broken Azure-AsyncOperation host.
 _RESOURCE_MUTATION_METHODS = ("PUT", "PATCH", "DELETE")
 _ACTION_METHOD = "POST"
+_ADR_LRO_TIMEOUT_SECONDS = 10 * 60
+_ADR_LRO_MAX_DELAY_SECONDS = 30
+
+
+def _retry_after_seconds(response, fallback: float) -> float:
+    """Return a positive integer Retry-After, case-insensitively."""
+    value = None
+    headers = getattr(response, "headers", None) or {}
+    items = headers.items() if isinstance(headers, Mapping) else ()
+    for key, candidate in items:
+        if str(key).casefold() == "retry-after":
+            value = candidate
+            break
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = 0
+    if parsed <= 0:
+        parsed = max(0, fallback)
+    return min(parsed, _ADR_LRO_MAX_DELAY_SECONDS)
+
+
+def _poll_with_deadline(
+    request: Callable,
+    inspect_response: Callable,
+    timeout_message: Callable[[], str],
+    *,
+    initial_response=None,
+    wait_sec: float = LRO_POLL_WAIT_SEC,
+    timeout_sec: float = _ADR_LRO_TIMEOUT_SECONDS,
+    clock: Callable = monotonic,
+    sleeper: Callable = sleep,
+):
+    """Poll until an inspector reports completion or the deadline expires."""
+    deadline = clock() + max(0, timeout_sec)
+    previous_response = initial_response
+    while True:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            break
+        delay = _retry_after_seconds(previous_response, wait_sec)
+        if delay:
+            sleeper(min(delay, remaining))
+            if deadline - clock() <= 0:
+                break
+
+        response = request()
+        complete, value = inspect_response(response)
+        if complete:
+            return value
+        previous_response = response
+
+    raise AzureResponseError(timeout_message())
 
 
 class ADRProvider(object):
-    def __init__(self, cmd):
+    def __init__(self, cmd, client=None):
         self.cmd = cmd
-        self.client = adr_service_factory(cmd.cli_ctx)
+        self.client = (
+            client
+            if client is not None
+            else adr_service_factory(cmd.cli_ctx)
+        )
 
     def _wait(self, poller, status_message: str, **kwargs):
         """Block on a long-running-operation poller, honoring ``--no-wait``.
@@ -182,6 +246,13 @@ class ADRProvider(object):
         )
 
     @staticmethod
+    def _initial_response_body(response):
+        """Deserialize an inline LRO response without generated callback bugs."""
+        if response is None or not getattr(response, "content", None):
+            return None
+        return response.json()
+
+    @staticmethod
     def _extract_failure_detail(body):
         """Best-effort human-readable reason from a Failed resource body.
 
@@ -235,13 +306,21 @@ class ADRProvider(object):
         if detail:
             message += f" {detail}" if detail.endswith((".", "!", "?")) else f" {detail}."
         if detail and "not authorized" in detail.lower():
-            # AdrMiNotAuthorized: the link saga needs bidirectional role assignments (see the ADR
-            # linking reference). Surface the concrete fix instead of just the backend's read hint.
             message += (
-                " Linking requires role assignments: grant the namespace's managed identity"
-                " Contributor on the linked resource (and 'IoT Hub Data Contributor' on IoT Hubs),"
-                " and grant the linked resource's managed identity Contributor on the namespace."
+                " Verify access for the identity and resource named in the service error. "
+                "Role assignments visible in ARM may not yet be effective at the linked service. "
+                "If the failed endpoint is still present, use link update, not link add, "
+                "preserving its existing identity and endpoint settings. "
+                "Update reruns RBAC preflight; it does not require deleting the linked resource."
             )
+            commands = failed_link_recovery_commands(body)
+            if commands:
+                message += (
+                    "\nAfter verifying access and allowing any recent assignments to propagate, "
+                    "retry the persisted failed link(s):\n"
+                    + "\n".join(commands)
+                    + "\n"
+                )
         headers = getattr(response, "headers", None)
         corr = headers.get("x-ms-correlation-request-id") if headers is not None else None
         if corr:
@@ -250,7 +329,15 @@ class ADRProvider(object):
             message += " Inspect the service activity log using the operation's correlation id."
         return message
 
-    def _poll_provisioning_state(self, poller, wait_sec: int = LRO_POLL_WAIT_SEC, **_):
+    def _poll_provisioning_state(
+        self,
+        poller,
+        wait_sec: int = LRO_POLL_WAIT_SEC,
+        timeout_sec: int = _ADR_LRO_TIMEOUT_SECONDS,
+        clock=None,
+        sleeper=None,
+        **_,
+    ):
         """TEMPORARY: resolve an LRO by polling the resource's ``provisioningState``.
 
         See the module-level workaround note. Steps:
@@ -267,54 +354,86 @@ class ADRProvider(object):
         404 responses are retried. POST actions use the authenticated SDK
         pipeline to poll the Location URL.
         """
-        from time import sleep
-
         url, method = self._poller_initial_request(poller)
         initial_response = self._poller_initial_http_response(poller)
         if method == _ACTION_METHOD:
             if initial_response is not None and not self._poller_is_async(poller):
-                return poller.result()
-            return self._poll_location(poller, wait_sec=wait_sec)
+                return self._initial_response_body(initial_response)
+            return self._poll_location(
+                poller,
+                wait_sec=wait_sec,
+                timeout_sec=timeout_sec,
+                clock=clock,
+                sleeper=sleeper,
+            )
+        is_delete = method == "DELETE"
+        last_body = None
         if url and method in _RESOURCE_MUTATION_METHODS:
             if initial_response is not None and not self._poller_is_async(poller):
-                return poller.result()
+                last_body = self._initial_response_body(initial_response)
+                state = ((last_body or {}).get("properties") or {}).get("provisioningState")
+                if state in _PROVISIONING_FAILURES:
+                    raise AzureResponseError(self._format_failure(state, last_body, initial_response))
+                # A headerless PUT/PATCH may still be provisioning. Only
+                # completed inline responses can bypass resource polling.
+                if state == _PROVISIONING_SUCCEEDED or state is None:
+                    return last_body
         else:
             if poller.done():
                 return poller.result()
             return wait_for_terminal_state(poller, wait_sec=wait_sec)
 
-        is_delete = method == "DELETE"
-        last_body = None
-        for _ in range(LRO_POLL_RETRIES):
-            response = self.client.send_request(HttpRequest("GET", url))
+        def inspect_response(response):
+            nonlocal last_body
             code = response.status_code
             if code == 404:
                 if is_delete:
-                    return None  # resource removed -> delete complete
-                sleep(wait_sec)  # not readable yet -> retry
-                continue
+                    return True, None  # resource removed -> delete complete
+                return False, None  # not readable yet -> retry
             if 200 <= code < 300:
-                last_body = response.json()
-                state = (last_body.get("properties") or {}).get("provisioningState")
-                if state == _PROVISIONING_SUCCEEDED or state is None:
-                    return last_body
+                last_body = response.json() if code != 204 else None
+                state = ((last_body or {}).get("properties") or {}).get("provisioningState")
+                # A readable resource can retain its old successful state
+                # after DELETE has been accepted. Only 404 confirms removal.
+                if not is_delete and (state == _PROVISIONING_SUCCEEDED or state is None):
+                    return True, last_body
                 if state in _PROVISIONING_FAILURES:
                     raise AzureResponseError(self._format_failure(state, last_body, response))
-                sleep(wait_sec)  # still provisioning (Accepted/Updating/...) -> re-check
-                continue
+                return False, None
+            if code in (408, 429) or code >= 500:
+                return False, None
             if 400 <= code < 500:
                 response.raise_for_status()
-            # Transient service failure: briefly back off before retrying.
-            sleep(wait_sec)
-        state = ((last_body or {}).get("properties") or {}).get("provisioningState")
-        raise AzureResponseError(
-            "Timed out waiting for the operation to complete"
-            + (f" (last provisioningState='{state}')." if state else ".")
+            return False, None
+
+        def timeout_message():
+            state = ((last_body or {}).get("properties") or {}).get(
+                "provisioningState"
+            )
+            return (
+                "Timed out waiting for the operation to complete"
+                + (f" (last provisioningState='{state}')." if state else ".")
+            )
+
+        return _poll_with_deadline(
+            lambda: self.client.send_request(HttpRequest("GET", url)),
+            inspect_response,
+            timeout_message,
+            initial_response=initial_response,
+            wait_sec=wait_sec,
+            timeout_sec=timeout_sec,
+            clock=clock or monotonic,
+            sleeper=sleeper or sleep,
         )
 
-    def _poll_location(self, poller, wait_sec: int):
-        from time import sleep
-
+    def _poll_location(
+        self,
+        poller,
+        wait_sec: int,
+        timeout_sec: int = _ADR_LRO_TIMEOUT_SECONDS,
+        clock=None,
+        sleeper=None,
+    ):
         location = self._poller_location(poller)
         if not location:
             raise AzureResponseError(
@@ -322,12 +441,12 @@ class ADRProvider(object):
             )
 
         last_status = None
-        for _ in range(LRO_POLL_RETRIES):
-            response = self.client.send_request(HttpRequest("GET", location))
+
+        def inspect_response(response):
+            nonlocal last_status
             code = response.status_code
             if code == 404:
-                sleep(wait_sec)
-                continue
+                return False, None
             if 200 <= code < 300:
                 body = None
                 if code != 204:
@@ -346,16 +465,33 @@ class ADRProvider(object):
                 if code != 202 and (
                     last_status == _PROVISIONING_SUCCEEDED or last_status is None
                 ):
-                    return body
-                sleep(wait_sec)
-                continue
+                    return True, body
+                return False, None
+            if code in (408, 429) or code >= 500:
+                return False, None
             if 400 <= code < 500:
                 response.raise_for_status()
-            sleep(wait_sec)
+            return False, None
 
-        raise AzureResponseError(
-            "Timed out waiting for the POST operation to complete"
-            + (f" (last status='{last_status}')." if last_status else ".")
+        def timeout_message():
+            return (
+                "Timed out waiting for the POST operation to complete"
+                + (
+                    f" (last status='{last_status}')."
+                    if last_status
+                    else "."
+                )
+            )
+
+        return _poll_with_deadline(
+            lambda: self.client.send_request(HttpRequest("GET", location)),
+            inspect_response,
+            timeout_message,
+            initial_response=self._poller_initial_http_response(poller),
+            wait_sec=wait_sec,
+            timeout_sec=timeout_sec,
+            clock=clock or monotonic,
+            sleeper=sleeper or sleep,
         )
 
     def _raise_if_parent_not_found(self, error: Exception, message: str):

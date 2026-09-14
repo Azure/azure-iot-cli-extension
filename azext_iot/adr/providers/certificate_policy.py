@@ -6,11 +6,22 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import RequiredArgumentMissingError
+from azure.cli.core.azclierror import (
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+)
 from azure.core.exceptions import HttpResponseError
 
-from azext_iot.adr.common import CA_PARENT_RESOURCE_NOT_FOUND_MSG
+from azext_iot.adr.common import (
+    CA_PARENT_RESOURCE_NOT_FOUND_MSG,
+    CertificateAuthorityType,
+)
 from azext_iot.adr.providers.base import ADRProvider
+
+
+_MIN_VALIDITY_DAYS = 7
+_MAX_VALIDITY_DAYS = 90
 
 
 class CertificatePolicyProvider(ADRProvider):
@@ -29,6 +40,48 @@ class CertificatePolicyProvider(ADRProvider):
             ),
         )
 
+    def _validate_issuing_ca(
+        self,
+        certificate_authority_name: str,
+        namespace_name: str,
+        resource_group_name: str,
+    ):
+        try:
+            certificate_authority = self.client.certificate_authorities.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                certificate_authority_name=certificate_authority_name,
+            )
+        except HttpResponseError as error:
+            if error.status_code == 404:
+                raise ResourceNotFoundError(
+                    CA_PARENT_RESOURCE_NOT_FOUND_MSG.format(
+                        certificate_authority_name=certificate_authority_name,
+                        namespace_name=namespace_name,
+                        resource_group_name=resource_group_name,
+                    )
+                ) from error
+            raise
+
+        properties = (certificate_authority or {}).get("properties") or {}
+        certificate_authority_type = properties.get("certificateAuthorityType")
+        if certificate_authority_type != CertificateAuthorityType.ica.value:
+            actual_type = certificate_authority_type or "unknown"
+            raise InvalidArgumentValueError(
+                f"Certificate policy creation requires an issuing certificate authority "
+                f"with type 'ICA', but '{certificate_authority_name}' has type "
+                f"'{actual_type}'. Create an ICA under a Root CA and pass its name "
+                "with --ca-name."
+            )
+
+    @staticmethod
+    def _validate_validity_days(validity_days: int):
+        if not _MIN_VALIDITY_DAYS <= validity_days <= _MAX_VALIDITY_DAYS:
+            raise InvalidArgumentValueError(
+                f"--validity-days must be between {_MIN_VALIDITY_DAYS} and "
+                f"{_MAX_VALIDITY_DAYS} days, inclusive. Received {validity_days}."
+            )
+
     def create(
         self,
         certificate_policy_name: str,
@@ -40,6 +93,12 @@ class CertificatePolicyProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
+        self._validate_validity_days(validity_days)
+        self._validate_issuing_ca(
+            certificate_authority_name=certificate_authority_name,
+            namespace_name=namespace_name,
+            resource_group_name=resource_group_name,
+        )
         location = self._resolve_location(namespace_name, resource_group_name, location)
 
         resource = {
@@ -115,6 +174,9 @@ class CertificatePolicyProvider(ADRProvider):
                 "Nothing to update. Provide --tags or --validity-days "
                 "to update the certificate policy."
             )
+
+        if validity_days is not None:
+            self._validate_validity_days(validity_days)
 
         properties = {}
         if tags is not None:

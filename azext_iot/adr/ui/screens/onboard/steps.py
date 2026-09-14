@@ -6,9 +6,8 @@
 
 """The onboarding step graph for connectivity (S0 through S5).
 
-Scope is deliberately limited to reaching minimum viability: a namespace that can
-provision and communicate with devices. Certificates, software updates, the first device
-and the first group are later steps that plug into this same engine.
+Scope covers namespace connectivity and optional Software Updates. Certificates,
+groups and jobs remain separate browsing surfaces.
 
 Ordering here is not a UI preference. Each rule mirrors one the service enforces:
 a DPS endpoint must exist before a messaging endpoint is accepted, at most one
@@ -41,20 +40,7 @@ from azext_iot.adr.ui.screens.onboard.identity import (
     has_uami,
     identity_command_flags,
     outbound_matches,
-    principal_of as identity_principal_of,
 )
-
-#: Roles the linking saga needs, in both directions.
-NAMESPACE_TO_RESOURCE_ROLES = {
-    "hub": ("Contributor", "IoT Hub Data Contributor"),
-    "dps": ("Contributor",),
-    "su": ("Contributor",),
-}
-RESOURCE_TO_NAMESPACE_ROLE = "Contributor"
-ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
-#: Role assignments are not effective immediately; linking too soon fails for a reason
-#: that looks like a backend bug. The e2e waits the same amount.
-ROLE_PROPAGATION_WAIT_SEC = 60
 
 #: Execution phases. Grants must precede the links that depend on them.
 PHASE_PREREQUISITE = 10
@@ -99,11 +85,137 @@ def has_namespace(context: Dict[str, Any]) -> bool:
 
 
 def software_updates_linked(context: Dict[str, Any]) -> bool:
-    return bool(_endpoints(context, "updating"))
+    return bool(_endpoints(context, "updating")) and not software_updates_chosen(context)
 
 
 def software_updates_chosen(context: Dict[str, Any]) -> bool:
     return bool(context.get("selected_sus")) or context.get("create_su") is not None
+
+
+def reconcile_software_updates_creation(context: Dict[str, Any]) -> None:
+    """A reloaded matching endpoint proves that the planned creation/link persisted.
+
+    This also covers a local timeout after Azure accepted the link. Never discard a
+    request for a different target, or infer completion solely from a resource name.
+    """
+    request = context.get("create_su")
+    endpoints = _endpoints(context, "updating")
+    if request is None or len(endpoints) != 1:
+        return
+    target_id = (next(iter(endpoints.values())) or {}).get("resourceId") or ""
+    planned_id = request.arm_id(context.get("subscription_id") or "")
+    if target_id.rstrip("/").casefold() == planned_id.rstrip("/").casefold():
+        context.pop("create_su")
+
+
+def namespace_location(context: Dict[str, Any]):
+    """Use live namespace state when available, otherwise the planned namespace region."""
+    location = _namespace(context).get("location")
+    request = context.get("create_namespace")
+    return location or (request.location if request is not None else None)
+
+
+def onboarding_error(context: Dict[str, Any]) -> str:
+    """Reject all known topology/region conflicts before creating prerequisites."""
+    reason = software_updates_error(context)
+    if reason:
+        return reason
+    location = namespace_location(context)
+    if not location:
+        return ""
+    for kind, key in (("dps", "selected_dps"), ("hub", "selected_hubs"), ("su", "selected_sus")):
+        selected = context.get(key)
+        targets = ([selected] if selected is not None else []) if kind == "dps" else list(selected or [])
+        request = context.get(f"create_{kind}")
+        if request is not None:
+            targets.append(request)
+        for target in targets:
+            target_location = getattr(target, "location", "") or (
+                getattr(target, "raw", None) or {}
+            ).get("location")
+            if target_location and str(target_location).casefold() != str(location).casefold():
+                return (
+                    f"Cross-region linking is not supported. Namespace region is '{location}'; "
+                    f"{kind.upper()} '{target.name}' region is '{target_location}'. "
+                    "Choose or create targets in the namespace region."
+                )
+    return ""
+
+
+def software_updates_error(context: Dict[str, Any]) -> str:
+    """Validate existing, selected and planned instances before any work is submitted."""
+    endpoints = _endpoints(context, "updating")
+    selected = list(context.get("selected_sus") or [])
+    creating = context.get("create_su") is not None
+    if len(endpoints) > 1 or len(selected) + int(creating) > 1:
+        return "Only one Software Updates instance may be linked per namespace."
+    if endpoints and (selected or creating):
+        existing = next(iter(endpoints.values())) or {}
+        if creating or (
+            (existing.get("resourceId") or "").rstrip("/").casefold()
+            != selected[0].resource_id.rstrip("/").casefold()
+        ):
+            return (
+                "This namespace already has a Software Updates instance. Only one is allowed; "
+                "su update changes the existing inbound identity, not the linked target."
+            )
+    return ""
+
+
+def _su_endpoint_name(context: Dict[str, Any]) -> str:
+    return next(iter(_endpoints(context, "updating")), None) or context.get("su_endpoint_name") or "su"
+
+
+def _topology(namespace):
+    """Only writable link state participates; asynchronous status changes are harmless."""
+    properties = (namespace or {}).get("properties") or {}
+    return (
+        properties.get("outboundIdentity"),
+        {
+            section: {
+                name: {key: endpoint.get(key) for key in (
+                    "endpointType", "resourceId", "inboundCallerIdentity", "provisioning"
+                )}
+                for name, endpoint in ((properties.get(section) or {}).get("endpoints") or {}).items()
+            }
+            for section in ("provisioning", "messaging", "updating")
+        },
+    )
+
+
+def plan_preflight(context: Dict[str, Any]) -> List[PlanItem]:
+    """Guard the frozen review against stale topology before identities, grants or creates."""
+    from copy import deepcopy
+
+    if has_namespace(context) and has_identity(context) and not any(
+        context.get(key) for key in (
+            "create_resource_group", "create_namespace", "create_dps", "create_hub", "create_su",
+            "selected_dps", "selected_hubs", "selected_sus",
+        )
+    ):
+        return []
+    expected = deepcopy(_topology(_namespace(context)))
+
+    def verify(session, ctx):
+        if getattr(session, "read_only", False):
+            raise AzureResponseError("Read-only session: setup is disabled.")
+        reason = onboarding_error(ctx)
+        if reason:
+            raise AzureResponseError(reason)
+        if has_namespace(ctx):
+            current = session.call(session.provider("namespace").show, **_scope_of(ctx))
+            reason = onboarding_error({**ctx, "namespace": current})
+            if reason:
+                raise AzureResponseError(reason)
+            if _topology(current) != expected:
+                raise AzureResponseError("Namespace links or outbound identity changed. Reload and review the plan.")
+            ctx["namespace"] = current
+
+    return [PlanItem(
+        key="preflight", description="Recheck namespace topology before making changes",
+        command="# Recheck current namespace links against the reviewed plan",
+        phase=-1, long_running=False, invoke=verify, category="verification",
+    )]
 
 
 def has_identity(context: Dict[str, Any]) -> bool:
@@ -139,15 +251,6 @@ def provisioning_planned(context: Dict[str, Any]) -> bool:
 
 def messaging_planned(context: Dict[str, Any]) -> bool:
     return bool(context.get("selected_hubs")) or context.get("create_hub") is not None
-
-
-def permissions_confirmed(context: Dict[str, Any]) -> bool:
-    """Role assignments are advisory until the open security question is settled.
-
-    The flow reports what is required and lets the operator confirm it is done, rather
-    than silently granting rights on the customer's behalf.
-    """
-    return bool(context.get("permissions_confirmed"))
 
 
 # -- plan contributions --------------------------------------------------------------
@@ -232,7 +335,7 @@ def plan_namespace(context: Dict[str, Any]) -> List[PlanItem]:
         scope={"resource_group_name": request.resource_group_name},
         options={
             "location": request.location,
-            "outbound_mi_user_assigned": (
+            "outbound_user_assigned_mi": (
                 request.identity.uami_id
                 if request.identity.is_user_assigned
                 else None
@@ -241,7 +344,7 @@ def plan_namespace(context: Dict[str, Any]) -> List[PlanItem]:
         flags=(
             ()
             if request.identity.is_user_assigned
-            else ("--outbound-mi-system-assigned",)
+            else ("--outbound-system-assigned-mi",)
         ),
     )
     if request.tags:
@@ -295,15 +398,19 @@ def plan_identity(context: Dict[str, Any]) -> List[PlanItem]:
         return items
     choice = get_choice(context, "namespace")
     flag = (
-        f"--outbound-mi-user-assigned {quote(choice.uami_id)}"
+        f"--outbound-user-assigned-mi {quote(choice.uami_id)}"
         if choice.is_user_assigned
-        else "--outbound-mi-system-assigned"
+        else "--outbound-system-assigned-mi"
     )
     items.append(
         PlanItem(
             key="identity",
             description=f"Configure namespace outbound identity: {choice.label}",
-            phase=PHASE_IDENTITY,
+            # Updating outbound identity on linked namespaces invokes base RBAC.
+            # Batch all displayed requirements first, including those existing links.
+            phase=PHASE_PROPAGATION if any(
+                _endpoints(context, section) for section in ("provisioning", "messaging", "updating")
+            ) else PHASE_IDENTITY,
             command=(
                 f"az iot adr ns update -n {quote(name)} "
                 f"-g {quote(context.get('resource_group_name') or '')} {flag}"
@@ -448,7 +555,7 @@ def _plan_target_identity(
             command = (
                 f"az iot adr ns su instance update -n {quote(target.name)} "
                 f"-g {quote(raw.get('resourceGroup') or '')} "
-                f"--mi-user-assigned {quote(choice.uami_id)}"
+                f"--user-assigned-mi {quote(choice.uami_id)}"
             )
     else:
         description = f"Enable system-assigned identity on {kind} '{target.name}'"
@@ -467,7 +574,7 @@ def _plan_target_identity(
             command = (
                 f"az iot adr ns su instance update -n {quote(target.name)} "
                 f"-g {quote(raw.get('resourceGroup') or '')} "
-                "--mi-system-assigned true"
+                "--system-assigned-mi true"
             )
     return [
         PlanItem(
@@ -693,8 +800,16 @@ def _principal_lookup(resource_id: str) -> str:
     return (
         '"$(az resource show '
         f"--ids {quote(resource_id)} "
+        f"{_subscription_argument(resource_id)} "
         '--query "identity.principalId || properties.principalId" --output tsv)"'
     )
+
+
+def _subscription_argument(scope: str) -> str:
+    from azext_iot.adr.rbac import _scope_subscription
+
+    subscription = _scope_subscription(scope)
+    return f" --subscription {quote(subscription)}" if subscription else ""
 
 
 def grant_command(
@@ -712,12 +827,16 @@ def grant_command(
     return (
         f"az role assignment create --assignee-object-id {assignee} "
         f"--assignee-principal-type ServicePrincipal --role {quote(role)} "
-        f"--scope {quote(scope)}"
+        f"--scope {quote(scope)}{_subscription_argument(scope)}"
     )
 
 
 def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
     """Optional: link an update instance so the namespace can run update jobs."""
+    reason = software_updates_error(context)
+    if reason:
+        return [PlanItem(key="su", description="Link Software Updates", action="blocked",
+                         blocked_reason=reason, phase=0, long_running=False)]
     instances = list(context.get("selected_sus") or [])
     request = context.get("create_su")
     if not instances and request is None:
@@ -737,7 +856,7 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
                                scope={"resource_group_name": request.resource_group_name},
                                options={
                                    "location": request.location,
-                                   "mi_user_assigned": (
+                                   "user_assigned_mi": (
                                        request.identity.uami_id
                                        if request.identity.is_user_assigned
                                        else None
@@ -746,7 +865,7 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
                                flags=(
                                    ()
                                    if request.identity.is_user_assigned
-                                   else ("--mi-system-assigned",)
+                                   else ("--system-assigned-mi",)
                                )),
                 invoke=make,
                 target=request.name,
@@ -755,8 +874,7 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
         )
         instances.append(_placeholder(request, context))
 
-    # Updating endpoints are a map on the namespace, so several may be linked. One chosen
-    # instance keeps the configured endpoint name; several must be named apart.
+    updating = bool(_endpoints(context, "updating"))
     for index, instance in enumerate(instances):
         choice = (
             request.identity
@@ -764,35 +882,36 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
             else get_choice(context, "su", instance.resource_id)
         )
         items.extend(_plan_target_identity(context, "su", instance, choice))
-        endpoint = (
-            instance.name if len(instances) > 1
-            else (context.get("su_endpoint_name") or "su")
-        )
+        endpoint = _su_endpoint_name(context)
         link_command = render(
-            "iot adr ns link su add",
+            "iot adr ns link su update" if updating else "iot adr ns link su add",
             scope=_scope_of(context),
             options={
                 "endpoint_name": endpoint,
-                "su_id": instance.resource_id,
+                "su_id": None if updating else instance.resource_id,
             },
         )
 
-        def link(session, ctx, _su=instance, _endpoint=endpoint, _choice=choice):
+        def link(session, ctx, _su=instance, _endpoint=endpoint, _choice=choice, _updating=updating):
+            provider = session.provider("link")
             return session.call(
-                session.provider("link").su_add,
+                provider.su_update if _updating else provider.su_add,
                 endpoint_name=_endpoint,
                 namespace_name=ctx.get("namespace_name"),
                 resource_group_name=ctx.get("resource_group_name"),
-                su_resource_id=_su.resource_id,
                 mi_system_assigned=not _choice.is_user_assigned,
                 mi_user_assigned=_choice.uami_id if _choice.is_user_assigned else None,
                 no_wait=True,
+                **({} if _updating else {"su_resource_id": _su.resource_id}),
             )
 
         items.append(
             PlanItem(
                 key="su" if index == 0 else f"su-{index}",
-                description=f"Link update instance '{instance.name}' as endpoint '{endpoint}'",
+                description=(
+                    f"Update inbound identity on existing Software Updates endpoint '{endpoint}'"
+                    if updating else f"Link update instance '{instance.name}' as endpoint '{endpoint}'"
+                ),
                 phase=PHASE_LINK,
                 command=(
                     f"{link_command} "
@@ -884,9 +1003,7 @@ def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
     if context.get("create_su") is not None:
         instances.append(_placeholder(context["create_su"], context))
     for instance in instances:
-        endpoint = instance.name if len(instances) > 1 else (
-            context.get("su_endpoint_name") or "su"
-        )
+        endpoint = _su_endpoint_name(context)
         expected.append(("updating", endpoint, instance.resource_id))
     if not expected:
         return []
@@ -913,7 +1030,7 @@ def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
                 ((properties.get(section) or {}).get("endpoints") or {})
                 .get(endpoint_name)
             ) or {}
-            if str(endpoint.get("resourceId") or "").casefold() != target_id.casefold():
+            if str(endpoint.get("resourceId") or "").rstrip("/").casefold() != target_id.rstrip("/").casefold():
                 raise AzureResponseError(
                     f"Final verification could not match endpoint '{endpoint_name}' "
                     f"to target '{target_id}'."
@@ -944,56 +1061,6 @@ def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
     ]
 
 
-def _grant_invoker(principal: str, principal_source: str, role: str, scope: str):
-    """Bind one grant so the plan can run it like any other operation.
-
-    ``principal`` may be empty when the resource holding the identity is created by an
-    earlier item of this same plan; ``principal_source`` is then read at run time, by
-    which point the resource exists.
-    """
-    def invoke(session, _context):
-        from azext_iot.adr.ui.core.rbac import grant_role, resolve_principal
-
-        assignee = principal or resolve_principal(session, principal_source)
-        if not assignee:
-            raise RuntimeError(
-                f"could not read a system-assigned identity for "
-                f"{(principal_source or '').rsplit('/', 1)[-1] or 'the resource'}, "
-                f"so '{role}' could not be granted"
-            )
-        created = grant_role(session, assignee, role, scope)
-        if created:
-            # Only a newly created assignment has to propagate; see the wait below.
-            _context["_granted_any"] = True
-        return None
-    return invoke
-
-
-def _service_principal_grant_invoker(
-    application_id: str,
-    role: str,
-    scope: str,
-):
-    def invoke(session, context):
-        from azext_iot.adr.ui.core.rbac import (
-            grant_role,
-            resolve_service_principal,
-        )
-
-        principal = resolve_service_principal(session, application_id)
-        if not principal:
-            raise RuntimeError(
-                "could not resolve the Azure Device Update service principal "
-                f"for application id {application_id}"
-            )
-        created = grant_role(session, principal, role, scope)
-        if created:
-            context["_granted_any"] = True
-        return None
-
-    return invoke
-
-
 def _service_principal_grant_command(
     application_id: str,
     role: str,
@@ -1002,236 +1069,18 @@ def _service_principal_grant_command(
     return (
         'az role assignment create --assignee-object-id '
         f'"$(az ad sp show --id {quote(application_id)} '
+        f"{_subscription_argument(scope)} "
         '--query id --output tsv)" '
         "--assignee-principal-type ServicePrincipal "
-        f"--role {quote(role)} --scope {quote(scope)}"
+        f"--role {quote(role)} --scope {quote(scope)}{_subscription_argument(scope)}"
     )
-
-
-def _wait_for_propagation(_session, context):
-    """Role assignments are not effective the instant they are created.
-
-    Skipped when every grant already existed - re-running setup should not idle for a
-    minute waiting for propagation that happened long ago.
-    """
-    import time
-
-    if not context.get("_granted_any"):
-        return None
-    time.sleep(ROLE_PROPAGATION_WAIT_SEC)
-    return None
 
 
 def plan_permissions(context: Dict[str, Any]) -> List[PlanItem]:
-    """Emit the grants the linking saga needs, in both directions, ready to run.
+    """Display base requirements and execute them through one atomic RBAC preflight."""
+    from azext_iot.adr.ui.screens.onboard.permissions import plan_link_roles
 
-    Both principal ids are already known - the namespace payload and each candidate carry
-    their own identity - so the commands are emitted complete rather than as placeholders
-    a customer would have to fill in by hand.
-
-    Whether radr runs them itself turns on ``can_grant_roles`` in the context, which is
-    ARM's own answer about this caller at this scope. When ARM says no, the grants stay in
-    the plan as commands to hand to someone with Owner or User Access Administrator -
-    the customer still sees exactly what has to happen, and why radr stopped short.
-    """
-    namespace_scope = namespace_arm_id(context)
-    namespace_request = context.get("create_namespace")
-    namespace_choice = (
-        namespace_request.identity
-        if namespace_request is not None
-        else get_choice(context, "namespace")
-    )
-    namespace_principal = identity_principal_of(
-        context.get("namespace") or {},
-        namespace_choice,
-    )
-    namespace_principal_source = (
-        namespace_choice.uami_id
-        if namespace_choice.is_user_assigned
-        else namespace_scope
-    )
-    #: None means "not probed / could not tell", which is treated as no.
-    may_grant = context.get("can_grant_roles") is True
-
-    items: List[PlanItem] = []
-    targets = []
-    # Resources being created need the same grants as existing ones; their principal id
-    # is simply not known yet, which the reverse grant reports explicitly.
-    if context.get("selected_dps") is not None:
-        targets.append(("dps", context["selected_dps"]))
-    elif context.get("create_dps") is not None:
-        targets.append(("dps", _placeholder(context["create_dps"], context)))
-    for hub in context.get("selected_hubs") or []:
-        targets.append(("hub", hub))
-    if context.get("create_hub") is not None:
-        targets.append(("hub", _placeholder(context["create_hub"], context)))
-    for instance in context.get("selected_sus") or []:
-        targets.append(("su", instance))
-    if context.get("create_su") is not None:
-        targets.append(("su", _placeholder(context["create_su"], context)))
-
-    for kind, target in targets:
-        request = context.get(
-            {"dps": "create_dps", "hub": "create_hub", "su": "create_su"}[kind]
-        )
-        target_choice = (
-            request.identity
-            if request is not None and getattr(target, "pending", False)
-            else get_choice(context, kind, target.resource_id)
-        )
-        target_principal = identity_principal_of(
-            getattr(target, "raw", None) or {},
-            target_choice,
-        )
-        target_principal_source = (
-            target_choice.uami_id
-            if target_choice.is_user_assigned
-            else target.resource_id
-        )
-        target_pending = bool(getattr(target, "pending", False))
-        namespace_pending = context.get("create_namespace") is not None
-
-        # Forward: the namespace identity acts on the linked resource.
-        for role in NAMESPACE_TO_RESOURCE_ROLES[kind]:
-            item = PlanItem(
-                key=f"grant-ns-to-{kind}-{target.name}-{role}",
-                description=f"Grant the namespace identity '{role}' on {kind} '{target.name}'",
-                action="manual",
-                phase=PHASE_GRANT,
-                long_running=False,
-                target=target.name,
-                category="role",
-            )
-            if namespace_principal or namespace_pending or namespace_principal_source:
-                item.command = grant_command(
-                    namespace_principal,
-                    role,
-                    target.resource_id,
-                    principal_source=namespace_principal_source,
-                )
-                if may_grant:
-                    item.action = "create"
-                    # An empty principal is resolved when the item runs, by which point an
-                    # earlier item in this same plan has created the namespace.
-                    item.invoke = _grant_invoker(
-                        namespace_principal,
-                        namespace_principal_source,
-                        role,
-                        target.resource_id,
-                    )
-                elif not namespace_principal:
-                    item.blocked_reason = (
-                        "run this after the namespace is created, using its principal id"
-                    )
-            else:
-                item.action = "blocked"
-                item.blocked_reason = (
-                    "the namespace has no system-assigned identity yet; assign one first"
-                )
-            items.append(item)
-
-        # Reverse: the linked resource's identity acts on the namespace.
-        reverse = PlanItem(
-            key=f"grant-{kind}-to-ns-{target.name}",
-            description=(
-                f"Grant {kind} '{target.name}' identity "
-                f"'{RESOURCE_TO_NAMESPACE_ROLE}' on the namespace"
-            ),
-            action="manual",
-            phase=PHASE_GRANT,
-            long_running=False,
-            target=target.name,
-            category="role",
-        )
-        if target_principal or target_pending or target_principal_source:
-            reverse.command = grant_command(
-                target_principal,
-                RESOURCE_TO_NAMESPACE_ROLE,
-                namespace_scope,
-                principal_source=target_principal_source,
-            )
-            if may_grant:
-                reverse.action = "create"
-                reverse.invoke = _grant_invoker(
-                    target_principal, target_principal_source,
-                    RESOURCE_TO_NAMESPACE_ROLE, namespace_scope,
-                )
-            elif not target_principal:
-                reverse.blocked_reason = (
-                    f"run this after {target.name} is created, using its principal id"
-                )
-        else:
-            reverse.action = "blocked"
-            reverse.blocked_reason = (
-                f"{target.name} exposes no system-assigned identity, so the reverse grant "
-                "cannot be made; recreate it with an identity"
-            )
-        items.append(reverse)
-
-        if kind == "su":
-            consented = context.get("adu_fpa_confirmed") is True
-            fpa = PlanItem(
-                key=f"grant-adu-fpa-{target.name}",
-                description=(
-                    f"Grant the Azure Device Update service 'Contributor' on "
-                    f"update instance '{target.name}'"
-                ),
-                action=(
-                    "blocked"
-                    if not consented
-                    else ("create" if may_grant else "manual")
-                ),
-                blocked_reason=(
-                    "explicit approval is required for the Azure Device Update "
-                    "first-party service grant"
-                    if not consented
-                    else ""
-                ),
-                phase=PHASE_GRANT,
-                long_running=False,
-                command=_service_principal_grant_command(
-                    ADU_FIRST_PARTY_APP_ID,
-                    "Contributor",
-                    target.resource_id,
-                ),
-                target=target.name,
-                category="role",
-            )
-            if consented and may_grant:
-                fpa.invoke = _service_principal_grant_invoker(
-                    ADU_FIRST_PARTY_APP_ID,
-                    "Contributor",
-                    target.resource_id,
-                )
-            items.append(fpa)
-
-    deduplicated = []
-    seen_grants = set()
-    for item in items:
-        if item.command and item.command.startswith("az role assignment create"):
-            if item.command in seen_grants:
-                continue
-            seen_grants.add(item.command)
-        deduplicated.append(item)
-    items = deduplicated
-
-    if items:
-        items.append(
-            PlanItem(
-                key="grant-propagation",
-                description=(
-                    f"Wait about {ROLE_PROPAGATION_WAIT_SEC}s for role propagation before linking"
-                ),
-                action="create" if may_grant else "manual",
-                phase=PHASE_PROPAGATION,
-                long_running=False,
-                command=f"sleep {ROLE_PROPAGATION_WAIT_SEC}",
-                invoke=_wait_for_propagation if may_grant else None,
-                target="Azure RBAC",
-                category="wait",
-            )
-        )
-    return items
+    return plan_link_roles(context)
 
 
 # -- graph ---------------------------------------------------------------------------
@@ -1240,6 +1089,8 @@ def plan_permissions(context: Dict[str, Any]) -> List[PlanItem]:
 def build_flow(context: Dict[str, Any]) -> Flow:
     """The connectivity flow: scope, namespace, identity, provisioning, messaging, grants."""
     steps = [
+        Step(id="preflight", title="Validate plan", plan=plan_preflight,
+             hidden=True, optional=True),
         Step(id="subscription", title="Subscription", detect=has_subscription),
         Step(id="scope", title="Resource group", after=("subscription",), detect=has_scope,
              planned=scope_planned, plan=plan_resource_group,
@@ -1291,8 +1142,8 @@ def build_flow(context: Dict[str, Any]) -> Flow:
              plan=plan_software_updates, optional=True,
              blocked_reason="Choose a DPS first."),
         Step(id="permissions", title="Grant role assignments",
-             after=("dps",), detect=permissions_confirmed, plan=plan_permissions,
-             hidden=True,
+             after=("dps",), detect=lambda ctx: False, plan=plan_permissions,
+             hidden=True, optional=True,
              blocked_reason="Choose the DPS, hubs, or update instances to link first."),
         Step(id="verification", title="Verify readiness",
              after=("dps",), detect=lambda ctx: False,
@@ -1302,4 +1153,4 @@ def build_flow(context: Dict[str, Any]) -> Flow:
              detect=lambda ctx: False, optional=True,
              blocked_reason="Choose or create a namespace first."),
     ]
-    return Flow(steps=steps, context=context)
+    return Flow(steps=steps, context=context, validate=onboarding_error)

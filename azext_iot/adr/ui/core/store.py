@@ -33,7 +33,6 @@ _IDENTITY_KEYS = (
     "subscription_id",
     "resource_group_name",
     "namespace_name",
-    "registry_device_name",
     "certificate_authority_name",
     "job_name",
     "group_name",

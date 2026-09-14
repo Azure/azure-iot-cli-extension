@@ -13,16 +13,12 @@ Nothing in ``core``, ``screens`` or ``widgets`` changes.
 from typing import Callable, List
 
 from azext_iot.adr.ui.core.spec import Registry, ResourceSpec
-from azext_iot.adr.ui.kinds import certificate, device, group, job, link, namespace
+from azext_iot.adr.ui.kinds import certificate, group, job, link, namespace
 
 #: Builders in registration order. Roots first, so the application opens on a namespace
 #: list; each builder takes a session and returns one spec.
 _BUILDERS: List[Callable[[object], ResourceSpec]] = [
     namespace.build,
-    device.build,
-    device.build_auth,
-    device.build_attribute,
-    device.build_capability,
     group.build,
     group.build_member,
     job.build,

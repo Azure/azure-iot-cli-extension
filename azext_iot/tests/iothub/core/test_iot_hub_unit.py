@@ -73,13 +73,13 @@ def importexport_service_client_error(mocked_response, get_mgmt_client, request)
 
     mocked_response.add(
         method=responses.POST,
-        url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
+        url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
         body=json.dumps(
             {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
         ),
         status=request.param[0],
         content_type="application/json",
-        match_querystring=False,
+        match_querystring=True,
     )
     setattr(mocked_response, "expected_exception", request.param[1])
 
@@ -93,11 +93,11 @@ class TestIoTHubDeviceIdentityExport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
+            url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",
-            match_querystring=False,
+            match_querystring=True,
         )
 
         yield mocked_response
@@ -109,6 +109,7 @@ class TestIoTHubDeviceIdentityExport(object):
             generate_device_identity(include_keys=True),
             generate_device_identity(rg=resource_group_name),
             generate_device_identity(identity="[system]"),
+            generate_device_identity(include_keys=True, identity="[system]"),
             generate_device_identity(identity="managed_identity"),
         ]
     )
@@ -133,26 +134,10 @@ class TestIoTHubDeviceIdentityExport(object):
             assert request_body["storageAuthenticationType"] == AuthenticationType.identityBased.name
             if req["identity"] != "[system]":
                 assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
+            else:
+                assert "identity" not in request_body
 
         assert_device_identity_result(result, generic_job_response)
-
-    @pytest.mark.parametrize(
-        "req",
-        [
-            generate_device_identity(identity="[system]"),
-            generate_device_identity(identity="system"),
-        ]
-    )
-    def test_device_identity_export_input(self, fixture_cmd, req):
-        with pytest.raises(CLIError):
-            subject.iot_device_export(
-                cmd=fixture_cmd,
-                hub_name_or_hostname=hub_name,
-                blob_container_uri=blob_container_uri,
-                include_keys=req["include_keys"],
-                identity=req["identity"],
-                resource_group_name=req["resource_group_name"],
-            )
 
     def test_device_identity_export_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:
@@ -178,11 +163,11 @@ class TestIoTHubDeviceIdentityImport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
+            url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",
-            match_querystring=False,
+            match_querystring=True,
         )
 
         yield mocked_response
@@ -217,26 +202,10 @@ class TestIoTHubDeviceIdentityImport(object):
             assert request_body["storageAuthenticationType"] == AuthenticationType.identityBased.name
             if req["identity"] != "[system]":
                 assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
+            else:
+                assert "identity" not in request_body
 
         assert_device_identity_result(result, generic_job_response)
-
-    @pytest.mark.parametrize(
-        "req",
-        [
-            generate_device_identity(identity="[system]"),
-            generate_device_identity(identity="managed_identity"),
-        ]
-    )
-    def test_device_identity_import_input(self, fixture_cmd, req):
-        with pytest.raises(CLIError):
-            subject.iot_device_import(
-                cmd=fixture_cmd,
-                hub_name_or_hostname=hub_name,
-                input_blob_container_uri=blob_container_uri,
-                output_blob_container_uri=blob_container_uri + "2",
-                identity=req["identity"],
-                resource_group_name=req["resource_group_name"],
-            )
 
     def test_device_identity_import_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:

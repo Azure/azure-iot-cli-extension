@@ -113,6 +113,20 @@ Execute the following command to run the IoT Hub unit tests:
 
 Integration tests are run against Azure resources and depend on environment variables.
 
+The preview Hub, DPS, Device Registry, and Update Instance management clients use
+the public Azure canary endpoint `https://centraluseuap.management.azure.com`.
+They require a public Azure Microsoft Entra authority and ARM audience; sovereign
+cloud configurations are rejected before credentials are acquired. Custom-named
+public Azure cloud configurations remain supported.
+
+The shared pipeline resource group is subject to the Azure DevOps cleanup job
+in `.azure-devops/cleanup.yml`, scheduled daily at **13:00 UTC** from `dev`.
+It deletes every resource not excluded by name, without checking resource age
+or active test ownership. Run-scoped names and receipts do not prevent this
+cleanup. Check Azure DevOps cleanup activity as well as GitHub workflows before
+starting a suite, and allow its full execution and teardown budget to finish
+before the cleanup window, or wait until cleanup has completed.
+
 Example int tests runs:
 
 _Hub:_
@@ -131,6 +145,111 @@ Execute the following command to run the IoT Hub integration tests:
 To run specific test in any integration test file, such as:
 
 `pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
+
+#### DPS preview authentication phases
+
+The GitHub integration workflow's DPS selection runs three complete `DPS-int`
+invocations serially: `regular`, with local authentication disabled, then
+`service-sas`, with local authentication enabled, then `local-auth-toggle`. Service-SAS covers all 28
+service-key/connection-string lifecycle variants and the KeyBased-to-managed-identity
+Hub-link transition. Device symmetric-key and X.509 attestation remain separate
+from service authentication.
+
+The first two phases need two available DPS slots; the serial toggle phase needs
+one separate DPS, with no Hub. Its three cases verify creation with local auth
+disabled, explicit enable/disable and omitted-update preservation, and real
+login/key/connection-string access before, during and after disabling local auth.
+Toggle coverage cannot borrow regular fixtures or supplied resources. The runner
+rejects supplied-resource pins (`azext_iot_testdps`, `azext_iot_testdps_hub`, and
+`azext_iot_testhub`), verifies owned-resource cleanup before continuing, and preserves
+each phase's outcome and sanitized artifacts under `test-result/dps-phases/`.
+Shared fixtures retain a controller reference until all pytest workers finish,
+so an early worker cannot delete a resource before a later worker first uses it.
+The controller releases DPS references before the shared Hub reference, preserving
+ownership checks and the single-create guard.
+The first two phase budgets remain 20/5 and 40/10 minutes for execution/cleanup.
+The toggle phase has 20/5 minutes, within the 110-minute runner and 120-minute job
+bounds. All cases retain their 900-second limit and run without scenario reruns.
+Do not overlap these phases with another DPS-consuming workload.
+
+The serial runner and receipt-enabled integration fixtures are **Linux-only**:
+their bounded cleanup relies on Linux signals, process groups, `/proc`, and pipe
+polling. Windows and macOS entry attempts fail before credential discovery or
+resource execution; they are not supported orchestration platforms. Normal CLI
+use and phase-unset manual tests are unchanged. Portable selection, receipt,
+SDK/HTTP, and result-gate unit tests still run on every OS; only real Linux
+process/timer proofs are platform-marked.
+
+Prepare the controller and worker environments with
+`tox r -e DPS-phases,DPS-int --notest`, then invoke the runner with
+`.tox/DPS-phases/bin/python scripts/run_dps_phases.py` and the required
+`--subscription` and `--resource-group` arguments. Keep the controller outside
+`DPS-int`: tox can recreate that managed environment when its interpreter,
+dependencies, or virtualenv version changes.
+
+For direct test invocations, `azext_iot_dps_test_phase=service-sas` selects exactly
+the 29 SAS cases; partial selections are errors. The default retains Entra fixture
+behavior without changing command defaults. Explicit `regular` and `service-sas`
+phases do not include the optional cross-service certificate cases: that workflow
+coverage is not configured yet. Leave `azext_iot_dps_test_phase` unset to select
+existing manually configured certificate tests with their required prerequisites.
+
+Explicit `regular` also requires the complete branch contract (32 modern-registration
+cases, or 30 legacy-registration cases). No explicit phase accepts skips.
+`local-auth-toggle` requires exactly its three marked cases, `-n 0`, and
+receipt-enabled ownership; run it through the controller rather than bypassing
+its resource and cleanup gates. Default/manual regular selection excludes it.
+The runner pins commands and credential discovery to its subscription only within
+the test process, without switching the shared CLI profile/cloud. Owned fixture
+ARM writes (including identity/link updates, certificate children, and scoped role
+assignments) each disable SDK retries and fence repeat transport attempts. Each
+subsequent explicit SDK operation/CLI command gets a fresh boundary; LRO GET
+polling is unchanged. RBAC creation is followed by read-only visibility polling,
+not repeated creation. This guard does not change data-plane SDK retry policies. At a phase
+deadline the runner asks workers to unwind while keeping tox/xdist's controller
+alive for bounded fixture cleanup, then forcibly terminates any remaining owned
+processes. Timeout/cancellation is always unsuccessful, even when cleanup finishes.
+
+#### Opt-in Hub key and connection-string coverage
+
+The normal `HubMgmt-int` and `HubData-int` suites retain `disableLocalAuth=true`
+and Entra service authentication. This is a test policy, not a claim that Azure
+requires local authentication to be disabled.
+
+`HubSAS-int` runs six existing HTTP, messaging, monitoring and file-upload cases
+serially against a separate, generated S1 Hub with `disableLocalAuth=false`.
+This opt-in phase supports Linux and macOS only, with POSIX interval timers on
+the main thread. Unsupported platforms or missing timer capabilities are rejected
+before credentials, network calls or ownership receipt creation; ordinary CLI
+commands and regular integration suites retain their existing platform support.
+The exact node list and upload-first order are checked before unittest
+constructors can provision resources. Resource pins, parallel workers,
+selection filters, scenario reruns and uncaptured output are rejected.
+The HTTP C2D case covers key, login and connection-string service authentication;
+device MQTT keys remain distinct from Hub service policy keys.
+
+The workflow's `testHubSAS` toggle defaults to false. Reusable workflows can
+explicitly select `HubSAS` in `test-services`; `auto` never selects it.
+The phase requires `azext_iot_testrg` and an explicit
+`azext_iot_hubsas_subscription`, and uses `centraluseuap`. It needs only one Hub,
+one Storage account/container, and one Hub-scoped data-role assignment. No DPS,
+UAMI or separate Event Hubs namespace is provisioned.
+
+The phase writes credential-free ownership/results to `test-result/hub-sas.json`
+before mutations. Cleanup operates only on those IDs, checks ownership, observes
+already-Deleting resources without repeating DELETE, and reports incomplete
+cleanup as failure. Constructor failure cannot trigger another creation attempt.
+Cases use 900-second item deadlines, except event monitoring, which allows 2,700
+seconds to include its bounded 30-minute wait for exact query-cohort visibility.
+There are no scenario reruns, and cleanup deadlines remain unchanged.
+Background cleanup is bounded; a worker still running prevents resource deletion.
+Forced process termination can prevent finalizers: consult the ownership receipt
+and obtain explicit authorization for any remaining resource cleanup.
+
+Captured reports and logging are filtered using the existing integration
+redactor before pytest/GitHub reporting. Do not use `--showlocals`, live logging
+or `--capture=no`. A phase is successful only with six actual passes, no skips,
+and complete owned-resource cleanup; DLA-false creation alone is not SAS proof.
 
 #### Azure Resource Setup
 

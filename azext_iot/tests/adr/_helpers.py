@@ -6,9 +6,24 @@
 
 """Shared helpers for ADR integration tests that require Azure infrastructure."""
 
+import json
 import re
+import shlex
+import sys
 import time
 from typing import Callable, Dict, Optional, TypeVar
+
+from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
+from azure.cli.testsdk.exceptions import CliExecutionError
+from azure.core.exceptions import (
+    ClientAuthenticationError,
+    HttpResponseError,
+    ResourceNotFoundError as SDKResourceNotFoundError,
+    ServiceRequestError,
+    ServiceResponseError,
+)
+from knack.util import CLIError
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-compat
     LogKind,
@@ -17,12 +32,17 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
     timed_step,
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
 ROLE_PROPAGATION_DELAY = 30
 RESOURCE_POLL_INTERVAL = 10
 RESOURCE_MAX_POLLS = 30
 RESOURCE_POLL_TIMEOUT = RESOURCE_POLL_INTERVAL * RESOURCE_MAX_POLLS
+SU_PROVISIONING_MAX_POLLS = 360
+SU_PROVISIONING_POLL_INTERVAL = 10
+# Preserve the existing readiness window and leave time for the lifecycle and cleanup.
+SU_LIFECYCLE_TIMEOUT = SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL + 15 * 60
 MATERIALIZATION_POLL_INTERVAL = 10
 MATERIALIZATION_POLL_TIMEOUT = 120
 RESOURCE_RETRYABLE_STATUS_CODES = {
@@ -42,6 +62,14 @@ RESOURCE_RETRYABLE_ERROR = re.compile(
     r"\b(408|409|429|500|502|503|504)\b",
     re.IGNORECASE,
 )
+RESOURCE_NOT_FOUND_ERROR = re.compile(
+    r"(?:\((?:ResourceNotFound|ParentResourceNotFound|ResourceGroupNotFound)\)|"
+    r"(?:ResourceNotFound|ParentResourceNotFound|ResourceGroupNotFound)(?=[:\s]))[^\n]*(?:\n.*)?|"
+    r"An IotHub '[^']+' under resource group '[^']+' was not found\.",
+    re.IGNORECASE | re.DOTALL,
+)
+RESOURCE_NOT_FOUND_CODES = {"resourcenotfound", "parentresourcenotfound", "resourcegroupnotfound", "notfound"}
+HUB_NOT_FOUND_RESPONSE = re.compile(r"Not Found\((.*)\)", re.DOTALL)
 T = TypeVar("T")
 
 
@@ -50,29 +78,42 @@ class CleanupLedger:
 
     def __init__(self):
         self._actions = []
+        self._completed = set()
 
     def __enter__(self):
         return self
 
-    def register(self, label: str, cleanup: Callable[[], None]) -> None:
-        self._actions.append((label, cleanup))
+    def register(self, label: str, cleanup: Callable[[], None], *, depends_on=()) -> None:
+        self._completed.discard(label)
+        self._actions.append((label, cleanup, tuple(depends_on)))
 
     def dismiss(self, label: str) -> None:
         self._actions = [
             action for action in self._actions if action[0] != label
         ]
+        self._completed.add(label)
 
     def cleanup(self) -> list:
         failures = []
+        pending = []
         while self._actions:
-            label, cleanup = self._actions.pop()
+            action = self._actions.pop()
+            label, cleanup, dependencies = action
             try:
+                unresolved = [dependency for dependency in dependencies if dependency not in self._completed]
+                if unresolved:
+                    raise AssertionError(
+                        f"Dependent cleanup has not completed: {', '.join(unresolved)}"
+                    )
                 cleanup()
             except Exception as error:  # noqa: BLE001 - report all cleanup errors
                 failures.append((label, error))
+                pending.append(action)
                 _log(LogKind.WARN, "Cleanup failed for %s: %s", label, error)
             else:
+                self._completed.add(label)
                 _log(LogKind.RESULT, "Cleanup completed for %s", label)
+        self._actions.extend(reversed(pending))
         return failures
 
     def __exit__(self, exception_type, _exception, _traceback):
@@ -94,6 +135,110 @@ def is_retryable_resource_error(error: Exception) -> bool:
     return (
         status_code in RESOURCE_RETRYABLE_STATUS_CODES
         or RESOURCE_RETRYABLE_ERROR.search(str(error)) is not None
+    )
+
+
+def is_resource_not_found_error(error: Exception) -> bool:
+    statuses = []
+    codes = []
+    seen = set()
+    current = error
+    while True:
+        if id(current) in seen:
+            return False
+        if isinstance(current, (ClientAuthenticationError, ServiceRequestError, ServiceResponseError)):
+            return False
+        seen.add(id(current))
+        response_statuses = []
+        for status in (
+            getattr(current, "status_code", None),
+            getattr(getattr(current, "response", None), "status_code", None),
+        ):
+            if status is not None:
+                statuses.append(status)
+                response_statuses.append(status)
+        if isinstance(current, CLIError):
+            match = HUB_NOT_FOUND_RESPONSE.fullmatch(str(current))
+            if match:
+                try:
+                    detail = json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    return False
+                if not isinstance(detail, dict) or "httpStatusCode" not in detail or "code" not in detail:
+                    return False
+                statuses.append(detail["httpStatusCode"])
+                response_statuses.append(detail["httpStatusCode"])
+                codes.append(detail["code"])
+        if not isinstance(current, SystemExit):
+            for detail in (current, getattr(current, "error", None)):
+                code = detail.get("code") if isinstance(detail, dict) else getattr(detail, "code", None)
+                if code not in (None, ""):
+                    codes.append(code)
+        cause = current.__cause__
+        # A fresh HTTP response during cleanup can have an unrelated primary
+        # failure as its implicit context. Only unwrap status-less wrappers.
+        if cause is None and not response_statuses and not current.__suppress_context__:
+            cause = current.__context__
+        if (
+            isinstance(current, CliExecutionError)
+            and current.__cause__ is None
+            and id(current.exception) in seen
+            and current.exception.__context__ is current
+            and current.__context__ in (None, current.exception)
+        ):
+            # testsdk re-raises the same exception; Python can break the
+            # resulting context cycle at this wrapper. Keep all metadata above.
+            current = current.exception
+            break
+        if cause is None:
+            break
+        current = cause
+
+    # Any contradictory status/code wins over not-found-looking message text,
+    # including evidence preserved beneath a CLI wrapper.
+    if any(status != 404 for status in statuses):
+        return False
+    for code in codes:
+        if isinstance(code, str) and code.casefold() in RESOURCE_NOT_FOUND_CODES:
+            continue
+        # Hub ARM returns numeric IH404002; require its accompanying HTTP 404.
+        if statuses and isinstance(code, (int, str)) and str(code) == "404002":
+            continue
+        return False
+    if statuses or codes:
+        return True
+    if isinstance(current, (CLIResourceNotFoundError, SDKResourceNotFoundError)):
+        return True
+    if isinstance(current, SystemExit):
+        return current.code == 3
+    return isinstance(current, CLIError) and RESOURCE_NOT_FOUND_ERROR.fullmatch(str(current)) is not None
+
+
+def resource_is_absent(test, show_command: str, *, description: str = "resource") -> bool:
+    try:
+        test.cmd(show_command)
+    except SystemExit as error:
+        if error.code == 3 and is_resource_not_found_error(error):
+            return True
+        raise AssertionError(f"{description} lookup exited with code {error.code}") from error
+    except (HttpResponseError, CloudError, CLIError) as error:
+        if not is_resource_not_found_error(error):
+            raise
+        return True
+    return False
+
+
+def wait_for_resource_absent(
+    test, show_command: str, *, timeout: float = MATERIALIZATION_POLL_TIMEOUT, interval: float = 5,
+) -> None:
+    wait_for_condition(
+        lambda: resource_is_absent(test, show_command),
+        lambda absent: absent,
+        description=f"resource absence: {show_command}",
+        timeout=timeout,
+        interval=interval,
+        describe=lambda _absent: "resource is still readable",
+        is_retryable_error=lambda _error: False,
     )
 
 
@@ -212,8 +357,46 @@ def wait_for_materialized_resources(
     )
 
 
+def wait_for_listed_resource(
+    test,
+    list_command: str,
+    resource_name: str,
+    *,
+    timeout: float = MATERIALIZATION_POLL_TIMEOUT,
+    interval: float = MATERIALIZATION_POLL_INTERVAL,
+) -> list:
+    """Wait for a newly-created resource to become visible in collection reads."""
+    return wait_for_condition(
+        lambda: test.cmd(list_command).get_output_in_json(),
+        lambda resources: any(resource.get("name") == resource_name for resource in resources),
+        description=f"resource '{resource_name}' in '{list_command}'",
+        timeout=timeout,
+        interval=interval,
+        describe=lambda resources: f"listed count={len(resources)}; expected resource absent",
+    )
+
+
 class ADRFullInfraHelper(RoleAssignmentHelper):
     """Setup and teardown for tests linking an ADR namespace to an IoT Hub."""
+
+    _RESOURCE_COMMANDS = {
+        "namespace": "iot adr ns",
+        "dps": "iot dps",
+        "hub": "iot hub",
+        "su": "iot adr ns su instance",
+        "identity": "identity",
+    }
+
+    def create_owned_resource(self, command, *, kind, name, resource_group):
+        """Require absence and record the attempt before creating a resource."""
+        if kind not in self._RESOURCE_COMMANDS:
+            raise ValueError(f"Unsupported test-owned resource kind: {kind}")
+        if not self._resource_is_absent(kind, name, resource_group):
+            raise AssertionError(f"Refusing to overwrite existing {kind} '{name}' in '{resource_group}'.")
+        if not hasattr(self, "_owned_resources"):
+            self._owned_resources = {}
+        self._owned_resources[(kind, name, resource_group)] = None
+        return self.cmd(command)
 
     def setup_full_infra(
         self,
@@ -221,15 +404,18 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         namespace_name: str,
         hub_name: str,
         identity_name: str,
+        assign_setup_roles: bool = True,
     ) -> Dict[str, str]:
-        """Create UAMI, ADR namespace, RBAC, and an ADR-linked IoT Hub."""
+        """Create UAMI, ADR namespace, and a standalone IoT Hub."""
         with timed_step("Setup 1/5 > Create UAMI"):
             uami_cmd = (
                 f"identity create -n {identity_name} -g {resource_group} "
                 f"--location {TEST_LOCATION}"
             )
             _log(LogKind.CMD, "az %s", uami_cmd)
-            identity = self.cmd(uami_cmd).get_output_in_json()
+            identity = self.create_owned_resource(
+                uami_cmd, kind="identity", name=identity_name, resource_group=resource_group,
+            ).get_output_in_json()
             identity_resource_id = identity["id"]
             identity_principal_id = identity["principalId"]
             _log(LogKind.RESULT, "principalId=%s", identity_principal_id)
@@ -238,18 +424,22 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             subscription_id = self.cmd("account show").get_output_in_json()["id"]
             _log(LogKind.RESULT, "subscription=%s", subscription_id)
 
-        with timed_step("Setup 2/5 > RBAC: Hub RP Contributor"):
-            self.assign_hub_rp_contributor_role(
-                subscription_id, resource_group
-            )
+        if assign_setup_roles:
+            with timed_step("Setup 2/5 > RBAC: Hub RP Contributor"):
+                self.assign_hub_rp_contributor_role(
+                    subscription_id, resource_group
+                )
 
         with timed_step("Setup 3/5 > Create ADR Namespace"):
             ns_cmd = (
                 f"iot adr ns create -n {namespace_name} -g {resource_group} "
-                f"--location {TEST_LOCATION}"
+                f"--location {TEST_LOCATION} "
+                f"--outbound-user-assigned-mi {identity_resource_id}"
             )
             _log(LogKind.CMD, "az %s", ns_cmd)
-            namespace = self.cmd(ns_cmd).get_output_in_json()
+            namespace = self.create_owned_resource(
+                ns_cmd, kind="namespace", name=namespace_name, resource_group=resource_group,
+            ).get_output_in_json()
             adr_resource_id = namespace["id"]
             assert namespace["properties"]["provisioningState"] == "Succeeded"
             _log(
@@ -259,27 +449,29 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                 namespace.get("identity", {}).get("type"),
             )
 
-        with timed_step("Setup 4/5 > RBAC: ADR Roles for UAMI"):
-            self.assign_adr_roles_to_identity(
-                identity_principal_id, adr_resource_id
-            )
+        if assign_setup_roles:
+            with timed_step("Setup 4/5 > RBAC: ADR Roles for UAMI"):
+                self.assign_adr_roles_to_identity(
+                    identity_principal_id, adr_resource_id
+                )
 
         with timed_step(
-            "Setup 5/5 > Create IoT Hub Gen2 (may take 3-5 min)"
+            "Setup 5/5 > Create Standard IoT Hub (may take 3-5 min)"
         ):
             hub_cmd = (
                 f"iot hub create -n {hub_name} -g {resource_group} "
-                f"--sku GEN2 --location {TEST_LOCATION} "
-                f"--mi-user-assigned {identity_resource_id} "
-                f"--ns-resource-id {adr_resource_id} "
-                f"--ns-identity-id {identity_resource_id}"
+                f"--sku S1 --location {HUB_TEST_LOCATION} "
+                f"--user-assigned-mi {identity_resource_id} "
+                "--disable-local-auth true"
             )
             _log(LogKind.CMD, "az %s", hub_cmd)
             _log(
                 LogKind.WARN,
                 "Hub provisioning in progress - this is the slowest step ...",
             )
-            hub = self.cmd(hub_cmd).get_output_in_json()
+            hub = self.create_owned_resource(
+                hub_cmd, kind="hub", name=hub_name, resource_group=resource_group,
+            ).get_output_in_json()
             assert hub["properties"]["state"] == "Active"
             _log(LogKind.RESULT, "Hub state=Active")
 
@@ -287,14 +479,11 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                 f"iot hub show -n {hub_name} -g {resource_group}"
             )
             _log(LogKind.CMD, "az %s", hub_show_cmd)
-            hub_show = self.cmd(hub_show_cmd).get_output_in_json()
-            adr_props = hub_show.get("properties", {}).get(
-                "deviceRegistry", {}
-            )
+            self.cmd(hub_show_cmd).get_output_in_json()
             _log(
                 LogKind.RESULT,
-                "ADR config: nsResourceId=%s",
-                adr_props.get("namespaceResourceId"),
+                "Standard Hub created independently; namespace links are added "
+                "only through az iot adr ns link.",
             )
 
         _log(
@@ -315,67 +504,56 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
     def cleanup_namespace(
         self, namespace_name: str, resource_group: str
     ) -> None:
-        """Delete just the ADR namespace."""
-        with timed_step("Cleanup > Delete Namespace"):
-            cleanup_cmd = (
-                f"iot adr ns delete -n {namespace_name} "
-                f"-g {resource_group} -y"
-            )
-            _log(LogKind.CMD, "az %s", cleanup_cmd)
-            try:
-                self.cmd(cleanup_cmd)
-                _log(LogKind.RESULT, "ok")
-            except Exception as error:  # noqa: BLE001 - cleanup is best-effort
-                _log(LogKind.WARN, "Cleanup failed: %s", error)
+        """Clean up the caller's test namespace without masking its failure."""
+        self._cleanup_owned_resources([("namespace", namespace_name, resource_group)])
 
-    def cleanup_full_infra(
-        self,
-        resource_group: str,
-        hub_name: Optional[str] = None,
-        namespace_name: Optional[str] = None,
-        identity_name: Optional[str] = None,
-        dps_name: Optional[str] = None,
-    ) -> None:
-        """Best-effort cleanup of infrastructure resources."""
-        _log(LogKind.STEP, "Cleanup > Delete All Infrastructure")
-        cleanup_start = time.monotonic()
-        resources = [
-            (
-                "DPS",
-                f"iot dps delete --name {dps_name} -g {resource_group}"
-                if dps_name
-                else None,
-            ),
-            (
-                "IoT Hub",
-                f"iot hub delete -n {hub_name} -g {resource_group}"
-                if hub_name
-                else None,
-            ),
-            (
-                "ADR namespace",
-                f"iot adr ns delete -n {namespace_name} "
-                f"-g {resource_group} -y"
-                if namespace_name
-                else None,
-            ),
-            (
-                "UAMI",
-                f"identity delete -n {identity_name} -g {resource_group}"
-                if identity_name
-                else None,
-            ),
-        ]
-        for label, command in resources:
-            if command:
-                _log(LogKind.CMD, "az %s", command)
-                try:
-                    self.cmd(command)
-                    _log(LogKind.RESULT, "%s deleted", label)
-                except Exception as error:  # noqa: BLE001
-                    _log(LogKind.WARN, "%s cleanup failed: %s", label, error)
-        _log(
-            "_time",
-            "(%s)",
-            _fmt_duration(time.monotonic() - cleanup_start),
-        )
+    def _resource_is_absent(self, kind, name, resource_group):
+        command = self._RESOURCE_COMMANDS[kind]
+        arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
+        return resource_is_absent(self, f"{command} show {arguments}", description=kind)
+
+    def _delete_owned_resource(self, kind, name, resource_group):
+        if self._resource_is_absent(kind, name, resource_group):
+            return
+        command = self._RESOURCE_COMMANDS[kind]
+        arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
+        confirmation = " --yes" if kind in {"namespace", "su"} else ""
+        try:
+            self.cmd(f"{command} delete {arguments}{confirmation}")
+        except SystemExit as error:
+            if error.code == 3 and is_resource_not_found_error(error):
+                return
+            raise AssertionError(f"{kind} delete exited with code {error.code}") from error
+        except (HttpResponseError, CloudError, CLIError) as error:
+            if not is_resource_not_found_error(error):
+                raise
+
+    def cleanup_full_infra(self):
+        """Delete recorded namespaces before targets, and identities last.
+
+        Links are namespace properties, not ownership records. Never discover
+        targets from endpoints or delete a supplied external fixture.
+        """
+        resources = getattr(self, "_owned_resources", {})
+        self._cleanup_owned_resources(resources)
+
+    def _cleanup_owned_resource(self, resource):
+        self._delete_owned_resource(*resource)
+        self._owned_resources.pop(resource, None)
+
+    def _cleanup_owned_resources(self, resources):
+        if not hasattr(self, "_owned_resources"):
+            self._owned_resources = {}
+        order = {kind: index for index, kind in enumerate(self._RESOURCE_COMMANDS)}
+        ledger = CleanupLedger()
+        for kind, name, group in sorted(resources, key=lambda item: order[item[0]], reverse=True):
+            resource = (kind, name, group)
+            self._owned_resources.setdefault(resource, None)
+            ledger.register(
+                f"{kind} {name}",
+                lambda resource=resource: self._cleanup_owned_resource(resource),
+            )
+        failures = ledger.cleanup()
+        if failures and sys.exc_info()[0] is None:
+            detail = ", ".join(f"{label}: {error}" for label, error in failures)
+            raise AssertionError(f"ADR cleanup failed: {detail}") from failures[0][1]

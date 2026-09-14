@@ -13,23 +13,13 @@ from knack.help_files import helps
 # Help additions for core commands
 def patch_core_help():
 
-    # add Hub create examples for ADR properties
+    # Resource creation is separate from canonical namespace linking.
     if "iot hub create" in helps:
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and custom role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and skip role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --skip-ns-ra
+  - name: Create a Standard IoT Hub with a system-assigned identity for later namespace linking.
+    text: az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi
 """
 
     # add DPS create examples for ADR properties
@@ -37,13 +27,24 @@ def patch_core_help():
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with system identity and Device Registry namespace properties
+  - name: Create DPS with a system-assigned identity for later namespace linking.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi
+  - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned identity
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned --ns-resource-id NamespaceResourceId
-  - name: Create an Azure IoT Hub Device Provisioning Service with user-managed identity and Device Registry namespace properties
+        az iot dps create --name MyDps --resource-group MyResourceGroup --user-assigned-mi IdentityResourceId
+  - name: Create an Azure IoT Hub Device Provisioning Service with SAS key (local) authentication disabled, requiring Azure RBAC
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
-        --ns-resource-id NamespaceResourceId --ns-identity-id IdentityResourceId
+        az iot dps create --name MyDps --resource-group MyResourceGroup --disable-local-auth
+"""
+
+    # add DPS update example for local authentication
+    if "iot dps update" in helps:
+        helps[
+            "iot dps update"
+        ] += """
+  - name: Disable SAS key (local) authentication on an existing Device Provisioning Service, requiring Azure RBAC
+    text: >
+        az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
 """
 
     # add DPS identity help

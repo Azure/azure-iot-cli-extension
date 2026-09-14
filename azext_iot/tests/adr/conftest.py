@@ -21,15 +21,16 @@ from azext_iot.adr.providers.report import ReportProvider
 from azext_iot.adr.providers.job import JobProvider
 from azext_iot.adr.providers.job_run import JobRunProvider
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.adr._log import _log, _pretty_log_enabled
 
 # ADR integration defaults mirror scripts/smoke_tests/adr_2026_11_02_full_e2e.sh.
 TEST_SUBSCRIPTION = os.getenv(
     "azext_iot_adr_subscription",
-    "efb15086-3322-405d-a9d0-c35715a9b722",
+    "a386d5ea-ea90-441a-8263-d816368c84a1",
 )
 TEST_RG = os.getenv(
     "azext_iot_adr_resource_group",
-    "adr-vnect-scale-rg-0",
+    "cli-int-test-rg",
 )
 TEST_LOCATION = os.getenv("azext_iot_adr_location", "centraluseuap")
 TEST_API_VERSION = os.getenv(
@@ -62,6 +63,8 @@ OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_su_namespace",
     "azext_iot_adr_su_storage_account",
     "azext_iot_adr_su_storage_subscription",
+    "azext_iot_adr_failed_dps_namespace_id",
+    "azext_iot_adr_failed_dps_endpoint",
 )
 
 
@@ -201,11 +204,10 @@ def adr_integration_preflight(request):
 
 def pytest_runtest_logreport(report):
     """In pretty mode, emit PASSED/FAILED via _log so colors work."""
-    if not os.environ.get("PRETTY_LOG"):
+    if not _pretty_log_enabled():
         return
     if report.when != "call":
         return
-    from azext_iot.tests.adr._log import _log
 
     test_name = report.nodeid.split("::")[-1]
     if report.passed:
@@ -262,10 +264,7 @@ _SPECCED_OPERATION_GROUPS = (
     "groups",
     "jobs",
     "job_runs",
-    "registry_devices",
-    "registry_device_attributes",
-    "registry_device_authentication_profiles",
-    "registry_device_capabilities",
+    "job_runs_by_namespace",
 )
 
 _REAL_ADR_CLIENT = None
@@ -275,11 +274,9 @@ def _real_adr_client():
     """Instantiate the real management client once per session (no network I/O)."""
     global _REAL_ADR_CLIENT
     if _REAL_ADR_CLIENT is None:
-        from azext_iot.sdk.deviceregistry import (
-            MicrosoftDeviceRegistryManagementService,
-        )
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
-        _REAL_ADR_CLIENT = MicrosoftDeviceRegistryManagementService(
+        _REAL_ADR_CLIENT = DeviceRegistryMgmtClient(
             credential=MagicMock(),
             subscription_id="00000000-0000-0000-0000-000000000000",
         )
@@ -367,6 +364,21 @@ def fixture_link_provider(fixture_cmd):
         mock_factory.return_value = mock_client
         provider = LinkProvider(fixture_cmd)
         provider.client = mock_client
+        provider._rbac = MagicMock()  # pylint: disable=protected-access
+        # Existing endpoint-shape tests isolate namespace mutation from the
+        # cross-RP/RBAC preflight. Dedicated preflight/RBAC tests exercise the
+        # real helpers with strictly controlled clients.
+        provider._preflight_link = MagicMock(  # pylint: disable=protected-access
+            return_value={
+                "location": "centraluseuap",
+                "sku": {"name": "S1"},
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "hostName": "hub.azure-devices.net",
+                },
+            }
+        )
+        provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
         return provider
 
 
@@ -464,13 +476,23 @@ class RoleAssignmentHelper:
     cmd: callable  # provided by CaptureOutputLiveScenarioTest via MRO
 
     def assign_role(
-        self, assignee_id: str, role: str, scope: str, assignee_type: str = "auto",
+        self, assignee_id: str, role: str, scope: str, assignee_type: Optional[str] = "auto",
     ) -> Optional[str]:
-        """Assign an Azure RBAC role, skipping if already assigned."""
+        """Assign a role; None identifies an object ID whose type ARM should resolve."""
         from azext_iot.tests.adr._log import LogKind, _log
 
         try:
-            check_cmd = f"role assignment list --assignee '{assignee_id}' --scope '{scope}' --role '{role}'"
+            if assignee_type == "auto":
+                assignee_filter = f"--assignee '{assignee_id}'"
+            else:
+                assignee_filter = (
+                    f"--assignee-object-id '{assignee_id}' "
+                    "--fill-principal-name false"
+                )
+            check_cmd = (
+                f"role assignment list {assignee_filter} --scope '{scope}' "
+                f"--role '{role}'"
+            )
             _log(LogKind.CMD, "az %s", check_cmd)
             existing = self.cmd(check_cmd).get_output_in_json()
             if existing:
@@ -482,8 +504,10 @@ class RoleAssignmentHelper:
             else:
                 create_cmd = (
                     f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
-                    f"--scope '{scope}' --assignee-principal-type '{assignee_type}'"
+                    f"--scope '{scope}'"
                 )
+                if assignee_type:
+                    create_cmd += f" --assignee-principal-type {assignee_type}"
             _log(LogKind.CMD, "az %s", create_cmd)
             result = self.cmd(create_cmd).get_output_in_json()
             _log(LogKind.RESULT, "Role '%s' assigned", role)
@@ -502,4 +526,13 @@ class RoleAssignmentHelper:
     def assign_adr_roles_to_identity(self, principal_id: str, scope: str):
         """Assign ADR Contributor + Onboarding roles to a managed identity."""
         for role in ["Azure Device Registry Contributor", "Azure Device Registry Onboarding"]:
-            self.assign_role(principal_id, role, scope)
+            assignment_id = self.assign_role(
+                principal_id,
+                role,
+                scope,
+                assignee_type="ServicePrincipal",
+            )
+            if assignment_id is None:
+                raise AssertionError(
+                    f"Failed to assign required ADR role '{role}'."
+                )

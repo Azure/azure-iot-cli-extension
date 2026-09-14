@@ -333,7 +333,7 @@ def test_enter_drills_into_child_kind():
         return app.screen.spec.kind, app.screen.model.total_count
 
     kind, count = drive(scenario)
-    assert kind == "device"
+    assert kind == "group"
     assert count == 6
 
 
@@ -520,9 +520,9 @@ def test_stack_does_not_pop_below_the_root():
 
 def test_three_level_drill_down_and_return():
     async def scenario(app, pilot):
-        await pilot.press("enter")  # namespace -> device
+        await pilot.press("enter")  # namespace -> group
         await settle(app, pilot)
-        await pilot.press("enter")  # device -> attribute
+        await pilot.press("enter")  # group -> member
         await settle(app, pilot)
         deepest = app.screen.spec.kind
         await pilot.press("escape")
@@ -532,7 +532,7 @@ def test_three_level_drill_down_and_return():
         return deepest, app.screen.spec.kind
 
     deepest, back_at = drive(scenario)
-    assert deepest == "attribute"
+    assert deepest == "member"
     assert back_at == "namespace", "the stack unwinds cleanly"
 
 
@@ -585,7 +585,7 @@ def test_breadcrumbs_track_the_stack():
         return crumbs.text
 
     trail = drive(scenario)
-    assert "namespaces" in trail and "registry devices" in trail
+    assert "namespaces" in trail and "groups" in trail
 
 
 def test_hint_bar_widget_is_populated():
@@ -600,11 +600,11 @@ def test_hint_bar_widget_is_populated():
 
 def test_filter_narrows_rows_and_escape_clears_it():
     async def scenario(app, pilot):
-        await pilot.press("enter")  # into devices
+        await pilot.press("enter")  # into groups
         await settle(app, pilot)
         await pilot.press("slash")
         await pilot.pause()
-        for ch in "fabrikam":
+        for ch in "stale":
             await pilot.press(ch)
         await pilot.pause()
         filtered = app.screen.model.row_count
@@ -617,7 +617,7 @@ def test_filter_narrows_rows_and_escape_clears_it():
     filtered, after_clear, kind = drive(scenario)
     assert filtered == 2
     assert after_clear == 6
-    assert kind == "device", "clearing a filter must not also pop the screen"
+    assert kind == "group", "clearing a filter must not also pop the screen"
 
 
 def test_wide_toggle_adds_columns():
@@ -707,11 +707,11 @@ def test_browse_hint_bar_surfaces_both_onboarding_entries():
 
 def test_command_bar_resolves_an_alias():
     async def scenario(app, pilot):
-        app._run_command("dev")
+        app._run_command("grp")
         await settle(app, pilot)
         return app.screen.spec.kind
 
-    assert drive(scenario) == "device"
+    assert drive(scenario) == "group"
 
 
 def test_command_bar_rejects_unknown_token_without_navigating():
@@ -794,16 +794,16 @@ def test_namespace_without_children_shows_empty_not_loading():
 
     async def scenario(app, pilot):
         table = app.screen.query_one("#rows", DataTable)
-        table.move_cursor(row=2)  # 'retired-ns' has no devices by design
+        table.move_cursor(row=2)  # 'retired-ns' has no groups by design
         await pilot.pause()
         await pilot.press("enter")
         await settle(app, pilot)
         return app.screen.spec.kind, app.screen.model.state.value, app.screen.model.status_text()
 
     kind, state, status = drive(scenario)
-    assert kind == "device"
+    assert kind == "group"
     assert state == "empty", "an empty collection must not read as still loading"
-    assert "No registry devices in the current scope" in status
+    assert "No groups in the current scope" in status
 
 
 def test_child_rows_are_scoped_to_the_selected_parent():
@@ -819,21 +819,21 @@ def test_child_rows_are_scoped_to_the_selected_parent():
 
     namespace, count = drive(scenario)
     assert namespace == "lab-westus"
-    assert count == 3, "lab-westus has fewer devices than factory-eastus2"
+    assert count == 3, "lab-westus has fewer groups than factory-eastus2"
 
 
 def test_command_bar_jump_inherits_the_on_screen_scope():
     """Typing an alias deep in the tree must keep the namespace, not query with none."""
 
     async def scenario(app, pilot):
-        await pilot.press("enter")  # namespaces -> devices, scope gains the namespace
+        await pilot.press("enter")  # namespaces -> groups, scope gains the namespace
         await settle(app, pilot)
-        app._run_command("attr")    # jump sideways to another kind
+        app._run_command("mem")     # jump to another supported kind
         await settle(app, pilot)
         return app.screen.spec.kind, app.screen.scope.get("namespace_name")
 
     kind, namespace = drive(scenario)
-    assert kind == "attribute"
+    assert kind == "member"
     assert namespace == "factory-eastus2", "the alias jump kept the on-screen scope"
 
 
@@ -841,13 +841,13 @@ def test_child_hotkey_opens_that_child_directly():
     """Every declared child is reachable, not only the one Enter opens."""
 
     async def scenario(app, pilot):
-        await pilot.press("enter")   # namespaces -> devices (primary child)
+        await pilot.press("enter")   # namespaces -> groups (primary child)
         await settle(app, pilot)
-        await pilot.press("t")       # 't' is the attributes child key
+        await pilot.press("m")       # 'm' is the members child key
         await settle(app, pilot)
         return app.screen.spec.kind
 
-    assert drive(scenario) == "attribute"
+    assert drive(scenario) == "member"
 
 
 def test_overlapping_refresh_is_dropped_not_queued():
@@ -914,7 +914,7 @@ def test_missing_scope_message_does_not_name_the_implied_resource_group():
                 kind="thing", title="Thing", title_plural="Things", aliases=("th",),
                 row_id=lambda p: p["name"], list=lambda scope: [],
                 columns=(Column("name", "NAME", lambda p: p["name"]),),
-                requires=("namespace_name", "resource_group_name", "registry_device_name"),
+                requires=("namespace_name", "resource_group_name", "group_name"),
             )
         )
         app = RadrApp(registry=registry)
@@ -923,7 +923,7 @@ def test_missing_scope_message_does_not_name_the_implied_resource_group():
             return app.screen.model.status_text()
 
     status = asyncio.run(runner())
-    assert "a namespace and a device" in status
+    assert "a namespace and a group" in status
     assert "resource group" not in status
 
 
@@ -1784,7 +1784,7 @@ def test_onboarding_context_bar_tracks_the_selected_scope():
     assert "Contoso" in text and "rg-one" in text and "factory" in text
 
 
-def test_review_does_not_run_links_before_manual_role_grants():
+def test_review_allows_confirmation_without_assignment_write_but_includes_role_preflight():
     from azext_iot.adr.ui.screens.onboard.pickers import Candidate
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
@@ -1843,11 +1843,13 @@ def test_review_does_not_run_links_before_manual_role_grants():
             screen.context["can_grant_roles"] = False
             screen.action_apply()
             await pilot.pause()
-            return screen.query_one("#flash-line").text, type(app.screen).__name__
+            plan = screen.flow.build_plan()
+            runnable = [item.key for item in plan if item.invoke is not None]
+            return runnable, type(app.screen).__name__
 
-    message, screen_name = asyncio.run(runner())
-    assert "role grants need administrator access" in message
-    assert screen_name == "OnboardScreen", "no confirmation dialog should open"
+    runnable, screen_name = asyncio.run(runner())
+    assert runnable.index("grant-preflight") < runnable.index("dps")
+    assert screen_name == "CommandPreviewDialog"
 
 
 # -- page guide ----------------------------------------------------------------------

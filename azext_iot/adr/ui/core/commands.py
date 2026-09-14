@@ -21,13 +21,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 _FLAGS: Tuple[Tuple[str, str], ...] = (
     ("namespace_name", "--ns"),
     ("resource_group_name", "-g"),
-    ("registry_device_name", "--device"),
     ("certificate_authority_name", "--ca-name"),
     ("group_name", "--group-name"),
     ("job_name", "--job-name"),
     ("endpoint_name", "--endpoint-name"),
-    ("authentication_profile_name", "-n"),
-    ("attribute_name", "-n"),
     ("run_name", "-n"),
     ("update_instance_name", "-n"),
 )

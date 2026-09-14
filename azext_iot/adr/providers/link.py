@@ -13,272 +13,81 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from knack.log import get_logger
-from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
-from azext_iot._factory import iot_service_provisioning_factory
+from azext_iot._factory import (
+    adr_iot_hub_service_factory,
+    adr_iot_service_provisioning_factory,
+    adr_update_instance_service_factory,
+)
 from azext_iot.adr.common import (
     DPS_ENDPOINT_TYPE,
     IOT_HUB_ENDPOINT_TYPE,
     SU_ENDPOINT_TYPE,
-    IdentityType,
-    build_mi_body,
 )
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.link_helpers import (
+    MI_MUTEX_MSG as _MI_MUTEX_MSG,
+    build_dps_endpoint_body as _build_dps_endpoint_body,
+    build_hub_endpoint_body as _build_hub_endpoint_body,
+    build_su_endpoint_body as _build_su_endpoint_body,
+    endpoint_update_body as _endpoint_update_body,
+    get_messaging_endpoints as _get_messaging_endpoints,
+    get_provisioning_endpoints as _get_provisioning_endpoints,
+    get_updating_endpoints as _get_updating_endpoints,
+    parse_dps_resource_id as _parse_dps_resource_id,
+    parse_hub_resource_id as _parse_hub_resource_id,
+    parse_su_resource_id as _parse_su_resource_id,
+    resolve_inbound_identity as _resolve_inbound_identity,
+)
+from azext_iot.adr.providers.link_persistence import (
+    get_typed_endpoint,
+    patch_namespace_endpoints,
+)
+from azext_iot.adr.providers.link_preflight import (
+    TargetLookup,
+    get_target,
+    preflight_target,
+)
+from azext_iot.adr.rbac import LinkRbacManager
+from azext_iot.adr.topology import (
+    DPS_CAP_EXCEEDED_MSG,
+    DPS_REQUIRED_MSG,
+    HUB_CAP_EXCEEDED_MSG,
+    SU_CAP_EXCEEDED_MSG,
+    endpoint_is_type,
+    has_dps_endpoint,
+    has_su_endpoint,
+    hub_endpoint_count,
+    is_failed_hub_endpoint,
+)
 
 logger = get_logger(__name__)
 
-
-DPS_FIRST_REQUIRED_MSG = (
-    "Link a DPS to this namespace before adding a Hub. "
-    "Run 'az iot adr ns link dps add ...' or 'az iot adr ns link add ...' to add both at once."
+_HUB_TARGET = TargetLookup(
+    factory=adr_iot_hub_service_factory,
+    operation_group_name="iot_hub_resource",
+    name_parameter="resource_name",
+    display_name="IoT Hub",
+    require_standard_hub=True,
 )
-
-DPS_CAP_EXCEEDED_MSG = (
-    "Namespace already has a linked DPS; use 'az iot adr ns link dps update' "
-    "to rotate its identity. Only one DPS may be linked per namespace."
+_DPS_TARGET = TargetLookup(
+    factory=adr_iot_service_provisioning_factory,
+    operation_group_name="iot_dps_resource",
+    name_parameter="provisioning_service_name",
+    display_name="DPS",
 )
-
-_MI_MUTEX_MSG = (
-    "Specify only one linked-resource identity: use --mi-system-assigned for its "
-    "system-assigned identity, or --mi-user-assigned <uami-resource-id> for a "
-    "user-assigned identity attached to that resource."
+_SU_TARGET = TargetLookup(
+    factory=adr_update_instance_service_factory,
+    operation_group_name="update_instances",
+    name_parameter="update_instance_name",
+    display_name="Software Updates instance",
 )
-
-_MI_REQUIRED_MSG = (
-    "An inbound caller identity is required from the linked resource. Pass "
-    "--mi-system-assigned for its system-assigned identity, or "
-    "--mi-user-assigned <uami-resource-id> for an attached user-assigned identity."
-)
-
-
-def _parse_dps_resource_id(dps_resource_id: str) -> dict:
-    """Parse a DPS ARM resource ID into its components.
-
-    Expected shape:
-        /subscriptions/<sub>/resourceGroups/<rg>/providers/
-            Microsoft.Devices/provisioningServices/<name>
-    """
-    raw = (dps_resource_id or "").strip()
-    if not raw:
-        raise InvalidArgumentValueError(
-            "--dps-id is required and must be a Microsoft.Devices/provisioningServices ARM resource ID."
-        )
-    # Friendly hint: a bare name (no slashes) is the most common mistake here.
-    if "/" not in raw:
-        raise InvalidArgumentValueError(
-            f"'{raw}' looks like a bare DPS name. Pass the full ARM resource ID instead "
-            "(use 'az iot dps show -n <dps> --query id -o tsv' to retrieve it)."
-        )
-    if not is_valid_resource_id(raw):
-        raise InvalidArgumentValueError(
-            f"'{dps_resource_id}' is not a valid ARM resource ID."
-        )
-    parsed = parse_resource_id(raw)
-    # Reject child resources (e.g. .../provisioningServices/<n>/certificates/<c>) and
-    # any non-DPS resource type.
-    if (
-        (parsed.get("namespace") or "").lower() != "microsoft.devices"
-        or (parsed.get("type") or "").lower() != "provisioningservices"
-        or "child_name_1" in parsed
-    ):
-        raise InvalidArgumentValueError(
-            f"'{dps_resource_id}' is not a Microsoft.Devices/provisioningServices resource ID."
-        )
-    return {
-        "subscription_id": parsed["subscription"],
-        "resource_group_name": parsed["resource_group"],
-        "name": parsed["name"],
-    }
-
-
-def _parse_su_resource_id(su_resource_id: str) -> dict:
-    """Parse an Update Instance ARM resource ID into its components.
-
-    Expected shape:
-        /subscriptions/<sub>/resourceGroups/<rg>/providers/
-            Microsoft.DeviceUpdate/updateInstances/<name>
-    """
-    raw = (su_resource_id or "").strip()
-    if not raw:
-        raise InvalidArgumentValueError(
-            "--su-id is required and must be a Microsoft.DeviceUpdate/updateInstances ARM resource ID."
-        )
-    # Friendly hint: a bare name (no slashes) is the most common mistake here.
-    if "/" not in raw:
-        raise InvalidArgumentValueError(
-            f"'{raw}' looks like a bare Update Instance name. Pass the full ARM resource ID instead."
-        )
-    if not is_valid_resource_id(raw):
-        raise InvalidArgumentValueError(
-            f"'{su_resource_id}' is not a valid ARM resource ID."
-        )
-    parsed = parse_resource_id(raw)
-    # Reject child resources and any non-updateInstances resource type.
-    if (
-        (parsed.get("namespace") or "").lower() != "microsoft.deviceupdate"
-        or (parsed.get("type") or "").lower() != "updateinstances"
-        or "child_name_1" in parsed
-    ):
-        raise InvalidArgumentValueError(
-            f"'{su_resource_id}' is not a Microsoft.DeviceUpdate/updateInstances resource ID. "
-            "Pass the full ARM resource ID of the Software Update instance."
-        )
-    return {
-        "subscription_id": parsed["subscription"],
-        "resource_group_name": parsed["resource_group"],
-        "name": parsed["name"],
-    }
-
-
-def _resolve_inbound_identity(
-    mi_system_assigned: bool, mi_user_assigned: Optional[str]
-) -> Optional[dict]:
-    """Build the InboundCallerIdentity body from CLI flags, or None when neither is given.
-
-    SAMI and UAMI are mutually exclusive. This does not require an identity (returns None when
-    no flag is supplied) so it can be shared by both ``add`` (which requires one, via
-    ``_build_inbound_identity``) and ``update`` (where the caller may change other fields only).
-    """
-    # Normalize empty/whitespace UAMI before the mutex check so a stray
-    # '--mi-user-assigned ""' is treated as not provided.
-    if mi_user_assigned is not None and not mi_user_assigned.strip():
-        mi_user_assigned = None
-    if mi_system_assigned and mi_user_assigned:
-        raise ArgumentUsageError(_MI_MUTEX_MSG)
-    return build_mi_body(
-        mi_system_assigned,
-        mi_user_assigned,
-        sami_type=IdentityType.system_assigned.value,
-        uami_type=IdentityType.user_assigned.value,
-    )
-
-
-def _build_inbound_identity(mi_system_assigned: bool, mi_user_assigned: Optional[str]) -> dict:
-    """Build the InboundCallerIdentity body for ``add`` flows. Exactly one variant required."""
-    body = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
-    if body is None:
-        raise RequiredArgumentMissingError(_MI_REQUIRED_MSG)
-    return body
-
-
-def _get_endpoints(namespace: dict, section: str) -> dict:
-    """Return ``properties.<section>.endpoints`` from a namespace, defaulting to {} at each hop.
-
-    ``section`` is one of "messaging" (Hub), "provisioning" (DPS) or "updating" (Software Updates).
-    """
-    return ((((namespace or {}).get("properties") or {}).get(section) or {}).get("endpoints")) or {}
-
-
-def _get_messaging_endpoints(namespace: dict) -> dict:
-    return _get_endpoints(namespace, "messaging")
-
-
-def _get_provisioning_endpoints(namespace: dict) -> dict:
-    return _get_endpoints(namespace, "provisioning")
-
-
-def _get_updating_endpoints(namespace: dict) -> dict:
-    return _get_endpoints(namespace, "updating")
-
-
-def _project_endpoint_section(endpoints: dict, expected_type: str) -> list:
-    """Project one endpoint section without hiding older records.
-
-    The section itself is authoritative (messaging means Hub, provisioning means DPS,
-    updating means Software Updates). Older records may omit ``endpointType``; strict
-    filtering made namespace counts non-zero while the corresponding list looked empty.
-    Preserve filtering for an explicitly different future type, but infer the type when
-    it is absent.
-    """
-    projected = []
-    for name, endpoint in endpoints.items():
-        body = dict(endpoint or {})
-        endpoint_type = body.get("endpointType")
-        if endpoint_type and str(endpoint_type).casefold() != expected_type.casefold():
-            continue
-        body.setdefault("endpointType", expected_type)
-        projected.append({"name": name, **body})
-    return projected
-
-
-def _build_hub_endpoint_body(
-    hub_resource_id: str,
-    mi_system_assigned: bool,
-    mi_user_assigned: Optional[str],
-    availability: Optional[str] = None,
-    allocation_weight: Optional[int] = None,
-) -> dict:
-    """Build a full Hub messaging-endpoint body for a namespace PATCH."""
-    body = {
-        "endpointType": IOT_HUB_ENDPOINT_TYPE,
-        "resourceId": hub_resource_id,
-    }
-    inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
-    if inbound_identity is not None:
-        body["inboundCallerIdentity"] = inbound_identity
-    provisioning = {}
-    if availability is not None:
-        provisioning["availability"] = availability
-    if allocation_weight is not None:
-        provisioning["allocationWeight"] = allocation_weight
-    if provisioning:
-        body["provisioning"] = provisioning
-    return body
-
-
-def _build_dps_endpoint_body(
-    dps_resource_id: str,
-    mi_system_assigned: bool,
-    mi_user_assigned: Optional[str],
-) -> dict:
-    """Build a full DPS provisioning-endpoint body for a namespace PATCH."""
-    return {
-        "endpointType": DPS_ENDPOINT_TYPE,
-        "resourceId": dps_resource_id,
-        "inboundCallerIdentity": _build_inbound_identity(mi_system_assigned, mi_user_assigned),
-    }
-
-
-def _build_su_endpoint_body(
-    su_resource_id: str,
-    mi_system_assigned: bool,
-    mi_user_assigned: Optional[str],
-) -> dict:
-    """Build a full Software Updates updating-endpoint body for a namespace PATCH."""
-    return {
-        "endpointType": SU_ENDPOINT_TYPE,
-        "resourceId": su_resource_id,
-        "inboundCallerIdentity": _build_inbound_identity(mi_system_assigned, mi_user_assigned),
-    }
-
-
-def _endpoint_update_body(
-    existing: Optional[dict],
-    inbound_identity: Optional[dict] = None,
-) -> dict:
-    """Build the endpoint body for an *update* PATCH.
-
-    A namespace endpoint update must re-send the endpoint's identity (``endpointType`` and
-    ``resourceId``), not a sparse delta, or the backend rejects it with InvalidRequestContent.
-    Provisioning is intentionally omitted because established links only
-    support inbound-identity rotation.
-    """
-    existing = existing or {}
-    body: dict = {
-        "endpointType": existing.get("endpointType"),
-        "resourceId": existing.get("resourceId"),
-    }
-    current_inbound = existing.get("inboundCallerIdentity")
-    if current_inbound is not None:
-        body["inboundCallerIdentity"] = current_inbound
-    if inbound_identity is not None:
-        body["inboundCallerIdentity"] = inbound_identity
-    return body
 
 
 class LinkProvider(ADRProvider):
-    def __init__(self, cmd):
-        super(LinkProvider, self).__init__(cmd)
+    def __init__(self, cmd, client=None):
+        super(LinkProvider, self).__init__(cmd, client=client)
+        self._rbac = None
 
     # Helpers
 
@@ -293,38 +102,92 @@ class LinkProvider(ADRProvider):
     def list_all(self, namespace_name: str, resource_group_name: str) -> list:
         """Project every endpoint section from one namespace read."""
         namespace = self._get_namespace(namespace_name, resource_group_name)
-        return (
-            _project_endpoint_section(
-                _get_provisioning_endpoints(namespace),
-                DPS_ENDPOINT_TYPE,
+        return [
+            {"name": name, **endpoint}
+            for get_endpoints, endpoint_type in (
+                (_get_provisioning_endpoints, DPS_ENDPOINT_TYPE),
+                (_get_messaging_endpoints, IOT_HUB_ENDPOINT_TYPE),
+                (_get_updating_endpoints, SU_ENDPOINT_TYPE),
             )
-            + _project_endpoint_section(
-                _get_messaging_endpoints(namespace),
-                IOT_HUB_ENDPOINT_TYPE,
-            )
-            + _project_endpoint_section(
-                _get_updating_endpoints(namespace),
-                SU_ENDPOINT_TYPE,
-            )
+            for name, endpoint in get_endpoints(namespace).items()
+            if endpoint_is_type(endpoint, endpoint_type)
+        ]
+
+    def _rbac_manager(self):
+        if self._rbac is None:
+            self._rbac = LinkRbacManager(self.cmd.cli_ctx)
+        return self._rbac
+
+    def _get_target(
+        self,
+        parsed: dict,
+        strategy: TargetLookup,
+    ) -> dict:
+        return get_target(
+            self.cmd.cli_ctx,
+            parsed,
+            strategy,
         )
 
-    def _patch_messaging_endpoints(
+    def _preflight_link(
+        self,
+        link_type: str,
+        namespace: dict,
+        target_resource_id: str,
+        inbound_identity: Optional[dict],
+        parsed: dict,
+        strategy: TargetLookup,
+        *,
+        rbac_requests: Optional[list] = None,
+    ) -> dict:
+        return preflight_target(
+            link_type=link_type,
+            namespace=namespace,
+            target_resource_id=target_resource_id,
+            inbound_identity=inbound_identity,
+            parsed=parsed,
+            strategy=strategy,
+            lookup=lambda parsed_id, _: self._get_target(parsed_id, strategy),
+            rbac_manager=self._rbac_manager,
+            rbac_requests=rbac_requests,
+        )
+
+    @staticmethod
+    def _get_typed_endpoint(
+        namespace: dict,
+        section: str,
+        endpoint_name: str,
+        endpoint_type: str,
+        namespace_name: str,
+        display_name: str,
+    ) -> dict:
+        return get_typed_endpoint(
+            namespace,
+            section,
+            endpoint_name,
+            endpoint_type,
+            namespace_name,
+            display_name,
+        )
+
+    def _patch_endpoints(
         self,
         namespace_name: str,
         resource_group_name: str,
+        section: str,
         endpoints_patch: dict,
+        status_message: str,
         no_wait: bool = False,
         **kwargs,
     ):
-        properties = {"properties": {"messaging": {"endpoints": endpoints_patch}}}
-        poller = self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name,
+        return patch_namespace_endpoints(
+            client=self.client,
+            wait_operation=self._wait,
             namespace_name=namespace_name,
-            properties=properties,
-        )
-        return self._wait(
-            poller,
-            f"Updating messaging endpoints on namespace {namespace_name}...",
+            resource_group_name=resource_group_name,
+            section=section,
+            endpoints_patch=endpoints_patch,
+            status_message=status_message,
             no_wait=no_wait,
             **kwargs,
         )
@@ -344,11 +207,20 @@ class LinkProvider(ADRProvider):
         **kwargs,
     ):
         """Add an IoT Hub messaging endpoint to a namespace (DPS-first preflight)."""
+        parsed_hub = _parse_hub_resource_id(hub_resource_id)
         existing = self._get_namespace(namespace_name, resource_group_name)
 
         # DPS-first: namespace must already have at least one DPS endpoint
-        if not _get_provisioning_endpoints(existing):
-            raise ArgumentUsageError(DPS_FIRST_REQUIRED_MSG)
+        if not has_dps_endpoint(existing):
+            raise ArgumentUsageError(DPS_REQUIRED_MSG)
+        if hub_endpoint_count(existing) >= 10:
+            raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
+        if endpoint_name in _get_messaging_endpoints(existing):
+            raise ArgumentUsageError(
+                f"Messaging endpoint '{endpoint_name}' already exists on namespace "
+                f"'{namespace_name}' and cannot be repointed by link hub add. "
+                "Use link hub update or delete the existing endpoint first."
+            )
 
         endpoint_body = _build_hub_endpoint_body(
             hub_resource_id,
@@ -357,11 +229,24 @@ class LinkProvider(ADRProvider):
             availability=availability,
             allocation_weight=allocation_weight,
         )
+        hub = self._preflight_link(
+            link_type="hub",
+            namespace=existing,
+            target_resource_id=hub_resource_id,
+            inbound_identity=endpoint_body.get("inboundCallerIdentity"),
+            parsed=parsed_hub,
+            strategy=_HUB_TARGET,
+        )
+        self._warn_if_hub_classically_linked(existing, parsed_hub, hub)
 
-        return self._patch_messaging_endpoints(
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="messaging",
             endpoints_patch={endpoint_name: endpoint_body},
+            status_message=(
+                f"Updating messaging endpoints on namespace {namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -379,31 +264,51 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(_MI_MUTEX_MSG)
 
         existing = self._get_namespace(namespace_name, resource_group_name)
-        endpoints = _get_messaging_endpoints(existing)
-        if endpoint_name not in endpoints:
-            raise ResourceNotFoundError(
-                f"Hub endpoint '{endpoint_name}' was not found on namespace '{namespace_name}'."
-            )
+        endpoint = self._get_typed_endpoint(
+            existing,
+            "messaging",
+            endpoint_name,
+            IOT_HUB_ENDPOINT_TYPE,
+            namespace_name,
+            "Hub",
+        )
+        if is_failed_hub_endpoint(endpoint) and not has_dps_endpoint(existing):
+            raise ArgumentUsageError(DPS_REQUIRED_MSG)
 
         inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
         if inbound_identity is None:
             raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --mi-system-assigned or "
-                "--mi-user-assigned <uami-resource-id>."
+                "Nothing to update. Pass --system-assigned-mi or "
+                "--user-assigned-mi <uami-resource-id>."
             )
 
         # The backend requires the full endpoint identity (endpointType + resourceId) on update,
         # so re-send the existing endpoint with the requested changes overlaid rather than a
         # sparse patch (which fails InvalidRequestContent).
         endpoint_patch = _endpoint_update_body(
-            endpoints.get(endpoint_name),
+            endpoint,
             inbound_identity=inbound_identity,
         )
+        hub_resource_id = endpoint.get("resourceId")
+        parsed_hub = _parse_hub_resource_id(hub_resource_id)
+        hub = self._preflight_link(
+            link_type="hub",
+            namespace=existing,
+            target_resource_id=hub_resource_id,
+            inbound_identity=inbound_identity,
+            parsed=parsed_hub,
+            strategy=_HUB_TARGET,
+        )
+        self._warn_if_hub_classically_linked(existing, parsed_hub, hub)
 
-        return self._patch_messaging_endpoints(
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="messaging",
             endpoints_patch={endpoint_name: endpoint_patch},
+            status_message=(
+                f"Updating messaging endpoints on namespace {namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -420,32 +325,15 @@ class LinkProvider(ADRProvider):
     def hub_list(self, namespace_name: str, resource_group_name: str):
         """List all Hub messaging endpoints on the namespace."""
         ns = self._get_namespace(namespace_name, resource_group_name)
-        return _project_endpoint_section(
-            _get_messaging_endpoints(ns), IOT_HUB_ENDPOINT_TYPE
-        )
+        endpoints = _get_messaging_endpoints(ns)
+        # Filter to only Hub-typed entries (defensively; other endpointTypes may exist later)
+        return [
+            {"name": name, **(ep or {})}
+            for name, ep in endpoints.items()
+            if endpoint_is_type(ep, IOT_HUB_ENDPOINT_TYPE)
+        ]
 
     # DPS commands
-
-    def _patch_provisioning_endpoints(
-        self,
-        namespace_name: str,
-        resource_group_name: str,
-        endpoints_patch: dict,
-        no_wait: bool = False,
-        **kwargs,
-    ):
-        properties = {"properties": {"provisioning": {"endpoints": endpoints_patch}}}
-        poller = self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            properties=properties,
-        )
-        return self._wait(
-            poller,
-            f"Updating provisioning endpoints on namespace {namespace_name}...",
-            no_wait=no_wait,
-            **kwargs,
-        )
 
     def _side_get_dps_resource(self, dps_resource_id: str) -> dict:
         """Side-GET the DPS RP to surface existing ``properties.iotHubs[]`` registrations.
@@ -459,7 +347,10 @@ class LinkProvider(ADRProvider):
             return {}
         dps_name = parsed["name"]
         try:
-            client = iot_service_provisioning_factory(self.cmd.cli_ctx).iot_dps_resource
+            client = adr_iot_service_provisioning_factory(
+                self.cmd.cli_ctx,
+                subscription_id=parsed["subscription_id"],
+            ).iot_dps_resource
             return dict(
                 client.get(
                     resource_group_name=parsed["resource_group_name"],
@@ -472,6 +363,38 @@ class LinkProvider(ADRProvider):
                 "Could not list existing IoT Hubs registered on DPS '%s': %s", dps_name, exc
             )
             return {}
+
+    def _warn_if_hub_classically_linked(
+        self, namespace: dict, parsed_hub: dict, hub: dict
+    ):
+        hub_names = {
+            parsed_hub["name"].casefold(),
+            str(((hub.get("properties") or {}).get("hostName") or "")).casefold(),
+            str(((hub.get("properties") or {}).get("deviceHostName") or "")).casefold(),
+        }
+        for endpoint in _get_provisioning_endpoints(namespace).values():
+            if not endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE):
+                continue
+            dps = self._side_get_dps_resource(endpoint.get("resourceId"))
+            for classic_hub in ((dps.get("properties") or {}).get("iotHubs") or []):
+                classic_name = str(
+                    classic_hub.get("hostName")
+                    or classic_hub.get("name")
+                    or ""
+                ).casefold()
+                if (
+                    classic_name in hub_names
+                    or classic_name.split(".", 1)[0]
+                    == parsed_hub["name"].casefold()
+                ):
+                    logger.warning(
+                        "IoT Hub '%s' is also configured in the linked DPS "
+                        "properties.iotHubs list. The namespace Hub link is the "
+                        "authoritative ADR relationship; keep classic DPS allocation "
+                        "settings reconciled.",
+                        parsed_hub["name"],
+                    )
+                    return
 
     def dps_add(
         self,
@@ -488,19 +411,36 @@ class LinkProvider(ADRProvider):
         Only one DPS endpoint may be linked per namespace; the existence check
         below rejects a second one.
         """
-        _parse_dps_resource_id(dps_resource_id)  # validate ARM ID shape up front
+        parsed_dps = _parse_dps_resource_id(dps_resource_id)
 
         existing = self._get_namespace(namespace_name, resource_group_name)
-        if _get_provisioning_endpoints(existing):
+        if has_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_CAP_EXCEEDED_MSG)
+        if endpoint_name in _get_provisioning_endpoints(existing):
+            raise ArgumentUsageError(
+                f"Provisioning endpoint '{endpoint_name}' already exists on "
+                f"namespace '{namespace_name}'. Update or remove it first."
+            )
 
         endpoint_body = _build_dps_endpoint_body(
             dps_resource_id, mi_system_assigned, mi_user_assigned
         )
-        return self._patch_provisioning_endpoints(
+        self._preflight_link(
+            link_type="dps",
+            namespace=existing,
+            target_resource_id=dps_resource_id,
+            inbound_identity=endpoint_body.get("inboundCallerIdentity"),
+            parsed=parsed_dps,
+            strategy=_DPS_TARGET,
+        )
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="provisioning",
             endpoints_patch={endpoint_name: endpoint_body},
+            status_message=(
+                f"Updating provisioning endpoints on namespace {namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -518,30 +458,46 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(_MI_MUTEX_MSG)
 
         existing = self._get_namespace(namespace_name, resource_group_name)
-        endpoints = _get_provisioning_endpoints(existing)
-        if endpoint_name not in endpoints:
-            raise ResourceNotFoundError(
-                f"DPS endpoint '{endpoint_name}' was not found on namespace '{namespace_name}'."
-            )
+        endpoint = self._get_typed_endpoint(
+            existing,
+            "provisioning",
+            endpoint_name,
+            DPS_ENDPOINT_TYPE,
+            namespace_name,
+            "DPS",
+        )
 
         inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
         if inbound_identity is None:
             raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --mi-system-assigned or "
-                "--mi-user-assigned <uami-resource-id> to change the inbound caller identity."
+                "Nothing to update. Pass --system-assigned-mi or "
+                "--user-assigned-mi <uami-resource-id> to change the inbound caller identity."
             )
 
         # The backend requires the full endpoint body (endpointType + resourceId) on update, so
         # re-send the existing endpoint with the new inbound identity overlaid rather than a sparse
         # patch (which fails InvalidRequestContent).
         endpoint_patch = _endpoint_update_body(
-            endpoints.get(endpoint_name), inbound_identity=inbound_identity
+            endpoint, inbound_identity=inbound_identity
+        )
+        dps_resource_id = endpoint.get("resourceId")
+        self._preflight_link(
+            link_type="dps",
+            namespace=existing,
+            target_resource_id=dps_resource_id,
+            inbound_identity=inbound_identity,
+            parsed=_parse_dps_resource_id(dps_resource_id),
+            strategy=_DPS_TARGET,
         )
 
-        return self._patch_provisioning_endpoints(
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="provisioning",
             endpoints_patch={endpoint_name: endpoint_patch},
+            status_message=(
+                f"Updating provisioning endpoints on namespace {namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -567,32 +523,14 @@ class LinkProvider(ADRProvider):
     def dps_list(self, namespace_name: str, resource_group_name: str):
         """List all DPS provisioning endpoints on the namespace."""
         ns = self._get_namespace(namespace_name, resource_group_name)
-        return _project_endpoint_section(
-            _get_provisioning_endpoints(ns), DPS_ENDPOINT_TYPE
-        )
+        endpoints = _get_provisioning_endpoints(ns)
+        return [
+            {"name": name, **(ep or {})}
+            for name, ep in endpoints.items()
+            if endpoint_is_type(ep, DPS_ENDPOINT_TYPE)
+        ]
 
     # Software Updates commands
-
-    def _patch_updating_endpoints(
-        self,
-        namespace_name: str,
-        resource_group_name: str,
-        endpoints_patch: dict,
-        no_wait: bool = False,
-        **kwargs,
-    ):
-        properties = {"properties": {"updating": {"endpoints": endpoints_patch}}}
-        poller = self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            properties=properties,
-        )
-        return self._wait(
-            poller,
-            f"Updating software update endpoints on namespace {namespace_name}...",
-            no_wait=no_wait,
-            **kwargs,
-        )
 
     def su_add(
         self,
@@ -605,22 +543,39 @@ class LinkProvider(ADRProvider):
         **kwargs,
     ):
         """Add a Software Updates updating endpoint to a namespace."""
-        _parse_su_resource_id(su_resource_id)  # validate ARM ID shape up front
+        parsed_su = _parse_su_resource_id(su_resource_id)
 
         existing = self._get_namespace(namespace_name, resource_group_name)
-        if endpoint_name in _get_updating_endpoints(existing):
+        updating_endpoints = _get_updating_endpoints(existing)
+        if has_su_endpoint(existing):
+            raise ArgumentUsageError(SU_CAP_EXCEEDED_MSG)
+        if endpoint_name in updating_endpoints:
             raise ArgumentUsageError(
-                f"Software update endpoint '{endpoint_name}' already exists on namespace "
-                f"'{namespace_name}'. Use 'az iot adr ns link su update' to modify it."
+                f"Updating endpoint '{endpoint_name}' already exists on namespace "
+                f"'{namespace_name}' and cannot be overwritten by link su add. "
+                "Update or remove the existing endpoint first."
             )
 
         endpoint_body = _build_su_endpoint_body(
             su_resource_id, mi_system_assigned, mi_user_assigned
         )
-        return self._patch_updating_endpoints(
+        self._preflight_link(
+            link_type="su",
+            namespace=existing,
+            target_resource_id=su_resource_id,
+            inbound_identity=endpoint_body.get("inboundCallerIdentity"),
+            parsed=parsed_su,
+            strategy=_SU_TARGET,
+        )
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="updating",
             endpoints_patch={endpoint_name: endpoint_body},
+            status_message=(
+                "Updating software update endpoints on namespace "
+                f"{namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -638,30 +593,47 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(_MI_MUTEX_MSG)
 
         existing = self._get_namespace(namespace_name, resource_group_name)
-        endpoints = _get_updating_endpoints(existing)
-        if endpoint_name not in endpoints:
-            raise ResourceNotFoundError(
-                f"Software update endpoint '{endpoint_name}' was not found on namespace '{namespace_name}'."
-            )
+        endpoint = self._get_typed_endpoint(
+            existing,
+            "updating",
+            endpoint_name,
+            SU_ENDPOINT_TYPE,
+            namespace_name,
+            "Software update",
+        )
 
         inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
         if inbound_identity is None:
             raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --mi-system-assigned or "
-                "--mi-user-assigned <uami-resource-id> to change the inbound caller identity."
+                "Nothing to update. Pass --system-assigned-mi or "
+                "--user-assigned-mi <uami-resource-id> to change the inbound caller identity."
             )
 
         # The backend requires the full endpoint body (endpointType + resourceId) on update, so
         # re-send the existing endpoint with the new inbound identity overlaid rather than a sparse
         # patch (which fails InvalidRequestContent).
         endpoint_patch = _endpoint_update_body(
-            endpoints.get(endpoint_name), inbound_identity=inbound_identity
+            endpoint, inbound_identity=inbound_identity
+        )
+        su_resource_id = endpoint.get("resourceId")
+        self._preflight_link(
+            link_type="su",
+            namespace=existing,
+            target_resource_id=su_resource_id,
+            inbound_identity=inbound_identity,
+            parsed=_parse_su_resource_id(su_resource_id),
+            strategy=_SU_TARGET,
         )
 
-        return self._patch_updating_endpoints(
+        return self._patch_endpoints(
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
+            section="updating",
             endpoints_patch={endpoint_name: endpoint_patch},
+            status_message=(
+                "Updating software update endpoints on namespace "
+                f"{namespace_name}..."
+            ),
             **kwargs,
         )
 
@@ -678,9 +650,12 @@ class LinkProvider(ADRProvider):
     def su_list(self, namespace_name: str, resource_group_name: str):
         """List all Software Updates updating endpoints on the namespace."""
         ns = self._get_namespace(namespace_name, resource_group_name)
-        return _project_endpoint_section(
-            _get_updating_endpoints(ns), SU_ENDPOINT_TYPE
-        )
+        endpoints = _get_updating_endpoints(ns)
+        return [
+            {"name": name, **(ep or {})}
+            for name, ep in endpoints.items()
+            if endpoint_is_type(ep, SU_ENDPOINT_TYPE)
+        ]
 
     # Bundled link add
 
@@ -707,11 +682,25 @@ class LinkProvider(ADRProvider):
         first because provisioning endpoints land before messaging endpoints in the
         materialized body order below.
         """
-        # Validate DPS ARM ID up front; reject overflow before composing the body.
-        _parse_dps_resource_id(dps_resource_id)
+        # Validate both ARM IDs up front; reject overflow/collisions before
+        # composing the body or touching RBAC.
+        parsed_dps = _parse_dps_resource_id(dps_resource_id)
+        parsed_hub = _parse_hub_resource_id(hub_resource_id)
         existing = self._get_namespace(namespace_name, resource_group_name)
-        if _get_provisioning_endpoints(existing):
+        if has_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_CAP_EXCEEDED_MSG)
+        if hub_endpoint_count(existing) >= 10:
+            raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
+        if dps_endpoint_name in _get_provisioning_endpoints(existing):
+            raise ArgumentUsageError(
+                f"Provisioning endpoint '{dps_endpoint_name}' already exists on "
+                f"namespace '{namespace_name}'."
+            )
+        if hub_endpoint_name in _get_messaging_endpoints(existing):
+            raise ArgumentUsageError(
+                f"Messaging endpoint '{hub_endpoint_name}' already exists on "
+                f"namespace '{namespace_name}' and cannot be repointed."
+            )
 
         # Build the two endpoint bodies (each call validates its own MI flag pair).
         dps_body = _build_dps_endpoint_body(
@@ -724,6 +713,27 @@ class LinkProvider(ADRProvider):
             availability=hub_availability,
             allocation_weight=hub_allocation_weight,
         )
+        rbac_requests = []
+        self._preflight_link(
+            link_type="dps",
+            namespace=existing,
+            target_resource_id=dps_resource_id,
+            inbound_identity=dps_body.get("inboundCallerIdentity"),
+            parsed=parsed_dps,
+            strategy=_DPS_TARGET,
+            rbac_requests=rbac_requests,
+        )
+        hub = self._preflight_link(
+            link_type="hub",
+            namespace=existing,
+            target_resource_id=hub_resource_id,
+            inbound_identity=hub_body.get("inboundCallerIdentity"),
+            parsed=parsed_hub,
+            strategy=_HUB_TARGET,
+            rbac_requests=rbac_requests,
+        )
+        self._rbac_manager().ensure_many(rbac_requests)
+        self._warn_if_hub_classically_linked(existing, parsed_hub, hub)
 
         # DPS-first ordering in the bundled PATCH body.
         properties = {

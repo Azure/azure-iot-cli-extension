@@ -13,7 +13,6 @@ from azext_iot.dps.common import (
     FAILED_REGISTRATION_ERROR,
     UNAUTHORIZED_ERROR,
     COMPUTE_KEY_ERROR,
-    CERTIFICATE_FILE_ERROR,
     CERTIFICATE_RETRIEVAL_ERROR,
     TPM_SUPPORT_ERROR,
     MISSING_DPS_CREDENTIALS_ERROR
@@ -152,8 +151,6 @@ class DeviceRegistrationProvider():
                 key_file=key_file,
                 pass_phrase=passphrase or ""
             )
-        elif certificate_file or key_file:
-            raise RequiredArgumentMissingError(CERTIFICATE_FILE_ERROR)
         elif not (self.dps_name or self.login):
             raise RequiredArgumentMissingError(MISSING_DPS_CREDENTIALS_ERROR)
         # Retrieve the attestation if nothing is provided.

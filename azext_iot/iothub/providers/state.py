@@ -343,7 +343,8 @@ class StateProvider(IoTHubProvider):
             if not self.target:
                 self.target = self.discovery.get_target(
                     hub_resource["name"],
-                    resource_group_name=arm_result.as_json()["resourceGroup"]
+                    resource_group_name=arm_result.as_json()["resourceGroup"],
+                    auth_type=self.auth_type,
                 )
                 print(usr_msgs.CREATE_IOT_HUB_MSG.format(self.hub_name))
             else:

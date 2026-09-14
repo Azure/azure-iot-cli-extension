@@ -90,8 +90,8 @@ def build(session) -> ResourceSpec:
             ),
             runs="az iot adr ns link dps|hub|su list --ns <namespace> -g <resource-group>  ·  read-only",
             note=(
-                "Exactly one DPS may be linked, and it must be linked before any hub. Press w for guided setup, which "
-                "handles the ordering and the role assignments."
+                "At most one DPS and one Software Updates instance; DPS precedes hubs. "
+                "Press w for guided setup, ordering and required service roles."
             ),
         ),
         row_id=lambda p: f"{_endpoint_type(p)}/{name_of(p)}",

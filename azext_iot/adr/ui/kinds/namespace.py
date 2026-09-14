@@ -138,10 +138,6 @@ def build(session) -> ResourceSpec:
                 "DPS, IoT Hubs and Software Updates endpoints attached to this namespace.",
             ),
             ChildRef(
-                "device", "Devices", "d",
-                "Registry records, enablement and provisioning state.",
-            ),
-            ChildRef(
                 "group", "Groups", "g",
                 "Saved device queries and their current membership.",
             ),

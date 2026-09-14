@@ -9,6 +9,7 @@ import json
 import pytest
 
 from unittest import mock
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.eventhub import EventData
 from azure.eventhub import TransportType
 from azext_iot.central.providers import (
@@ -120,6 +121,46 @@ def _create_event_data(
     mock_event.get_data = mock.Mock(return_value=get_data_generator())
 
     return mock_event
+
+
+@pytest.mark.parametrize("rows", [[], [{"deviceId": "included"}], None])
+def test_monitor_query_filters_actual_event_callbacks(rows, mocker, capsys):
+    from azext_iot.operations import hub
+    cmd = mock.Mock()
+    cmd.cli_ctx.invocation.data = {"output": "json"}
+    query = mocker.patch.object(hub, "iot_query", return_value=rows)
+    discovery = mocker.patch.object(hub, "IotHubDiscovery")
+    builder = mocker.patch.object(hub_target_builder, "EventTargetBuilder")
+
+    def receive(**kwargs):
+        for device_id in ("included", "excluded"):
+            kwargs["on_message_received"](_create_event_data(
+                "payload", annotations={common_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            ))
+
+    monitor = mocker.patch.object(telemetry, "start_single_monitor", side_effect=receive)
+    options = {"cmd": cmd, "hub_name_or_hostname": "hub", "resource_group_name": "rg", "timeout": 8}
+    if rows is not None:
+        options["device_query"] = "select * from devices where deviceId = 'included'"
+    if rows == []:
+        with pytest.raises(ResourceNotFoundError, match="No devices matched"):
+            hub.iot_hub_monitor_events(**options)
+        discovery.assert_not_called()
+        builder.assert_not_called()
+        monitor.assert_not_called()
+        assert capsys.readouterr().out == ""
+    else:
+        hub.iot_hub_monitor_events(**options)
+        output = capsys.readouterr().out
+        assert '"origin": "included"' in output
+        assert ('"origin": "excluded"' in output) == (rows is None)
+        monitor.assert_called_once()
+    if rows is None:
+        query.assert_not_called()
+    else:
+        query.assert_called_once_with(
+            cmd, options["device_query"], "hub", None, "rg", login=None,
+        )
 
 
 def _validate_issues(

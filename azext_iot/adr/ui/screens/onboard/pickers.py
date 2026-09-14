@@ -85,7 +85,7 @@ def _resource_group_of(resource: Dict[str, Any]) -> str:
 
 def evaluate(resource: Dict[str, Any], namespace_location: Optional[str] = None,
              registered_hub_names: Optional[Sequence[str]] = None,
-             require_identity: bool = True) -> Candidate:
+             require_identity: bool = True, require_standard_hub: bool = False) -> Candidate:
     """Judge one candidate resource against the namespace it would be linked to."""
     identity = _identity_of(resource)
     location = str(resource.get("location") or "")
@@ -108,14 +108,19 @@ def evaluate(resource: Dict[str, Any], namespace_location: Optional[str] = None,
         candidate.verdict = INELIGIBLE
         candidate.reason = "provisioning failed"
         return candidate
+    if namespace_location and location and location.casefold() != namespace_location.casefold():
+        candidate.verdict = INELIGIBLE
+        candidate.reason = "cross-region linking is not supported"
+        return candidate
+    if require_standard_hub and not str((resource.get("sku") or {}).get("name") or "").upper().startswith("S"):
+        candidate.verdict = INELIGIBLE
+        candidate.reason = "Standard S-tier Hub required"
+        return candidate
 
     warnings = []
     if require_identity and identity == NO_IDENTITY:
         # Guided setup can enable a SAMI or attach a UAMI before linking.
         warnings.append("identity setup required")
-    if namespace_location and location and location.lower() != namespace_location.lower():
-        warnings.append("other region")
-
     if registered_hub_names is not None:
         # DPS records Hub host names; compare on the leading segment.
         registered = {

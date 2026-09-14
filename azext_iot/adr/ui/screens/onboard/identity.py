@@ -1,7 +1,7 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See License.txt in the repo root for license information.
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 """Managed-identity choices and mutations for guided namespace linking."""
@@ -159,14 +159,14 @@ def principal_of(resource: Dict[str, Any], choice: IdentityChoice) -> str:
 
 def identity_flags(choice: IdentityChoice):
     if choice.is_user_assigned:
-        return (), {"mi_user_assigned": choice.uami_id}
-    return ("--mi-system-assigned",), {}
+        return (), {"user_assigned_mi": choice.uami_id}
+    return ("--system-assigned-mi",), {}
 
 
 def identity_command_flags(choice: IdentityChoice) -> str:
     if choice.is_user_assigned:
-        return f"--mi-user-assigned {quote(choice.uami_id)}"
-    return "--mi-system-assigned"
+        return f"--user-assigned-mi {quote(choice.uami_id)}"
+    return "--system-assigned-mi"
 
 
 def assignment_rows(context: Dict[str, Any]):

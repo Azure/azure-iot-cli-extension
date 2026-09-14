@@ -10,11 +10,18 @@ from unittest.mock import Mock, patch
 import pytest
 from azure.cli.core.azclierror import (
     AzureResponseError,
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError
 
-from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.base import (
+    ADRProvider,
+    _poll_with_deadline,
+    _retry_after_seconds,
+    parse_json_object,
+)
 
 
 @pytest.mark.parametrize("input_location", ["location", None])
@@ -43,6 +50,21 @@ def test_ensure_location(fixture_adr_provider, fixture_cmd, input_location):
         assert result == input_location
 
 
+def test_parse_json_object_rejects_unsupported_and_missing_properties():
+    with pytest.raises(InvalidArgumentValueError, match="unsupported"):
+        parse_json_object(
+            {"known": 1, "unknown": 2},
+            "--body",
+            allowed_keys=frozenset({"known"}),
+        )
+    with pytest.raises(RequiredArgumentMissingError, match="required"):
+        parse_json_object(
+            {"required": None},
+            "--body",
+            required_keys=frozenset({"required"}),
+        )
+
+
 def test_provider_initialization(fixture_cmd):
     """Test that ADRProvider initializes correctly."""
     with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
@@ -56,7 +78,7 @@ def test_provider_initialization(fixture_cmd):
         mock_factory.assert_called_once_with(fixture_cmd.cli_ctx)
 
 
-def _resource_poller(method="PATCH", location=None):
+def _resource_poller(method="PATCH", location=None, status_code=202, body=None):
     poller = Mock()
     poller.done.return_value = False
     poller._polling_method._initial_response.http_request = Mock(
@@ -65,12 +87,30 @@ def _resource_poller(method="PATCH", location=None):
     poller._polling_method._initial_response.http_response.headers = (
         {"Location": location} if location else {}
     )
-    poller._polling_method._initial_response.http_response.status_code = 202
+    response = poller._polling_method._initial_response.http_response
+    response.status_code = status_code
+    response.content = b"resource body" if body is not None else b""
+    response.json.return_value = body
     return poller
 
 
+def _fake_time():
+    now = [0]
+    sleeps = []
+
+    def clock():
+        return now[0]
+
+    def sleeper(delay):
+        sleeps.append(delay)
+        now[0] += delay
+
+    return clock, sleeper, sleeps
+
+
+@pytest.mark.parametrize("method", ["PATCH", "DELETE"])
 def test_poll_provisioning_state_raises_4xx_immediately(
-    fixture_adr_provider,
+    fixture_adr_provider, method,
 ):
     response = Mock(status_code=400)
     response.raise_for_status.side_effect = RuntimeError("bad request")
@@ -78,7 +118,7 @@ def test_poll_provisioning_state_raises_4xx_immediately(
 
     with pytest.raises(RuntimeError, match="bad request"):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller(), wait_sec=0
+            _resource_poller(method), wait_sec=0
         )
 
     response.raise_for_status.assert_called_once_with()
@@ -108,12 +148,15 @@ def test_poll_provisioning_state_timeout_is_an_error(
     expected_message,
 ):
     fixture_adr_provider.client.send_request.return_value = response
+    clock, sleeper, _ = _fake_time()
 
-    with patch(
-        "azext_iot.adr.providers.base.LRO_POLL_RETRIES", 2
-    ), pytest.raises(AzureResponseError, match=expected_message):
+    with pytest.raises(AzureResponseError, match=expected_message):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller(), wait_sec=0
+            _resource_poller(),
+            wait_sec=1,
+            timeout_sec=3,
+            clock=clock,
+            sleeper=sleeper,
         )
 
     assert fixture_adr_provider.client.send_request.call_count == 2
@@ -328,7 +371,12 @@ def test_format_failure_includes_authorization_guidance_and_correlation_id(
     )
 
     assert "Managed identity is not authorized." in message
-    assert "grant the namespace's managed identity" in message
+    assert "Role assignments visible in ARM may not yet be effective" in message
+    assert "use link update, not link add" in message
+    assert "Update reruns RBAC preflight" in message
+    assert "roles are incomplete" not in message
+    assert "exact remediation commands" not in message
+    assert "\naz iot" not in message
     assert "Correlation id: correlation-id." in message
 
 
@@ -414,19 +462,127 @@ def test_post_lro_ignores_sdk_done_state_for_accepted_response(
     poller.result.assert_not_called()
 
 
-@pytest.mark.parametrize("method", ["POST", "PATCH"])
-def test_inline_mutation_returns_poller_result(
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_inline_mutation_returns_initial_response_body(
     fixture_adr_provider, method
 ):
     poller = _resource_poller(method)
-    poller._polling_method._initial_response.http_response.status_code = 200
-    poller.result.return_value = {"status": "complete"}
+    response = poller._polling_method._initial_response.http_response
+    response.status_code = 200
+    response.content = b'{"status":"complete"}'
+    response.json.return_value = {"status": "complete"}
 
     assert fixture_adr_provider._poll_provisioning_state(
         poller, wait_sec=0
     ) == {"status": "complete"}
-    poller.result.assert_called_once_with()
+    response.json.assert_called_once_with()
+    poller.result.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])
+def test_inline_mutation_without_body_returns_none(fixture_adr_provider, method):
+    poller = _resource_poller(method)
+    response = poller._polling_method._initial_response.http_response
+    response.status_code = 204
+    response.content = b""
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller, wait_sec=0
+    ) is None
+    response.json.assert_not_called()
+    poller.result.assert_not_called()
     fixture_adr_provider.client.send_request.assert_not_called()
+
+
+@pytest.mark.parametrize("method,status_code", [("PUT", 201), ("PATCH", 200), ("DELETE", 200)])
+@pytest.mark.parametrize("properties", [{}, {"provisioningState": "Succeeded"}])
+def test_headerless_completed_resource_returns_inline(
+    fixture_adr_provider, method, status_code, properties,
+):
+    body = {"properties": properties}
+    poller = _resource_poller(method, status_code=status_code, body=body)
+
+    assert fixture_adr_provider._poll_provisioning_state(poller, wait_sec=0) == body
+
+    fixture_adr_provider.client.send_request.assert_not_called()
+    poller.result.assert_not_called()
+
+
+@pytest.mark.parametrize("method,status_code", [("PUT", 201), ("PATCH", 200), ("DELETE", 200)])
+@pytest.mark.parametrize("state", ["Failed", "Canceled"])
+def test_headerless_resource_rejects_terminal_failure(
+    fixture_adr_provider, method, status_code, state,
+):
+    body = {"properties": {"provisioningState": state, "error": {"message": "mutation failed"}}}
+    poller = _resource_poller(method, status_code=status_code, body=body)
+    poller._polling_method._initial_response.http_response.headers = {
+        "x-ms-correlation-request-id": "initial-correlation"
+    }
+
+    with pytest.raises(AzureResponseError, match=state) as raised:
+        fixture_adr_provider._poll_provisioning_state(poller, wait_sec=0)
+
+    assert "mutation failed" in str(raised.value)
+    assert "initial-correlation" in str(raised.value)
+    fixture_adr_provider.client.send_request.assert_not_called()
+    poller.result.assert_not_called()
+
+
+@pytest.mark.parametrize("method,status_code", [("PUT", 201), ("PATCH", 200)])
+def test_headerless_creating_resource_is_polled(
+    fixture_adr_provider, method, status_code,
+):
+    poller = _resource_poller(
+        method, status_code=status_code,
+        body={"properties": {"provisioningState": "Creating"}},
+    )
+    result = {"properties": {"provisioningState": "Succeeded"}}
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=200, json=Mock(return_value={"properties": {"provisioningState": "Updating"}})),
+        Mock(status_code=200, json=Mock(return_value=result)),
+    ]
+    clock, sleeper, sleeps = _fake_time()
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller, wait_sec=1, timeout_sec=5, clock=clock, sleeper=sleeper,
+    ) == result
+
+    assert sleeps == [1, 1]
+    assert fixture_adr_provider.client.send_request.call_count == 2
+    assert all(
+        call.args[0].method == "GET"
+        and call.args[0].url == "https://management.azure.com/resource"
+        for call in fixture_adr_provider.client.send_request.call_args_list
+    )
+    poller.result.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "method,status_code,properties",
+    [
+        ("PUT", 201, {"provisioningState": "Creating"}),
+        ("PATCH", 200, {"provisioningState": "Updating"}),
+        ("DELETE", 202, {"provisioningState": "Succeeded"}),
+        ("DELETE", 202, {}),
+    ],
+)
+def test_pending_resource_mutations_time_out(
+    fixture_adr_provider, method, status_code, properties,
+):
+    body = {"properties": properties}
+    poller = _resource_poller(method, status_code=status_code, body=body)
+    fixture_adr_provider.client.send_request.return_value = Mock(
+        status_code=200, json=Mock(return_value=body)
+    )
+    clock, sleeper, _ = _fake_time()
+
+    with pytest.raises(AzureResponseError, match="Timed out waiting"):
+        fixture_adr_provider._poll_provisioning_state(
+            poller, wait_sec=1, timeout_sec=3, clock=clock, sleeper=sleeper,
+        )
+
+    assert fixture_adr_provider.client.send_request.call_count == 2
+    poller.result.assert_not_called()
 
 
 def test_post_lro_requires_location(fixture_adr_provider):
@@ -496,14 +652,151 @@ def test_post_lro_timeout_is_an_error(
     fixture_adr_provider, response, expected
 ):
     fixture_adr_provider.client.send_request.return_value = response
+    clock, sleeper, _ = _fake_time()
 
-    with patch(
-        "azext_iot.adr.providers.base.LRO_POLL_RETRIES", 2
-    ), pytest.raises(AzureResponseError, match=expected):
+    with pytest.raises(AzureResponseError, match=expected):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller("POST", location="https://management.azure.com/status"),
-            wait_sec=0,
+            _resource_poller(
+                "POST", location="https://management.azure.com/status"
+            ),
+            wait_sec=1,
+            timeout_sec=3,
+            clock=clock,
+            sleeper=sleeper,
         )
+
+
+def test_workaround_waiter_honors_initial_and_subsequent_retry_after(
+    fixture_adr_provider,
+):
+    poller = _resource_poller()
+    poller._polling_method._initial_response.http_response.headers = {
+        "rEtRy-AfTeR": "2"
+    }
+    body = {"properties": {"provisioningState": "Succeeded"}}
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=429, headers={"RETRY-AFTER": "4"}),
+        Mock(status_code=200, headers={}, json=Mock(return_value=body)),
+    ]
+    clock, sleeper, sleeps = _fake_time()
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller,
+        timeout_sec=20,
+        clock=clock,
+        sleeper=sleeper,
+    ) == body
+
+    assert sleeps == [2, 4]
+
+
+@pytest.mark.parametrize(
+    "headers,fallback,expected",
+    [
+        ({"Retry-After": "45"}, 2, 30),
+        ({"retry-after": "invalid"}, 7, 7),
+        ({"ReTrY-AfTeR": 3}, 7, 3),
+        ({"Retry-After": 0}, 4, 4),
+    ],
+)
+def test_retry_after_is_case_insensitive_integer_and_capped(
+    headers, fallback, expected
+):
+    assert (
+        _retry_after_seconds(
+            SimpleNamespace(headers=headers), fallback=fallback
+        )
+        == expected
+    )
+
+
+def test_deadline_waiter_clamps_sleep_to_remaining_time():
+    clock, sleeper, sleeps = _fake_time()
+    request = Mock()
+
+    with pytest.raises(AzureResponseError, match="deadline"):
+        _poll_with_deadline(
+            request,
+            Mock(),
+            lambda: "deadline expired",
+            initial_response=SimpleNamespace(
+                headers={"Retry-After": "30"}
+            ),
+            timeout_sec=5,
+            clock=clock,
+            sleeper=sleeper,
+        )
+
+    assert sleeps == [5]
+    request.assert_not_called()
+
+
+def test_deadline_waiter_rejects_already_expired_deadline():
+    request = Mock()
+
+    with pytest.raises(AzureResponseError, match="already expired"):
+        _poll_with_deadline(
+            request,
+            Mock(),
+            lambda: "deadline already expired",
+            timeout_sec=0,
+            clock=lambda: 1,
+            sleeper=Mock(),
+        )
+
+    request.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["PATCH", "POST"])
+def test_workaround_waiter_tolerates_unexpected_redirect_response(
+    fixture_adr_provider, method
+):
+    body = (
+        {"properties": {"provisioningState": "Succeeded"}}
+        if method == "PATCH"
+        else {"status": "Succeeded"}
+    )
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=302, headers={}),
+        Mock(status_code=200, headers={}, json=Mock(return_value=body)),
+    ]
+    poller = _resource_poller(
+        method,
+        location=(
+            "https://management.azure.com/status"
+            if method == "POST"
+            else None
+        ),
+    )
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller, wait_sec=0
+    ) == body
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE", "POST"])
+def test_no_wait_returns_before_workaround_polling(fixture_adr_provider, method):
+    poller = _resource_poller(method)
+    fixture_adr_provider._await_terminal = Mock()
+
+    assert (
+        fixture_adr_provider._wait(
+            poller, "Working...", no_wait=True
+        )
+        is poller
+    )
+    fixture_adr_provider._await_terminal.assert_not_called()
+    fixture_adr_provider.client.send_request.assert_not_called()
+    poller.result.assert_not_called()
+
+
+def test_resolve_location_rejects_parent_without_location(
+    fixture_adr_provider,
+):
+    fixture_adr_provider.client.namespaces.get.return_value = {}
+
+    with pytest.raises(AzureResponseError, match="does not contain a location"):
+        fixture_adr_provider._resolve_location("namespace", "rg")
 
 
 def test_poll_provisioning_state_treats_delete_404_as_success(
@@ -519,6 +812,48 @@ def test_poll_provisioning_state_treats_delete_404_as_success(
         )
         is None
     )
+
+
+@pytest.mark.parametrize("properties", [{}, {"provisioningState": "Succeeded"}])
+@pytest.mark.parametrize("status_code", [202, 200])
+def test_async_delete_waits_for_404_despite_readable_resource(
+    fixture_adr_provider, properties, status_code,
+):
+    poller = _resource_poller(
+        "DELETE", status_code=status_code,
+        location="https://management.azure.com/status",
+    )
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=200, json=Mock(return_value={"properties": properties})),
+        Mock(status_code=204),
+        Mock(status_code=404),
+    ]
+
+    assert fixture_adr_provider._poll_provisioning_state(poller, wait_sec=0) is None
+
+    assert fixture_adr_provider.client.send_request.call_count == 3
+    assert all(
+        call.args[0].url == "https://management.azure.com/resource"
+        for call in fixture_adr_provider.client.send_request.call_args_list
+    )
+    poller.result.assert_not_called()
+
+
+def test_async_delete_retries_transient_errors_until_404(fixture_adr_provider):
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=408),
+        Mock(status_code=429),
+        Mock(status_code=500),
+        Mock(status_code=404),
+    ]
+    clock, sleeper, _ = _fake_time()
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        _resource_poller("DELETE"),
+        wait_sec=1, timeout_sec=5, clock=clock, sleeper=sleeper,
+    ) is None
+
+    assert fixture_adr_provider.client.send_request.call_count == 4
 
 
 def test_poll_provisioning_state_retries_read_404_then_succeeds(
@@ -551,9 +886,11 @@ def test_poll_provisioning_state_accepts_resource_without_state(
 
 
 @pytest.mark.parametrize("state", ["Failed", "Canceled"])
+@pytest.mark.parametrize("method", ["PATCH", "DELETE"])
 def test_poll_provisioning_state_raises_terminal_failure(
     fixture_adr_provider,
     state,
+    method,
 ):
     body = {"properties": {"provisioningState": state}}
     fixture_adr_provider.client.send_request.return_value = Mock(
@@ -564,7 +901,7 @@ def test_poll_provisioning_state_raises_terminal_failure(
 
     with pytest.raises(AzureResponseError, match=state):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller(), wait_sec=0
+            _resource_poller(method), wait_sec=0
         )
 
 

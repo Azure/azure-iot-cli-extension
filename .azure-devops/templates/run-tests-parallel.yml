@@ -87,8 +87,16 @@ steps:
               pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
           ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
             inlineScript: |
+              set -e
               export COVERAGE_FILE=.coverage.${{ parameters.name }}
-              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+              # This legacy service-connection/pinned-resource template also supports Windows
+              # and parallel matrix jobs; it does not supply the isolated controller's scope.
+              if [ -n "${azext_iot_dps_test_phase:-}${azext_iot_dps_phase_receipts:-}${azext_iot_dps_run_uid:-}${azext_iot_dps_test_subscription:-}${azext_iot_dps_test_resource_group:-}" ]; then
+                echo "Legacy Azure DevOps DPS coverage rejects isolated phase overrides; use the GitHub DPS controller with explicit scope." >&2
+                exit 2
+              fi
+              echo "DPS coverage: legacy regular only. Service-SAS and owned local-auth-toggle coverage run through the GitHub DPS controller."
+              pytest -vv ${{ parameters.path }} -k "_int.py" --ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
           ${{ if contains(parameters.path, 'azext_iot/tests/adr') }}:
             inlineScript: |
               export COVERAGE_FILE=.coverage.${{ parameters.name }}

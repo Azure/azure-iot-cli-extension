@@ -49,7 +49,7 @@ def adr_ui_launch(
     try:
         from azext_iot.adr.ui.app import RadrApp
     except ModuleNotFoundError as error:  # pragma: no cover - depends on install shape
-        missing = error.name or ""
+        missing = str(error.name or "")
         if missing != "textual" and not missing.startswith("textual."):
             raise
         raise CLIInternalError(_TEXTUAL_MISSING_MSG) from error

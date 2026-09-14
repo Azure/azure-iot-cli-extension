@@ -21,7 +21,6 @@ from typing import Any, Callable, Dict, Optional
 #: :meth:`Session.provider` so building a session stays cheap.
 _PROVIDER_PATHS = {
     "namespace": ("azext_iot.adr.providers.namespace", "NamespaceProvider"),
-    "registry_device": ("azext_iot.adr.providers.registry_device", "RegistryDeviceProvider"),
     "group": ("azext_iot.adr.providers.group", "GroupProvider"),
     "job": ("azext_iot.adr.providers.job", "JobProvider"),
     "job_run": ("azext_iot.adr.providers.job_run", "JobRunProvider"),

@@ -43,8 +43,8 @@ if not PACKAGE_NAME:
 # and azure-eventhub for telemetry monitoring.
 
 DEPENDENCIES = [
-    "azure-core>=1.24.0,<1.40.0",
-    "azure-mgmt-core>=1.3.0,<2.0.0",
+    "azure-core>=1.31.0,<1.40.0",
+    "azure-mgmt-core>=1.5.0,<2.0.0",
     "azure-identity>=1.6.1,<1.18.0",
     "azure-storage-blob>=12.14.0,<12.30.0",
     "msrest>=0.6.21",
@@ -62,7 +62,7 @@ DEPENDENCIES = [
     # aiohttp is required by azure-eventhub for async AMQP over WebSocket transport (used when proxy is configured).
     # azure-eventhub does not include it as an extras dependency, so it must be declared explicitly.
     "aiohttp>=3.9,<4.0",
-    # Terminal UI (`az iot adr ui`). Imported lazily so no other command pays the cost.
+    # Terminal UI (`az iot adr ns ui`). Imported lazily so no other command pays the cost.
     # Capped below 7 because textual 7+ requires rich>=14, which conflicts with the pin above.
     "textual>=6.0,<7.0",
 ]

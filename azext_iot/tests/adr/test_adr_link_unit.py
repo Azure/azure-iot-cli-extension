@@ -5,14 +5,17 @@
 # --------------------------------------------------------------------------------------------
 
 import inspect
+from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AzureResponseError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
+from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.common import (
     SU_ENDPOINT_TYPE,
@@ -20,11 +23,12 @@ from azext_iot.adr.common import (
     IOT_HUB_ENDPOINT_TYPE,
     build_mi_body,
 )
-from azext_iot.adr.providers.link import (
-    LinkProvider,
-    _endpoint_update_body,
-    _parse_su_resource_id,
-    _parse_dps_resource_id,
+from azext_iot.adr.providers.link import LinkProvider
+from azext_iot.adr.providers.link_helpers import (
+    endpoint_update_body as _endpoint_update_body,
+    parse_dps_resource_id as _parse_dps_resource_id,
+    parse_hub_resource_id as _parse_hub_resource_id,
+    parse_su_resource_id as _parse_su_resource_id,
 )
 
 
@@ -64,6 +68,26 @@ def _endpoint(endpoint_type, resource_id, **extra):
     }
 
 
+def _http_error(status_code):
+    error = HttpResponseError(message=f"HTTP {status_code}")
+    error.status_code = status_code
+    return error
+
+
+def test_link_provider_reuses_injected_namespace_client(mocker):
+    fallback_factory = mocker.patch(
+        "azext_iot.adr.providers.base.adr_service_factory"
+    )
+    cmd = Mock(cli_ctx=Mock())
+    namespace_client = Mock()
+
+    provider = LinkProvider(cmd, client=namespace_client)
+
+    assert provider.cmd is cmd
+    assert provider.client is namespace_client
+    fallback_factory.assert_not_called()
+
+
 def test_identity_body_treats_whitespace_uami_as_unset():
     assert (
         build_mi_body(
@@ -83,6 +107,17 @@ def test_su_contract_uses_update_instances():
         "resource_group_name": "rg",
         "name": "su",
     }
+
+
+def test_hub_parser_accepts_only_iothub_resource_ids():
+    assert _parse_hub_resource_id(HUB_ID) == {
+        "subscription_id": "sub",
+        "resource_group_name": "rg",
+        "name": "hub",
+    }
+    for resource_id in ("", "hub", DPS_ID, f"{HUB_ID}/certificates/cert"):
+        with pytest.raises(InvalidArgumentValueError):
+            _parse_hub_resource_id(resource_id)
 
 
 @pytest.mark.parametrize(
@@ -188,11 +223,27 @@ def test_hub_add_allows_no_inbound_identity(
 def test_hub_add_requires_dps_first(fixture_link_provider):
     fixture_link_provider.client.namespaces.get.return_value = _namespace()
 
-    with pytest.raises(ArgumentUsageError, match="Link a DPS"):
+    with pytest.raises(ArgumentUsageError, match="DPS link is required"):
         fixture_link_provider.hub_add(
             "hub-endpoint", "namespace", "rg", HUB_ID
         )
     fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+def test_hub_add_rejects_eleventh_hub_before_preflight(fixture_link_provider):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)},
+        hubs={
+            f"hub-{index}": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID)
+            for index in range(10)
+        },
+    )
+
+    with pytest.raises(ArgumentUsageError, match="maximum of 10"):
+        fixture_link_provider.hub_add(
+            "hub-11", "namespace", "rg", HUB_ID
+        )
+    fixture_link_provider._preflight_link.assert_not_called()
 
 
 def test_hub_update_surface_is_identity_only():
@@ -201,7 +252,7 @@ def test_hub_update_surface_is_identity_only():
     assert "allocation_weight" not in parameters
 
 
-def test_hub_update_rotates_identity_and_drops_provisioning(
+def test_hub_update_rotates_identity_and_preserves_provisioning(
     fixture_link_provider, mock_poller
 ):
     existing = _endpoint(
@@ -235,9 +286,118 @@ def test_hub_update_rotates_identity_and_drops_provisioning(
             "type": "UserAssigned",
             "userAssignedIdentity": UAMI_ID,
         },
+        "provisioning": {
+            "availability": "Available",
+            "allocationWeight": 50,
+        },
     }
-    assert "provisioning" not in endpoint
     assert "serviceAddress" not in endpoint
+
+
+@pytest.mark.parametrize("linking_state", ["Failed", "fAiLeD"])
+def test_failed_hub_update_without_dps_is_rejected(
+    fixture_link_provider, linking_state
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        hubs={
+            "hub-endpoint": _endpoint(
+                IOT_HUB_ENDPOINT_TYPE,
+                HUB_ID,
+                linkingState=linking_state,
+            )
+        }
+    )
+
+    with pytest.raises(
+        ArgumentUsageError,
+        match="before adding a new Hub or retrying a failed Hub",
+    ):
+        fixture_link_provider.hub_update(
+            "hub-endpoint",
+            "namespace",
+            "rg",
+            mi_system_assigned=True,
+        )
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+def test_failed_hub_update_with_dps_is_allowed(
+    fixture_link_provider, mock_poller
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        hubs={
+            "hub-endpoint": _endpoint(
+                IOT_HUB_ENDPOINT_TYPE,
+                HUB_ID,
+                linkingState="Failed",
+            )
+        },
+        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)},
+    )
+    fixture_link_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({})
+    )
+
+    fixture_link_provider.hub_update(
+        "hub-endpoint",
+        "namespace",
+        "rg",
+        mi_system_assigned=True,
+    )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_called_once()
+
+
+def test_succeeded_hub_update_without_dps_is_allowed(
+    fixture_link_provider, mock_poller
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        hubs={
+            "hub-endpoint": _endpoint(
+                IOT_HUB_ENDPOINT_TYPE,
+                HUB_ID,
+                linkingState="Succeeded",
+            )
+        }
+    )
+    fixture_link_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({})
+    )
+
+    fixture_link_provider.hub_update(
+        "hub-endpoint",
+        "namespace",
+        "rg",
+        mi_system_assigned=True,
+    )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_called_once()
+
+
+def test_non_failed_hub_update_without_dps_is_not_over_gated(
+    fixture_link_provider, mock_poller
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        hubs={
+            "hub-endpoint": _endpoint(
+                IOT_HUB_ENDPOINT_TYPE,
+                HUB_ID,
+                linkingState="Pending",
+            )
+        }
+    )
+    fixture_link_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({})
+    )
+
+    fixture_link_provider.hub_update(
+        "hub-endpoint",
+        "namespace",
+        "rg",
+        mi_system_assigned=True,
+    )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -350,21 +510,41 @@ def test_list_all_reads_the_namespace_once(fixture_link_provider):
         ("su", "su", SU_ENDPOINT_TYPE, SU_ID),
     ],
 )
-def test_list_keeps_legacy_endpoint_without_type(
+def test_list_all_matches_typed_endpoint_lists(
     fixture_link_provider, kind, section, expected_type, resource_id
 ):
-    """The section identifies the type; older records did not always repeat it."""
+    endpoint = _endpoint(expected_type.lower(), resource_id)
     fixture_link_provider.client.namespaces.get.return_value = _namespace(
-        **{section: {"legacy": {"resourceId": resource_id}}}
+        **{
+            section: {
+                "current": endpoint,
+                "legacy": {"resourceId": resource_id},
+                "future": _endpoint("Future.Type/endpoints", "/future"),
+                "empty": None,
+            }
+        }
     )
 
-    assert getattr(fixture_link_provider, f"{kind}_list")("namespace", "rg") == [
-        {
-            "name": "legacy",
-            "resourceId": resource_id,
-            "endpointType": expected_type,
-        }
-    ]
+    expected = [{"name": "current", **endpoint}]
+    assert getattr(fixture_link_provider, f"{kind}_list")("namespace", "rg") == expected
+    assert fixture_link_provider.list_all("namespace", "rg") == expected
+
+
+@pytest.mark.parametrize("namespace", [None, {}, _namespace()])
+def test_list_all_empty_is_list(fixture_link_provider, namespace):
+    fixture_link_provider.client.namespaces.get.return_value = namespace
+
+    assert fixture_link_provider.list_all("namespace", "rg") == []
+
+
+def test_list_all_propagates_namespace_failure(fixture_link_provider):
+    failure = _http_error(403)
+    fixture_link_provider.client.namespaces.get.side_effect = failure
+
+    with pytest.raises(HttpResponseError) as error:
+        fixture_link_provider.list_all("namespace", "rg")
+
+    assert error.value is failure
 
 
 def test_dps_add_uses_update_body(fixture_link_provider, mock_poller):
@@ -426,6 +606,7 @@ def test_dps_add_rejects_second_endpoint(fixture_link_provider):
             DPS_ID,
             mi_system_assigned=True,
         )
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_dps_update_show_and_list_named_objects(
@@ -443,7 +624,7 @@ def test_dps_update_show_and_list_named_objects(
         {}
     )
     dps_client = mocker.patch(
-        "azext_iot.adr.providers.link.iot_service_provisioning_factory"
+        "azext_iot.adr.providers.link.adr_iot_service_provisioning_factory"
     ).return_value.iot_dps_resource
     dps_client.get.return_value = {
         "properties": {"iotHubs": [{"name": "brownfield"}]}
@@ -550,7 +731,7 @@ def test_dps_show_enrichment_failure_is_non_fatal(
         dps={"primary": _endpoint(DPS_ENDPOINT_TYPE, resource_id)}
     )
     mocker.patch(
-        "azext_iot.adr.providers.link.iot_service_provisioning_factory",
+        "azext_iot.adr.providers.link.adr_iot_service_provisioning_factory",
         side_effect=RuntimeError("unavailable"),
     )
 
@@ -610,6 +791,96 @@ def test_su_add_rejects_duplicate_name(fixture_link_provider):
         )
 
 
+@pytest.mark.parametrize(
+    "endpoint_type,linking_state",
+    [
+        (SU_ENDPOINT_TYPE, "Succeeded"),
+        (SU_ENDPOINT_TYPE, "Failed"),
+        (SU_ENDPOINT_TYPE.swapcase(), "Succeeded"),
+    ],
+)
+def test_su_add_rejects_existing_su_regardless_of_name_state_or_type_casing(
+    fixture_link_provider, endpoint_type, linking_state
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        su={
+            "existing": _endpoint(
+                endpoint_type,
+                SU_ID.upper(),
+                linkingState=linking_state,
+            )
+        }
+    )
+
+    with pytest.raises(
+        ArgumentUsageError,
+        match="only one may be linked per namespace",
+    ):
+        fixture_link_provider.su_add(
+            "different-name",
+            "namespace",
+            "rg",
+            SU_ID,
+            mi_system_assigned=True,
+        )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+def test_su_add_ignores_non_su_updating_endpoint(
+    fixture_link_provider, mock_poller
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        su={
+            "future": _endpoint(
+                "Microsoft.Future/updatingEndpoints",
+                "/subscriptions/sub/resourceGroups/rg/providers/"
+                "Microsoft.Future/updatingEndpoints/future",
+                linkingState="Failed",
+            ),
+            "malformed-service-value": {"endpointType": 1},
+        }
+    )
+    fixture_link_provider.client.namespaces.begin_update.return_value = mock_poller(
+        {}
+    )
+
+    fixture_link_provider.su_add(
+        "su-endpoint",
+        "namespace",
+        "rg",
+        SU_ID,
+        mi_system_assigned=True,
+    )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_called_once()
+
+
+def test_su_add_rejects_same_name_non_su_updating_endpoint(
+    fixture_link_provider
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        su={
+            "same-name": _endpoint(
+                "Microsoft.Future/updatingEndpoints",
+                "/subscriptions/sub/resourceGroups/rg/providers/"
+                "Microsoft.Future/updatingEndpoints/future",
+            )
+        }
+    )
+
+    with pytest.raises(ArgumentUsageError, match="cannot be overwritten"):
+        fixture_link_provider.su_add(
+            "same-name",
+            "namespace",
+            "rg",
+            SU_ID,
+            mi_system_assigned=True,
+        )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
 def test_su_update_show_and_list_named_objects(
     fixture_link_provider, mock_poller
 ):
@@ -647,6 +918,134 @@ def test_su_update_show_and_list_named_objects(
     assert fixture_link_provider.su_list("namespace", "rg") == [
         {"name": "primary", **endpoint}
     ]
+
+
+@pytest.mark.parametrize(
+    "kind,section,endpoint_type,resource_id,display_name,operation_group,name_parameter",
+    [
+        (
+            "hub",
+            "hubs",
+            IOT_HUB_ENDPOINT_TYPE,
+            HUB_ID,
+            "IoT Hub",
+            "iot_hub_resource",
+            "resource_name",
+        ),
+        (
+            "dps",
+            "dps",
+            DPS_ENDPOINT_TYPE,
+            DPS_ID,
+            "DPS",
+            "iot_dps_resource",
+            "provisioning_service_name",
+        ),
+        (
+            "su",
+            "su",
+            SU_ENDPOINT_TYPE,
+            SU_ID,
+            "Software Updates instance",
+            "update_instances",
+            "update_instance_name",
+        ),
+    ],
+)
+def test_link_update_repeats_add_preflight_before_namespace_patch(
+    fixture_link_provider,
+    mock_poller,
+    kind,
+    section,
+    endpoint_type,
+    resource_id,
+    display_name,
+    operation_group,
+    name_parameter,
+):
+    endpoint = _endpoint(endpoint_type, resource_id)
+    namespace = _namespace(**{section: {"primary": endpoint}})
+    fixture_link_provider.client.namespaces.get.return_value = namespace
+    fixture_link_provider.client.namespaces.begin_update.return_value = mock_poller(
+        {}
+    )
+
+    getattr(fixture_link_provider, f"{kind}_update")(
+        "primary", "namespace", "rg", mi_system_assigned=True
+    )
+
+    preflight = fixture_link_provider._preflight_link.call_args
+    assert preflight.kwargs["link_type"] == kind
+    assert preflight.kwargs["namespace"] == namespace
+    assert preflight.kwargs["target_resource_id"] == resource_id
+    assert preflight.kwargs["inbound_identity"] == {
+        "type": "SystemAssigned"
+    }
+    strategy = preflight.kwargs["strategy"]
+    assert strategy.operation_group_name == operation_group
+    assert strategy.name_parameter == name_parameter
+    assert strategy.display_name == display_name
+    assert strategy.require_standard_hub is (
+        kind == "hub"
+    )
+
+
+@pytest.mark.parametrize(
+    "kind,section,endpoint_type,resource_id",
+    [
+        ("hub", "hubs", IOT_HUB_ENDPOINT_TYPE, HUB_ID),
+        ("dps", "dps", DPS_ENDPOINT_TYPE, DPS_ID),
+        ("su", "su", SU_ENDPOINT_TYPE, SU_ID),
+    ],
+)
+def test_link_update_preflight_failure_prevents_namespace_patch(
+    fixture_link_provider,
+    kind,
+    section,
+    endpoint_type,
+    resource_id,
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        **{section: {"primary": _endpoint(endpoint_type, resource_id)}}
+    )
+    fixture_link_provider._preflight_link.side_effect = AzureResponseError(
+        "RBAC assignments are not visible"
+    )
+
+    with pytest.raises(AzureResponseError, match="not visible"):
+        getattr(fixture_link_provider, f"{kind}_update")(
+            "primary", "namespace", "rg", mi_system_assigned=True
+        )
+
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "kind,section,wrong_type,resource_id",
+    [
+        ("hub", "hubs", DPS_ENDPOINT_TYPE, HUB_ID),
+        ("dps", "dps", IOT_HUB_ENDPOINT_TYPE, DPS_ID),
+        ("su", "su", DPS_ENDPOINT_TYPE, SU_ID),
+    ],
+)
+def test_link_update_rejects_same_name_endpoint_of_wrong_type(
+    fixture_link_provider,
+    kind,
+    section,
+    wrong_type,
+    resource_id,
+):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        **{section: {"primary": _endpoint(wrong_type, resource_id)}}
+    )
+
+    with pytest.raises(ResourceNotFoundError):
+        getattr(fixture_link_provider, f"{kind}_update")(
+            "primary", "namespace", "rg", mi_system_assigned=True
+        )
+
+    fixture_link_provider._preflight_link.assert_not_called()
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
@@ -724,6 +1123,10 @@ def test_link_mutation_supports_no_wait(fixture_link_provider, mock_poller):
     poller.result.assert_not_called()
 
 
-def test_remove_provider_methods_are_absent():
-    for method in ("hub_remove", "dps_remove", "su_remove"):
+def test_remove_provider_methods_are_absent(fixture_link_provider):
+    for method in (
+        "hub_remove", "dps_remove", "su_remove", "hub_delete", "dps_delete", "su_delete",
+        "_delete_link", "_wait_for_linked_resource_deleted",
+    ):
         assert not hasattr(LinkProvider, method)
+        assert not hasattr(fixture_link_provider, method)

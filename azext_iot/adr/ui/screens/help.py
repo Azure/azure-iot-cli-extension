@@ -37,7 +37,7 @@ GLOBAL_KEYS: Sequence[Tuple[str, str]] = (
 #: opens help while stuck on a multi-select step is told nothing useful.
 SETUP_KEYS: Sequence[Tuple[str, str]] = (
     ("enter", "choose the highlighted resource"),
-    ("space", "also toggles a Hub or update-instance selection"),
+    ("space", "also toggles a Hub selection; Software Updates allows one instance"),
     ("d", "done with this step - move to the next one"),
     ("n", "create a new resource for this step"),
     ("j", "show JSON for the highlighted candidate"),

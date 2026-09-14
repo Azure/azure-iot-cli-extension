@@ -11,6 +11,7 @@ from azext_iot.adr.providers.link import LinkProvider
 
 def adr_link_hub_add(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -21,7 +22,7 @@ def adr_link_hub_add(
     allocation_weight: Optional[int] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.hub_add(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -37,6 +38,7 @@ def adr_link_hub_add(
 
 def adr_link_hub_update(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -44,7 +46,7 @@ def adr_link_hub_update(
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.hub_update(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -55,8 +57,14 @@ def adr_link_hub_update(
     )
 
 
-def adr_link_hub_show(cmd, endpoint_name: str, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_hub_show(
+    cmd,
+    client,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.hub_show(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -64,8 +72,13 @@ def adr_link_hub_show(cmd, endpoint_name: str, namespace_name: str, resource_gro
     )
 
 
-def adr_link_hub_list(cmd, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_hub_list(
+    cmd,
+    client,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.hub_list(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
@@ -77,6 +90,7 @@ def adr_link_hub_list(cmd, namespace_name: str, resource_group_name: str):
 
 def adr_link_dps_add(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -85,7 +99,7 @@ def adr_link_dps_add(
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.dps_add(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -99,6 +113,7 @@ def adr_link_dps_add(
 
 def adr_link_dps_update(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -106,7 +121,7 @@ def adr_link_dps_update(
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.dps_update(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -117,8 +132,14 @@ def adr_link_dps_update(
     )
 
 
-def adr_link_dps_show(cmd, endpoint_name: str, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_dps_show(
+    cmd,
+    client,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.dps_show(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -126,8 +147,13 @@ def adr_link_dps_show(cmd, endpoint_name: str, namespace_name: str, resource_gro
     )
 
 
-def adr_link_dps_list(cmd, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_dps_list(
+    cmd,
+    client,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.dps_list(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
@@ -139,6 +165,7 @@ def adr_link_dps_list(cmd, namespace_name: str, resource_group_name: str):
 
 def adr_link_su_add(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -147,7 +174,7 @@ def adr_link_su_add(
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.su_add(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -161,6 +188,7 @@ def adr_link_su_add(
 
 def adr_link_su_update(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -168,7 +196,7 @@ def adr_link_su_update(
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.su_update(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -179,8 +207,14 @@ def adr_link_su_update(
     )
 
 
-def adr_link_su_show(cmd, endpoint_name: str, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_su_show(
+    cmd,
+    client,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.su_show(
         endpoint_name=endpoint_name,
         namespace_name=namespace_name,
@@ -188,8 +222,13 @@ def adr_link_su_show(cmd, endpoint_name: str, namespace_name: str, resource_grou
     )
 
 
-def adr_link_su_list(cmd, namespace_name: str, resource_group_name: str):
-    provider = LinkProvider(cmd)
+def adr_link_su_list(
+    cmd,
+    client,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    provider = LinkProvider(cmd, client=client)
     return provider.su_list(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
@@ -201,6 +240,7 @@ def adr_link_su_list(cmd, namespace_name: str, resource_group_name: str):
 
 def adr_link_add(
     cmd,
+    client,
     namespace_name: str,
     resource_group_name: str,
     hub_endpoint_name: str,
@@ -215,7 +255,7 @@ def adr_link_add(
     hub_allocation_weight: Optional[int] = None,
     no_wait: bool = False,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return provider.link_add(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,

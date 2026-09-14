@@ -36,6 +36,12 @@ def test_load_core_commands():
     load_core_commands(MagicMock(), None)
 
 
+def test_load_root_hub_and_dps_data_commands():
+    from azext_iot.commands import load_command_table
+
+    load_command_table(MagicMock(), None)
+
+
 def test_load_core_arguments():
     load_core_arguments(MagicMock(), None)
 

@@ -114,7 +114,6 @@ class BrowseScreen(ChromeScreen):
         readable = {
             "namespace_name": "a namespace",
             "resource_group_name": "a resource group",
-            "registry_device_name": "a device",
             "group_name": "a group",
             "job_name": "a job",
             "certificate_authority_name": "a certificate authority",

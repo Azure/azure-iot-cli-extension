@@ -44,7 +44,7 @@ def test_job_run_list_by_job(fixture_job_run_provider):
         namespace_name="namespace",
         job_name="job",
     )
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_not_called()
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_not_called()
 
 
 def test_job_run_list_by_job_with_filter(fixture_job_run_provider):
@@ -84,7 +84,7 @@ def test_job_run_list_by_job_with_order_by(fixture_job_run_provider):
 
 
 def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter(
         [{"name": "one"}]
     )
 
@@ -95,7 +95,7 @@ def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
     )
 
     assert result == [{"name": "one"}]
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_called_once_with(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         filter="status eq 'Active'",
@@ -104,7 +104,7 @@ def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
 
 
 def test_job_run_list_by_namespace_with_order_by(fixture_job_run_provider):
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter([])
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter([])
 
     fixture_job_run_provider.list(
         "namespace",
@@ -112,7 +112,7 @@ def test_job_run_list_by_namespace_with_order_by(fixture_job_run_provider):
         order_by="status asc",
     )
 
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_called_once_with(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         order_by="status asc",
@@ -143,16 +143,16 @@ def test_job_run_list_wrapper_forwards_order_by(mocker):
     )
 
 
-def test_job_run_list_accepts_status_equality_or(fixture_job_run_provider):
-    status_filter = "status eq 'Active' or status eq 'Scheduled'"
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter([])
+def test_job_run_list_accepts_status_in(fixture_job_run_provider):
+    status_filter = "status in ('Active', 'Scheduled')"
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter([])
 
     fixture_job_run_provider.list(
         "namespace", "rg", status_filter=status_filter
     )
 
     assert (
-        fixture_job_run_provider.client.job_runs.list_by_namespace.call_args.kwargs[
+        fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.call_args.kwargs[
             "filter"
         ]
         == status_filter
@@ -164,6 +164,10 @@ def test_job_run_list_accepts_status_equality_or(fixture_job_run_provider):
     [
         "status ne 'Canceled'",
         "status eq 'Unknown'",
+        "status eq 'Queued'",
+        "status eq 'Active' or status eq 'Scheduled'",
+        "status in ()",
+        "status in ('Active', Scheduled)",
         "name eq 'Active'",
     ],
 )
@@ -218,11 +222,49 @@ def test_job_run_results_posts_filter_body(fixture_job_run_provider):
     )
 
 
+def test_job_run_results_posts_order_by(fixture_job_run_provider):
+    fixture_job_run_provider.client.job_runs.list_results.return_value = {
+        "value": [],
+        "skipToken": None,
+    }
+
+    list(
+        fixture_job_run_provider.results(
+            "job",
+            "run",
+            "namespace",
+            "rg",
+            order_by="status desc",
+        )
+    )
+
+    assert (
+        fixture_job_run_provider.client.job_runs.list_results.call_args.kwargs["body"]
+        == {"orderBy": "status desc"}
+    )
+
+
+def test_job_run_results_rejects_unsupported_order_by(fixture_job_run_provider):
+    with pytest.raises(InvalidArgumentValueError):
+        list(
+            fixture_job_run_provider.results(
+                "job",
+                "run",
+                "namespace",
+                "rg",
+                order_by="createdTime desc",
+            )
+        )
+    fixture_job_run_provider.client.job_runs.list_results.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "status_filter",
     [
         "status ne 'Failed'",
         "status eq 'Unknown'",
+        "status eq 'NotApplied'",
+        "status in ('Failed', 'Canceled')",
         "status eq 'Failed' or status eq 'Canceled'",
     ],
 )
@@ -265,6 +307,7 @@ def test_job_run_results_posts_each_page_with_skip_token(
             "namespace",
             "rg",
             status_filter="status eq 'Failed'",
+            order_by="status asc",
         )
     )
 
@@ -273,13 +316,18 @@ def test_job_run_results_posts_each_page_with_skip_token(
         call.kwargs["body"]
         for call in fixture_job_run_provider.client.job_runs.list_results.call_args_list
     ] == [
-        {"filter": "status eq 'Failed'"},
         {
             "filter": "status eq 'Failed'",
+            "orderBy": "status asc",
+        },
+        {
+            "filter": "status eq 'Failed'",
+            "orderBy": "status asc",
             "skipToken": "token-1",
         },
         {
             "filter": "status eq 'Failed'",
+            "orderBy": "status asc",
             "skipToken": "token-2",
         },
     ]
@@ -349,15 +397,16 @@ def test_job_run_results_rejects_repeated_skip_token(fixture_job_run_provider):
 
 
 def test_job_run_cancel_waits_for_lro(fixture_job_run_provider, mock_poller):
-    fixture_job_run_provider.client.job_runs.begin_cancel.return_value = mock_poller(
-        {"status": "Canceled"}
-    )
+    # The generated SDK returns LROPoller[None], not an execution status.
+    poller = mock_poller(None)
+    poller.result.return_value = None
+    fixture_job_run_provider.client.job_runs.begin_cancel.return_value = poller
 
     result = fixture_job_run_provider.cancel(
         "job", "run", "namespace", "rg"
     )
 
-    assert result == {"status": "Canceled"}
+    assert result is None
     fixture_job_run_provider.client.job_runs.begin_cancel.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
@@ -416,8 +465,26 @@ def test_job_run_create_generates_run_name(fixture_job_run_provider, mock_poller
     )
 
     kwargs = fixture_job_run_provider.client.job_runs.begin_create_or_replace.call_args.kwargs
-    assert re.fullmatch(r"run-\d{14}", kwargs["run_name"])
+    assert re.fullmatch(r"run-\d{14}-[0-9a-f]{8}", kwargs["run_name"])
     assert kwargs["resource"] == {"properties": {}}
+
+
+def test_job_run_create_same_second_uses_distinct_names(fixture_job_run_provider, mock_poller, mocker):
+    clock = mocker.patch("azext_iot.adr.providers.job_run.datetime")
+    clock.now.return_value.strftime.return_value = "20260914080000"
+    mocker.patch(
+        "azext_iot.adr.providers.job_run.uuid4",
+        side_effect=[Mock(hex="a" * 32), Mock(hex="b" * 32)],
+    )
+    create = fixture_job_run_provider.client.job_runs.begin_create_or_replace
+    create.return_value = mock_poller({})
+
+    for _ in range(2):
+        fixture_job_run_provider.create("job", "namespace", "rg")
+
+    names = [call.kwargs["run_name"] for call in create.call_args_list]
+    assert len(names) == len(set(names)) == 2
+    assert names == ["run-20260914080000-aaaaaaaa", "run-20260914080000-bbbbbbbb"]
 
 
 @pytest.mark.parametrize(

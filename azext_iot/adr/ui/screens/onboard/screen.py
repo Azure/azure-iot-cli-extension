@@ -68,7 +68,9 @@ from azext_iot.adr.ui.screens.onboard.identity import (
     system_choice,
 )
 from azext_iot.adr.ui.screens.onboard.identity_dialog import IdentityChoiceDialog
-from azext_iot.adr.ui.screens.onboard.steps import build_flow
+from azext_iot.adr.ui.screens.onboard.steps import (
+    build_flow, namespace_location, reconcile_software_updates_creation, software_updates_error,
+)
 from azext_iot.adr.ui.theme import style_for
 from azext_iot.adr.ui.widgets.tray import CommandPreviewDialog
 
@@ -89,13 +91,12 @@ _CREATABLE = {
 #: step id -> context key holding the chosen existing resource
 _SELECTABLE = {"dps": "selected_dps", "hub": "selected_hubs", "su": "selected_sus"}
 
-#: Steps where several resources may be chosen. A namespace accepts many messaging and
-#: many updating endpoints, but exactly one DPS endpoint - so DPS is not here.
-_MULTI_SELECT = {"hub": "IoT Hub", "su": "update instance"}
+#: Only messaging endpoints allow multiple targets. DPS and Software Updates allow one.
+_MULTI_SELECT = {"hub": "IoT Hub"}
 
 #: How many chosen names the rail spells out before it summarises the rest.
 _RAIL_CHOICE_LIMIT = 10
-_HUB_SKUS = {"F1", "B1", "B2", "B3", "S1", "S2", "S3"}
+_HUB_SKUS = {"S1", "S2", "S3"}
 #: Shown when a picker finds nothing. An empty table with no explanation reads as a
 #: broken product; every one of these ends with the action that moves the customer on.
 _EMPTY_GUIDANCE = {
@@ -312,7 +313,7 @@ class OnboardScreen(ChromeScreen):
                         yield Label("SKU", classes="form-label")
                         yield SetupFormInput(
                             id="create-sku",
-                            placeholder="S1, S2, S3, B1, B2, B3, or F1",
+                            placeholder="S1, S2, or S3",
                         )
                     with Horizontal(classes="form-field", id="create-capacity-row"):
                         yield Label("Units", classes="form-label")
@@ -414,8 +415,6 @@ class OnboardScreen(ChromeScreen):
         )
 
     def _permission_requirements(self):
-        from azext_iot.adr.ui.core.rbac import ROLE_WRITE_ACTION
-
         subscription = self.context.get("subscription_id") or ""
         subscription_scope = f"/subscriptions/{subscription}"
         requirements = {}
@@ -434,12 +433,10 @@ class OnboardScreen(ChromeScreen):
                 return subscription_scope
             return group_scope(group)
 
-        def require(scope, *actions, role_write=False):
-            if not scope:
+        def require(scope, *actions):
+            if not scope or not actions:
                 return
             requirements.setdefault(scope, set()).update(actions)
-            if role_write:
-                requirements[scope].add(ROLE_WRITE_ACTION)
 
         namespace_group = self.context.get("resource_group_name")
         namespace_scope = (
@@ -451,10 +448,7 @@ class OnboardScreen(ChromeScreen):
         require(
             namespace_scope if namespace_exists else parent_scope(namespace_group),
             "Microsoft.DeviceRegistry/namespaces/write",
-            role_write=not namespace_exists,
         )
-        if namespace_exists:
-            require(namespace_scope, role_write=True)
 
         for kind, key, action in (
             ("dps", "selected_dps", "Microsoft.Devices/provisioningServices/write"),
@@ -482,14 +476,12 @@ class OnboardScreen(ChromeScreen):
                 require(
                     resource.resource_id,
                     *((action,) if not identity_ready else ()),
-                    role_write=True,
                 )
             request = self.context.get(f"create_{kind}")
             if request is not None:
                 require(
                     parent_scope(request.resource_group_name),
                     action,
-                    role_write=True,
                 )
         identity_choices = list(
             (self.context.get("identity_choices") or {}).values()
@@ -524,33 +516,22 @@ class OnboardScreen(ChromeScreen):
         return requirements
 
     def _read_grant_rights(self, signature, requirements) -> None:
-        from azext_iot.adr.ui.core.rbac import (
-            ROLE_WRITE_ACTION,
-            permissions_at_scope,
-        )
+        from azext_iot.adr.ui.core.rbac import permissions_at_scope
 
         matrix = {}
         for scope, actions in requirements.items():
             matrix[scope] = permissions_at_scope(
                 self.session, scope, sorted(actions)
             )
-        role_ready = all(
-            matrix.get(scope) is not None
-            and matrix[scope].get(ROLE_WRITE_ACTION) is True
-            for scope, actions in requirements.items()
-            if ROLE_WRITE_ACTION in actions
-        )
         write_ready = bool(matrix) and all(
             result is not None
-            and all(allowed for action, allowed in result.items()
-                    if action != ROLE_WRITE_ACTION)
+            and all(result.values())
             for result in matrix.values()
         )
         self.app.call_from_thread(
             self._grant_rights_read,
             signature,
             matrix,
-            role_ready,
             write_ready,
         )
 
@@ -558,14 +539,12 @@ class OnboardScreen(ChromeScreen):
         self,
         signature,
         matrix,
-        role_ready: bool,
         write_ready: bool,
     ) -> None:
         if self.context.get("_grant_probe_for") != signature:
             return
         self.context["permission_checking"] = False
         self.context["permission_matrix"] = matrix
-        self.context["can_grant_roles"] = role_ready
         self.context["can_write_resources"] = write_ready
         self.refresh_view()
 
@@ -587,10 +566,6 @@ class OnboardScreen(ChromeScreen):
             return
         plan = self.flow.build_plan()
         runnable = [item for item in plan if item.invoke is not None]
-        manual = [item for item in plan if item.action == "manual"]
-        manual_grants = [
-            item for item in manual if item.key != "grant-propagation"
-        ]
         blocked = [item for item in plan if item.action == "blocked"]
         visible_changes = [
             item
@@ -599,7 +574,7 @@ class OnboardScreen(ChromeScreen):
             and item.key != "grant-propagation"
         ]
 
-        if not runnable and not manual:
+        if not runnable and not blocked:
             text.append(
                 "READY\n",
                 style=f"bold {self._style(STYLE_ACTIVE)}",
@@ -608,7 +583,7 @@ class OnboardScreen(ChromeScreen):
             text.append("\nNEXT  Escape returns to browsing.\n", style="bold")
             return
 
-        heading = "PLANNED AFTER ACCESS" if manual else "CHANGES"
+        heading = "CHANGES"
         text.append(f"{heading}\n", style=f"bold {self._style(STYLE_ACTIVE)}")
         text.append(
             f"{len(runnable)} operations"
@@ -621,18 +596,17 @@ class OnboardScreen(ChromeScreen):
         if len(visible_changes) > 6:
             text.append(f"  \u2022 {len(visible_changes) - 6} more; press p for details\n")
 
-        if manual:
+        required = [item for item in plan if item.action == "required"]
+        if required:
+            text.append("\nREQUIRED SERVICE ROLES\n", style="bold")
+            for item in required:
+                text.append(f"  \u2022 {item.description}\n")
+                text.append(f"    Scope: {item.target}\n", style="dim")
             text.append(
-                "\nNEEDS ADMIN ACCESS\n",
-                style=f"bold {self._style(STYLE_WARN)}",
+                "Existing inherited assignments are reused. Only missing assignments "
+                "require inherited Owner or User Access Administrator. All missing scopes "
+                "are authorized before any role is granted; base preflight waits for visibility.\n"
             )
-            text.append(
-                f"{len(manual_grants)} role grants cannot be created by this account.\n"
-                "Activate Owner/User Access Administrator and press r. If another "
-                "administrator will grant access, press x to copy the runnable script "
-                "and send it to them.\n"
-            )
-
         if blocked:
             text.append(
                 "\nBLOCKED\n",
@@ -644,9 +618,6 @@ class OnboardScreen(ChromeScreen):
         text.append("\nNEXT\n", style=f"bold {self._style(STYLE_ACTIVE)}")
         if blocked:
             text.append("Return to the highlighted step and resolve it before running.\n")
-        elif manual:
-            text.append("x Copy admin script  \u00b7  r Recheck access  \u00b7  "
-                        "p Full details\n")
         else:
             text.append("a Run setup  \u00b7  p Full details  \u00b7  x Copy script\n",
                         style="bold")
@@ -674,7 +645,7 @@ class OnboardScreen(ChromeScreen):
                 f"{chosen.name} · "
                 f"{self._identity_indicator('dps', chosen.resource_id)}"
             ] if chosen is not None else []
-        if step_id in _MULTI_SELECT:
+        if step_id in ("hub", "su"):
             chosen = self.context.get(_SELECTABLE[step_id]) or []
             names = [
                 f"{item.name} · "
@@ -983,17 +954,16 @@ class OnboardScreen(ChromeScreen):
                         "one; d finishes. A missing identity can be enabled during setup.\n",
                         style="dim")
         elif step.id == "su":
-            text.append("Optional. Links Software Updates instances so this namespace can "
-                        "run update jobs. Enter selects; i chooses SAMI or UAMI for the "
-                        "highlighted instance; n creates one; d finishes or skips.\n",
+            text.append("Optional. At most one Software Updates instance, including existing "
+                        "links and planned creation. Enter chooses or clears a selection; "
+                        "i chooses SAMI or UAMI; n creates one; d skips. An existing link "
+                        "can change inbound identity only, not its target.\n",
                         style="dim")
         elif step.id == "permissions":
             text.append(
-                "Linking only works if the namespace and the linked resource can call each "
-                "other, which needs two role assignments per resource:\n"
-                "  the namespace identity -> Contributor on the DPS/Hub "
-                "(plus IoT Hub Data Contributor on a Hub)\n"
-                "  the DPS/Hub identity   -> Contributor on the namespace\n",
+                "The full plan lists every required service role from the ADR link policy, "
+                "including Software Updates' Device Update Administrator and first-party "
+                "Contributor requirements.\n",
                 style="dim",
             )
             text.append(self._grant_rights_note(), style="dim")
@@ -1013,27 +983,20 @@ class OnboardScreen(ChromeScreen):
         self._render_command_hint(step)
 
     def _grant_rights_note(self) -> str:
-        """Say plainly whether radr will make the grants, and if not, why not."""
+        """Resource-write checks are separate from base service-role preflight."""
         if self.context.get("permission_checking"):
-            return "radr is checking resource and role access at every involved scope...\n"
-        verdict = self.context.get("can_grant_roles")
+            return "radr is checking resource-write access at every involved scope...\n"
         writes = self.context.get("can_write_resources")
-        if verdict is True and writes is True:
-            return (
-                "Permission preflight passed at every involved resource group. "
-                "radr can make resource changes and role assignments.\n"
-            )
         if writes is False:
             return (
                 "Resource-write access is missing at one or more involved resource "
-                "groups. Owner, or Contributor plus User Access Administrator, is "
-                "the simplest supported permission model.\n"
+                "scopes. Obtain the displayed resource permissions and reload.\n"
             )
-        if verdict is False:
-            return ("Your account may not create role assignments here, so radr will list "
-                    "them instead. Activate Owner or User Access Administrator (PIM) and "
-                    "press r, or press x to copy a runnable admin script.\n")
-        return ("radr is checking whether your account may create role assignments...\n")
+        return (
+            "Service roles are checked by base link preflight at execution. Existing "
+            "inherited grants need no assignment-write access. Only missing grants require "
+            "Owner or User Access Administrator; failures include exact remediation commands.\n"
+        )
 
     def _pending_summary(self) -> str:
         parts = []
@@ -1176,7 +1139,7 @@ class OnboardScreen(ChromeScreen):
                     registered = self.catalog.registered_hub_names(dps.raw or {})
                 candidates = [
                     evaluate(resource, namespace_location=self._namespace_location(),
-                             registered_hub_names=registered)
+                             registered_hub_names=registered, require_standard_hub=True)
                     for resource in self.catalog.hubs()
                 ]
             elif step_id == "su":
@@ -1200,7 +1163,7 @@ class OnboardScreen(ChromeScreen):
         )
 
     def _namespace_location(self) -> Optional[str]:
-        return (self.context.get("namespace") or {}).get("location")
+        return namespace_location(self.context)
 
     def _visible_candidates(self) -> List:
         needle = (self._candidate_filter or "").strip().lower()
@@ -1524,7 +1487,7 @@ class OnboardScreen(ChromeScreen):
         if problem is None:
             problem = tags_problem
         if problem is None and kind == "hub" and sku not in _HUB_SKUS:
-            problem = "Hub SKU must be F1, B1, B2, B3, S1, S2, or S3"
+            problem = "ADR linking requires a Standard Hub SKU: S1, S2, or S3"
         if problem is None:
             problem = capacity_problem
         if problem:
@@ -1576,6 +1539,11 @@ class OnboardScreen(ChromeScreen):
         """Record a creation request. Nothing is created until apply."""
         if request is None:
             return
+        if step_id == "su":
+            reason = software_updates_error({**self.context, context_key: request})
+            if reason:
+                self.flash(reason, "warning")
+                return
         replacing = context_key in self.context
         self.context[context_key] = request
         if step_id == "scope":
@@ -1653,11 +1621,25 @@ class OnboardScreen(ChromeScreen):
                         request.resource_group_name = candidate.name
             self._advance(f"resource group {candidate.name}")
             return
-        if step.id == "dps":
+        if step.id in ("dps", "su"):
+            if step.id == "su":
+                if self._is_chosen(candidate):
+                    self.context["selected_sus"] = []
+                    remove_choice(self.context, "su", candidate.resource_id)
+                    self.flash(f"removed Software Updates selection {candidate.name}", "info")
+                    self.refresh_view()
+                    self._paint_candidates()
+                    return
+                reason = software_updates_error({
+                    **self.context, "selected_sus": [candidate], "create_su": None,
+                })
+                if reason:
+                    self.flash(reason, "warning")
+                    return
             self._prompt_candidate_identity(
                 step.id,
                 candidate,
-                get_choice(self.context, "dps", candidate.resource_id),
+                get_choice(self.context, step.id, candidate.resource_id),
             )
             return
         if step.id in _MULTI_SELECT:
@@ -1802,6 +1784,22 @@ class OnboardScreen(ChromeScreen):
     def _accept_candidate_identity(self, kind: str, candidate, choice) -> None:
         if choice is None:
             return
+        if kind == "su":
+            # Choosing an existing resource explicitly replaces the pending creation,
+            # as the creation pane advertises. Never retain both in the resulting plan.
+            reason = software_updates_error({
+                **self.context, "selected_sus": [candidate], "create_su": None,
+            })
+            if reason:
+                self.flash(reason, "warning")
+                return
+            for previous in self.context.get("selected_sus") or []:
+                remove_choice(self.context, "su", previous.resource_id)
+            self.context["selected_sus"] = [candidate]
+            self.context.pop("create_su", None)
+            set_choice(self.context, kind, choice, candidate.resource_id)
+            self._advance(f"Software Updates {candidate.name} · {choice.label}")
+            return
         set_choice(self.context, kind, choice, candidate.resource_id)
         if kind == "namespace":
             self.context["namespace_name"] = candidate.name
@@ -1931,42 +1929,10 @@ class OnboardScreen(ChromeScreen):
             return
         plan = self.flow.build_plan()
         runnable = [item for item in plan if item.invoke is not None]
-        manual = [item for item in plan if item.action == "manual"]
         blocked = [item for item in plan if item.action == "blocked"]
-        adu_consent = next(
-            (
-                item
-                for item in blocked
-                if item.key.startswith("grant-adu-fpa-")
-                and self.context.get("adu_fpa_confirmed") is not True
-            ),
-            None,
-        )
-        if adu_consent is not None:
-            self.app.push_screen(
-                CommandPreviewDialog(
-                    "Approve Software Updates service access",
-                    adu_consent.command,
-                    note=(
-                        "Software Updates linking currently requires Contributor for "
-                        "the Azure Device Update first-party service on this Update "
-                        "Instance. This grant is shown separately for explicit approval."
-                    ),
-                ),
-                self._adu_consent_result,
-            )
-            return
         if blocked:
             self.flash(
                 f"setup is blocked: {blocked[0].blocked_reason or blocked[0].description}",
-                "warning",
-            )
-            return
-        if manual:
-            self.flash(
-                "role grants need administrator access; press x to copy a runnable "
-                "script for an administrator, or activate Owner/User Access "
-                "Administrator and press r",
                 "warning",
             )
             return
@@ -1974,14 +1940,17 @@ class OnboardScreen(ChromeScreen):
             self.flash("nothing to apply - this namespace is already configured", "info")
             return
 
-        grants = sum(1 for item in runnable if item.key.startswith("grant-"))
+        requirements = [item for item in plan if item.action == "required"]
         note = f"{len(runnable)} operation(s) will run in order."
-        if grants:
+        if requirements:
             note += (
-                f" {grants} of them are role assignments radr will create for you, "
-                "because your account is allowed to."
+                " The displayed service roles will be checked, not blindly granted. "
+                "Only missing grants require Owner/User Access Administrator."
             )
-        preview = "\n".join(item.command for item in runnable)
+        preview = "\n".join(
+            [f"# {item.description}\n# Scope: {item.target}" for item in requirements]
+            + [item.command for item in runnable]
+        )
         self.app.push_screen(
             CommandPreviewDialog("Run setup", preview, note=note),
             lambda approved: self._start_apply(runnable) if approved else None,
@@ -1996,13 +1965,6 @@ class OnboardScreen(ChromeScreen):
                 on_complete=self._execution_finished,
             )
         )
-
-    def _adu_consent_result(self, approved: bool) -> None:
-        if not approved:
-            return
-        self.context["adu_fpa_confirmed"] = True
-        self.refresh_view()
-        self.action_apply()
 
     def _execution_finished(self, _succeeded: bool) -> None:
         self.action_reload()
@@ -2044,6 +2006,7 @@ class OnboardScreen(ChromeScreen):
 
     def _apply_namespace(self, namespace) -> None:
         self.context["namespace"] = namespace or {}
+        reconcile_software_updates_creation(self.context)
         if (
             namespace
             and "namespace"
@@ -2081,13 +2044,7 @@ class OnboardScreen(ChromeScreen):
         common question here - "will this create the role assignments or not?" - has a
         different answer depending on who is signed in.
         """
-        verdict = self.context.get("can_grant_roles")
-        if verdict is True:
-            grants = "Role grants included."
-        elif verdict is False:
-            grants = "Role grants need Owner/User Access Administrator; x copies an admin script."
-        else:
-            grants = "Checking role access."
+        grants = "Existing service roles are reused; only missing grants require Owner/User Access Administrator."
         return Guide(
             about=(
                 "Build or repair namespace connectivity. Nothing changes until Run setup."
@@ -2111,6 +2068,7 @@ class PlanDialog(ChromeScreen):
     BINDINGS = [Binding("escape", "back", "Back", show=True)]
 
     _ACTION_TOKENS = {
+        "required": STYLE_WARN,
         "exists": STYLE_MUTED,
         "create": STYLE_ACTIVE,
         "modify": STYLE_ACTIVE,
@@ -2148,7 +2106,7 @@ class PlanDialog(ChromeScreen):
                 group = scope.rsplit("/", 1)[-1]
                 ready = result is not None and all(result.values())
                 text.append(
-                    f"{'READY' if ready else 'BLOCKED':<9}{group}\n",
+                    f"{'UNKNOWN' if result is None else ('READY' if ready else 'BLOCKED'):<9}{group}\n",
                     style=style_for(STYLE_ACTIVE if ready else STYLE_ERROR, theme),
                 )
         else:

@@ -7,6 +7,7 @@
 import re
 from datetime import datetime, timezone
 from typing import Iterator, Optional
+from uuid import uuid4
 
 from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError
 
@@ -15,7 +16,6 @@ from azext_iot.adr.providers.base import ADRProvider
 
 _JOB_RUN_STATUSES = {
     "Scheduled",
-    "Queued",
     "Active",
     "Succeeded",
     "Failed",
@@ -27,9 +27,11 @@ _RESULT_STATUSES = {
     "Failed",
     "InProgress",
     "Canceled",
-    "NotApplied",
 }
-_STATUS_CLAUSE = re.compile(r"status eq '([^']+)'")
+_STATUS_FILTER = re.compile(
+    r"status\s+(?:eq\s+'(?P<equality>[^']+)'|in\s+\((?P<values>.*)\))"
+)
+_STATUS_VALUE = re.compile(r"\s*'([^']+)'\s*")
 _ORDER_BY_CLAUSE = re.compile(r"(?P<field>[A-Za-z][A-Za-z0-9_.]*)(?:\s+(?P<dir>asc|desc))?")
 _ORDER_BY_FIELDS = {"status"}
 
@@ -39,9 +41,9 @@ def _generate_job_run_name() -> str:
 
     ``runName`` is a required path segment, but the common case is "run this job
     now" where the caller does not care about the name. A UTC timestamp keeps
-    generated names sortable and collision-free at second resolution.
+    names sortable; a random suffix prevents systematic same-second collisions.
     """
-    return f"run-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    return f"run-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}"
 
 
 def _validate_order_by(order_by: Optional[str]):
@@ -60,21 +62,35 @@ def _validate_order_by(order_by: Optional[str]):
 def _validate_status_filter(
     status_filter: Optional[str],
     allowed_statuses: set,
-    allow_multiple: bool,
+    allow_in: bool,
 ):
     if not status_filter:
         return
-    clauses = status_filter.split(" or ")
-    if not allow_multiple and len(clauses) != 1:
-        raise InvalidArgumentValueError("Result filtering accepts one status equality clause.")
-    for clause in clauses:
-        match = _STATUS_CLAUSE.fullmatch(clause.strip())
-        if not match or match.group(1) not in allowed_statuses:
-            values = ", ".join(sorted(allowed_statuses))
-            raise InvalidArgumentValueError(
-                "Use status equality clauses such as \"status eq 'Failed'\". "
-                f"Supported statuses: {values}."
-            )
+    match = _STATUS_FILTER.fullmatch(status_filter.strip())
+    selected_statuses = []
+    if match:
+        equality = match.group("equality")
+        if equality:
+            selected_statuses = [equality]
+        elif allow_in:
+            raw_values = match.group("values").split(",")
+            parsed_values = [_STATUS_VALUE.fullmatch(value) for value in raw_values]
+            if all(parsed_values):
+                selected_statuses = [value.group(1) for value in parsed_values]
+
+    if not selected_statuses or any(
+        status not in allowed_statuses for status in selected_statuses
+    ):
+        values = ", ".join(sorted(allowed_statuses))
+        example = (
+            "\"status eq 'Active'\" or \"status in ('Active', 'Scheduled')\""
+            if allow_in
+            else "\"status eq 'Failed'\""
+        )
+        raise InvalidArgumentValueError(
+            f"Use a supported status filter such as {example}. "
+            f"Supported statuses: {values}."
+        )
 
 
 class JobRunProvider(ADRProvider):
@@ -171,7 +187,7 @@ class JobRunProvider(ADRProvider):
         status_filter: Optional[str] = None,
         order_by: Optional[str] = None,
     ) -> list:
-        _validate_status_filter(status_filter, _JOB_RUN_STATUSES, allow_multiple=True)
+        _validate_status_filter(status_filter, _JOB_RUN_STATUSES, allow_in=True)
         _validate_order_by(order_by)
         kwargs = {}
         if status_filter:
@@ -186,7 +202,7 @@ class JobRunProvider(ADRProvider):
                 **kwargs,
             )
         else:
-            result = self.client.job_runs.list_by_namespace(
+            result = self.client.job_runs_by_namespace.list_by_namespace(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 **kwargs,
@@ -220,11 +236,15 @@ class JobRunProvider(ADRProvider):
         namespace_name: str,
         resource_group_name: str,
         status_filter: Optional[str] = None,
+        order_by: Optional[str] = None,
     ) -> Iterator[dict]:
-        _validate_status_filter(status_filter, _RESULT_STATUSES, allow_multiple=False)
+        _validate_status_filter(status_filter, _RESULT_STATUSES, allow_in=False)
+        _validate_order_by(order_by)
         body = {}
         if status_filter:
             body["filter"] = status_filter
+        if order_by:
+            body["orderBy"] = order_by
 
         skip_token = None
         seen_tokens = set()

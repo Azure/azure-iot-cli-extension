@@ -64,7 +64,7 @@ class RadrApp(App):
         Binding("w", "onboard", "Connect selected", show=True),
         Binding("n", "new_setup", "New setup", show=True),
         Binding("o", "operations", "Operations", show=True),
-        # Single letters are claimed by drill-down children (d devices, g groups, ...),
+        # Single letters are claimed by drill-down children (g groups, l links, ...),
         # so the guide toggle takes a modifier rather than shadowing one of them.
         Binding("ctrl+g", "toggle_guide", "Guide", show=True),
         Binding("ctrl+t", "toggle_theme", "Theme", show=True),

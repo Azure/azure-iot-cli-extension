@@ -4,12 +4,24 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from unittest.mock import Mock
+
 import pytest
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
+from azure.core.exceptions import HttpResponseError
+
+from azext_iot.adr.providers.wait import group_membership_ready
+
+
+def _refresh_error(status_code, code):
+    error = HttpResponseError(message=code)
+    error.status_code = status_code
+    error.error = Mock(code=code)
+    return error
 
 
 def test_group_create_all_fields(fixture_group_provider):
@@ -179,13 +191,14 @@ def test_group_show_and_list(fixture_group_provider):
 
 
 def test_group_delete_calls_groups_delete_directly(
-    fixture_group_provider, mock_poller
+    fixture_group_provider, mocker
 ):
-    fixture_group_provider.client.groups.begin_delete.return_value = mock_poller(None)
+    fixture_group_provider.client.groups.delete.return_value = None
+    wait = mocker.patch.object(fixture_group_provider, "_wait")
 
-    fixture_group_provider.delete("group", "namespace", "rg")
+    assert fixture_group_provider.delete("group", "namespace", "rg") is None
 
-    fixture_group_provider.client.groups.begin_delete.assert_called_once_with(
+    fixture_group_provider.client.groups.delete.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         group_name="group",
@@ -193,18 +206,27 @@ def test_group_delete_calls_groups_delete_directly(
     fixture_group_provider.client.jobs.list_by_namespace.assert_not_called()
     fixture_group_provider.client.jobs.begin_delete.assert_not_called()
     fixture_group_provider.client.job_runs.list_by_job.assert_not_called()
+    wait.assert_not_called()
 
 
-def test_group_delete_no_wait(fixture_group_provider, mock_poller):
-    poller = mock_poller(None)
-    fixture_group_provider.client.groups.begin_delete.return_value = poller
+def test_group_delete_no_wait(fixture_group_provider, mocker):
+    fixture_group_provider.client.groups.delete.return_value = None
+    wait = mocker.patch.object(fixture_group_provider, "_wait")
 
     result = fixture_group_provider.delete(
         "group", "namespace", "rg", no_wait=True
     )
 
-    assert result is poller
-    poller.result.assert_not_called()
+    assert result is None
+    fixture_group_provider.client.groups.delete.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+        group_name="group",
+    )
+    fixture_group_provider.client.jobs.list_by_namespace.assert_not_called()
+    fixture_group_provider.client.jobs.begin_delete.assert_not_called()
+    fixture_group_provider.client.job_runs.list_by_job.assert_not_called()
+    wait.assert_not_called()
 
 
 def test_group_refresh(fixture_group_provider, mock_poller):
@@ -221,6 +243,85 @@ def test_group_refresh(fixture_group_provider, mock_poller):
         namespace_name="namespace",
         group_name="group",
     )
+
+
+def test_group_refresh_in_progress_no_wait_returns_current_group(
+    fixture_group_provider,
+):
+    fixture_group_provider.client.groups.begin_refresh_members.side_effect = (
+        _refresh_error(409, "GroupRefreshAlreadyInProgress")
+    )
+    fixture_group_provider.client.groups.get.return_value = {
+        "properties": {"membershipState": "Resolving"}
+    }
+
+    result = fixture_group_provider.refresh(
+        "group", "namespace", "rg", no_wait=True
+    )
+
+    assert result == {"properties": {"membershipState": "Resolving"}}
+    fixture_group_provider.client.groups.get.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+        group_name="group",
+    )
+
+
+def test_group_refresh_in_progress_waits_for_current_group(
+    fixture_group_provider, mocker
+):
+    fixture_group_provider.client.groups.begin_refresh_members.side_effect = (
+        _refresh_error(409, "GroupRefreshAlreadyInProgress")
+    )
+    ready_group = {"properties": {"membershipState": "Ready"}}
+    fixture_group_provider.client.groups.get.return_value = ready_group
+    wait = mocker.patch(
+        "azext_iot.adr.providers.group.wait_for_resource",
+    )
+
+    result = fixture_group_provider.refresh("group", "namespace", "rg")
+
+    assert result == ready_group
+    cli_ctx, getter, condition = wait.call_args.args
+    assert cli_ctx is fixture_group_provider.cmd.cli_ctx
+    assert condition is group_membership_ready
+    assert getter() == ready_group
+    assert (
+        fixture_group_provider.client.groups.get.call_count == 2
+    )
+
+
+def test_group_refresh_rate_limit_is_not_treated_as_idempotent(
+    fixture_group_provider,
+):
+    error = _refresh_error(409, "GroupRefreshRateLimited")
+    fixture_group_provider.client.groups.begin_refresh_members.side_effect = error
+
+    with pytest.raises(HttpResponseError) as raised:
+        fixture_group_provider.refresh("group", "namespace", "rg")
+
+    assert raised.value is error
+    assert raised.value.error.code == "GroupRefreshRateLimited"
+    fixture_group_provider.client.groups.get.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _refresh_error(409, "SomeOtherConflict"),
+        _refresh_error(400, "GroupRefreshAlreadyInProgress"),
+    ],
+)
+def test_group_refresh_propagates_unrelated_error(
+    fixture_group_provider, error
+):
+    fixture_group_provider.client.groups.begin_refresh_members.side_effect = error
+
+    with pytest.raises(HttpResponseError) as raised:
+        fixture_group_provider.refresh("group", "namespace", "rg")
+
+    assert raised.value is error
+    fixture_group_provider.client.groups.get.assert_not_called()
 
 
 def test_group_list_members_single_page_uses_body(fixture_group_provider):

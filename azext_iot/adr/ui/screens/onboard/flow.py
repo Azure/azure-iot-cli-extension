@@ -41,7 +41,7 @@ class PlanItem:
     key: str
     description: str
     command: str = ""
-    #: exists / create / modify / blocked
+    #: exists / create / modify / blocked / required (reviewed, checked by shared preflight)
     action: str = "create"
     depends_on: Tuple[str, ...] = ()
     #: Execution phase. Steps are ordered for selection, but operations must run in
@@ -103,6 +103,7 @@ class Flow:
 
     steps: List[Step]
     context: Dict[str, Any] = field(default_factory=dict)
+    validate: Optional[Callable[[Dict[str, Any]], str]] = None
 
     def __post_init__(self):
         self._by_id = {step.id: step for step in self.steps}
@@ -164,6 +165,11 @@ class Flow:
 
         Nothing is mutated here: the plan is the contract shown to the user before apply.
         """
+        reason = self.validate(self.context) if self.validate else ""
+        if reason:
+            return [PlanItem(key="validation", description="Invalid linking plan",
+                             action="blocked", blocked_reason=reason, phase=-1,
+                             long_running=False)]
         items = self._collect_plan()
         # Stable sort keeps each phase in its declared order.
         return sorted(items, key=lambda item: item.phase)
@@ -203,12 +209,24 @@ class Flow:
 
     def script(self) -> str:
         """The plan as a runnable script: plan-only mode, and the audit trail."""
-        lines = ["#!/usr/bin/env bash", "set -euo pipefail", ""]
-        for item in self.build_plan():
+        lines = [
+            "#!/usr/bin/env bash", "set -euo pipefail", "",
+            "# Role requirements below are reviewed requirements, not unconditional grants.",
+            "# Exported ADR commands each use base RBAC preflight; the UI batches preflight before linking.",
+            "",
+        ]
+        plan = self.build_plan()
+        if any(item.action == "blocked" for item in plan):
+            lines += ["# Resolve all blocked steps before running this plan.", "exit 1", ""]
+        for item in plan:
             if item.action == "exists":
                 lines.append(f"# {item.description}")
             elif item.action == "blocked":
                 lines.append(f"# BLOCKED {item.description}: {item.blocked_reason}")
+            elif item.action == "required":
+                lines.append(f"# Required (base link preflight checks existing grants): {item.description}")
+                if item.command:
+                    lines.append(f"# Remediation only: {item.command}")
             elif item.command:
                 lines.append(f"# {item.description}")
                 lines.append(item.command)

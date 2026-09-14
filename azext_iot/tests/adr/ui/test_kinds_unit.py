@@ -44,7 +44,6 @@ def registry(session):
 SCOPE = {
     "resource_group_name": "rg",
     "namespace_name": "ns",
-    "registry_device_name": "dev1",
     "group_name": "grp1",
     "job_name": "job1",
     "certificate_authority_name": "ca1",
@@ -55,8 +54,8 @@ SCOPE = {
 
 
 def test_every_kind_registers_and_validates(registry):
-    """Registration runs spec validation, so this covers all thirteen kinds at once."""
-    assert len(registry) == 13
+    """Registration runs spec validation, so this covers all supported kinds at once."""
+    assert len(registry) == 9
 
 
 def test_namespace_is_the_root(registry):
@@ -71,9 +70,9 @@ def test_update_instance_is_also_a_root(registry):
 @pytest.mark.parametrize(
     "alias, kind",
     [
-        ("ns", "namespace"), ("dev", "device"), ("rd", "device"), ("grp", "group"),
+        ("ns", "namespace"), ("grp", "group"),
         ("jb", "job"), ("rn", "run"), ("ep", "link"), ("cert", "ca"), ("pol", "policy"),
-        ("attr", "attribute"), ("cap", "capability"), ("auth", "auth"), ("mem", "member"),
+        ("mem", "member"),
     ],
 )
 def test_aliases_resolve(registry, alias, kind):
@@ -84,22 +83,32 @@ def test_child_relationships_are_declared(registry):
     def children(kind):
         return {ref.kind for ref in registry.get(kind).children}
 
-    assert {"device", "group", "job", "link", "ca"} <= children("namespace")
-    assert {"auth", "attribute", "capability"} == children("device")
+    assert {"group", "job", "link", "ca"} == children("namespace")
     assert children("group") == {"member"}
     assert children("job") == {"run"}
     assert children("ca") == {"policy"}
 
 
-def test_auth_guide_uses_the_registered_device_name_flag(registry):
-    command = registry.get("auth").guide.runs
-    assert "--registry-device-name" in command
-    assert " --device " not in command
+@pytest.mark.parametrize("alias", ["device", "registry-device", "dev", "rd", "auth", "attr", "cap"])
+def test_retired_device_surfaces_are_not_registered(registry, alias):
+    assert registry.resolve(alias) is None
+
+
+def test_live_and_demo_have_no_retired_devices_or_link_delete_actions(registry):
+    from azext_iot.adr.ui.core.session import _PROVIDER_PATHS
+    from azext_iot.adr.ui.kinds.synthetic import build_synthetic_registry
+
+    assert "registry_device" not in _PROVIDER_PATHS
+    for kinds in (registry, build_synthetic_registry()):
+        for alias in ("device", "attribute", "capability", "auth"):
+            assert kinds.resolve(alias) is None
+        assert kinds.resolve("group") is not None
+    assert registry.get("link").actions == ()
 
 
 def test_namespace_hierarchy_explains_every_related_collection(registry):
     children = registry.get("namespace").children
-    assert [child.kind for child in children] == ["link", "device", "group", "job", "ca"]
+    assert [child.kind for child in children] == ["link", "group", "job", "ca"]
     assert all(child.description for child in children)
     assert children[0].label == "Linked resources"
 
@@ -111,8 +120,6 @@ def test_namespace_hierarchy_explains_every_related_collection(registry):
     "kind, provider, method, expected",
     [
         ("namespace", "namespace", "list", {"resource_group_name": "rg"}),
-        ("device", "registry_device", "list",
-         {"namespace_name": "ns", "resource_group_name": "rg"}),
         ("group", "group", "list", {"namespace_name": "ns", "resource_group_name": "rg"}),
         ("job", "job", "list", {"namespace_name": "ns", "resource_group_name": "rg"}),
         ("ca", "certificate_authority", "list",
@@ -120,12 +127,6 @@ def test_namespace_hierarchy_explains_every_related_collection(registry):
         ("policy", "certificate_policy", "list",
          {"certificate_authority_name": "ca1", "namespace_name": "ns", "resource_group_name": "rg"}),
         ("su", "update_instance", "list", {"resource_group_name": "rg"}),
-        ("auth", "registry_device", "auth_list",
-         {"registry_device_name": "dev1", "namespace_name": "ns", "resource_group_name": "rg"}),
-        ("attribute", "registry_device", "attribute_list",
-         {"registry_device_name": "dev1", "namespace_name": "ns", "resource_group_name": "rg"}),
-        ("capability", "registry_device", "capability_list",
-         {"registry_device_name": "dev1", "namespace_name": "ns", "resource_group_name": "rg"}),
         ("member", "group", "list_members",
          {"group_name": "grp1", "namespace_name": "ns", "resource_group_name": "rg"}),
     ],
@@ -171,7 +172,7 @@ def test_namespace_resource_group_is_parsed_from_the_arm_id(registry):
 
 @pytest.mark.parametrize(
     "kind, key",
-    [("device", "registry_device_name"), ("group", "group_name"), ("job", "job_name"),
+    [("group", "group_name"), ("job", "job_name"),
      ("ca", "certificate_authority_name")],
 )
 def test_child_scope_keys_match_provider_argument_names(registry, kind, key):
@@ -209,14 +210,14 @@ def test_namespace_row_renders_from_a_realistic_payload(registry):
     assert STYLE_OK in row.styles
 
 
-def test_device_row_colours_enablement_and_state(registry):
+def test_group_row_colours_membership_and_state(registry):
     payloads = [
-        {"name": "d1", "properties": {"enablementState": "Enabled", "provisioningState": "Succeeded"}},
-        {"name": "d2", "properties": {"enablementState": "Disabled", "provisioningState": "Failed"}},
+        {"name": "g1", "properties": {"membershipState": "Resolved", "provisioningState": "Succeeded"}},
+        {"name": "g2", "properties": {"membershipState": "Stale", "provisioningState": "Failed"}},
     ]
-    model = TableModel(registry.get("device"))
+    model = TableModel(registry.get("group"))
     model.apply(payloads)
-    assert model.rows[0].styles[1] == STYLE_OK
+    assert model.rows[0].styles[3] == STYLE_OK
     assert STYLE_ERROR in model.rows[1].styles
 
 
@@ -243,8 +244,8 @@ def test_link_row_ids_are_unique_across_sections(registry):
     assert model.total_count == 2, "identically named endpoints must not collide"
 
 
-@pytest.mark.parametrize("kind", ["namespace", "device", "group", "job", "run", "link", "ca",
-                                  "policy", "su", "auth", "attribute", "capability", "member"])
+@pytest.mark.parametrize("kind", ["namespace", "group", "job", "run", "link", "ca",
+                                  "policy", "su", "member"])
 def test_every_kind_survives_an_empty_payload(registry, kind):
     """Preview payloads drop fields; a missing value must render blank, never raise."""
     model = TableModel(registry.get(kind))
@@ -252,8 +253,8 @@ def test_every_kind_survives_an_empty_payload(registry, kind):
     assert model.total_count == 1
 
 
-@pytest.mark.parametrize("kind", ["namespace", "device", "group", "job", "run", "link", "ca",
-                                  "policy", "su", "auth", "attribute", "capability", "member"])
+@pytest.mark.parametrize("kind", ["namespace", "group", "job", "run", "link", "ca",
+                                  "policy", "su", "member"])
 def test_every_kind_survives_a_payload_with_null_properties(registry, kind):
     model = TableModel(registry.get(kind))
     model.apply([{"name": "x", "properties": None}])
@@ -333,10 +334,9 @@ def test_namespace_without_a_name_still_renders_one_readable_row(registry):
 @pytest.mark.parametrize(
     "kind, required",
     [
-        ("device", "namespace_name"), ("group", "namespace_name"), ("job", "namespace_name"),
+        ("group", "namespace_name"), ("job", "namespace_name"),
         ("link", "namespace_name"), ("ca", "namespace_name"),
-        ("auth", "registry_device_name"), ("attribute", "registry_device_name"),
-        ("capability", "registry_device_name"), ("member", "group_name"),
+        ("member", "group_name"),
         ("policy", "certificate_authority_name"),
     ],
 )
@@ -357,17 +357,17 @@ def test_roots_need_no_scope(registry):
 
 
 def test_blank_scope_values_count_as_missing(registry):
-    assert "namespace_name" in registry.get("device").missing_scope({"namespace_name": ""})
+    assert "namespace_name" in registry.get("group").missing_scope({"namespace_name": ""})
 
 
-def test_device_column_labels_are_unambiguous(registry):
-    """Enablement and provisioning are different things and must not share a header."""
-    labels = [column.label for column in registry.get("device").columns]
+def test_group_column_labels_are_unambiguous(registry):
+    """Membership and provisioning are different things and must not share a header."""
+    labels = [column.label for column in registry.get("group").columns]
     assert len(labels) == len(set(labels)), f"duplicate column headers: {labels}"
 
 
-@pytest.mark.parametrize("kind", ["namespace", "device", "group", "job", "run", "link", "ca",
-                                  "policy", "su", "auth", "attribute", "capability", "member"])
+@pytest.mark.parametrize("kind", ["namespace", "group", "job", "run", "link", "ca",
+                                  "policy", "su", "member"])
 def test_no_kind_has_duplicate_column_labels(registry, kind):
     labels = [column.label for column in registry.get(kind).columns]
     assert len(labels) == len(set(labels))

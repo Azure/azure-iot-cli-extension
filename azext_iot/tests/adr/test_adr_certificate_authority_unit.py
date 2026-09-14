@@ -4,15 +4,18 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import errno
 from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     AzureResponseError,
+    FileOperationError,
     RequiredArgumentMissingError,
 )
 
+from azext_iot.adr import commands_certificate_authority as commands
 
 _SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000000"
 
@@ -23,6 +26,52 @@ def _patch_subscription_id(monkeypatch):
         "azext_iot.adr.providers.certificate_authority.get_subscription_id",
         lambda _ctx: _SUBSCRIPTION_ID,
     )
+
+
+@pytest.mark.parametrize("file_kind", ["missing", "directory"])
+def test_activate_file_errors_precede_provider_creation(mocker, tmp_path, file_kind):
+    path = tmp_path / "certificate-chain.pem"
+    if file_kind == "directory":
+        path.mkdir()
+    provider = mocker.patch.object(commands, "CertificateAuthorityProvider")
+
+    with pytest.raises(FileOperationError) as raised:
+        commands.adr_ca_activate(Mock(), "ca", "ns", "rg", str(path))
+
+    assert str(path) in str(raised.value)
+    assert isinstance(raised.value.__cause__, OSError)
+    provider.assert_not_called()
+
+
+def test_activate_unreadable_file_preserves_the_os_reason(mocker):
+    error = PermissionError(errno.EACCES, "Permission denied", "chain.pem")
+    mocker.patch("azext_iot.common.utility.read_file_content", side_effect=error)
+    provider = mocker.patch.object(commands, "CertificateAuthorityProvider")
+
+    with pytest.raises(FileOperationError, match="Permission denied") as raised:
+        commands.adr_ca_activate(Mock(), "ca", "ns", "rg", "chain.pem")
+
+    assert raised.value.__cause__ is error
+    provider.assert_not_called()
+
+
+def test_activate_file_success_preserves_content_and_options(mocker, tmp_path):
+    path = tmp_path / "certificate-chain.pem"
+    path.write_text("certificate chain\n", encoding="utf-8")
+    provider = mocker.patch.object(commands, "CertificateAuthorityProvider")
+    cmd = Mock()
+
+    result = commands.adr_ca_activate(cmd, "ca", "ns", "rg", str(path), no_wait=True)
+
+    provider.assert_called_once_with(cmd)
+    provider.return_value.activate.assert_called_once_with(
+        certificate_authority_name="ca",
+        namespace_name="ns",
+        resource_group_name="rg",
+        certificate_chain="certificate chain\n",
+        no_wait=True,
+    )
+    assert result is provider.return_value.activate.return_value
 
 
 # ==================== Create ====================

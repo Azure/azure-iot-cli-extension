@@ -8,9 +8,10 @@
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+from azext_iot.tests.adr import ADRLiveScenarioTest
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
+from azext_iot.tests.adr._readiness import delete_test_namespace
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -24,20 +25,71 @@ def _generate_group_name() -> str:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
+    def test_adr_group_delete_allows_immediate_name_reuse(self):
+        namespace_name = generate_adr_namespace_name()
+        group_name = _generate_group_name()
+        namespace_args = f"--ns {namespace_name} -g {TEST_RG}"
+        group_args = f"-n {group_name} {namespace_args}"
+        with CleanupLedger() as cleanup:
+            self.cmd(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG} "
+                f"--location {TEST_LOCATION}"
+            )
+            cleanup.register(
+                "namespace",
+                lambda: delete_test_namespace(
+                    self, namespace_name, TEST_RG, groups=(group_name,),
+                ),
+            )
+            for suffix in ("--no-wait", ""):
+                created = self.cmd(
+                    f"iot adr ns group create {group_args} "
+                    '--query-string "*" --tags lifecycle=original'
+                ).get_output_in_json()
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(f"iot adr ns group delete {group_args} --yes"),
+                )
+                self.cmd(f"iot adr ns group delete {group_args} --yes {suffix}")
+                cleanup.dismiss("group")
+                self.cmd(f"iot adr ns group wait {group_args} --deleted")
+                recreated = self.cmd(
+                    f"iot adr ns group create {group_args} "
+                    '--query-string "*" --tags lifecycle=recreated'
+                ).get_output_in_json()
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(f"iot adr ns group delete {group_args} --yes"),
+                )
+                assert recreated["id"] == created["id"]
+                assert recreated["tags"] == {"lifecycle": "recreated"}
+                self.cmd(f"iot adr ns group delete {group_args} --yes")
+                cleanup.dismiss("group")
+                self.cmd(f"iot adr ns group wait {group_args} --deleted")
+
     def test_adr_group_lifecycle(self):
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
         group_name = _generate_group_name()
-
-        try:
+        with CleanupLedger() as cleanup:
             with timed_step("Setup ❯ Create namespace"):
                 self.cmd(
                     f"iot adr ns create -n {namespace_name} -g {rg} "
                     f"--location {TEST_LOCATION}"
                 )
+                cleanup.register(
+                    "namespace",
+                    lambda: delete_test_namespace(self, namespace_name, rg, groups=(group_name,)),
+                )
 
             with timed_step("Step 1 ❯ Create and inspect group"):
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(
+                        f"iot adr ns group delete -n {group_name} --ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 created = self.cmd(
                     f"iot adr ns group create -n {group_name} "
                     f"--ns {namespace_name} -g {rg} "
@@ -48,7 +100,11 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                 assert created["properties"]["queryFilter"] == "*"
                 # Group is a plain TrackedResource in 2026-11-02-preview: no identity.
                 assert "identity" not in created
-                # Groups_CreateOrReplace is synchronous, so no wait is needed here.
+                # Create starts the initial membership calculation.
+                self.cmd(
+                    f"iot adr ns group wait -n {group_name} "
+                    f"--ns {namespace_name} -g {rg}"
+                )
 
                 shown = self.cmd(
                     f"iot adr ns group show -n {group_name} "
@@ -60,30 +116,7 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                 ).get_output_in_json()
                 assert group_name in [group["name"] for group in listed]
 
-            with timed_step("Step 2 ❯ Update group"):
-                updated = self.cmd(
-                    f"iot adr ns group update -n {group_name} "
-                    f"--ns {namespace_name} -g {rg} "
-                    "--display-name 'Test group' --description 'integration test' "
-                    "--tags env=ci"
-                ).get_output_in_json()
-                assert updated["properties"]["displayName"] == "Test group"
-                assert updated["properties"]["description"] == "integration test"
-                assert updated["tags"]["env"] == "ci"
-                assert "identity" not in updated
-
-            with timed_step("Step 3 ❯ Reject empty update"):
-                self.cmd(
-                    f"iot adr ns group update -n {group_name} "
-                    f"--ns {namespace_name} -g {rg}",
-                    expect_failure=True,
-                )
-
-            with timed_step("Step 4 ❯ Refresh, list members, and count"):
-                self.cmd(
-                    f"iot adr ns group refresh -n {group_name} "
-                    f"--ns {namespace_name} -g {rg}"
-                )
+            with timed_step("Step 2 ❯ List members and count after initial calculation"):
                 members = self.cmd(
                     f"iot adr ns group list-members -n {group_name} "
                     f"--ns {namespace_name} -g {rg} --page-size 1"
@@ -95,16 +128,40 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                     f"--ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 assert int(count or 0) == len(members)
-                self.cmd(
+
+            with timed_step("Step 3 ❯ Immediate manual refresh is rate-limited"):
+                refresh_failure = self.cmd(
                     f"iot adr ns group refresh -n {group_name} "
-                    f"--ns {namespace_name} -g {rg}"
+                    f"--ns {namespace_name} -g {rg}",
+                    expect_failure=True,
+                )
+                assert refresh_failure.exit_code == 1
+
+            with timed_step("Step 4 ❯ Update group"):
+                updated = self.cmd(
+                    f"iot adr ns group update -n {group_name} "
+                    f"--ns {namespace_name} -g {rg} "
+                    "--display-name 'Test group' --description 'integration test' "
+                    "--tags env=ci"
+                ).get_output_in_json()
+                assert updated["properties"]["displayName"] == "Test group"
+                assert updated["properties"]["description"] == "integration test"
+                assert updated["tags"]["env"] == "ci"
+                assert "identity" not in updated
+
+            with timed_step("Step 5 ❯ Reject empty update"):
+                self.cmd(
+                    f"iot adr ns group update -n {group_name} "
+                    f"--ns {namespace_name} -g {rg}",
+                    expect_failure=True,
                 )
 
-            with timed_step("Step 5 ❯ Delete group directly"):
+            with timed_step("Step 6 ❯ Delete group directly"):
                 self.cmd(
                     f"iot adr ns group delete -n {group_name} "
                     f"--ns {namespace_name} -g {rg} -y"
                 )
+                cleanup.dismiss("group")
                 self.cmd(
                     f"iot adr ns group show -n {group_name} "
                     f"--ns {namespace_name} -g {rg}",
@@ -117,5 +174,3 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                         expect_failure=True,
                     )
                 _log(LogKind.OK, "Group lifecycle passed")
-        finally:
-            self.cleanup_namespace(namespace_name, rg)

@@ -6,8 +6,6 @@
 
 """Guided onboarding: step graph, pickers and plan (steps 11-12)."""
 
-import time
-
 from azext_iot.adr.ui.screens.onboard.flow import Flow, PlanItem, Step, StepState
 from azext_iot.adr.ui.screens.onboard.pickers import (
     ELIGIBLE,
@@ -232,7 +230,7 @@ def namespace_with_principal(principal="pid-ns", **kwargs):
 def test_grant_commands_are_runnable_not_placeholders():
     """The customer must be able to paste these; a placeholder makes the plan useless."""
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate()), subscription_id="sub-1")
     )
     grants = [item for item in flow.build_plan() if item.key.startswith("grant-ns-to")]
@@ -245,7 +243,7 @@ def test_grant_commands_are_runnable_not_placeholders():
 
 def test_reverse_grant_uses_the_targets_own_principal():
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate(), principal="pid-dps"),
                 subscription_id="sub-1")
     )
@@ -256,11 +254,11 @@ def test_reverse_grant_uses_the_targets_own_principal():
 
 def test_missing_namespace_principal_is_resolved_after_identity_setup():
     flow = build_flow(
-        context(namespace_payload(identity="SystemAssigned", provisioning={"dps": {}}),
+        context(namespace_payload(identity="SystemAssigned"),
                 selected_dps=identified(dps_candidate()))
     )
     forward = next(item for item in flow.build_plan() if item.key.startswith("grant-ns-to"))
-    assert forward.action == "manual"
+    assert forward.action == "required"
     assert "az resource show" in forward.command
 
 
@@ -268,21 +266,20 @@ def test_target_without_identity_is_enabled_before_the_reverse_grant():
     candidate = dps_candidate()
     candidate.raw = {"identity": {}}
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}), selected_dps=candidate)
+        context(namespace_with_principal(), selected_dps=candidate)
     )
     reverse = next(item for item in flow.build_plan() if item.key.startswith("grant-dps-to-ns"))
-    assert reverse.action == "manual"
+    assert reverse.action == "required"
     assert "az resource show" in reverse.command
 
 
-def test_plan_includes_a_propagation_wait():
-    """Linking immediately after granting fails in a way that looks like a backend bug."""
+def test_plan_delegates_propagation_to_shared_preflight():
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate()))
     )
-    wait = next(item for item in flow.build_plan() if item.key == "grant-propagation")
-    assert "propagation" in wait.description
+    wait = next(item for item in flow.build_plan() if item.key == "grant-preflight")
+    assert "wait for visibility" in wait.description
 
 
 def test_permissions_plan_covers_both_directions():
@@ -305,37 +302,36 @@ def test_hub_grants_include_the_data_role():
     assert "IoT Hub Data Contributor" in roles
 
 
-def test_grants_stay_manual_when_the_account_may_not_make_them():
-    """Without the right, radr reports the grants rather than failing halfway through."""
+def test_assignment_write_probe_does_not_block_existing_grants():
+    """Only base can decide whether assignments are missing and need admin access."""
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate()), can_grant_roles=False)
     )
     grants = [item for item in flow.build_plan() if item.key.startswith("grant-")]
     assert grants
-    assert all(item.action == "manual" for item in grants)
-    assert all(item.invoke is None for item in grants)
+    assert not any(item.action == "manual" for item in grants)
+    assert [item.key for item in grants if item.invoke is not None] == ["grant-preflight"]
 
 
-def test_an_unanswered_permission_probe_is_treated_as_no():
-    """Promising a grant radr cannot make would fail the run at the worst moment."""
+def test_unanswered_assignment_write_probe_still_defers_to_base():
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate()), can_grant_roles=None)
     )
     grants = [item for item in flow.build_plan() if item.key.startswith("grant-")]
-    assert grants and all(item.invoke is None for item in grants)
+    assert grants and any(item.key == "grant-preflight" and item.invoke for item in grants)
 
 
-def test_grants_are_applied_when_the_account_is_allowed_to_make_them():
+def test_requirements_are_not_individual_unconditional_grants():
     flow = build_flow(
-        context(namespace_with_principal(provisioning={"dps": {}}),
+        context(namespace_with_principal(),
                 selected_dps=identified(dps_candidate()), can_grant_roles=True)
     )
     grants = [item for item in flow.build_plan() if item.key.startswith("grant-ns-to")]
     assert grants
-    assert all(item.action == "create" for item in grants)
-    assert all(item.invoke is not None for item in grants), "radr should do this itself"
+    assert all(item.action == "required" for item in grants)
+    assert all(item.invoke is None for item in grants), "base authorizes the whole missing set first"
 
 
 def test_grants_run_before_the_links_that_need_them():
@@ -380,14 +376,24 @@ def test_resource_without_identity_is_selectable_for_identity_setup():
     assert candidate.selectable
 
 
-def test_region_mismatch_is_a_warning_not_a_block():
+def test_region_mismatch_is_ineligible_like_base_link_preflight():
     candidate = evaluate(
         {"name": "dps-west", "id": "/x/dps-west", "location": "westus2",
          "identity": {"type": "SystemAssigned"}},
         namespace_location="eastus2",
     )
-    assert candidate.verdict == WARNING
-    assert candidate.selectable, "a warning must not prevent selection"
+    assert candidate.verdict == INELIGIBLE
+    assert not candidate.selectable
+
+
+def test_hub_picker_only_accepts_standard_tiers_for_adr_linking():
+    for sku in ("F1", "B1", "B2", "B3", ""):
+        candidate = evaluate({"name": "hub", "id": "/hub", "sku": {"name": sku}},
+                             require_standard_hub=True)
+        assert not candidate.selectable
+        assert "Standard S-tier" in candidate.reason
+    assert evaluate({"name": "hub", "id": "/hub", "sku": {"name": "S1"}},
+                    require_standard_hub=True).selectable
 
 
 def test_failed_resource_is_blocked_from_linking():
@@ -427,10 +433,10 @@ def test_readiness_messages_are_compact_and_unpunctuated():
     assert [candidate.reason for candidate in candidates] == [
         "provisioning failed",
         "identity setup required",
-        "other region + not in DPS",
+        "cross-region linking is not supported",
     ]
     assert all(";" not in candidate.describe() for candidate in candidates)
-    assert all(len(candidate.describe()) <= 32 for candidate in candidates)
+    assert all(len(candidate.describe()) <= 48 for candidate in candidates)
 
 
 def test_hub_registered_on_the_service_is_recommended():
@@ -454,15 +460,15 @@ def test_unregistered_hub_warns_about_silent_allocation_failure():
     assert candidate.reason == "not in DPS"
 
 
-def test_link_readiness_reports_multiple_warnings_together():
+def test_link_readiness_prioritizes_base_region_restriction():
     candidate = evaluate(
         {"name": "hub-b", "id": "/x/hub-b", "location": "westus2",
          "identity": {"type": "SystemAssigned"}},
         namespace_location="eastus2",
         registered_hub_names=["hub-a.azure-devices.net"],
     )
-    assert candidate.verdict == WARNING
-    assert candidate.reason == "other region + not in DPS"
+    assert candidate.verdict == INELIGIBLE
+    assert candidate.reason == "cross-region linking is not supported"
 
 
 def test_resource_group_is_parsed_from_the_id():
@@ -638,7 +644,7 @@ def test_grants_are_ordered_before_the_links_that_need_them():
     first_grant = min(i for i, key in enumerate(keys) if key.startswith("grant-ns-to"))
     link_dps = keys.index("dps")
     assert first_grant < link_dps, "grants must precede the link"
-    assert keys.index("grant-propagation") < link_dps, "and the wait must precede it too"
+    assert keys.index("grant-preflight") < link_dps, "shared preflight must finish before linking"
 
 
 def test_prerequisites_come_before_grants():
@@ -674,17 +680,13 @@ def test_identity_and_link_steps_are_executable():
     assert plan["hub-0"].invoke is not None
 
 
-def test_propagation_wait_is_skipped_when_nothing_was_newly_granted():
-    """Re-running setup should not idle for a minute over long-settled assignments."""
+def test_unchanged_existing_link_does_not_plan_extra_grants():
+    """A satisfied link must not authorize a selected-but-unused target."""
     flow = build_flow(
         context(namespace_with_principal(provisioning={"dps": {}}),
                 selected_dps=identified(dps_candidate()), can_grant_roles=True)
     )
-    wait = next(item for item in flow.build_plan() if item.key == "grant-propagation")
-    assert wait.invoke is not None
-    started = time.monotonic()
-    wait.invoke(None, {})
-    assert time.monotonic() - started < 1, "no grant was created, so there is nothing to wait for"
+    assert not any(item.key.startswith("grant-") for item in flow.build_plan())
 
 
 def test_identity_step_calls_the_provider_with_no_wait():
@@ -724,7 +726,7 @@ def test_existing_namespace_without_outbound_identity_plans_update():
     identity = next(item for item in flow.build_plan() if item.key == "identity")
     assert identity.action == "create"
     assert "ns update" in identity.command
-    assert "--outbound-mi-system-assigned" in identity.command
+    assert "--outbound-system-assigned-mi" in identity.command
 
 
 def test_existing_namespace_uami_is_preserved_by_default():
@@ -759,8 +761,7 @@ def test_existing_namespace_uami_is_preserved_by_default():
     ).action == "exists"
 
 
-def test_permission_requirements_use_exact_role_scopes():
-    from azext_iot.adr.ui.core.rbac import ROLE_WRITE_ACTION
+def test_permission_requirements_only_probe_resource_actions():
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
     dps = dps_candidate()
@@ -789,12 +790,14 @@ def test_permission_requirements_use_exact_role_scopes():
     screen.context["selected_dps"] = dps
     set_choice(screen.context, "dps", choice, dps.resource_id)
     requirements = screen._permission_requirements()
-    assert ROLE_WRITE_ACTION in requirements[dps.resource_id]
-    assert ROLE_WRITE_ACTION not in requirements[choice.uami_id]
+    assert "Microsoft.Devices/provisioningServices/write" in requirements[dps.resource_id]
+    assert all(
+        "Microsoft.Authorization/roleAssignments/write" not in actions
+        for actions in requirements.values()
+    )
 
 
-def test_ready_target_only_requires_role_assignment_access():
-    from azext_iot.adr.ui.core.rbac import ROLE_WRITE_ACTION
+def test_ready_target_needs_no_resource_write_or_assignment_write_probe():
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
     dps = dps_candidate()
@@ -819,7 +822,7 @@ def test_ready_target_only_requires_role_assignment_access():
     )
     screen.context["selected_dps"] = dps
     requirements = screen._permission_requirements()
-    assert requirements[dps.resource_id] == {ROLE_WRITE_ACTION}
+    assert dps.resource_id not in requirements
 
 
 def test_new_resource_group_checks_subscription_create_permission():
@@ -1027,7 +1030,7 @@ def test_selected_uami_flows_to_link_and_role_plans():
         for item in flow.build_plan()
         if item.key.startswith("grant-dps-to-ns")
     )
-    assert f"--mi-user-assigned {choice.uami_id}" in link.command
+    assert f"--user-assigned-mi {choice.uami_id}" in link.command
     assert "--assignee-object-id pid-uami" in reverse.command
 
 
@@ -1231,7 +1234,7 @@ def test_creating_a_namespace_plans_it_with_an_identity():
     plan = {item.key: item for item in flow.build_plan()}
     assert plan["namespace"].action == "create"
     assert plan["namespace"].invoke is not None
-    assert "--outbound-mi-system-assigned" in plan["namespace"].command
+    assert "--outbound-system-assigned-mi" in plan["namespace"].command
 
 
 def test_namespace_plan_includes_optional_tags():
@@ -1341,21 +1344,22 @@ def test_hub_and_dps_plan_commands_include_size():
 
 
 def test_reverse_grant_for_a_pending_resource_says_when_to_run_it():
-    """Without the right to grant, the principal id can only be read after creation."""
+    """A new resource's principal is resolved at execution, not guessed in review."""
     flow = build_flow(context(namespace_with_principal(), create_dps=create_request(),
                               subscription_id="sub-1", can_grant_roles=False))
     reverse = next(item for item in flow.build_plan() if item.key.startswith("grant-dps-to-ns"))
-    assert reverse.action == "manual"
-    assert "after" in reverse.blocked_reason and "is created" in reverse.blocked_reason
+    assert reverse.action == "required"
+    assert reverse.invoke is None
+    assert any(item.key == "grant-preflight" and item.invoke for item in flow.build_plan())
     assert "az resource show" in reverse.command
     assert "<" not in reverse.command
 
 
 def test_a_resource_without_an_identity_is_repaired_before_reverse_grant():
-    flow = build_flow(context(namespace_with_principal(provisioning={"dps": {}}),
+    flow = build_flow(context(namespace_with_principal(),
                               selected_dps=dps_candidate(), can_grant_roles=True))
     reverse = next(item for item in flow.build_plan() if item.key.startswith("grant-dps-to-ns"))
-    assert reverse.action == "create"
+    assert reverse.action == "required"
 
 
 def test_creating_a_hub_plans_create_then_link():
@@ -1397,23 +1401,25 @@ def test_software_updates_gets_grants_in_both_directions():
         for item in flow.build_plan()
         if item.key.startswith("grant-") and "su-1" in item.key
     ]
-    assert len(grants) == 3
+    assert len(grants) == 4
+    assert any("--role 'Device Update Administrator'" in item.command for item in grants)
     assert any("--assignee-object-id pid-ns" in item.command for item in grants)
     assert any("--assignee-object-id pid-su" in item.command for item in grants)
     link = next(item for item in flow.build_plan() if item.key == "su")
     assert max(item.phase for item in grants) < link.phase
 
 
-def test_several_update_instances_are_each_linked_under_their_own_endpoint():
-    """Updating endpoints are a map, so one namespace may serve several instances."""
+def test_several_update_instances_block_the_entire_plan_before_any_mutation():
     flow = build_flow(context(namespace_with_principal(provisioning={"dps": {}}),
                               selected_sus=[identified(dps_candidate("su-1")),
                                             identified(dps_candidate("su-2"))],
                               subscription_id="sub-1"))
-    links = [item for item in flow.build_plan() if item.key in ("su", "su-1")]
-    assert len(links) == 2
-    endpoints = {item.command.split("--endpoint-name ")[1].split()[0] for item in links}
-    assert endpoints == {"su-1", "su-2"}, "a shared endpoint name would overwrite the first"
+    plan = flow.build_plan()
+    assert all(item.invoke is None for item in plan)
+    assert plan[0].action == "blocked"
+    assert "Only one Software Updates instance" in plan[0].blocked_reason
+    assert "exit 1" in flow.script()
+    assert "az role assignment create" not in flow.script()
 
 
 def test_name_validation_rejects_bad_resource_names():
@@ -1449,8 +1455,8 @@ def test_a_resource_created_in_the_same_run_can_still_be_granted():
     flow = build_flow(context(namespace_with_principal(), create_dps=create_request(),
                               subscription_id="sub-1", can_grant_roles=True))
     reverse = next(item for item in flow.build_plan() if item.key.startswith("grant-dps-to-ns"))
-    assert reverse.action == "create", "waiting for a second run defeats guided setup"
-    assert reverse.invoke is not None
+    assert reverse.action == "required"
+    assert any(item.key == "grant-preflight" and item.invoke for item in flow.build_plan())
 
 
 # -- scope: subscription and resource group ------------------------------------------
@@ -1822,8 +1828,9 @@ def test_review_page_ends_with_one_clear_next_step():
         "def _chosen_lines", 1
     )[0]
     assert '"\\nNEXT\\n"' in review
-    assert "NEEDS ADMIN ACCESS" in review
-    assert "manual[:4]" not in review, "individual grants belong in the full plan"
+    assert "REQUIRED SERVICE ROLES" in review
+    assert "Only missing assignments" in review
+    assert "NEEDS ADMIN ACCESS" not in review, "existing grants do not require administrator access"
 
 
 def test_right_pane_omits_progress_and_selected_resource_repetition():
@@ -1866,10 +1873,9 @@ def test_rail_lists_chosen_update_instances_too():
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
     screen = OnboardScreen(session=None, scope={"subscription_id": "sub-1"})
-    screen.context["selected_sus"] = [hub_candidate("su-a"), hub_candidate("su-b")]
+    screen.context["selected_sus"] = [hub_candidate("su-a")]
     assert screen._chosen_lines("su") == [
         "su-a · choose identity",
-        "su-b · choose identity",
     ]
 
 
@@ -1908,7 +1914,7 @@ def test_rail_positions_map_to_visible_steps_only():
     visible = flow.visible_steps()
     assert [s.id for s in visible][:4] == ["subscription", "scope", "namespace", "dps"]
     # Identity planning steps are hidden between scope/namespace and DPS.
-    assert [s.id for s in flow.steps][2:5] == ["uami", "namespace", "identity"]
+    assert [s.id for s in flow.steps][3:6] == ["uami", "namespace", "identity"]
     assert visible[3].id == "dps", "rail position 4 must be Link DPS, not the hidden step"
 
 
@@ -1996,11 +2002,15 @@ def test_selecting_the_same_hub_twice_removes_it():
     assert screen.context["selected_hubs"] == []
 
 
-def test_update_instances_toggle_the_same_way_as_hubs():
+def test_update_instance_selection_replaces_instead_of_appending():
+    from azext_iot.adr.ui.screens.onboard.screen import _MULTI_SELECT
+
     screen = _screen_with()
-    screen._toggle_choice("su", hub_candidate("su-a"))
-    screen._toggle_choice("su", hub_candidate("su-b"))
-    assert [s.name for s in screen.context["selected_sus"]] == ["su-a", "su-b"]
+    screen._advance = lambda *_: None
+    screen._accept_candidate_identity("su", hub_candidate("su-a"), system_choice())
+    screen._accept_candidate_identity("su", hub_candidate("su-b"), system_choice())
+    assert [s.name for s in screen.context["selected_sus"]] == ["su-b"]
+    assert "su" not in _MULTI_SELECT
 
 
 def test_done_on_a_multi_select_step_moves_on():

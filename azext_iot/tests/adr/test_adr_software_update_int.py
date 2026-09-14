@@ -14,13 +14,13 @@ from tempfile import TemporaryDirectory
 import pytest
 from msrestazure.tools import parse_resource_id
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr.conftest import TEST_RG
 from azext_iot.tests.generators import generate_generic_id
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateLocalCommands(CaptureOutputLiveScenarioTest):
+class TestADRSoftwareUpdateLocalCommands(ADRLiveScenarioTest):
     def test_software_update_local_commands(self):
         with TemporaryDirectory() as directory:
             payload_path = Path(directory) / "install.sh"
@@ -50,7 +50,7 @@ class TestADRSoftwareUpdateLocalCommands(CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateStage(CaptureOutputLiveScenarioTest):
+class TestADRSoftwareUpdateStage(ADRLiveScenarioTest):
     def test_software_update_stage_upload_and_reuse(self):
         namespace_name = os.getenv("azext_iot_adr_su_namespace")
         storage_account = os.getenv("azext_iot_adr_su_storage_account")
@@ -144,3 +144,60 @@ class TestADRSoftwareUpdateStage(CaptureOutputLiveScenarioTest):
                 if subscription:
                     cleanup += f" --subscription {subscription}"
                 self.cmd(cleanup)
+
+
+@pytest.mark.usefixtures("set_cwd")
+class TestADRSoftwareUpdateDiscovery(ADRLiveScenarioTest):
+    """Validate catalog and no-wait follow-up surfaces against a linked service."""
+
+    def test_catalog_and_operation_status_discovery(self):
+        namespace_name = os.getenv("azext_iot_adr_su_namespace")
+        if not namespace_name:
+            pytest.skip(
+                "Set azext_iot_adr_su_namespace to run Software Updates "
+                "catalog/status integration coverage."
+            )
+
+        providers = self.cmd(
+            "iot adr ns su software-update catalog provider list "
+            f"--ns {namespace_name} -g {TEST_RG}"
+        ).get_output_in_json()
+        assert isinstance(providers, list)
+        if providers:
+            provider = providers[0]
+            names = self.cmd(
+                "iot adr ns su software-update catalog name list "
+                f"--ns {namespace_name} -g {TEST_RG} "
+                f"--update-provider '{provider}'"
+            ).get_output_in_json()
+            assert isinstance(names, list)
+            if names:
+                versions = self.cmd(
+                    "iot adr ns su software-update catalog version list "
+                    f"--ns {namespace_name} -g {TEST_RG} "
+                    f"--update-provider '{provider}' "
+                    f"--update-name '{names[0]}'"
+                ).get_output_in_json()
+                assert isinstance(versions, list)
+                if versions:
+                    self.cmd(
+                        "iot adr ns su software-update wait "
+                        f"--ns {namespace_name} -g {TEST_RG} "
+                        f"--update-provider '{provider}' "
+                        f"--update-name '{names[0]}' "
+                        f"--update-version '{versions[0]}'"
+                    )
+
+        statuses = self.cmd(
+            "iot adr ns su software-update operation-status list "
+            f"--ns {namespace_name} -g {TEST_RG}"
+        ).get_output_in_json()
+        assert isinstance(statuses, list)
+        if statuses:
+            operation_id = statuses[0]["operationId"]
+            shown = self.cmd(
+                "iot adr ns su software-update operation-status show "
+                f"--ns {namespace_name} -g {TEST_RG} "
+                f"--operation-id '{operation_id}'"
+            ).get_output_in_json()
+            assert shown["operationId"] == operation_id

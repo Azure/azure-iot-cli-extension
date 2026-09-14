@@ -10,6 +10,8 @@ import tarfile
 from shutil import rmtree
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+from azext_iot.tests.iothub._integration_helpers import delete_known_devices
 
 
 class EdgeDevicesTestConfig(NamedTuple):
@@ -22,6 +24,11 @@ class EdgeDevicesTestConfig(NamedTuple):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
+    owned_device_ids = (
+        tuple(f"device_{index}" for index in (400, 300, 200, 100, 7, 6, 5, 4, 3, 2, 1))
+        + tuple(f"device{index}" for index in range(7, 0, -1))
+    )
+
     def __init__(self, test_case):
         super(TestNestedEdgeHierarchy, self).__init__(test_case)
         self.deployment_top = "./device_configs/deployments/deploymentTopLayer.json"
@@ -29,6 +36,22 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self.deployment_top_config = "./deployments/deploymentTopLayer.json"
         self.deployment_lower_config = "./deployments/deploymentLowerLayer.json"
+
+    def _delete_owned_devices(self):
+        provider = DeviceIdentityProvider(
+            cmd=self, hub_name=self.entity_name, rg=self.entity_rg, auth_type_dataplane="login"
+        )
+        delete_known_devices(provider.service_sdk.devices, self.owned_device_ids)
+
+    def setUp(self):
+        super().setUp()
+        self._delete_owned_devices()
+
+    def tearDown(self):
+        try:
+            self._delete_owned_devices()
+        finally:
+            super().tearDown()
 
     def test_nested_edge_devices_create_nArgs_full(self):
         # ├── device_1 (toplayer)
@@ -275,12 +298,13 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         cert_auth: bool = False,
         custom_device_template: bool = False,
     ):
-        # get all devices in hub
-        device_list = self.cmd(
-            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json()
-        # make sure all devices were created
-        assert len(device_list) == len(devices)
+        # These scenarios validate identity creation, not the eventually consistent
+        # query index. Query/list coverage remains in the device identity tests.
+        provider = DeviceIdentityProvider(
+            cmd=self, hub_name=self.entity_name, rg=self.entity_rg, auth_type_dataplane="login"
+        )
+        actual_ids = {device.device_id for device in provider.service_sdk.devices.get_devices()}
+        assert actual_ids == {device.id for device in devices}
         # validate each device
         for device_tuple in devices:
             device_id = device_tuple.id

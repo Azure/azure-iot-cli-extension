@@ -11,6 +11,7 @@ pylint==3.0.3
 flake8
 pytest-xdist
 pytest-rerunfailures
+pytest-timeout>=2.3,<3
 filelock
 tox
 build
