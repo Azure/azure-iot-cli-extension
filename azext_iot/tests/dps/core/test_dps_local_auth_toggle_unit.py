@@ -10,6 +10,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 
@@ -202,6 +203,7 @@ def test_serial_worker_rejects_non_linux_before_setup(isolated, mocker, platform
 
 @pytest.mark.parametrize("failure", [
     CLIError("invalid arguments"), CLIError("unrelated device 1401"),
+    CLIError("Unexpected errorCode 401002"),
     HttpResponseError(message="backend", status_code=500),
 ])
 def test_unrelated_error_cannot_satisfy_expected_sas_denial(mocker, failure):
@@ -210,7 +212,13 @@ def test_unrelated_error_cannot_satisfy_expected_sas_denial(mocker, failure):
         live._assert_service_sas_denied("iot dps enrollment list")
 
 
-@pytest.mark.parametrize("failure", [CLIError("(401) Unauthorized"), CLIError("(403) Forbidden")])
+@pytest.mark.parametrize("failure", [
+    CLIError("(401) Unauthorized"), CLIError("(403) Forbidden"),
+    UnauthorizedError(
+        "{'errorCode': 401002, 'message': 'Local authentication (SAS) is disabled for this DPS instance.'}"
+    ),
+    ForbiddenError("Enrollment listing is blocked by the service policy."),
+])
 def test_expected_sas_authentication_failure_is_specific(mocker, failure):
     mocker.patch.object(live, "_invoke", side_effect=failure)
     live._assert_service_sas_denied("iot dps enrollment list")
@@ -232,7 +240,14 @@ def test_toggle_fixture_restores_disabled_policy_after_failed_or_successful_enab
     assert [call.args[0].rsplit(" ", 1)[-1] for call in invoke.call_args_list] == ["false", "true"]
 
 
-def test_live_toggle_matrix_exercises_all_auth_modes_in_each_policy_state(mocker):
+@pytest.mark.parametrize("auth_failure", [
+    CLIError("(401) Unauthorized"),
+    UnauthorizedError(
+        "{'errorCode': 401002, 'message': 'Local authentication (SAS) is disabled for this DPS instance.'}"
+    ),
+    ForbiddenError("Enrollment listing is blocked by the service policy."),
+])
+def test_live_toggle_matrix_exercises_all_auth_modes_in_each_policy_state(mocker, auth_failure):
     state = {"disabled": False}
     seen = []
     resource = {
@@ -246,7 +261,7 @@ def test_live_toggle_matrix_exercises_all_auth_modes_in_each_policy_state(mocker
         else:
             seen.append((state["disabled"], command))
             if state["disabled"] and "--auth-type login" not in command:
-                raise CLIError("(401) Unauthorized")
+                raise auth_failure
         return SimpleNamespace(success=lambda: True, as_json=lambda: deepcopy(resource))
 
     mocker.patch.object(live, "_invoke", side_effect=invoke)

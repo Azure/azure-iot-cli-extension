@@ -7,6 +7,7 @@
 import re
 
 import pytest
+from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 
@@ -28,7 +29,8 @@ def _assert_service_sas_denied(command):
         _invoke(command)
     diagnostic = str(error.value).lower()
     assert (
-        getattr(error.value, "status_code", None) in (401, 403)
+        isinstance(error.value, (UnauthorizedError, ForbiddenError))
+        or getattr(error.value, "status_code", None) in (401, 403)
         or re.search(r"\b(?:unauthorized(?:access)?|forbidden)\b|(?:\(|http\s+)(?:401|403)\b", diagnostic)
     ), "Disabling DPS local auth must reject SAS authentication, not fail for an unrelated reason."
 
