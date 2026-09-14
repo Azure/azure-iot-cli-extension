@@ -356,17 +356,20 @@ def test_state_snapshot_reads_identity_metadata_for_every_auth_type(mocker, auth
     twin = {
         "deviceId": "device", "status": "enabled", "capabilities": {"iotEdge": False},
         "authenticationType": auth_type, "x509Thumbprint": {},
+        "tags": {"fresh": "value"},
         "properties": {"desired": {"$metadata": {}, "$version": 1, "value": 7}, "reported": {"notReplayed": True}},
     }
-    mocker.patch("azext_iot.iothub.providers.state._iot_device_twin_list", return_value=[deepcopy(twin)])
+    mocker.patch("azext_iot.iothub.providers.state._iot_device_twin_list", return_value=[{"deviceId": "device"}])
+    read_twin = mocker.patch("azext_iot.iothub.providers.state._iot_device_twin_show", return_value=deepcopy(twin))
     read = mocker.patch("azext_iot.iothub.providers.state._iot_device_show", return_value=identity)
     mocker.patch("azext_iot.iothub.providers.state._iot_device_module_list", return_value=[])
     snapshot = provider.download_devices({"entity": "hub"})["device"]
     read.assert_called_once()
+    read_twin.assert_called_once_with(target={"entity": "hub"}, device_id="device")
     assert snapshot["identity"]["authentication"] == authentication
     assert snapshot["identity"]["adrDeviceProperties"] == metadata
     assert snapshot["identity"]["attributes"] == identity["attributes"]
-    assert snapshot["twin"] == {"properties": {"desired": {"value": 7}}}
+    assert snapshot["twin"] == {"tags": {"fresh": "value"}, "properties": {"desired": {"value": 7}}}
 
 
 def test_state_status_reason_and_extensions_are_forwarded_to_write_projection(mocker):

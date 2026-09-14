@@ -42,6 +42,7 @@ from azext_iot.operations.hub import (_iot_device_create, _iot_device_delete,
                                       _iot_device_module_twin_update,
                                       _iot_device_set_parent, _iot_device_show,
                                       _iot_device_twin_list,
+                                      _iot_device_twin_show,
                                       _iot_device_twin_update,
                                       _iot_edge_set_modules,
                                       _iot_hub_configuration_create,
@@ -522,6 +523,10 @@ class StateProvider(IoTHubProvider):
         """
         # if incorrect permissions, will fail to retrieve any devices
         devices = {}
+        # Only an explicit SKU identifies Basic; missing query properties can
+        # instead be index lag and must never silently discard a Standard twin.
+        if target.get("sku_tier") == "Basic":
+            return devices
         try:
             twins = _iot_device_twin_list(target=target, top=None)
         except AzCLIError:
@@ -529,17 +534,17 @@ class StateProvider(IoTHubProvider):
             return
 
         for i in tqdm(range(len(twins)), desc=usr_msgs.SAVE_DEVICE_DESC, ascii=" #"):
-            device_twin = twins[i]
-            device_id = device_twin["deviceId"]
+            device_id = twins[i]["deviceId"]
+            # Query is discovery, not a snapshot: its tags/desired properties
+            # can lag a successful write. A failed authoritative read must
+            # abort capture before migration deletes or restores anything.
+            device_twin = _iot_device_twin_show(target=target, device_id=device_id)
             device_obj = {}
 
             if device_twin.get("parentScopes"):
                 device_parent = device_twin["parentScopes"][0].split("://")[1]
                 device_obj["parent"] = device_parent[:device_parent.rfind("-")]
 
-            # Basic tier does not support device twins, modules
-            if not device_twin.get("properties"):
-                continue
             # put properties + tags into the saved twin
             device_twin["properties"].pop("reported")
             for key in ["$metadata", "$version"]:
@@ -549,7 +554,7 @@ class StateProvider(IoTHubProvider):
                 "properties": device_twin.pop("properties")
             }
 
-            if device_twin.get("tags"):
+            if "tags" in device_twin:
                 device_obj["twin"]["tags"] = device_twin.pop("tags")
 
             # create the device identity from the device twin
@@ -563,8 +568,8 @@ class StateProvider(IoTHubProvider):
             except AzCLIError:
                 logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_RETRIEVE_FAIL_MSG.format(device_id))
                 continue
-            device_twin.pop("authenticationType")
-            device_twin.pop("x509Thumbprint")
+            device_twin.pop("authenticationType", None)
+            device_twin.pop("x509Thumbprint", None)
             device_twin["authentication"] = identity["authentication"]
             for name in ("attributes", *OWNED_IDENTITY_FIELDS):
                 if identity.get(name) is not None:

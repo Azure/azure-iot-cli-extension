@@ -107,8 +107,13 @@ Identity reads retain the new metadata, as well as the older 2025
 device-identity mutations of those top-level properties fail clearly. User
 attributes with the same nested names remain user data.
 
-State export uses identity GET for authoritative authentication/metadata rather
-than assuming Twin/query contains them. Snapshots retain source metadata;
+State export uses queries to discover device IDs, then direct identity and twin
+GETs for authoritative authentication, metadata, tags and desired properties.
+Stale or incomplete query projections are not used as device-twin snapshots.
+A failed direct device-twin read stops export/migration before replacing an
+existing snapshot file or changing the destination. Enumeration still depends
+on query visibility, and snapshots are not atomic against concurrent writes.
+Snapshots retain source metadata;
 restore preserves writable authentication/attribute extensions and restores
 parents against destination identities, without replaying source ownership.
 
@@ -125,6 +130,9 @@ transport case in `tests/iothub/test_dataplane_wire_unit.py`. Those 51 cases ass
 exact verb/path, exact API query, JSON/no-body behavior and callback results.
 `test_dataplane_adapter_unit.py`, `test_dataplane_cli_unit.py` and existing
 consumer units cover the maintained seams and actual parser/factory behavior.
+`test_preview_auth_switch_unit.py` exercises repeated key/login/connection-string
+CLI invocations in one context, including invoke-only authorization failures and
+token-acquisition failures without credential reuse or automatic fallback.
 
 The following table names **all 42 CLI-used generated operations**. Paths use
 the SDK's operation group names. Existing suites supply broad behavioral
