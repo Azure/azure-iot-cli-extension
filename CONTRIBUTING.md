@@ -146,6 +146,43 @@ To run specific test in any integration test file, such as:
 
 `pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
 
+#### Radar UI coverage and smoke test
+
+The radar unit suite exercises headless Textual interactions and mocked service
+boundaries. Its executable-line coverage gate does not require Azure access:
+
+```bash
+python -m pytest azext_iot/tests/adr/ui -k "_unit.py" -p no:rerunfailures \
+  --cov=azext_iot.adr.ui --cov-config=.coveragerc --cov-fail-under=99
+```
+
+The small live smoke scenario creates one unique, absence-checked ADR namespace.
+It exercises real radar Session/provider reads, namespace navigation, empty child
+collections, and read-only action guards without a TTY. Cleanup is registered
+before creation and deletes only the test-owned namespace. It does not provision
+Hub, DPS, or Software Updates resources or replace manual onboarding evaluation.
+
+Use the candidate extension and a dedicated Azure CLI profile: ADR preflight
+selects the configured test subscription. The existing `azext_iot_adr_subscription`,
+`azext_iot_adr_resource_group`, and `azext_iot_adr_location` settings apply, as do
+the cleanup-admission requirements above. To run only this smoke scenario:
+
+```bash
+AZURE_TEST_RUN_LIVE=True python -m pytest \
+  azext_iot/tests/adr/test_adr_radar_int.py::TestADRRadar::test_radar_readonly_namespace_smoke \
+  -p no:rerunfailures --timeout=900
+```
+
+The existing `ADR-int` selection also includes this scenario.
+
+While the service's known namespace continuation failure is unresolved,
+`azext_iot_adr_radar_skip_namespace_list=true` explicitly omits namespace listing
+from this smoke. The test-only namespace picker then reads the owned namespace
+through its real scoped GET. Child collection reads, headless navigation,
+read-only guards, and owned cleanup remain unchanged. This mode does not validate
+namespace pagination or change production behavior; the default still exercises
+the namespace list.
+
 #### DPS preview authentication phases
 
 The GitHub integration workflow's DPS selection runs three complete `DPS-int`

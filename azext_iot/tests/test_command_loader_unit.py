@@ -97,7 +97,7 @@ def management_command_parser():
     loader = cli_ctx.commands_loader
     loader.skip_applicability = True
     loader.load_command_table(None)
-    names = [*_LINK_PARSER_CASES, "iot hub create", "iot dps create"]
+    names = [*_LINK_PARSER_CASES, "iot hub create", "iot dps create", "iot adr ns ui"]
     loader.command_table = {
         name: loader.command_table[name]
         for name in names
@@ -139,6 +139,7 @@ def test_command_table_loads(command_table):
         "iot adr ns su software-update catalog provider list",
         "iot adr ns su software-update catalog name list",
         "iot adr ns su software-update catalog version list",
+        "iot adr ns ui",
     ]:
         assert expected in command_table, f"Missing command: {expected}"
 
@@ -320,3 +321,30 @@ def test_resource_create_local_auth_option(management_command_parser, kind, valu
         arguments += ["--disable-local-auth", value]
     parsed = management_command_parser.parse_args(arguments)
     assert parsed.disable_local_auth is expected
+
+
+def test_radar_command_allows_interactive_namespace_selection(management_command_parser):
+    parsed = management_command_parser.parse_args(["iot", "adr", "ns", "ui"])
+
+    assert parsed.namespace_name is None
+    assert parsed.resource_group_name is None
+
+
+def test_radar_command_parses_session_options(management_command_parser):
+    parsed = management_command_parser.parse_args(
+        [
+            "iot", "adr", "ns", "ui",
+            *_NAMESPACE_ARGUMENTS,
+            "--read-only",
+            "--refresh-interval", "10",
+            "--theme", "light",
+            "--log-file", "radar.log",
+        ]
+    )
+
+    assert parsed.namespace_name == "namespace"
+    assert parsed.resource_group_name == "resource-group"
+    assert parsed.read_only is True
+    assert parsed.refresh_interval == 10
+    assert parsed.theme == "light"
+    assert parsed.log_file == "radar.log"

@@ -204,7 +204,10 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 92
+    service_commands = {name for name in commands if name != "iot adr ns ui"}
+    assert len(service_commands) == 92
+    assert commands["iot adr ns ui"] == ("command", "adr_ui_launch", {})
+    assert not any(name.startswith("iot adr ns registry-device") for name in commands)
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} delete" not in commands
         assert not hasattr(commands_link, f"adr_link_{endpoint}_delete")

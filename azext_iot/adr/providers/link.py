@@ -99,6 +99,20 @@ class LinkProvider(ADRProvider):
             or {}
         )
 
+    def list_all(self, namespace_name: str, resource_group_name: str) -> list:
+        """Project every endpoint section from one namespace read."""
+        namespace = self._get_namespace(namespace_name, resource_group_name)
+        return [
+            {"name": name, **endpoint}
+            for get_endpoints, endpoint_type in (
+                (_get_provisioning_endpoints, DPS_ENDPOINT_TYPE),
+                (_get_messaging_endpoints, IOT_HUB_ENDPOINT_TYPE),
+                (_get_updating_endpoints, SU_ENDPOINT_TYPE),
+            )
+            for name, endpoint in get_endpoints(namespace).items()
+            if endpoint_is_type(endpoint, endpoint_type)
+        ]
+
     def _rbac_manager(self):
         if self._rbac is None:
             self._rbac = LinkRbacManager(self.cmd.cli_ctx)
