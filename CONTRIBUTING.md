@@ -134,14 +134,18 @@ To run specific test in any integration test file, such as:
 
 #### DPS preview authentication phases
 
-The GitHub integration workflow's DPS selection runs two complete `DPS-int`
+The GitHub integration workflow's DPS selection runs three complete `DPS-int`
 invocations serially: `regular`, with local authentication disabled, then
-`service-sas`, with local authentication enabled. The latter covers all 28
+`service-sas`, with local authentication enabled, then `local-auth-toggle`. Service-SAS covers all 28
 service-key/connection-string lifecycle variants and the KeyBased-to-managed-identity
 Hub-link transition. Device symmetric-key and X.509 attestation remain separate
 from service authentication.
 
-Each phase needs two available DPS slots and creates its own resources. The runner
+The first two phases need two available DPS slots; the serial toggle phase needs
+one separate DPS, with no Hub. Its three cases verify creation with local auth
+disabled, explicit enable/disable and omitted-update preservation, and real
+login/key/connection-string access before, during and after disabling local auth.
+Toggle coverage cannot borrow regular fixtures or supplied resources. The runner
 rejects supplied-resource pins (`azext_iot_testdps`, `azext_iot_testdps_hub`, and
 `azext_iot_testhub`), verifies owned-resource cleanup before continuing, and preserves
 each phase's outcome and sanitized artifacts under `test-result/dps-phases/`.
@@ -149,6 +153,9 @@ Shared fixtures retain a controller reference until all pytest workers finish,
 so an early worker cannot delete a resource before a later worker first uses it.
 The controller releases DPS references before the shared Hub reference, preserving
 ownership checks and the single-create guard.
+The first two phase budgets remain 20/5 and 40/10 minutes for execution/cleanup.
+The toggle phase has 20/5 minutes, within the 110-minute runner and 120-minute job
+bounds. All cases retain their 900-second limit and run without scenario reruns.
 Do not overlap these phases with another DPS-consuming workload.
 
 The serial runner and receipt-enabled integration fixtures are **Linux-only**:
@@ -174,7 +181,10 @@ coverage is not configured yet. Leave `azext_iot_dps_test_phase` unset to select
 existing manually configured certificate tests with their required prerequisites.
 
 Explicit `regular` also requires the complete branch contract (32 modern-registration
-cases, or 30 legacy-registration cases). Neither explicit phase accepts skips.
+cases, or 30 legacy-registration cases). No explicit phase accepts skips.
+`local-auth-toggle` requires exactly its three marked cases, `-n 0`, and
+receipt-enabled ownership; run it through the controller rather than bypassing
+its resource and cleanup gates. Default/manual regular selection excludes it.
 The runner pins commands and credential discovery to its subscription only within
 the test process, without switching the shared CLI profile/cloud. Owned fixture
 ARM writes (including identity/link updates, certificate children, and scoped role

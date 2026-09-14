@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import io
 import runpy
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -35,10 +36,11 @@ def plain_logs(monkeypatch):
 )
 @pytest.mark.parametrize("pretty", [False, True])
 def test_log_format(kind, prefix, color, pretty, monkeypatch, capsys, caplog):
-    if pretty:
-        monkeypatch.setenv("PRETTY_LOG", "1")
-    with patch.object(log, "_ts", return_value="17:21:30"):
-        log._log(kind, "example %s", "message")
+    with monkeypatch.context() as context:
+        if pretty:
+            context.setenv("PRETTY_LOG", "1")
+        with patch.object(log, "_ts", return_value="17:21:30"):
+            log._log(kind, "example %s", "message")
 
     text = prefix + "example message"
     if kind == log.LogKind.STEP:
@@ -59,9 +61,10 @@ def test_log_format(kind, prefix, color, pretty, monkeypatch, capsys, caplog):
 
 @pytest.mark.parametrize("value", [None, "", "0", "false", "1"])
 def test_pretty_log_requires_explicit_opt_in(value, monkeypatch):
-    if value is not None:
-        monkeypatch.setenv("PRETTY_LOG", value)
-    assert log._pretty_log_enabled() is (value == "1")
+    with monkeypatch.context() as context:
+        if value is not None:
+            context.setenv("PRETTY_LOG", value)
+        assert log._pretty_log_enabled() is (value == "1")
 
 
 def test_unknown_log_kind_is_rejected(capsys, caplog):
@@ -109,7 +112,6 @@ def test_timed_step_reports_delta_and_preserves_failure(fails, caplog):
     ],
 )
 def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
     report = SimpleNamespace(
         when="call",
         nodeid="test_example_int.py::TestExample::test_example",
@@ -118,7 +120,9 @@ def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
         longreprtext=reason,
     )
 
-    pytest_runtest_logreport(report)
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        pytest_runtest_logreport(report)
 
     color = "sage" if outcome == "passed" else "terra"
     assert capsys.readouterr().out == f"{log._ANSI[color]}{expected}{log._ANSI_RESET}\n"
@@ -135,7 +139,6 @@ def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
     ],
 )
 def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome, monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", pretty)
     report = SimpleNamespace(
         when=when,
         nodeid="test_example_int.py::TestExample::test_example",
@@ -143,7 +146,9 @@ def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome,
         failed=outcome == "failed",
     )
 
-    pytest_runtest_logreport(report)
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", pretty)
+        pytest_runtest_logreport(report)
 
     assert not capsys.readouterr().out
 
@@ -260,10 +265,11 @@ def test_timestamp_is_utc():
 
 @pytest.mark.parametrize("pretty", [False, True])
 def test_raw_log_with_and_without_arguments(pretty, monkeypatch, caplog, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1" if pretty else "0")
-    log._raw_log()
-    log._raw_log("literal")
-    log._raw_log("value %s", "example")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1" if pretty else "0")
+        log._raw_log()
+        log._raw_log("literal")
+        log._raw_log("value %s", "example")
     if pretty:
         assert capsys.readouterr().out == "\nliteral\nvalue example\n"
     else:
@@ -271,17 +277,114 @@ def test_raw_log_with_and_without_arguments(pretty, monkeypatch, caplog, capsys)
 
 
 def test_pretty_log_without_color(monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
-    monkeypatch.setitem(log._STYLES, "plain", ("prefix ", "missing"))
-    log._log("plain", "value")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        context.setitem(log._STYLES, "plain", ("prefix ", "missing"))
+        log._log("plain", "value")
     assert capsys.readouterr().out == "prefix value\n"
 
 
 def test_pretty_step_without_arguments(monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
-    with patch.object(log, "_ts", return_value="17:21:30"):
-        log._log(log.LogKind.STEP, "Step")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        with patch.object(log, "_ts", return_value="17:21:30"):
+            log._log(log.LogKind.STEP, "Step")
     assert "Step \u00b7 17:21:30" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252", "ascii"])
+@pytest.mark.parametrize("raw", [False, True])
+def test_pretty_output_respects_stream_encoding(encoding, raw, monkeypatch):
+    buffer = io.BytesIO()
+    with io.TextIOWrapper(buffer, encoding=encoding, errors="strict", newline="\n") as stream:
+        with monkeypatch.context() as context:
+            context.setenv("PRETTY_LOG", "1")
+            context.setattr(log.sys, "stdout", stream)
+            if raw:
+                log._raw_log("value %s", "\u2713 caf\u00e9")
+                text = "value \u2713 caf\u00e9\n"
+            else:
+                log._log(log.LogKind.OK, "value %s", "caf\u00e9")
+                text = f"{log._ANSI['sage']}  \u2713 value caf\u00e9{log._ANSI_RESET}\n"
+        # No explicit flush here: the logger must flush before returning.
+        assert buffer.getvalue() == text.encode(encoding, errors="backslashreplace")
+
+
+@pytest.mark.parametrize("outcome", ["passed", "failed"])
+def test_pretty_report_hook_on_cp1252_stream(outcome, monkeypatch):
+    report = SimpleNamespace(
+        when="call",
+        nodeid="test_example_int.py::TestExample::test_example",
+        passed=outcome == "passed",
+        failed=outcome == "failed",
+        longreprtext="AssertionError: caf\u00e9",
+    )
+    buffer = io.BytesIO()
+    with io.TextIOWrapper(buffer, encoding="cp1252", errors="strict", newline="\n") as stream:
+        with monkeypatch.context() as context:
+            context.setenv("PRETTY_LOG", "1")
+            context.setattr(log.sys, "stdout", stream)
+            pytest_runtest_logreport(report)
+        first_report = buffer.getvalue()
+        # The test's own call report runs before fixture teardown. Pretty mode
+        # must already be restored, not just restored by monkeypatch teardown.
+        with monkeypatch.context() as context:
+            context.setattr(log.sys, "stdout", stream)
+            pytest_runtest_logreport(report)
+        assert buffer.getvalue() == first_report
+    if outcome == "passed":
+        expected = f"{log._ANSI['sage']}\\u2713 PASS test_example{log._ANSI_RESET}\n"
+    else:
+        expected = (
+            f"{log._ANSI['terra']}\\u2717 FAIL test_example"
+            f" -- AssertionError: caf\u00e9{log._ANSI_RESET}\n"
+        )
+    assert first_report == expected.encode("cp1252")
+
+
+@pytest.mark.parametrize("encoding", [None, "missing"])
+def test_pretty_output_without_stream_encoding(encoding, monkeypatch):
+    output = io.StringIO()
+    stream = SimpleNamespace(write=output.write, flush=Mock())
+    if encoding is None:
+        stream.encoding = None
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        log._print_pretty("\u2713 caf\u00e9")
+    assert output.getvalue() == "\u2713 caf\u00e9\n"
+    stream.flush.assert_called_once_with()
+
+
+@pytest.mark.parametrize("operation", ["write", "flush"])
+@pytest.mark.parametrize("error", [
+    BrokenPipeError("closed pipe"),
+    OSError("output unavailable"),
+    UnicodeEncodeError("utf-8", "x", 0, 1, "synthetic stream failure"),
+])
+def test_pretty_output_does_not_retry_stream_errors(operation, error, monkeypatch):
+    stream = SimpleNamespace(encoding="utf-8", write=Mock(), flush=Mock())
+    getattr(stream, operation).side_effect = error
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        with pytest.raises(type(error)) as raised:
+            log._print_pretty("\u2713")
+    assert raised.value is error
+    if operation == "write":
+        stream.write.assert_called_once_with("\u2713")
+        stream.flush.assert_not_called()
+    else:
+        assert stream.write.call_count == 2  # text and newline, with no retry
+        stream.flush.assert_called_once_with()
+
+
+def test_pretty_output_rejects_invalid_encoding_before_writing(monkeypatch):
+    stream = SimpleNamespace(encoding="not-a-real-codec", write=Mock(), flush=Mock())
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        with pytest.raises(LookupError):
+            log._print_pretty("\u2713")
+    stream.write.assert_not_called()
+    stream.flush.assert_not_called()
 
 
 def test_namespace_name_generation():

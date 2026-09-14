@@ -17,15 +17,15 @@ MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[1] / "azext_iot/t
 
 
 def evaluate_dps_phases(result_dir):
-    """Do not trust a green job/last tox exit without both phases and cleanup evidence."""
+    """Do not trust a green job/last tox exit without every phase and cleanup evidence."""
     errors = []
     try:
         receipt = json.loads((result_dir / "dps-phases.json").read_text(encoding="utf-8"))
         phases = receipt["phases"]
         if (receipt["schema"] != 1 or receipt["status"] != "passed"
-                or [phase["name"] for phase in phases] != ["regular", "service-sas"]
+                or [phase["name"] for phase in phases] != list(MANIFEST["PHASE_NAMES"])
                 or not receipt["baseline"]["capacity"]["ready"]):
-            raise ValueError("incomplete/failed two-phase summary")
+            raise ValueError("incomplete/failed DPS phase summary")
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
         for phase in phases:
             name = phase["name"]
@@ -62,15 +62,16 @@ def evaluate_dps_phases(result_dir):
                     or results["passed"] != len(expected) or results["failures"] or results["errors"] or results["skipped"]
                     or any(any(case.find(outcome) is not None for outcome in ("failure", "error", "skipped")) for case in cases)):
                 raise ValueError(f"{name}: missing/incomplete/failed JUnit results")
-            if name == "service-sas":
+            if name != "regular":
                 gate = phase["gate"]
                 capacity = gate["capacity"]
-                if (len(cases) != 29 or results["passed"] != 29 or results["skipped"]
+                required = 1 if name == "local-auth-toggle" else 2
+                if (results["passed"] != len(expected) or results["skipped"]
                         or any(case.find("skipped") is not None for case in cases)
                         or gate["previous_owned_absent"] is not True or capacity["ready"] is not True
                         or capacity["count"] != len(set(capacity["ids"]))
-                        or capacity["required"] != 2 or capacity["count"] + 2 > capacity["limit"]):
-                    raise ValueError("service-sas: missing coverage or failed pre-phase cleanup/capacity gate")
+                        or capacity["required"] != required or capacity["count"] + required > capacity["limit"]):
+                    raise ValueError(f"{name}: missing coverage or failed pre-phase cleanup/capacity gate")
     except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as error:
         errors.append(f"DPS phase evidence is incomplete or unsuccessful: {error}.")
     return errors

@@ -25,6 +25,7 @@ from azure.core.pipeline.policies import RetryPolicy
 from azure.core.pipeline.transport import HttpTransport, RequestsTransport
 
 from azext_iot.tests.dps import _phase_receipts as receipts
+from azext_iot.tests.dps import _phase
 
 ARM_HOST = "centraluseuap.management.azure.com"
 _WRITE = ContextVar("owned_dps_fixture_write", default=None)
@@ -298,7 +299,7 @@ class WorkerStop:
 
 def start_worker(session):
     config = receipts.settings()
-    if not config or not hasattr(session.config, "workerinput"):
+    if not config or (not hasattr(session.config, "workerinput") and _phase.get_phase() != _phase.LOCAL_AUTH_TOGGLE):
         return
     require_linux()
     directory = config[0]

@@ -34,7 +34,7 @@ def test_dps_phase_junit_is_isolated_and_coverage_remains_cumulative():
     section = config[INTEGRATION_ENVIRONMENT]
     dps = " ".join(line.strip() for line in section["commands"].splitlines() if line.strip().startswith("DPS:"))
     assert "--junitxml={env:azext_iot_dps_junit:junit/test-iotext-dps-int.xml}" in dps
-    assert "--cov-append" in dps and "-n 7" in dps
+    assert "--cov-append" in dps and "-n {env:azext_iot_dps_workers:7}" in dps
     # Grace is provided by worker cancellation, not tox's SIGINT/execnet teardown path.
     assert "interrupt_timeout" not in section
     assert "azext_*" in section["passenv"]

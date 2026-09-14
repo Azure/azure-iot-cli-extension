@@ -124,8 +124,8 @@ jobs:
           set -euo pipefail
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
-            # Two serial phases only: regular -> service-SAS; certificate is not wired.
-            "DPS|azext_iot/tests/dps|DPS-int|90"
+            # Regular -> service-SAS -> serial local-auth-toggle; certificate is not wired.
+            "DPS|azext_iot/tests/dps|DPS-int|120"
             # Successful Hub suites include more than 90 minutes of shared resource lifecycles.
             "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|120"
             "HubData|azext_iot/tests/iothub|HubData-int|120"
@@ -347,7 +347,7 @@ jobs:
           set -o pipefail
           run_service() {
             if [ "${{ matrix.config.service }}" = "DPS" ]; then
-              echo "DPS coverage: regular and service-SAS; certificate coverage is not configured in this workflow."
+              echo "DPS coverage: regular, service-SAS and serial local-auth-toggle; certificate coverage is not configured in this workflow."
               .tox/DPS-phases/bin/python scripts/run_dps_phases.py \
                 --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" --resource-group "${{ env.RESOURCE_GROUP }}" \
                 --region "${{ matrix.config.region }}"

@@ -42,6 +42,15 @@ def configuration(args=subject.NODES, **options):
     )
 
 
+@pytest.fixture(autouse=True)
+def isolated_resource_pins(monkeypatch, request):
+    # Indirect parameters reproduce the environment supplied by ADO's pytest.ini.
+    for pin, value in getattr(request, "param", {}).items():
+        monkeypatch.setenv(pin, value)
+    for pin in subject.PINS:
+        monkeypatch.delenv(pin, raising=False)
+
+
 @pytest.fixture
 def phase(tmp_path, monkeypatch):
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "True")
@@ -77,28 +86,48 @@ def test_default_is_regular(monkeypatch):
     subject.NODES + ("azext_iot/tests/dps",),
 ])
 def test_exact_arguments_fail_before_constructors(args):
-    with pytest.raises(pytest.UsageError):
+    with pytest.raises(pytest.UsageError, match="requires exactly its .* node arguments, with upload first"):
         subject.validate_selection(configuration(args))
 
 
+@pytest.mark.parametrize("isolated_resource_pins", [
+    {},
+    dict.fromkeys(subject.PINS, "sentinel"),
+    {pin: f"$({pin})" for pin in subject.PINS},
+], indirect=True, ids=["unset", "ado-sentinels", "ado-unexpanded-variables"])
 def test_exact_upload_first_arguments_are_accepted():
+    assert all(os.getenv(pin) is None for pin in subject.PINS)
     subject.validate_selection(configuration())
     subject.validate_selection(configuration(["./" + node for node in subject.NODES]))
 
 
 @pytest.mark.parametrize("options", [
     {"numprocesses": 1}, {"keyword": "_int"}, {"markexpr": "sas"}, {"deselect": [subject.NODES[0]]},
-    {"capture": "no"}, {"showlocals": True}, {"reruns": 1},
+    {"capture": "no"}, {"showlocals": True}, {"log_cli_level": "WARNING"},
 ])
 def test_unsafe_execution_options_rejected(options):
-    with pytest.raises(pytest.UsageError):
+    with pytest.raises(pytest.UsageError, match="requires serial, unfiltered, captured execution"):
         subject.validate_selection(configuration(**options))
 
 
+def test_live_logging_configuration_rejected():
+    config = configuration()
+    config.getini = lambda _name: True
+    with pytest.raises(pytest.UsageError, match="requires serial, unfiltered, captured execution"):
+        subject.validate_selection(config)
+
+
+def test_scenario_reruns_rejected():
+    with pytest.raises(pytest.UsageError, match="HubSAS does not permit scenario reruns"):
+        subject.validate_selection(configuration(reruns=1))
+
+
 @pytest.mark.parametrize("pin", subject.PINS)
-def test_resource_pins_are_rejected(pin, monkeypatch):
-    monkeypatch.setenv(pin, "borrowed")
-    with pytest.raises(pytest.UsageError):
+@pytest.mark.parametrize("value", ["borrowed", "sentinel", "unexpanded"])
+def test_resource_pins_are_rejected(pin, value, monkeypatch):
+    monkeypatch.setenv(pin, f"$({pin})" if value == "unexpanded" else value)
+    assert all(os.getenv(other) is None for other in subject.PINS if other != pin)
+    with pytest.raises(pytest.UsageError, match="HubSAS cannot borrow externally pinned resources"):
         subject.validate_selection(configuration())
 
 

@@ -2,7 +2,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 
-"""Linux-only regular -> service-SAS DPS orchestration, with read-only ownership/capacity gates."""
+"""Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/capacity gates."""
 
 import argparse
 from contextlib import contextmanager
@@ -26,8 +26,12 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 ARM = "https://centraluseuap.management.azure.com"
-PHASES = (("regular", 20 * 60, 5 * 60), ("service-sas", 40 * 60, 10 * 60))
-RUNNER_SECONDS = 80 * 60
+PHASES = (
+    ("regular", 20 * 60, 5 * 60),
+    ("service-sas", 40 * 60, 10 * 60),
+    ("local-auth-toggle", 20 * 60, 5 * 60),
+)
+RUNNER_SECONDS = 110 * 60
 READ_SECONDS = 60
 DPS_LIMIT = 10  # Conservative subscription default; the DPS SDK exposes no quota-read operation.
 REQUIRED_SLOTS = 2
@@ -196,13 +200,13 @@ class ArmReader:
             return self.snapshot(resource)
 
 
-def capacity(inventory):
+def capacity(inventory, required=REQUIRED_SLOTS):
     ids = [resource["id"].lower() for resource in inventory]
     if len(ids) != len(set(ids)):
         raise PhaseError("Subscription inventory contains duplicate IDs; capacity is not proven.")
     return {
-        "ready": len(ids) + REQUIRED_SLOTS <= DPS_LIMIT, "count": len(ids),
-        "limit": DPS_LIMIT, "required": REQUIRED_SLOTS, "ids": sorted(ids),
+        "ready": len(ids) + required <= DPS_LIMIT, "count": len(ids),
+        "limit": DPS_LIMIT, "required": required, "ids": sorted(ids),
         "limit_source": "conservative DPS subscription default (no SDK quota-read operation)",
     }
 
@@ -220,8 +224,8 @@ def ownership(receipts, phase, uid, subscription, group, baseline):
             f"/subscriptions/{subscription}/resourceGroups/{group}/providers/Microsoft.Devices/"
             f"{resource_type}/{record.get('name')}"
         )
-        expected_uid = uid if phase == "regular" else f"{uid}-service-sas"
-        if (kind not in ("h", "nh", "hub") or record.get("run_uid") != uid
+        expected_uid = uid if phase == "regular" else f"{uid}-{phase}"
+        if (kind not in MANIFEST["resource_kinds"](phase) or record.get("run_uid") != uid
                 or record.get("phase") != phase or record.get("subscription") != subscription
                 or record.get("resource_group") != group or record.get("id") != expected_id
                 or record.get("tags") != {"intTest": "true", "runUid": expected_uid, "kind": kind}
@@ -268,7 +272,9 @@ def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=t
                          if resource["id"].lower() in known - remaining_ids)
         unrecorded = [
             resource for resource in inventory
-            if (resource.get("tags") or {}).get("runUid") in (uid, f"{uid}-service-sas")
+            if (resource.get("tags") or {}).get("runUid") in (
+                uid, *(f"{uid}-{phase}" for phase in MANIFEST["PHASE_NAMES"] if phase != "regular"),
+            )
             and resource["id"].lower() not in known
         ]
         if unrecorded:
@@ -453,10 +459,11 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         pins = [name for name in ("azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_testhub")
                 if os.environ.get(name, "").strip()]
         if pins:
-            raise PhaseError("Isolated two-phase DPS run rejects supplied resource pins: " + ", ".join(pins))
+            raise PhaseError("Isolated DPS phases reject supplied resource pins: " + ", ".join(pins))
         if any(os.environ.get(name) for name in (
             "azext_iot_dps_test_phase", "azext_iot_dps_run_uid", "azext_iot_dps_phase_receipts",
             "azext_iot_dps_junit", "azext_iot_dps_interrupt_timeout",
+            "azext_iot_dps_workers",
         )):
             raise PhaseError("The serial runner owns phase/UID/receipt/JUnit/cleanup options; unset conflicting overrides.")
         baseline = reader.inventory()
@@ -473,14 +480,14 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     result["reason"] = "Cancelled or insufficient remaining runtime/cleanup budget"
                     break
                 if index:
-                    prior = summary["phases"][0]
+                    prior = summary["phases"][index - 1]
                     if not prior.get("cleanup", {}).get("complete"):
-                        result["reason"] = "Regular owned-resource cleanup was not proven"
+                        result["reason"] = f"{prior['name']} owned-resource cleanup was not proven"
                         break
                     previous_ids = set(prior["cleanup"]["owned_ids"])
                     present = [resource for record in records if (resource := reader.get(record)) is not None]
                     inventory = reader.inventory()
-                    fresh = capacity(inventory)
+                    fresh = capacity(inventory, required=1 if name == "local-auth-toggle" else REQUIRED_SLOTS)
                     listed = [resource for resource in inventory
                               if resource["id"].lower() in {value.lower() for value in previous_ids}]
                     absent = not present and not listed
@@ -488,7 +495,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                         "previous_owned_absent": absent, "remaining": present + listed, "capacity": fresh, "at": utc(),
                     }
                     if not absent or not fresh["ready"]:
-                        result["reason"] = "Fresh owned-ID absence or two-slot subscription capacity gate failed"
+                        result["reason"] = "Fresh owned-ID absence or subscription capacity gate failed"
                         break
                 if clock() + runtime + cleanup + READ_SECONDS > deadline:
                     result["reason"] = "Read-only gates left insufficient full phase/cleanup budget"
@@ -503,6 +510,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_dps_test_subscription=subscription,
                                    azext_iot_dps_test_resource_group=group, azext_iot_testrg=group,
                                    azext_iot_dps_test_location="centraluseuap", azext_iot_testhub_location="centraluseuap",
+                                   azext_iot_dps_workers="0" if name == "local-auth-toggle" else "7",
                                    azext_iot_dps_junit=str(raw_junit))
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)

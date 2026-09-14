@@ -8,6 +8,8 @@
 
 from pathlib import Path
 
+PHASE_NAMES = ("regular", "service-sas", "local-auth-toggle")
+
 LIFECYCLES = {
     "enrollment/test_iot_dps_enrollment_int.py": (
         "test_dps_enrollment_tpm_lifecycle", "test_dps_enrollment_x509_lifecycle",
@@ -51,8 +53,26 @@ REGULAR_BASE_NODEIDS = frozenset(
     for kind in ("individual", "group")
 }
 
+LOCAL_AUTH_TOGGLE_NODEIDS = frozenset(
+    "core/test_dps_disable_local_auth_int.py::" + name for name in (
+        "test_dps_create_disable_local_auth",
+        "test_dps_update_disable_local_auth",
+        "test_dps_disable_local_auth_dataplane",
+    )
+)
+
+
+def resource_kinds(phase):
+    if phase == "local-auth-toggle":
+        return ("dla",)
+    if phase not in ("regular", "service-sas"):
+        raise ValueError("Unknown DPS phase.")
+    return ("h", "nh", "hub")
+
 
 def expected_nodeids(phase):
+    if phase == "local-auth-toggle":
+        return LOCAL_AUTH_TOGGLE_NODEIDS
     if phase == "service-sas":
         return SERVICE_SAS_NODEIDS
     if phase != "regular":

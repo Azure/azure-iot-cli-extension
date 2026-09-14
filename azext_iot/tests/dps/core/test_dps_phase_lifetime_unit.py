@@ -97,12 +97,15 @@ def local(tmp_path, monkeypatch, mocker):
     return store
 
 
-@pytest.mark.parametrize("phase", [_phase.REGULAR, _phase.SERVICE_SAS])
-@pytest.mark.parametrize("kind", ["h", "nh", "hub"])
+@pytest.mark.parametrize("phase,kind", [
+    (phase, kind)
+    for phase in (_phase.REGULAR, _phase.SERVICE_SAS, _phase.LOCAL_AUTH_TOGGLE)
+    for kind in _phase.resource_kinds(phase)
+])
 def test_late_consumer_reuses_single_creation_until_controller_releases(local, monkeypatch, phase, kind):
     monkeypatch.setenv(_phase.PHASE_ENV, phase)
     uid = fixtures._get_run_uid(_session())
-    assert uid == UID + ("-service-sas" if phase == _phase.SERVICE_SAS else "")
+    assert uid == UID + ("-" + phase if phase != _phase.REGULAR else "")
     assert fixtures._get_run_uid(_session(worker=True)) == uid
     original = fixtures._shared_acquire(uid, kind, local.create, local.find)
     assert fixtures._shared_acquire(uid, kind, local.create, local.find) == original
@@ -322,3 +325,64 @@ def test_real_xdist_late_file_reuses_no_hub_until_actual_controller_sessionfinis
     assert not list(tmp_path.glob("resource-*.json")) and not list(tmp_path.glob("state-*.json"))
     for pid in (controller, early, late):
         assert not Path(f"/proc/{pid}").exists()
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.skipif(sys.platform != "linux", reason="Serial cancellation proof uses Linux signals and owned process groups.")
+@pytest.mark.parametrize("cancel", [False, True])
+def test_real_serial_toggle_releases_controller_reference_even_on_cancellation(tmp_path, mocker, cancel):
+    directory = tmp_path / "receipts"
+    directory.mkdir()
+    profile = tmp_path / "private-cli"
+    profile.mkdir(mode=0o700)
+    (profile / "config").write_text(
+        "[core]\ncheck_version=no\ncollect_telemetry=no\n[extension]\nuse_dynamic_install=no\n", encoding="utf-8",
+    )
+    (tmp_path / "lifetime_parent_dependency.py").write_text("AVAILABLE = True\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        textwrap.dedent(CHILD_CONFTEST).replace("'nh'", "'dla'"), encoding="utf-8",
+    )
+    (tmp_path / "pytest.ini").write_text("[pytest]\naddopts=\n", encoding="utf-8")
+    body = "    while True: time.sleep(.05)\n" if cancel else ""
+    (tmp_path / "test_toggle.py").write_text(
+        "import time\n"
+        "def test_owned(owned):\n"
+        "    assert owned['name'] == 'unit-lifetime-dla'\n" + body, encoding="utf-8",
+    )
+    paths = dict.fromkeys([str(ROOT), str(tmp_path), *(os.path.abspath(path) for path in sys.path)])
+    environment = dict(
+        os.environ, PYTHONPATH=os.pathsep.join(paths), PYTEST_DISABLE_PLUGIN_AUTOLOAD="1",
+        AZURE_CONFIG_DIR=str(profile), AZURE_TEST_RUN_LIVE="False", AZURE_CORE_COLLECT_TELEMETRY="0",
+        AZURE_CORE_CHECK_VERSION="no", AZURE_EXTENSION_USE_DYNAMIC_INSTALL="no", azext_iot_testrg=GROUP,
+        azext_iot_dps_phase_receipts=str(directory), azext_iot_dps_run_uid=UID,
+        azext_iot_dps_test_subscription=SUB, azext_iot_dps_test_resource_group=GROUP,
+        azext_iot_dps_test_phase=_phase.LOCAL_AUTH_TOGGLE,
+    )
+    command = [
+        sys.executable, "-m", "pytest", "-p", "xdist.plugin", "-n", "0",
+        "--rootdir", str(tmp_path), "--confcutdir", str(tmp_path), "-c", str(tmp_path / "pytest.ini"),
+        "-q", str(tmp_path / "test_toggle.py"),
+    ]
+    runner = runpy.run_path(str(ROOT / "scripts/run_dps_phases.py"))
+    mocker.patch.dict(runner["child"].__globals__, READ_SECONDS=1)
+    processes = runner["child"].__globals__["subprocess"]
+    original = processes.Popen
+    mocker.patch.object(processes, "Popen", side_effect=lambda *args, **kwargs: original(*args, cwd=tmp_path, **kwargs))
+    result = runner["child"](
+        command, environment, tmp_path / "output.log", runtime=25, cleanup=8,
+        cancelled=lambda: cancel and (directory / "created-dla.json").exists(),
+    )
+    diagnostic = (tmp_path / "output.log").read_text(encoding="utf-8")[-4096:]
+    assert not result["timed_out"], diagnostic
+    assert result["interrupted"] is cancel, diagnostic
+    assert (result["exit_code"] == 0) is not cancel, diagnostic
+    pid = json.loads((tmp_path / "controller.json").read_text())["pid"]
+    assert LocalResources(tmp_path).events() == [
+        {"action": "create", "name": "unit-lifetime-dla", "pid": pid},
+        {"action": "delete", "name": "unit-lifetime-dla", "pid": pid},
+    ]
+    assert (directory / "deleted-dla.json").is_file()
+    assert len(list(directory.glob("owned-*.json"))) == 1
+    assert len(list(directory.glob("worker-*.json"))) == 1
+    assert not list(tmp_path.glob("resource-*.json")) and not list(tmp_path.glob("state-*.json"))
+    assert not Path(f"/proc/{pid}").exists()
