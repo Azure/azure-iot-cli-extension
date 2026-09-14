@@ -27,6 +27,7 @@ from azure.cli.core.commands import LongRunningOperation
 from azure.cli.core.commands.arm import assign_identity
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
+from azure.core.polling import PollingMethod
 from knack.log import get_logger
 from knack.util import CLIError
 
@@ -1121,18 +1122,16 @@ def iot_hub_create(
     if bool(identity_role) ^ bool(identity_scopes):
         raise RequiredArgumentMissingError('At least one scope (--scopes) and one role (--role) required for system-assigned managed identity role assignment')
 
-    def identity_assignment(lro):
-        try:
-            instance = lro.resource()
-            identity = instance.get("identity")
-            if identity:
-                principal_id = identity.get("principalId")
-                if principal_id:
-                    hub_description["identity"]["principalId"] = principal_id
-                    for scope in identity_scopes:
-                        assign_identity(cmd.cli_ctx, lambda: hub_description, lambda hub: hub_description, identity_role=identity_role, identity_scope=scope)
-        except HttpResponseError as e:
-            raise e
+    def identity_assignment(polling_method: PollingMethod):
+        # Azure Core supplies the polling strategy, not the outer LROPoller.
+        instance = polling_method.resource()
+        identity = instance.get("identity")
+        if identity:
+            principal_id = identity.get("principalId")
+            if principal_id:
+                hub_description["identity"]["principalId"] = principal_id
+                for scope in identity_scopes:
+                    assign_identity(cmd.cli_ctx, lambda: hub_description, lambda hub: hub_description, identity_role=identity_role, identity_scope=scope)
 
     create = client.iot_hub_resource.begin_create_or_update(
         resource_group_name=resource_group_name, resource_name=hub_name,

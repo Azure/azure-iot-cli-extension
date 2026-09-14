@@ -14,6 +14,7 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError, UnclassifiedUserFault,
 )
 from azure.core.exceptions import HttpResponseError
+from azure.core.polling import LROPoller, NoPolling, PollingMethod
 from knack.util import CLIError
 
 from azext_iot.core import custom
@@ -405,13 +406,15 @@ def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
     assignment = mocker.patch.object(custom, "assign_identity")
+    client.iot_hub_resource.begin_create_or_update.return_value = mocker.Mock(spec=LROPoller)
     poller = custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/one", "/two"]
     )
     assignment.assert_not_called()
-    poller.resource.return_value = {"identity": {"principalId": "principal"}}
+    polling_method = mocker.Mock(spec=PollingMethod)
+    polling_method.resource.return_value = {"identity": {"principalId": "principal"}}
     callback = poller.add_done_callback.call_args.args[0]
-    callback(poller)
+    callback(polling_method)
     assert assignment.call_count == 2
     for call, scope in zip(assignment.call_args_list, ["/one", "/two"]):
         context, getter, setter = call.args
@@ -420,10 +423,29 @@ def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
         assert getter()["identity"] == {"type": "SystemAssigned", "principalId": "principal"}
         assert setter(getter()) is getter()
     error = HttpResponseError(message="creation failed")
-    poller.resource.side_effect = error
+    polling_method.resource.side_effect = error
     with pytest.raises(HttpResponseError) as raised:
-        callback(poller)
+        callback(polling_method)
     assert raised.value is error
+
+
+def test_hub_create_assigns_roles_with_completed_azure_core_poller(mocker, preview_mgmt):
+    cmd, client, _, _, _ = preview_mgmt
+    client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
+    result = {"identity": {"principalId": "principal"}}
+    poller = LROPoller(None, result, lambda response: response, NoPolling())
+    client.iot_hub_resource.begin_create_or_update.return_value = poller
+    assignment = mocker.patch.object(custom, "assign_identity")
+
+    assert custom.iot_hub_create(
+        cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/scope"]
+    ) is poller
+
+    assert poller.result() is result
+    assignment.assert_called_once()
+    _, getter, _ = assignment.call_args.args
+    assert getter()["identity"]["principalId"] == "principal"
+    assert assignment.call_args.kwargs == {"identity_role": "Reader", "identity_scope": "/scope"}
 
 
 def test_hub_identity_show_and_scoped_assignment(mocker, preview_mgmt):

@@ -113,6 +113,12 @@ Execute the following command to run the IoT Hub unit tests:
 
 Integration tests are run against Azure resources and depend on environment variables.
 
+The preview Hub, DPS, Device Registry, and Update Instance management clients use
+the public Azure canary endpoint `https://centraluseuap.management.azure.com`.
+They require a public Azure Microsoft Entra authority and ARM audience; sovereign
+cloud configurations are rejected before credentials are acquired. Custom-named
+public Azure cloud configurations remain supported.
+
 Example int tests runs:
 
 _Hub:_

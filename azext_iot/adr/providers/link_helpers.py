@@ -6,7 +6,6 @@
 
 """Pure parsing and serialization helpers for namespace links."""
 
-from copy import deepcopy
 from shlex import join
 from typing import Optional
 
@@ -25,6 +24,8 @@ from azext_iot.adr.common import (
     build_mi_body,
     validate_uami_resource_id,
 )
+# Re-exported so existing link call sites keep importing it from here.
+from azext_iot.adr.topology import endpoint_update_body  # noqa: F401
 from azext_iot.adr.topology import (
     endpoint_is_type,
     get_endpoints,
@@ -269,26 +270,6 @@ def build_su_endpoint_body(
             mi_system_assigned, mi_user_assigned
         ),
     }
-
-
-def endpoint_update_body(
-    existing: Optional[dict],
-    inbound_identity: Optional[dict] = None,
-) -> dict:
-    """Serialize a full endpoint identity for an update PATCH."""
-    existing = existing or {}
-    body = {
-        "endpointType": existing.get("endpointType"),
-        "resourceId": existing.get("resourceId"),
-    }
-    current_inbound = existing.get("inboundCallerIdentity")
-    if current_inbound is not None:
-        body["inboundCallerIdentity"] = current_inbound
-    if inbound_identity is not None:
-        body["inboundCallerIdentity"] = inbound_identity
-    if existing.get("provisioning") is not None:
-        body["provisioning"] = deepcopy(existing["provisioning"])
-    return body
 
 
 def sanitize_identity(identity: Optional[dict]) -> Optional[dict]:

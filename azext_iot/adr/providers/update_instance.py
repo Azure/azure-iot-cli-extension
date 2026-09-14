@@ -140,6 +140,7 @@ class UpdateInstanceProvider(ADRProvider):
         if identity is not None:
             current = self.show(update_instance_name, resource_group_name)
             self._protect_link_identity(current, identity)
+            identity = self._apply_uami_removals(identity, current)
             properties["identity"] = identity
         if not properties:
             raise RequiredArgumentMissingError(
@@ -159,6 +160,33 @@ class UpdateInstanceProvider(ADRProvider):
             f"Updating Update Instance '{update_instance_name}'...",
             **kwargs,
         )
+
+    @staticmethod
+    def _apply_uami_removals(desired_identity: dict, current: Optional[dict]) -> dict:
+        """Null user-assigned identities attached to the resource but absent from
+        the desired set, so the PATCH detaches them (an omitted entry stays
+        attached). Nulls are emitted only while a user-assigned identity remains;
+        dropping them all is handled by the type change. Comparison is
+        case-insensitive; callers must run the link guard first.
+        """
+        existing = (
+            ((current or {}).get("identity") or {}).get("userAssignedIdentities")
+            or {}
+        )
+        desired_map = desired_identity.get("userAssignedIdentities") or {}
+        if not existing or not desired_map:
+            return desired_identity
+        desired_norm = {
+            resource_id.rstrip("/").casefold() for resource_id in desired_map
+        }
+        removals = {
+            resource_id: None
+            for resource_id in existing
+            if resource_id.rstrip("/").casefold() not in desired_norm
+        }
+        if removals:
+            desired_identity["userAssignedIdentities"] = {**desired_map, **removals}
+        return desired_identity
 
     def _protect_link_identity(self, instance: dict, desired_identity: dict):
         linking = ((instance or {}).get("properties") or {}).get("linking") or {}

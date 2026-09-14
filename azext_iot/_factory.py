@@ -9,6 +9,7 @@ Factory functions for IoT Hub and Device Provisioning Service.
 """
 
 from knack.log import get_logger
+from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.common.auth import IoTOAuth, get_cli_credential
@@ -60,6 +61,27 @@ def _get_credential_scopes(cli_ctx):
     return resource_to_scopes(cli_ctx.cloud.endpoints.active_directory_resource_id)
 
 
+def _get_canary_credential_scopes(cli_ctx):
+    """Reject incompatible credentials before using the public canary host."""
+    endpoints = cli_ctx.cloud.endpoints
+    for endpoint, public_endpoints in (
+        (
+            endpoints.active_directory,
+            {"https://login.microsoftonline.com", "https://login.windows.net"},
+        ),
+        (
+            endpoints.active_directory_resource_id,
+            {"https://management.core.windows.net", "https://management.azure.com"},
+        ),
+    ):
+        if not isinstance(endpoint, str) or endpoint.rstrip("/").casefold() not in public_endpoints:
+            raise CLIError(
+                "The preview IoT management APIs support Azure public cloud only. "
+                "Use an AzureCloud-compatible Microsoft Entra authority and ARM audience."
+            )
+    return _get_credential_scopes(cli_ctx)
+
+
 def _iot_hub_management_client(
     cli_ctx, subscription_id, base_url, **kwargs
 ):
@@ -67,6 +89,7 @@ def _iot_hub_management_client(
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
+    credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
@@ -76,7 +99,7 @@ def _iot_hub_management_client(
         subscription_id=subscription_id,
         base_url=base_url,
         **kwargs,
-        credential_scopes=_get_credential_scopes(cli_ctx),
+        credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )
@@ -116,6 +139,7 @@ def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
+    credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(
@@ -125,7 +149,7 @@ def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
         subscription_id=subscription_id,
         base_url=base_url,
         **kwargs,
-        credential_scopes=_get_credential_scopes(cli_ctx),
+        credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )
@@ -178,6 +202,7 @@ def adr_service_factory(cli_ctx, *_, subscription_id=None):
 
     from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
+    credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return DeviceRegistryMgmtClient(
@@ -186,7 +211,7 @@ def adr_service_factory(cli_ctx, *_, subscription_id=None):
         ),
         subscription_id=subscription_id,
         base_url=_ADR_CANARY_ARM_ENDPOINT,
-        credential_scopes=_get_credential_scopes(cli_ctx),
+        credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )
@@ -198,6 +223,7 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
 
     from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
 
+    credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return DeviceUpdateClient(
@@ -206,7 +232,7 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
         ),
         subscription_id=subscription_id,
         base_url=_ADR_CANARY_ARM_ENDPOINT,
-        credential_scopes=_get_credential_scopes(cli_ctx),
+        credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )

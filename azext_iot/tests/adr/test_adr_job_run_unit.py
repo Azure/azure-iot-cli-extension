@@ -465,8 +465,26 @@ def test_job_run_create_generates_run_name(fixture_job_run_provider, mock_poller
     )
 
     kwargs = fixture_job_run_provider.client.job_runs.begin_create_or_replace.call_args.kwargs
-    assert re.fullmatch(r"run-\d{14}", kwargs["run_name"])
+    assert re.fullmatch(r"run-\d{14}-[0-9a-f]{8}", kwargs["run_name"])
     assert kwargs["resource"] == {"properties": {}}
+
+
+def test_job_run_create_same_second_uses_distinct_names(fixture_job_run_provider, mock_poller, mocker):
+    clock = mocker.patch("azext_iot.adr.providers.job_run.datetime")
+    clock.now.return_value.strftime.return_value = "20260914080000"
+    mocker.patch(
+        "azext_iot.adr.providers.job_run.uuid4",
+        side_effect=[Mock(hex="a" * 32), Mock(hex="b" * 32)],
+    )
+    create = fixture_job_run_provider.client.job_runs.begin_create_or_replace
+    create.return_value = mock_poller({})
+
+    for _ in range(2):
+        fixture_job_run_provider.create("job", "namespace", "rg")
+
+    names = [call.kwargs["run_name"] for call in create.call_args_list]
+    assert len(names) == len(set(names)) == 2
+    assert names == ["run-20260914080000-aaaaaaaa", "run-20260914080000-bbbbbbbb"]
 
 
 @pytest.mark.parametrize(

@@ -12,21 +12,43 @@ CLOUD_CONFIGS = [
     {
         "id": "public",
         "resource_manager": "https://management.azure.com",
+        "active_directory": "https://login.microsoftonline.com",
         "active_directory_resource_id": "https://management.core.windows.net/",
         "expected_scopes": ["https://management.core.windows.net//.default"],
     },
     {
         "id": "usgov",
         "resource_manager": "https://management.usgovcloudapi.net",
+        "active_directory": "https://login.microsoftonline.us",
         "active_directory_resource_id": "https://management.core.usgovcloudapi.net/",
         "expected_scopes": ["https://management.core.usgovcloudapi.net//.default"],
+    },
+    {
+        "id": "china",
+        "resource_manager": "https://management.chinacloudapi.cn",
+        "active_directory": "https://login.chinacloudapi.cn",
+        "active_directory_resource_id": "https://management.core.chinacloudapi.cn/",
+        "expected_scopes": ["https://management.core.chinacloudapi.cn//.default"],
+    },
+]
+
+PUBLIC_CLOUD_CONFIGS = [
+    CLOUD_CONFIGS[0],
+    {
+        "id": "custom-public-canary",
+        "resource_manager": CANARY_ARM,
+        "active_directory": "HTTPS://LOGIN.WINDOWS.NET/",
+        "active_directory_resource_id": "https://management.azure.com",
+        "expected_scopes": ["https://management.azure.com/.default"],
     },
 ]
 
 
 def _build_cli_ctx(mocker, cloud_config):
     cli_ctx = mocker.MagicMock()
+    cli_ctx.cloud.name = cloud_config["id"]
     cli_ctx.cloud.endpoints.resource_manager = cloud_config["resource_manager"]
+    cli_ctx.cloud.endpoints.active_directory = cloud_config["active_directory"]
     cli_ctx.cloud.endpoints.active_directory_resource_id = cloud_config["active_directory_resource_id"]
     cli_ctx.data = {"subscription_id": "test-sub-id"}
     return cli_ctx
@@ -51,7 +73,7 @@ MANAGEMENT_FACTORIES = [
 ]
 
 
-@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
+@pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
 class TestFactoryCredentialScopes:
     """Preserve scopes/endpoints while authenticating in the hosting CLI."""
 
@@ -108,6 +130,56 @@ class TestFactoryCredentialScopes:
         assert kwargs[endpoint_key] == CANARY_ARM
 
 
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
+@pytest.mark.parametrize("factory_name,client_path,_endpoint_key", MANAGEMENT_FACTORIES)
+@pytest.mark.parametrize("subscription_id", [None, "linked-sub"])
+def test_canary_rejects_sovereign_cloud_before_credentials(
+    mocker, cli_profile, mocked_response, cloud_config, factory_name, client_path, _endpoint_key, subscription_id
+):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    client_type = mocker.patch(client_path)
+    get_subscription = mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id")
+    get_credential = mocker.spy(_factory, "get_cli_credential")
+    cli_ctx = _build_cli_ctx(mocker, cloud_config)
+
+    with pytest.raises(CLIError, match="Azure public cloud only"):
+        getattr(_factory, factory_name)(cli_ctx, subscription_id=subscription_id)
+
+    get_subscription.assert_not_called()
+    get_credential.assert_not_called()
+    cli_profile.assert_not_called()
+    cli_profile.return_value.get_login_credentials.assert_not_called()
+    client_type.assert_not_called()
+    assert not mocked_response.calls
+
+
+@pytest.mark.parametrize("field,value", [
+    ("active_directory", "https://login.microsoftonline.us"),
+    ("active_directory_resource_id", "https://management.core.usgovcloudapi.net/"),
+    ("active_directory", "https://login.microsoftonline.com.invalid"),
+    ("active_directory_resource_id", "https://management.azure.com.invalid"),
+    ("active_directory", "http://login.microsoftonline.com"),
+    ("active_directory_resource_id", "http://management.azure.com"),
+    ("active_directory", "https://user@login.microsoftonline.com"),
+    ("active_directory_resource_id", "https://management.azure.com/other"),
+    ("active_directory", None),
+    ("active_directory_resource_id", None),
+])
+def test_canary_rejects_incompatible_endpoint_pairs(mocker, field, value):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    cli_ctx = _build_cli_ctx(mocker, CLOUD_CONFIGS[0])
+    setattr(cli_ctx.cloud.endpoints, field, value)
+    scopes = mocker.spy(_factory, "_get_credential_scopes")
+
+    with pytest.raises(CLIError, match="Azure public cloud only"):
+        _factory._get_canary_credential_scopes(cli_ctx)
+    scopes.assert_not_called()
+
+
 def test_credential_is_selected_per_context_without_global_cache(mocker, cli_profile):
     from azext_iot.common.auth import get_cli_credential
 
@@ -146,7 +218,7 @@ def test_factory_propagates_login_failure(mocker, cli_profile):
 
 
 @pytest.mark.parametrize("operation", ["get", "create"])
-@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
+@pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
 def test_adr_requests_use_in_process_auth_without_spawning_cli(
     mocker, cli_profile, mocked_response, operation, cloud_config
 ):
@@ -221,7 +293,7 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
     )
 
 
-@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
+@pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
 def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_profile, mocked_response, cloud_config):
     from urllib.parse import parse_qs, urlsplit
     from azure.core.credentials import AccessToken
