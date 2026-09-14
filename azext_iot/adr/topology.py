@@ -7,6 +7,7 @@
 """Shared helpers and diagnostics for atomic namespace link operations."""
 
 from copy import deepcopy
+from typing import Optional
 
 from azext_iot.adr.common import (
     DPS_ENDPOINT_TYPE,
@@ -85,8 +86,31 @@ def is_failed_hub_endpoint(endpoint) -> bool:
     ).casefold() == "failed"
 
 
+def endpoint_update_body(
+    existing: Optional[dict],
+    inbound_identity: Optional[dict] = None,
+) -> dict:
+    """Project an endpoint onto its writable fields, dropping server-computed
+    status/output (linkingState, linkingError, serviceAddress, address,
+    deviceAddress)."""
+    existing = existing or {}
+    body = {
+        "endpointType": existing.get("endpointType"),
+        "resourceId": existing.get("resourceId"),
+    }
+    current_inbound = existing.get("inboundCallerIdentity")
+    if current_inbound is not None:
+        body["inboundCallerIdentity"] = current_inbound
+    if inbound_identity is not None:
+        body["inboundCallerIdentity"] = inbound_identity
+    if existing.get("provisioning") is not None:
+        body["provisioning"] = deepcopy(existing["provisioning"])
+    return body
+
+
 def writable_namespace_properties(properties: dict) -> dict:
-    """Copy replaceable namespace state without dropping established links."""
+    """Copy replaceable namespace state, projecting endpoints to their writable
+    fields so a CreateOrReplace PUT does not echo server-computed status."""
     result = deepcopy(properties or {})
     result.pop("provisioningState", None)
     result.pop("uuid", None)
@@ -96,7 +120,7 @@ def writable_namespace_properties(properties: dict) -> dict:
         section_body = result.get(section) or {}
         endpoints = section_body.get("endpoints") or {}
         section_body["endpoints"] = {
-            name: deepcopy(endpoint)
+            name: endpoint_update_body(endpoint)
             for name, endpoint in endpoints.items()
             if isinstance(endpoint, dict)
         }

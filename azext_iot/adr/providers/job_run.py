@@ -7,6 +7,7 @@
 import re
 from datetime import datetime, timezone
 from typing import Iterator, Optional
+from uuid import uuid4
 
 from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError
 
@@ -40,9 +41,9 @@ def _generate_job_run_name() -> str:
 
     ``runName`` is a required path segment, but the common case is "run this job
     now" where the caller does not care about the name. A UTC timestamp keeps
-    generated names sortable and collision-free at second resolution.
+    names sortable; a random suffix prevents systematic same-second collisions.
     """
-    return f"run-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    return f"run-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:8]}"
 
 
 def _validate_order_by(order_by: Optional[str]):

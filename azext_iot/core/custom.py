@@ -27,6 +27,7 @@ from azure.cli.core.commands import LongRunningOperation
 from azure.cli.core.commands.arm import create_role_assignment
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
+from azure.core.polling import PollingMethod
 from knack.log import get_logger
 from knack.util import CLIError
 
@@ -1249,8 +1250,9 @@ def iot_hub_create(
     if identity_requested:
         hub_description["identity"] = desired_identity
 
-    def identity_assignment(lro):
-        instance = lro.resource()
+    def identity_assignment(polling_method: PollingMethod):
+        # Azure Core supplies the polling strategy, not the outer LROPoller.
+        instance = polling_method.resource()
         principal_id = ((instance or {}).get("identity") or {}).get("principalId")
         if not principal_id:
             raise CLIInternalError(
