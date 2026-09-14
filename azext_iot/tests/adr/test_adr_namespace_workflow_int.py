@@ -6,7 +6,7 @@
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -20,7 +20,7 @@ from azext_iot.tests.generators import generate_generic_id
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRNamespaceWorkflow(
-    ADRFullInfraHelper, CaptureOutputLiveScenarioTest
+    ADRFullInfraHelper, ADRLiveScenarioTest
 ):
     def test_namespace_setup_tagged_plan_is_read_only(self):
         namespace_name = generate_adr_namespace_name()

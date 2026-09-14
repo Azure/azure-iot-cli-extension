@@ -2,6 +2,14 @@
 
 Release History
 ===============
+0.33.0+workflow3 (Preview)
+++++++++++++++++++++++++++
+
+**Namespace workflow CI fixes**
+
+* Isolated workflow renderer unit tests from real terminal input/output, including Windows runners without a console, without changing interactive behavior.
+* Aligned the namespace workflow integration harness with the shared ADR command logging wrapper.
+
 0.33.0+workflow2 (Preview)
 ++++++++++++++++++++++++++
 

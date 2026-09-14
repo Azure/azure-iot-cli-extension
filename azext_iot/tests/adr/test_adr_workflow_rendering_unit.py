@@ -8,12 +8,25 @@ from io import StringIO
 from unittest.mock import MagicMock
 
 import pytest
+from prompt_toolkit.application import create_app_session
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
+from prompt_toolkit.input import DummyInput
+from prompt_toolkit.output import DummyOutput
 from rich.console import Console
 
 from azext_iot.adr.workflows import rendering as subject
 from azext_iot.adr.workflows.models import EndpointSpec, SetupRequest
+
+
+@pytest.fixture(autouse=True)
+def prompt_io(mocker):
+    """Keep real prompt sessions without opening the host terminal."""
+    output = DummyOutput()
+    # The renderer explicitly targets stderr, bypassing the app session output.
+    create_output = mocker.patch.object(subject, "create_output", return_value=output)
+    with create_app_session(input=DummyInput(), output=output) as session:
+        yield session, create_output
 
 
 def _console(stream, force_terminal=False):
@@ -201,6 +214,37 @@ def test_rich_execution_and_symbols():
     assert "Failed" in output
     assert "step 2/3" in output
     assert "resources" in output
+
+
+def test_rich_prompt_sessions_do_not_open_host_console(mocker, prompt_io):
+    session, renderer_output = prompt_io
+    create_input = mocker.patch(
+        "prompt_toolkit.input.defaults.create_input",
+        side_effect=AssertionError("Real terminal input must not be opened"),
+    )
+    create_output = mocker.patch(
+        "prompt_toolkit.output.defaults.create_output",
+        side_effect=AssertionError("Real terminal output must not be opened"),
+    )
+    renderer = subject.WorkflowRenderer(
+        "Namespace setup",
+        console=_console(StringIO(), force_terminal=True),
+    )
+    assert renderer.rich
+    original = renderer._prompt_session
+    assert isinstance(original, subject.PromptSession)
+    assert original.app.input is session.input
+    assert original.app.output is session.output
+    renderer_output.assert_called_once_with(stdout=subject.sys.stderr)
+
+    mocker.patch.object(original, "prompt", return_value="p")
+    assert renderer.action("Review?", {"p": "save"}) == "p"
+    assert renderer._prompt_session is not original
+    assert renderer._prompt_session.app.input is session.input
+    assert renderer._prompt_session.app.output is session.output
+    assert renderer_output.call_count == 2
+    create_input.assert_not_called()
+    create_output.assert_not_called()
 
 
 def test_prompt_navigation_commands(mocker):
