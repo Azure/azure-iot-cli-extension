@@ -163,15 +163,41 @@ def test_toggle_creation_keeps_receipts_true_policy_grants_and_no_broad_gc(isola
 def test_serial_worker_installs_cooperative_cleanup_signal(isolated, mocker):
     config = mocker.Mock(spec=["pluginmanager", "add_cleanup"])
     session = SimpleNamespace(config=config)
-    signal = mocker.patch.object(runtime.signal, "signal")
+    require_linux = mocker.patch.object(runtime, "require_linux")
+    signals = SimpleNamespace(
+        Signals={"SIGUSR1": mocker.sentinel.stop_signal},
+        signal=mocker.Mock(return_value=mocker.sentinel.previous_handler),
+    )
+    mocker.patch.object(runtime, "signal", signals)
     runtime.start_worker(session)
+    require_linux.assert_called_once_with()
     config.pluginmanager.register.assert_called_once()
-    signal.assert_called_once()
     assert len(list(isolated.glob("worker-*.json"))) == 1
     plugin = config.pluginmanager.register.call_args.args[0]
+    signals.signal.assert_called_once_with(mocker.sentinel.stop_signal, plugin.stop)
+    config.add_cleanup.assert_called_once()
+    config.add_cleanup.call_args.args[0]()
+    assert signals.signal.call_args.args == (mocker.sentinel.stop_signal, mocker.sentinel.previous_handler)
+    assert signals.signal.call_count == 2
     plugin.cleaning = True
     plugin.stop()
     assert "cleanup" in session.shouldstop
+
+
+@pytest.mark.parametrize("platform", ["darwin", "win32"])
+def test_serial_worker_rejects_non_linux_before_setup(isolated, mocker, platform):
+    config = mocker.Mock(spec=["pluginmanager", "add_cleanup"])
+    mocker.patch.object(runtime, "sys", SimpleNamespace(platform=platform))
+    signals = SimpleNamespace(Signals={}, signal=mocker.Mock())
+    mocker.patch.object(runtime, "signal", signals)
+    write = mocker.patch.object(receipts, "write")
+    with pytest.raises(pytest.UsageError, match="requires Linux"):
+        runtime.start_worker(SimpleNamespace(config=config))
+    config.pluginmanager.register.assert_not_called()
+    config.add_cleanup.assert_not_called()
+    signals.signal.assert_not_called()
+    write.assert_not_called()
+    assert not list(isolated.glob("worker-*.json"))
 
 
 @pytest.mark.parametrize("failure", [
