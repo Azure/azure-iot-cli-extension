@@ -8,9 +8,11 @@
 
 from contextlib import nullcontext
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import runpy
+import signal
 import subprocess
 import sys
 import time
@@ -25,6 +27,7 @@ from azure.core.pipeline import Pipeline
 from azure.core.pipeline.policies import HTTPPolicy
 from azure.core.pipeline.transport import RequestsTransport
 from azure.core.pipeline.transport import HttpRequest
+from filelock import FileLock
 
 from azext_iot import _factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -217,6 +220,86 @@ def test_native_known_object_role_grant_never_queries_graph(scope, mocker, monke
     assert all(call.request.url.startswith(base + f"/subscriptions/{SUB_B}/") for call in responses.calls)
 
 
+@responses.activate
+@pytest.mark.parametrize("known_principal", [False, True])
+@pytest.mark.parametrize("confirmation", [
+    "visible", "empty", "wrong-principal", "wrong-role", "parent-scope", "child-scope", "read-denied",
+])
+def test_native_duplicate_empty_fallback_requires_exact_bounded_confirmation(scope, mocker, known_principal, confirmation):
+    from azure.cli.command_modules.role import RoleCommandsLoader, custom as role_commands
+    from azure.cli.command_modules.role._msgrpah import GraphClient
+    from azext_iot.tests import helpers
+    from azext_iot.tests.dps import conftest as fixtures
+
+    owned = _owned("hub").removeprefix(ARM)
+    cli = _real_cli(mocker, RoleCommandsLoader)
+    mocker.patch.object(helpers, "cli", cli)
+    pause = mocker.patch.object(runtime, "sleep")
+    graph = mocker.patch.object(GraphClient, "_send", side_effect=AssertionError("No principal-name hydration"))
+    resolve = mocker.patch.object(role_commands, "_resolve_object_id_and_type", return_value=(SUB_A, "ServicePrincipal"))
+    alias_read = mocker.patch.object(role_commands, "_resolve_object_id", return_value=SUB_A)
+    assignment_name = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    role_id = f"/subscriptions/{SUB_B}/providers/Microsoft.Authorization/roleDefinitions/dddddddd-dddd-dddd-dddd-dddddddddddd"
+    mocker.patch.object(role_commands, "_gen_guid", return_value=assignment_name)
+    assignments = ARM + owned + "/providers/Microsoft.Authorization/roleAssignments"
+    target = assignments + "/" + assignment_name
+    resource = {
+        "id": target.removeprefix(ARM), "name": assignment_name,
+        "properties": {"scope": owned, "principalId": SUB_A, "principalType": "ServicePrincipal",
+                       "roleDefinitionId": role_id},
+    }
+    responses.add("GET", ARM + owned + "/providers/Microsoft.Authorization/roleDefinitions", json={
+        "value": [{"id": role_id, "properties": {"roleName": fixtures.HUB_USER_ROLE}}],
+    })
+    # Worker preflight and native CLI's immediate fallback both miss the grant.
+    responses.add("GET", assignments, json={"value": []})
+    responses.add("PUT", target, status=409, json={
+        "error": {"code": "RoleAssignmentExists", "message": "synthetic existing assignment"},
+    })
+    responses.add("GET", assignments, json={"value": []})
+    responses.add("GET", assignments, json={"value": []})  # First read-only confirmation is still too early.
+    properties = resource["properties"]
+    if confirmation == "wrong-principal":
+        properties["principalId"] = SUB_B
+    elif confirmation == "wrong-role":
+        properties["roleDefinitionId"] = role_id.replace("dddddddd", "eeeeeeee")
+    elif confirmation == "parent-scope":
+        properties["scope"] = owned.split("/providers/")[0]
+    elif confirmation == "child-scope":
+        properties["scope"] = owned + "/children/child"
+    if confirmation == "read-denied":
+        responses.add("GET", assignments, status=403, json={"error": {"code": "AuthorizationFailed"}})
+    else:
+        responses.add("GET", assignments, json={"value": [] if confirmation == "empty" else [resource]})
+    arguments = {"assignee_object_id": SUB_A, "assignee_principal_type": "ServicePrincipal"} if known_principal else {
+        "assignee": "caller-app-id",
+    }
+    original_list = role_commands.list_role_assignments
+    expected = HttpResponseError if confirmation == "read-denied" else runtime.ScopeError
+    with runtime.activate(SUB_B, existing=(cli,)):
+        with nullcontext() if confirmation == "visible" else pytest.raises(expected) as raised:
+            runtime.assign_role_assignment_once(
+                role=fixtures.HUB_USER_ROLE, scope=owned, max_tries=2, wait=3, **arguments,
+            )
+    if confirmation not in ("visible", "read-denied"):
+        assert isinstance(raised.value.__cause__, runtime._RoleAssignmentPending)
+        duplicate = raised.value.__cause__.__cause__
+        assert duplicate.status_code == 409
+        assert duplicate.error.code == "RoleAssignmentExists"
+    assert role_commands.list_role_assignments is original_list
+    assert resolve.call_count == (0 if known_principal else 1)
+    assert alias_read.call_count == (0 if known_principal else 1)
+    graph.assert_not_called()
+    assert pause.call_args_list == [mocker.call(3), mocker.call(3)]
+    puts = [call for call in responses.calls if call.request.method == "PUT"]
+    assert len(puts) == 1
+    assert json.loads(puts[0].request.body)["properties"]["principalId"] == SUB_A
+    assert len([call for call in responses.calls if call.request.url.startswith(assignments)
+                and call.request.method == "GET"]) == 4  # Original bound plus native fallback, not an extra retry loop.
+    assert all(call.request.url.startswith(ARM + f"/subscriptions/{SUB_B}/") for call in responses.calls)
+    assert len(list(scope.glob("mutation-*.json"))) == 1
+
+
 def _arm_resources(url):
     hub_url = _owned("hub")
     host = "owned.azure-devices.net"
@@ -389,6 +472,373 @@ def test_fixture_role_visibility_fails_without_repeating_create(scope, mocker, f
         runtime.assign_role_assignment_once(role="role", scope=owned, assignee="unit", max_tries=2)
     create.assert_called_once()
     assert reads.call_count == (1 if failure == "uncertain-create" else 3)
+
+
+@pytest.mark.parametrize("origin", ["create", "fallback-list", "response-json", "cancel"])
+def test_fixture_role_confirmation_does_not_hide_unrelated_errors(scope, mocker, origin):
+    from azure.cli.command_modules.role import custom as role_commands
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    pause = mocker.patch.object(runtime, "sleep")
+    error = KeyboardInterrupt() if origin == "cancel" else IndexError("unrelated indexing failure")
+    create = mocker.patch.object(helpers, "invoke_checked")
+    if origin == "fallback-list":
+        duplicate = HttpResponseError(message="synthetic duplicate")
+        duplicate.status_code = 409
+        duplicate.error = SimpleNamespace(code="RoleAssignmentExists")
+        mocker.patch.object(role_commands, "_create_role_assignment", side_effect=duplicate)
+        mocker.patch.object(role_commands, "list_role_assignments", side_effect=error)
+        create.side_effect = lambda *_args, **_kwargs: role_commands.create_role_assignment(
+            SimpleNamespace(cli_ctx=None), "role", owned,
+            assignee_object_id=SUB_A, assignee_principal_type="ServicePrincipal",
+        )
+    elif origin == "response-json":
+        create.return_value.as_json.side_effect = error
+    else:
+        create.side_effect = error
+    with pytest.raises(type(error)) as raised:
+        runtime.assign_role_assignment_once(
+            role="role", scope=owned, assignee_object_id=SUB_A, assignee_principal_type="ServicePrincipal", max_tries=2,
+        )
+    assert raised.value is error
+    create.assert_called_once()
+    reads.assert_called_once()
+    pause.assert_not_called()
+
+
+@pytest.mark.parametrize("other_target", [
+    {"role": "other-role"}, {"scope": "/other-scope"},
+    {"assignee_object_id": SUB_B}, {"assignee": "other-alias", "assignee_object_id": None},
+])
+def test_fixture_role_confirmation_rejects_duplicate_from_another_native_target(scope, mocker, other_target):
+    from azure.cli.command_modules.role import custom as role_commands
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    arguments = {"role": "role", "scope": owned, "assignee_object_id": SUB_A}
+    arguments.update(other_target)
+    duplicate = HttpResponseError(message="synthetic duplicate")
+    duplicate.status_code = 409
+    duplicate.error = SimpleNamespace(code="RoleAssignmentExists")
+    mocker.patch.object(role_commands, "_resolve_object_id_and_type", return_value=(SUB_B, "ServicePrincipal"))
+    mocker.patch.object(role_commands, "_get_principal_type_from_object_id", return_value="ServicePrincipal")
+    mocker.patch.object(role_commands, "_create_role_assignment", side_effect=duplicate)
+    mocker.patch.object(role_commands, "list_role_assignments", return_value=[])
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked", side_effect=lambda *_args, **_kwargs: (
+        role_commands.create_role_assignment(SimpleNamespace(cli_ctx=None), **arguments)
+    ))
+    pause = mocker.patch.object(runtime, "sleep")
+    with pytest.raises(IndexError) as raised:
+        runtime.assign_role_assignment_once(
+            role="role", scope=owned, assignee_object_id=SUB_A, assignee_principal_type="ServicePrincipal", max_tries=2,
+        )
+    assert raised.value.__context__ is duplicate
+    create.assert_called_once()
+    reads.assert_called_once()
+    pause.assert_not_called()
+
+
+def test_fixture_role_zero_budget_never_creates_or_sleeps(scope, mocker):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    pause = mocker.patch.object(runtime, "sleep")
+    with pytest.raises(runtime.ScopeError, match="verification bound"):
+        runtime.assign_role_assignment_once(role="role", scope=owned, assignee="unit", max_tries=0)
+    reads.assert_called_once()
+    create.assert_not_called()
+    pause.assert_not_called()
+
+
+def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker):
+    from azext_iot.tests import helpers
+    from azext_iot.tests.dps import conftest as fixtures
+
+    owned = _owned("hub").removeprefix(ARM)
+    resource = {"name": "owned", "id": owned, "location": fixtures.HUB_TEST_LOCATION}
+    lock = scope / "shared.lock"
+    state = scope / "shared.json"
+    mocker.patch.object(fixtures, "_state_paths", return_value=(str(lock), str(state)))
+    mocker.patch.object(fixtures, "_get_run_uid", return_value=UID)
+    mocker.patch.object(fixtures.settings.env, "azext_iot_testdps_hub", None)
+    mocker.patch.object(fixtures, "_assert_local_auth_policy")
+    create_hub = mocker.patch.object(fixtures, "_create_managed_hub", return_value=("owned", resource))
+    mocker.patch.object(fixtures, "_find_hub_by_name", return_value=resource)
+    mocker.patch.object(fixtures, "sleep")
+    mocker.patch.object(runtime, "sleep")
+    mocker.patch.object(fixtures.cli, "invoke").return_value.as_json.return_value = {"user": {"name": SUB_A}}
+    reads = mocker.patch.object(helpers, "get_role_assignments", side_effect=[
+        [], [{"principalId": SUB_A}], [], [{"principalId": SUB_A}],
+    ])
+    create_role = mocker.patch.object(helpers, "invoke_checked")
+    create_role.return_value.as_json.return_value = {"principalId": SUB_A}
+    # Hub acquire/refcount locking remains unchanged. The separate grant receipt
+    # prevents even a stale second preflight from issuing another role create.
+    first = fixtures._iot_hubs_provisioner(None)
+    second = fixtures._iot_hubs_provisioner(None)
+    assert first == second
+    create_hub.assert_called_once()
+    create_role.assert_called_once()
+    assert reads.call_count == 2
+    assert lock.exists()
+    assert json.loads(state.read_text())["refcount"] == 3  # Controller plus both callers.
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Receipt-enabled DPS workers require Linux.")
+@pytest.mark.timeout(15)
+@pytest.mark.parametrize("outcome", ["success", "uncertain-visible", "uncertain", "cancelled", "terminated"])
+def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocker, outcome):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    context = multiprocessing.get_context("fork")
+    creating, release, waiter_started = (context.Event() for _ in range(3))
+    creates, reads = context.Value("i", 0), context.Value("i", 0)
+    visible = context.Value("b", False)
+    results = context.Queue()
+
+    def read(**kwargs):
+        assert kwargs["role"] == "role" and kwargs["scope"] == owned
+        assert kwargs.get("assignee") == "caller-alias" or kwargs.get("assignee_object_id") == SUB_A
+        with reads.get_lock():
+            reads.value += 1
+        return [{"principalId": SUB_A}] if visible.value else []
+
+    def create(*_args, **_kwargs):
+        with creates.get_lock():
+            creates.value += 1
+        creating.set()  # The durable attempt marker and real grant lock already exist.
+        if outcome == "terminated":
+            time.sleep(10)  # Do not kill a process holding a multiprocessing.Event's condition lock.
+        else:
+            assert release.wait(5)
+        if outcome in ("success", "uncertain-visible"):
+            visible.value = True
+        if outcome == "cancelled":
+            raise KeyboardInterrupt()
+        if outcome != "success":
+            raise ServiceResponseError("synthetic uncertain response")
+        return SimpleNamespace(as_json=lambda: {"principalId": SUB_A})
+
+    def worker(label):
+        if label == "waiter":
+            waiter_started.set()
+        try:
+            runtime.assign_role_assignment_once("role", owned, "caller-alias", max_tries=10, wait=0.05)
+        except BaseException as error:  # pylint: disable=broad-except
+            results.put((label, type(error).__name__))
+        else:
+            results.put((label, "verified"))
+
+    mocker.patch.object(helpers, "get_role_assignments", side_effect=read)
+    mocker.patch.object(helpers, "invoke_checked", side_effect=create)
+    owner = context.Process(target=worker, args=("owner",))
+    waiter = context.Process(target=worker, args=("waiter",))
+    owner.start()
+    try:
+        assert creating.wait(5)
+        waiter.start()
+        assert waiter_started.wait(5)
+        time.sleep(0.05)
+        assert reads.value == creates.value == 1  # Waiter is behind the real cross-process FileLock.
+        if outcome == "terminated":
+            os.kill(owner.pid, signal.SIGTERM)
+        else:
+            release.set()
+        owner.join(3)
+        waiter.join(3)
+        assert not owner.is_alive() and not waiter.is_alive()
+        statuses = dict(results.get(timeout=1) for _ in range(1 if outcome == "terminated" else 2))
+        assert statuses["waiter"] == ("verified" if outcome in ("success", "uncertain-visible") else "ScopeError")
+        if outcome != "terminated":
+            assert statuses["owner"] == {
+                "success": "verified", "uncertain-visible": "ServiceResponseError",
+                "uncertain": "ServiceResponseError", "cancelled": "KeyboardInterrupt",
+            }[outcome]
+        assert creates.value == 1
+        record = json.loads(next(scope.glob("role-grant-*.json")).read_text())
+        assert record["create_attempted"] is True
+        assert record["run_uid"] == UID and record["subscription"] == SUB_B and record["phase"] == "regular"
+        if outcome in ("success", "uncertain-visible"):
+            assert record["verified"] and record["principal_id"] == SUB_A
+            assert reads.value == 2
+    finally:
+        release.set()
+        for process in (owner, waiter):
+            if process.pid:
+                if process.is_alive():
+                    os.kill(process.pid, signal.SIGTERM)
+                process.join(3)
+        results.close()
+
+
+def test_role_grant_lock_wait_is_bounded_and_does_not_replay(scope, mocker):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked", side_effect=ServiceResponseError("uncertain"))
+    with pytest.raises(ServiceResponseError):
+        runtime.assign_role_assignment_once("role", owned, "alias", max_tries=1, wait=0)
+    receipt = next(scope.glob("role-grant-*.json"))
+    started = time.monotonic()
+    with FileLock(str(receipt) + ".grant.lock"):
+        with pytest.raises(runtime.ScopeError, match="cross-worker verification bound"):
+            runtime.assign_role_assignment_once("role", owned, "alias", max_tries=2, wait=0.05)
+    assert 0.1 <= time.monotonic() - started < 2
+    create.assert_called_once()
+    reads.assert_called_once()
+
+
+def test_role_grant_lock_wait_consumes_existing_visibility_budget(scope, mocker):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    clock = [0]
+    mocker.patch.object(runtime, "monotonic", side_effect=lambda: clock[0])
+
+    class DelayedLock(FileLock):
+        def acquire(self, *args, **kwargs):
+            assert kwargs["timeout"] == 10
+            clock[0] += 7
+            return super().acquire(*args, **kwargs)
+
+    mocker.patch.object(runtime, "FileLock", DelayedLock)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_A}
+
+    def advance(duration):
+        clock[0] += duration
+
+    pause = mocker.patch.object(runtime, "sleep", side_effect=advance)
+    with pytest.raises(runtime.ScopeError, match="read-only verification bound"):
+        runtime.assign_role_assignment_once("role", owned, "alias", max_tries=1, wait=10)
+    assert clock[0] == 10  # Seven seconds waiting leaves three, not another ten.
+    pause.assert_called_once_with(3)
+    create.assert_called_once()
+    assert reads.call_count == 2
+
+
+def test_role_grant_uuid_alias_reuses_resolved_principal_after_unverified_attempt(scope, mocker):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", side_effect=[
+        [], [], [{"principalId": SUB_B}],
+    ])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_B}  # App ID != object ID.
+    with pytest.raises(runtime.ScopeError, match="read-only verification bound"):
+        runtime.assign_role_assignment_once("role", owned, SUB_A, max_tries=1, wait=0)
+    runtime.assign_role_assignment_once("role", owned, SUB_A, max_tries=1, wait=0)
+    runtime.assign_role_assignment_once("role", owned, SUB_A, max_tries=1, wait=0)
+    create.assert_called_once()
+    assert f'--assignee "{SUB_A}"' in create.call_args.args[1]
+    assert "--assignee-object-id" not in create.call_args.args[1]
+    assert reads.call_args_list[0].kwargs["assignee"] == SUB_A
+    assert all(call.kwargs["assignee_object_id"] == SUB_B for call in reads.call_args_list[1:])
+    record = json.loads(next(scope.glob("role-grant-*.json")).read_text())
+    assert record["target_kind"] == "alias" and record["target"] == SUB_A
+    assert record["principal_id"] == SUB_B and record["verified"]
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_role_grant_known_id_case_does_not_change_logical_grant(scope, mocker, existing):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(
+        helpers, "get_role_assignments",
+        side_effect=[[{"principalId": SUB_A.upper()}]] if existing else [[], [{"principalId": SUB_A}]],
+    )
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_A.upper()}
+    for role, target_scope, principal in (("role", owned, SUB_A), ("ROLE", owned.upper(), SUB_A.upper())):
+        runtime.assign_role_assignment_once(
+            role, target_scope, assignee_object_id=principal, assignee_principal_type="ServicePrincipal",
+            max_tries=1, wait=0,
+        )
+    assert reads.call_count == (1 if existing else 2)
+    assert create.call_count == (0 if existing else 1)
+    assert len(list(scope.glob("role-grant-*.json"))) == 1
+
+
+@pytest.mark.parametrize("principal", [None, "", " ", 17, True, {}])
+def test_role_grant_invalid_principal_read_cannot_verify_or_create(scope, mocker, principal):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[{"principalId": principal}])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    with pytest.raises(runtime.ScopeError):
+        runtime.assign_role_assignment_once("role", owned, "alias", max_tries=1, wait=0)
+    create.assert_not_called()
+    assert not list(scope.glob("role-grant-*.json"))
+
+
+def test_role_grant_requires_durable_attempt_receipt_before_create(scope, mocker):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    mocker.patch.object(receipts, "write", side_effect=OSError("receipt write failed"))
+    with pytest.raises(OSError, match="receipt write failed"):
+        runtime.assign_role_assignment_once("role", owned, "alias")
+    create.assert_not_called()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("phase", "service-sas"), ("run_uid", "a" * 32), ("subscription", SUB_A),
+    ("scope", "/other"), ("role", "other-role"), ("target", "other-alias"),
+])
+def test_role_grant_rejects_mismatched_receipt_before_cli(scope, mocker, field, value):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[{"principalId": SUB_A}])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    runtime.assign_role_assignment_once("role", owned, "alias")
+    receipt = next(scope.glob("role-grant-*.json"))
+    record = json.loads(receipt.read_text())
+    record[field] = value
+    receipt.write_text(json.dumps(record))
+    with pytest.raises(runtime.ScopeError, match="exact grant"):
+        runtime.assign_role_assignment_once("role", owned, "alias")
+    reads.assert_called_once()
+    create.assert_not_called()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("create_attempted", None), ("verified", "true"), ("principal_id", None),
+    ("principal_id", 42), ("principal_id", ""), ("principal_id", False), ("principal_id", " "),
+])
+@pytest.mark.parametrize("known_principal", [False, True])
+def test_role_grant_corrupt_receipt_cannot_authorize_success_or_recreation(scope, mocker, field, value, known_principal):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[{"principalId": SUB_A}])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    target = (
+        {"assignee_object_id": SUB_A, "assignee_principal_type": "ServicePrincipal"}
+        if known_principal else {"assignee": "alias"}
+    )
+    runtime.assign_role_assignment_once("role", owned, **target)
+    receipt = next(scope.glob("role-grant-*.json"))
+    record = json.loads(receipt.read_text())
+    record[field] = value
+    receipt.write_text(json.dumps(record))
+    with pytest.raises(runtime.ScopeError):
+        runtime.assign_role_assignment_once("role", owned, **target)
+    reads.assert_called_once()
+    create.assert_not_called()
 
 
 @responses.activate

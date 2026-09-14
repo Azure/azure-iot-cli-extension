@@ -119,6 +119,14 @@ They require a public Azure Microsoft Entra authority and ARM audience; sovereig
 cloud configurations are rejected before credentials are acquired. Custom-named
 public Azure cloud configurations remain supported.
 
+The shared pipeline resource group is subject to the Azure DevOps cleanup job
+in `.azure-devops/cleanup.yml`, scheduled daily at **13:00 UTC** from `dev`.
+It deletes every resource not excluded by name, without checking resource age
+or active test ownership. Run-scoped names and receipts do not prevent this
+cleanup. Check Azure DevOps cleanup activity as well as GitHub workflows before
+starting a suite, and allow its full execution and teardown budget to finish
+before the cleanup window, or wait until cleanup has completed.
+
 Example int tests runs:
 
 _Hub:_
