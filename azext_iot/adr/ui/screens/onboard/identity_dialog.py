@@ -218,6 +218,10 @@ class IdentityChoiceDialog(ModalScreen[Optional[IdentityChoice]]):
         self.app.call_from_thread(self._apply_uamis, identities, problem)
 
     def _apply_uamis(self, identities, problem: str) -> None:
+        # A slow list may finish after the customer has switched to creating a UAMI.
+        # Do not replace that form or steal its keyboard focus with old picker results.
+        if self._active_mode != "identity-uami":
+            return
         self.query_one("#identity-loading", LoadingIndicator).display = False
         status = self.query_one("#identity-status", Static)
         table = self.query_one("#identity-table", DataTable)

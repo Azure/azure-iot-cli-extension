@@ -11,7 +11,7 @@ from copy import deepcopy
 from azure.cli.core.azclierror import AzureResponseError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
-from azext_iot.adr.rbac import ADU_FIRST_PARTY_APP_ID, LINK_ROLE_MATRIX, _scope_subscription
+from azext_iot.adr.rbac import ADU_FIRST_PARTY_APP_ID, LINK_ROLE_MATRIX, _normalized_id, _scope_subscription
 from azext_iot.adr.topology import endpoint_is_type
 from azext_iot.adr.ui.core.commands import quote
 from azext_iot.adr.ui.screens.onboard.flow import PlanItem
@@ -20,36 +20,20 @@ from azext_iot.adr.ui.screens.onboard.identity import (
 )
 from azext_iot.adr.ui.screens.onboard.pickers import Candidate
 from azext_iot.adr.ui.screens.onboard.steps import (
-    PHASE_GRANT, _endpoints, _namespace, _placeholder, _scope_of, _topology,
-    _service_principal_grant_command, grant_command, has_identity, has_messaging,
-    has_namespace, has_provisioning, namespace_arm_id, onboarding_error,
+    PHASE_GRANT, _endpoints, _namespace, _scope_of, _topology,
+    _service_principal_grant_command, grant_command, has_identity,
+    has_namespace, link_choice, link_needs_work, link_targets, namespace_arm_id, onboarding_error,
 )
 
 
 def role_targets(context):
     """Only links that will run, including existing links affected by outbound MI changes."""
-    targets = []
-    if not has_provisioning(context):
-        if context.get("selected_dps") is not None:
-            targets.append(("dps", context["selected_dps"]))
-        elif context.get("create_dps") is not None:
-            targets.append(("dps", _placeholder(context["create_dps"], context)))
-    if not has_messaging(context):
-        targets.extend(("hub", hub) for hub in context.get("selected_hubs") or [])
-        if context.get("create_hub") is not None:
-            targets.append(("hub", _placeholder(context["create_hub"], context)))
-    targets.extend(("su", instance) for instance in context.get("selected_sus") or [])
-    if context.get("create_su") is not None:
-        targets.append(("su", _placeholder(context["create_su"], context)))
-    resolved = []
-    for kind, target in targets:
-        request = context.get(f"create_{kind}")
-        choice = (
-            request.identity
-            if request is not None and getattr(target, "pending", False)
-            else get_choice(context, kind, target.resource_id)
-        )
-        resolved.append((kind, target, choice))
+    resolved = [
+        (kind, target, link_choice(context, kind, target))
+        for kind in ("dps", "hub", "su") for target in link_targets(context, kind)
+        if link_needs_work(context, kind, target)
+    ]
+    seen = {(kind, _normalized_id(target.resource_id)) for kind, target, _choice in resolved}
     if has_namespace(context) and not has_identity(context):
         types = {"dps": DPS_ENDPOINT_TYPE, "hub": IOT_HUB_ENDPOINT_TYPE, "su": SU_ENDPOINT_TYPE}
         for kind, section in (("dps", "provisioning"), ("hub", "messaging"), ("su", "updating")):
@@ -57,6 +41,8 @@ def role_targets(context):
                 if not endpoint_is_type(endpoint, types[kind]):
                     continue
                 resource_id = endpoint.get("resourceId") or ""
+                if (kind, _normalized_id(resource_id)) in seen:
+                    continue
                 inbound = endpoint.get("inboundCallerIdentity")
                 choice = None
                 if inbound:

@@ -6,6 +6,8 @@
 
 """Session: provider caching, scope resolution and the error boundary (step 6)."""
 
+from types import SimpleNamespace
+
 import pytest
 from azure.cli.core.azclierror import InvalidArgumentValueError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
@@ -189,12 +191,14 @@ def test_subscription_is_resolved_once(monkeypatch):
         def __init__(self, cli_ctx=None):
             pass
 
-        def get_subscription(self):
+        def get_subscription(self, subscription):
+            assert subscription == "sub-123"
             calls.append(1)
             return {"id": "sub-123", "name": "Contoso Dev"}
 
     monkeypatch.setattr(profile_module, "Profile", FakeProfile)
     session = make_session()
+    session.cmd = SimpleNamespace(cli_ctx=SimpleNamespace(data={"subscription_id": "sub-123"}))
     assert session.resolve_subscription() == "sub-123"
     assert session.resolve_subscription() == "sub-123"
     assert len(calls) == 1

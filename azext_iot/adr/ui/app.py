@@ -27,6 +27,7 @@ from azext_iot.adr.ui.screens.base import ChromeScreen
 from azext_iot.adr.ui.screens.browse import BrowseScreen
 from azext_iot.adr.ui.screens.detail import DetailScreen
 from azext_iot.adr.ui.screens.help import CommandBar, HelpScreen
+from azext_iot.adr.ui.screens.onboard.execution import ExecutionScreen
 from azext_iot.adr.ui.screens.onboard.pickers import ResourceCatalog
 from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 from azext_iot.adr.ui.screens.overview import OverviewScreen
@@ -143,19 +144,62 @@ class RadrApp(App):
         if self.session is not None:
             # Reading the profile touches disk, so it happens once, off the render path.
             self.run_worker(self._resolve_scope, thread=True, name="resolve-scope")
-        root = self.registry.roots()[0]
-        self.push_kind(root, self.scope)
+        else:
+            self.push_kind(self.registry.roots()[0], self.scope)
 
     def _resolve_scope(self) -> None:
-        self.session.resolve_subscription()
-        self.call_from_thread(self._apply_resolved_scope)
+        session = self.session
+        session.resolve_subscription()
+        self.call_from_thread(self._apply_resolved_scope, session)
 
-    def _apply_resolved_scope(self) -> None:
+    def _apply_resolved_scope(self, resolved_session=None) -> None:
+        if resolved_session is not None and resolved_session is not self.session:
+            return
         self.scope.update(self.session.scope.as_dict())
         # This arrives from a worker and may land before the first screen is mounted or
         # after the last one is popped during shutdown.
-        if self.screen_stack:
+        if len(self.screen_stack) == 1:
+            self.push_kind(self.registry.roots()[0], self.scope)
+        elif self.screen_stack:
             self.sync_chrome(self.screen)
+
+    async def switch_subscription(self, subscription_id: str, subscription_name: str) -> None:
+        """Replace all subscription-bound state without changing the persisted CLI account."""
+        if self.session is None:
+            self.flash("switching subscription needs a live session", "warning")
+            return
+        if self.tracker.running or any(
+            isinstance(screen, ExecutionScreen)
+            and any(not record.state.terminal for record in screen.records)
+            for screen in self.screen_stack
+        ) or any(
+            worker.name == "onboard-execution" and not worker.is_finished
+            for worker in self.workers
+        ):
+            self.flash("wait for running operations before switching subscription", "warning")
+            return
+        self.workers.cancel_all()
+        # Old threads may finish after cancellation. Give B entirely new session and
+        # screen objects so neither an A callback nor its cached client can retarget B.
+        self.session = Session(self.session.cmd, read_only=self.read_only)
+        self.session.cmd.cli_ctx.data["subscription_id"] = subscription_id
+        self.session.scope.subscription_id = subscription_id
+        self.session.scope.subscription_name = subscription_name
+        self.scope = self.session.scope.as_dict()
+        while len(self.screen_stack) > 1:
+            await self.pop_screen()
+        self.store.clear()
+        self.registry = build_registry(self.session)
+        self.tracker = OperationTracker(make_session_waiter(self.session))
+        self.push_kind(self.registry.roots()[0], self.scope)
+        await self.push_screen(
+            OnboardScreen(
+                self.session,
+                {"subscription_id": subscription_id, "subscription_name": subscription_name},
+                catalog=ResourceCatalog(self.session.cmd),
+            )
+        )
+        self.flash(f"subscription {subscription_name}", "success")
 
     # -- navigation --------------------------------------------------------
 

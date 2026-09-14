@@ -135,8 +135,10 @@ class Session:
             return self.scope.subscription_id
         try:
             from azure.cli.core._profile import Profile
+            from azure.cli.core.commands.client_factory import get_subscription_id
 
-            subscription = Profile(cli_ctx=self.cmd.cli_ctx).get_subscription()
+            subscription_id = get_subscription_id(self.cmd.cli_ctx)
+            subscription = Profile(cli_ctx=self.cmd.cli_ctx).get_subscription(subscription_id)
             self.scope.subscription_id = subscription.get("id")
             self.scope.subscription_name = subscription.get("name")
         except Exception:  # noqa: BLE001 - an unusable profile must not stop the UI

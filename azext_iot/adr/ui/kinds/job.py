@@ -21,12 +21,11 @@ from azext_iot.adr.ui.kinds._common import (
 
 def _update_identity(payload) -> str:
     """Provider/name/version rendered as one readable token."""
-    parts = [
-        str(prop("updateId", key, default="")(payload) or prop(key, default="")(payload))
-        for key in ("provider", "name", "version")
-    ]
-    parts = [part for part in parts if part]
-    return "/".join(parts)
+    reference = str(prop("definition", "updateResourceId")(payload) or "")
+    parts = reference.strip("/").split("/")
+    if len(parts) == 7 and parts[:2] == ["updates", "providers"] and parts[3] == "names" and parts[5] == "versions":
+        return "/".join((parts[2], parts[4], parts[6]))
+    return reference
 
 
 def build(session) -> ResourceSpec:
@@ -57,8 +56,7 @@ def build(session) -> ResourceSpec:
             Column(
                 "target",
                 "TARGET GROUP",
-                lambda p: short_id(prop("targetGroupId", default="")(p))
-                or prop("targetGroupName", default="")(p),
+                lambda p: short_id(prop("target", "resourceId")(p)),
                 width=22,
             ),
             Column("update", "UPDATE", _update_identity, width=28),

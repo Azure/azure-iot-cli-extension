@@ -20,7 +20,20 @@ This module is deliberately free of any UI framework import.
 
 from dataclasses import dataclass, field
 from enum import Enum
+import shlex
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from azext_iot.adr.ui.core.commands import quote
+
+
+def _pin_subscription(command: str, subscription: Optional[str]) -> str:
+    """Scope standalone Azure commands without changing the terminal's default."""
+    tokens = shlex.split(command, comments=True)
+    if not subscription or not tokens or tokens[0] != "az":
+        return command
+    if any(token == "--subscription" or token.startswith("--subscription=") for token in tokens):
+        return command
+    return f"{command} --subscription {quote(subscription)}"
 
 
 class StepState(Enum):
@@ -32,6 +45,17 @@ class StepState(Enum):
     @property
     def is_actionable(self) -> bool:
         return self in (StepState.CURRENT, StepState.PENDING)
+
+
+@dataclass(frozen=True)
+class ScriptCheck:
+    """An Azure read whose output must match the reviewed value before export succeeds."""
+
+    command: str
+    expected: str
+    description: str
+    strip_spaces: bool = False
+    strip_trailing_slash: bool = False
 
 
 @dataclass
@@ -55,6 +79,8 @@ class PlanItem:
     target: str = ""
     category: str = "operation"
     blocked_reason: str = ""
+    verify_commands: Tuple[str, ...] = ()
+    verify_checks: Tuple[ScriptCheck, ...] = ()
 
     @property
     def is_actionable(self) -> bool:
@@ -160,6 +186,10 @@ class Flow:
 
     # -- planning ----------------------------------------------------------
 
+    def scoped_command(self, command: str) -> str:
+        """Scope previews and exports to the reviewed subscription, preserving explicit targets."""
+        return _pin_subscription(command, self.context.get("subscription_id"))
+
     def build_plan(self) -> List[PlanItem]:
         """Collect plan entries, ordered for execution rather than for selection.
 
@@ -207,17 +237,27 @@ class Flow:
                 items.extend(step.plan(self.context) or [])
         return items
 
-    def script(self) -> str:
-        """The plan as a runnable script: plan-only mode, and the audit trail."""
+    def script(self, plan: Optional[List[PlanItem]] = None) -> str:
+        """Render an already-reviewed plan, or build one for a direct export."""
         lines = [
             "#!/usr/bin/env bash", "set -euo pipefail", "",
             "# Role requirements below are reviewed requirements, not unconditional grants.",
             "# Exported ADR commands each use base RBAC preflight; the UI batches preflight before linking.",
+            "# Verification uses Azure CLI and standard POSIX text utilities.",
             "",
         ]
-        plan = self.build_plan()
+        plan = self.build_plan() if plan is None else plan
         if any(item.action == "blocked" for item in plan):
             lines += ["# Resolve all blocked steps before running this plan.", "exit 1", ""]
+        missing_verification = [
+            item.description for item in plan
+            if item.verify is not None and not (item.verify_commands or item.verify_checks)
+        ]
+        if missing_verification:
+            lines += [
+                "# No executable verification is available for: " + ", ".join(missing_verification),
+                "exit 1", "",
+            ]
         for item in plan:
             if item.action == "exists":
                 lines.append(f"# {item.description}")
@@ -229,6 +269,28 @@ class Flow:
                     lines.append(f"# Remediation only: {item.command}")
             elif item.command:
                 lines.append(f"# {item.description}")
-                lines.append(item.command)
+                lines.append(self.scoped_command(item.command))
                 lines.append("")
+            if item.action not in ("exists", "blocked", "required"):
+                lines.extend(self.scoped_command(command) for command in item.verify_commands)
+                for check in item.verify_checks:
+                    lines.extend(self._script_check(check))
         return "\n".join(lines)
+
+    def _script_check(self, check: ScriptCheck) -> List[str]:
+        expected = check.expected.casefold()
+        if check.strip_spaces:
+            expected = expected.replace(" ", "")
+        remove = r"\r " if check.strip_spaces else r"\r"
+        normalization = f"tr '[:upper:]' '[:lower:]' | tr -d {quote(remove)}"
+        if check.strip_trailing_slash:
+            expected = expected.rstrip("/")
+            normalization += " | sed 's:/*$::'"
+        return [
+            f"radar_check=$({self.scoped_command(check.command)})",
+            f"radar_check=$(printf '%s' \"$radar_check\" | {normalization})",
+            f"if [ \"$radar_check\" != {quote(expected)} ]; then",
+            f"    printf '%s\\n' {quote('Verification failed: ' + check.description)} >&2",
+            "    exit 1",
+            "fi",
+        ]

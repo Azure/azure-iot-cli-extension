@@ -96,12 +96,11 @@ class Store:
 
     def _should_fetch(self, entry: Entry, interval: int, force: bool) -> bool:
         now = self._clock()
-        if force:
-            # A manual refresh still respects backoff, so a failing service cannot be
-            # hammered by holding down the refresh key.
-            return now >= entry.next_attempt_at
-        if not entry.has_loaded:
-            return now >= entry.next_attempt_at
+        # Backoff applies to both automatic and manual refreshes, including stale rows.
+        if now < entry.next_attempt_at:
+            return False
+        if force or not entry.has_loaded:
+            return True
         return now - entry.loaded_at >= interval
 
     # -- access ------------------------------------------------------------

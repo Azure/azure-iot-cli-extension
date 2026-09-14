@@ -30,12 +30,13 @@ def selected(resource_id=SU_ID):
 def context(existing=False):
     properties = {
         "outboundIdentity": {"type": "SystemAssigned"},
-        "provisioning": {"endpoints": {"dps": {}}},
+        "provisioning": {"endpoints": {"dps": {"linkingState": "Succeeded"}}},
     }
     if existing:
         properties["updating"] = {"endpoints": {"existing-updates": {
             "endpointType": "Microsoft.DeviceUpdate/updateInstances", "resourceId": SU_ID,
             "inboundCallerIdentity": {"type": "SystemAssigned"},
+            "linkingState": "Succeeded", "serviceAddress": "https://updates.example",
         }}}
     return {
         "subscription_id": "sub", "resource_group_name": "rg", "namespace_name": "ns",
@@ -83,6 +84,7 @@ def test_existing_and_unselected_instance_stays_untouched():
 
 def test_same_existing_target_updates_only_identity_and_preserves_endpoint_name():
     ctx = context(existing=True)
+    ctx["namespace"]["properties"]["updating"]["endpoints"]["existing-updates"]["linkingState"] = "Failed"
     ctx["selected_sus"] = [selected(SU_ID.upper() + "/")]
     ctx["su_endpoint_name"] = "must-not-rename"
     assert not software_updates_error(ctx)
@@ -155,6 +157,7 @@ def test_reload_reconciles_a_completed_su_creation(monkeypatch, timed_out):
     from azext_iot.adr.ui.screens.onboard.execution import ExecutionRecord, execute_records
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
+    monkeypatch.setattr(OnboardScreen, "is_attached", property(lambda _self: True))
     ctx = context()
     request = create_request()
     ctx["create_su"] = request
@@ -200,9 +203,10 @@ def test_reload_reconciles_a_completed_su_creation(monkeypatch, timed_out):
     assert not any("link su add" in item.command for item in retry)
 
 
-def test_reload_keeps_a_conflicting_su_creation_blocked():
+def test_reload_keeps_a_conflicting_su_creation_blocked(monkeypatch):
     from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
+    monkeypatch.setattr(OnboardScreen, "is_attached", property(lambda _self: True))
     ctx = context()
     ctx["create_su"] = create_request()  # new-instance differs from the persisted updates instance
     screen = OnboardScreen(None, scope=ctx, namespace=ctx["namespace"])

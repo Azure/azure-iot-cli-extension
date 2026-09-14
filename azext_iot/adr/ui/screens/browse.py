@@ -130,13 +130,14 @@ class BrowseScreen(ChromeScreen):
 
     def _load(self, force: bool = False) -> None:
         """Worker body. Runs on a thread; touches the UI only via the app."""
+        app = self.app
         try:
             result = self.source(self.scope, force=force)
             payloads = list(result)
         except Exception as error:  # noqa: BLE001 - this worker is the error boundary
-            self.app.call_from_thread(self._on_load_failed, str(error))
+            app.call_from_thread(self._on_load_failed, str(error))
         else:
-            self.app.call_from_thread(
+            app.call_from_thread(
                 self._on_loaded,
                 payloads,
                 getattr(result, "error", None),
@@ -144,6 +145,8 @@ class BrowseScreen(ChromeScreen):
             )
 
     def _on_loaded(self, payloads, error=None, loaded_at=None) -> None:
+        if not self.is_attached:
+            return
         self._loading = False
         self.model.apply(payloads, loaded_at=loaded_at)
         if error:
@@ -157,6 +160,8 @@ class BrowseScreen(ChromeScreen):
         self._repaint()
 
     def _on_load_failed(self, message: str) -> None:
+        if not self.is_attached:
+            return
         self._loading = False
         if self.spec.parent and "not found" in message.lower():
             message = (
@@ -173,10 +178,11 @@ class BrowseScreen(ChromeScreen):
         for column in self.model.columns:
             table.add_column(column.label, key=column.key, width=column.width)
 
-    def _repaint(self) -> None:
+    def _repaint(self, selected: Optional[str] = None) -> None:
         """Rebuild visible rows, preserving the cursor by row identity."""
         table = self.query_one("#rows", DataTable)
-        selected = self.selected_row_id()
+        if selected is None:
+            selected = self.selected_row_id()
 
         table.clear()
         theme = getattr(self.app, "theme_tokens", None)
@@ -290,9 +296,11 @@ class BrowseScreen(ChromeScreen):
         self.refresh_rows(force=True)
 
     def action_toggle_wide(self) -> None:
+        # Rebuilding the columns clears the table, so capture identity before that.
+        selected = self.selected_row_id()
         self.model.toggle_wide()
         self._build_columns()
-        self._repaint()
+        self._repaint(selected)
 
     def action_sort(self) -> None:
         """Sort by the column under the cursor; repeating reverses direction."""

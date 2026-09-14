@@ -9,7 +9,7 @@
 import re
 import shlex
 from dataclasses import dataclass
-from typing import Dict, Optional, Pattern, Tuple
+from typing import Dict, Optional, Tuple
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -27,7 +27,7 @@ from azext_iot.adr.ui.theme import style_for
 class _NameRule:
     minimum: int
     maximum: int
-    pattern: Pattern[str]
+    pattern: re.Pattern[str]
     characters: str
     cannot_end_with_period: bool = False
 

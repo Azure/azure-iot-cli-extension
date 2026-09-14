@@ -6,6 +6,12 @@
 
 """Guided onboarding: step graph, pickers and plan (steps 11-12)."""
 
+from pathlib import Path
+
+import pytest
+
+from azext_iot.adr import ui
+from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.ui.screens.onboard.flow import Flow, PlanItem, Step, StepState
 from azext_iot.adr.ui.screens.onboard.pickers import (
     ELIGIBLE,
@@ -25,6 +31,31 @@ from azext_iot.adr.ui.screens.onboard.identity import (
 )
 
 
+@pytest.fixture
+def radar_source_root(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    return Path(ui.__file__).resolve().parent
+
+
+@pytest.fixture
+def onboard_source(radar_source_root):
+    return (radar_source_root / "screens" / "onboard" / "screen.py").read_text(encoding="utf-8")
+
+
+def ready_endpoints(endpoints, endpoint_type):
+    return {
+        name: {
+            "endpointType": endpoint_type,
+            "resourceId": f"/subscriptions/sub-1/resourceGroups/rg1/providers/{endpoint_type}/{name}",
+            "inboundCallerIdentity": {"type": "SystemAssigned"},
+            "linkingState": "Succeeded",
+            "serviceAddress": f"https://{name}.example.test",
+            "deviceAddress": f"{name}.example.test",
+        } if isinstance(endpoint, dict) and not endpoint else endpoint
+        for name, endpoint in endpoints.items()
+    }
+
+
 def namespace_payload(
     identity=None,
     provisioning=None,
@@ -36,9 +67,9 @@ def namespace_payload(
     if identity and outbound:
         properties["outboundIdentity"] = {"type": identity}
     if provisioning is not None:
-        properties["provisioning"] = {"endpoints": provisioning}
+        properties["provisioning"] = {"endpoints": ready_endpoints(provisioning, DPS_ENDPOINT_TYPE)}
     if messaging is not None:
-        properties["messaging"] = {"endpoints": messaging}
+        properties["messaging"] = {"endpoints": ready_endpoints(messaging, IOT_HUB_ENDPOINT_TYPE)}
     return {
         "name": "ns1",
         "location": location,
@@ -285,7 +316,7 @@ def test_plan_delegates_propagation_to_shared_preflight():
 def test_permissions_plan_covers_both_directions():
     flow = build_flow(
         context(namespace_payload(identity="SystemAssigned", provisioning={"dps": {}}),
-                selected_dps=dps_candidate(), selected_hubs=[hub_candidate()],
+                selected_hubs=[hub_candidate()],
                 subscription_id="sub-1")
     )
     commands = [item.description for item in flow.build_plan() if item.key.startswith("grant-")]
@@ -535,7 +566,9 @@ def test_catalog_records_why_an_enumeration_failed():
     def broken():
         raise RuntimeError("AuthorizationFailed")
 
-    assert catalog._listed("dps", broken) == []
+    result = catalog._listed("dps", broken)
+    assert isinstance(result, list)
+    assert not result
     assert "AuthorizationFailed" in catalog.errors["dps"]
 
 
@@ -573,9 +606,12 @@ def test_catalog_discards_results_started_before_clear():
     release.set()
     worker.join(timeout=2)
 
-    assert result == []
-    assert catalog._cache == {}
-    assert catalog.errors == {}
+    assert not worker.is_alive()
+    assert not result
+    assert isinstance(catalog._cache, dict)
+    assert not catalog._cache
+    assert isinstance(catalog.errors, dict)
+    assert not catalog.errors
 
 
 def test_newer_same_key_catalog_load_wins():
@@ -610,7 +646,9 @@ def test_newer_same_key_catalog_load_wins():
     release_old.set()
     old_worker.join(timeout=2)
 
-    assert old_result == []
+    assert not old_worker.is_alive()
+    assert not new_worker.is_alive()
+    assert not old_result
     assert new_result == [{"name": "current"}]
     assert catalog._cache["hub"] == [{"name": "current"}]
     assert "hub" not in catalog.errors
@@ -944,10 +982,15 @@ def test_update_instance_identity_attachment_uses_registered_factory(monkeypatch
     class Catalog:
         cmd = type("Cmd", (), {"cli_ctx": object()})()
 
+    def factory(cli_ctx, subscription_id):
+        assert cli_ctx is Catalog.cmd.cli_ctx
+        assert subscription_id == "sub-1"
+        return type("Client", (), {"update_instances": Operations()})()
+
     monkeypatch.setattr(
         factories,
         "adr_update_instance_service_factory",
-        lambda _cli_ctx: type("Client", (), {"update_instances": Operations()})(),
+        factory,
     )
     result = attach_identity(
         Catalog(),
@@ -1514,34 +1557,22 @@ def test_active_step_falls_back_to_the_flow():
 # -- interaction model (follows Posting/Harlequin: focusable panes, inline forms) -----
 
 
-def test_creation_is_inline_not_a_pushed_screen():
+def test_creation_is_inline_not_a_pushed_screen(onboard_source):
     """A pushed screen would hide the step rail and the context being worked against."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert "CreateResourceDialog" not in source, "creation must not push a screen"
     assert 'id="create-form"' in source, "the form lives inside the pane"
 
 
-def test_screen_focuses_the_picker_on_arrival():
+def test_screen_focuses_the_picker_on_arrival(onboard_source):
     """Without an explicit focus, arrow keys go nowhere."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert '.focus()' in source
 
 
-def test_steps_are_listed_in_a_navigable_widget():
+def test_steps_are_listed_in_a_navigable_widget(onboard_source):
     """The rail is a list so arrows move through steps, as in the reference apps."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert "ListView" in source and "on_list_view_highlighted" in source
 
 
@@ -1611,13 +1642,9 @@ def test_queued_creation_is_visible_in_the_rail_and_body():
     assert "create namespace 'radar1'" in screen._pending_summary()
 
 
-def test_button_label_does_not_claim_to_create():
+def test_button_label_does_not_claim_to_create(onboard_source):
     """It adds to the plan; nothing runs until apply."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert "SetupFormButton(" in source and '"Add to setup"' in source
     assert 'Button("Create"' not in source
 
@@ -1752,13 +1779,9 @@ def test_rail_shows_what_was_chosen_for_each_step():
     assert screen._chosen_lines("namespace") == ["factory · choose identity"]
 
 
-def test_rail_uses_names_and_focus_instead_of_status_badges():
+def test_rail_uses_names_and_focus_instead_of_status_badges(onboard_source):
     """`[ok]` beside every selection is visual noise; the chosen name is the evidence."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     rail = source.split("def _render_rail", 1)[1].split("def _render_body", 1)[0]
     assert "[ok]" not in rail
     assert "_chosen_lines" in rail
@@ -1766,13 +1789,9 @@ def test_rail_uses_names_and_focus_instead_of_status_badges():
     assert 'classes="step-resources"' in rail
 
 
-def test_inline_create_form_has_a_clear_field_hierarchy():
+def test_inline_create_form_has_a_clear_field_hierarchy(onboard_source):
     """The form should read as a compact form, not six unrelated stacked widgets."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert 'classes="form-field"' in source
     assert 'classes="form-label"' in source
     assert 'id="create-subtitle"' in source
@@ -1783,13 +1802,9 @@ def test_inline_create_form_has_a_clear_field_hierarchy():
     assert "IDENTITY  SystemAssigned" not in source
 
 
-def test_chosen_candidate_name_does_not_collide_with_cursor_colour():
+def test_chosen_candidate_name_does_not_collide_with_cursor_colour(onboard_source):
     """The cursor owns foreground contrast; selection uses weight and a visible marker."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     paint = source.split("def _paint_candidates", 1)[1].split(
         "def _is_chosen", 1
     )[0]
@@ -1799,12 +1814,8 @@ def test_chosen_candidate_name_does_not_collide_with_cursor_colour():
     assert "STYLE_ACTIVE" not in chosen_style
 
 
-def test_candidate_loading_never_shows_rows_from_the_previous_step():
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+def test_candidate_loading_never_shows_rows_from_the_previous_step(onboard_source):
+    source = onboard_source
     assert 'LoadingIndicator(id="candidate-loading")' in source
     assert "def _load_candidates(self, step_id: str, generation: int)" in source
     show = source.split("def _show_candidates", 1)[1].split(
@@ -1818,12 +1829,8 @@ def test_candidate_loading_never_shows_rows_from_the_previous_step():
     assert "table.display = False" in reload_candidates
 
 
-def test_review_page_ends_with_one_clear_next_step():
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+def test_review_page_ends_with_one_clear_next_step(onboard_source):
+    source = onboard_source
     review = source.split("def _render_review", 1)[1].split(
         "def _chosen_lines", 1
     )[0]
@@ -1833,12 +1840,8 @@ def test_review_page_ends_with_one_clear_next_step():
     assert "NEEDS ADMIN ACCESS" not in review, "existing grants do not require administrator access"
 
 
-def test_right_pane_omits_progress_and_selected_resource_repetition():
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+def test_right_pane_omits_progress_and_selected_resource_repetition(onboard_source):
+    source = onboard_source
     body = source.split("def _render_body", 1)[1].split(
         "def _grant_rights_note", 1
     )[0]
@@ -1847,10 +1850,10 @@ def test_right_pane_omits_progress_and_selected_resource_repetition():
     assert "Selected   " not in body
 
 
-def test_customer_facing_provisioning_resource_is_called_dps():
-    import pathlib
-
-    for path in pathlib.Path("azext_iot/adr/ui").rglob("*.py"):
+def test_customer_facing_provisioning_resource_is_called_dps(radar_source_root):
+    paths = list(radar_source_root.rglob("*.py"))
+    assert paths
+    for path in paths:
         source = path.read_text(encoding="utf-8").lower()
         assert "provisioning service" not in source, path
 
@@ -1951,24 +1954,16 @@ def test_advance_moves_to_the_next_unsatisfied_step():
     assert screen.active_step().id == "namespace"
 
 
-def test_hub_step_does_not_advance_because_it_is_multi_select():
+def test_hub_step_does_not_advance_because_it_is_multi_select(onboard_source):
     """Advancing after the first hub would make linking a second one awkward."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     hub_branch = source.split('if step.id == "hub":', 1)[1].split("def ", 1)[0]
     assert "_advance(" not in hub_branch, "the hub step must stay put for multi-select"
 
 
-def test_rail_repaint_is_not_mistaken_for_a_choice():
+def test_rail_repaint_is_not_mistaken_for_a_choice(onboard_source):
     """Setting the rail index programmatically used to re-pin the step being left."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     assert "_syncing_rail" in source
     handler = source.split("def on_list_view_highlighted", 1)[1].split("def ", 1)[0]
     assert "if self._syncing_rail:" in handler
@@ -2118,24 +2113,17 @@ def test_help_documents_the_guided_setup_keys():
     assert {"enter", "space", "d", "n", "j", "a", "p"} <= keys
 
 
-def test_reload_re_asks_whether_grants_are_allowed():
+def test_reload_re_asks_whether_grants_are_allowed(onboard_source):
     """The review panel tells the customer to activate PIM and press r, so r must re-ask."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+    source = onboard_source
     handler = source.split("def action_reload", 1)[1].split("    def ", 1)[0]
     assert "_grant_probe_for" in handler and "_probe_grant_rights()" in handler
     assert "self.catalog.clear()" in handler
 
 
-def test_switching_subscription_discards_the_previous_grant_verdict():
-    """Rights are per subscription; carrying the answer over would be wrong either way."""
-    import pathlib
-
-    source = pathlib.Path(
-        "azext_iot/adr/ui/screens/onboard/screen.py"
-    ).read_text(encoding="utf-8")
+def test_switching_subscription_delegates_to_application_transition(onboard_source):
+    """The application replaces all old subscription-bound screens and their contexts."""
+    source = onboard_source
     handler = source.split("def _switch_subscription", 1)[1].split("    def ", 1)[0]
-    assert 'pop("can_grant_roles"' in handler
+    assert "self.app.call_next" in handler
+    assert "self.app.switch_subscription" in handler

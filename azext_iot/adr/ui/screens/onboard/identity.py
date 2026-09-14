@@ -9,6 +9,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
+from azext_iot.adr.rbac import _normalized_id, _scope_subscription
 from azext_iot.adr.ui.core.commands import quote
 
 SYSTEM_ASSIGNED = "system"
@@ -64,7 +65,7 @@ def choice_key(kind: str, resource_id: str = "") -> str:
     """Stable context key for a namespace or selected target resource."""
     if kind == "namespace":
         return "namespace"
-    return f"{kind}:{resource_id.casefold()}"
+    return f"{kind}:{_normalized_id(resource_id)}"
 
 
 def choices(context: Dict[str, Any]) -> Dict[str, IdentityChoice]:
@@ -218,10 +219,12 @@ def create_uami(session, choice: IdentityChoice):
 
 def attach_identity(catalog, kind: str, resource: Dict[str, Any], choice: IdentityChoice):
     """Attach the chosen identity without removing identities already on the resource."""
+    subscription = _scope_subscription(resource.get("id") or "")
+    scope = {"subscription_id": subscription} if subscription else {}
     if kind == "hub":
         from azext_iot._factory import iot_hub_service_factory
 
-        client = iot_hub_service_factory(catalog.cmd.cli_ctx).iot_hub_resource
+        client = iot_hub_service_factory(catalog.cmd.cli_ctx, **scope).iot_hub_resource
         body = dict(resource)
         identity = _merged_identity(resource, choice)
         body["identity"] = identity
@@ -235,7 +238,7 @@ def attach_identity(catalog, kind: str, resource: Dict[str, Any], choice: Identi
         from azext_iot._factory import iot_service_provisioning_factory
 
         client = iot_service_provisioning_factory(
-            catalog.cmd.cli_ctx
+            catalog.cmd.cli_ctx, **scope
         ).iot_dps_resource
         body = dict(resource)
         body["identity"] = _merged_identity(resource, choice)
@@ -248,7 +251,7 @@ def attach_identity(catalog, kind: str, resource: Dict[str, Any], choice: Identi
         from azext_iot._factory import adr_update_instance_service_factory
 
         client = adr_update_instance_service_factory(
-            catalog.cmd.cli_ctx
+            catalog.cmd.cli_ctx, **scope
         ).update_instances
         return client.begin_update(
             resource_group_name=_resource_group(resource),

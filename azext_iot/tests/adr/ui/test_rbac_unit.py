@@ -189,7 +189,7 @@ def test_manual_confirmation_cannot_bypass_base_preflight():
     from azext_iot.adr.ui.screens.onboard.steps import build_flow
 
     ctx = context()
-    ctx["namespace"]["properties"]["provisioning"] = {"endpoints": {"dps": {}}}
+    ctx["namespace"]["properties"]["provisioning"] = {"endpoints": {"dps": {"linkingState": "Succeeded"}}}
     ctx["permissions_confirmed"] = True
     assert any(item.key == "grant-preflight" and item.invoke for item in build_flow(ctx).build_plan())
 
@@ -213,6 +213,74 @@ def test_invalid_su_plan_blocks_roles_without_reads_or_grants():
     session.provider("namespace").show.assert_not_called()
     manager._assignment_exists.assert_not_called()
     cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["region", "topology"])
+def test_roles_revalidate_namespace_before_target_reads_or_grants(change):
+    session, manager, cli = execution_fixture()
+    ctx = context()
+    live = namespace()
+    if change == "region":
+        live["location"] = "westus2"
+    else:
+        live["properties"]["messaging"] = {"endpoints": {"unreviewed": {}}}
+    session.provider("namespace").show.return_value = live
+    item = next(item for item in plan_link_roles(ctx) if item.invoke is not None)
+    with pytest.raises(AzureResponseError, match="Cross-region" if change == "region" else "Namespace links"):
+        item.invoke(session, ctx)
+    session.provider("link")._get_target.assert_not_called()
+    manager._assignment_exists.assert_not_called()
+    cli.invoke.assert_not_called()
+
+
+def test_reviewed_inbound_uami_is_forwarded_to_authoritative_base_preflight():
+    from azext_iot.adr.ui.screens.onboard.identity import set_choice
+
+    session, manager, cli = execution_fixture()
+    ctx = context()
+    uami_id = "/subscriptions/target-sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/inbound"
+    choice = IdentityChoice(mode=USER_ASSIGNED, uami_id=uami_id, principal_id="uami-pid")
+    set_choice(ctx, "su", choice, SU_ID)
+    live = target()
+    live["identity"]["userAssignedIdentities"] = {uami_id: {"principalId": "uami-pid"}}
+    session.provider("link")._get_target.return_value = live
+    manager._invoke_json = Mock(return_value={"principalId": "uami-pid"})
+    item = next(item for item in plan_link_roles(ctx) if item.invoke is not None)
+    item.invoke(session, ctx)
+    manager._assignment_exists.assert_any_call("uami-pid", "Contributor", NS_ID)
+    manager._caller_can_assign.assert_not_called()
+    cli.invoke.assert_not_called()
+
+
+def test_outbound_identity_change_requires_no_reverse_role_for_link_without_inbound_identity():
+    from azext_iot.adr.ui.screens.onboard.identity import set_choice
+
+    ctx = context()
+    ctx.pop("selected_sus")
+    ctx["namespace"]["properties"]["updating"] = {"endpoints": {"updates": {
+        "endpointType": "Microsoft.DeviceUpdate/updateInstances", "resourceId": SU_ID,
+        "linkingState": "Succeeded", "serviceAddress": "https://updates.example",
+    }}}
+    set_choice(ctx, "namespace", IdentityChoice(mode=USER_ASSIGNED, uami_id="/outbound", principal_id="outbound-pid"))
+    requirements = [item for item in plan_link_roles(ctx) if item.action == "required"]
+    assert len(requirements) == 3
+    assert all(item.target == SU_ID for item in requirements)
+    assert any("Device Update Administrator" in item.description for item in requirements)
+    assert any("first-party" in item.description for item in requirements)
+
+
+def test_outbound_change_does_not_invent_role_grants_for_unknown_endpoint_types():
+    from azext_iot.adr.ui.screens.onboard.identity import set_choice
+    from azext_iot.adr.ui.screens.onboard.permissions import role_targets
+
+    ctx = context()
+    ctx.pop("selected_sus")
+    ctx["namespace"]["properties"]["updating"] = {"endpoints": {"unsupported": {
+        "endpointType": "Unsupported/resources", "resourceId": "/external",
+    }}}
+    set_choice(ctx, "namespace", IdentityChoice(mode=USER_ASSIGNED, uami_id="/outbound"))
+    assert not role_targets(ctx)
+    assert not plan_link_roles(ctx)
 
 
 def test_outbound_change_displays_existing_link_roles_before_namespace_update():
@@ -251,7 +319,7 @@ def test_built_plan_keeps_reviewed_principal_after_initial_topology_refresh(mode
 
     session, manager, cli = execution_fixture()
     ctx = context()
-    ctx["namespace"]["properties"]["provisioning"] = {"endpoints": {"dps": {}}}
+    ctx["namespace"]["properties"]["provisioning"] = {"endpoints": {"dps": {"linkingState": "Succeeded"}}}
     uami_id = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/outbound"
     if mode == "user":
         set_choice(ctx, "namespace", IdentityChoice(mode=USER_ASSIGNED, uami_id=uami_id))

@@ -80,24 +80,25 @@ class OverviewScreen(ChromeScreen):
     def _load_child(
         self, child: ChildRef, spec: ResourceSpec, source, force: bool
     ) -> None:
+        app = self.app
         try:
             result = source(self.scope, force=force)
             payloads = list(result)
         except Exception as error:  # noqa: BLE001 - one unavailable collection should not hide the rest
-            self.app.call_from_thread(self._child_failed, child.kind, str(error))
+            app.call_from_thread(self._child_failed, child.kind, str(error))
         else:
             details = spec.summarize_rows(payloads)
             error = getattr(result, "error", None)
             if error:
                 if not getattr(result, "stale", False):
-                    self.app.call_from_thread(
+                    app.call_from_thread(
                         self._child_failed,
                         child.kind,
                         error,
                     )
                     return
                 details = f"Stale data: {error}"
-            self.app.call_from_thread(
+            app.call_from_thread(
                 self._child_loaded,
                 child.kind,
                 str(len(payloads)),
@@ -105,13 +106,13 @@ class OverviewScreen(ChromeScreen):
             )
 
     def _child_loaded(self, kind: str, count: str, details: str) -> None:
-        if not self.is_mounted:
+        if not self.is_mounted or not self.is_attached:
             return
         self._results[kind] = (count, details)
         self._paint()
 
     def _child_failed(self, kind: str, message: str) -> None:
-        if not self.is_mounted:
+        if not self.is_mounted or not self.is_attached:
             return
         self._results[kind] = ("!", message)
         self._paint()

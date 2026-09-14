@@ -6,6 +6,7 @@
 
 """The guided onboarding screen: step rail, current step, and the plan."""
 
+import shlex
 from typing import Any, Dict, List, Optional
 
 from rich.text import Text
@@ -257,6 +258,7 @@ class OnboardScreen(ChromeScreen):
         self._candidates_for: Optional[str] = None
         self._candidates_loading = False
         self._candidate_generation = 0
+        self._namespace_generation = 0
         #: A step the user jumped to. Satisfied steps are skipped by the flow, so without
         #: this there is no way to revisit one - for example to change subscription.
         self._focus_step: Optional[str] = None
@@ -516,6 +518,7 @@ class OnboardScreen(ChromeScreen):
         return requirements
 
     def _read_grant_rights(self, signature, requirements) -> None:
+        app = self.app
         from azext_iot.adr.ui.core.rbac import permissions_at_scope
 
         matrix = {}
@@ -528,7 +531,7 @@ class OnboardScreen(ChromeScreen):
             and all(result.values())
             for result in matrix.values()
         )
-        self.app.call_from_thread(
+        app.call_from_thread(
             self._grant_rights_read,
             signature,
             matrix,
@@ -541,7 +544,7 @@ class OnboardScreen(ChromeScreen):
         matrix,
         write_ready: bool,
     ) -> None:
-        if self.context.get("_grant_probe_for") != signature:
+        if not self.is_attached or self.context.get("_grant_probe_for") != signature:
             return
         self.context["permission_checking"] = False
         self.context["permission_matrix"] = matrix
@@ -855,6 +858,7 @@ class OnboardScreen(ChromeScreen):
             rail.append(
                 ListItem(
                     *children,
+                    name=step.id,
                     classes="selected-step" if is_selected else "",
                 )
             )
@@ -887,8 +891,12 @@ class OnboardScreen(ChromeScreen):
     def _paint_rail_selection(self, index: int) -> None:
         """Highlight the active step even when navigation came from a number key."""
         rail = self.query_one("#step-list", ListView)
-        for position, item in enumerate(rail.children):
-            item.set_class(position == index, "selected-step")
+        steps = self.flow.visible_steps()
+        selected_id = steps[index].id if 0 <= index < len(steps) else None
+        # Old rows remain in the DOM until ListView.clear() finishes asynchronously.
+        # Match step identity, not DOM position, so both generations paint correctly.
+        for item in rail.children:
+            item.set_class(item.name == selected_id, "selected-step")
 
     def _render_body(self) -> None:
         body = self.query_one("#step-body", Static)
@@ -1108,6 +1116,7 @@ class OnboardScreen(ChromeScreen):
         """Enumerate selectable resources on a worker; pickers never block the UI."""
         if self.catalog is None:
             return
+        app = self.app
         try:
             if step_id == "subscription":
                 candidates = [
@@ -1155,7 +1164,7 @@ class OnboardScreen(ChromeScreen):
         except Exception as error:  # noqa: BLE001 - an unavailable provider yields no candidates
             diagnostics.exception("candidate enumeration failed: %s", error)
             candidates = []
-        self.app.call_from_thread(
+        app.call_from_thread(
             self._show_candidates,
             step_id,
             generation,
@@ -1179,7 +1188,8 @@ class OnboardScreen(ChromeScreen):
     def _show_candidates(self, step_id: str, generation: int, candidates) -> None:
         step = self.active_step()
         if (
-            step is None
+            not self.is_attached
+            or step is None
             or step.id != step_id
             or self._candidates_for != step_id
             or generation != self._candidate_generation
@@ -1312,45 +1322,12 @@ class OnboardScreen(ChromeScreen):
     # -- actions -----------------------------------------------------------
 
     def _switch_subscription(self, candidate) -> None:
-        """Point the whole session at another subscription.
-
-        Clients are built per subscription, so cached providers, cached rows and the
-        candidate catalog must all be discarded together.
-        """
-        subscription_id = candidate.resource_id or candidate.name
-        self.context["subscription_id"] = subscription_id
-        self.context["subscription_name"] = candidate.name
-        for key in (
-            "resource_group_name",
-            "namespace_name",
-            "location",
-            "create_resource_group",
-            "create_namespace",
-            "create_dps",
-            "create_hub",
-            "create_su",
-            "selected_dps",
-            "selected_hubs",
-            "selected_sus",
-            "identity_choices",
-        ):
-            self.context.pop(key, None)
-        self.context["namespace"] = {}
-        if self.session is not None:
-            self.session.cmd.cli_ctx.data["subscription_id"] = subscription_id
-            self.session.scope.subscription_id = subscription_id
-            self.session.scope.subscription_name = candidate.name
-            self.session._providers.clear()
-        if self.catalog is not None:
-            self.catalog.clear()
-        self._candidate_generation += 1
-        store = getattr(self.app, "store", None)
-        if store is not None:
-            store.clear()
-        # Grant rights are per subscription, so the previous answer no longer applies.
-        self.context.pop("can_grant_roles", None)
-        self._advance(f"subscription {candidate.name}")
-        self._probe_grant_rights()
+        """Let the application retire every screen, client and plan from the old scope."""
+        self.app.call_next(
+            self.app.switch_subscription,
+            candidate.resource_id or candidate.name,
+            candidate.name,
+        )
 
     def action_create_new(self) -> None:
         """Open the inline creation form for the active step."""
@@ -1405,7 +1382,7 @@ class OnboardScreen(ChromeScreen):
         )
         self.query_one("#create-location", Input).value = location
         tags = getattr(pending, "tags", None) or {}
-        self.query_one("#create-tags", Input).value = " ".join(
+        self.query_one("#create-tags", Input).value = shlex.join(
             f"{key}={value}" for key, value in tags.items()
         )
         self.query_one("#create-tags-row", Horizontal).display = kind == "namespace"
@@ -1545,6 +1522,14 @@ class OnboardScreen(ChromeScreen):
                 self.flash(reason, "warning")
                 return
         replacing = context_key in self.context
+        if step_id == "dps":
+            self._clear_selected_dps()
+        if step_id == "namespace" and (
+            self.context.get("namespace")
+            or self.context.get("namespace_name") != request.name
+            or self.context.get("resource_group_name") != request.resource_group_name
+        ):
+            self._reset_namespace_state()
         self.context[context_key] = request
         if step_id == "scope":
             # A new resource group fixes both the group and the region for everything below.
@@ -1555,6 +1540,7 @@ class OnboardScreen(ChromeScreen):
             self.context["namespace_name"] = request.name
             self.context["resource_group_name"] = request.resource_group_name
             self.context["location"] = request.location
+            set_choice(self.context, "namespace", request.identity)
         diagnostics.log("queued creation: %s '%s' in %s/%s", request.kind, request.name,
                         request.resource_group_name, request.location)
         if self.is_mounted:
@@ -1572,6 +1558,30 @@ class OnboardScreen(ChromeScreen):
                     f"{'updated' if replacing else 'added'} in the plan; "
                     f"return to {step_id} and press n to edit"
                 )
+
+    def _clear_selected_dps(self) -> None:
+        previous = self.context.pop("selected_dps", None)
+        if previous is not None:
+            remove_choice(self.context, "dps", previous.resource_id)
+
+    def _reset_namespace_state(self) -> None:
+        """Retire the old namespace's topology, targets, identities and permission verdict."""
+        for key in (
+            "create_namespace", "create_dps", "create_hub", "create_su",
+            "selected_dps", "selected_hubs", "selected_sus", "identity_choices",
+            "dps_endpoint_name", "hub_endpoint_name", "su_endpoint_name",
+            "can_grant_roles", "can_write_resources", "permission_matrix",
+            "permission_checking", "_grant_probe_for",
+        ):
+            self.context.pop(key, None)
+        self.context["namespace"] = {}
+        self._candidate_generation += 1
+        self._candidates_for = None
+        self._candidates = []
+        self._candidate_filter = ""
+        self._candidates_loading = False
+        self._namespace_generation += 1
+        self._state_loaded = True
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "create-confirm":
@@ -1800,6 +1810,14 @@ class OnboardScreen(ChromeScreen):
             set_choice(self.context, kind, choice, candidate.resource_id)
             self._advance(f"Software Updates {candidate.name} · {choice.label}")
             return
+        if kind == "dps":
+            self._clear_selected_dps()
+        if kind == "namespace" and (
+            self.context.get("create_namespace") is not None
+            or self.context.get("namespace_name") != candidate.name
+            or (candidate.resource_group and self.context.get("resource_group_name") != candidate.resource_group)
+        ):
+            self._reset_namespace_state()
         set_choice(self.context, kind, choice, candidate.resource_id)
         if kind == "namespace":
             self.context["namespace_name"] = candidate.name
@@ -1808,6 +1826,8 @@ class OnboardScreen(ChromeScreen):
             )
             self.context.pop("create_namespace", None)
             self.context["namespace"] = candidate.raw or {}
+            self.context["location"] = candidate.location or (candidate.raw or {}).get("location")
+            self._namespace_generation += 1
             self._state_loaded = True
             self._advance(f"namespace {candidate.name} · {choice.label}")
             return
@@ -1947,12 +1967,11 @@ class OnboardScreen(ChromeScreen):
                 " The displayed service roles will be checked, not blindly granted. "
                 "Only missing grants require Owner/User Access Administrator."
             )
-        preview = "\n".join(
-            [f"# {item.description}\n# Scope: {item.target}" for item in requirements]
-            + [item.command for item in runnable]
-        )
+            note += "\n" + "\n".join(
+                f"Required: {item.description}\nScope: {item.target}" for item in requirements
+            )
         self.app.push_screen(
-            CommandPreviewDialog("Run setup", preview, note=note),
+            CommandPreviewDialog("Run setup", self.flow.script(plan=plan), note=note),
             lambda approved: self._start_apply(runnable) if approved else None,
         )
 
@@ -1984,6 +2003,7 @@ class OnboardScreen(ChromeScreen):
         self._state_loaded = False
         self._candidates_for = None
         self._candidate_generation += 1
+        self._namespace_generation += 1
         if self.catalog is not None:
             self.catalog.clear()
         self.refresh_view()
@@ -1994,6 +2014,8 @@ class OnboardScreen(ChromeScreen):
         self._probe_grant_rights()
 
     def _reload_namespace(self) -> None:
+        app = self.app
+        generation = self._namespace_generation
         try:
             namespace = self.session.call(
                 self.session.provider("namespace").show,
@@ -2002,9 +2024,11 @@ class OnboardScreen(ChromeScreen):
             )
         except Exception:  # noqa: BLE001 - a missing namespace simply leaves the step unmet
             namespace = {}
-        self.app.call_from_thread(self._apply_namespace, namespace)
+        app.call_from_thread(self._apply_namespace, namespace, generation)
 
-    def _apply_namespace(self, namespace) -> None:
+    def _apply_namespace(self, namespace, generation: Optional[int] = None) -> None:
+        if not self.is_attached or (generation is not None and generation != self._namespace_generation):
+            return
         self.context["namespace"] = namespace or {}
         reconcile_software_updates_creation(self.context)
         if (
@@ -2122,8 +2146,9 @@ class PlanDialog(ChromeScreen):
                     style=style_for(STYLE_WARN, theme),
                 )
             if item.command:
+                command = self.flow.scoped_command(item.command)
                 text.append(
-                    f"         {item.command}\n",
+                    f"         {command}\n",
                     style=style_for(STYLE_ACTIVE, theme),
                 )
         text.append("\npress x on the previous screen to copy the runnable script", style="dim")

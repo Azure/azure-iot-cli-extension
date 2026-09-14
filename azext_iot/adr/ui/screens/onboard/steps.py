@@ -17,10 +17,16 @@ present an identity.
 This module is deliberately free of any UI framework import.
 """
 
+from dataclasses import replace
+import json
 from typing import Any, Dict, List
 
 from azure.cli.core.azclierror import AzureResponseError
 
+from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
+from azext_iot.adr.providers.wait import _link_state
+from azext_iot.adr.rbac import _normalized_id
+from azext_iot.adr.topology import endpoint_is_type
 from azext_iot.adr.ui.core.commands import quote, render
 from azext_iot.adr.ui.screens.onboard.create import (
     create_dps,
@@ -28,19 +34,23 @@ from azext_iot.adr.ui.screens.onboard.create import (
     create_namespace,
     create_update_instance,
 )
-from azext_iot.adr.ui.screens.onboard.flow import Flow, PlanItem, Step
+from azext_iot.adr.ui.screens.onboard.flow import Flow, PlanItem, ScriptCheck, Step
 from azext_iot.adr.ui.screens.onboard.identity import (
     IdentityChoice,
+    USER_ASSIGNED,
     attach_identity,
     choice_key,
     create_uami,
     create_uami_command,
     get_choice,
+    has_choice,
     has_system_identity,
     has_uami,
     identity_command_flags,
     outbound_matches,
+    set_choice,
 )
+from azext_iot.adr.ui.screens.onboard.pickers import Candidate
 
 #: Execution phases. Grants must precede the links that depend on them.
 PHASE_PREREQUISITE = 10
@@ -50,6 +60,9 @@ PHASE_GRANT = 20
 PHASE_PROPAGATION = 30
 PHASE_LINK = 40
 PHASE_VERIFY = 50
+
+_LINK_SECTIONS = {"dps": "provisioning", "hub": "messaging", "su": "updating"}
+_LINK_TYPES = {"dps": DPS_ENDPOINT_TYPE, "hub": IOT_HUB_ENDPOINT_TYPE, "su": SU_ENDPOINT_TYPE}
 
 
 # -- detection ----------------------------------------------------------------------
@@ -85,27 +98,29 @@ def has_namespace(context: Dict[str, Any]) -> bool:
 
 
 def software_updates_linked(context: Dict[str, Any]) -> bool:
-    return bool(_endpoints(context, "updating")) and not software_updates_chosen(context)
+    return _links_satisfied(context, "su")
 
 
 def software_updates_chosen(context: Dict[str, Any]) -> bool:
-    return bool(context.get("selected_sus")) or context.get("create_su") is not None
+    return bool(link_targets(context, "su"))
 
 
 def reconcile_software_updates_creation(context: Dict[str, Any]) -> None:
-    """A reloaded matching endpoint proves that the planned creation/link persisted.
-
-    This also covers a local timeout after Azure accepted the link. Never discard a
-    request for a different target, or infer completion solely from a resource name.
-    """
+    """A matching endpoint proves resource creation, not successful link readiness."""
     request = context.get("create_su")
     endpoints = _endpoints(context, "updating")
     if request is None or len(endpoints) != 1:
         return
     target_id = (next(iter(endpoints.values())) or {}).get("resourceId") or ""
     planned_id = request.arm_id(context.get("subscription_id") or "")
-    if target_id.rstrip("/").casefold() == planned_id.rstrip("/").casefold():
+    if _normalized_id(target_id) == _normalized_id(planned_id):
         context.pop("create_su")
+        set_choice(context, "su", replace(request.identity, create_uami=False), planned_id)
+        if not _endpoint_ready(next(iter(endpoints.values())), "su"):
+            context["selected_sus"] = [Candidate(
+                name=request.name, resource_id=planned_id,
+                resource_group=request.resource_group_name, location=request.location,
+            )]
 
 
 def namespace_location(context: Dict[str, Any]):
@@ -117,7 +132,7 @@ def namespace_location(context: Dict[str, Any]):
 
 def onboarding_error(context: Dict[str, Any]) -> str:
     """Reject all known topology/region conflicts before creating prerequisites."""
-    reason = software_updates_error(context)
+    reason = software_updates_error(context) or _dps_target_error(context)
     if reason:
         return reason
     location = namespace_location(context)
@@ -142,6 +157,27 @@ def onboarding_error(context: Dict[str, Any]) -> str:
     return ""
 
 
+def _dps_target_error(context):
+    selected = context.get("selected_dps")
+    request = context.get("create_dps")
+    if selected is not None and request is not None:
+        return "Choose either an existing DPS or a new DPS, not both. Only one DPS target may be planned."
+    provisioning = _endpoints(context, "provisioning")
+    if len(provisioning) > 1:
+        return "Only one DPS may be linked per namespace."
+    if provisioning:
+        target_id = (
+            request.arm_id(context.get("subscription_id") or "") if request is not None
+            else selected.resource_id if selected is not None else None
+        )
+        if target_id and not any(
+            _normalized_id(endpoint.get("resourceId")) == _normalized_id(target_id)
+            for endpoint in provisioning.values()
+        ):
+            return "This namespace already has a DPS. Update its inbound identity; replacing the linked target is not supported."
+    return ""
+
+
 def software_updates_error(context: Dict[str, Any]) -> str:
     """Validate existing, selected and planned instances before any work is submitted."""
     endpoints = _endpoints(context, "updating")
@@ -151,10 +187,11 @@ def software_updates_error(context: Dict[str, Any]) -> str:
         return "Only one Software Updates instance may be linked per namespace."
     if endpoints and (selected or creating):
         existing = next(iter(endpoints.values())) or {}
-        if creating or (
-            (existing.get("resourceId") or "").rstrip("/").casefold()
-            != selected[0].resource_id.rstrip("/").casefold()
-        ):
+        target_id = (
+            context["create_su"].arm_id(context.get("subscription_id") or "")
+            if creating else selected[0].resource_id
+        )
+        if _normalized_id(existing.get("resourceId")) != _normalized_id(target_id):
             return (
                 "This namespace already has a Software Updates instance. Only one is allowed; "
                 "su update changes the existing inbound identity, not the linked target."
@@ -192,7 +229,7 @@ def plan_preflight(context: Dict[str, Any]) -> List[PlanItem]:
             "create_resource_group", "create_namespace", "create_dps", "create_hub", "create_su",
             "selected_dps", "selected_hubs", "selected_sus",
         )
-    ):
+    ) and not any(link_targets(context, kind) for kind in _LINK_SECTIONS):
         return []
     expected = deepcopy(_topology(_namespace(context)))
 
@@ -226,11 +263,87 @@ def has_identity(context: Dict[str, Any]) -> bool:
 
 
 def has_provisioning(context: Dict[str, Any]) -> bool:
-    return bool(_endpoints(context, "provisioning"))
+    return _links_satisfied(context, "dps")
 
 
 def has_messaging(context: Dict[str, Any]) -> bool:
-    return bool(_endpoints(context, "messaging"))
+    return _links_satisfied(context, "hub")
+
+
+def _endpoint_ready(endpoint, kind):
+    return str(_link_state(endpoint or {}) or "").casefold() == "succeeded" and (
+        kind != "su" or bool(endpoint.get("serviceAddress"))
+    )
+
+
+def linked_endpoint(context, kind, target):
+    """Match by ARM ID, never by the selected resource's display name."""
+    for name, endpoint in _endpoints(context, _LINK_SECTIONS[kind]).items():
+        if _normalized_id(endpoint.get("resourceId")) == _normalized_id(target.resource_id):
+            return name, endpoint
+    return "", {}
+
+
+def link_endpoint_name(context, kind, target):
+    name, _endpoint = linked_endpoint(context, kind, target)
+    if name:
+        return name
+    if kind == "su":
+        return _su_endpoint_name(context)
+    if kind == "dps":
+        return context.get("dps_endpoint_name") or "dps"
+    return target.name if len(link_targets(context, "hub")) > 1 else (context.get("hub_endpoint_name") or target.name)
+
+
+def link_targets(context, kind):
+    selected = context.get({"dps": "selected_dps", "hub": "selected_hubs", "su": "selected_sus"}[kind])
+    targets = ([selected] if selected is not None else []) if kind == "dps" else list(selected or [])
+    request = context.get(f"create_{kind}")
+    if request is not None:
+        targets.append(_placeholder(request, context))
+    seen = {_normalized_id(target.resource_id) for target in targets}
+    for endpoint in _endpoints(context, _LINK_SECTIONS[kind]).values():
+        resource_id = endpoint.get("resourceId") or ""
+        if (
+            resource_id and _normalized_id(resource_id) not in seen
+            and endpoint_is_type(endpoint, _LINK_TYPES[kind]) and not _endpoint_ready(endpoint, kind)
+        ):
+            targets.append(Candidate(name=resource_id.rstrip("/").rsplit("/", 1)[-1], resource_id=resource_id))
+            seen.add(_normalized_id(resource_id))
+    return targets
+
+
+def link_choice(context, kind, target):
+    request = context.get(f"create_{kind}")
+    if request is not None and _normalized_id(request.arm_id(context.get("subscription_id") or "")) == _normalized_id(
+        target.resource_id
+    ):
+        return request.identity
+    if has_choice(context, kind, target.resource_id):
+        return get_choice(context, kind, target.resource_id)
+    inbound = linked_endpoint(context, kind, target)[1].get("inboundCallerIdentity") or {}
+    return IdentityChoice(
+        mode=USER_ASSIGNED if str(inbound.get("type")).casefold() == "userassigned" else "system",
+        uami_id=inbound.get("userAssignedIdentity") or "",
+    )
+
+
+def _inbound_matches(endpoint, choice):
+    return outbound_matches({"properties": {"outboundIdentity": endpoint.get("inboundCallerIdentity")}}, choice)
+
+
+def link_needs_work(context, kind, target):
+    name, endpoint = linked_endpoint(context, kind, target)
+    return not name or not _endpoint_ready(endpoint, kind) or not _inbound_matches(
+        endpoint, link_choice(context, kind, target),
+    )
+
+
+def _links_satisfied(context, kind):
+    endpoints = _endpoints(context, _LINK_SECTIONS[kind])
+    return bool(endpoints) and all(_endpoint_ready(endpoint, kind) for endpoint in endpoints.values()) and not any(
+        link_needs_work(context, kind, target) for target in link_targets(context, kind)
+    )
 
 
 # -- "will the plan satisfy this?" ---------------------------------------------------
@@ -246,11 +359,11 @@ def identity_planned(context: Dict[str, Any]) -> bool:
 
 
 def provisioning_planned(context: Dict[str, Any]) -> bool:
-    return context.get("selected_dps") is not None or context.get("create_dps") is not None
+    return bool(link_targets(context, "dps"))
 
 
 def messaging_planned(context: Dict[str, Any]) -> bool:
-    return bool(context.get("selected_hubs")) or context.get("create_hub") is not None
+    return bool(link_targets(context, "hub"))
 
 
 # -- plan contributions --------------------------------------------------------------
@@ -455,6 +568,22 @@ def _plan_uami_creations(context: Dict[str, Any]) -> List[PlanItem]:
                 command=create_uami_command(choice),
                 invoke=make,
                 verify=_uami_verifier(choice),
+                verify_commands=(
+                    render(
+                        "resource wait", options={
+                            "ids": choice.uami_id, "timeout": 60, "interval": 2,
+                            "custom": "properties.principalId || principalId",
+                        },
+                    ) + _subscription_argument(choice.uami_id),
+                ),
+                # Generic resource wait can return a timeout as data rather than a nonzero exit.
+                verify_checks=(ScriptCheck(
+                    command=render("resource show", options={
+                        "ids": choice.uami_id, "query": "to_string(!!(properties.principalId || principalId))",
+                        "output": "tsv",
+                    }) + _subscription_argument(choice.uami_id),
+                    expected="true", description=f"principal of user-assigned identity '{choice.uami_name}'",
+                ),),
                 target=choice.uami_name,
                 category="identity",
             )
@@ -515,6 +644,9 @@ def _plan_target_identity(
 ) -> List[PlanItem]:
     """Plan SAMI enablement or UAMI attachment for one selected target."""
     if getattr(target, "pending", False):
+        return []
+    name, endpoint = linked_endpoint(context, kind, target)
+    if name and (not has_choice(context, kind, target.resource_id) or _inbound_matches(endpoint, choice)):
         return []
     raw = dict(getattr(target, "raw", None) or {})
     raw.setdefault("name", target.name)
@@ -581,7 +713,7 @@ def _plan_target_identity(
             key=f"identity-{choice_key(kind, target.resource_id)}",
             description=description,
             phase=PHASE_IDENTITY,
-            command=command,
+            command=command + _subscription_argument(target.resource_id),
             invoke=attach,
             target=target.name,
             category="identity",
@@ -590,7 +722,12 @@ def _plan_target_identity(
 
 
 def plan_provisioning(context: Dict[str, Any]) -> List[PlanItem]:
-    dps = context.get("selected_dps")
+    reason = _dps_target_error(context)
+    if reason:
+        return [PlanItem(key="dps", description="Link DPS", action="blocked",
+                         blocked_reason=reason, long_running=False)]
+    targets = link_targets(context, "dps")
+    dps = targets[0] if targets else None
     request = context.get("create_dps")
     items: List[PlanItem] = []
 
@@ -601,7 +738,11 @@ def plan_provisioning(context: Dict[str, Any]) -> List[PlanItem]:
                      phase=0, long_running=False)
         ]
 
-    if request is not None:
+    if dps is not None and not link_needs_work(context, "dps", dps):
+        return []
+    existing_name = linked_endpoint(context, "dps", dps)[0]
+    choice = link_choice(context, "dps", dps)
+    if request is not None and not existing_name:
         def make(session, ctx, _request=request):
             return create_dps(ctx["_catalog"], _request)
 
@@ -638,36 +779,33 @@ def plan_provisioning(context: Dict[str, Any]) -> List[PlanItem]:
                 category="resource",
             )
         )
-        dps = _placeholder(request, context)
-        choice = request.identity
-    else:
-        choice = get_choice(context, "dps", dps.resource_id)
-
     items.extend(_plan_target_identity(context, "dps", dps, choice))
 
-    endpoint = context.get("dps_endpoint_name") or "dps"
+    endpoint = link_endpoint_name(context, "dps", dps)
     link_command = render(
-        "iot adr ns link dps add",
+        "iot adr ns link dps update" if existing_name else "iot adr ns link dps add",
         scope=_scope_of(context),
-        options={"endpoint_name": endpoint, "dps_id": dps.resource_id},
+        options={"endpoint_name": endpoint, "dps_id": None if existing_name else dps.resource_id},
     )
 
-    def link(session, ctx, _dps=dps, _endpoint=endpoint, _choice=choice):
+    def link(session, ctx, _dps=dps, _endpoint=endpoint, _choice=choice, _updating=bool(existing_name)):
+        provider = session.provider("link")
         return session.call(
-            session.provider("link").dps_add,
+            provider.dps_update if _updating else provider.dps_add,
             endpoint_name=_endpoint,
             namespace_name=ctx.get("namespace_name"),
             resource_group_name=ctx.get("resource_group_name"),
-            dps_resource_id=_dps.resource_id,
             mi_system_assigned=not _choice.is_user_assigned,
             mi_user_assigned=_choice.uami_id if _choice.is_user_assigned else None,
             no_wait=True,
+            **({} if _updating else {"dps_resource_id": _dps.resource_id}),
         )
 
     items.append(
         PlanItem(
             key="dps",
-            description=f"Link DPS '{dps.name}' as endpoint '{endpoint}'",
+            description=f"{'Retry' if existing_name else 'Link'} DPS '{dps.name}' as endpoint '{endpoint}'",
+            action="modify" if existing_name else "create",
             phase=PHASE_LINK,
             command=(
                 f"{link_command} "
@@ -676,6 +814,8 @@ def plan_provisioning(context: Dict[str, Any]) -> List[PlanItem]:
             depends_on=("identity",),
             invoke=link,
             verify=_endpoint_verifier("provisioning", endpoint),
+            verify_commands=_endpoint_wait_commands(context, "dps", endpoint),
+            verify_checks=(_endpoint_readiness_check(context, "dps", endpoint),),
             target=endpoint,
             category="link",
         )
@@ -684,7 +824,7 @@ def plan_provisioning(context: Dict[str, Any]) -> List[PlanItem]:
 
 
 def plan_messaging(context: Dict[str, Any]) -> List[PlanItem]:
-    hubs = list(context.get("selected_hubs") or [])
+    hubs = link_targets(context, "hub")
     request = context.get("create_hub")
     items: List[PlanItem] = []
 
@@ -694,7 +834,7 @@ def plan_messaging(context: Dict[str, Any]) -> List[PlanItem]:
                      blocked_reason="no hub chosen yet", phase=0, long_running=False)
         ]
 
-    if request is not None:
+    if request is not None and not linked_endpoint(context, "hub", _placeholder(request, context))[0]:
         def make(session, ctx, _request=request):
             return create_hub(ctx["_catalog"], _request)
 
@@ -731,37 +871,37 @@ def plan_messaging(context: Dict[str, Any]) -> List[PlanItem]:
                 category="resource",
             )
         )
-        hubs.append(_placeholder(request, context))
     for index, hub in enumerate(hubs):
-        choice = (
-            request.identity
-            if request is not None and getattr(hub, "pending", False)
-            else get_choice(context, "hub", hub.resource_id)
-        )
+        if not link_needs_work(context, "hub", hub):
+            continue
+        choice = link_choice(context, "hub", hub)
+        existing_name = linked_endpoint(context, "hub", hub)[0]
         items.extend(_plan_target_identity(context, "hub", hub, choice))
-        endpoint = hub.name if len(hubs) > 1 else (context.get("hub_endpoint_name") or hub.name)
+        endpoint = link_endpoint_name(context, "hub", hub)
         link_command = render(
-            "iot adr ns link hub add",
+            "iot adr ns link hub update" if existing_name else "iot adr ns link hub add",
             scope=_scope_of(context),
-            options={"endpoint_name": endpoint, "hub_id": hub.resource_id},
+            options={"endpoint_name": endpoint, "hub_id": None if existing_name else hub.resource_id},
         )
 
-        def link(session, ctx, _hub=hub, _endpoint=endpoint, _choice=choice):
+        def link(session, ctx, _hub=hub, _endpoint=endpoint, _choice=choice, _updating=bool(existing_name)):
+            provider = session.provider("link")
             return session.call(
-                session.provider("link").hub_add,
+                provider.hub_update if _updating else provider.hub_add,
                 endpoint_name=_endpoint,
                 namespace_name=ctx.get("namespace_name"),
                 resource_group_name=ctx.get("resource_group_name"),
-                hub_resource_id=_hub.resource_id,
                 mi_system_assigned=not _choice.is_user_assigned,
                 mi_user_assigned=_choice.uami_id if _choice.is_user_assigned else None,
                 no_wait=True,
+                **({} if _updating else {"hub_resource_id": _hub.resource_id}),
             )
 
         items.append(
             PlanItem(
                 key=f"hub-{index}",
-                description=f"Link IoT Hub '{hub.name}' as endpoint '{endpoint}'",
+                description=f"{'Retry' if existing_name else 'Link'} IoT Hub '{hub.name}' as endpoint '{endpoint}'",
+                action="modify" if existing_name else "create",
                 phase=PHASE_LINK,
                 command=(
                     f"{link_command} "
@@ -771,6 +911,8 @@ def plan_messaging(context: Dict[str, Any]) -> List[PlanItem]:
                 depends_on=("dps",),
                 invoke=link,
                 verify=_endpoint_verifier("messaging", endpoint),
+                verify_commands=_endpoint_wait_commands(context, "hub", endpoint),
+                verify_checks=(_endpoint_readiness_check(context, "hub", endpoint),),
                 target=endpoint,
                 category="link",
             )
@@ -837,13 +979,13 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
     if reason:
         return [PlanItem(key="su", description="Link Software Updates", action="blocked",
                          blocked_reason=reason, phase=0, long_running=False)]
-    instances = list(context.get("selected_sus") or [])
+    instances = link_targets(context, "su")
     request = context.get("create_su")
     if not instances and request is None:
         return []
 
     items: List[PlanItem] = []
-    if request is not None:
+    if request is not None and not linked_endpoint(context, "su", _placeholder(request, context))[0]:
         def make(session, _ctx, _request=request):
             return create_update_instance(session, _request)
 
@@ -872,15 +1014,11 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
                 category="resource",
             )
         )
-        instances.append(_placeholder(request, context))
-
     updating = bool(_endpoints(context, "updating"))
     for index, instance in enumerate(instances):
-        choice = (
-            request.identity
-            if request is not None and getattr(instance, "pending", False)
-            else get_choice(context, "su", instance.resource_id)
-        )
+        if not link_needs_work(context, "su", instance):
+            continue
+        choice = link_choice(context, "su", instance)
         items.extend(_plan_target_identity(context, "su", instance, choice))
         endpoint = _su_endpoint_name(context)
         link_command = render(
@@ -908,6 +1046,7 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
         items.append(
             PlanItem(
                 key="su" if index == 0 else f"su-{index}",
+                action="modify" if updating else "create",
                 description=(
                     f"Update inbound identity on existing Software Updates endpoint '{endpoint}'"
                     if updating else f"Link update instance '{instance.name}' as endpoint '{endpoint}'"
@@ -920,11 +1059,49 @@ def plan_software_updates(context: Dict[str, Any]) -> List[PlanItem]:
                 depends_on=("dps",),
                 invoke=link,
                 verify=_endpoint_verifier("updating", endpoint, require_service_address=True),
+                verify_commands=_endpoint_wait_commands(context, "su", endpoint),
+                verify_checks=(_endpoint_readiness_check(context, "su", endpoint),),
                 target=endpoint,
                 category="link",
             )
         )
     return items
+
+
+def _endpoint_path(kind, endpoint_name):
+    return f"properties.{_LINK_SECTIONS[kind]}.endpoints.{json.dumps(endpoint_name)}"
+
+
+def _endpoint_wait_commands(context, kind, endpoint_name):
+    command = render(
+        f"iot adr ns link {kind} wait", scope=_scope_of(context),
+        options={"endpoint_name": endpoint_name, "timeout": 600, "interval": 5},
+    )
+    if kind == "su":
+        return (
+            command,
+            command + " --custom " + quote(f"{_endpoint_path(kind, endpoint_name)}.serviceAddress"),
+        )
+    return (command,)
+
+
+def _namespace_check(context, expression, value, description, **normalization):
+    command = render(
+        "iot adr ns show", name=context.get("namespace_name") or "",
+        scope={"resource_group_name": context.get("resource_group_name")},
+        options={"query": expression, "output": "tsv"},
+    )
+    return ScriptCheck(command, value, description, **normalization)
+
+
+def _endpoint_readiness_check(context, kind, endpoint_name):
+    path = _endpoint_path(kind, endpoint_name)
+    expression = f"not_null({path}.linkingState, {path}.provisioningStatus.status, '')"
+    expected = "Succeeded"
+    if kind == "su":
+        expression = f"join('|', [{expression}, to_string(!!({path}.serviceAddress))])"
+        expected += "|true"
+    return _namespace_check(context, expression, expected, f"readiness of {kind} endpoint '{endpoint_name}'")
 
 
 def _endpoint_verifier(
@@ -951,12 +1128,7 @@ def _endpoint_verifier(
                 .get("endpoints", {})
                 .get(endpoint_name)
             ) or {}
-            status = endpoint.get("provisioningStatus") or {}
-            state = str(
-                endpoint.get("linkingState")
-                or (status.get("status") if isinstance(status, dict) else "")
-                or ""
-            )
+            state = str(_link_state(endpoint) or "")
             last_state = state or "not visible"
             if notify is not None:
                 notify(f"linkingState: {last_state}")
@@ -984,29 +1156,32 @@ def _endpoint_verifier(
 
 def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
     expected = []
-    dps = context.get("selected_dps")
-    dps_request = context.get("create_dps")
-    if dps is not None or dps_request is not None:
-        target = dps.resource_id if dps is not None else dps_request.arm_id(
-            context.get("subscription_id") or ""
-        )
-        expected.append(("provisioning", context.get("dps_endpoint_name") or "dps", target))
-    hubs = list(context.get("selected_hubs") or [])
-    if context.get("create_hub") is not None:
-        hubs.append(_placeholder(context["create_hub"], context))
-    for hub in hubs:
-        endpoint = hub.name if len(hubs) > 1 else (
-            context.get("hub_endpoint_name") or hub.name
-        )
-        expected.append(("messaging", endpoint, hub.resource_id))
-    instances = list(context.get("selected_sus") or [])
-    if context.get("create_su") is not None:
-        instances.append(_placeholder(context["create_su"], context))
-    for instance in instances:
-        endpoint = _su_endpoint_name(context)
-        expected.append(("updating", endpoint, instance.resource_id))
+    for kind, section in _LINK_SECTIONS.items():
+        for target in link_targets(context, kind):
+            expected.append((section, link_endpoint_name(context, kind, target), target.resource_id))
     if not expected:
         return []
+
+    namespace_request = context.get("create_namespace")
+    namespace_choice = namespace_request.identity if namespace_request is not None else get_choice(context, "namespace")
+    checks = [_namespace_check(
+        context, "properties.outboundIdentity.type", "UserAssigned" if namespace_choice.is_user_assigned else "SystemAssigned",
+        "namespace outbound identity type", strip_spaces=True,
+    )]
+    if namespace_choice.is_user_assigned:
+        checks.append(_namespace_check(
+            context, "properties.outboundIdentity.userAssignedIdentity", namespace_choice.uami_id,
+            "namespace outbound user-assigned identity",
+        ))
+    wait_commands = []
+    for section, endpoint_name, target_id in expected:
+        kind = next(kind for kind, value in _LINK_SECTIONS.items() if value == section)
+        wait_commands.extend(_endpoint_wait_commands(context, kind, endpoint_name))
+        checks.append(_namespace_check(
+            context, f"{_endpoint_path(kind, endpoint_name)}.resourceId", target_id,
+            f"target of {kind} endpoint '{endpoint_name}'", strip_trailing_slash=True,
+        ))
+        checks.append(_endpoint_readiness_check(context, kind, endpoint_name))
 
     def verify(session, ctx, notify=None, _expected=tuple(expected)):
         namespace = session.call(
@@ -1035,10 +1210,14 @@ def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
                     f"Final verification could not match endpoint '{endpoint_name}' "
                     f"to target '{target_id}'."
                 )
-            if str(endpoint.get("linkingState") or "").casefold() != "succeeded":
+            if str(_link_state(endpoint) or "").casefold() != "succeeded":
                 raise AzureResponseError(
                     f"Final verification found endpoint '{endpoint_name}' in "
                     f"linkingState '{endpoint.get('linkingState') or 'unknown'}'."
+                )
+            if section == "updating" and not endpoint.get("serviceAddress"):
+                raise AzureResponseError(
+                    f"Final verification found endpoint '{endpoint_name}' without a serviceAddress."
                 )
         if notify is not None:
             notify(f"{len(_expected)} endpoint(s) ready")
@@ -1055,6 +1234,8 @@ def plan_final_verification(context: Dict[str, Any]) -> List[PlanItem]:
             ),
             invoke=lambda _session, _context: None,
             verify=verify,
+            verify_commands=tuple(wait_commands),
+            verify_checks=tuple(checks),
             target=context.get("namespace_name") or "namespace",
             category="verify",
         )
