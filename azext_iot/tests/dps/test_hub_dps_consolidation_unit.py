@@ -515,20 +515,42 @@ def test_worker_reuses_provider_and_closes_client(mocker):
     provider.client.close.assert_called_once()
 
 
-def test_deadline_options_and_registration_dispatch(mocker):
-    mocker.patch.object(registration, "monotonic", return_value=10)
-    assert registration.registration_deadline(5) == 15
+@pytest.mark.parametrize("clock_start", [10.0, 1014.003], ids=["exact-clock", "fractional-clock"])
+def test_deadline_options_and_registration_dispatch(mocker, clock_start):
+    clock = mocker.patch.object(registration, "monotonic", return_value=clock_start)
+    assert registration.registration_deadline(5) == clock_start + 5
     with pytest.raises(AzureConnectionError):
-        registration._remaining(10)
-    assert device.DeviceRegistrationProvider._request_options(20) == {
-        "connection_timeout": 5, "read_timeout": 5, "retry_total": 0,
+        registration._remaining(clock_start)
+    deadline = registration.registration_deadline(10)
+    remaining = deadline - clock_start
+    options = device.DeviceRegistrationProvider._request_options(deadline)
+    assert options == {
+        "connection_timeout": remaining / 2, "read_timeout": remaining / 2, "retry_total": 0,
     }
+    assert options["connection_timeout"] + options["read_timeout"] == remaining
     provider = device.DeviceRegistrationProvider(
         SimpleNamespace(cli_ctx=None), "reg", id_scope="scope", device_symmetric_key="key"
     )
     dispatch = mocker.patch.object(registration, "register_with_deadline", return_value={"status": "assigned"})
     assert provider.create(payload={"site": "factory"}, timeout=5) == {"status": "assigned"}
     dispatch.assert_called_once_with(provider, {"registrationId": "reg", "payload": {"site": "factory"}}, 5)
+
+    clock.return_value = deadline
+    operation = Mock()
+    with pytest.raises(AzureConnectionError, match="timed out"):
+        registration.call_with_deadline(operation, deadline, cls=device._capture_device_response)
+    operation.assert_not_called()
+
+    def finish_at_deadline(**kwargs):
+        assert kwargs["connection_timeout"] + kwargs["read_timeout"] == remaining
+        clock.return_value = deadline
+        return {"status": "assigned"}
+
+    clock.return_value = clock_start
+    operation.side_effect = finish_at_deadline
+    with pytest.raises(AzureConnectionError, match="timed out"):
+        registration.call_with_deadline(operation, deadline, cls=device._capture_device_response)
+    operation.assert_called_once()
 
 
 def test_worker_hard_deadline_reaps_nonresponsive_process(fake_worker, mocker):
@@ -768,6 +790,9 @@ def test_real_provider_deadline_flow_uses_register_and_operation_status(mocker):
 def test_registration_requests_transport_options_and_confidentiality(
     mocker, caplog, csr_material, path, with_csr, polled, credential,
 ):
+    # Transport and confidentiality checks must not depend on the host clock's resolution.
+    mocker.patch.object(registration, "monotonic", return_value=1000.0)
+    mocker.patch.object(device, "monotonic", return_value=1000.0)
     caplog.set_level(logging.DEBUG)
     blocked = mocker.Mock(side_effect=AssertionError("Network access is forbidden"))
     mocker.patch.object(socket.socket, "connect", blocked)
@@ -838,7 +863,7 @@ def test_registration_requests_transport_options_and_confidentiality(
     for options in request_options:
         assert not {"logging_enable", "connection_timeout", "read_timeout", "retry_total", "raw_response_hook"} & options.keys()
         if path != "default":
-            assert all(0 < value <= 5 for value in options["timeout"])
+            assert all(0 < value <= 5 for value in options["timeout"]), options["timeout"]
         assert options["allow_redirects"] is False
     for secret in (
         key, base64.b64encode(signing_key).decode(), pem, encoded_csr,
