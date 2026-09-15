@@ -4,9 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
@@ -20,6 +22,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubDevices, self).__init__(test_case)
 
+    @pytest.mark.timeout(
+        900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
+    )
     def test_iothub_device_identity(self):
         to_remove_device_ids = []
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -243,14 +248,22 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                     query_checks.append(self.exists(f"[?deviceId=='{d}']"))
 
                 # By default query has no return cap
-                wait_for_assertion(
+                wait_for_query_ids(
                     lambda: self.cmd(
                         self.set_cmd_auth_type(
                             f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',
                             auth_type=auth_phase,
-                        ),
-                        checks=query_checks,
-                    )
+                        )
+                    ).get_output_in_json(),
+                    to_remove_device_ids,
+                    id_key="deviceId",
+                )
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',
+                        auth_type=auth_phase,
+                    ),
+                    checks=query_checks,
                 )
 
                 # -1 Top is equivalent to unlimited
@@ -454,11 +467,15 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-        # Mixed case connection string
-        cstring = self.connection_string
+        # Device SAS remains valid when Hub service local auth is disabled.
+        # Read the device key with Entra, then exercise the offline mixed-case parser.
+        cstring = self.cmd(
+            f"iot hub device-identity connection-string show -d {device_ids[0]} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
         mixed_case_cstring = cstring.replace("HostName", "hostname", 1)
         self.cmd(
-            f"iot hub generate-sas-token -d {device_ids[0]} --login {mixed_case_cstring}",
+            f"iot hub generate-sas-token --connection-string {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
 

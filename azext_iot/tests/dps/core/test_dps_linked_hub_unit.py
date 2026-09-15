@@ -67,6 +67,26 @@ class TestLinkedHubCreateValidation:
         mocker.patch("azext_iot.core.custom.iot_dps_linked_hub_list", return_value=[])
         return mock_client
 
+    def test_keybased_resolves_hub_group_from_arm_id(self, fixture_cmd, mock_deps, mocker):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "id": "/subscriptions/sub/resourceGroups/hub-rg/providers/Microsoft.Devices/IotHubs/hub",
+            "properties": {"deviceHostName": "hub.device.azure-devices.net"},
+            "location": "centraluseuap",
+        })
+        policy_get = mocker.patch("azext_iot.core.custom.iot_hub_policy_get", return_value={
+            "keyName": "iothubowner", "primaryKey": "testkey",
+        })
+
+        iot_dps_linked_hub_create(
+            cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="hub",
+            resource_group_name="test-rg", authentication_type="KeyBased",
+        )
+
+        assert policy_get.call_args.args[1:] == ("hub", "iothubowner", "hub-rg")
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_called_once()
+
     def test_mi_requires_hub_name(self, fixture_cmd, mock_deps):
         from azext_iot.core.custom import iot_dps_linked_hub_create
         with pytest.raises(RequiredArgumentMissingError, match="--hub-name"):

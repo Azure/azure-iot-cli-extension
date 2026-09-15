@@ -232,6 +232,22 @@ class TestVersionComparison(object):
 
 
 class TestEmbeddedCli(object):
+    @pytest.mark.parametrize(
+        "command",
+        ["account show", "ad sp show --id app-id", "extension show -n azure-iot"],
+    )
+    def test_non_subscription_commands_do_not_receive_subscription(
+        self, mocker, mocked_azclient, command
+    ):
+        cli_ctx = mocker.MagicMock()
+        cli_ctx.data = {"subscription_id": "subscription"}
+        cli = EmbeddedCLI(cli_ctx)
+
+        cli.invoke(command)
+
+        expected = command.split() + ["-o", "json"]
+        assert mocked_azclient().invoke.call_args.args[0] == expected
+
     @pytest.fixture(params=[0, 1, 2])
     def mocked_azclient(self, mocker, request):
         azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import io
 import runpy
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -35,10 +36,11 @@ def plain_logs(monkeypatch):
 )
 @pytest.mark.parametrize("pretty", [False, True])
 def test_log_format(kind, prefix, color, pretty, monkeypatch, capsys, caplog):
-    if pretty:
-        monkeypatch.setenv("PRETTY_LOG", "1")
-    with patch.object(log, "_ts", return_value="17:21:30"):
-        log._log(kind, "example %s", "message")
+    with monkeypatch.context() as context:
+        if pretty:
+            context.setenv("PRETTY_LOG", "1")
+        with patch.object(log, "_ts", return_value="17:21:30"):
+            log._log(kind, "example %s", "message")
 
     text = prefix + "example message"
     if kind == log.LogKind.STEP:
@@ -59,9 +61,10 @@ def test_log_format(kind, prefix, color, pretty, monkeypatch, capsys, caplog):
 
 @pytest.mark.parametrize("value", [None, "", "0", "false", "1"])
 def test_pretty_log_requires_explicit_opt_in(value, monkeypatch):
-    if value is not None:
-        monkeypatch.setenv("PRETTY_LOG", value)
-    assert log._pretty_log_enabled() is (value == "1")
+    with monkeypatch.context() as context:
+        if value is not None:
+            context.setenv("PRETTY_LOG", value)
+        assert log._pretty_log_enabled() is (value == "1")
 
 
 def test_unknown_log_kind_is_rejected(capsys, caplog):
@@ -109,7 +112,6 @@ def test_timed_step_reports_delta_and_preserves_failure(fails, caplog):
     ],
 )
 def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
     report = SimpleNamespace(
         when="call",
         nodeid="test_example_int.py::TestExample::test_example",
@@ -118,7 +120,9 @@ def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
         longreprtext=reason,
     )
 
-    pytest_runtest_logreport(report)
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        pytest_runtest_logreport(report)
 
     color = "sage" if outcome == "passed" else "terra"
     assert capsys.readouterr().out == f"{log._ANSI[color]}{expected}{log._ANSI_RESET}\n"
@@ -135,7 +139,6 @@ def test_pretty_test_outcome(outcome, reason, expected, monkeypatch, capsys):
     ],
 )
 def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome, monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", pretty)
     report = SimpleNamespace(
         when=when,
         nodeid="test_example_int.py::TestExample::test_example",
@@ -143,13 +146,16 @@ def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome,
         failed=outcome == "failed",
     )
 
-    pytest_runtest_logreport(report)
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", pretty)
+        pytest_runtest_logreport(report)
 
     assert not capsys.readouterr().out
 
 
-@pytest.mark.parametrize("wait_fails,cleanup_fails", [(False, False), (True, False), (True, True)])
-def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, cleanup_fails, caplog, mocker):
+def test_namespace_lifecycle_logging_preserves_ignite_commands(
+    caplog, mocker
+):
     from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
 
     test = object.__new__(scenario.TestADRNamespaceCrud)
@@ -164,61 +170,93 @@ def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, 
     created = {
         "name": namespace_name,
         "location": scenario.TEST_LOCATION,
-        "identity": {"type": "SystemAssigned"},
-        "properties": {"provisioningState": "Succeeded"},
+        "properties": {
+            "provisioningState": "Succeeded",
+            "observability": {"enabled": False},
+        },
     }
     execution.return_value.assert_with_checks.return_value.get_output_in_json.side_effect = [
-        {"id": "test-sub"},
-        {"endpoints": {"resourceManager": "https://management.azure.com/"}},
         created,
-        [created],
+        created,
+        created,
         {"tags": {"env": "test", "purpose": "ci"}},
         {"tags": {"owner": "adr-tests"}},
-        {"properties": {"messaging": {"endpoints": {}}}},
-        {"type": "None"},
-        {"type": "SystemAssigned"},
     ]
-    error = RuntimeError("authentication failed")
-    if wait_fails:
-        execution.side_effect = [
-            *[execution.return_value] * 5,
-            error,
-            RuntimeError("cleanup failed") if cleanup_fails else execution.return_value,
-        ]
 
-    with patch.object(scenario, "generate_adr_namespace_name", return_value=namespace_name):
-        if wait_fails:
-            with pytest.raises(RuntimeError) as raised:
-                scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
-            assert raised.value is error
-        else:
-            scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
+    with patch.object(
+        scenario, "generate_adr_namespace_name", return_value=namespace_name
+    ):
+        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
 
     commands = [call.args[0] for call in test.cmd.call_args_list]
-    assert commands[4] == (
+    assert commands[0] == (
         f"iot adr ns create -n {namespace_name} -g {scenario.TEST_RG} "
         f"--location {scenario.TEST_LOCATION} --no-wait"
     )
-    assert commands[5] == f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} --created"
+    assert commands[1] == (
+        f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG}"
+    )
+    assert not any("--messaging-endpoints" in command for command in commands)
     assert caplog.messages[0] == "\u25b6 TEST: test_namespace_crud_lifecycle"
-    command_logs = [message for message in caplog.messages if message.startswith("  \u203a az ")]
+    command_logs = [
+        message
+        for message in caplog.messages
+        if message.startswith("  \u203a az ")
+    ]
     assert len(command_logs) == len(commands)
-    durations = [message for message in caplog.messages if message.startswith("  \u0394 (")]
-    if wait_fails:
-        assert commands[6:] == [f"iot adr ns delete -n {namespace_name} -g {scenario.TEST_RG} --yes"]
-        assert len(durations) == 3
-        assert not any(message.startswith("  \u2713 ") for message in caplog.messages)
-        assert any("cleanup failed" in message for message in caplog.messages) is cleanup_fails
-    else:
-        assert len(commands) == 23
-        assert commands[-2] == f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} --deleted"
-        assert [index for index, call in enumerate(test.cmd.call_args_list) if call.kwargs] == [9, 22]
-        assert all(
-            call.kwargs == {"expect_failure": True}
-            for call in test.cmd.call_args_list if call.kwargs
-        )
-        assert len(durations) == 6
-        assert "  \u2713 Namespace deleted" in caplog.messages
+    durations = [
+        message
+        for message in caplog.messages
+        if message.startswith("  \u0394 (")
+    ]
+    assert len(commands) == 12
+    assert commands[-2] == (
+        f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} "
+        "--deleted"
+    )
+    assert [
+        index
+        for index, call in enumerate(test.cmd.call_args_list)
+        if call.kwargs
+    ] == [4, 8, 11]
+    assert all(
+        call.kwargs == {"expect_failure": True}
+        for call in test.cmd.call_args_list
+        if call.kwargs
+    )
+    assert len(durations) == 4
+    assert "  \u2713 Namespace deleted" in caplog.messages
+
+
+@pytest.mark.parametrize(
+    "method_name,list_command",
+    [
+        ("test_namespace_list_by_resource_group", "iot adr ns list -g test-rg"),
+        ("test_namespace_list_by_subscription", "iot adr ns list"),
+    ],
+)
+def test_namespace_list_scenarios_preserve_both_scopes(method_name, list_command, mocker):
+    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
+
+    test = object.__new__(scenario.TestADRNamespaceCrud)
+    test._testMethodName = method_name
+    test.kwargs = {}
+    test.cli_ctx = Mock()
+    test.cmd = Mock(wraps=test.cmd)
+    mocker.patch.object(scenario, "TEST_RG", "test-rg")
+    mocker.patch.object(scenario, "TEST_SUBSCRIPTION", None)
+    mocker.patch.object(scenario, "generate_adr_namespace_name", return_value="test-namespace")
+    execution = mocker.patch("azure.cli.testsdk.base.execute", autospec=True)
+    execution.return_value.assert_with_checks.return_value.get_output_in_json.return_value = [
+        {"name": "test-namespace"}
+    ]
+
+    getattr(test, method_name)()
+
+    commands = [call.args[0].strip() for call in test.cmd.call_args_list]
+    assert len(commands) == 3
+    assert commands[1] == list_command
+    assert commands[2] == "iot adr ns delete -n test-namespace -g test-rg --yes"
 
 
 def test_timestamp_is_utc():
@@ -227,10 +265,11 @@ def test_timestamp_is_utc():
 
 @pytest.mark.parametrize("pretty", [False, True])
 def test_raw_log_with_and_without_arguments(pretty, monkeypatch, caplog, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1" if pretty else "0")
-    log._raw_log()
-    log._raw_log("literal")
-    log._raw_log("value %s", "example")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1" if pretty else "0")
+        log._raw_log()
+        log._raw_log("literal")
+        log._raw_log("value %s", "example")
     if pretty:
         assert capsys.readouterr().out == "\nliteral\nvalue example\n"
     else:
@@ -238,51 +277,114 @@ def test_raw_log_with_and_without_arguments(pretty, monkeypatch, caplog, capsys)
 
 
 def test_pretty_log_without_color(monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
-    monkeypatch.setitem(log._STYLES, "plain", ("prefix ", "missing"))
-    log._log("plain", "value")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        context.setitem(log._STYLES, "plain", ("prefix ", "missing"))
+        log._log("plain", "value")
     assert capsys.readouterr().out == "prefix value\n"
 
 
 def test_pretty_step_without_arguments(monkeypatch, capsys):
-    monkeypatch.setenv("PRETTY_LOG", "1")
-    with patch.object(log, "_ts", return_value="17:21:30"):
-        log._log(log.LogKind.STEP, "Step")
+    with monkeypatch.context() as context:
+        context.setenv("PRETTY_LOG", "1")
+        with patch.object(log, "_ts", return_value="17:21:30"):
+            log._log(log.LogKind.STEP, "Step")
     assert "Step \u00b7 17:21:30" in capsys.readouterr().out
 
 
-def test_namespace_scenario_requires_config(mocker):
-    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
-    mocker.patch.object(scenario, "TEST_RG", None)
-    test = object.__new__(scenario.TestADRNamespaceCrud)
-    with pytest.raises(pytest.skip.Exception, match="azext_iot_testrg"):
-        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252", "ascii"])
+@pytest.mark.parametrize("raw", [False, True])
+def test_pretty_output_respects_stream_encoding(encoding, raw, monkeypatch):
+    buffer = io.BytesIO()
+    with io.TextIOWrapper(buffer, encoding=encoding, errors="strict", newline="\n") as stream:
+        with monkeypatch.context() as context:
+            context.setenv("PRETTY_LOG", "1")
+            context.setattr(log.sys, "stdout", stream)
+            if raw:
+                log._raw_log("value %s", "\u2713 caf\u00e9")
+                text = "value \u2713 caf\u00e9\n"
+            else:
+                log._log(log.LogKind.OK, "value %s", "caf\u00e9")
+                text = f"{log._ANSI['sage']}  \u2713 value caf\u00e9{log._ANSI_RESET}\n"
+        # No explicit flush here: the logger must flush before returning.
+        assert buffer.getvalue() == text.encode(encoding, errors="backslashreplace")
 
 
-def test_preflight_uses_explicit_configuration_and_does_not_provision(mocker):
-    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
-    mocker.patch.object(scenario, "TEST_RG", "test group")
-    mocker.patch.object(scenario, "TEST_SUBSCRIPTION", "selected-sub")
-    mocker.patch.object(scenario, "TEST_LOCATION", "selected-location")
-    mocker.patch.object(scenario, "TEST_API_VERSION", "selected-api")
-    test = object.__new__(scenario.TestADRNamespaceCrud)
-    test.cmd = Mock()
-    test.cmd.return_value.get_output_in_json.side_effect = [
-        {"id": "selected-sub"},
-        {"endpoints": {"resourceManager": "https://management.example/"}},
-    ]
-    error = RuntimeError("preflight failure")
-    test.cmd.side_effect = [test.cmd.return_value, test.cmd.return_value, test.cmd.return_value, error]
-    with pytest.raises(RuntimeError) as raised:
-        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
+@pytest.mark.parametrize("outcome", ["passed", "failed"])
+def test_pretty_report_hook_on_cp1252_stream(outcome, monkeypatch):
+    report = SimpleNamespace(
+        when="call",
+        nodeid="test_example_int.py::TestExample::test_example",
+        passed=outcome == "passed",
+        failed=outcome == "failed",
+        longreprtext="AssertionError: caf\u00e9",
+    )
+    buffer = io.BytesIO()
+    with io.TextIOWrapper(buffer, encoding="cp1252", errors="strict", newline="\n") as stream:
+        with monkeypatch.context() as context:
+            context.setenv("PRETTY_LOG", "1")
+            context.setattr(log.sys, "stdout", stream)
+            pytest_runtest_logreport(report)
+        first_report = buffer.getvalue()
+        # The test's own call report runs before fixture teardown. Pretty mode
+        # must already be restored, not just restored by monkeypatch teardown.
+        with monkeypatch.context() as context:
+            context.setattr(log.sys, "stdout", stream)
+            pytest_runtest_logreport(report)
+        assert buffer.getvalue() == first_report
+    if outcome == "passed":
+        expected = f"{log._ANSI['sage']}\\u2713 PASS test_example{log._ANSI_RESET}\n"
+    else:
+        expected = (
+            f"{log._ANSI['terra']}\\u2717 FAIL test_example"
+            f" -- AssertionError: caf\u00e9{log._ANSI_RESET}\n"
+        )
+    assert first_report == expected.encode("cp1252")
+
+
+@pytest.mark.parametrize("encoding", [None, "missing"])
+def test_pretty_output_without_stream_encoding(encoding, monkeypatch):
+    output = io.StringIO()
+    stream = SimpleNamespace(write=output.write, flush=Mock())
+    if encoding is None:
+        stream.encoding = None
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        log._print_pretty("\u2713 caf\u00e9")
+    assert output.getvalue() == "\u2713 caf\u00e9\n"
+    stream.flush.assert_called_once_with()
+
+
+@pytest.mark.parametrize("operation", ["write", "flush"])
+@pytest.mark.parametrize("error", [
+    BrokenPipeError("closed pipe"),
+    OSError("output unavailable"),
+    UnicodeEncodeError("utf-8", "x", 0, 1, "synthetic stream failure"),
+])
+def test_pretty_output_does_not_retry_stream_errors(operation, error, monkeypatch):
+    stream = SimpleNamespace(encoding="utf-8", write=Mock(), flush=Mock())
+    getattr(stream, operation).side_effect = error
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        with pytest.raises(type(error)) as raised:
+            log._print_pretty("\u2713")
     assert raised.value is error
-    commands = [call.args[0] for call in test.cmd.call_args_list]
-    assert commands == [
-        "account show --subscription selected-sub", "cloud show",
-        "group show -n 'test group' --subscription selected-sub",
-        "rest --method get --url 'https://management.example/subscriptions/selected-sub/resourceGroups/test%20group/"
-        "providers/Microsoft.DeviceRegistry/namespaces?api-version=selected-api'",
-    ]
+    if operation == "write":
+        stream.write.assert_called_once_with("\u2713")
+        stream.flush.assert_not_called()
+    else:
+        assert stream.write.call_count == 2  # text and newline, with no retry
+        stream.flush.assert_called_once_with()
+
+
+def test_pretty_output_rejects_invalid_encoding_before_writing(monkeypatch):
+    stream = SimpleNamespace(encoding="not-a-real-codec", write=Mock(), flush=Mock())
+    with monkeypatch.context() as context:
+        context.setattr(log.sys, "stdout", stream)
+        with pytest.raises(LookupError):
+            log._print_pretty("\u2713")
+    stream.write.assert_not_called()
+    stream.flush.assert_not_called()
 
 
 def test_namespace_name_generation():
@@ -292,8 +394,17 @@ def test_namespace_name_generation():
     assert len(name) == 15
 
 
-@pytest.mark.parametrize("adr_group", [None, "", "adr-group"])
-def test_adr_resource_group_override_and_fallback(monkeypatch, adr_group):
+@pytest.mark.parametrize(
+    "adr_group,expected",
+    [
+        (None, "cli-int-test-rg"),
+        ("", ""),
+        ("adr-group", "adr-group"),
+    ],
+)
+def test_adr_resource_group_preserves_ignite_default(
+    monkeypatch, adr_group, expected
+):
     from azext_iot.tests.adr import conftest
 
     monkeypatch.setenv("azext_iot_testrg", "shared-group")
@@ -301,4 +412,4 @@ def test_adr_resource_group_override_and_fallback(monkeypatch, adr_group):
     if adr_group is not None:
         monkeypatch.setenv("azext_iot_adr_resource_group", adr_group)
     settings = runpy.run_path(conftest.__file__)
-    assert settings["TEST_RG"] == (adr_group or "shared-group")
+    assert settings["TEST_RG"] == expected
