@@ -32,18 +32,30 @@ def patch_core_help():
         --ns-identity-id UserIdentityResourceId --skip-ns-ra
 """
 
-    # add DPS create examples for ADR properties
+    # add DPS create examples for managed identities
     if "iot dps create" in helps:
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with system identity and Device Registry namespace properties
+  - name: Create an Azure IoT Hub Device Provisioning Service with a system-assigned identity
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned --ns-resource-id NamespaceResourceId
-  - name: Create an Azure IoT Hub Device Provisioning Service with user-managed identity and Device Registry namespace properties
+        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned
+  - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned identity
     text: >
         az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
-        --ns-resource-id NamespaceResourceId --ns-identity-id IdentityResourceId
+  - name: Create an Azure IoT Hub Device Provisioning Service with SAS key (local) authentication disabled, requiring Azure RBAC
+    text: >
+        az iot dps create --name MyDps --resource-group MyResourceGroup --disable-local-auth
+"""
+
+    # add DPS update example for local authentication
+    if "iot dps update" in helps:
+        helps[
+            "iot dps update"
+        ] += """
+  - name: Disable SAS key (local) authentication on an existing Device Provisioning Service, requiring Azure RBAC
+    text: >
+        az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
 """
 
     # add DPS identity help

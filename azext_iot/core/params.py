@@ -52,18 +52,8 @@ def load_core_arguments(self, _):
             "Only applicable to Gen2 IoT Hubs.",
         )
 
-    # DPS create / update ADR and identity params
+    # DPS create / update identity params
     with self.argument_context("iot dps") as c:
-        c.argument(
-            "adr_ns_id",
-            options_list=["--ns-resource-id", "--ns-id"],
-            help="Device Registry namespace resource ID to link to this provisioning service.",
-        )
-        c.argument(
-            "adr_ns_identity_id",
-            options_list=["--ns-identity-id"],
-            help="User-managed identity resource ID to access Device Registry namespace.",
-        )
         c.argument(
             "mi_system_assigned",
             arg_type=get_three_state_flag(),
@@ -77,6 +67,18 @@ def load_core_arguments(self, _):
             help="Enable user-assigned managed identities for this provisioning service. "
             "Accepts space-separated list of identity resource IDs.",
         )
+
+    # DPS local authentication params
+    for scope in ["iot dps create", "iot dps update"]:
+        with self.argument_context(scope) as c:
+            c.argument(
+                "disable_local_auth",
+                arg_type=get_three_state_flag(),
+                options_list=["--disable-local-auth", "--dla"],
+                help="A boolean indicating whether or not to disable SAS key (shared access policy) "
+                "authentication for this provisioning service. When disabled, only Azure RBAC is "
+                "used to authorize data plane requests.",
+            )
 
     # DPS identity assignment params
     with self.argument_context("iot dps identity assign") as c:

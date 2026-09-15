@@ -1,0 +1,7 @@
+{
+  "events": {
+    "address": "https://events.example",
+    "endpointType": "EventGrid",
+    "resourceId": "/event-grid"
+  }
+}

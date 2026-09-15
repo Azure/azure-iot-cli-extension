@@ -13,11 +13,18 @@ from azext_iot.deviceupdate.providers.storage import StorageAccountManager
 
 
 def test_init(mocker):
-    mocker.patch.object(subject, "AzureCliCredential")
+    profile = mocker.patch("azext_iot.common.auth.Profile")
+    profile.return_value.get_login_credentials.return_value = (mocker.sentinel.credential, "sub", "tenant")
+    get_subscription = mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id")
     smc = mocker.patch.object(subject, "StorageManagementClient")
-    mgr = StorageAccountManager(subscription_id="sub")
+    cli_ctx = mocker.sentinel.cli_ctx
+    mgr = StorageAccountManager(cli_ctx=cli_ctx, subscription_id="sub")
     assert mgr.subscription_id == "sub"
     assert mgr.client is smc.return_value
+    profile.assert_called_once_with(cli_ctx=cli_ctx)
+    profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="sub")
+    smc.assert_called_once_with(credential=mocker.sentinel.credential, subscription_id="sub")
+    get_subscription.assert_not_called()
 
 
 def _mgr():

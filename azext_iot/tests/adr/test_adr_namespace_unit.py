@@ -4,245 +4,251 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from unittest.mock import Mock, patch
+from copy import deepcopy
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
+from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError, RequiredArgumentMissingError
+from azure.core.exceptions import HttpResponseError
 
-from azext_iot.adr.common import (
-    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
-    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
-    DEFAULT_NS_POLICY_NAME,
-    IdentityType,
-)
+from azext_iot.adr.providers.base import parse_json_object
+from azext_iot.adr.providers.namespace import _clean_migrate_resource_ids, _messaging_properties
 
-
-# ==================== Create ====================
-
-
-@pytest.mark.parametrize("enable_certificate_management", [False, True])
-@pytest.mark.parametrize("policy_name", [None, "test-policy"])
-@pytest.mark.parametrize("cert_key_type", [None, DEFAULT_NS_POLICY_CERT_KEY_TYPE])
-@pytest.mark.parametrize("cert_validity_days", [None, 30])
-@pytest.mark.parametrize("cert_subject", [None, "CN=TestSubject"])
-def test_create_namespace(
-    fixture_namespace_provider,
-    fixture_credential_provider,
-    fixture_policy_provider,
-    mock_poller,
-    cert_key_type,
-    cert_validity_days,
-    cert_subject,
-    policy_name,
-    enable_certificate_management,
-):
-    """Namespace creation with credential-policy matrix."""
-    ns_name, rg, location = "test-namespace", "test-rg", "eastus"
-
-    fixture_credential_provider.create = Mock(return_value={"id": "credential-id"})
-    fixture_policy_provider.create = Mock(return_value={"id": "policy-id"})
-
-    has_policy_args = any([enable_certificate_management, policy_name, cert_key_type, cert_subject, cert_validity_days])
-
-    with patch(
-        "azext_iot.adr.providers.credential.CredentialProvider", return_value=fixture_credential_provider
-    ), patch("azext_iot.adr.providers.policy.PolicyProvider", return_value=fixture_policy_provider):
-        ns_result_data = {
-            "id": (
-                f"/subscriptions/test-sub/resourceGroups/{rg}/"
-                f"providers/Microsoft.DeviceRegistry/namespaces/{ns_name}"
-            ),
-            "name": ns_name,
-            "type": "Microsoft.DeviceRegistry/namespaces",
-            "location": location,
-            "identity": {"principalId": "test-principal-id", "type": "SystemAssigned"},
-            "resourceGroup": rg,
-        }
-        fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller(
-            ns_result_data
-        )
-
-        create_kwargs = {
-            "namespace_name": ns_name,
-            "resource_group_name": rg,
-            "location": location,
-            "tags": None,
-            "enable_certificate_management": enable_certificate_management,
-            "policy_name": policy_name,
-            "certificate_key_type": cert_key_type,
-            "certificate_subject": cert_subject,
-            "certificate_validity_days": cert_validity_days,
-        }
-
-        # Mutually-exclusive validation
-        if enable_certificate_management is False and any([
-            policy_name is not None,
-            cert_key_type is not None,
-            cert_validity_days is not None,
-            cert_subject is not None,
-        ]):
-            with pytest.raises(MutuallyExclusiveArgumentError):
-                fixture_namespace_provider.create(**create_kwargs)
-            return
-
-        result = fixture_namespace_provider.create(**create_kwargs)
-
-        assert result["name"] == ns_name
-        assert result["resourceGroup"] == rg
-
-        call_args = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args[1]
-        assert call_args["resource"]["location"] == location
-        assert call_args["resource"]["identity"] == {"type": IdentityType.system_assigned.value}
-
-        if has_policy_args:
-            fixture_credential_provider.create.assert_called_once_with(
-                namespace_name=ns_name, resource_group_name=rg, location=location,
-            )
-            fixture_policy_provider.create.assert_called_once_with(
-                policy_name=policy_name or DEFAULT_NS_POLICY_NAME,
-                namespace_name=ns_name,
-                resource_group_name=rg,
-                location=location,
-                certificate_key_type=cert_key_type if cert_key_type is not None else DEFAULT_NS_POLICY_CERT_KEY_TYPE,
-                certificate_subject=cert_subject,
-                certificate_validity_days=(
-                    cert_validity_days if cert_validity_days is not None else DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
-                ),
-            )
-        else:
-            fixture_credential_provider.create.assert_not_called()
-            fixture_policy_provider.create.assert_not_called()
+NS = "test-ns"
+RG = "test-rg"
+ASSET_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/assets/asset1"
+ENDPOINTS = {"events": {"address": "https://events.example", "endpointType": "EventGrid", "resourceId": "/event-grid"}}
 
 
-def test_create_namespace_resolves_location_and_tags(
-    fixture_namespace_provider, mock_poller
-):
-    """When location is omitted it is resolved; tags are passed through."""
-    ns_name, rg = "test-namespace", "test-rg"
-    fixture_namespace_provider._ensure_location = Mock(return_value="resolvedloc")
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller(
-        {"name": ns_name}
-    )
-
-    fixture_namespace_provider.create(
-        namespace_name=ns_name,
-        resource_group_name=rg,
-        location=None,
-        tags={"env": "test"},
-    )
-
-    fixture_namespace_provider._ensure_location.assert_called_once()
-    call_args = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args[1]
-    assert call_args["resource"]["location"] == "resolvedloc"
-    assert call_args["resource"]["tags"] == {"env": "test"}
+@pytest.fixture
+def provider(fixture_namespace_provider, mocker):
+    mocker.patch("azext_iot.adr.providers.base.wait_for_terminal_state", side_effect=lambda poller, **_: poller.result())
+    return fixture_namespace_provider
 
 
-def test_create_namespace_credential_and_policy_errors_logged(
-    fixture_namespace_provider, fixture_credential_provider, fixture_policy_provider, mock_poller
-):
-    """Credential/policy creation failures are caught and logged, not raised."""
-    ns_name, rg, location = "test-namespace", "test-rg", "eastus"
-    fixture_credential_provider.create = Mock(side_effect=Exception("cred boom"))
-    fixture_policy_provider.create = Mock(side_effect=Exception("policy boom"))
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller(
-        {"name": ns_name, "resourceGroup": rg}
-    )
-
-    with patch(
-        "azext_iot.adr.providers.credential.CredentialProvider", return_value=fixture_credential_provider
-    ), patch("azext_iot.adr.providers.policy.PolicyProvider", return_value=fixture_policy_provider):
-        result = fixture_namespace_provider.create(
-            namespace_name=ns_name,
-            resource_group_name=rg,
-            location=location,
-            enable_certificate_management=True,
-        )
-
-    assert result["name"] == ns_name
-    fixture_credential_provider.create.assert_called_once()
-    fixture_policy_provider.create.assert_called_once()
+@pytest.mark.parametrize("value", [{"a": 1}, '{"a":1}'])
+def test_json_objects(value):
+    assert parse_json_object(value, "--arg") == {"a": 1}
 
 
-# ==================== Show ====================
+def test_json_file():
+    path = Path(__file__).parent / "fixtures" / "messaging.json"
+    assert parse_json_object(str(path), "--messaging-endpoints") == ENDPOINTS
 
 
-def test_show_namespace(fixture_namespace_provider):
-    """Show returns the serialized namespace."""
-    expected = {"name": "test-namespace", "location": "eastus"}
-    fixture_namespace_provider.client.namespaces.get.return_value = expected
-
-    result = fixture_namespace_provider.show(namespace_name="test-namespace", resource_group_name="test-rg")
-
-    assert result == expected
-    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
-        resource_group_name="test-rg", namespace_name="test-namespace",
-    )
+@pytest.mark.parametrize("value", ["bad json", "missing-file.json", "[]", "null", "1", [], 1, None])
+def test_invalid_json(value):
+    with pytest.raises(InvalidArgumentValueError, match="JSON object"):
+        parse_json_object(value, "--arg")
 
 
-# ==================== Delete ====================
+@pytest.mark.parametrize("value,expected", [(None, {}), ({}, {"messaging": {"endpoints": {}}})])
+def test_empty_messaging(value, expected):
+    assert _messaging_properties(value) == expected
 
 
-def test_delete_namespace(fixture_namespace_provider):
-    """Delete triggers begin_delete LRO."""
-    fixture_namespace_provider.client.namespaces.begin_delete.return_value = Mock()
-
-    result = fixture_namespace_provider.delete(namespace_name="test-namespace", resource_group_name="test-rg")
-
-    assert result is not None
-    fixture_namespace_provider.client.namespaces.begin_delete.assert_called_once_with(
-        resource_group_name="test-rg", namespace_name="test-namespace",
-    )
-
-
-# ==================== List ====================
-
-
-def test_list_namespaces_by_resource_group(fixture_namespace_provider):
-    """List by resource group returns serialized results."""
-    expected = [{"name": "ns1", "location": "eastus"}, {"name": "ns2", "location": "westus"}]
-    fixture_namespace_provider.client.namespaces.list_by_resource_group.return_value = expected
-
-    assert fixture_namespace_provider.list(resource_group_name="test-rg") == expected
-    fixture_namespace_provider.client.namespaces.list_by_resource_group.assert_called_once_with(
-        resource_group_name="test-rg",
-    )
-
-
-def test_list_namespaces_by_subscription(fixture_namespace_provider):
-    """List by subscription returns serialized results."""
-    expected = [{"name": "ns1", "location": "eastus"}, {"name": "ns2", "location": "westus"}]
-    fixture_namespace_provider.client.namespaces.list_by_subscription.return_value = expected
-
-    assert fixture_namespace_provider.list() == expected
-    fixture_namespace_provider.client.namespaces.list_by_subscription.assert_called_once()
-
-
-# ==================== Update ====================
+def test_messaging_does_not_mutate_input():
+    value = deepcopy(ENDPOINTS)
+    assert _messaging_properties(value) == {"messaging": {"endpoints": ENDPOINTS}}
+    assert value == ENDPOINTS
 
 
 @pytest.mark.parametrize(
-    "namespace_name, resource_group_name, tags",
+    "value,error",
     [
-        ("test-namespace", "test-rg", {"env": "production"}),
-        ("prod-namespace", "prod-rg", {"team": "platform", "env": "prod"}),
-        ("update-namespace", "update-rg", None),
+        ({"": {"address": "value"}}, "nonempty endpoint names"),
+        ({"  ": {"address": "value"}}, "nonempty endpoint names"),
+        ({1: {"address": "value"}}, "nonempty endpoint names"),
+        ({"one": []}, "JSON objects"),
+        ({"one": {"address": "value", "authentication": {}}}, "unsupported properties: authentication"),
+        ({"one": {}}, "requires a nonempty address"),
+        ({"one": {"address": None}}, "requires a nonempty address"),
+        ({"one": {"address": "  "}}, "requires a nonempty address"),
+        ({"one": {"address": 1}}, "requires a nonempty address"),
+        ({"one": {"address": "value", "endpointType": None}}, "endpointType.*must be a string"),
+        ({"one": {"address": "value", "resourceId": {}}}, "resourceId.*must be a string"),
     ],
 )
-def test_update_namespace(fixture_namespace_provider, mock_poller, namespace_name, resource_group_name, tags):
-    """Update triggers begin_update LRO and returns the serialized result."""
-    expected = {"name": namespace_name, "location": "eastus"}
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(expected)
+def test_invalid_messaging(provider, value, error):
+    with pytest.raises(InvalidArgumentValueError, match=error):
+        provider.create(NS, RG, messaging_endpoints=value)
+    provider.client.namespaces.begin_create_or_replace.assert_not_called()
 
-    result = fixture_namespace_provider.update(
-        namespace_name=namespace_name, resource_group_name=resource_group_name, tags=tags,
+
+@pytest.mark.parametrize("system_assigned", [True, False])
+@pytest.mark.parametrize("tags", [None, {}, {"env": "test"}])
+@pytest.mark.parametrize("endpoints", [None, {}, ENDPOINTS])
+def test_namespace_create(provider, tags, endpoints, system_assigned):
+    result = {"name": NS}
+    provider.client.namespaces.begin_create_or_replace.return_value.result.return_value = result
+    assert provider.create(
+        NS, RG, location="centraluseuap", tags=tags,
+        system_assigned=system_assigned, messaging_endpoints=endpoints,
+    ) == {"name": NS, "resourceGroup": RG}
+    body = {
+        "location": "centraluseuap",
+        "identity": {"type": "SystemAssigned" if system_assigned else "None"},
+    }
+    if tags is not None:
+        body["tags"] = tags
+    if endpoints is not None:
+        body["properties"] = {"messaging": {"endpoints": endpoints}}
+    provider.client.namespaces.begin_create_or_replace.assert_called_once_with(
+        resource_group_name=RG, namespace_name=NS, resource=body,
+    )
+    provider.client.namespaces.get.assert_not_called()
+
+
+@pytest.mark.parametrize("result", [None, {"resourceGroup": "existing"}, {}])
+def test_namespace_create_result_shapes(provider, mocker, result):
+    fallback = mocker.patch.object(provider, "_ensure_location", return_value="group-location")
+    provider.client.namespaces.begin_create_or_replace.return_value.result.return_value = result
+    assert provider.create(NS, RG) is result
+    fallback.assert_called_once_with(provider.cmd.cli_ctx, RG, None)
+    assert provider.client.namespaces.begin_create_or_replace.call_args.kwargs["resource"]["identity"] == {
+        "type": "SystemAssigned"
+    }
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete", "migrate", "identity_assign", "identity_remove"])
+def test_mutations_no_wait(provider, operation, mocker):
+    wait = mocker.patch("azext_iot.adr.providers.base.wait_for_terminal_state")
+    arguments = {"location": "centraluseuap"} if operation == "create" else {}
+    if operation == "migrate":
+        arguments["resource_ids"] = [ASSET_ID]
+    sdk_operation = {
+        "create": "begin_create_or_replace", "delete": "begin_delete", "migrate": "begin_migrate",
+    }.get(operation, "begin_update")
+    poller = getattr(provider.client.namespaces, sdk_operation).return_value
+    assert getattr(provider, operation)(NS, RG, no_wait=True, **arguments) is poller
+    wait.assert_not_called()
+    poller.result.assert_not_called()
+
+
+@pytest.mark.parametrize("system_assigned", [None, True, False])
+@pytest.mark.parametrize("tags", [None, {}, {"env": "test"}])
+@pytest.mark.parametrize("endpoints", [None, {}, ENDPOINTS])
+def test_namespace_update(provider, tags, endpoints, system_assigned):
+    expected = {}
+    if tags is not None:
+        expected["tags"] = tags
+    if system_assigned is not None:
+        expected["identity"] = {"type": "SystemAssigned" if system_assigned else "None"}
+    if endpoints is not None:
+        expected["properties"] = {"messaging": {"endpoints": endpoints}}
+    poller = provider.client.namespaces.begin_update.return_value
+    assert provider.update(NS, RG, tags, system_assigned, endpoints) is poller.result.return_value
+    provider.client.namespaces.begin_update.assert_called_once_with(
+        resource_group_name=RG, namespace_name=NS, properties=expected,
+    )
+    provider.client.namespaces.get.assert_not_called()
+
+
+def test_namespace_show(provider):
+    assert provider.show(NS, RG) is provider.client.namespaces.get.return_value
+    provider.client.namespaces.get.assert_called_once_with(resource_group_name=RG, namespace_name=NS)
+
+
+@pytest.mark.parametrize("resource_group", [RG, None])
+def test_namespace_list(provider, resource_group):
+    operation = (
+        provider.client.namespaces.list_by_resource_group if resource_group
+        else provider.client.namespaces.list_by_subscription
+    )
+    operation.return_value = iter([{"name": "one"}, {"name": "two"}])
+    assert provider.list(resource_group) == [{"name": "one"}, {"name": "two"}]
+    operation.assert_called_once_with(**({"resource_group_name": RG} if resource_group else {}))
+
+
+def test_namespace_delete(provider):
+    provider.client.namespaces.begin_delete.return_value.result.return_value = None
+    assert provider.delete(NS, RG) is None
+    provider.client.namespaces.begin_delete.assert_called_once_with(resource_group_name=RG, namespace_name=NS)
+
+
+@pytest.mark.parametrize("during_poll", [True, False])
+@pytest.mark.parametrize("not_empty", [True, False])
+def test_delete_errors(provider, during_poll, not_empty):
+    error = HttpResponseError("NamespaceNotEmpty" if not_empty else "Forbidden")
+    operation = provider.client.namespaces.begin_delete
+    if during_poll:
+        operation.return_value.result.side_effect = error
+    else:
+        operation.side_effect = error
+    with pytest.raises(AzureResponseError if not_empty else HttpResponseError) as raised:
+        provider.delete(NS, RG)
+    if not_empty:
+        assert raised.value.__cause__ is error
+        assert "does not cascade" in str(raised.value)
+        assert "az iot adr ns" not in str(raised.value)
+    else:
+        assert raised.value is error
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "show", "list", "migrate"])
+def test_service_errors_propagate(provider, operation):
+    error = HttpResponseError("Forbidden")
+    sdk_operation = {
+        "create": "begin_create_or_replace", "update": "begin_update", "show": "get",
+        "list": "list_by_resource_group", "migrate": "begin_migrate",
+    }[operation]
+    getattr(provider.client.namespaces, sdk_operation).side_effect = error
+    arguments = {"location": "centraluseuap"} if operation == "create" else {}
+    if operation == "migrate":
+        arguments["resource_ids"] = [ASSET_ID]
+    with pytest.raises(HttpResponseError) as raised:
+        if operation == "list":
+            provider.list(RG)
+        else:
+            getattr(provider, operation)(NS, RG, **arguments)
+    assert raised.value is error
+
+
+def test_migrate(provider):
+    poller = provider.client.namespaces.begin_migrate.return_value
+    assert provider.migrate(NS, RG, [ASSET_ID, " " + ASSET_ID.upper() + "/ "]) is poller.result.return_value
+    provider.client.namespaces.begin_migrate.assert_called_once_with(
+        namespace_name=NS, resource_group_name=RG, body={"scope": "Resources", "resourceIds": [ASSET_ID]},
     )
 
-    assert result == expected
 
-    kw = fixture_namespace_provider.client.namespaces.begin_update.call_args[1]
-    assert kw["resource_group_name"] == resource_group_name
-    assert kw["namespace_name"] == namespace_name
-    if tags is not None:
-        assert kw["properties"]["tags"] == tags
-    else:
-        assert kw["properties"] == {}
+@pytest.mark.parametrize("value", [None, []])
+def test_missing_migration_ids(value):
+    with pytest.raises(RequiredArgumentMissingError, match="--resource-ids"):
+        _clean_migrate_resource_ids(value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, 1, "", " ", "bad", ASSET_ID.replace("DeviceRegistry", "Other"),
+     ASSET_ID.replace("/assets/", "/namespaces/"), ASSET_ID + "/child/name"],
+)
+def test_invalid_migration_ids(provider, value):
+    with pytest.raises(InvalidArgumentValueError, match="resource ID"):
+        provider.migrate(NS, RG, [value])
+    provider.client.namespaces.begin_migrate.assert_not_called()
+
+
+@pytest.mark.parametrize("identity", [None, {}, {"type": "SystemAssigned", "principalId": "principal"}])
+def test_identity_show(provider, identity):
+    provider.client.namespaces.get.return_value = {"identity": identity}
+    assert provider.identity_show(NS, RG) == (identity or {})
+
+
+@pytest.mark.parametrize("operation,identity_type", [("identity_assign", "SystemAssigned"), ("identity_remove", "None")])
+@pytest.mark.parametrize("result", [None, {}, {"identity": None}, {"identity": {"type": "SystemAssigned"}}])
+def test_identity_mutations(provider, operation, identity_type, result):
+    provider.client.namespaces.begin_update.return_value.result.return_value = result
+    expected = None if result is None else result.get("identity") or {}
+    assert getattr(provider, operation)(NS, RG) == expected
+    provider.client.namespaces.begin_update.assert_called_once_with(
+        namespace_name=NS, resource_group_name=RG, properties={"identity": {"type": identity_type}},
+    )
+
+
+def test_wait_forwards_poll_options(fixture_adr_provider, mocker):
+    wait = mocker.patch("azext_iot.adr.providers.base.wait_for_terminal_state")
+    poller = Mock()
+    assert fixture_adr_provider._wait(poller, "waiting", wait_sec=0, no_wait=False) is wait.return_value
+    wait.assert_called_once_with(poller, wait_sec=0)

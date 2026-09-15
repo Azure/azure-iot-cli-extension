@@ -87,8 +87,10 @@ steps:
               pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
           ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
             inlineScript: |
+              set -e
               export COVERAGE_FILE=.coverage.${{ parameters.name }}
-              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+              pytest -vv ${{ parameters.path }} -k "_int.py" --ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+              pytest -vv azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py -n 0 --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-append --cov-config .coveragerc --junitxml=junit/test-iotext-dps-rbac-int.xml --durations=0
           ${{ if contains(parameters.path, 'azext_iot/tests/adr') }}:
             inlineScript: |
               export COVERAGE_FILE=.coverage.${{ parameters.name }}

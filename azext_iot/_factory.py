@@ -11,7 +11,7 @@ Factory functions for IoT Hub and Device Provisioning Service.
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
-from azext_iot.common.auth import IoTOAuth
+from azext_iot.common.auth import IoTOAuth, get_cli_credential
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.common.utility import ensure_azure_namespace_path
@@ -20,9 +20,6 @@ from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGE
 ensure_azure_namespace_path()
 
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
-from azure.identity import AzureCliCredential
-
-AZURE_CLI_CREDENTIAL = AzureCliCredential()
 
 logger = get_logger(__name__)
 
@@ -60,7 +57,7 @@ def _get_arm_endpoint(cli_ctx):
     return cli_ctx.cloud.endpoints.resource_manager
 
 
-def iot_hub_service_factory(cli_ctx, *_):
+def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     """
     Factory for importing deps and getting service client resources.
 
@@ -76,10 +73,10 @@ def iot_hub_service_factory(cli_ctx, *_):
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    subscription_id = get_subscription_id(cli_ctx)
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
-        credential=AZURE_CLI_CREDENTIAL,
+        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
         subscription_id=subscription_id,
         base_url=_get_arm_endpoint(cli_ctx),
         credential_scopes=_get_credential_scopes(cli_ctx),
@@ -88,7 +85,7 @@ def iot_hub_service_factory(cli_ctx, *_):
     )
 
 
-def iot_service_provisioning_factory(cli_ctx, *_):
+def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     """
     Factory for importing deps and getting service client resources.
 
@@ -104,12 +101,12 @@ def iot_service_provisioning_factory(cli_ctx, *_):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    subscription_id = get_subscription_id(cli_ctx)
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(
-        credential=AZURE_CLI_CREDENTIAL,
+        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
         subscription_id=subscription_id,
-        endpoint=_get_arm_endpoint(cli_ctx),
+        base_url=_get_arm_endpoint(cli_ctx),
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
@@ -125,19 +122,19 @@ def adr_service_factory(cli_ctx, *_):
         *_ : all other args ignored.
 
     Returns:
-        service_client (MicrosoftDeviceRegistryManagementService): operational resource for
+        service_client (DeviceRegistryMgmtClient): operational resource for
             working with Azure Device Registry Service.
     """
     from azure.cli.core.commands.client_factory import get_subscription_id
 
-    from azext_iot.sdk.deviceregistry import MicrosoftDeviceRegistryManagementService
+    from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
     subscription_id = get_subscription_id(cli_ctx)
 
-    return MicrosoftDeviceRegistryManagementService(
-        credential=AZURE_CLI_CREDENTIAL,
+    return DeviceRegistryMgmtClient(
+        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
         subscription_id=subscription_id,
-        endpoint=cli_ctx.cloud.endpoints.resource_manager,
+        base_url=_get_arm_endpoint(cli_ctx),
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
