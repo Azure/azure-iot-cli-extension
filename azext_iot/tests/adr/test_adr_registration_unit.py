@@ -9,6 +9,7 @@
 import inspect
 from unittest.mock import MagicMock
 
+import pytest
 import yaml
 from knack.help_files import helps
 
@@ -97,7 +98,8 @@ def _registered_commands():
     }
 
 
-def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
+@pytest.mark.parametrize("command", ["iot adr ns create", "iot adr ns check", "iot adr ns setup"])
+def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker, command):
     from azure.cli.core.mock import DummyCli
 
     from azext_iot import IoTExtCommandsLoader
@@ -107,6 +109,8 @@ def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
     assert "iot adr ns link dps add" in table
     assert "iot adr ns su software-update import" in table
     assert "iot du account create" in table
+    assert "iot adr ns check" in table
+    assert "iot adr ns setup" in table
 
     argument_loaders = [
         "azext_iot._params.load_arguments",
@@ -117,13 +121,14 @@ def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
         "azext_iot.deviceupdate.params.load_deviceupdate_arguments",
         "azext_iot.core.params.load_core_arguments",
         "azext_iot.adr.params.load_adr_arguments",
+        "azext_iot.adr.workflows.params.load_adr_workflow_arguments",
     ]
     patched = [mocker.patch(path) for path in argument_loaders]
 
-    loader.load_arguments("iot adr ns create")
+    loader.load_arguments(command)
 
     for argument_loader in patched:
-        argument_loader.assert_called_once_with(loader, "iot adr ns create")
+        argument_loader.assert_called_once_with(loader, command)
 
 
 def test_2026_command_surface_is_registered():

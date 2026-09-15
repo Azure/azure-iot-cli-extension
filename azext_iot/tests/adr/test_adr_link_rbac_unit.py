@@ -27,6 +27,7 @@ from azext_iot.adr.rbac import (
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
+    SERVICE_AUTHORIZATION_PROPAGATION_SECONDS,
     SU_DATA_ROLE,
     _scope_subscription,
     format_role_requirements,
@@ -64,6 +65,7 @@ def _access_token(object_id="caller-object-id"):
 @pytest.fixture(autouse=True)
 def token_profile(mocker):
     """Keep RBAC token acquisition isolated from the local Azure login."""
+    mocker.patch("azext_iot.adr.rbac.sleep")
     profile = mocker.patch("azext_iot.adr.rbac.Profile")
     profile.return_value.get_raw_token.return_value = (
         ("Bearer", _access_token(), {}),
@@ -279,7 +281,10 @@ def test_linked_principal_errors(resource, selected, error_type, message):
 def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     cli = MagicMock()
     cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(3)]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure(
         "hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", "hub-principal"
@@ -295,6 +300,50 @@ def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     )
     assert not any("account get-access-token" in command for command in commands)
     assert not any("role assignment create" in command for command in commands)
+
+
+@pytest.mark.parametrize("assignments", [[], [{"id": "inherited-assignment"}]])
+def test_public_assignment_lookup_preserves_scoped_read_only_query(assignments):
+    cli = MagicMock()
+    cli.invoke.return_value = _result(assignments)
+    manager = LinkRbacManager(MagicMock(), cli=cli)
+    scope = TARGET_SCOPE.replace("/sub/", "/target-sub/")
+
+    assert manager.assignment_exists("principal-id", HUB_DATA_ROLE, scope) is bool(assignments)
+
+    cli.invoke.assert_called_once_with(
+        "role assignment list --assignee-object-id 'principal-id' "
+        f"--role '{HUB_DATA_ROLE}' --scope '{scope}' "
+        "--include-inherited --fill-principal-name false",
+        subscription="target-sub",
+    )
+
+
+def test_public_adu_principal_lookup_uses_scope_subscription_and_cache(token_profile):
+    cli = MagicMock()
+    graph_get = MagicMock(return_value=_graph_response([{"id": "adu-object-id"}]))
+    manager = LinkRbacManager(
+        SimpleNamespace(cloud=AZURE_PUBLIC_CLOUD), cli=cli, graph_get=graph_get,
+    )
+    scope = (
+        "/subscriptions/target-sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceUpdate/updateInstances/updates"
+    )
+
+    assert manager.resolve_adu_principal(scope) == "adu-object-id"
+    assert manager.resolve_adu_principal(scope + "-other") == "adu-object-id"
+
+    token_profile.return_value.get_raw_token.assert_called_once_with(
+        subscription="target-sub",
+        resource=AZURE_PUBLIC_CLOUD.endpoints.microsoft_graph_resource_id,
+    )
+    graph_get.assert_called_once_with(
+        GRAPH_SERVICE_PRINCIPALS_URL,
+        headers={"Authorization": f"Bearer {_access_token()}"},
+        params={"$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'", "$select": "id"},
+        timeout=30,
+    )
+    cli.invoke.assert_not_called()
 
 
 def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
@@ -361,7 +410,10 @@ def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
 def test_hub_without_inbound_identity_skips_reverse_assignment():
     cli = MagicMock()
     cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(2)]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure("hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", None)
 
@@ -382,7 +434,10 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
         _result([{"id": "visible-target"}]),
         _result([{"id": "visible-namespace"}]),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure(
         "hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", "hub-principal"
@@ -406,6 +461,9 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
     assert all("--include-groups" in item for item in privilege_queries)
     assert all("--include-inherited" in item for item in privilege_queries)
     assert all("--all" not in item for item in privilege_queries)
+    service_wait.assert_called_with(
+        SERVICE_AUTHORIZATION_PROPAGATION_SECONDS
+    )
 
 
 def test_rbac_unauthorized_fails_with_exact_remediation_before_create():
@@ -503,7 +561,7 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment(token_pro
         (("Bearer", "graph-access-token", {}), "sub", "tenant"),
         (("Bearer", _access_token("owner-object-id"), {}), "sub", "tenant"),
     ]
-    manager = LinkRbacManager(cli_ctx, cli=cli, graph_get=graph_get)
+    manager = LinkRbacManager(cli_ctx, cli=cli, graph_get=graph_get, sleeper=MagicMock())
 
     manager.ensure(
         "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
@@ -753,7 +811,9 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(caplog):
         _result({"id": "created-second"}),
         _result([{"id": "visible-second"}]),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=MagicMock()
+    )
 
     manager.ensure(
         "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
@@ -768,6 +828,36 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(caplog):
     completed = caplog.text.split("Completed these role-assignment creation requests")[1]
     assert "principalId=dps-principal" in completed
     assert "principalId=ns-principal" not in completed
+
+
+def test_all_raced_assignments_wait_for_service_authorization():
+    cli = MagicMock()
+    cli.invoke.side_effect = [
+        _result([]),
+        _result([]),
+        _result([{"id": "owner"}]),
+        _result([{"id": "owner"}]),
+        RuntimeError("assignment already exists"),
+        _result([{"id": "raced-target"}]),
+        RuntimeError("assignment already exists"),
+        _result([{"id": "raced-namespace"}]),
+    ]
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
+
+    manager.ensure(
+        "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+    )
+
+    service_wait.assert_called_once_with(
+        SERVICE_AUTHORIZATION_PROPAGATION_SECONDS
+    )
+    assert sum(
+        "role assignment create" in call.args[0]
+        for call in cli.invoke.call_args_list
+    ) == 2
 
 
 def test_created_assignments_wait_for_visibility_with_capped_backoff():

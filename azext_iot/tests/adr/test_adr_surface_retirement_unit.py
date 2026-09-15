@@ -19,7 +19,7 @@ from knack.help_files import helps
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
 from azext_iot.tests.adr import test_adr_validation_scenarios_unit as validation_fixtures
-from azext_iot.tests.adr import _helpers, test_adr_link_int
+from azext_iot.tests.adr import _helpers, test_adr_link_int, test_adr_namespace_workflow_int
 
 
 offline_cli = validation_fixtures.offline_cli
@@ -43,7 +43,7 @@ def test_registry_device_surface_is_retired_but_backend_group_type_remains(offli
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("module", [_helpers, test_adr_link_int])
+@pytest.mark.parametrize("module", [_helpers, test_adr_link_int, test_adr_namespace_workflow_int])
 def test_cleanup_sources_do_not_construct_retired_commands(module):
     for node in ast.walk(ast.parse(inspect.getsource(module))):
         if isinstance(node, ast.JoinedStr):

@@ -124,10 +124,12 @@ Subgroups:
     su                      : Manage Software Updates for Device Registry namespaces.
 
 Commands:
+    check                   : Check namespace connectivity readiness.
     create                  : Create a Device Registry namespace.
     delete                  : Delete a Device Registry namespace.
     list                    : List Device Registry namespaces.
     migrate                 : Migrate legacy assets into a Device Registry namespace.
+    setup                   : Configure namespace identity and endpoint connectivity.
     show                    : Show details of a Device Registry namespace.
     update                  : Update a Device Registry namespace.
     wait                    : Wait for a Device Registry namespace to reach a desired state.

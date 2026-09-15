@@ -33,6 +33,7 @@ USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
+SERVICE_AUTHORIZATION_PROPAGATION_SECONDS = 60
 GRAPH_SERVICE_PRINCIPALS_URL = (
     "https://graph.microsoft.com/v1.0/servicePrincipals"
 )
@@ -306,6 +307,16 @@ class LinkRbacManager:
         )
         return bool(assignments)
 
+    def assignment_exists(
+        self, principal_id: str, role: str, scope: str
+    ) -> bool:
+        """Return whether a required link assignment exists."""
+        return self._assignment_exists(principal_id, role, scope)
+
+    def resolve_adu_principal(self, scope: str) -> str:
+        """Resolve the ADU first-party principal in a scope's tenant."""
+        return self._resolve_adu_principal(_scope_subscription(scope))
+
     def _current_assignee_object_id(self, subscription_id: str) -> str:
         if subscription_id in self._caller_object_ids:
             return self._caller_object_ids[subscription_id]
@@ -516,6 +527,7 @@ class LinkRbacManager:
             self._assignment_summary(missing, descriptions),
         )
         created = []
+        needs_service_propagation = bool(missing)
         for index, (principal_id, role, scope) in enumerate(missing):
             try:
                 self._invoke_json(
@@ -558,3 +570,5 @@ class LinkRbacManager:
                 self._assignment_summary(created, descriptions),
             )
         self._wait_for_assignments(created)
+        if needs_service_propagation:
+            self._sleep(SERVICE_AUTHORIZATION_PROPAGATION_SECONDS)

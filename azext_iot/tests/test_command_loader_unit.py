@@ -41,6 +41,16 @@ _SU_ID = (
     "/subscriptions/su-sub/resourceGroups/su-rg/providers/"
     "Microsoft.DeviceUpdate/updateInstances/su"
 )
+_WORKFLOW_PARSER_CASES = {
+    "iot adr ns check": ["-n", "namespace", "-g", "resource-group", "--no-input", "--plain"],
+    "iot adr ns setup": [
+        "-n", "namespace", "-g", "resource-group", "--no-input", "--plain",
+        "--plan-only", "--yes", "--namespace-outbound-identity", "system-assigned",
+        "--dps", "endpoint=dps", f"resource-id={_DPS_ID}", "identity=system-assigned",
+        "--hub", "endpoint=hub", f"resource-id={_HUB_ID}", "identity=system-assigned",
+        "--su", "endpoint=su", f"resource-id={_SU_ID}", "create-if-missing=true",
+    ],
+}
 _LINK_PARSER_CASES = {
     "iot adr ns link add": [
         *_NAMESPACE_ARGUMENTS,
@@ -97,7 +107,7 @@ def management_command_parser():
     loader = cli_ctx.commands_loader
     loader.skip_applicability = True
     loader.load_command_table(None)
-    names = [*_LINK_PARSER_CASES, "iot hub create", "iot dps create"]
+    names = [*_LINK_PARSER_CASES, *_WORKFLOW_PARSER_CASES, "iot hub create", "iot dps create"]
     loader.command_table = {
         name: loader.command_table[name]
         for name in names
@@ -135,6 +145,8 @@ def test_command_table_loads(command_table):
         "iot dps enrollment create",
         "iot hub device-identity create",
         "iot device registration create",
+        "iot adr ns setup",
+        "iot adr ns check",
         "iot adr ns su software-update operation-status list",
         "iot adr ns su software-update catalog provider list",
         "iot adr ns su software-update catalog name list",
@@ -296,6 +308,30 @@ def test_all_link_commands_parse_one_global_subscription_without_collision(
     ]
     assert len(subscription_actions) == 1
     assert subscription_actions[0].dest == "_subscription"
+
+
+@pytest.mark.parametrize("command_name", sorted(_WORKFLOW_PARSER_CASES))
+def test_workflow_commands_parse_with_global_subscription(mocker, management_command_parser, command_name):
+    mocker.patch(
+        "azure.cli.core._profile.Profile.load_cached_subscriptions",
+        return_value=[{"id": "namespace-sub", "name": "namespace-subscription"}],
+    )
+    parsed = management_command_parser.parse_args([
+        *command_name.split(), *_WORKFLOW_PARSER_CASES[command_name],
+        "--subscription", "namespace-sub",
+    ])
+    assert parsed.namespace_name == "namespace"
+    assert parsed.resource_group_name == "resource-group"
+    assert parsed.no_input is True
+    assert parsed.plain is True
+    assert parsed._subscription == "namespace-sub"  # pylint: disable=protected-access
+    if command_name.endswith("setup"):
+        assert parsed.plan_only is True
+        assert parsed.yes is True
+        assert parsed.namespace_outbound_identity == "system-assigned"
+        assert parsed.dps == ["endpoint=dps", f"resource-id={_DPS_ID}", "identity=system-assigned"]
+        assert parsed.hubs == [["endpoint=hub", f"resource-id={_HUB_ID}", "identity=system-assigned"]]
+        assert parsed.software_updates == ["endpoint=su", f"resource-id={_SU_ID}", "create-if-missing=true"]
 
 
 def test_link_command_parser_leaves_subscription_for_current_account_default(

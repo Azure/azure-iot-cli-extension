@@ -2,6 +2,27 @@
 
 Release History
 ===============
+0.33.0+workflow3 (Preview)
+++++++++++++++++++++++++++
+
+**Namespace workflow CI fixes**
+
+* Isolated workflow renderer unit tests from real terminal input/output, including Windows runners without a console, without changing interactive behavior.
+* Aligned the namespace workflow integration harness with the shared ADR command logging wrapper.
+
+0.33.0+workflow2 (Preview)
+++++++++++++++++++++++++++
+
+**Namespace workflow redesign**
+
+* Synced setup/check with the current ``0.33.0b10`` ADR-only base, retaining its supported command surface and function-local loader imports.
+* Workflow Hub/DPS target discovery uses the ADR-specific management contracts (Hub ``2026-10-01-preview`` and DPS ``2026-06-01-preview``).
+* Workflow integration cleanup records resource ownership before creation and uses standalone namespace, Hub, DPS, and Update Instance deletion, preserving external fixtures and primary failures.
+* Changed ``az iot adr ns setup`` to delegate target validation, managed-identity checks, automatic service-to-service RBAC, assignment visibility, and namespace mutation to the atomic Hub, DPS, bundled DPS/Hub, and Software Updates link providers.
+* Removed the workflow-owned role matrix, permission probes, role-assignment creation, manual RBAC flags and resume path, and fixed workflow propagation sleep. Setup plans now describe the authoritative link requirements without maintaining a second RBAC implementation.
+* Added provider-owned access validation and repair for reused links, including identity-less Hub diagnostics and a service-authorization propagation delay after newly created or raced role assignments.
+* Split live setup coverage into standalone DPS, Hub-after-DPS, and Software Updates scenarios with automatic RBAC for an authorized caller. Live scenarios require separate validation against the synced base.
+
 0.33.0b10 (Preview)
 ++++++++++++++++++++
 
@@ -62,6 +83,13 @@ Release History
 * Scoped ``az iot adr ns`` to cloud-only resources by removing every command that requires an Azure IoT Operations custom location.
 
 **Azure Device Registry updates**
+
+* **Namespace workflows**
+
+  - Added ``az iot adr ns check`` for read-only namespace, configured-link, linked-resource, identity, and RBAC readiness diagnostics with actionable remediation.
+  - Added ``az iot adr ns setup`` for idempotent namespace creation/adoption, outbound identity configuration, DPS-first Hub linking, optional Software Updates linking, plan-only review, config input, and script export. The current workflow delegates scoped role assignments to the base link providers.
+  - Refined guided setup with append-only aligned history, single-line glyph progress, context-specific hotkeys, compact plan rows, interactive plan JSON export, namespace tags, elapsed execution, and safe in-session retry or optional Software Updates continuation.
+  - Added an unframed hybrid terminal history with browse-or-exact resource selection, staged/skipped/revisitable configuration, provider-owned RBAC planning, measurable progress, persisted setup receipts, and append-only plain/automation output.
 
 * **Registry Devices and child resources**
 
