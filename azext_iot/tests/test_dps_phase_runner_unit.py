@@ -7,6 +7,7 @@
 """Offline runner tests: fake ARM inventories/fixtures and harmless local child processes."""
 
 from contextlib import nullcontext
+import ast
 import json
 import os
 from pathlib import Path
@@ -342,22 +343,183 @@ def test_unsupported_read_rejects_before_timer_or_network_work(mocker, platform)
 
 
 @pytest.mark.parametrize("fails", [False, True])
-def test_linux_read_timer_is_bounded_and_restored_on_all_exit_paths(mocker, fails):
+@pytest.mark.parametrize("deadline,seconds", [(None, 60), (107, 7), (200, 60)])
+def test_linux_read_timer_is_bounded_and_restored_on_all_exit_paths(mocker, fails, deadline, seconds):
     previous = object()
     timer = SimpleNamespace(
         SIGALRM="alarm", ITIMER_REAL="real",
         signal=mocker.Mock(return_value=previous), setitimer=mocker.Mock(),
+        getitimer=mocker.Mock(return_value=(0, 0)),
     )
-    mocker.patch.dict(RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform="linux"), signal=timer)
+    mocker.patch.dict(
+        RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform="linux"), signal=timer,
+        time=SimpleNamespace(monotonic=lambda: 100),
+    )
     with pytest.raises(ValueError) if fails else nullcontext():
-        with RUNNER["bounded_read"]():
+        with RUNNER["bounded_read"](deadline):
             if fails:
                 raise ValueError("synthetic body failure")
-    assert timer.setitimer.call_args_list == [mocker.call("real", RUNNER["READ_SECONDS"]), mocker.call("real", 0)]
+    assert timer.setitimer.call_args_list == [mocker.call("real", seconds), mocker.call("real", 0)]
     assert timer.signal.call_count == 2
     assert timer.signal.call_args == mocker.call("alarm", previous)
     with pytest.raises(RUNNER["PhaseError"], match="exceeded"):
         timer.signal.call_args_list[0].args[1](None, None)
+
+
+@pytest.mark.parametrize("member", ["SIGALRM", "ITIMER_REAL", "setitimer", "getitimer"])
+@pytest.mark.parametrize("missing", [False, True])
+def test_missing_read_capability_rejects_before_timer_or_network_work(mocker, member, missing):
+    timer = SimpleNamespace(SIGALRM=14, ITIMER_REAL=0, setitimer=mocker.Mock(),
+                            getitimer=mocker.Mock(), signal=mocker.Mock())
+    if missing:
+        delattr(timer, member)
+    else:
+        setattr(timer, member, None)
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform="linux"), signal=timer)
+    with pytest.raises(RUNNER["PhaseError"], match="POSIX interval timers"):
+        with RUNNER["bounded_read"]():
+            pytest.fail("Missing capabilities must not start credential or ARM work")
+    timer.signal.assert_not_called()
+    if member != "setitimer":
+        timer.setitimer.assert_not_called()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Real DPS interval timers are Linux-only.")
+def test_linux_read_uses_real_interval_timer_and_restores_handler():
+    timer = RUNNER["signal"]
+    alarm = getattr(timer, "SIGALRM")
+    real = getattr(timer, "ITIMER_REAL")
+    previous = timer.getsignal(alarm)
+    with pytest.raises(RUNNER["PhaseError"], match="exceeded"):
+        with RUNNER["bounded_read"](time.monotonic() + .05):
+            time.sleep(1)
+    assert timer.getsignal(alarm) == previous
+    assert getattr(timer, "getitimer")(real) == (0, 0)
+
+
+@pytest.mark.parametrize("remaining,elapsed,expected", [(10, 3, 7), (0.00001, 0.001, 0.000001)])
+def test_nested_read_restores_absolute_outer_timer_even_when_nearly_expired(mocker, remaining, elapsed, expected):
+    clock = [100.0]
+    previous = mocker.Mock()
+    timer = SimpleNamespace(SIGALRM=14, ITIMER_REAL=0, signal=mocker.Mock(return_value=previous),
+                            getitimer=lambda _: (remaining, 0), setitimer=mocker.Mock())
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, signal=timer, sys=SimpleNamespace(platform="linux"),
+                      time=SimpleNamespace(monotonic=lambda: clock[0]))
+    with RUNNER["bounded_read"]():
+        assert timer.setitimer.call_args.args[1] == pytest.approx(remaining)
+        clock[0] += elapsed
+    assert timer.setitimer.call_args.args == pytest.approx((0, expected, 0))
+    assert timer.signal.call_args == mocker.call(14, previous)
+
+
+@pytest.mark.parametrize("outer_first", [False, True])
+def test_nested_timer_dispatch_preserves_outer_exception_meaning(mocker, outer_first):
+    clock = [100.0]
+    outer = mocker.Mock(side_effect=ValueError("outer item timeout"))
+    timer = SimpleNamespace(SIGALRM=14, ITIMER_REAL=0, signal=mocker.Mock(return_value=outer),
+                            getitimer=lambda _: (0.01 if outer_first else 10, 0), setitimer=mocker.Mock())
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, signal=timer, sys=SimpleNamespace(platform="linux"),
+                      time=SimpleNamespace(monotonic=lambda: clock[0]))
+    with pytest.raises(ValueError if outer_first else RUNNER["PhaseError"],
+                       match="outer item timeout" if outer_first else "exceeded"):
+        with RUNNER["bounded_read"](101):
+            handler = timer.signal.call_args.args[1]
+            clock[0] += 0.02 if outer_first else 1
+            handler(14, None)
+    assert outer.call_count == int(outer_first)
+    if not outer_first:
+        assert timer.setitimer.call_args.args == (0, 9, 0)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Real nested POSIX interval timer regression is Linux-only.")
+def test_real_active_item_timer_fires_inside_bounded_read_without_being_extended():
+    timer = RUNNER["signal"]
+    alarm, real = getattr(timer, "SIGALRM"), getattr(timer, "ITIMER_REAL")
+    set_timer, get_timer = getattr(timer, "setitimer"), getattr(timer, "getitimer")
+    previous = timer.getsignal(alarm)
+    old_remaining, old_interval = get_timer(real)
+    started = time.monotonic()
+
+    def outer_timeout(_signum, _frame):
+        raise ValueError("outer item deadline")
+
+    try:
+        timer.signal(alarm, outer_timeout)
+        set_timer(real, .02)
+        with pytest.raises(ValueError, match="outer item deadline"):
+            with RUNNER["bounded_read"](time.monotonic() + 5):
+                time.sleep(1)
+        assert time.monotonic() - started < .8
+        assert timer.getsignal(alarm) is outer_timeout
+        assert get_timer(real) == (0, 0)
+    finally:
+        set_timer(real, 0)
+        timer.signal(alarm, previous)
+        if old_remaining:
+            set_timer(real, max(.000001, old_remaining - (time.monotonic() - started)), old_interval)
+
+
+@pytest.mark.parametrize("member", ["getpgid", "killpg", "SIGUSR1", "SIGKILL"])
+@pytest.mark.parametrize("missing", [False, True])
+def test_missing_child_capability_rejects_before_files_or_processes(tmp_path, mocker, member, missing):
+    processes = mocker.Mock()
+    operating_system = SimpleNamespace(getpgid=mocker.Mock(), killpg=mocker.Mock(), kill=mocker.Mock())
+    signals = SimpleNamespace(SIGUSR1=10, SIGKILL=9)
+    owner = operating_system if member in ("getpgid", "killpg") else signals
+    if missing:
+        delattr(owner, member)
+    else:
+        setattr(owner, member, None)
+    mocker.patch.dict(
+        RUNNER["child"].__globals__, sys=SimpleNamespace(platform="linux"),
+        os=operating_system, signal=signals, subprocess=processes,
+    )
+    with pytest.raises(RUNNER["PhaseError"], match="POSIX process groups and signals"):
+        RUNNER["child"](["not-executed"], {}, tmp_path / "log", 1, 1)
+    assert not processes.mock_calls
+    operating_system.kill.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("foreign_worker", [False, True])
+def test_child_capabilities_keep_worker_ownership_and_absolute_cleanup_bound(tmp_path, mocker, foreign_worker):
+    _json(tmp_path / "worker-1.json", {"pid": 123, "ready": True})
+    process = mocker.Mock(pid=42, returncode=-9)
+    process.poll.return_value = None
+    processes = SimpleNamespace(Popen=mocker.Mock(return_value=process), PIPE=-1, STDOUT=-2)
+    operating_system = SimpleNamespace(
+        chmod=mocker.Mock(), fsync=mocker.Mock(), getpgid=mocker.Mock(return_value=43 if foreign_worker else 42),
+        killpg=mocker.Mock(), kill=mocker.Mock(),
+    )
+    mocker.patch.dict(
+        RUNNER["child"].__globals__, sys=SimpleNamespace(platform="linux"), os=operating_system,
+        signal=SimpleNamespace(SIGUSR1=10, SIGKILL=9, SIGTERM=15), subprocess=processes,
+        time=SimpleNamespace(monotonic=mocker.Mock(side_effect=[100, 101, 111, 112]), sleep=mocker.Mock()),
+        select=SimpleNamespace(select=mocker.Mock(return_value=([], [], []))), READ_SECONDS=0,
+    )
+    with pytest.raises(RUNNER["PhaseError"], match="process group") if foreign_worker else nullcontext():
+        result = RUNNER["child"](
+            ["not-executed"], {"azext_iot_dps_phase_receipts": str(tmp_path)}, tmp_path / "log", .5, 10,
+        )
+        assert result["timed_out"] and result["interrupted"]
+        assert result["cleanup_deadline"] == 110.5  # No new budget when interruption/cleanup is observed.
+    operating_system.getpgid.assert_called_once_with(123)
+    assert operating_system.kill.call_args_list == ([] if foreign_worker else [mocker.call(123, 10)])
+    assert operating_system.killpg.call_args_list == [mocker.call(42, 15), mocker.call(42, 9)]
+    assert processes.Popen.call_args.kwargs["start_new_session"] is True
+    process.wait.assert_called_once_with(timeout=5)
+    process.stdout.close.assert_called_once_with()
+
+
+def test_windows_missing_posix_members_are_not_accessed_directly():
+    tree = ast.parse(Path(RUNNER["__file__"]).read_text(encoding="utf-8"))
+    missing = {"signal": {"SIGALRM", "ITIMER_REAL", "setitimer", "getitimer", "SIGUSR1", "SIGKILL"},
+               "os": {"getpgid", "killpg"}}
+    assert not [
+        (node.value.id, node.attr, node.lineno) for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+        and node.attr in missing.get(node.value.id, set())
+    ]
 
 
 @pytest.mark.parametrize("defect", [

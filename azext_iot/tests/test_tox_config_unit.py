@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 
-INTEGRATION_ENVIRONMENT = "testenv:{Central,ADT,DPS,HubMgmt,HubData,HubSAS,ADU,ADR}-int"
+INTEGRATION_ENVIRONMENT = "testenv:{Central,ADT,DPS,HubControl,HubData,ADU,ADR}-int"
 
 
 def test_integration_environments_discover_the_candidate_extension():
@@ -54,7 +54,7 @@ def test_dps_controller_dependencies_are_isolated_from_the_managed_environment()
     assert "DPS: ." not in managed["deps"]
 
 
-@pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData", "HubSAS"])
+@pytest.mark.parametrize("service", ["ADR", "DPS"])
 def test_preview_integration_environments_bound_each_test_and_select_only_integration_files(service):
     config = ConfigParser(interpolation=None)
     root = Path(__file__).resolve().parents[2]
@@ -67,22 +67,31 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
     assert "--timeout=900" in command
     assert "--integration-progress-interval=60" in command
     assert "-o faulthandler_timeout=300" in command
-    if service != "HubSAS":
-        assert "-k _int.py " in command
+    assert "-k _int.py " in command
     assert "PYTHONUNBUFFERED=1" in {line.strip() for line in section["setenv"].splitlines()}
     service_lines = [
         line.strip() for line in section["commands"].splitlines()
         if line.strip().startswith(f"{service}:")
     ]
-    if service == "HubSAS":
-        from azext_iot.tests.iothub._sas_phase import NODES
-
-        arguments = [line.split(":", 1)[1].strip() for line in service_lines]
-        nodes = [argument for argument in arguments if argument.startswith("azext_iot/")]
-        assert tuple(node.rstrip(" \\") for node in nodes) == NODES
-        assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
-        assert "-n 0" in " ".join(service_lines)
     # Even --reruns 0 buffers phase reports until teardown finishes.
     assert "-p no:rerunfailures" in " ".join(service_lines)
     assert "--reruns" not in " ".join(service_lines)
     assert "pytest-timeout" in (root / "dev_requirements").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("suite", ["HubControl", "HubData"])
+def test_public_hub_tox_uses_managed_controller_with_explicit_scope_and_no_filters(suite):
+    config = ConfigParser(interpolation=None)
+    config.read(Path(__file__).resolve().parents[2] / "tox.ini")
+    section = config[INTEGRATION_ENVIRONMENT]
+    commands = section["commands"]
+    assert f"{suite}: python -m azext_iot.tests._hub_phase_runner --suite {suite}" in commands
+    assert "--subscription {env:azext_iot_hub_subscription}" in commands
+    assert "--resource-group {env:azext_iot_testrg:cli-int-test-rg}" in commands
+    assert "--region {env:azext_iot_testhub_location:centraluseuap}" in commands
+    assert "--output test-result/hub-phases" in commands
+    hub_lines = [line for line in commands.splitlines() if line.startswith("Hub")]
+    assert all("{posargs}" not in line and "pytest " not in line for line in hub_lines)
+    assert "HubSAS" not in commands and "HubMgmt" not in commands
+    assert "hubsas_subscription" not in section["setenv"]
+    assert "azext_iot_testhub_location={env:azext_iot_testhub_location:centraluseuap}" in section["setenv"]

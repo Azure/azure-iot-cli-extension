@@ -33,9 +33,15 @@ parameters:
   - name: "maxParallelDPS"
     type: number
     default: 1
-  - name: "maxParallelHub"
-    type: number
-    default: 1
+  - name: hubSubscription
+    type: string
+    default: a386d5ea-ea90-441a-8263-d816368c84a1
+  - name: hubResourceGroup
+    type: string
+    default: cli-int-test-rg
+  - name: hubRegion
+    type: string
+    default: centraluseuap
   - name: "maxParallelADU"
     type: number
     default: 1
@@ -95,35 +101,42 @@ jobs:
           pythonVersion: $(python)
           serviceConnection: $(AzureServiceConnection)
 
-  - job: "testHub_job_1"
-    timeoutInMinutes: 120
-    displayName: "Test IoT Hub - certificate, config, core, jobs, state"
-    condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
+  - job: "HubControl"
+    timeoutInMinutes: 190
+    displayName: "HubControl - owned control-plane"
+    dependsOn: [testCentral, testADT, testDPS, testADU, testADR]
+    condition: and(not(canceled()), eq('${{ parameters.testHub }}', true))
     strategy:
       matrix: $[ variables['pythonVersions'] ]
-      maxParallel: ${{ parameters.maxParallelHub }}
+      maxParallel: 1
     steps:
       - template: run-tests-parallel.yml
         parameters:
-          path: "azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs azext_iot/tests/iothub/state"
-          name: "iot-hub-1"
-          num_threads: 7
+          hubSuite: HubControl
+          hubSubscription: ${{ parameters.hubSubscription }}
+          hubResourceGroup: ${{ parameters.hubResourceGroup }}
+          hubRegion: ${{ parameters.hubRegion }}
+          name: "HubControl"
           azureCLIVersion: ${{ parameters.azureCLIVersion }}
           pythonVersion: $(python)
           serviceConnection: $(AzureServiceConnection)
 
-  - job: "testHub_job_2"
-    timeoutInMinutes: 120
-    condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-    displayName: "Test IoT Hub - devices, message endpoints, messaging, and modules"
+  - job: "HubData"
+    timeoutInMinutes: 360
+    dependsOn: HubControl
+    condition: and(not(canceled()), eq('${{ parameters.testHub }}', true))
+    displayName: "HubData - owned Entra and SAS phases"
     strategy:
       matrix: $[ variables['pythonVersions'] ]
-      maxParallel: ${{ parameters.maxParallelHub }}
+      maxParallel: 1
     steps:
       - template: run-tests-parallel.yml
         parameters:
-          path: "azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules azext_iot/tests/iothub/message_endpoint"
-          name: "iot-hub-2"
+          hubSuite: HubData
+          hubSubscription: ${{ parameters.hubSubscription }}
+          hubResourceGroup: ${{ parameters.hubResourceGroup }}
+          hubRegion: ${{ parameters.hubRegion }}
+          name: "HubData"
           azureCLIVersion: ${{ parameters.azureCLIVersion }}
           pythonVersion: $(python)
           serviceConnection: $(AzureServiceConnection)

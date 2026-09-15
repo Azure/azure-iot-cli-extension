@@ -174,11 +174,14 @@ def test_workflow_failure_propagation_is_wired():
 
 
 def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
+    from azext_iot.tests._hub_phase_runner import BUDGETS, CLEANUP, RESERVE
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    budgets = dict(re.findall(r'"(HubMgmt|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubMgmt": "120", "HubData": "120", "ADR": "120"}
+    budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
+    assert budgets == {"HubControl": "190", "HubData": "360", "ADR": "120"}
+    for suite, phases in BUDGETS.items():
+        assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
     assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
@@ -218,9 +221,9 @@ def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
         assert "ADR-only" in setting["description"]
     # Existing service defaults must not change when the filter is introduced.
     assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
-    for service in ("DPS", "HubMgmt", "HubData", "ADU", "ADR"):
+    for service in ("DPS", "HubControl", "HubData", "ADU", "ADR"):
         assert triggers["workflow_dispatch"]["inputs"][f"test{service}"]["default"] is True
-    assert triggers["workflow_dispatch"]["inputs"]["testHubSAS"]["default"] is False
+    assert "testHubSAS" not in triggers["workflow_dispatch"]["inputs"]
     step = _integration_run_step()
     assert step["env"]["ADR_TEST_FILTER"] == "${{ inputs['adr-test-filter'] }}"
     assert "adr-test-filter" not in step["run"]
@@ -257,7 +260,7 @@ tee() { cat; }
 
 
 @pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
-@pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData", "HubSAS", "ADU"])
+@pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData", "ADU"])
 @pytest.mark.parametrize("expression", ["", "test_adr_job_lifecycle or test_adr_job_validation_negatives"])
 def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service, expression):
     result = _run_integration_shell(tmp_path, service, expression)
@@ -382,54 +385,149 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 
-def test_hub_sas_workflow_defaults_to_opt_in():
+def test_hub_workflow_uses_two_public_suites_and_scoped_serial_consumers():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
-    assert triggers["workflow_dispatch"]["inputs"]["testHubSAS"]["default"] is False
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert inputs["testHubControl"]["default"] is True
+    assert inputs["testHubData"]["default"] is True
+    assert not {"testHubMgmt", "testHubSAS"}.intersection(inputs)
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
-    assert step["env"]["INPUT_TEST_HUB_SAS"] == "${{ inputs.testHubSAS }}"
+    assert step["env"]["INPUT_TEST_HUB_CONTROL"] == "${{ inputs.testHubControl }}"
+    job = workflow["jobs"]["int-test"]
+    assert job["strategy"]["max-parallel"] == 1
+    assert job["concurrency"]["cancel-in-progress"] is False
+    assert job["concurrency"]["group"] == "integration-live-${{ needs.setup.outputs.live-scope }}"
+    assert '"${TEST_SUBSCRIPTION_ID,,}" "${RESOURCE_GROUP,,}" | sha256sum' in step["run"]
+    env = _integration_run_step()["env"]
+    assert env["azext_iot_testhub_location"] == "${{ matrix.config.region }}"
+    assert env["azext_iot_hub_subscription"] == "${{ env.TEST_SUBSCRIPTION_ID }}"
+    assert not any(key.startswith("azext_iot_hubsas_") for key in env)
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
 @pytest.mark.parametrize("services,toggle,expected", [
-    ("auto", "false", False), ("auto", "true", False),
-    ("HubSAS", "false", True), ("", "true", True),
+    ("auto", "false", {"DPS", "HubControl", "HubData", "ADU", "ADR"}),
+    ("auto", "true", {"DPS", "HubControl", "HubData", "ADU", "ADR"}),
+    ("HubData", "false", {"HubData"}), ("", "true", {"HubData"}),
+    ("HubControl", "false", {"HubControl"}),
 ])
-def test_hub_sas_is_explicitly_opt_in(services, toggle, expected, tmp_path):
+def test_hub_public_matrix_auto_includes_complete_data_suite(services, toggle, expected, tmp_path):
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
     output = tmp_path / "output"
-    env = dict(os.environ, INPUT_SERVICES=services, INPUT_TEST_HUB_SAS=toggle,
-               INPUT_TEST_DPS="false", INPUT_TEST_HUB_MGMT="false", INPUT_TEST_HUB_DATA="false",
+    env = dict(os.environ, INPUT_SERVICES=services, INPUT_TEST_HUB_DATA=toggle,
+               INPUT_TEST_DPS="false", INPUT_TEST_HUB_CONTROL="false",
                INPUT_TEST_ADU="false", INPUT_TEST_ADR="false", INPUT_PYTHON_VERSIONS="3.13",
+               TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1", RESOURCE_GROUP="cli-int-test-rg",
                INPUT_REGIONS="centraluseuap", GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
     result = subprocess.run(
         ["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
         capture_output=True, text=True, timeout=15, check=False,
     )
     assert result.returncode == 0, result.stderr
-    matrix = json.loads(output.read_text(encoding="utf-8").split("matrix=", 1)[1])
-    assert any(value["service"] == "HubSAS" for value in matrix) is expected
-    if expected:
-        assert matrix == [{"service": "HubSAS", "tox_env": "HubSAS-int",
-                           "timeout": 120, "python": "3.13", "region": "centraluseuap"}]
+    matrix = json.loads(output.read_text(encoding="utf-8").split("matrix=", 1)[1].splitlines()[0])
+    assert {value["service"] for value in matrix} == expected
+    for value in matrix:
+        assert value["tox_env"] == value["service"] + "-int"
+        assert value["region"] == "centraluseuap"
 
 
+@pytest.mark.parametrize("service", ["HubControl", "HubData"])
 @pytest.mark.parametrize("status", ["success", "failure", "cancelled"])
-def test_hub_sas_uses_existing_service_result_gate(tmp_path, status):
-    combination = dict(MATRIX[0], service="HubSAS")
+def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, status):
+    combination = dict(MATRIX[0], service=service)
     _result(tmp_path, combination, status=status)
     _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
-    assert bool(errors) == (status != "success")
+    assert errors
+    assert any("Hub phase evidence" in error for error in errors)
 
 
-def test_hub_sas_tox_uses_exact_nodes_without_changing_other_auth_defaults():
+def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_default():
     from azext_iot.tests.iothub._sas_phase import NODES
+    from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
-    selected = re.findall(r"HubSAS:\s+(azext_iot/tests/iothub/\S+::\S+::\S+)", content)
-    assert tuple(selected) == NODES
-    assert "HubSAS: pytest -c setup.cfg" in content
-    assert "HubSAS: azext_iot_hub_auth_phase=local-auth" in content
-    assert "HubSAS: azext_iot_hubsas_subscription={env:azext_iot_hubsas_subscription}\n" in content
-    assert "HubSAS:    -n 0 -p no:rerunfailures --capture=fd" in content
+    assert tuple(nodes("HubData", "sas")) == NODES
+    assert phases("HubData") == ("entra", "sas")
+    assert len(nodes("HubData", "entra")) == 44
+    assert len(nodes("HubControl", "regular")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
+
+
+@pytest.mark.parametrize("service", ["HubControl", "HubData"])
+@pytest.mark.parametrize("passed", [False, True])
+def test_hub_gate_delegates_to_checkout_controller(tmp_path, mocker, service, passed):
+    combination = dict(MATRIX[0], service=service)
+    _result(tmp_path, combination)
+    folder = tmp_path / "hub-phases"
+    folder.mkdir()
+    (folder / "hub-phases.json").write_text(json.dumps({"suite": service}), encoding="utf-8")
+    evaluate = mocker.Mock(return_value={"passed": passed, "errors": [] if passed else ["incomplete cleanup"]})
+    load = mocker.patch("runpy.run_path", return_value={"evaluate_hub_phases": evaluate})
+    _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
+    load.assert_called_once_with(str(REPOSITORY_ROOT / "azext_iot/tests/_hub_phase_runner.py"))
+    evaluate.assert_called_once_with(folder)
+    assert bool(errors) is not passed
+
+
+def test_hub_control_evidence_cannot_qualify_hub_data(tmp_path):
+    combination = dict(MATRIX[0], service="HubData")
+    _result(tmp_path, combination)
+    folder = tmp_path / "hub-phases"
+    folder.mkdir()
+    (folder / "hub-phases.json").write_text('{"suite":"HubControl"}', encoding="utf-8")
+    _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
+    assert any("suite does not match" in error for error in errors)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
+@pytest.mark.parametrize("override", [
+    {"INPUT_SERVICES": "HubSAS"}, {"INPUT_SERVICES": "HubMgmt"},
+    {"INPUT_REGIONS": "westus"}, {"INPUT_REGIONS": "centraluseuap,westus"},
+    {"TEST_SUBSCRIPTION_ID": "foreign"}, {"RESOURCE_GROUP": "foreign"},
+])
+def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_path, override):
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
+    output = tmp_path / "output"
+    env = dict(os.environ, INPUT_SERVICES="HubData", INPUT_PYTHON_VERSIONS="3.13",
+               INPUT_REGIONS="centraluseuap", RESOURCE_GROUP="cli-int-test-rg",
+               TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1",
+               GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
+    env.update(override)
+    result = subprocess.run(["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
+                            capture_output=True, text=True, timeout=15, check=False)
+    assert result.returncode != 0
+    assert "::error::" in result.stdout
+    assert not output.exists()
+
+
+def test_hub_release_and_schedule_callers_use_owned_canary_scope():
+    release = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    inputs = release["jobs"]["int_test"]["with"]
+    assert inputs["test-services"] == "auto"
+    assert inputs["regions"] == "centraluseuap"
+    assert inputs["resource-group"] == "cli-int-test-rg"
+    assert inputs["subscription-id"] == "a386d5ea-ea90-441a-8263-d816368c84a1"
+    scheduler = (REPOSITORY_ROOT / ".github/workflows/int_test_schedule.yml").read_text(encoding="utf-8")
+    assert 'region="centraluseuap"' in scheduler
+    assert "-f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1" in scheduler
+    assert "-f resource-group=cli-int-test-rg" in scheduler
+    assert "region_list=" not in scheduler
+
+
+def test_hub_workflow_gate_loads_real_phase_evaluator_without_installed_dependencies(tmp_path):
+    combination = dict(MATRIX[0], service="HubData")
+    _result(tmp_path, combination)
+    folder = tmp_path / "hub-phases"
+    folder.mkdir()
+    (folder / "hub-phases.json").write_text('{"suite":"HubData"}', encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", str(REPOSITORY_ROOT / "azext_iot/tests/_evaluate_test_results.py"),
+         "--results-dir", str(tmp_path)], cwd=tmp_path, capture_output=True, text=True, timeout=15, check=False,
+        env=dict(os.environ, INTEGRATION_MATRIX=json.dumps([combination]), SETUP_RESULT="success",
+                 UNIT_TEST_RESULT="success", INTEGRATION_RESULT="success", GATE_JOB_RESULT="success"),
+    )
+    assert result.returncode == 1
+    assert "Hub phase evidence is incomplete or unsuccessful" in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr

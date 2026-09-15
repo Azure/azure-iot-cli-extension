@@ -24,6 +24,19 @@ parameters:
   - name: serviceConnection
     type: string
     default: ""
+  - name: hubSuite
+    type: string
+    default: ""
+    values: ["", "HubControl", "HubData"]
+  - name: hubSubscription
+    type: string
+    default: ""
+  - name: hubResourceGroup
+    type: string
+    default: cli-int-test-rg
+  - name: hubRegion
+    type: string
+    default: centraluseuap
   - name: num_threads
     type: number
     default: 6
@@ -49,7 +62,33 @@ steps:
       pythonVersion: ${{ parameters.pythonVersion }}
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
-  - template: set-testenv-sentinel.yml
+  # Owned Hub phases must never inherit the legacy pinned-resource pytest.ini.
+  - ${{ if eq(parameters.hubSuite, '') }}:
+      - template: set-testenv-sentinel.yml
+
+  - ${{ if ne(parameters.hubSuite, '') }}:
+      - task: PythonScript@0
+        displayName: "Validate owned Hub scope and platform before Azure login"
+        inputs:
+          scriptSource: inline
+          script: |
+            import os
+            import runpy
+            import sys
+            from pathlib import Path
+            if sys.platform != "linux":
+                raise SystemExit("Hub live phases are unsupported on Windows; this job cannot qualify Hub coverage.")
+            scope = (os.environ["azext_iot_hub_subscription"], os.environ["azext_iot_testrg"],
+                     os.environ["azext_iot_testhub_location"])
+            if scope != ("a386d5ea-ea90-441a-8263-d816368c84a1", "cli-int-test-rg", "centraluseuap"):
+                raise SystemExit("Hub live phases require the authorized subscription, resource group and canary region.")
+            environment = runpy.run_path("azext_iot/tests/_hub_phase_runner.py")["environment"]
+            environment(dict(os.environ), "${{ parameters.hubSuite }}", "preflight",
+                        Path("test-result/hub-phases"), "preflight", scope[0], scope[1])
+        env:
+          azext_iot_hub_subscription: ${{ parameters.hubSubscription }}
+          azext_iot_testrg: ${{ parameters.hubResourceGroup }}
+          azext_iot_testhub_location: ${{ parameters.hubRegion }}
 
   # Fix for DNS resolution issues: https://github.com/actions/virtual-environments/issues/798
   - script: |
@@ -66,7 +105,14 @@ steps:
 
   - ${{ if eq(parameters.runIntTests, 'true') }}:
       - task: AzureCLI@2
-        continueOnError: true
+        ${{ if ne(parameters.hubSuite, '') }}:
+          continueOnError: false
+          env:
+            azext_iot_hub_subscription: ${{ parameters.hubSubscription }}
+            azext_iot_testrg: ${{ parameters.hubResourceGroup }}
+            azext_iot_testhub_location: ${{ parameters.hubRegion }}
+        ${{ else }}:
+          continueOnError: true
         displayName: "${{ parameters.name }} integration tests"
         inputs:
           azureSubscription: ${{ parameters.serviceConnection }}
@@ -81,10 +127,18 @@ steps:
             inlineScript: |
               export COVERAGE_FILE=.coverage.${{ parameters.name }}
               pytest -vv ${{ parameters.path }} -k "_int.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
-          ${{ if contains(parameters.path, 'azext_iot/tests/iothub') }}:
+          ${{ if ne(parameters.hubSuite, '') }}:
             inlineScript: |
+              set -euo pipefail
               export COVERAGE_FILE=.coverage.${{ parameters.name }}
-              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
+              subscription=$(az account show --query id -o tsv)
+              if [ "$subscription" != "$azext_iot_hub_subscription" ]; then
+                echo "Hub service connection subscription does not match the authorized scope." >&2
+                exit 2
+              fi
+              python -m azext_iot.tests._hub_phase_runner --suite "${{ parameters.hubSuite }}" \
+                --subscription "$azext_iot_hub_subscription" --resource-group "$azext_iot_testrg" \
+                --region "$azext_iot_testhub_location" --output test-result/hub-phases
           ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
             inlineScript: |
               set -e
@@ -101,18 +155,45 @@ steps:
             inlineScript: |
               export COVERAGE_FILE=.coverage.${{ parameters.name }}
               pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+  - ${{ if ne(parameters.hubSuite, '') }}:
+      - task: PublishBuildArtifacts@1
+        condition: succeededOrFailed()
+        displayName: "Publish Hub phase evidence and redacted logs"
+        inputs:
+          pathToPublish: test-result/
+          publishLocation: "Container"
+          artifactName: "hub-phases-${{ parameters.hubSuite }}-py${{ parameters.pythonVersion }}-$(Agent.OS)"
 
-  - task: PublishBuildArtifacts@1
-    inputs:
-      pathToPublish: .coverage.${{ parameters.name }}
-      publishLocation: "Container"
-      artifactName: "coverage"
+      - task: PublishBuildArtifacts@1
+        condition: succeededOrFailed()
+        inputs:
+          pathToPublish: .coverage.${{ parameters.name }}
+          publishLocation: "Container"
+          artifactName: "coverage"
 
-  - task: PublishTestResults@2
-    condition: succeededOrFailed()
-    displayName: "Publish Test Results"
-    inputs:
-      testResultsFormat: "JUnit"
-      testResultsFiles: "**/test-*.xml"
-      testRunTitle: "Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)"
-      searchFolder: "$(System.DefaultWorkingDirectory)"
+      - task: PublishTestResults@2
+        condition: succeededOrFailed()
+        displayName: "Publish sanitized Hub phase results"
+        inputs:
+          testResultsFormat: "JUnit"
+          testResultsFiles: "test-result/hub-phases/**/junit.xml"
+          testRunTitle: "${{ parameters.hubSuite }} Python ${{ parameters.pythonVersion }}"
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true
+          searchFolder: "$(System.DefaultWorkingDirectory)"
+
+  - ${{ if eq(parameters.hubSuite, '') }}:
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathToPublish: .coverage.${{ parameters.name }}
+          publishLocation: "Container"
+          artifactName: "coverage"
+
+      - task: PublishTestResults@2
+        condition: succeededOrFailed()
+        displayName: "Publish Test Results"
+        inputs:
+          testResultsFormat: "JUnit"
+          testResultsFiles: "**/test-*.xml"
+          testRunTitle: "Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)"
+          searchFolder: "$(System.DefaultWorkingDirectory)"
