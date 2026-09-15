@@ -86,6 +86,22 @@ def _combination(values):
     return result
 
 
+def evaluate_hub_result(result_dir, service):
+    """Bind authoritative phase evidence to the scheduled suite, not just a green job."""
+    try:
+        folder = result_dir / "hub-phases"
+        receipt = json.loads((folder / "hub-phases.json").read_text(encoding="utf-8"))
+        if receipt["suite"] != service:
+            return [f"{service}: Hub phase summary suite does not match the scheduled service."]
+        controller = runpy.run_path(str(Path(__file__).resolve().with_name("_hub_phase_runner.py")))
+        result = controller["evaluate_hub_phases"](folder)
+        if result["passed"] is not True or result["errors"]:
+            return [f"{service}: Hub phase evidence is incomplete or unsuccessful."] + result["errors"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return [f"{service}: missing or malformed Hub phase evidence."]
+    return []
+
+
 def evaluate_results(results_dir, matrix, job_results):
     errors = []
     summary = [
@@ -126,6 +142,8 @@ def evaluate_results(results_dir, matrix, job_results):
         seen.add(combination)
         if service == "DPS":
             errors.extend(evaluate_dps_phases(result_dir))
+        if service in ("HubControl", "HubData"):
+            errors.extend(evaluate_hub_result(result_dir, service))
         if status != "success":
             errors.append(f"{service} / {python} / {region} did not succeed: {status or 'missing result'}.")
 

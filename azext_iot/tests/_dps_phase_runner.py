@@ -96,19 +96,56 @@ class Redactor:
 
 @contextmanager
 def bounded_read(deadline=None):
-    def expired(_signum, _frame):
-        raise PhaseError("Read-only ARM/authentication operation exceeded its 60-second bound.")
-    seconds = READ_SECONDS if deadline is None else min(READ_SECONDS, deadline - time.monotonic())
+    started = time.monotonic()
+    seconds = READ_SECONDS if deadline is None else min(READ_SECONDS, deadline - started)
     if seconds <= 0:
         raise PhaseError("Read-only verification budget exhausted.")
     require_linux()
-    previous = signal.signal(signal.SIGALRM, expired)
-    signal.setitimer(signal.ITIMER_REAL, seconds)
+    alarm = getattr(signal, "SIGALRM", None)
+    timer = getattr(signal, "ITIMER_REAL", None)
+    set_timer = getattr(signal, "setitimer", None)
+    get_timer = getattr(signal, "getitimer", None)
+    if alarm is None or timer is None or not callable(set_timer) or not callable(get_timer):
+        raise PhaseError("DPS read bounds require POSIX interval timers.")
+    timer_started = time.monotonic()
+    remaining, interval = get_timer(timer)
+    outer_deadline = timer_started + remaining if remaining else None
+    outer_fired = False
+
+    def expired(signum, frame):
+        nonlocal outer_fired, outer_deadline
+        if outer_deadline is not None and (not outer_fired or interval) and time.monotonic() >= outer_deadline:
+            outer_fired = True
+            # Preserve pytest's timeout exception/meaning, not a read-bound error.
+            if callable(previous):
+                previous(signum, frame)
+            elif previous != signal.SIG_IGN:
+                signal.signal(alarm, previous)
+                signal.raise_signal(alarm)
+            if interval:
+                outer_deadline += interval * (1 + int((time.monotonic() - outer_deadline) // interval))
+            left = started + seconds - time.monotonic()
+            if interval:
+                left = min(left, outer_deadline - time.monotonic())
+            set_timer(timer, max(0.000001, left))
+            return
+        raise PhaseError("Read-only ARM/authentication operation exceeded its 60-second bound.")
+
+    previous = signal.signal(alarm, expired)
     try:
+        read_deadline = started + seconds
+        limit = min(read_deadline, outer_deadline) if outer_deadline is not None else read_deadline
+        set_timer(timer, max(0.000001, limit - time.monotonic()))
         yield
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, previous)
+        set_timer(timer, 0)
+        signal.signal(alarm, previous)
+        if outer_deadline is not None and (not outer_fired or interval):
+            left = outer_deadline - time.monotonic()
+            if outer_fired and interval:
+                left = interval - ((time.monotonic() - outer_deadline) % interval)
+            # setitimer(0) cancels; an elapsed outer deadline must fire immediately.
+            set_timer(timer, max(0.000001, left), interval)
 
 
 class ArmReader:
@@ -343,6 +380,12 @@ def selection_count(receipts, phase):
 def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     """Ask workers to unwind while tox/xdist's controller remains alive to await them."""
     require_linux()  # Reject before opening logs, spawning children, or accessing signal/pipe APIs.
+    get_pgid = getattr(os, "getpgid", None)
+    kill_pg = getattr(os, "killpg", None)
+    worker_signal = getattr(signal, "SIGUSR1", None)
+    kill_signal = getattr(signal, "SIGKILL", None)
+    if not callable(get_pgid) or not callable(kill_pg) or worker_signal is None or kill_signal is None:
+        raise PhaseError("DPS child orchestration requires POSIX process groups and signals.")
     started = time.monotonic()
     runtime_end = started + runtime
     hard_end = runtime_end + cleanup
@@ -387,9 +430,9 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
                         pid = worker["pid"]
                         if worker.get("ready") and pid not in signalled:
                             try:
-                                if os.getpgid(pid) != process.pid:
+                                if get_pgid(pid) != process.pid:
                                     raise PhaseError("Worker PID does not belong to this phase's process group.")
-                                os.kill(pid, signal.SIGUSR1)
+                                os.kill(pid, worker_signal)
                             except ProcessLookupError:
                                 pass
                             signalled.add(pid)
@@ -420,9 +463,9 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
         finally:
             # Known process group only; no process-name matching and no mutation retries.
             try:
-                os.killpg(process.pid, signal.SIGTERM)
+                kill_pg(process.pid, signal.SIGTERM)
                 time.sleep(0.2)
-                os.killpg(process.pid, signal.SIGKILL)
+                kill_pg(process.pid, kill_signal)
             except ProcessLookupError:
                 pass
             process.wait(timeout=5)

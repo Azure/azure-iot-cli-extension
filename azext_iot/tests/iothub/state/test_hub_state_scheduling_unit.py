@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from configparser import ConfigParser
 from pathlib import Path
 from shlex import split
 from types import SimpleNamespace
@@ -116,35 +115,42 @@ def test_state_module_pools_own_distinct_resources_and_propagate_cleanup_failure
     assert len(active) == (1 if failed_group else 0)
 
 
-def test_hubmgmt_collection_keeps_42_nodes_including_two_isolated_state_groups(pytester, mocker, monkeypatch):
+@pytest.mark.parametrize("suite,phase,count", [
+    ("HubControl", "regular", 28),
+    ("HubData", "entra", 42),
+])
+def test_hub_manifest_collection_preserves_isolated_state_groups(
+    pytester, mocker, monkeypatch, suite, phase, count
+):
+    from azext_iot.tests._hub_suite_manifest import nodes
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "False")
     mocker.patch("requests.sessions.Session.send", side_effect=AssertionError("Collection must not make network calls."))
     root = Path(__file__).resolve().parents[4]
-    config = ConfigParser(interpolation=None)
-    config.read(root / "tox.ini")
-    commands = config.get("testenv:{Central,ADT,DPS,HubMgmt,HubData,HubSAS,ADU,ADR}-int", "commands")
-    command = " ".join(line.split(":", 1)[1].rstrip(" \\") for line in commands.splitlines() if line.startswith("HubMgmt:"))
-    args = split(command)
-    assert args[0] == "pytest"
-    assert "--dist=loadfile" in args and args[args.index("-n") + 1] == "7"
-    assert args[args.index("-k") + 1] == "_int.py"
-    paths = [str(root / arg) for arg in args if arg.startswith("./azext_iot/")]
+    paths = [str(root / node) for node in nodes(suite, phase)]
     _, recorder = pytester.inline_genitems(
-        "-c", str(root / "setup.cfg"), "-k", "_int.py",
-        *paths, *(arg for arg in args if arg.startswith("--deselect=")),
+        "-c", str(root / "setup.cfg"), "--rootdir", str(root), "--confcutdir", str(root), *paths,
     )
     assert recorder.getcalls("pytest_sessionfinish")[0].exitstatus == 0
     items = recorder.getcalls("pytest_collection_finish")[0].session.items
-    assert len(items) == len({item.nodeid for item in items}) == 42
+    assert len(items) == len({item.nodeid for item in items}) == count
     state_items = [item for item in items if Path(str(item.fspath)).parent.name == "state"]
-    assert len(state_items) == 11
-    assert {Path(str(item.fspath)).name for item in state_items} == set(STATE_NODES)
+    # Classify asserted behavior, not the containing file: this negative is data-plane.
+    data_negative = {"test_mirgate_hub_dataplane_error"}
+    expected_files = (
+        {"test_hub_state_int.py": STATE_NODES["test_hub_state_int.py"] - data_negative}
+        if suite == "HubControl" else {
+            "test_hub_state_int.py": data_negative,
+            "test_hub_state_dataplane_int.py": STATE_NODES["test_hub_state_dataplane_int.py"],
+        }
+    )
+    assert len(state_items) == sum(len(expected) for expected in expected_files.values())
+    assert {Path(str(item.fspath)).name for item in state_items} == set(expected_files)
     heavy_dependencies = {
         "setup_hub_controlplane_states", "provisioned_iot_hubs_with_storage_user_module",
         "provisioned_storage_module", "provisioned_user_identity_module",
         "provisioned_event_hub_module", "provisioned_service_bus_module", "provisioned_cosmos_db_module",
     }
-    for filename, expected in STATE_NODES.items():
+    for filename, expected in expected_files.items():
         selected = [item for item in state_items if Path(str(item.fspath)).name == filename]
         assert {item.name for item in selected} == expected
         for item in selected:

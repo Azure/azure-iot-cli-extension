@@ -10,6 +10,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 
 import pytest
 import yaml
@@ -119,3 +120,121 @@ def test_ado_rejects_controller_overrides_before_any_test_execution(tmp_path, ov
     assert not calls
     assert "rejects isolated phase overrides" in result.stderr
     assert "supplied-controller-value" not in result.stderr
+
+
+def _hub_wiring():
+    template = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
+    integration = next(
+        value for step in template["steps"] for key, value in step.items()
+        if "if eq(parameters.runIntTests" in key
+    )
+    task = next(step for step in integration if step.get("task") == "AzureCLI@2")
+    script = next(value["inlineScript"] for key, value in task["inputs"].items()
+                  if "ne(parameters.hubSuite, '')" in key)
+    admission = next(
+        child for step in template["steps"] for key, children in step.items()
+        if "ne(parameters.hubSuite, '')" in key for child in children
+        if child.get("task") == "PythonScript@0"
+    )
+    return template, task, script, admission
+
+
+def test_ado_hub_uses_shared_controller_without_legacy_pins_or_hidden_failures():
+    template, task, script, admission = _hub_wiring()
+    assert "pytest " not in script
+    assert 'python -m azext_iot.tests._hub_phase_runner --suite "${{ parameters.hubSuite }}"' in script
+    assert '--subscription "$azext_iot_hub_subscription"' in script
+    assert '--resource-group "$azext_iot_testrg"' in script
+    assert '--region "$azext_iot_testhub_location" --output test-result/hub-phases' in script
+    assert "set -euo pipefail" in script
+    assert task["${{ if ne(parameters.hubSuite, '') }}"]["continueOnError"] is False
+    assert task["${{ else }}"]["continueOnError"] is True  # Preserve unrelated DPS behavior.
+    assert admission["displayName"].endswith("before Azure login")
+    sentinel = next(step for step in template["steps"] if "${{ if eq(parameters.hubSuite, '') }}" in step)
+    assert sentinel["${{ if eq(parameters.hubSuite, '') }}"][0]["template"] == "set-testenv-sentinel.yml"
+    hub_publish = [child for step in template["steps"] for key, children in step.items()
+                   if "ne(parameters.hubSuite, '')" in key for child in children
+                   if child.get("task") == "PublishBuildArtifacts@1"]
+    assert {step["inputs"]["pathToPublish"] for step in hub_publish} == {
+        "test-result/", ".coverage.${{ parameters.name }}",
+    }
+    junit = [child for step in template["steps"] for key, children in step.items()
+             if "ne(parameters.hubSuite, '')" in key for child in children
+             if child.get("task") == "PublishTestResults@2"]
+    assert len(junit) == 1
+    assert junit[0]["inputs"]["testResultsFiles"] == "test-result/hub-phases/**/junit.xml"
+    assert junit[0]["inputs"]["failTaskOnFailedTests"] is True
+    assert junit[0]["inputs"]["failTaskOnMissingResultsFile"] is True
+    assert not any(step.get("task") == "PublishTestResults@2" for step in template["steps"])
+
+
+def test_ado_hub_public_jobs_are_serial_with_full_budgets_and_no_folder_selection():
+    trigger = yaml.safe_load((ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
+    hub_jobs = [job for job in trigger["jobs"] if job["job"].startswith("Hub")]
+    assert [job["job"] for job in hub_jobs] == ["HubControl", "HubData"]
+    assert [job["timeoutInMinutes"] for job in hub_jobs] == [190, 360]
+    assert hub_jobs[1]["dependsOn"] == "HubControl"
+    assert {"testDPS", "testADU", "testADR"}.issubset(hub_jobs[0]["dependsOn"])
+    for job in hub_jobs:
+        assert job["strategy"]["maxParallel"] == 1
+        parameters = job["steps"][0]["parameters"]
+        assert parameters["hubSuite"] == job["job"]
+        assert "path" not in parameters
+        assert parameters["hubSubscription"] == "${{ parameters.hubSubscription }}"
+    assert "azext_iot/tests/iothub/" not in TEMPLATE.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("platform,override,expected", [
+    ("linux", {}, 0), ("win32", {}, 1),
+    ("linux", {"azext_iot_hub_subscription": "foreign"}, 1),
+    ("linux", {"azext_iot_testrg": "foreign"}, 1),
+    ("linux", {"azext_iot_testhub_location": "westus"}, 1),
+    ("linux", {"azext_iot_hubsas_subscription": "ambient"}, 1),
+    ("linux", {"azext_iot_testhub": "pinned"}, 1),
+])
+def test_ado_hub_admission_rejects_unsupported_scope_platform_and_ambient_pins(platform, override, expected):
+    script = _hub_wiring()[3]["inputs"]["script"].replace("${{ parameters.hubSuite }}", "HubData")
+    env = {
+        "PATH": os.environ.get("PATH", ""), "azext_iot_hub_subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+        "azext_iot_testrg": "cli-int-test-rg", "azext_iot_testhub_location": "centraluseuap",
+    }
+    env.update(override)
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-c", f"import sys; sys.platform = {platform!r}\n" + script],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=10, check=False,
+    )
+    assert result.returncode == expected, result.stdout + result.stderr
+    if platform == "win32":
+        assert "unsupported on Windows" in result.stderr
+
+
+@pytest.mark.parametrize("exit_code,subscription,expected", [
+    (0, "authorized", 0), (1, "authorized", 1), (5, "authorized", 5), (0, "foreign", 2),
+])
+def test_ado_hub_controller_failure_and_service_connection_mismatch_fail_job(exit_code, subscription, expected):
+    bash = shutil.which("bash")
+    if not bash:
+        pytest.skip("AzureCLI script proof requires bash.")
+    script = _hub_wiring()[2].replace("${{ parameters.name }}", "HubData").replace(
+        "${{ parameters.hubSuite }}", "HubData",
+    )
+    stubs = (
+        'az() { printf "%s\\n" "$OFFLINE_SUBSCRIPTION"; }\n'
+        'python() { printf "%s\\n" "$@"; return "$OFFLINE_EXIT"; }\n'
+    )
+    result = subprocess.run(
+        [bash, "-c", stubs + script], cwd=ROOT, capture_output=True, text=True, timeout=10, check=False,
+        env=dict(os.environ, azext_iot_hub_subscription="authorized", azext_iot_testrg="cli-int-test-rg",
+                 azext_iot_testhub_location="centraluseuap", OFFLINE_SUBSCRIPTION=subscription,
+                 OFFLINE_EXIT=str(exit_code)),
+    )
+    assert result.returncode == expected
+    if subscription == "foreign":
+        assert "does not match" in result.stderr
+        assert "_hub_phase_runner" not in result.stdout
+    else:
+        assert result.stdout.splitlines() == [
+            "-m", "azext_iot.tests._hub_phase_runner", "--suite", "HubData",
+            "--subscription", "authorized", "--resource-group", "cli-int-test-rg",
+            "--region", "centraluseuap", "--output", "test-result/hub-phases",
+        ]

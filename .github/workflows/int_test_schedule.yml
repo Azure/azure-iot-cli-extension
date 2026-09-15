@@ -4,8 +4,8 @@ run-name: "Dispatch integration tests → ${{ github.event_name == 'schedule' &&
 on:
     schedule:
         # Same schedule every day (weekday or weekend): two runs per day.
-        # Each run takes at most ~2h30m, so the two slots are spaced 4h apart and
-        # both fall in off-hours (PT). DST shifts these ~1h; exact times are not critical.
+        # Full serial qualification can span both slots. Same-scope live jobs use
+        # the integration workflow's non-cancelling resource concurrency group.
         - cron: "17 8 * * *" # ~00:17 AM PT nightly (08:17 UTC) → preview
         - cron: "17 12 * * *" # ~04:17 AM PT early morning (12:17 UTC) → dev
     workflow_dispatch:
@@ -36,18 +36,18 @@ jobs:
                     branch="preview"
                   fi
 
-                  # Rotate Python version and region using day-of-year as seed
+                  # Rotate Python only. Owned Hub phases require the authorized canary scope.
                   py_versions=("3.10" "3.11" "3.12" "3.13")
-                  region_list=("eastus" "westus" "northeurope" "westeurope")
                   day_of_year=$(date -u +"%j")
                   py_idx=$(( day_of_year % ${#py_versions[@]} ))
-                  rg_idx=$(( (day_of_year / ${#py_versions[@]}) % ${#region_list[@]} ))
                   python_ver="${py_versions[$py_idx]}"
-                  region="${region_list[$rg_idx]}"
+                  region="centraluseuap"
 
                   echo "Dispatching to $branch: Python $python_ver, Region $region"
                   gh workflow run int_test.yml \
                     --repo "${{ github.repository }}" \
                     --ref "$branch" \
                     -f python-versions="$python_ver" \
-                    -f regions="$region" || echo "::warning::Failed to dispatch to $branch (branch may not exist)"
+                    -f regions="$region" \
+                    -f resource-group=cli-int-test-rg \
+                    -f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1
