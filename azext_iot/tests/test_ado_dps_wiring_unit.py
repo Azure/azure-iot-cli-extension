@@ -194,10 +194,12 @@ def test_ado_hub_public_jobs_are_serial_with_full_budgets_and_no_folder_selectio
 ])
 def test_ado_hub_admission_rejects_unsupported_scope_platform_and_ambient_pins(platform, override, expected):
     script = _hub_wiring()[3]["inputs"]["script"].replace("${{ parameters.hubSuite }}", "HubData")
-    env = {
-        "PATH": os.environ.get("PATH", ""), "azext_iot_hub_subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+    env = {key: value for key, value in os.environ.items()
+           if key.upper() in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")}
+    env.update({
+        "azext_iot_hub_subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
         "azext_iot_testrg": "cli-int-test-rg", "azext_iot_testhub_location": "centraluseuap",
-    }
+    })
     env.update(override)
     result = subprocess.run(
         [sys.executable, "-I", "-S", "-c", f"import sys; sys.platform = {platform!r}\n" + script],
