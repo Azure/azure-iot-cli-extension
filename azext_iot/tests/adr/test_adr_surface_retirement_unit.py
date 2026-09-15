@@ -25,29 +25,22 @@ from azext_iot.tests.adr import _helpers, test_adr_link_int
 offline_cli = validation_fixtures.offline_cli
 
 
-def test_primary_retains_the_complete_registry_device_surface(offline_cli):
+def test_registry_device_surface_is_retired_but_backend_group_type_remains(offline_cli):
     from azext_iot._factory import adr_service_factory
     from azext_iot.adr.common import GroupType
 
     table = MainCommandsLoader(offline_cli).load_command_table(["iot", "adr", "ns"])
     load_adr_help()
-    expected = {
-        f"iot adr ns registry-device{group} {verb}"
-        for group, verbs in (
-            ("", ("create", "show", "list", "update", "delete", "wait")),
-            (" auth", ("list", "show", "show-keys", "revoke-certs", "wait")),
-            (" attribute", ("create", "list", "show", "delete")),
-            (" capability", ("list", "show")),
-        )
-        for verb in verbs
-    }
-    assert {name for name in table if name.startswith("iot adr ns registry-device ")} == expected
-    assert expected <= set(helps)
+    assert not any(name.startswith("iot adr ns registry-device") for name in table)
+    assert not any(name.startswith("iot adr ns registry-device") for name in helps)
     assert GroupType.registry_device.value == "RegistryDevice"
     assert callable(adr_service_factory(offline_cli).registry_devices.get)
     for command in ("iot adr ns group create", "iot adr ns job create",
                     "iot hub device-identity create", "iot device registration create"):
         assert command in table
+    with pytest.raises(SystemExit) as error:
+        offline_cli.invoke(["iot", "adr", "ns", "registry-device", "list"])
+    assert error.value.code == 2
 
 
 @pytest.mark.parametrize("module", [_helpers, test_adr_link_int])

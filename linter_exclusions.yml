@@ -298,9 +298,6 @@ iot hub:
     - require_wait_command_if_no_wait
 
 # These asynchronous POST actions do not expose a retrievable provisioning-state resource.
-iot adr ns registry-device auth-profile:
-  rule_exclusions:
-    - require_wait_command_if_no_wait
 iot adr ns report:
   rule_exclusions:
     - require_wait_command_if_no_wait

@@ -21,7 +21,7 @@ Release History
 
 * Replaced the ADR/CMS and Software Updates control/data clients with three pinned TypeSpec-generated ``1.0.0b1`` clients. These ADR-owned clients are modeless and synchronous-only; their generated ``models`` and ``aio`` packages are intentionally absent.
 * ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint. ADR target lookup and identity-safety reads reuse the native modeless Hub/DPS management clients with explicit ``2026-10-01-preview`` (Hub) and ``2026-06-01-preview`` (DPS) contracts. Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
-* The inherited ADR-only base separated general Hub/DPS upgrades; the child consolidation above restores them while retaining this branch's Registry Device commands and refreshed ADR SDK.
+* The inherited ADR-only base separated general Hub/DPS upgrades; the child consolidation above restores them while retaining the refreshed ADR SDK and matching the ADR branch's Registry Device command retirement.
 * Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. This supersedes the b9 ``Azure-AsyncOperation`` polling change because that service host is not usable.
 
 **Canonical namespace links and resource management**
@@ -47,8 +47,7 @@ Release History
 * Reused the hosting Azure CLI's login for Hub, DPS, Device Registry, Update Instance, Software Updates data-plane, and update-staging storage clients. Credentials are selected in process for each CLI context and subscription instead of using a global ``AzureCliCredential`` that spawns nested CLI processes.
 * Added secret-redacted ADR live-test command logging, optional ``PRETTY_LOG=1`` colored diagnostics, timed steps, and separate DPS/ADR integration JUnit reports.
 * Consolidated the temporary ADR resource/Location workaround on one deadline-based waiter with a ten-minute default, case-insensitive Retry-After handling, transient-read retries, and distinct timeout versus terminal-failure diagnostics.
-* Registry Device ``show`` accepts exactly one resource name or external device ID. External-ID lookup follows every SDK page, fails on zero or multiple matches, and can be paired with the bounded ``registry-device wait`` materialization flow.
-* Registry Device attribute JSON accepts inline objects, plain file paths, and one-leading-``@`` file paths. Customer writes always serialize ``reportedBy=User``; attempts to author service-owned ``Microsoft.DeviceUpdate`` provenance through either the hidden compatibility option or ``--properties`` are rejected locally before mutation, while backend-generated attributes remain readable.
+* Retired the entire ADR ``registry-device`` command group, including CRUD, wait, authentication, attributes, and capabilities, and its dedicated integration tests, matching the ADR branch. Generated SDK operations, the backend ``RegistryDevice`` group type used by groups/jobs, and DPS registration's Registry Device external-ID correlation remain unchanged.
 * Expanded focused tests for link validation/RBAC/topology, target API and credential isolation, Software Updates discovery, command retirement, test-owned cleanup, identity-safety reads, and generated-client compatibility.
 * Updated public help, release documentation, design status, and local manual E2E runners. Dedicated Hub/DPS, CA/onboarding, and SU runners delegate to one full runner; live integration/E2E remains an explicit release-operator step.
 

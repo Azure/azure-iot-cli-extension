@@ -36,7 +36,7 @@ _SCENARIOS = (
         namespace_validation.TestADRValidationNegatives,
         "test_adr_validation_negatives",
         MutuallyExclusiveArgumentError,
-        16,
+        15,
     ),
     (
         update_validation.TestADRUpdateInstanceValidation,

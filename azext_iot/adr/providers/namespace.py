@@ -469,7 +469,6 @@ class NamespaceProvider(ADRProvider):
             f"  az iot adr ns job run delete --ns {namespace_name} -g <rg> "
             f"--job-name <job> --run-name <run>\n"
             f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"
-            f"  az iot adr ns registry-device delete --ns {namespace_name} -g <rg> -n <device>\n"
             f"  az iot adr ns group delete --ns {namespace_name} -g <rg> -n <group>\n"
             f"  az iot adr ns ca policy delete --ns {namespace_name} -g <rg> "
             f"--ca-name <ca> -n <policy>\n"

@@ -7,7 +7,6 @@
 """Offline state-machine proofs for ADR integration cleanup and Hub/DPS readiness."""
 
 from copy import deepcopy
-from functools import partial
 import shlex
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -31,13 +30,10 @@ from azext_iot.tests.adr import test_adr_group_int as group_scenarios
 from azext_iot.tests.adr import test_adr_job_int as job_scenarios
 from azext_iot.tests.adr import test_adr_job_run_int as run_scenarios
 from azext_iot.tests.adr import test_adr_link_int as link_scenarios
-from azext_iot.tests.adr import test_adr_registry_device_int as registry_scenarios
-from azext_iot.tests.adr._helpers import CleanupLedger
 from azext_iot.tests.adr.test_adr_cleanup_regressions_unit import _sdk_error
 
 
 NS_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
-REGISTRY_DEVICE_ID = NS_ID + "/registryDevices/device"
 HUB_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub"
 DPS_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps"
 UAMI_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uami"
@@ -98,10 +94,7 @@ def _http(
 
 
 def _missing(kind):
-    return _http(resource_id=NS_ID + {
-        "job": "/jobs/job", "group": "/groups/group", "namespace": "",
-        "registry-device": "/registryDevices/device",
-    }[kind])
+    return _http(resource_id=NS_ID + {"job": "/jobs/job", "group": "/groups/group", "namespace": ""}[kind])
 
 
 def _output(value):
@@ -381,291 +374,6 @@ def test_accepted_delete_only_polls_even_if_namespace_state_is_stale(already_del
     with pytest.raises(AssertionError, match="namespace DELETE accepted"):
         _cleanup(scenario, Clock(), timeout=25)
     assert sum(" delete " in cmd for cmd in _commands(scenario)) == (0 if already_deleting else 1)
-
-
-def _registry_cleanup(scenario, clock, monkeypatch):
-    monkeypatch.setattr(registry_scenarios, "TEST_RG", "rg")
-    monkeypatch.setattr(
-        registry_scenarios, "delete_test_namespace",
-        partial(readiness.delete_test_namespace, clock=clock, sleeper=clock.sleep),
-    )
-    registry_scenarios._cleanup_namespace(scenario, "ns", "device")
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error, _cli_exit])
-def test_registry_get_404_uses_native_collection_path(wrap):
-    scenario = Mock()
-    scenario.cmd.side_effect = wrap(_missing("registry-device"))
-    assert readiness._get_resource(
-        scenario, "iot adr ns registry-device show --namespace ns -g rg -n device",
-    ) is None
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error])
-@pytest.mark.parametrize("delete_missing", [False, True])
-def test_registry_cleanup_requires_get_200_then_404_before_parent_delete(monkeypatch, wrap, delete_missing):
-    scenario = Mock()
-    scenario.cmd.side_effect = [
-        wrap(_http(method="DELETE", resource_id=REGISTRY_DEVICE_ID)) if delete_missing else _output(None),
-        _output({"properties": {"provisioningState": "Deleting"}}), wrap(_missing("registry-device")),
-        _output({}), _output(None),
-        wrap(_missing("registry-device")), wrap(_missing("namespace")),
-    ]
-    clock = Clock()
-    with CleanupLedger() as cleanup:
-        cleanup.register("registry fixture", lambda: _registry_cleanup(scenario, clock, monkeypatch))
-    assert _commands(scenario) == [
-        "iot adr ns registry-device delete -n device --ns ns -g rg --yes",
-        "iot adr ns registry-device show --namespace ns -g rg -n device",
-        "iot adr ns registry-device show --namespace ns -g rg -n device",
-        "iot adr ns show --namespace ns -g rg",
-        "iot adr ns delete --namespace ns -g rg -y --no-wait",
-        "iot adr ns registry-device show --namespace ns -g rg -n device",
-        "iot adr ns show --namespace ns -g rg",
-    ]
-    assert clock.sleeps == [10, 10]
-
-
-def test_all_known_child_kinds_and_registry_names_require_exact_absence():
-    scenario = Mock()
-    other_missing = _http(resource_id=NS_ID + "/registryDevices/other-owned")
-    scenario.cmd.side_effect = [
-        _missing("job"), _missing("group"), _missing("registry-device"), _output({}), other_missing,
-        _output({}), _output(None),
-        _missing("job"), _missing("group"), _missing("registry-device"), other_missing, _missing("namespace"),
-    ]
-    clock = Clock()
-    _cleanup(scenario, clock, registry_devices=("device", "other-owned"))
-    commands = _commands(scenario)
-    children = [
-        "iot adr ns job show --namespace ns -g rg -n job",
-        "iot adr ns group show --namespace ns -g rg -n group",
-        "iot adr ns registry-device show --namespace ns -g rg -n device",
-        "iot adr ns registry-device show --namespace ns -g rg -n other-owned",
-    ]
-    assert commands == children + [
-        children[-1], "iot adr ns show --namespace ns -g rg",
-        "iot adr ns delete --namespace ns -g rg -y --no-wait",
-    ] + children + ["iot adr ns show --namespace ns -g rg"]
-    assert clock.sleeps == [10, 10]
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error])
-@pytest.mark.parametrize("parent_failure", [False, True])
-@pytest.mark.parametrize("status", [403, 500, 502, "uncertain"])
-def test_registry_cleanup_ledger_reports_real_delete_failures(monkeypatch, wrap, parent_failure, status):
-    error = wrap(
-        ServiceRequestError("DELETE outcome unknown")
-        if status == "uncertain" else _http(
-            status, "AuthorizationFailed" if status == 403 else "InternalServerError",
-            method="DELETE", resource_id=NS_ID if parent_failure else REGISTRY_DEVICE_ID,
-        )
-    )
-    scenario = Mock()
-    scenario.cmd.side_effect = (
-        [_output(None), _missing("registry-device"), _output({}), error]
-        if parent_failure else [error]
-    )
-    clock = Clock()
-    with pytest.raises(AssertionError, match="ADR cleanup failed: registry fixture:"):
-        with CleanupLedger() as cleanup:
-            cleanup.register("registry fixture", lambda: _registry_cleanup(scenario, clock, monkeypatch))
-    commands = _commands(scenario)
-    assert len(commands) == (4 if parent_failure else 1)
-    assert sum("registry-device delete" in command for command in commands) == 1
-    assert sum("iot adr ns delete " in command for command in commands) == int(parent_failure)
-    assert not clock.sleeps
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error, _cli_exit])
-@pytest.mark.parametrize("resource_id,method,error_type", [
-    (NS_ID, "GET", HttpResponseError),
-    (NS_ID + "/jobs/device", "GET", HttpResponseError),
-    (NS_ID + "/registryDevices/other", "GET", HttpResponseError),
-    ("/tenant/oauth2/token", "GET", HttpResponseError),
-    (REGISTRY_DEVICE_ID, "POST", HttpResponseError),
-    (REGISTRY_DEVICE_ID, "GET", ClientAuthenticationError),
-])
-def test_registry_wrong_resource_or_credential_404_cannot_delete_parent(
-    monkeypatch, wrap, resource_id, method, error_type,
-):
-    error = wrap(_http(resource_id=resource_id, method=method, error_type=error_type))
-    scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), error]
-    clock = Clock()
-    with pytest.raises(type(error)) as caught:
-        _registry_cleanup(scenario, clock, monkeypatch)
-    assert caught.value is error
-    assert len(_commands(scenario)) == 2
-    assert "registry-device show" in _commands(scenario)[-1]
-    assert not clock.sleeps
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error])
-@pytest.mark.parametrize("error", [
-    _http(403, resource_id=REGISTRY_DEVICE_ID), _http(502, resource_id=REGISTRY_DEVICE_ID),
-    _http(404, "AuthorizationFailed", resource_id=REGISTRY_DEVICE_ID),
-    CLIError("ResourceNotFound (404)"), ResourceNotFoundError("status-less error"), SystemExit(3),
-])
-def test_registry_failed_or_unproven_get_never_deletes_parent(monkeypatch, wrap, error):
-    error = wrap(error)
-    scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), error]
-    clock = Clock()
-    with pytest.raises(type(error)) as caught:
-        _registry_cleanup(scenario, clock, monkeypatch)
-    assert caught.value is error
-    assert len(_commands(scenario)) == 2
-    assert "registry-device show" in _commands(scenario)[-1]
-    assert not clock.sleeps
-
-
-@pytest.mark.parametrize("output", [None, "", []])
-def test_registry_empty_get_output_is_not_absence(monkeypatch, output):
-    scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), _output(output)]
-    with pytest.raises(AssertionError, match="not HTTP 404"):
-        _registry_cleanup(scenario, Clock(), monkeypatch)
-    assert len(_commands(scenario)) == 2
-
-
-def test_registry_lingering_child_uses_existing_120_second_budget(monkeypatch):
-    scenario = Mock()
-    scenario.cmd.return_value = _output({})
-    clock = Clock()
-    with pytest.raises(AssertionError, match="owned registry-device GET still readable"):
-        with CleanupLedger() as cleanup:
-            cleanup.register("registry fixture", lambda: _registry_cleanup(scenario, clock, monkeypatch))
-    assert clock.now == 120
-    assert clock.sleeps == [10] * 12
-    commands = _commands(scenario)
-    assert "registry-device delete" in commands[0]
-    assert all("registry-device show" in command for command in commands[1:])
-
-
-def test_registry_get_duration_consumes_cleanup_budget(monkeypatch):
-    scenario = Mock()
-    clock = Clock()
-
-    def command(text):
-        if "registry-device delete" in text:
-            return _output(None)
-        clock.now += 120
-        raise _missing("registry-device")
-
-    scenario.cmd.side_effect = command
-    with pytest.raises(AssertionError, match="Timed out waiting for owned namespace cleanup"):
-        _registry_cleanup(scenario, clock, monkeypatch)
-    assert len(_commands(scenario)) == 2
-    assert not clock.sleeps
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error])
-def test_registry_cleanup_already_absent_child_and_namespace(monkeypatch, wrap):
-    scenario = Mock()
-    scenario.cmd.side_effect = [
-        wrap(_http(method="DELETE", resource_id=REGISTRY_DEVICE_ID)),
-        wrap(_missing("registry-device")), wrap(_missing("namespace")),
-    ]
-    clock = Clock()
-    with CleanupLedger() as cleanup:
-        cleanup.register("registry fixture", lambda: _registry_cleanup(scenario, clock, monkeypatch))
-    assert len(_commands(scenario)) == 3
-    assert sum(" delete " in command for command in _commands(scenario)) == 1
-    assert not clock.sleeps
-
-
-@pytest.mark.parametrize("already_deleting", [False, True])
-def test_registry_parent_accepted_delete_only_polls_gets(monkeypatch, already_deleting):
-    scenario = Mock()
-
-    def command(text):
-        if " delete " in text:
-            return _output(None)
-        if "registry-device show" in text:
-            raise _missing("registry-device")
-        return _output({"properties": {"provisioningState": "Deleting" if already_deleting else "Succeeded"}})
-
-    scenario.cmd.side_effect = command
-    clock = Clock()
-    with pytest.raises(AssertionError, match="namespace DELETE accepted"):
-        with CleanupLedger() as cleanup:
-            cleanup.register("registry fixture", lambda: _registry_cleanup(scenario, clock, monkeypatch))
-    commands = _commands(scenario)
-    assert sum("registry-device delete" in command for command in commands) == 1
-    assert sum("iot adr ns delete " in command for command in commands) == int(not already_deleting)
-    assert all(" show " in command for command in commands[4 if not already_deleting else 3:])
-    assert clock.now == 120
-    assert clock.sleeps == [10] * 12
-
-
-@pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error])
-@pytest.mark.parametrize("registry_list", [[], [{"name": "stranger"}], None])
-def test_registry_child_index_rejection_checks_registry_list_without_deleting_strangers(
-    monkeypatch, wrap, registry_list,
-):
-    rejection = wrap(_http(409, "NamespaceNotEmpty", method="DELETE", resource_id=NS_ID))
-    scenario = Mock()
-    scenario.cmd.side_effect = [
-        _output(None), _missing("registry-device"), _output({}), rejection,
-        _missing("registry-device"), _output({}), _output([]), _output([]), _output(registry_list),
-        _output(None), _missing("registry-device"), _missing("namespace"),
-    ]
-    clock = Clock()
-    if registry_list == []:
-        _registry_cleanup(scenario, clock, monkeypatch)
-    else:
-        with pytest.raises(HttpResponseError) as caught:
-            _registry_cleanup(scenario, clock, monkeypatch)
-        assert caught.value is rejection
-    commands = _commands(scenario)
-    assert commands[6:9] == [
-        "iot adr ns job list --namespace ns -g rg",
-        "iot adr ns group list --namespace ns -g rg",
-        "iot adr ns registry-device list --namespace ns -g rg",
-    ]
-    assert sum("registry-device delete" in command for command in commands) == 1
-    assert sum("iot adr ns delete " in command for command in commands) == (2 if registry_list == [] else 1)
-    assert not any("stranger" in command for command in commands)
-    assert clock.sleeps == ([10, 10] if registry_list == [] else [10])
-
-
-def test_real_registry_get_404_and_testsdk_rethrow_allow_parent_delete(mocked_response, mocker, monkeypatch):
-    namespace_url = "https://management.azure.com" + NS_ID
-    absent = {"error": {"code": "ResourceNotFound", "message": "Owned registry device was deleted"}}
-    mocked_response.add("GET", namespace_url + "/registryDevices/device", status=404, json=absent)
-    mocked_response.add("GET", namespace_url, json={"properties": {"provisioningState": "Succeeded"}})
-    mocked_response.add("GET", namespace_url, status=404, json=absent)
-    mocked_response.add("DELETE", namespace_url, status=204)
-    credential = Mock(spec=["get_token"])
-    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
-    clock = Clock()
-    with DeviceRegistryMgmtClient(credential, "sub", retry_total=0, polling_interval=0) as client:
-        mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=client)
-        provider = NamespaceProvider(Mock())
-
-        def command(text):
-            try:
-                if "registry-device delete" in text:
-                    return _output(None)
-                if "registry-device show" in text:
-                    return _output(client.registry_devices.get("rg", "ns", "device"))
-                if "ns show" in text:
-                    return _output(client.namespaces.get("rg", "ns"))
-                assert text == "iot adr ns delete --namespace ns -g rg -y --no-wait"
-                provider.delete("ns", "rg", no_wait=True)
-                return _output(None)
-            except HttpResponseError as error:
-                raise _sdk_error(error)
-
-        scenario = SimpleNamespace(cmd=Mock(side_effect=command))
-        _registry_cleanup(scenario, clock, monkeypatch)
-    assert sum("registry-device delete" in cmd for cmd in _commands(scenario)) == 1
-    assert [(call.request.method, urlsplit(call.request.url).path) for call in mocked_response.calls] == [
-        ("GET", REGISTRY_DEVICE_ID), ("GET", NS_ID), ("DELETE", NS_ID),
-        ("GET", REGISTRY_DEVICE_ID), ("GET", NS_ID),
-    ]
-    assert clock.sleeps == [10]
 
 
 def _namespace(ns_state="Failed", state="Failed", expected=None, message=None, *, kind="hub"):

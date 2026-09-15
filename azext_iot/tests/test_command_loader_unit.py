@@ -63,6 +63,16 @@ _PNP_PARSER_CASES = {
     "iot hub digital-twin update": ["--patch", "[]"],
     "iot hub digital-twin invoke-command": ["--cn", "noop"],
 }
+_RETIRED_REGISTRY_DEVICE_COMMANDS = [
+    f"iot adr ns registry-device{group} {verb}"
+    for group, verbs in (
+        ("", ("create", "show", "list", "update", "delete", "wait")),
+        (" auth", ("list", "show", "show-keys", "revoke-certs", "wait")),
+        (" attribute", ("create", "list", "show", "delete")),
+        (" capability", ("list", "show")),
+    )
+    for verb in verbs
+]
 for _kind, _resource_option, _resource_id in (
     ("hub", "--hub-resource-id", _HUB_ID),
     ("dps", "--dps-resource-id", _DPS_ID),
@@ -154,6 +164,20 @@ def test_pnp_update_authentication_default_has_only_the_standard_linter_exceptio
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_retired_link_delete_is_not_registered(command_table, kind):
     assert f"iot adr ns link {kind} delete" not in command_table
+
+
+@pytest.mark.parametrize("command_name", _RETIRED_REGISTRY_DEVICE_COMMANDS)
+def test_retired_registry_device_commands_are_rejected(command_table, management_command_parser, command_name):
+    assert command_name not in command_table
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args(command_name.split())
+    assert error.value.code == 2
+
+
+def test_adr_command_count_excludes_retired_registry_devices(command_table):
+    commands = [name for name in command_table if name.startswith("iot adr ")]
+    assert len(commands) == 92
+    assert not any(name.startswith("iot adr ns registry-device") for name in commands)
 
 
 def test_command_table_loads(command_table):

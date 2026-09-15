@@ -7,7 +7,6 @@
 import importlib.util
 import inspect
 import json
-import logging
 from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
 
@@ -17,7 +16,6 @@ from azure.core.exceptions import HttpResponseError
 from azure.core.polling import LROPoller
 
 from azext_iot.adr.providers.group import GroupProvider
-from azext_iot.adr.providers.registry_device import RegistryDeviceProvider
 from azext_iot.adr.providers.report import ReportProvider
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient, operations
 
@@ -145,40 +143,6 @@ def test_group_delete_wire_rejects_async_response(fixture_cmd, wire_client, mock
 
     assert raised.value.status_code == 202
     assert len(mocked_response.calls) == 1
-
-
-def test_show_keys_wire_uses_list_keys_without_secret_logging(
-    fixture_cmd, wire_client, mocked_response, mocker, caplog
-):
-    profile_url = f"{NAMESPACE_URL}/registryDevices/device/authenticationProfiles/default"
-    keys = {"symmetricKey": {"primaryKey": "test-primary-secret", "secondaryKey": "test-secondary-secret"}}
-    mocked_response.add(
-        "GET", profile_url, json={"properties": {"authenticationType": "SymmetricKey"}}
-    )
-    mocked_response.add("POST", f"{profile_url}/listKeys", json=keys)
-    list_keys = mocker.spy(wire_client.registry_device_authentication_profiles, "list_keys")
-    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=wire_client)
-    provider = RegistryDeviceProvider(fixture_cmd)
-
-    with caplog.at_level(logging.DEBUG):
-        assert provider.auth_show_keys("default", "device", "namespace", "rg") == keys
-
-    list_keys.assert_called_once_with(
-        resource_group_name="rg",
-        namespace_name="namespace",
-        registry_device_name="device",
-        authentication_profile_name="default",
-        logging_enable=False,
-    )
-    assert not hasattr(wire_client.registry_device_authentication_profiles, "get_keys")
-    assert [call.request.method for call in mocked_response.calls] == ["GET", "POST"]
-    for call in mocked_response.calls:
-        _assert_api_version(call.request)
-    assert urlsplit(mocked_response.calls[1].request.url).path.endswith("/default/listKeys")
-    assert "The returned symmetric keys are secrets" in caplog.text
-    assert "test-primary-secret" not in caplog.text
-    assert "test-secondary-secret" not in caplog.text
-    assert any(record.name.startswith("azure.") for record in caplog.records)
 
 
 @pytest.mark.parametrize("status_code", [202, 204])

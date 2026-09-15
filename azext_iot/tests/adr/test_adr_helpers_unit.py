@@ -384,42 +384,6 @@ def test_cleanup_ledger_raises_when_only_cleanup_fails():
             cleanup.register("resource", fail_cleanup)
 
 
-def test_registry_cleanup_ledger_fails_on_child_delete_denial():
-    from azext_iot.tests.adr.test_adr_registry_device_int import _cleanup_namespace
-
-    scenario = Mock()
-    scenario.cmd.side_effect = [RuntimeError("403 Forbidden"), None]
-    with pytest.raises(AssertionError, match="ADR cleanup failed: registry fixture: 403 Forbidden"):
-        with CleanupLedger() as cleanup:
-            cleanup.register("registry fixture", lambda: _cleanup_namespace(scenario, "ns", "device"))
-    assert scenario.cmd.call_count == 1
-    assert "registry-device delete" in scenario.cmd.call_args.args[0]
-
-
-@pytest.mark.parametrize(
-    "device_delete_error",
-    [None, CLIError("ResourceNotFound (404)")],
-)
-def test_registry_cleanup_delegates_owned_device_absence_after_delete(device_delete_error, mocker):
-    from azext_iot.tests.adr import test_adr_registry_device_int as registry_scenarios
-
-    test = Mock()
-    test.cmd.side_effect = device_delete_error
-    bounded_cleanup = mocker.patch.object(registry_scenarios, "delete_test_namespace")
-    test.attach_mock(bounded_cleanup, "bounded_cleanup")
-    registry_scenarios._cleanup_namespace(test, "ns", "device")
-
-    assert test.mock_calls == [
-        call.cmd(
-            "iot adr ns registry-device delete -n device "
-            f"--ns ns -g {registry_scenarios.TEST_RG} --yes"
-        ),
-        call.bounded_cleanup(
-            test, "ns", registry_scenarios.TEST_RG, registry_devices=("device",),
-        ),
-    ]
-
-
 def test_known_object_role_assignment_bypasses_graph_resolution():
     helper = RoleAssignmentHelper()
     absent = Mock()

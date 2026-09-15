@@ -24,8 +24,8 @@ def load_deviceprovisioningservice_help():
   short-summary: Register a device and optionally issue its operational certificate.
   long-summary: |
     Uses RegisterDeviceAndIssueCertificate. The response includes issuedCertificateChain
-    and connectionProfile when returned by DPS, plus registryDeviceExternalId to correlate
-    the result with `az iot adr ns registry-device show`. Supply --symmetric-key
+    and connectionProfile when returned by DPS, plus registryDeviceExternalId for
+    correlation with the backend Registry Device. Supply --symmetric-key
     (optionally --compute-key and --group-id), or an X.509 --certificate-file-path
     and --key-file-path pair. When DPS credentials are available, symmetric
     attestation material can be retrieved as before. A 202 response is polled,
