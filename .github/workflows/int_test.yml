@@ -11,6 +11,11 @@ on:
         type: string
         required: false
         default: "auto"
+      adr-test-filter:
+        description: "ADR-only pytest -k expression; empty runs the full ADR integration suite."
+        type: string
+        required: false
+        default: ""
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -65,6 +70,11 @@ on:
         description: "Run ADR tests"
         type: boolean
         default: true
+      adr-test-filter:
+        description: "ADR-only pytest -k expression; empty runs the full ADR integration suite."
+        type: string
+        required: false
+        default: ""
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -343,6 +353,7 @@ jobs:
           azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}
+          ADR_TEST_FILTER: ${{ inputs['adr-test-filter'] }}
         run: |
           set -o pipefail
           run_service() {
@@ -351,6 +362,13 @@ jobs:
               .tox/DPS-phases/bin/python scripts/run_dps_phases.py \
                 --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" --resource-group "${{ env.RESOURCE_GROUP }}" \
                 --region "${{ matrix.config.region }}"
+            elif [ "${{ matrix.config.service }}" = "ADR" ] && [ -n "$ADR_TEST_FILTER" ]; then
+              # Reject malformed expressions before wrapping, so parentheses cannot escape the integration-only guard.
+              .tox/ADR-int/bin/python -c \
+                'import os; from _pytest.mark.expression import Expression; Expression.compile(os.environ["ADR_TEST_FILTER"])' \
+                || return $?
+              tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install -- \
+                -k "(_int.py) and (${ADR_TEST_FILTER})"
             else
               tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install
             fi
