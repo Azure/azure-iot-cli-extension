@@ -9,6 +9,7 @@ import json
 import runpy
 import re
 import os
+import shutil
 import subprocess
 import sys
 
@@ -167,6 +168,179 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     assert "tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install" in step["run"]
     upload = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Upload test result")
     assert upload["with"]["path"] == "test-result/"
+
+
+def _integration_run_step():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    return next(step for step in workflow["jobs"]["int-test"]["steps"] if step.get("id") == "run_tests")
+
+
+def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    triggers = workflow.get("on", workflow.get(True))
+    for trigger in ("workflow_call", "workflow_dispatch"):
+        setting = triggers[trigger]["inputs"]["adr-test-filter"]
+        assert setting["type"] == "string"
+        assert setting["required"] is False
+        assert setting["default"] == ""
+        assert "ADR-only" in setting["description"]
+    # Existing service defaults must not change when the filter is introduced.
+    assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
+    for service in ("DPS", "HubMgmt", "HubData", "ADU", "ADR"):
+        assert triggers["workflow_dispatch"]["inputs"][f"test{service}"]["default"] is True
+    assert triggers["workflow_dispatch"]["inputs"]["testHubSAS"]["default"] is False
+    step = _integration_run_step()
+    assert step["env"]["ADR_TEST_FILTER"] == "${{ inputs['adr-test-filter'] }}"
+    assert "adr-test-filter" not in step["run"]
+    assert '-k "(_int.py) and (${ADR_TEST_FILTER})"' in step["run"]
+    assert 'Expression.compile(os.environ["ADR_TEST_FILTER"])' in step["run"]
+    assert not step.get("continue-on-error", False)
+    assert "|| true" not in step["run"]
+
+
+def _run_integration_shell(tmp_path, service, expression, exit_code=0):
+    script = _integration_run_step()["run"]
+    for key, value in {
+        "matrix.config.service": service,
+        "matrix.config.tox_env": f"{service}-int",
+        "env.TEST_SUBSCRIPTION_ID": "offline-subscription",
+        "env.RESOURCE_GROUP": "offline-rg",
+        "matrix.config.region": "centraluseuap",
+    }.items():
+        script = script.replace("${{ " + key + " }}", value)
+    # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
+    script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
+    script = script.replace(".tox/ADR-int/bin/python", '"$OFFLINE_PYTHON"')
+    stubs = """
+tox() { printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
+dps_controller() { printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
+tee() { cat; }
+"""
+    return subprocess.run(
+        ["bash", "-c", stubs + script], cwd=tmp_path,
+        env=dict(os.environ, ADR_TEST_FILTER=expression, OFFLINE_PYTHON=sys.executable,
+                 OFFLINE_EXIT_CODE=str(exit_code)),
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
+@pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData", "HubSAS", "ADU"])
+@pytest.mark.parametrize("expression", ["", "test_adr_job_lifecycle or test_adr_job_validation_negatives"])
+def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service, expression):
+    result = _run_integration_shell(tmp_path, service, expression)
+    assert result.returncode == 0, result.stdout + result.stderr
+    arguments = result.stdout.splitlines()
+    if service == "DPS":
+        assert arguments[1:] == [
+            "dps_controller", "scripts/run_dps_phases.py",
+            "--subscription", "offline-subscription", "--resource-group", "offline-rg",
+            "--region", "centraluseuap",
+        ]
+    else:
+        expected = ["tox", "r", "-e", f"{service}-int", "--skip-pkg-install"]
+        if service == "ADR" and expression:
+            expected += ["--", "-k", f"(_int.py) and ({expression})"]
+        assert arguments == expected
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
+@pytest.mark.parametrize("expression", ["and", "test_job) or _unit.py or (test_job", '$(printf UNEXPECTED); "quoted"'])
+def test_adr_workflow_rejects_invalid_or_shell_input_without_running_tox(tmp_path, expression):
+    result = _run_integration_shell(tmp_path, "ADR", expression)
+    assert result.returncode != 0
+    assert "tox\n" not in result.stdout
+    assert "\nUNEXPECTED\n" not in result.stdout
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
+@pytest.mark.parametrize("exit_code", [1, 4, 5])
+def test_adr_workflow_preserves_failure_usage_and_no_selection_exit_codes(tmp_path, exit_code):
+    result = _run_integration_shell(tmp_path, "ADR", "test_job", exit_code)
+    assert result.returncode == exit_code
+
+
+@pytest.mark.parametrize("expression,exit_code", [
+    ("test_job", 0),
+    ("test_job or _unit.py", 0),
+    ("does_not_match_any_test", 5),
+    ("and", 4),
+])
+def test_adr_filter_overrides_tox_keyword_without_selecting_unit_tests(tmp_path, expression, exit_code):
+    # Isolated, portable pytest collection: no repository conftest, credentials or live fixtures.
+    config = tmp_path / "pytest.ini"
+    config.write_text("[pytest]\n", encoding="utf-8")
+    for suffix in ("int", "unit"):
+        (tmp_path / f"test_example_{suffix}.py").write_text("def test_job(): pass\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-c", str(config), "--collect-only", "-q",
+         "-p", "no:cacheprovider", "-k", "_int.py", str(tmp_path),
+         "-k", f"(_int.py) and ({expression})"],
+        cwd=tmp_path, env=dict(os.environ, PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS=""),
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    assert result.returncode == exit_code, result.stdout + result.stderr
+    if exit_code == 0:
+        assert [line for line in result.stdout.splitlines() if "::" in line] == ["test_example_int.py::test_job"]
+
+
+@pytest.mark.parametrize("filtered", [False, True], ids=["full-adr", "five-ca-job-cases"])
+def test_adr_workflow_filter_collects_existing_cases_offline(tmp_path, monkeypatch, filtered):
+    expected = {
+        "test_adr_certificate_authority_int.py::TestADRCertificateAuthorityLifecycle"
+        "::test_adr_certificate_authority_lifecycle",
+        "test_adr_job_int.py::TestADRJobLifecycle::test_adr_job_lifecycle",
+        "test_adr_job_int.py::TestADRJobLifecycle::test_adr_onboarding_update_job_lifecycle",
+        "test_adr_job_int.py::TestADRJobValidation::test_adr_job_validation_negatives",
+        "test_adr_job_run_int.py::TestADRJobRunSurface::test_adr_job_run_surface_smoke",
+    }
+    expression = " or ".join(sorted(node.rsplit("::", 1)[1] for node in expected))
+    dependency_path = tmp_path / "parent-only-imports"
+    dependency_path.mkdir()
+    (dependency_path / "workflow_parent_dependency.py").write_text("AVAILABLE = True\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(dependency_path))
+    config = tmp_path / "pytest.ini"
+    config.write_text("[pytest]\n", encoding="utf-8")
+    script = """
+import socket
+import sys
+import workflow_parent_dependency
+assert workflow_parent_dependency.AVAILABLE
+def deny_network(*args, **kwargs):
+    raise AssertionError("Workflow collection must not connect to any service")
+socket.socket.connect = deny_network
+import pytest
+sys.exit(pytest.main(sys.argv[1:]))
+"""
+    command = [
+        sys.executable, "-B", "-c", script, "-c", str(config), "--rootdir", str(REPOSITORY_ROOT),
+        "--collect-only", "-q", "-p", "no:cacheprovider", "-k", "_int.py",
+        str(REPOSITORY_ROOT / "azext_iot/tests/adr"),
+    ]
+    if filtered:
+        command += ["-k", f"(_int.py) and ({expression})"]
+    # Azure CLI also adds extension dependency paths at runtime.
+    import_paths = dict.fromkeys([str(REPOSITORY_ROOT), *(os.path.abspath(path) for path in sys.path)])
+    result = subprocess.run(
+        command, cwd=REPOSITORY_ROOT,
+        env=dict(os.environ, PYTHONPATH=os.pathsep.join(import_paths),
+                 AZURE_TEST_RUN_LIVE="False", AZURE_CONFIG_DIR=str(tmp_path / "cli"),
+                 AZURE_CORE_COLLECT_TELEMETRY="0", AZURE_CORE_CHECK_VERSION="no",
+                 AZURE_EXTENSION_USE_DYNAMIC_INSTALL="no", azext_iot_testrg="offline-workflow-rg",
+                 PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS=""),
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    nodes = {
+        line.removeprefix("azext_iot/tests/adr/") for line in result.stdout.splitlines()
+        if line.startswith("azext_iot/tests/adr/") and "::" in line
+    }
+    if filtered:
+        assert nodes == expected
+    else:
+        assert len(nodes) == 26
+        assert expected <= nodes
+        assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 
 def test_hub_sas_workflow_defaults_to_opt_in():

@@ -146,6 +146,29 @@ To run specific test in any integration test file, such as:
 
 `pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
 
+#### Focused ADR workflow runs
+
+The integration workflow accepts an optional `adr-test-filter` string for both
+manual dispatch and reusable calls. It is a pytest `-k` expression applied only
+to ADR integration tests; leave it empty for the unchanged full ADR suite.
+It does not select ADR itself: choose `testADR` for dispatch or include `ADR` in
+`test-services` for a reusable call. Other selected services remain unfiltered.
+
+For example, this expression selects the five CA/job diagnostic cases without
+linked Hub/DPS fixtures:
+
+```text
+test_adr_certificate_authority_lifecycle or test_adr_job_lifecycle or
+test_adr_onboarding_update_job_lifecycle or test_adr_job_validation_negatives or
+test_adr_job_run_surface_smoke
+```
+
+The expression must be valid on its own. Invalid expressions and selections
+matching no tests fail the run. Filtering does not change authentication,
+preflight, installation, deadlines, cleanup, coverage, or failure reporting.
+Use an already-authorized workflow ref and resource scope; filtering grants no
+additional permissions and does not make the selected tests read-only.
+
 #### DPS preview authentication phases
 
 The GitHub integration workflow's DPS selection runs three complete `DPS-int`
