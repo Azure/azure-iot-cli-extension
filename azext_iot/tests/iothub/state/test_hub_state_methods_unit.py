@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import logging
+from copy import deepcopy
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -193,7 +194,7 @@ class TestSaveState:
         p = _provider(mocker)
         mocker.patch.object(p, "process_hub_to_dict", return_value={"devices": {}})
         state_file = str(tmp_path / "out.json")
-        p.save_state(state_file=state_file)
+        p.save_state(state_file=state_file, hub_aspects=[HubAspects.Devices.value])
         import os
 
         assert os.path.exists(state_file)
@@ -221,7 +222,7 @@ class TestSaveState:
         mocker.patch.object(p, "process_hub_to_dict", return_value={"devices": {}})
         bad_path = str(tmp_path / "missing_dir" / "out.json")
         with pytest.raises(FileOperationError):
-            p.save_state(state_file=bad_path)
+            p.save_state(state_file=bad_path, hub_aspects=[HubAspects.Devices.value])
 
 
 class TestUploadState:
@@ -297,8 +298,14 @@ class TestMigrateState:
     def test_migrate_rg_from_orig_target(self, mocker):
         p = _provider(mocker, target=None)
         p.rg = None
-        p.discovery.get_target.return_value = {"resourcegroup": "rg2"}
-        mocker.patch.object(p, "process_hub_to_dict", return_value={})
+        p.discovery.get_target.return_value = {"name": "orig"}
+        p.discovery.find_resource.return_value = {
+            "id": (
+                "/subscriptions/sub/resourceGroups/rg2/providers/"
+                "Microsoft.Devices/IotHubs/orig"
+            )
+        }
+        mocker.patch.object(p, "process_hub_to_dict", return_value=TestUploadHubFromDict()._arm_state())
         mocker.patch.object(p, "delete_aspects")
         mocker.patch.object(p, "upload_hub_from_dict")
         p.migrate_state(orig_hub="orig", hub_aspects=[HubAspects.Arm.value])
@@ -331,14 +338,16 @@ class TestProcessHubToDict:
     def test_configurations_list_fails(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{sp}._iot_hub_configuration_list", side_effect=AzCLIError("boom"))
-        result = p.process_hub_to_dict(p.target, [HubAspects.Configurations.value])
-        assert "configurations" not in result
+        with pytest.raises(AzCLIError, match="boom"):
+            p.process_hub_to_dict(p.target, [HubAspects.Configurations.value])
 
     def test_arm_aspect(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
-            "resourcegroup": "rg",
-            "id": "/subscriptions/x/hub",
+            "id": (
+                "/subscriptions/x/resourceGroups/rg/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            ),
         }
         arm_json = {"resources": [{"name": "hub", "type": "Microsoft.Devices/IotHubs"}]}
         invoke_result = mocker.MagicMock()
@@ -350,10 +359,13 @@ class TestProcessHubToDict:
 
     def test_arm_aspect_target_no_rg(self, mocker):
         p = _provider(mocker)
+        p.rg = None
         p.target = {"entity": "hub.azure-devices.net"}
         p.discovery.find_resource.return_value = {
-            "resourcegroup": "rg-from-resource",
-            "id": "/subscriptions/x/hub",
+            "id": (
+                "/subscriptions/x/resourceGroups/rg-from-resource/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            ),
         }
         arm_json = {"resources": [{"name": "hub", "type": "Microsoft.Devices/IotHubs"}]}
         invoke_result = mocker.MagicMock()
@@ -366,32 +378,47 @@ class TestProcessHubToDict:
 
     def test_arm_aspect_empty(self, mocker):
         p = _provider(mocker)
-        p.discovery.find_resource.return_value = {"resourcegroup": "rg", "id": "id"}
+        p.discovery.find_resource.return_value = {
+            "id": (
+                "/subscriptions/x/resourceGroups/rg/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            )
+        }
         invoke_result = mocker.MagicMock()
         invoke_result.as_json.return_value = {"resources": []}
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
-        result = p.process_hub_to_dict(p.target, [HubAspects.Arm.value])
-        assert "arm" not in result
+        with pytest.raises(BadRequestError, match="complete ARM template"):
+            p.process_hub_to_dict(p.target, [HubAspects.Arm.value])
 
     def test_arm_aspect_error(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.side_effect = AzCLIError("boom")
-        result = p.process_hub_to_dict(p.target, [HubAspects.Arm.value])
-        assert "arm" not in result
+        with pytest.raises(AzCLIError, match="boom"):
+            p.process_hub_to_dict(p.target, [HubAspects.Arm.value])
 
 
 class TestDownloadDevices:
+    def _mock_twins(self, mocker, twins):
+        mocker.patch(f"{sp}._iot_device_twin_list", return_value=deepcopy(twins))
+        return mocker.patch(
+            f"{sp}._iot_device_twin_show",
+            side_effect=lambda target, device_id: deepcopy(next(twin for twin in twins if twin["deviceId"] == device_id)),
+        )
+
     def test_list_fails(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{sp}._iot_device_twin_list", side_effect=AzCLIError("boom"))
-        assert p.download_devices(p.target) is None
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
     def test_basic_tier_no_properties(self, mocker):
         p = _provider(mocker)
+        p.target["sku_tier"] = "Basic"
         twin = {"deviceId": "d1"}
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
-        result = p.download_devices(p.target)
-        assert result == {}
+        show = self._mock_twins(mocker, [twin])
+        with pytest.raises(BadRequestError, match="Basic-tier"):
+            p.download_devices(p.target)
+        show.assert_not_called()
 
     def test_full_device_with_module(self, mocker):
         p = _provider(mocker)
@@ -406,13 +433,12 @@ class TestDownloadDevices:
             "authenticationType": DeviceAuthApiType.sas.value,
             "x509Thumbprint": None,
         }
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
+        self._mock_twins(mocker, [twin])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
         )
-        module = mocker.MagicMock()
-        module.serialize.return_value = {
+        module = {
             "moduleId": "m1",
             "generationId": "g",
             "connectionStateUpdatedTime": "t",
@@ -456,10 +482,10 @@ class TestDownloadDevices:
             "authenticationType": DeviceAuthApiType.sas.value,
             "x509Thumbprint": None,
         }
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
+        self._mock_twins(mocker, [twin])
         mocker.patch(f"{sp}._iot_device_show", side_effect=AzCLIError("boom"))
-        result = p.download_devices(p.target)
-        assert result == {}
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
     def _sas_device_twin(self):
         return {
@@ -470,8 +496,7 @@ class TestDownloadDevices:
         }
 
     def _serialized_module(self, mocker):
-        module = mocker.MagicMock()
-        module.serialize.return_value = {
+        module = {
             "moduleId": "m1",
             "generationId": "g",
             "connectionStateUpdatedTime": "t",
@@ -484,30 +509,30 @@ class TestDownloadDevices:
 
     def test_module_list_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
         )
         mocker.patch(f"{sp}._iot_device_module_list", side_effect=AzCLIError("boom"))
-        result = p.download_devices(p.target)
-        assert "modules" not in result["d1"]
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
     def test_module_identity_show_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
         )
         mocker.patch(f"{sp}._iot_device_module_list", return_value=[self._serialized_module(mocker)])
         mocker.patch(f"{sp}._iot_device_module_show", side_effect=AzCLIError("boom"))
-        result = p.download_devices(p.target)
-        assert result["d1"]["modules"] == {}
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
     def test_module_twin_show_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
@@ -518,8 +543,8 @@ class TestDownloadDevices:
             return_value={"authentication": {"type": "sas"}},
         )
         mocker.patch(f"{sp}._iot_device_module_twin_show", side_effect=AzCLIError("boom"))
-        result = p.download_devices(p.target)
-        assert result["d1"]["modules"] == {}
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
 
 class TestUploadHubFromDict:
@@ -702,6 +727,7 @@ class TestUploadHubFromDict:
                     {
                         "name": "oldhub",
                         "type": "Microsoft.Devices/IotHubs",
+                        "apiVersion": "2026-10-01-preview",
                         "location": "westus",
                         "sku": {},
                         "identity": {},
@@ -719,7 +745,6 @@ class TestUploadHubFromDict:
     def test_upload_arm_existing_target(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
-            "resourcegroup": "rg",
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -730,14 +755,16 @@ class TestUploadHubFromDict:
         invoke_result = mocker.MagicMock()
         invoke_result.success.return_value = True
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
-        mocker.patch.object(state_module.os, "remove")
         p.upload_hub_from_dict(self._arm_state(), [HubAspects.Arm.value])
 
     def test_upload_arm_existing_target_no_rg_with_certs(self, mocker):
         p = _provider(mocker)
         p.rg = None
         p.discovery.find_resource.return_value = {
-            "resourcegroup": "rg-resolved",
+            "id": (
+                "/subscriptions/sub/resourceGroups/rg-resolved/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            ),
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -765,7 +792,6 @@ class TestUploadHubFromDict:
         invoke_result = mocker.MagicMock()
         invoke_result.success.return_value = True
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
-        mocker.patch.object(state_module.os, "remove")
         p.upload_hub_from_dict(state, [HubAspects.Arm.value])
         assert p.rg == "rg-resolved"
         cert = state["arm"]["resources"][-1]
@@ -775,7 +801,6 @@ class TestUploadHubFromDict:
     def test_upload_arm_deployment_fails(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
-            "resourcegroup": "rg",
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -786,7 +811,6 @@ class TestUploadHubFromDict:
         invoke_result = mocker.MagicMock()
         invoke_result.success.return_value = False
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
-        mocker.patch.object(state_module.os, "remove")
         with pytest.raises(BadRequestError):
             p.upload_hub_from_dict(self._arm_state(), [HubAspects.Arm.value])
 
@@ -809,7 +833,6 @@ class TestUploadHubFromDict:
         invoke_result.success.return_value = True
         invoke_result.as_json.return_value = {"resourceGroup": "rg"}
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
-        mocker.patch.object(state_module.os, "remove")
         p.discovery.get_target.return_value = {"name": "hub", "entity": "hub.azure-devices.net"}
         p.upload_hub_from_dict(self._arm_state(), [HubAspects.Arm.value])
         assert p.target is not None
@@ -819,8 +842,8 @@ class TestUploadHubFromDict:
 class TestStateProviderInit:
     def test_init_success(self, mocker):
         def fake_init(self, **kwargs):
-            self.target = {"name": "hub", "resourcegroup": "rg"}
-            self.rg = None
+            self.target = {"name": "hub"}
+            self.rg = "rg"
 
         mocker.patch.object(state_module.IoTHubProvider, "__init__", fake_init)
         p = StateProvider(cmd=mocker.MagicMock())

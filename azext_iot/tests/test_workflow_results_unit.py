@@ -443,13 +443,13 @@ def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, s
     assert any("Hub phase evidence" in error for error in errors)
 
 
-def test_hub_data_manifest_preserves_exact_six_sas_nodes_and_normal_auth_default():
+def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_default():
     from azext_iot.tests.iothub._sas_phase import NODES
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra", "sas")
-    assert len(nodes("HubData", "entra")) == 42
+    assert len(nodes("HubData", "entra")) == 44
     assert len(nodes("HubControl", "regular")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 

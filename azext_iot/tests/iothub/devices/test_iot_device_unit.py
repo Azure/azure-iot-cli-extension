@@ -419,9 +419,9 @@ class TestCloudToDeviceMessaging:
             in url
         )
         assert result
-        assert result.total_messages_purged == 3
-        assert result.device_id == device_id
-        assert not result.module_id
+        assert result["totalMessagesPurged"] == 3
+        assert result["deviceId"] == device_id
+        assert not result.get("moduleId")
 
 
 class TestDeviceSimulate:
@@ -481,7 +481,8 @@ class TestDeviceSimulate:
             assert len(result) == mc
 
             # result[?][1] are the http request headers
-            assert result[0][1] == properties_to_send
+            assert {key: result[0][1][key] for key in properties_to_send} == properties_to_send
+            assert result[0][1]["Authorization"].startswith("SharedAccessSignature ")
 
             # result[?][2] is the http request body (prior to stringify)
             assert json.dumps(result[0][2])
