@@ -201,8 +201,10 @@ def test_ado_hub_admission_rejects_unsupported_scope_platform_and_ambient_pins(p
         "azext_iot_testrg": "cli-int-test-rg", "azext_iot_testhub_location": "centraluseuap",
     })
     env.update(override)
+    # Simulated Linux needs case-sensitive keys even on Windows' uppercase _Environ.
+    preamble = f"import os, sys; sys.platform = {platform!r}; os.environ = {env!r}\n"
     result = subprocess.run(
-        [sys.executable, "-I", "-S", "-c", f"import sys; sys.platform = {platform!r}\n" + script],
+        [sys.executable, "-I", "-S", "-c", preamble + script],
         cwd=ROOT, env=env, capture_output=True, text=True, timeout=10, check=False,
     )
     assert result.returncode == expected, result.stdout + result.stderr
