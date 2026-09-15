@@ -789,6 +789,43 @@ def test_setup_command_renders_input_and_plan_errors(mocker):
         command_subject.adr_namespace_setup(_cmd(), "ns", "rg")
 
 
+@pytest.mark.parametrize("after_back", [False, True])
+@pytest.mark.parametrize("failure_stage", ["selection", "validation"])
+def test_setup_subscription_failure_is_rendered_before_planning(mocker, after_back, failure_stage):
+    workflow, renderer = _workflow_mocks(mocker)
+    services = command_subject.WorkflowServices.return_value
+    error = RuntimeError("subscription unavailable")
+    select = command_subject._select_subscription
+    validate = mocker.patch.object(command_subject, "_validate_subscription")
+    builder = mocker.patch.object(
+        command_subject, "build_setup_request",
+        side_effect=command_subject.BackRequested(),
+    )
+    if failure_stage == "selection":
+        select.side_effect = [("sub", services), error] if after_back else error
+    else:
+        validate.side_effect = [None, error] if after_back else error
+
+    with pytest.raises(
+        command_subject.RenderedWorkflowError, match="subscription unavailable"
+    ) as raised:
+        command_subject.adr_namespace_setup(_cmd())
+
+    assert raised.value.error is error
+    assert raised.value.__cause__ is error
+    assert raised.value.result is None
+    raised.value.print_error()
+    renderer.error.assert_called_once_with(raised.value, None)
+    assert select.call_count == 1 + int(after_back)
+    assert validate.call_count == int(after_back) + int(failure_stage == "validation")
+    assert builder.call_count == int(after_back)
+    assert renderer.reset_setup.call_count == int(after_back)
+    workflow.plan_setup.assert_not_called()
+    workflow.setup.assert_not_called()
+    command_subject.write_receipt_file.assert_not_called()
+    renderer.cancelled.assert_not_called()
+
+
 def test_setup_command_rejects_blocked_plan(mocker):
     workflow, renderer = _workflow_mocks(mocker)
     mocker.patch.object(
@@ -1142,6 +1179,51 @@ def test_successful_retry_preserves_prior_succeeded_items(mocker):
 
     assert result["items"][0]["state"] == "Succeeded"
     assert result["summary"] == {"Succeeded": 1}
+
+
+def test_setup_retry_without_error_result_preserves_successful_actions(mocker):
+    workflow, renderer = _workflow_mocks(mocker)
+    request = SetupRequest("ns", "rg", outbound_identity_type="SystemAssigned")
+    mocker.patch.object(command_subject, "build_setup_request", return_value=request)
+    plan = {"state": "Planned", "items": [], "summary": {}}
+    workflow.plan_setup.return_value = (plan, [])
+    succeeded = {"id": "namespace", "action": "create", "target": "ns", "state": "Succeeded"}
+    partial = {
+        "state": "Failed",
+        "items": [succeeded, {"id": "execution", "state": "Failed"}],
+        "summary": {"Succeeded": 1, "Failed": 1},
+    }
+    retry_error = RuntimeError("retry lookup failed")
+    workflow.setup.side_effect = [
+        WorkflowExecutionError(RuntimeError("identity failed"), partial),
+        retry_error,
+    ]
+    renderer.recovery.side_effect = ["r", "q"]
+    mocker.patch.object(command_subject.sys.stdin, "isatty", return_value=True)
+    mocker.patch.object(command_subject.sys.stderr, "isatty", return_value=True)
+
+    with pytest.raises(
+        command_subject.RenderedWorkflowError, match="retry lookup failed"
+    ) as raised:
+        command_subject.adr_namespace_setup(_cmd(), "ns", "rg")
+
+    expected = {
+        "command": "az iot adr ns setup",
+        "state": "Failed",
+        "namespace": "ns",
+        "resourceGroup": "rg",
+        "items": [succeeded],
+        "summary": {"Succeeded": 1},
+        "keptActions": 1,
+        "receipt": "/tmp/receipt.json",
+    }
+    assert raised.value.__cause__ is retry_error
+    assert raised.value.result == expected
+    command_subject.write_receipt_file.assert_called_once_with(expected)
+    assert workflow.setup.call_args_list == [mocker.call(request)] * 2
+    assert renderer.recovery.call_count == 2
+    assert partial["items"] == [succeeded, {"id": "execution", "state": "Failed"}]
+    assert plan == {"state": "Planned", "items": [], "summary": {}}
 
 
 def test_setup_recovery_escape_preserves_original_failure(mocker):

@@ -302,6 +302,50 @@ def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     assert not any("role assignment create" in command for command in commands)
 
 
+@pytest.mark.parametrize("assignments", [[], [{"id": "inherited-assignment"}]])
+def test_public_assignment_lookup_preserves_scoped_read_only_query(assignments):
+    cli = MagicMock()
+    cli.invoke.return_value = _result(assignments)
+    manager = LinkRbacManager(MagicMock(), cli=cli)
+    scope = TARGET_SCOPE.replace("/sub/", "/target-sub/")
+
+    assert manager.assignment_exists("principal-id", HUB_DATA_ROLE, scope) is bool(assignments)
+
+    cli.invoke.assert_called_once_with(
+        "role assignment list --assignee-object-id 'principal-id' "
+        f"--role '{HUB_DATA_ROLE}' --scope '{scope}' "
+        "--include-inherited --fill-principal-name false",
+        subscription="target-sub",
+    )
+
+
+def test_public_adu_principal_lookup_uses_scope_subscription_and_cache(token_profile):
+    cli = MagicMock()
+    graph_get = MagicMock(return_value=_graph_response([{"id": "adu-object-id"}]))
+    manager = LinkRbacManager(
+        SimpleNamespace(cloud=AZURE_PUBLIC_CLOUD), cli=cli, graph_get=graph_get,
+    )
+    scope = (
+        "/subscriptions/target-sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceUpdate/updateInstances/updates"
+    )
+
+    assert manager.resolve_adu_principal(scope) == "adu-object-id"
+    assert manager.resolve_adu_principal(scope + "-other") == "adu-object-id"
+
+    token_profile.return_value.get_raw_token.assert_called_once_with(
+        subscription="target-sub",
+        resource=AZURE_PUBLIC_CLOUD.endpoints.microsoft_graph_resource_id,
+    )
+    graph_get.assert_called_once_with(
+        GRAPH_SERVICE_PRINCIPALS_URL,
+        headers={"Authorization": f"Bearer {_access_token()}"},
+        params={"$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'", "$select": "id"},
+        timeout=30,
+    )
+    cli.invoke.assert_not_called()
+
+
 def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
     from azure.cli.core import get_default_cli
 

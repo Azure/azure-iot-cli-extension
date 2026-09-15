@@ -704,6 +704,23 @@ def test_summary_deduplicates_and_marks_staged_input():
     assert "other             value · nothing written yet" in output
 
 
+def test_subphase_status_does_not_repeat_the_configuration_step():
+    stream = StringIO()
+    renderer = subject.WorkflowRenderer(
+        "Namespace setup", console=_console(stream, force_terminal=True),
+    )
+    renderer.journey("Subscription", "Resource group", "Namespace", "Configuration")
+    for phase in ("Configuration", "Apply", "Verify"):
+        renderer.phase(phase)
+        renderer.input_status(phase, f"{phase} complete", "Succeeded")
+        assert not renderer._phase_pending
+
+    output = _plain_terminal(stream)
+    assert output.count("step 4/4") == 1
+    for phase in ("Configuration", "Apply", "Verify"):
+        assert output.count(f"{phase} complete") == 1
+
+
 def test_subphases_map_to_real_steps():
     setup = subject.WorkflowRenderer(
         "Namespace setup",
@@ -1024,21 +1041,42 @@ def test_execution_records_explicit_failure_scope():
     assert renderer.failure["scope"] == "software-updates"
 
 
-def test_execution_suppresses_expected_branch_failure():
+@pytest.mark.parametrize("rich", [False, True])
+def test_execution_suppresses_expected_branch_failure(mocker, rich):
+    stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
-        plain=True,
-        console=_console(StringIO()),
+        plain=not rich,
+        console=_console(stream, force_terminal=rich),
     )
-    execution = subject.WorkflowExecution(renderer)
-    with pytest.raises(ValueError):
-        execution.run(
-            "Find optional resource",
-            lambda: (_ for _ in ()).throw(ValueError("missing")),
-            workflow_scope="software-updates",
-            handled_error=lambda error: isinstance(error, ValueError),
-        )
+    assert renderer.rich is rich
+    error = ValueError("missing")
+    handled_error = mocker.Mock(return_value=True)
+    stops = []
+
+    def find_resource():
+        if rich:
+            stops.append(mocker.spy(execution.live, "stop"))
+        raise error
+
+    original_quiet = subject.provider_console.quiet
+    with renderer.execution() as execution:
+        with pytest.raises(ValueError) as raised:
+            execution.run(
+                "Find optional resource", find_resource,
+                workflow_scope="software-updates", handled_error=handled_error,
+            )
+        assert raised.value is error
+        assert execution.live is None
+        assert not renderer._tasks
+        assert renderer._execution_completed == 0
     assert renderer.failure is None
+    assert not renderer.mutated_scopes
+    assert subject.provider_console.quiet is original_quiet
+    handled_error.assert_called_once_with(error)
+    for stop in stops:
+        stop.assert_called_once_with()
+    assert "failed" not in _plain_terminal(stream).lower()
 
 
 def test_execution_tracks_successful_mutated_scopes():

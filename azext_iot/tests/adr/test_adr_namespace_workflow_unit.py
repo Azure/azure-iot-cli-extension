@@ -323,6 +323,24 @@ def test_plan_setup_rejects_duplicate_endpoint_names(services):
         subject.NamespaceWorkflow(services).plan_setup(request)
 
 
+def test_plan_rejects_duplicate_resources_before_any_service_call(services):
+    request = SetupRequest(
+        "ns", RG,
+        hubs=(
+            _endpoint("hub", HUB_ID, "primary"),
+            _endpoint("hub", HUB_ID.upper() + "/", "secondary"),
+        ),
+    )
+
+    with pytest.raises(ArgumentUsageError) as raised:
+        subject.NamespaceWorkflow(services).plan_setup(request)
+
+    assert str(raised.value) == (
+        "Each target resource can be linked only once: " + HUB_ID.lower()
+    )
+    assert services.mock_calls == []
+
+
 def test_plan_setup_records_skipped_and_status_items(services):
     services.show_namespace.return_value = _namespace()
     request = SetupRequest(
@@ -545,6 +563,45 @@ def test_plan_setup_matching_and_conflicting_links(services):
     }
     result, _ = subject.NamespaceWorkflow(services).plan_setup(request)
     assert result["state"] == STATE_BLOCKED
+
+
+@pytest.mark.parametrize(
+    "kind, resource_id, request_key",
+    [("dps", DPS_ID, "dps"), ("hub", HUB_ID, "hubs"), ("software-updates", SU_ID, "software_updates")],
+)
+@pytest.mark.parametrize("conflict", ["Failed", "Canceled", "other-name"])
+def test_existing_link_conflicts_block_setup_without_mutation(services, kind, resource_id, request_key, conflict):
+    existing_name = "original" if conflict == "other-name" else "requested"
+    state = "Succeeded" if conflict == "other-name" else conflict
+    links = {existing_name: _link(resource_id.upper() + "/", state)}
+    namespace_key = {"dps": "dps", "hub": "hubs", "software-updates": "su"}[kind]
+    namespace_links = {"dps": {"healthy-dps": _link(DPS_ID)}, namespace_key: links}
+    services.show_namespace.return_value = _namespace(**namespace_links)
+    services.resolve_resource.return_value = {"identity": {"principalId": "target"}}
+    endpoint = _endpoint(kind, resource_id, "requested")
+    request = SetupRequest(
+        "ns", RG, **{request_key: (endpoint,) if kind == "hub" else endpoint}
+    )
+    workflow = subject.NamespaceWorkflow(services)
+
+    result, items = workflow.plan_setup(request)
+
+    assert result["state"] == STATE_BLOCKED
+    link_item = next(item for item in items if item.action == "link")
+    assert link_item.state == STATE_BLOCKED
+    assert link_item.target == "requested"
+    assert link_item.details["resourceId"] == resource_id
+    assert link_item.message == (
+        "Target resource is already linked as 'original'. Reuse that endpoint name."
+        if conflict == "other-name"
+        else f"Matching endpoint is in {conflict} state."
+    )
+    assert bool(link_item.command) == (conflict == "other-name")
+    with pytest.raises(ArgumentUsageError, match="Namespace setup is blocked"):
+        workflow.setup(request)
+    assert {call[0] for call in services.mock_calls} <= {
+        "show_namespace", "resolve_resource", "dps_linked_hubs",
+    }
 
 
 def test_setup_reused_link_repairs_access_through_provider(services):
@@ -892,6 +949,41 @@ def test_setup_reports_partial_state_on_apply_failure(services):
         subject.NamespaceWorkflow(services).setup(request)
     assert raised.value.result["state"] == STATE_FAILED
     assert raised.value.result["items"][-1]["state"] == STATE_FAILED
+
+
+def test_setup_interrupt_preserves_completed_identity_mutation(services):
+    interrupted = KeyboardInterrupt()
+    services.show_namespace.side_effect = [
+        _namespace(outbound=False), _namespace(outbound=False), interrupted,
+    ]
+    request = SetupRequest("ns", RG, outbound_identity_type="SystemAssigned")
+
+    with pytest.raises(subject.WorkflowExecutionError, match="KeyboardInterrupt") as raised:
+        subject.NamespaceWorkflow(services).setup(request)
+
+    assert raised.value.__cause__ is interrupted
+    assert raised.value.result == {
+        "command": "az iot adr ns setup",
+        "state": STATE_FAILED,
+        "namespace": "ns",
+        "resourceGroup": RG,
+        "summary": {STATE_SATISFIED: 1, STATE_SUCCEEDED: 1, STATE_FAILED: 1},
+        "items": [
+            {"id": "namespace", "action": "reuse", "target": "ns", "state": STATE_SATISFIED},
+            {
+                "id": "namespace-outbound-identity", "action": "configure",
+                "target": "ns", "state": STATE_SUCCEEDED,
+            },
+            {
+                "id": "execution", "action": "apply", "target": "ns",
+                "state": STATE_FAILED, "message": "Interrupted by user.",
+            },
+        ],
+    }
+    services.configure_outbound_identity.assert_called_once_with("ns", RG, "SystemAssigned", None)
+    assert services.show_namespace.call_count == 3
+    services.create_namespace.assert_not_called()
+    services.resolve_resource.assert_not_called()
 
 
 def test_setup_adds_individual_dps_before_existing_hubs(services):

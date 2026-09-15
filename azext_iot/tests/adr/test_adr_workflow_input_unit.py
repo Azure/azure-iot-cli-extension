@@ -237,6 +237,31 @@ def test_build_setup_request_runs_real_guided_configuration():
     assert request.outbound_identity_type == "SystemAssigned"
 
 
+def test_guided_request_without_resource_validator_passes_none_to_identity(mocker):
+    prompt = mocker.Mock(side_effect=[
+        "hub", "", "hub", "system", "no", "system", "done",
+    ])
+    validate_identity = mocker.Mock()
+
+    request = subject.build_setup_request(
+        "ns",
+        RG,
+        SUB,
+        interactive=True,
+        prompt=prompt,
+        write=lambda _: None,
+        validate_endpoint_identity=validate_identity,
+    )
+
+    endpoint = EndpointSpec("hub", "hub", HUB_ID, "system-assigned")
+    assert request == SetupRequest(
+        "ns", RG, outbound_identity_type="SystemAssigned",
+        hubs=(endpoint,), subscription_id=SUB,
+    )
+    validate_identity.assert_called_once_with(endpoint, None)
+    assert prompt.call_count == 7
+
+
 def test_config_builds_without_workflow_role_policy(tmp_path):
     config = tmp_path / "setup.yaml"
     config.write_text(
@@ -1011,6 +1036,32 @@ def test_guided_configuration_escape_preserves_staged_state(mocker):
     assert result["outbound_identity"] == "system-assigned"
 
 
+@pytest.mark.parametrize("choice", ["identity", "dps", "hub", "updates"])
+def test_back_from_capability_returns_to_configuration_without_losing_staged_values(mocker, choice):
+    initial = {
+        "outbound_identity": "system-assigned",
+        "hubs": [["resource-name=existing", "identity=system-assigned"]],
+        "check_status": True,
+        "skipped": (),
+    }
+    prompt = mocker.Mock(side_effect=[choice, "", subject.BackRequested(), "done"])
+
+    result = subject._guided_configuration(
+        prompt=prompt,
+        write=lambda _: None,
+        validate_resource=None,
+        validate_endpoint_identity=None,
+        validate_namespace_identity=None,
+        allow_identity_reuse=False,
+        browse=None,
+        initial=initial,
+    )
+
+    assert result == initial
+    assert result is not initial
+    assert prompt.call_count == 4
+
+
 def test_guided_endpoint_identity_edit_paths(mocker):
     answers = iter([
         "hub",
@@ -1108,6 +1159,23 @@ def test_select_delegates_to_renderer():
         renderer.select,
         lambda _: None,
     ) == "value"
+
+
+def test_action_reprompts_invalid_input_then_accepts_default(mocker):
+    prompt = mocker.Mock(side_effect=["invalid", "  "])
+    messages = []
+
+    assert subject._action(
+        "Configure?", {"enter": "configure", "s": "skip"},
+        prompt, messages.append, default="enter",
+    ) == "enter"
+
+    assert messages == [
+        "Configure?",
+        "[enter] configure · [s] skip",
+        "Choose one of the highlighted keys.",
+    ]
+    assert prompt.call_args_list == [mocker.call("Action: ")] * 2
 
 
 def test_action_delegates_to_renderer():
@@ -1276,7 +1344,7 @@ def test_guided_endpoint_retries_identity_and_uami_back(mocker):
     mocker.patch.object(
         subject, "_validation_action", return_value="retry"
     )
-    answers = iter(["hub", "user", "system", "system"])
+    answers = iter(["hub", "uami", "system"])
     uami_back = {"done": False}
 
     def prompt(label):
@@ -1299,7 +1367,10 @@ def test_guided_endpoint_retries_identity_and_uami_back(mocker):
         lambda _: None,
         validate_identity=validate_identity,
     )
-    assert "identity=system-assigned" in result
+    assert result == [
+        "endpoint=hub", "resource-name=hub", "identity=system-assigned",
+    ]
+    assert uami_back["done"]
     assert identity_calls["count"] == 2
 
 
