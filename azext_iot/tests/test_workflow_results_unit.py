@@ -18,7 +18,7 @@ import yaml
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-EVALUATE = runpy.run_path(str(REPOSITORY_ROOT / "scripts" / "evaluate_test_results.py"))["evaluate_results"]
+EVALUATE = runpy.run_path(str(REPOSITORY_ROOT / "azext_iot/tests/_evaluate_test_results.py"))["evaluate_results"]
 MATRIX = [{"service": "ADR", "python": "3.13", "region": "centraluseuap"}]
 SUCCESSFUL_JOBS = {
     "setup": "success",
@@ -26,6 +26,38 @@ SUCCESSFUL_JOBS = {
     "int-test": "success",
     "gate preparation": "success",
 }
+
+
+@pytest.mark.parametrize("helper,option", [
+    ("_dps_phase_runner.py", "--subscription"),
+    ("_evaluate_test_results.py", "--results-dir"),
+])
+def test_ci_helpers_resolve_checkout_and_execute_without_installed_dependencies(tmp_path, monkeypatch, helper, option):
+    script = REPOSITORY_ROOT / "azext_iot/tests" / helper
+    monkeypatch.chdir(tmp_path)
+    namespace = runpy.run_path(str(script))
+    assert Path(namespace["MANIFEST"]["__file__"]) == REPOSITORY_ROOT / "azext_iot/tests/dps/_phase_manifest.py"
+    if helper == "_dps_phase_runner.py":
+        assert namespace["ROOT"] == REPOSITORY_ROOT
+    # Help exits before credentials/ARM/children; isolated stdlib-only execution cannot import Azure CLI.
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", str(script), "--help"], cwd=tmp_path,
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert option in result.stdout
+    assert not list(tmp_path.iterdir())
+
+
+def test_ci_helpers_remain_excluded_from_extension_packages(monkeypatch, mocker):
+    setup = mocker.patch("setuptools.setup")
+    monkeypatch.chdir(REPOSITORY_ROOT)
+    runpy.run_path(str(REPOSITORY_ROOT / "setup.py"))
+    packages = setup.call_args.kwargs["packages"]
+    assert "azext_iot" in packages
+    assert not any(package == "azext_iot.tests" or package.startswith("azext_iot.tests.") for package in packages)
+    assert set(setup.call_args.kwargs["package_data"]) == {"azext_iot"}
+    assert not any("tests" in pattern for pattern in setup.call_args.kwargs["package_data"]["azext_iot"])
 
 
 def _result(path, config=None, status="success", failures=""):
@@ -115,7 +147,7 @@ def test_workflow_gate_command_exit_status_and_summary(tmp_path, monkeypatch, st
         "GITHUB_STEP_SUMMARY": str(summary),
     }.items():
         monkeypatch.setenv(key, value)
-    script = str(REPOSITORY_ROOT / "scripts" / "evaluate_test_results.py")
+    script = str(REPOSITORY_ROOT / "azext_iot/tests/_evaluate_test_results.py")
     monkeypatch.setattr("sys.argv", [script, "--results-dir", str(results)])
     with pytest.raises(SystemExit) as error:
         runpy.run_path(script, run_name="__main__")
@@ -132,7 +164,7 @@ def test_workflow_failure_propagation_is_wired():
     assert set(gate["needs"]) == {"setup", "unit-test", "int-test"}
     assert not any(step.get("continue-on-error", False) for step in gate["steps"])
     evaluation = next(step for step in gate["steps"] if step["name"] == "Evaluate per-service results")
-    assert "scripts/evaluate_test_results.py" in evaluation["run"]
+    assert "azext_iot/tests/_evaluate_test_results.py" in evaluation["run"]
     assert "needs.int-test.result" in evaluation["env"]["INTEGRATION_RESULT"]
     assert "needs.setup.outputs.matrix" in evaluation["env"]["INTEGRATION_MATRIX"]
     assert "job.status" in evaluation["env"]["GATE_JOB_RESULT"]
@@ -158,8 +190,8 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     setup = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in jobs["int-test"]["steps"] if step.get("id") == "run_tests")
-    assert ".tox/DPS-phases/bin/python scripts/run_dps_phases.py" in step["run"]
-    assert ".tox/DPS-int/bin/python scripts/run_dps_phases.py" not in step["run"]
+    assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
+    assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
     assert "certificate coverage is not configured in this workflow" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "${{ env.TEST_SUBSCRIPTION_ID }}"' in step["run"]
@@ -233,7 +265,7 @@ def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service
     arguments = result.stdout.splitlines()
     if service == "DPS":
         assert arguments[1:] == [
-            "dps_controller", "scripts/run_dps_phases.py",
+            "dps_controller", "azext_iot/tests/_dps_phase_runner.py",
             "--subscription", "offline-subscription", "--resource-group", "offline-rg",
             "--region", "centraluseuap",
         ]

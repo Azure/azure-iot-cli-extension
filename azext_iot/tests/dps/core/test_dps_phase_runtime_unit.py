@@ -34,7 +34,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.dps import _phase_receipts as receipts, _phase_runtime as runtime
 
 ROOT = Path(__file__).resolve().parents[4]
-RUNNER = runpy.run_path(str(ROOT / "scripts/run_dps_phases.py"))
+RUNNER = runpy.run_path(str(ROOT / "azext_iot/tests/_dps_phase_runner.py"))
 SUB_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 SUB_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 UID = "b" * 32

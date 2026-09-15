@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 """Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/capacity gates."""
 
@@ -24,7 +26,7 @@ from urllib.parse import urlsplit, parse_qs
 from uuid import UUID, uuid4
 import xml.etree.ElementTree as ET
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ARM = "https://centraluseuap.management.azure.com"
 PHASES = (
     ("regular", 20 * 60, 5 * 60),

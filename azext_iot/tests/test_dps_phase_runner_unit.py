@@ -20,9 +20,9 @@ import pytest
 import responses
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNNER = runpy.run_path(str(ROOT / "scripts/run_dps_phases.py"))
+RUNNER = runpy.run_path(str(ROOT / "azext_iot/tests/_dps_phase_runner.py"))
 RUN = RUNNER["run"]
-GATE = runpy.run_path(str(ROOT / "scripts/evaluate_test_results.py"))["evaluate_dps_phases"]
+GATE = runpy.run_path(str(ROOT / "azext_iot/tests/_evaluate_test_results.py"))["evaluate_dps_phases"]
 SUB = "11111111-2222-3333-4444-555555555555"
 GROUP = "isolated-tests"
 PREFIX = f"/subscriptions/{SUB}/resourceGroups/{GROUP}/providers/Microsoft.Devices/"
@@ -308,7 +308,7 @@ def test_unsupported_entry_rejects_before_credentials_artifacts_or_execution(tmp
     execute = mocker.Mock()
     output = tmp_path / "must-not-exist"
     mocker.patch.object(sys, "argv", [
-        "run_dps_phases.py", "--subscription", SUB, "--resource-group", GROUP, "--output", str(output),
+        "_dps_phase_runner.py", "--subscription", SUB, "--resource-group", GROUP, "--output", str(output),
     ])
     mocker.patch.dict(RUNNER["main"].__globals__, sys=SimpleNamespace(platform=platform), ArmReader=reader, run=execute)
     assert RUNNER["main"]() == 1

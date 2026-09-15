@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 """Fail closed when any expected integration result or prerequisite is unsuccessful."""
 
@@ -13,7 +15,7 @@ import xml.etree.ElementTree as ET
 
 
 COMBINATION_FIELDS = ("service", "python", "region")
-MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[1] / "azext_iot/tests/dps/_phase_manifest.py"))
+MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[2] / "azext_iot/tests/dps/_phase_manifest.py"))
 
 
 def evaluate_dps_phases(result_dir):
