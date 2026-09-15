@@ -37,12 +37,12 @@ def planned_root(resource_id):
     if len(parts) != 9:
         return False
     patterns = {
-        ("microsoft.devices", "iothubs"): r"(test-hub-[0-9a-f]{32}|aziotclitest-hub-[0-9a-f]{19})",
-        ("microsoft.storage", "storageaccounts"): r"(hubstore[0-9a-f]{4}|aziotclitest[0-9a-f]{13})",
-        ("microsoft.managedidentity", "userassignedidentities"): r"([0-9a-f]{32}|aziotclitest[0-9a-f]{13})",
-        ("microsoft.eventhub", "namespaces"): r"aziotclitest[0-9a-f]{13}",
-        ("microsoft.servicebus", "namespaces"): r"(sb[0-9a-f]{22}|aziotclitest[0-9a-f]{13})",
-        ("microsoft.documentdb", "databaseaccounts"): r"(scos[0-9a-f]{32}|aziotclitest[0-9a-f]{13})",
+        ("microsoft.devices", "iothubs"): r"(test-hub-[0-9a-f]{32}|aziotclitest-hub-[0-9a-f]{18})",
+        ("microsoft.storage", "storageaccounts"): r"(hubstore[0-9a-f]{4}|aziotclitest[0-9a-f]{12})",
+        ("microsoft.managedidentity", "userassignedidentities"): r"([0-9a-f]{32}|aziotclitest[0-9a-f]{12})",
+        ("microsoft.eventhub", "namespaces"): r"aziotclitest[0-9a-f]{12}",
+        ("microsoft.servicebus", "namespaces"): r"(sb[0-9a-f]{22}|aziotclitest[0-9a-f]{12})",
+        ("microsoft.documentdb", "databaseaccounts"): r"(scos[0-9a-f]{32}|aziotclitest[0-9a-f]{12})",
     }
     return re.fullmatch(patterns.get((parts[-3], parts[-2]), r"(?!)"), parts[-1]) is not None
 
@@ -682,9 +682,17 @@ class Observer:
                         body["tags"] = dict(body.get("tags") or {}, **{OWNER_TAG: owner.data["runId"]})
                         request.prepare_body(data=json.dumps(body), files=None)
                     session.get_adapter(request.url).max_retries = Retry(total=0, redirect=0)
-                kwargs["timeout"] = (5, 20)
+                # Preserve SDK mutation acknowledgement timeouts; pytest/phase
+                # absolute deadlines remain authoritative.
+                kwargs.setdefault("timeout", (5, 60))
                 kwargs["allow_redirects"] = False
-                response = owner.original_send(session, request, **kwargs)
+                try:
+                    response = owner.original_send(session, request, **kwargs)
+                except requests.RequestException as error:
+                    if root:
+                        owner.data["resources"][root]["mutations"][-1]["transportError"] = type(error).__name__
+                        owner.save()
+                    raise
                 if root:
                     owner.complete(root, response.status_code)
                 if deployed:

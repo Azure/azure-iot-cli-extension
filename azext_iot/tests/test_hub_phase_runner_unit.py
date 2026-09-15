@@ -433,12 +433,12 @@ def test_budgets_leave_external_setup_below_github_cap():
 
 @pytest.mark.parametrize("kind,name", [
     ("Microsoft.Devices/IotHubs", "test-hub-" + "a" * 32),
-    ("Microsoft.Devices/IotHubs", "aziotclitest-hub-" + "a" * 19),
+    ("Microsoft.Devices/IotHubs", "aziotclitest-hub-" + "a" * 18),
     ("Microsoft.Storage/storageAccounts", "hubstoreabcd"),
-    ("Microsoft.Storage/storageAccounts", "aziotclitest" + "a" * 13),
+    ("Microsoft.Storage/storageAccounts", "aziotclitest" + "a" * 12),
     ("Microsoft.ManagedIdentity/userAssignedIdentities", "a" * 32),
-    ("Microsoft.ManagedIdentity/userAssignedIdentities", "aziotclitest" + "a" * 13),
-    ("Microsoft.EventHub/namespaces", "aziotclitest" + "a" * 13),
+    ("Microsoft.ManagedIdentity/userAssignedIdentities", "aziotclitest" + "a" * 12),
+    ("Microsoft.EventHub/namespaces", "aziotclitest" + "a" * 12),
     ("Microsoft.ServiceBus/namespaces", "sb" + "a" * 22),
     ("Microsoft.DocumentDB/databaseAccounts", "scos" + "a" * 32),
 ])
@@ -456,6 +456,13 @@ def test_actual_fixture_naming_contracts_and_foreign_preexistence(tmp_path, kind
         foreign.prepare("PUT", resource_id, "api", body)
     assert not foreign.data["resources"]
     assert not ownership.planned_root(resource_id + "foreign")
+
+
+def test_ownership_accepts_names_from_real_fixture_generators():
+    from azext_iot.tests.iothub.conftest import generate_hub_id, generate_hub_depenency_id
+    assert ownership.planned_root(PREFIX + "Microsoft.Devices/IotHubs/" + generate_hub_id())
+    for kind in ownership.ROOT_TYPES - {("microsoft.devices", "iothubs")}:
+        assert ownership.planned_root(PREFIX + "/".join(kind) + "/" + generate_hub_depenency_id())
 
 
 @pytest.fixture
@@ -519,8 +526,38 @@ def wire(tmp_path, monkeypatch):
 
 def fixture_template():
     template = runner.read_json(Path(__file__).parent / "iothub/state/blank_hub_arm.json")
-    template["resources"][0]["name"] = "aziotclitest-hub-" + "a" * 19
+    template["resources"][0]["name"] = "aziotclitest-hub-" + "a" * 18
     return template
+
+
+def test_observer_preserves_sdk_acknowledgement_timeout(wire, monkeypatch):
+    import requests
+    observer, _, _, _, _ = wire
+    original = observer.original_send
+    send = Mock(side_effect=original)
+    monkeypatch.setattr(observer, "original_send", send)
+    hub = PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32
+    request = requests.Request(
+        "PUT", ownership.ARM + hub + "?api-version=api",
+        json={"properties": {"disableLocalAuth": True}},
+    ).prepare()
+    requests.Session().send(request, timeout=(10, 300))
+    assert send.call_args.kwargs["timeout"] == (10, 300)
+
+
+def test_transport_exception_records_only_type_and_never_authorizes_replay(wire, monkeypatch, tmp_path):
+    import requests
+    observer, _, _, _, submit = wire
+    monkeypatch.setattr(observer, "original_send", Mock(side_effect=requests.ReadTimeout("private diagnostic")))
+    hub = PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32
+    with pytest.raises(requests.ReadTimeout):
+        submit("PUT", hub, {"properties": {"disableLocalAuth": True}})
+    persisted = runner.read_json(tmp_path / "owner.json")
+    mutation = persisted["resources"][hub.casefold()]["mutations"][0]
+    assert mutation["status"] is None and mutation["transportError"] == "ReadTimeout"
+    assert "private diagnostic" not in json.dumps(persisted)
+    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+        submit("PUT", hub, {"properties": {"disableLocalAuth": True}})
 
 
 @pytest.mark.parametrize("create,certificates", [(False, False), (True, False), (True, True), (False, True)])
@@ -532,7 +569,7 @@ def test_state_deployment_exact_blank_and_provider_forms(wire, tmp_path, create,
     hub_id = (PREFIX + hub["type"] + "/" + hub["name"]).casefold()
     identity_id = (PREFIX + "Microsoft.ManagedIdentity/userAssignedIdentities/" + "b" * 32).casefold()
     submit("PUT", identity_id, {"location": ownership.REGION})
-    eventhub_name = "aziotclitest" + "d" * 13
+    eventhub_name = "aziotclitest" + "d" * 12
     submit("PUT", (PREFIX + "Microsoft.EventHub/namespaces/" + eventhub_name).casefold(),
            {"location": ownership.REGION})
     hub["identity"] = {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id: {}}}
