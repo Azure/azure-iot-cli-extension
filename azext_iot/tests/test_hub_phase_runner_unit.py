@@ -507,7 +507,8 @@ def wire(tmp_path, monkeypatch):
                         resources[resource_path.casefold()]["properties"]["provisioningState"] = "Succeeded"
         elif request.method == "DELETE":
             resources.pop(target, None)
-        return Mock(status_code=201 if request.method == "PUT" else 200, json=lambda: resources.get(target, {}))
+        return Mock(status_code=201 if request.method == "PUT" else 200, headers={},
+                    json=lambda: resources.get(target, {}))
 
     reader.request = get
     monkeypatch.setattr(requests.Session, "send", send)
@@ -711,7 +712,7 @@ def test_transport_never_replays_accepted_or_ambiguous_update_even_after_get(wir
     observer, reader, resources, _, submit = wire
     hub_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
     submit("PUT", hub_id, {"properties": {"disableLocalAuth": True}})
-    sender = Mock(return_value=Mock(status_code=status))
+    sender = Mock(return_value=Mock(status_code=status, headers={}, content=b""))
     if status is None:
         sender.side_effect = TimeoutError("transport outcome unknown")
     monkeypatch.setattr(observer, "original_send", sender)

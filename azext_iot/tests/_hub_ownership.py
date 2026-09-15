@@ -70,15 +70,66 @@ def pending_mutation(mutation):
             and not mutation.get("reconciled"))
 
 
-def polling_key(url):
-    """Correlate only an acknowledged ARM operation, without persisting URL secrets."""
-    parsed = urlsplit(url)
+def arm_location(url):
+    """Accept explicit ARM URLs and subscription-root relative references only."""
+    if not isinstance(url, str) or not url or re.search(r"[\s\\]", url):
+        raise OwnershipError("Unplanned ARM polling URL")
+    if url.casefold().startswith("subscriptions/"):
+        url = "/" + url
+    if url.startswith("/") and not url.startswith("//"):
+        url = ARM + url
+    try:
+        parsed = urlsplit(url)
+    except ValueError as error:
+        raise OwnershipError("Unplanned ARM polling URL") from error
     if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
             or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
-            or parsed.fragment):
+            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
+            or any(part in ("", ".", "..") for part in parsed.path.split("/")[1:])):
         raise OwnershipError("Unplanned ARM polling URL")
+    parts = parsed.path.casefold().split("/")
+    if parts[3] == "resourcegroups" and (len(parts) < 5 or parts[4] != GROUP):
+        raise OwnershipError("Unplanned ARM polling URL")
+    return parsed
+
+
+def polling_key(url):
+    """Correlate only an acknowledged ARM operation, without persisting URL secrets."""
+    parsed = arm_location(url)
     query = sorted((key, value) for key, value in parse_qsl(parsed.query) if key.casefold() != "api-version")
     return hashlib.sha256(json.dumps([parsed.path.casefold(), query]).encode()).hexdigest()
+
+
+def response_polling(mutation, headers, resource, run_id):
+    headers = {key.casefold(): value for key, value in (headers or {}).items()}
+    resource = resource or {}
+    target = mutation["id"]
+    synchronous_identity = (
+        mutation["method"] == "PUT" and mutation["status"] in (200, 201)
+        and len(target.split("/")) == 9 and "/microsoft.managedidentity/userassignedidentities/" in target
+        and resource.get("id", "").casefold() == target and resource.get("tags", {}).get(OWNER_TAG) == run_id
+        and resource.get("properties", {}).get("provisioningState", "").casefold() in ("", "succeeded")
+        and "azure-asyncoperation" not in headers
+    )
+    polling = {}
+    for key in ("azure-asyncoperation", "location"):
+        if key not in headers:
+            continue
+        value = headers[key]
+        if key == "location" and synchronous_identity:
+            # Managed Identity may return regional metadata or the created resource,
+            # neither of which makes its synchronous PUT an LRO.
+            if isinstance(value, str) and value.casefold() == REGION and resource.get("location", "").casefold() == REGION:
+                continue
+            path = arm_location(value).path.casefold()
+            if path == target:
+                continue
+            if not any(segment in path.split("/") for segment in (
+                "operations", "operationstatuses", "operationresults", "asyncoperations",
+            )):
+                raise OwnershipError("Unexpected identity response Location")
+        polling[key] = polling_key(value)
+    return polling
 
 
 def observe_poll(data, url, status, resource, headers=None):
@@ -150,7 +201,8 @@ def observe_get(data, resource_id, status, resource):
             if (resource.get("id", "").casefold() != root
                     or resource.get("tags", {}).get(OWNER_TAG) != data["runId"]):
                 raise OwnershipError("Observed resource no longer belongs to this phase")
-            if record["mutations"][0]["status"] in (200, 201, 202):
+            if (record["mutations"][0]["status"] in (200, 201, 202)
+                    and not record["mutations"][0].get("responseError")):
                 record["resolved"] = True
             if ("/microsoft.resources/deployments/" in root
                     and resource.get("properties", {}).get("provisioningState", "").casefold() == "succeeded"):
@@ -176,7 +228,7 @@ def observe_get(data, resource_id, status, resource):
             if confirmed:
                 mutation["reconciled"] = True
         record["uncertain"] = any(
-            m["status"] is None or pending_mutation(m)
+            m["status"] is None or m.get("responseError") or pending_mutation(m)
             or m["status"] in (408, 429) or (isinstance(m["status"], int) and m["status"] >= 500)
             for m in record["mutations"]
         )
@@ -198,7 +250,7 @@ def _reconcile(arm, data, deadline, save):
             continue
         mutations = record.get("mutations", [])
         if not mutations or any(
-            m.get("status") is None or m.get("status") in (408, 429)
+            m.get("status") is None or m.get("responseError") or m.get("status") in (408, 429)
             or (isinstance(m.get("status"), int) and m["status"] >= 500) for m in mutations
         ):
             return
@@ -276,7 +328,8 @@ def ownership_errors(data, run_id, phase):
                 or record.get("before") != 404 or not record.get("apiVersion")
                 or not record.get("attempted") or record.get("ownerTag") != run_id):
             errors.append("invalid pre-create evidence")
-        if record.get("uncertain") or not record.get("resolved"):
+        if (record.get("uncertain") or not record.get("resolved")
+                or any(m.get("responseError") for m in record.get("mutations", []))):
             errors.append("unresolved mutation; no replay permitted")
         mutations = record.get("mutations", [])
         if not mutations or mutations[0].get("method") != "PUT":
@@ -451,6 +504,13 @@ class Observer:
         """Return the owning root; called under the transport lock before send."""
         resource_id = resource_id.casefold()
         if not scope_id(resource_id) or not api:
+            # Never retain request queries, credentials or bodies at this gate.
+            path = resource_id.split("?", 1)[0].split("#", 1)[0]
+            self.data.setdefault("violationDetails", []).append({
+                "reason": "Mutation outside explicit resource scope", "method": method,
+                "resourcePath": path if re.fullmatch(r"/[A-Za-z0-9_.()/-]+", path) else "<invalid resource path>",
+                "apiVersionPresent": bool(api), "node": self.current_node,
+            })
             self.reject("Mutation outside explicit resource scope")
         if body.get("tags") is not None and not isinstance(body["tags"], dict):
             self.reject("Invalid resource tags")
@@ -693,8 +753,12 @@ class Observer:
         mutation = record["mutations"][-1]
         mutation["status"] = status
         if status in (200, 201, 202):
-            polling = {key: polling_key(value) for key in ("azure-asyncoperation", "location")
-                       if isinstance(value := (headers or {}).get(key), str) and value}
+            try:
+                polling = response_polling(mutation, headers, resource, self.data["runId"])
+            except OwnershipError:
+                mutation["responseError"] = True
+                record["uncertain"] = True
+                self.reject("Invalid ARM response Location/polling metadata")
             if polling:
                 mutation["polling"] = polling
             state = (resource or {}).get("properties", {}).get("provisioningState", "")

@@ -131,12 +131,13 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
 def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisioned_event_hub_module, setup_file):
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    hub_id = provisioned_only_iot_hubs_module[0]["hub"]["id"]
     state.delete_system_endpoints(hub_name, hub_rg)
 
     eventhub_cstring = provisioned_event_hub_module["connectionString"]
     endpoint_name = generate_generic_id()
-    state.cli.invoke(
-        f"resource update -n {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+    state._invoke_state(
+        f"resource update --ids {hub_id} "
         f"--add properties.routing.endpoints.eventHubs connectionString='{eventhub_cstring}' name={endpoint_name}"
     )
     time.sleep(60)

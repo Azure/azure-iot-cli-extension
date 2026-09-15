@@ -33,6 +33,7 @@ COSMOS = PREFIX + "microsoft.documentdb/databaseaccounts/aziotclitest" + "b" * 1
 DATABASE = COSMOS + "/sqldatabases/routedb"
 CONTAINER = DATABASE + "/containers/routecontainer"
 NAMESPACE = PREFIX + "microsoft.eventhub/namespaces/aziotclitest" + "c" * 12
+IDENTITY = PREFIX + "microsoft.managedidentity/userassignedidentities/aziotclitest" + "d" * 12
 
 
 class Credential:
@@ -46,6 +47,7 @@ class Wire:
         self.calls = []
         self.accepted = {}
         self.operations = {}
+        self.identity_headers = {}
 
     def send(self, request, **kwargs):
         assert urlsplit(request.url).hostname == urlsplit(ownership.ARM).hostname
@@ -77,6 +79,9 @@ class Wire:
             if "/sqldatabases/" not in target:
                 resource.setdefault("properties", {})["provisioningState"] = "Succeeded"
             self.resources[target] = resource
+            if target == IDENTITY:
+                resource["properties"] = {"principalId": "offline-principal", "clientId": "offline-client"}
+                return 201, resource, self.identity_headers
             if target in self.accepted:
                 header, status = self.accepted[target]
                 operation = (
@@ -119,6 +124,191 @@ def transport(tmp_path, monkeypatch):
 
 def create_hub(wire):
     wire.submit("PUT", HUB, {"location": ownership.REGION, "properties": {"disableLocalAuth": True}})
+
+
+def create_identity(monkeypatch):
+    from azure.cli.core import get_default_cli
+    from azure.cli.core.aaz._command_ctx import AAZCommandCtx
+    from azure.cli.command_modules.identity.aaz.latest.identity._create import Create
+    monkeypatch.setattr(AAZCommandCtx, "get_login_credential", lambda _ctx: Credential())
+    return Create(cli_ctx=get_default_cli())({
+        "subscription": ownership.SUBSCRIPTION, "resource_group": ownership.GROUP,
+        "resource_name": IDENTITY.rsplit("/", 1)[1], "location": ownership.REGION,
+    })
+
+
+@pytest.mark.parametrize("location", [
+    None, ownership.REGION, ownership.REGION.upper(), IDENTITY, IDENTITY.lstrip("/"),
+    ownership.ARM + IDENTITY, "https://management.azure.com" + IDENTITY + "?api-version=test&sig=private-response-query",
+])
+def test_real_synchronous_aaz_identity_location_then_reference_role_and_cleanup(transport, monkeypatch, location):
+    observer, arm, wire = transport
+    wire.identity_headers = {} if location is None else {"Location": location}
+    identity = create_identity(monkeypatch)
+    assert identity["id"].casefold() == IDENTITY
+    assert identity["principalId"] == "offline-principal"
+    assert [call[0] for call in wire.calls] == ["GET", "PUT"]
+    assert all(call[3] is threading.main_thread() for call in wire.calls)
+    record = observer.data["resources"][IDENTITY]
+    assert record["resolved"] and not record["uncertain"]
+    assert record["mutations"][0]["status"] == 201 and "polling" not in record["mutations"][0]
+    assert "provisioningState" not in wire.resources[IDENTITY]["properties"]
+    assert "private-response-query" not in observer.path.read_text(encoding="utf-8")
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+    observer.require_owned_reference(IDENTITY, "microsoft.managedidentity/userassignedidentities")
+    role = IDENTITY + "/providers/microsoft.authorization/roleassignments/offline-role"
+    wire.submit("PUT", role, {"properties": {"principalId": identity["principalId"]}})
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 2, observer.path)
+    assert result["complete"] and result["absentDescendantIds"] == [role] and not wire.resources
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+
+
+@pytest.mark.parametrize("location", [
+    "", "other-region", "//management.azure.com" + IDENTITY,
+    "http://management.azure.com" + IDENTITY, "https://unapproved.example" + IDENTITY + "?sig=private-response-query",
+    "https://management.azure.com:443" + IDENTITY, "https://user@management.azure.com" + IDENTITY,
+    "https://[malformed", IDENTITY + "#fragment", IDENTITY + "/../other",
+    IDENTITY.replace(ownership.SUBSCRIPTION, "foreign-subscription"),
+    IDENTITY.replace(ownership.GROUP, "foreign-group"), IDENTITY + "%2fother", IDENTITY + "/other",
+    IDENTITY.replace("d" * 12, "e" * 12),
+])
+def test_real_aaz_identity_bad_location_is_durable_and_never_replayed(transport, monkeypatch, location):
+    observer, arm, wire = transport
+    wire.identity_headers = {"Location": location}
+    with pytest.raises(ownership.OwnershipError, match="response Location"):
+        create_identity(monkeypatch)
+    record = observer.data["resources"][IDENTITY]
+    assert record["uncertain"] and not record["resolved"]
+    assert record["mutations"][0]["status"] == 201 and record["mutations"][0]["responseError"]
+    wire.submit("GET", IDENTITY)
+    assert record["uncertain"] and not record["resolved"]
+    with pytest.raises(ownership.OwnershipError, match="Reference requires"):
+        observer.require_owned_reference(IDENTITY, "microsoft.managedidentity/userassignedidentities")
+    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+        create_identity(monkeypatch)
+    assert len([call for call in wire.calls if call[0] == "PUT"]) == 1
+    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 2, observer.path)
+    assert not result["complete"] and not any(call[0] == "DELETE" for call in wire.calls)
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+    assert "private-response-query" not in observer.path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
+@pytest.mark.parametrize("status", [200, 201, 202])
+def test_relative_arm_operation_headers_remain_lros(transport, header, status):
+    observer, _, wire = transport
+    create_hub(wire)
+    operation = f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/operations/offline"
+    observer.prepare("PUT", HUB, "test", {})
+    observer.complete(HUB, status, {header: operation.lstrip("/")}, wire.resources[HUB])
+    record = observer.data["resources"][HUB]
+    assert record["uncertain"] and ownership.pending_mutation(record["mutations"][-1])
+    ownership.observe_poll(observer.data, ownership.ARM + operation, 200, {"status": "Succeeded"})
+    ownership.observe_get(observer.data, HUB, 200, wire.resources[HUB])
+    assert not record["uncertain"]
+    assert ownership.polling_key(operation) == ownership.polling_key(ownership.ARM + operation)
+
+
+@pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
+def test_real_aaz_identity_actual_operation_header_is_not_synchronous_metadata(transport, monkeypatch, header):
+    observer, _, wire = transport
+    operation = (
+        f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.ManagedIdentity/"
+        f"locations/{ownership.REGION}/operations/offline"
+    )
+    wire.identity_headers = {header: operation}
+    if header == "Azure-AsyncOperation":
+        wire.identity_headers["Location"] = IDENTITY
+    create_identity(monkeypatch)
+    record = observer.data["resources"][IDENTITY]
+    mutation = record["mutations"][0]
+    assert record["uncertain"] and mutation["awaitingProvisioning"]
+    assert mutation["polling"][header.casefold()] == ownership.polling_key(operation)
+    with pytest.raises(ownership.OwnershipError, match="Reference requires"):
+        observer.require_owned_reference(IDENTITY, "microsoft.managedidentity/userassignedidentities")
+
+
+@pytest.mark.parametrize("damage", ["foreign-id", "foreign-tag", "foreign-region", "provisioning", "async-header"])
+def test_identity_regional_location_exception_requires_exact_synchronous_owned_response(transport, monkeypatch, damage):
+    observer, _, wire = transport
+    wire.identity_headers = {"Location": ownership.REGION}
+    original = wire.handle
+
+    def handle(request):
+        status, body, headers = original(request)
+        if request.method == "PUT":
+            if damage == "foreign-id":
+                body["id"] = IDENTITY.replace(ownership.GROUP, "foreign-group")
+            elif damage == "foreign-tag":
+                body["tags"][ownership.OWNER_TAG] = "foreign"
+            elif damage == "foreign-region":
+                body["location"] = "other-region"
+            elif damage == "provisioning":
+                body["properties"]["provisioningState"] = "Creating"
+            else:
+                headers["Azure-AsyncOperation"] = ownership.ARM + IDENTITY + "/operations/offline"
+        return status, body, headers
+
+    monkeypatch.setattr(wire, "handle", handle)
+    with pytest.raises(ownership.OwnershipError, match="response Location"):
+        create_identity(monkeypatch)
+    assert observer.data["resources"][IDENTITY]["uncertain"]
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+
+
+@pytest.mark.parametrize("by_id", [False, True])
+def test_real_generic_resource_update_path(transport, monkeypatch, by_id):
+    from azure.cli.command_modules.resource import custom
+    from azure.mgmt.resource.resources import ResourceManagementClient
+    observer, _, wire = transport
+    create_hub(wire)
+    client = ResourceManagementClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM)
+    monkeypatch.setattr(custom, "_resource_client_factory", lambda _ctx: client)
+    monkeypatch.setattr(custom, "get_subscription_id", lambda _ctx: ownership.SUBSCRIPTION)
+    args = {"resource_ids": [HUB]} if by_id else {
+        "resource_group_name": ownership.GROUP, "resource_type": "Microsoft.Devices/IotHubs",
+        "resource_name": HUB.rsplit("/", 1)[1],
+    }
+    if not by_id:
+        with pytest.raises(ownership.OwnershipError, match="Mutation outside explicit resource scope"):
+            custom.update_resource(Mock(), deepcopy(wire.resources[HUB]), api_version="test", **args)
+        details = observer.data["violationDetails"][0]
+        assert details["resourcePath"] == HUB.replace("/microsoft.devices/", "/microsoft.devices//")
+        assert details["apiVersionPresent"] and details["method"] == "PUT"
+        assert len([call for call in wire.calls if call[0] == "PUT"]) == 1
+        return
+    result = custom.update_resource(Mock(), deepcopy(wire.resources[HUB]), api_version="test", **args).result(timeout=3)
+    assert result.id.casefold() == HUB
+    assert len(observer.data["resources"][HUB]["mutations"]) == 2
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+    wire.resources[HUB]["tags"][ownership.OWNER_TAG] = "foreign"
+    with pytest.raises(ownership.OwnershipError, match="ownership tag"):
+        custom.update_resource(Mock(), deepcopy(wire.resources[HUB]), api_version="test", **args)
+    assert len([call for call in wire.calls if call[0] == "PUT"]) == 2
+
+
+@pytest.mark.parametrize("target,api", [
+    (HUB.replace(ownership.GROUP, "foreign-group"), "test"),
+    (HUB.replace(ownership.SUBSCRIPTION, "foreign-subscription"), "test"),
+    (HUB, None), (HUB + "/%2fescape", "test"),
+])
+def test_scope_gate_persists_safe_context_before_blocking_transport(transport, target, api):
+    observer, _, wire = transport
+    observer.current_node = "offline-node"
+    params = {"sig": "private-query"}
+    if api:
+        params["api-version"] = api
+    with pytest.raises(ownership.OwnershipError, match="Mutation outside explicit resource scope"):
+        requests.put(ownership.ARM + target, params=params, json={"secret": "private-body"},
+                     headers={"Authorization": "Bearer private-token"})
+    assert not wire.calls
+    receipt = observer.path.read_text(encoding="utf-8")
+    assert not any(value in receipt for value in ("private-query", "private-body", "private-token"))
+    details = json.loads(receipt)["violationDetails"][0]
+    assert details["method"] == "PUT" and details["apiVersionPresent"] == bool(api)
+    assert details["node"] == "offline-node"
+    assert details["resourcePath"] == (target if "%" not in target else "<invalid resource path>")
 
 
 def namespace_poller():
