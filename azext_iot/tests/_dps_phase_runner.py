@@ -20,7 +20,7 @@ import signal
 import subprocess
 import sys
 import tempfile
-from threading import Event, Thread
+from threading import Event, Thread, current_thread, main_thread
 import time
 from urllib.parse import urlsplit, parse_qs
 from uuid import UUID, uuid4
@@ -146,6 +146,48 @@ def bounded_read(deadline=None):
                 left = interval - ((time.monotonic() - outer_deadline) % interval)
             # setitimer(0) cancels; an elapsed outer deadline must fire immediately.
             set_timer(timer, max(0.000001, left), interval)
+
+
+def bounded_read_call(operation, deadline=None):
+    """Bound a read-only callable, including authentication and response decoding.
+
+    Worker callers cannot own process timers. Isolate their read from observer
+    state and stop waiting at the absolute deadline. The checkpoint prevents a
+    late authentication/read result from starting another request or page.
+    """
+    require_linux()
+    limit = min(float("inf") if deadline is None else deadline, time.monotonic() + READ_SECONDS)
+    cancelled, done = Event(), Event()
+    result, errors = [], []
+
+    def checkpoint():
+        if cancelled.is_set() or time.monotonic() >= limit:
+            raise PhaseError("Read-only verification budget exhausted.")
+
+    checkpoint()
+    if current_thread() is main_thread():
+        with bounded_read(limit):
+            return operation(checkpoint)
+
+    def read():
+        try:
+            checkpoint()
+            result.append(operation(checkpoint))
+        except BaseException as error:  # Transfer the worker's failure to its caller, never swallow it.
+            errors.append(error)
+        finally:
+            done.set()
+
+    thread = Thread(target=read, name="hub-ownership-read", daemon=True)
+    thread.start()
+    try:
+        if not done.wait(max(0, limit - time.monotonic())) or time.monotonic() >= limit:
+            raise PhaseError("Read-only ARM/authentication operation exceeded its 60-second bound.")
+        if errors:
+            raise errors[0]
+        return result[0]
+    finally:
+        cancelled.set()
 
 
 class ArmReader:

@@ -645,7 +645,7 @@ def test_deployment_rejects_unplanned_targets_before_any_submission(wire, damage
     assert not requests_sent and not observer.data["resources"]
 
 
-@pytest.mark.parametrize("action", ["testRoute", "testAllRoutes", "exportTemplate"])
+@pytest.mark.parametrize("action", ["routing/routes/$testnew", "routing/routes/$testall", "exportTemplate"])
 def test_readonly_actions_require_exact_owned_roots(wire, action):
     observer, _, _, requests_sent, submit = wire
     hub = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()

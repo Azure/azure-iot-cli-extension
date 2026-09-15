@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 import threading
 import time
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, parse_qsl, urlsplit
 
 ARM = "https://centraluseuap.management.azure.com"
 AUDIENCE = "https://management.azure.com/"
@@ -70,6 +70,45 @@ def pending_mutation(mutation):
             and not mutation.get("reconciled"))
 
 
+def polling_key(url):
+    """Correlate only an acknowledged ARM operation, without persisting URL secrets."""
+    parsed = urlsplit(url)
+    if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
+            or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
+            or parsed.fragment):
+        raise OwnershipError("Unplanned ARM polling URL")
+    query = sorted((key, value) for key, value in parse_qsl(parsed.query) if key.casefold() != "api-version")
+    return hashlib.sha256(json.dumps([parsed.path.casefold(), query]).encode()).hexdigest()
+
+
+def observe_poll(data, url, status, resource, headers=None):
+    """LRO status is evidence only for the mutation whose response supplied the URL."""
+    key = polling_key(url)
+    for record in data["resources"].values():
+        for mutation in record["mutations"]:
+            if not pending_mutation(mutation):
+                continue
+            polling = mutation.get("polling", {})
+            state = (resource or {}).get("status", "").casefold()
+            if key not in polling.values():
+                continue
+            location = (headers or {}).get("location")
+            if (status == 202 and key == polling.get("location") and not polling.get("azure-asyncoperation")
+                    and isinstance(location, str) and location):
+                polling["location"] = polling_key(location)
+            if state in ("failed", "canceled", "cancelled"):
+                mutation["pollingFailed"] = True
+            if (status == 200 and state == "succeeded" and key == polling.get("azure-asyncoperation")) or (
+                status in (200, 204) and key == polling.get("location")
+                and not polling.get("azure-asyncoperation") and state in ("", "succeeded")
+            ):
+                mutation["pollingSucceeded"] = True
+                # Location polling can return the final resource at an operation
+                # URL, rather than issue a separate GET of the original target.
+                if resource and resource.get("id", "").casefold() == mutation["id"]:
+                    observe_get(data, mutation["id"], status, resource)
+
+
 def request_body(raw):
     """Decode JSON or the CLI policy's single unquoted envelope template key.
 
@@ -119,7 +158,9 @@ def observe_get(data, resource_id, status, resource):
         for mutation in record["mutations"]:
             if mutation["id"] != resource_id or not pending_mutation(mutation):
                 continue
-            if mutation["method"] == "DELETE":
+            if mutation.get("pollingFailed"):
+                confirmed = False
+            elif mutation["method"] == "DELETE":
                 confirmed = status == 404
             else:
                 state = resource.get("properties", {}).get("provisioningState", "") if status == 200 else ""
@@ -127,7 +168,9 @@ def observe_get(data, resource_id, status, resource):
                 deployment_done = not deployed or data["resources"][deployed].get("deploymentSucceeded")
                 confirmed = (status == 200 and resource.get("id", "").casefold() == resource_id
                              and deployment_done
-                             and (state.casefold() == "succeeded" or (deployed and "/certificates/" in resource_id)))
+                             and (state.casefold() == "succeeded"
+                                  or (not state and mutation.get("pollingSucceeded"))
+                                  or (deployed and "/certificates/" in resource_id)))
                 if confirmed and "/microsoft.resources/deployments/" in resource_id:
                     record["deploymentSucceeded"] = True
             if confirmed:
@@ -279,30 +322,58 @@ class Arm:
         from azure.cli.core._profile import Profile
         self.profile = Profile(cli_ctx=get_default_cli())
         self.session = requests.Session()
+        # Internal verification must not reenter the observer transport/lock.
+        # In particular, a timed-out offloaded GET must never update its ledger.
+        self.session.send = self.session.send
         self.deadline = None
+        self.read_failed = False
+
+    def _read(self, operation):
+        from azext_iot.tests._dps_phase_runner import PhaseError, bounded_read_call
+        if self.read_failed:
+            raise PhaseError("A previous ownership read exceeded its bound; no further requests permitted.")
+        try:
+            return bounded_read_call(operation, self.deadline)
+        except PhaseError:
+            self.read_failed = True
+            raise
 
     def request(self, method, resource_id, api):
         from azext_iot.tests._dps_phase_runner import bounded_read
         if method not in ("GET", "DELETE") or not scope_id(resource_id):
             raise OwnershipError("ARM scope rejected")
-        with bounded_read(self.deadline):
+        if self.read_failed:
+            raise OwnershipError("A previous ownership read failed; no mutation permitted")
+
+        def request(checkpoint):
             token, _, _ = self.profile.get_raw_token(subscription=SUBSCRIPTION, resource=AUDIENCE)
+            checkpoint()
             response = self.session.request(
                 method, ARM + resource_id, params={"api-version": api},
                 headers={"Authorization": "Bearer " + token[1]}, timeout=(5, 20), allow_redirects=False,
             )
             if response.status_code not in (200, 201, 202, 204, 404):
                 raise OwnershipError("ARM request failed (response omitted)")
-            return response.status_code, response.json() if response.status_code == 200 else None
+            body = response.json() if response.status_code == 200 else None
+            checkpoint()
+            return response.status_code, body
+
+        if method == "GET":
+            return self._read(request)
+        if threading.current_thread() is not threading.main_thread():
+            raise OwnershipError("Controller DELETE requires the main thread")
+        with bounded_read(self.deadline):
+            return request(lambda: None)
 
     def inventory(self):
-        from azext_iot.tests._dps_phase_runner import bounded_read
         from azext_iot._factory import _ADR_IOT_HUB_API_VERSION
-        url = ARM + f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.Devices/IotHubs"
-        resources, seen = [], set()
-        with bounded_read(self.deadline):
+
+        def inventory(checkpoint):
+            url = ARM + f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.Devices/IotHubs"
+            resources, seen = [], set()
             token, _, _ = self.profile.get_raw_token(subscription=SUBSCRIPTION, resource=AUDIENCE)
             while url:
+                checkpoint()
                 parsed = urlsplit(url)
                 if (parsed.scheme != "https" or parsed.netloc != urlsplit(ARM).netloc
                         or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/".casefold())
@@ -320,9 +391,11 @@ class Arm:
                     raise OwnershipError("Incomplete Hub inventory")
                 resources.extend(item["id"] for item in body["value"])
                 url = body.get("nextLink")
-        if len(set(value.casefold() for value in resources)) != len(resources):
-            raise OwnershipError("Duplicate Hub inventory IDs")
-        return resources
+            checkpoint()
+            if len(set(value.casefold() for value in resources)) != len(resources):
+                raise OwnershipError("Duplicate Hub inventory IDs")
+            return resources
+        return self._read(inventory)
 
 
 class Observer:
@@ -356,6 +429,24 @@ class Observer:
         self.save()
         raise OwnershipError(reason)
 
+    def _verify(self, operation, *args):
+        from azext_iot.tests._dps_phase_runner import PhaseError
+        try:
+            return operation(*args)
+        except PhaseError:
+            self.data["violations"].append("Ownership verification deadline exhausted")
+            self.save()
+            raise
+
+    def _read(self, resource_id, api):
+        status, resource = self._verify(self.arm.request, "GET", resource_id, api)
+        try:
+            observe_get(self.data, resource_id, status, resource)
+        except OwnershipError:
+            self.reject("Observed resource no longer has this phase's ownership tag")
+        self.save()
+        return status, resource
+
     def prepare(self, method, resource_id, api, body):
         """Return the owning root; called under the transport lock before send."""
         resource_id = resource_id.casefold()
@@ -374,9 +465,9 @@ class Observer:
                 self.reject("Resource location outside authorized region")
             if parts[-2] == "iothubs" and body.get("properties", {}).get("disableLocalAuth") is not True:
                 self.reject("Ordinary Hub must disable local authentication")
-            if parts[-2] == "iothubs" and len(self.arm.inventory()) >= 50:
+            if parts[-2] == "iothubs" and len(self._verify(self.arm.inventory)) >= 50:
                 self.reject("No subscription Hub capacity remains at creation")
-            status, _ = self.arm.request("GET", resource_id, api)
+            status, _ = self._read(resource_id, api)
             if status != 404:
                 self.reject("Cannot own a pre-existing resource")
             root = resource_id
@@ -388,13 +479,13 @@ class Observer:
         else:
             if roots[root]["uncertain"]:
                 deadline = min(self.arm.deadline or float("inf"), time.monotonic() + 60)
-                reconcile(self.arm, self.data, deadline, self.save)
+                self._verify(reconcile, self.arm, self.data, deadline, self.save)
             if roots[root]["uncertain"]:
                 self.reject("Uncertain mutation cannot be replayed")
             if not roots[root]["resolved"]:
                 self.reject("Failed initial creation cannot authorize an update")
             if roots[root]["resolved"]:
-                status, resource = self.arm.request("GET", root, roots[root]["apiVersion"])
+                status, resource = self._read(root, roots[root]["apiVersion"])
                 if status == 404 and method != "DELETE":
                     observe_get(self.data, root, status, resource)
                     latest = roots[root]["mutations"][-1]
@@ -405,7 +496,7 @@ class Observer:
                     if (body.get("location", REGION).casefold() != REGION
                             or ("/iothubs/" in root and body.get("properties", {}).get("disableLocalAuth") is not True)):
                         self.reject("Invalid recreation location/auth")
-                    if "/iothubs/" in root and len(self.arm.inventory()) >= 50:
+                    if "/iothubs/" in root and len(self._verify(self.arm.inventory)) >= 50:
                         self.reject("No subscription Hub capacity remains at creation")
                     previous = roots[root]
                     roots[root] = dict(previous, mutations=[], resolved=False, uncertain=False,
@@ -538,13 +629,14 @@ class Observer:
     def require_owned_reference(self, resource_id, resource_type):
         target = resource_id.casefold()
         record = self.data["resources"].get(target, {})
-        if (not scope_id(target) or f"/providers/{resource_type}/" not in target
+        if (not scope_id(target) or len(target.split("/")) != 9
+                or "/".join(target.split("/")[6:8]) != resource_type or record.get("id") != target
                 or not record.get("resolved") or record.get("uncertain")):
-            self.reject("Deployment references an unowned identity")
-        status, resource = self.arm.request("GET", target, record["apiVersion"])
+            self.reject("Reference requires an exact resolved owned root")
+        status, resource = self._read(target, record["apiVersion"])
         if (status != 200 or resource.get("id", "").casefold() != target
                 or resource.get("tags", {}).get(OWNER_TAG) != self.data["runId"]):
-            self.reject("Deployment reference ownership changed")
+            self.reject("Referenced root ownership changed")
 
     def require_owned_endpoint(self, hostname):
         suffixes = {
@@ -564,7 +656,7 @@ class Observer:
         targets = self.validate_deployment(resource_id, body)
         if not api:
             self.reject("Missing deployment API version")
-        status, current = self.arm.request("GET", resource_id, api)
+        status, current = self._read(resource_id, api)
         if status != 404 and (
             resource_id not in self.data["resources"] or current.get("id", "").casefold() != resource_id
             or current.get("tags", {}).get(OWNER_TAG) != self.data["runId"]
@@ -577,7 +669,7 @@ class Observer:
         hub_id, hub = targets[0]
         before = {}
         for target, resource in targets:
-            target_status, _ = self.arm.request("GET", target, resource["apiVersion"])
+            target_status, _ = self._read(target, resource["apiVersion"])
             if target_status != 404 and hub_id not in self.data["resources"]:
                 self.reject("Cannot own a pre-existing deployment target")
             before[target] = target_status
@@ -596,10 +688,19 @@ class Observer:
         self.save()
         return deployment, root, len(targets)
 
-    def complete(self, root, status):
+    def complete(self, root, status, headers=None, resource=None):
         record = self.data["resources"][root]
-        record["mutations"][-1]["status"] = status
-        record["uncertain"] = status == 202 or status in (408, 429) or status >= 500
+        mutation = record["mutations"][-1]
+        mutation["status"] = status
+        if status in (200, 201, 202):
+            polling = {key: polling_key(value) for key in ("azure-asyncoperation", "location")
+                       if isinstance(value := (headers or {}).get(key), str) and value}
+            if polling:
+                mutation["polling"] = polling
+            state = (resource or {}).get("properties", {}).get("provisioningState", "")
+            if polling or (state and state.casefold() != "succeeded"):
+                mutation["awaitingProvisioning"] = True
+        record["uncertain"] = pending_mutation(mutation) or status in (408, 429) or status >= 500
         if status == 404 and record["mutations"][-1]["method"] == "DELETE":
             record["uncertain"] = False
         # 202 is an unresolved acceptance until an exact resource GET observes it.
@@ -637,19 +738,27 @@ class Observer:
                 if method == "POST" and action == "exporttemplate":
                     group_id = f"/subscriptions/{SUBSCRIPTION}/resourcegroups/{GROUP}"
                     resources = body.get("resources", [])
-                    if (resource_id != group_id + "/exporttemplate" or set(body) - {"resources", "options"}
+                    if (resource_id != group_id + "/exporttemplate"
+                            or set(body) - {"resources", "options", "outputFormat"}
+                            or body.get("outputFormat", "Json") != "Json"
                             or not resources or not isinstance(resources, list)
+                            or not isinstance(body.get("options", ""), str)
                             or body.get("options", "").casefold() not in ("", "skipallparameterization")
                             or any(not isinstance(value, str) or value.casefold() not in owner.data["resources"]
                                    or not owner.data["resources"][value.casefold()]["resolved"]
                                    or owner.data["resources"][value.casefold()]["uncertain"] for value in resources)):
                         owner.reject("Export requires an exact owned resource subset")
+                    if len({value.casefold() for value in resources}) != len(resources):
+                        owner.reject("Export requires distinct exact owned resources")
+                    for value in resources:
+                        target = value.casefold()
+                        owner.require_owned_reference(target, target.split("/providers/")[1].rsplit("/", 1)[0])
                     readonly = True
-                if method == "POST" and action in ("testroute", "testallroutes"):
-                    if (action_root not in owner.data["resources"] or "/microsoft.devices/iothubs/" not in action_root
-                            or not owner.data["resources"][action_root]["resolved"]
-                            or owner.data["resources"][action_root]["uncertain"]):
-                        owner.reject("Route testing requires an exact owned Hub")
+                if method == "POST" and action in ("$testnew", "$testall"):
+                    route_root = resource_id.rsplit("/routing/routes/", 1)
+                    if len(route_root) != 2 or route_root[1] != action:
+                        owner.reject("Route testing requires the exact routing action path")
+                    owner.require_owned_reference(route_root[0], "microsoft.devices/iothubs")
                     readonly = True
                 if method == "POST" and action == "validate" and "/microsoft.resources/deployments/" in action_root:
                     owner.validate_deployment(action_root, body)
@@ -688,13 +797,14 @@ class Observer:
                 kwargs["allow_redirects"] = False
                 try:
                     response = owner.original_send(session, request, **kwargs)
+                    if root:
+                        resource = response.json() if method in ("PUT", "PATCH") and response.content else None
+                        owner.complete(root, response.status_code, response.headers, resource)
                 except requests.RequestException as error:
                     if root:
                         owner.data["resources"][root]["mutations"][-1]["transportError"] = type(error).__name__
                         owner.save()
                     raise
-                if root:
-                    owner.complete(root, response.status_code)
                 if deployed:
                     hub_root, count = deployed
                     for mutation in owner.data["resources"][hub_root]["mutations"][-count:]:
@@ -703,8 +813,10 @@ class Observer:
                     owner.save()
                 if method == "GET":
                     try:
-                        observe_get(owner.data, resource_id, response.status_code,
-                                    response.json() if response.status_code == 200 else None)
+                        resource = response.json() if response.status_code == 200 else None
+                        if parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/"):
+                            observe_poll(owner.data, request.url, response.status_code, resource, response.headers)
+                        observe_get(owner.data, resource_id, response.status_code, resource)
                     except OwnershipError:
                         owner.reject("Observed resource no longer belongs to this phase")
                     owner.save()

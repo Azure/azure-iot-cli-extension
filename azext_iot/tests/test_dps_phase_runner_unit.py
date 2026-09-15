@@ -303,6 +303,15 @@ def test_exhausted_read_budget_never_starts_network_work(mocker):
     assert not timer.mock_calls
 
 
+@pytest.mark.parametrize("deadline", [0, -1])
+def test_exhausted_callable_read_never_starts_authentication(mocker, deadline):
+    operation = mocker.Mock()
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform="linux"))
+    with pytest.raises(RUNNER["PhaseError"], match="budget"):
+        RUNNER["bounded_read_call"](operation, deadline)
+    operation.assert_not_called()
+
+
 @pytest.mark.parametrize("platform", ["win32", "darwin"])
 def test_unsupported_entry_rejects_before_credentials_artifacts_or_execution(tmp_path, mocker, capsys, platform):
     reader = mocker.Mock()
@@ -432,7 +441,8 @@ def test_nested_timer_dispatch_preserves_outer_exception_meaning(mocker, outer_f
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Real nested POSIX interval timer regression is Linux-only.")
-def test_real_active_item_timer_fires_inside_bounded_read_without_being_extended():
+@pytest.mark.parametrize("callable_read", [False, True])
+def test_real_active_item_timer_fires_inside_bounded_read_without_being_extended(callable_read):
     timer = RUNNER["signal"]
     alarm, real = getattr(timer, "SIGALRM"), getattr(timer, "ITIMER_REAL")
     set_timer, get_timer = getattr(timer, "setitimer"), getattr(timer, "getitimer")
@@ -447,8 +457,11 @@ def test_real_active_item_timer_fires_inside_bounded_read_without_being_extended
         timer.signal(alarm, outer_timeout)
         set_timer(real, .02)
         with pytest.raises(ValueError, match="outer item deadline"):
-            with RUNNER["bounded_read"](time.monotonic() + 5):
-                time.sleep(1)
+            if callable_read:
+                RUNNER["bounded_read_call"](lambda _checkpoint: time.sleep(1), time.monotonic() + 5)
+            else:
+                with RUNNER["bounded_read"](time.monotonic() + 5):
+                    time.sleep(1)
         assert time.monotonic() - started < .8
         assert timer.getsignal(alarm) is outer_timeout
         assert get_timer(real) == (0, 0)
