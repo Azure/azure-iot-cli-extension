@@ -96,6 +96,45 @@ def test_state_command_error_precedes_comparison(
         assert call.args[-1] is owned
 
 
+@pytest.mark.parametrize("failure_kind", [None, "cli_error", "nonzero"])
+def test_custom_controlplane_seed_uses_exact_fixture_id_and_propagates_failure(
+    mocker, fake_cli, tmp_path, failure_kind
+):
+    hub_id = "/subscriptions/unit/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/owned"
+    output = tmp_path / "state.json"
+    output.write_text(json.dumps({"arm": {"resources": [{
+        "properties": {"routing": {"endpoints": {"eventHubs": []}}},
+    }]}}), encoding="utf-8")
+    events = []
+    error = BadRequestError("Seed rejected")
+
+    def invoke(args, out_file):
+        events.append(args[:2])
+        if args[:2] == ["resource", "update"]:
+            assert args[2:4] == ["--ids", hub_id]
+            assert "-n" not in args and "-g" not in args and "--resource-type" not in args
+            assert args[4:6] == ["--add", "properties.routing.endpoints.eventHubs"]
+            fake_cli.result.error = error if failure_kind == "cli_error" else None
+            if failure_kind:
+                return 7
+        else:
+            assert args[:4] == ["iot", "hub", "state", "export"]
+        out_file.write("{}")
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    mocker.patch.object(subject, "delete_system_endpoints")
+    mocker.patch.object(controlplane.time, "sleep")
+    hubs = [{"name": "owned", "rg": "rg", "hub": {"id": hub_id}}]
+    if failure_kind:
+        with pytest.raises(BadRequestError if failure_kind == "cli_error" else CLIInternalError):
+            controlplane.test_custom_scenarios_controlplane(hubs, {"connectionString": "offline"}, str(output))
+        assert events == [["resource", "update"]]
+    else:
+        controlplane.test_custom_scenarios_controlplane(hubs, {"connectionString": "offline"}, str(output))
+        assert events == [["resource", "update"], ["iot", "hub"]]
+
+
 @pytest.mark.parametrize("scenario", [
     "test_mirgate_hub_dataplane_error",
     "test_export_import_migrate_missing_hubs_error",
