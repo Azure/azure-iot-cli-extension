@@ -304,16 +304,23 @@ def test_adr_workflow_filter_collects_existing_cases_offline(tmp_path, monkeypat
     script = """
 import socket
 import sys
+from pathlib import Path
 import workflow_parent_dependency
 assert workflow_parent_dependency.AVAILABLE
 def deny_network(*args, **kwargs):
     raise AssertionError("Workflow collection must not connect to any service")
 socket.socket.connect = deny_network
 import pytest
-sys.exit(pytest.main(sys.argv[1:]))
+repository = Path.cwd().resolve()
+class RepositoryOnlyCollection:
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_collect_directory(self, path, parent):
+        assert path.resolve().is_relative_to(repository), f"Collection escaped repository: {path}"
+sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
 """
     command = [
         sys.executable, "-B", "-c", script, "-c", str(config), "--rootdir", str(REPOSITORY_ROOT),
+        "--confcutdir", str(REPOSITORY_ROOT),
         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", "_int.py",
         str(REPOSITORY_ROOT / "azext_iot/tests/adr"),
     ]
