@@ -25,7 +25,7 @@ from azure.cli.core.azclierror import AzCLIError
 from azure.core.exceptions import HttpResponseError
 from msrestazure.azure_exceptions import CloudError
 
-from scripts.run_dps_phases import Redactor
+from azext_iot.tests._dps_phase_runner import Redactor
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
 

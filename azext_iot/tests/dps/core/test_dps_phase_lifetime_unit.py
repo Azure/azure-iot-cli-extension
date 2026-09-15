@@ -295,7 +295,7 @@ def test_real_xdist_late_file_reuses_no_hub_until_actual_controller_sessionfinis
         "--rootdir", str(tmp_path), "--confcutdir", str(tmp_path), "-c", str(tmp_path / "pytest.ini"),
         "-q", str(tmp_path / "test_early.py"), str(tmp_path / "test_late.py"),
     ]
-    runner = runpy.run_path(str(ROOT / "scripts/run_dps_phases.py"))
+    runner = runpy.run_path(str(ROOT / "azext_iot/tests/_dps_phase_runner.py"))
     mocker.patch.dict(runner["child"].__globals__, READ_SECONDS=1)
     # The runner retains its owned process-group kill/wait bound. No venv or installs.
     processes = runner["child"].__globals__["subprocess"]
@@ -363,7 +363,7 @@ def test_real_serial_toggle_releases_controller_reference_even_on_cancellation(t
         "--rootdir", str(tmp_path), "--confcutdir", str(tmp_path), "-c", str(tmp_path / "pytest.ini"),
         "-q", str(tmp_path / "test_toggle.py"),
     ]
-    runner = runpy.run_path(str(ROOT / "scripts/run_dps_phases.py"))
+    runner = runpy.run_path(str(ROOT / "azext_iot/tests/_dps_phase_runner.py"))
     mocker.patch.dict(runner["child"].__globals__, READ_SECONDS=1)
     processes = runner["child"].__globals__["subprocess"]
     original = processes.Popen

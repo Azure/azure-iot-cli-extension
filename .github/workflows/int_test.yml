@@ -359,7 +359,7 @@ jobs:
           run_service() {
             if [ "${{ matrix.config.service }}" = "DPS" ]; then
               echo "DPS coverage: regular, service-SAS and serial local-auth-toggle; certificate coverage is not configured in this workflow."
-              .tox/DPS-phases/bin/python scripts/run_dps_phases.py \
+              .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" --resource-group "${{ env.RESOURCE_GROUP }}" \
                 --region "${{ matrix.config.region }}"
             elif [ "${{ matrix.config.service }}" = "ADR" ] && [ -n "$ADR_TEST_FILTER" ]; then
@@ -438,7 +438,7 @@ jobs:
           UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
           INTEGRATION_RESULT: ${{ needs.int-test.result }}
           GATE_JOB_RESULT: ${{ job.status }}
-        run: python3 scripts/evaluate_test_results.py --results-dir ./test-results
+        run: python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results
 
   combine-coverage:
     name: "Combine coverage reports"

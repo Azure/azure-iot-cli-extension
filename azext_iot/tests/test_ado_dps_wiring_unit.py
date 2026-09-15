@@ -47,7 +47,7 @@ def test_ado_dps_template_has_one_honestly_scoped_legacy_invocation():
     assert "--junitxml=junit/test-iotext-int.xml" in command
     assert "legacy regular only" in script
     assert "Service-SAS and owned local-auth-toggle coverage run through the GitHub DPS controller" in script
-    assert "run_dps_phases.py" not in script
+    assert "_dps_phase_runner.py" not in script
     assert "unset " not in script
     assert not re.search(r"(?:export\s+)?azext_iot_dps_test_phase=", script)
 
