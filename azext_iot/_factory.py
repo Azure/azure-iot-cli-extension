@@ -62,6 +62,7 @@ def _get_arm_endpoint(cli_ctx):
 
 # TODO: Remove after https://github.com/microsoft/typespec/issues/11966 is fixed
 # and the IoT Hub SDK is regenerated.
+# This temporary workaround intentionally covers only the default ARM polling path used by extension call sites.
 class _ModelessJsonARMPolling(ARMPolling):
     """Deserialize modeless ARM LRO results without the generated callback."""
 

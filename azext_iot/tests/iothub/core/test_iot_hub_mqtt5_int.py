@@ -5,29 +5,34 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.iothub.conftest import generate_hub_id, RG
 
 
 cli = EmbeddedCLI()
+logger = get_logger(__name__)
 
 
 @pytest.fixture()
 def provisioned_mqtt5_hub():
     name = generate_hub_id()
-    hub_resource = cli.invoke(
-        f"iot hub create -n {name} -g {RG} --sku S1 "
-        "--connection-profile MqttV5 --yes",
-        capture_stderr=True,
-    )
     try:
-        yield hub_resource.as_json()
-    finally:
-        cli.invoke(
-            f"iot hub delete -n {name} -g {RG}",
+        hub_resource = cli.invoke(
+            f"iot hub create -n {name} -g {RG} --sku S1 "
+            "--connection-profile MqttV5 --yes",
             capture_stderr=True,
         )
+        yield hub_resource.as_json()
+    finally:
+        cleanup = EmbeddedCLI().invoke(f"iot hub delete -n {name} -g {RG}")
+        if not cleanup.success():
+            logger.error(
+                "Failed to clean up MQTT 5 integration-test Hub '%s': %s",
+                name,
+                cleanup.get_error(),
+            )
 
 
 def test_mqtt5_profile_lifecycle(provisioned_mqtt5_hub):

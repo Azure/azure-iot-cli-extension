@@ -297,10 +297,20 @@ class TestIotHubModelessLroPolling:
         from azext_iot._factory import iot_hub_service_factory
 
         service_client = iot_hub_service_factory(_build_cli_ctx(mocker, CLOUD_CONFIGS[0]))
-        service_client.iot_hub_resource.begin_create_or_update("argument", polling=polling)
+        service_client.iot_hub_resource.begin_create_or_update(
+            resource_group_name="test-rg",
+            resource_name="test-hub",
+            iot_hub_description={},
+            polling=polling,
+        )
 
         polling_cls.assert_not_called()
-        original_operation.assert_called_once_with("argument", polling=polling)
+        original_operation.assert_called_once_with(
+            resource_group_name="test-rg",
+            resource_name="test-hub",
+            iot_hub_description={},
+            polling=polling,
+        )
 
     def test_safe_polling_deserializes_json_and_applies_result_callback(self, mocker):
         from azext_iot._factory import _ModelessJsonARMPolling
