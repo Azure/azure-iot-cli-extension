@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from argcomplete.completers import FilesCompleter  # pylint: disable=import-error
-from knack.arguments import CLIArgumentType
+from knack.arguments import CLIArgumentType, ignore_type
 from azure.cli.core.commands.parameters import (get_location_type,
                                                 file_type,
                                                 get_resource_name_completion_list,
@@ -21,7 +21,7 @@ from azure.cli.command_modules.iot.shared import (EndpointType,
 
 
 from .custom import KeyType, SimpleAccessRights
-from ._validators import validate_dps_create_unit
+from ._validators import capture_dps_capacity_edit, validate_dps_create_unit
 from .shared import IotDpsSku, IotHubSku, AccessRightsDescription, IotHubAuthenticationType
 from azure.cli.command_modules.iot._validators import (validate_policy_permissions,
                                                        validate_retention_days,
@@ -83,7 +83,9 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    'Only available in select regions. Learn more at https://aka.ms/dpsdr')
 
     with self.argument_context('iot dps update') as c:
-        c.ignore('dps_capacity_edited')
+        # Command-level validation would bypass normal argument validators, including tags.
+        c.argument('dps_capacity_edited', arg_type=ignore_type, options_list=['--__DPS_CAPACITY_EDITED'],
+                   validator=capture_dps_capacity_edit)
 
     # plan to slowly align this with extension naming patterns - n should be aligned with dps_name
     for subgroup in ['linked-hub', 'certificate']:

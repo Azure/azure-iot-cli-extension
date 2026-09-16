@@ -46,7 +46,10 @@ def test_dps_unit_capacity_owned_lifecycle(request):
         name = f"clitest-dps-{kind}-{run_uid[:12]}"
         target = f"--name {name} --resource-group {group}"
         tags = f"intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())}"
-        create = f"iot dps create {target} --location {fixtures.ENTITY_LOCATION} --tags {tags}"
+        create = (
+            f"iot dps create {target} --location {fixtures.ENTITY_LOCATION} "
+            f"--disable-local-auth true --tags {tags}"
+        )
         assert fixtures._find_dps_by_name(name) is None
         with ExitStack() as cleanup:
             _phase_receipts.before_create(name, group, run_uid, kind)

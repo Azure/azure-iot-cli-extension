@@ -8,7 +8,6 @@ from azure.cli.core.commands import CliCommandType, LongRunningOperation
 
 from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
 from azext_iot.core.transforms import dps_certificate_response_transform
-from azext_iot.core._validators import capture_dps_capacity_edit
 
 # Command types for both IoT Hub and DPS management operations
 core_ops = CliCommandType(operations_tmpl="azext_iot.core.custom#{}")
@@ -152,7 +151,6 @@ def load_core_commands(self, _):
             getter_name="iot_dps_get",
             setter_name="iot_dps_update",
             custom_func_type=core_ops,
-            validator=capture_dps_capacity_edit,
         )
         cmd_group.show_command("show", "iot_dps_get")
         cmd_group.command("delete", "iot_dps_delete")

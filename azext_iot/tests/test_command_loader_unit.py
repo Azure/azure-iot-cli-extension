@@ -455,7 +455,7 @@ class _DpsManagementCommandsLoader(MainCommandsLoader):
         loader = IoTExtCommandsLoader(self.cli_ctx)
         self.command_table = {
             name: command for name, command in loader.load_command_table(args).items()
-            if name in ("iot dps create", "iot dps update")
+            if name in ("iot dps create", "iot dps update", "iot dps show", "iot dps list", "iot dps delete")
         }
         self.cmd_to_loader_map = {name: [loader] for name in self.command_table}
         return self.command_table
@@ -483,10 +483,12 @@ def dps_management_cli(mocker):
     )
     state = SimpleNamespace(
         cli=cli, location_factory=location_factory, management_factory=management_factory,
-        requests=[], status=201, available=True, lro=False,
+        requests=[], status=201, available=True, lro=False, resource_counts=[],
         resource={"id": resource_id, "name": "dps", "location": "centraluseuap",
                   "sku": {"name": "S1", "capacity": 1}, "properties": {"provisioningState": "Succeeded"}},
     )
+    state.resources = {resource_id: state.resource}
+    prefix = resource_id.rsplit("/", 1)[0]
 
     def respond(request):
         state.requests.append(request)
@@ -498,23 +500,36 @@ def dps_management_cli(mocker):
             return 200, {}, json.dumps({"id": path, "name": "rg", "location": "centraluseuap"})
         if path.endswith("/unit-operation"):
             return 200, {}, json.dumps({"status": "Succeeded"})
-        assert path == resource_id
+        if path == prefix and request.method == "GET":
+            return 200, {}, json.dumps({"value": list(state.resources.values())})
+        assert path.startswith(prefix + "/") and "/" not in path[len(prefix) + 1:]
         if request.method == "PUT":
             if state.status >= 400:
                 return state.status, {}, json.dumps({"error": {"code": "UnitServiceError", "message": "Service rejected"}})
-            state.resource.update(json.loads(request.body))
-            state.resource.setdefault("properties", {})["provisioningState"] = "Succeeded"
+            body = json.loads(request.body)
+            assert "tags" not in body or isinstance(body["tags"], dict), "ARM tags must be a JSON object."
+            resource = state.resources.setdefault(path, {"id": path, "name": path.rsplit("/", 1)[1]})
+            resource.update(body)
+            resource.setdefault("properties", {})["provisioningState"] = "Succeeded"
+            state.resource_counts.append(len(state.resources))
             if state.lro:
                 return 201, {"Azure-AsyncOperation": "https://centraluseuap.management.azure.com/unit-operation",
-                             "Retry-After": "0"}, json.dumps(state.resource)
-            return state.status, {}, json.dumps(state.resource)
+                             "Retry-After": "0"}, json.dumps(resource)
+            return state.status, {}, json.dumps(resource)
+        if request.method == "DELETE":
+            del state.resources[path]
+            state.resource_counts.append(len(state.resources))
+            return 200, {}, ""
         assert request.method == "GET"
-        return 200, {}, json.dumps(state.resource)
+        if path not in state.resources:
+            return 404, {}, json.dumps({"error": {"code": "ResourceNotFound", "message": "Resource is absent"}})
+        return 200, {}, json.dumps(state.resources[path])
 
-    def invoke(action, arguments):
+    def invoke(action, arguments, *, use_ids=False):
         output = StringIO()
+        target = ["--ids", resource_id] if use_ids else ["-n", "dps", "-g", "rg"]
         try:
-            code = cli.invoke(["iot", "dps", action, "-n", "dps", "-g", "rg", *arguments], out_file=output)
+            code = cli.invoke(["iot", "dps", action, *target, *arguments], out_file=output)
         except SystemExit as error:
             code = error.code
         return code, cli.result, output.getvalue()
@@ -618,11 +633,12 @@ def test_dps_valid_create_service_error_remains_visible(dps_management_cli):
     ["--set", '.sku={"name":"S1","capacity":0}'],
 ])
 @pytest.mark.parametrize("baseline", [0, 1])
-def test_dps_generic_final_explicit_capacity_invalid_never_writes(dps_management_cli, arguments, baseline):
+@pytest.mark.parametrize("use_ids", [False, True], ids=["name-and-group", "ids"])
+def test_dps_generic_final_explicit_capacity_invalid_never_writes(dps_management_cli, arguments, baseline, use_ids):
     runtime = dps_management_cli
     runtime.resource["sku"]["capacity"] = baseline
     before = deepcopy(runtime.resource)
-    code, result, _ = runtime.invoke("update", arguments)
+    code, result, _ = runtime.invoke("update", arguments, use_ids=use_ids)
     assert code != 0
     assert "sku.capacity must be an integer greater than or equal to 1" in str(result.error)
     assert [request.method for request in runtime.requests] == ["GET"]
@@ -637,8 +653,9 @@ def test_dps_generic_final_explicit_capacity_invalid_never_writes(dps_management
     (["--set", "sku..capacity=2"], 2),
     (["--set", ".sku.capacity=0", "--set", "sku.capacity.=2"], 2),
 ])
-def test_dps_generic_capacity_validates_final_ordered_edits(dps_management_cli, arguments, capacity):
-    code, result, _ = dps_management_cli.invoke("update", arguments)
+@pytest.mark.parametrize("use_ids", [False, True], ids=["name-and-group", "ids"])
+def test_dps_generic_capacity_validates_final_ordered_edits(dps_management_cli, arguments, capacity, use_ids):
+    code, result, _ = dps_management_cli.invoke("update", arguments, use_ids=use_ids)
     assert code == 0, result.error
     writes = [request for request in dps_management_cli.requests if request.method == "PUT"]
     assert len(writes) == 1
@@ -650,23 +667,152 @@ def test_dps_generic_capacity_validates_final_ordered_edits(dps_management_cli, 
     ["--set", "tags.purpose=unit"], ["--tags", "purpose=unit"],
     ["--system-assigned-mi"], ["--remove", "tags.old"],
 ])
-def test_dps_unrelated_update_does_not_validate_baseline_capacity(dps_management_cli, sku, arguments):
+@pytest.mark.parametrize("use_ids", [False, True], ids=["name-and-group", "ids"])
+def test_dps_unrelated_update_does_not_validate_baseline_capacity(dps_management_cli, sku, arguments, use_ids):
     runtime = dps_management_cli
     runtime.resource["tags"] = {"old": "value"}
+    runtime.resource["properties"]["disableLocalAuth"] = True
     if sku is None:
         runtime.resource.pop("sku")
     else:
         runtime.resource["sku"] = sku
-    code, result, _ = runtime.invoke("update", arguments)
+    code, result, _ = runtime.invoke("update", arguments, use_ids=use_ids)
     assert code == 0, result.error
-    assert len([request for request in runtime.requests if request.method == "PUT"]) == 1
+    writes = [request for request in runtime.requests if request.method == "PUT"]
+    assert len(writes) == 1
+    body = json.loads(writes[0].body)
+    assert isinstance(body["tags"], dict)
+    assert body["properties"]["disableLocalAuth"] is True
+    assert body.get("sku") == sku
+
+
+@pytest.mark.parametrize("capacity_arguments,expected_capacity", [
+    ([], 1),
+    (["--set", "sku.capacity=2"], 2),
+    (["--set", "sku.capacity=0", "--set", "sku.capacity=2"], 2),
+    (["--set", 'sku={"name":"S1","capacity":2}'], 2),
+    (["--set", "sku.capacity=0"], None),
+    (["--set", ".sku.capacity=-1"], None),
+    (["--set", "sku.capacity=1", "--force-string"], None),
+])
+@pytest.mark.parametrize("use_ids", [False, True], ids=["name-and-group", "ids"])
+def test_dps_tags_and_capacity_run_both_argument_validators(
+    dps_management_cli, capacity_arguments, expected_capacity, use_ids,
+):
+    runtime = dps_management_cli
+    runtime.resource["tags"] = {"old": "value"}
+    runtime.resource["properties"]["disableLocalAuth"] = True
+    before = deepcopy(runtime.resource)
+    code, result, _ = runtime.invoke(
+        "update", ["--tags", "purpose=unit", "empty", "message=two words", "equals=a=b", *capacity_arguments],
+        use_ids=use_ids,
+    )
+    if expected_capacity is None:
+        assert code != 0
+        assert "sku.capacity must be an integer greater than or equal to 1" in str(result.error)
+        assert [request.method for request in runtime.requests] == ["GET"]
+        assert runtime.resource == before
+    else:
+        assert code == 0, result.error
+        writes = [request for request in runtime.requests if request.method == "PUT"]
+        assert len(writes) == 1
+        body = json.loads(writes[0].body)
+        assert body["tags"] == {"purpose": "unit", "empty": "", "message": "two words", "equals": "a=b"}
+        assert body["sku"]["capacity"] == expected_capacity
+        assert body["properties"]["disableLocalAuth"] is True
+
+
+def test_dps_capacity_actual_lifecycle_preserves_auth_and_all_controls(dps_management_cli, mocker, monkeypatch, tmp_path):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    from azext_iot.tests.dps.core import test_dps_unit_capacity_int as scenario
+
+    runtime = dps_management_cli
+    runtime.resources.clear()
+    uid = "a" * 32
+    subscription = "00000000-0000-0000-0000-000000000001"
+    receipts = scenario._phase_receipts
+    for name, value in {
+        receipts.DIRECTORY_ENV: str(tmp_path),
+        receipts.RUN_UID_ENV: uid,
+        receipts.SUBSCRIPTION_ENV: subscription,
+        receipts.RESOURCE_GROUP_ENV: "rg",
+        scenario._phase.PHASE_ENV: scenario._phase.REGULAR,
+    }.items():
+        monkeypatch.setenv(name, value)
+    cli = EmbeddedCLI()
+    cli.az_cli = runtime.cli
+    mocker.patch.object(scenario, "EmbeddedCLI", return_value=cli)
+    mocker.patch.object(scenario.fixtures, "cli", cli)
+    mocker.patch.object(scenario.fixtures, "ENTITY_RG", "rg")
+    mocker.patch.object(scenario.fixtures, "ENTITY_LOCATION", "centraluseuap")
+    mocker.patch.object(scenario.fixtures, "_get_run_uid", return_value=uid)
+    with scenario._phase_runtime.activate(subscription, existing=[cli]):
+        mocker.patch("azure.cli.core._profile.Profile", return_value=SimpleNamespace(
+            load_cached_subscriptions=lambda: [{"id": subscription, "name": "offline"}],
+        ))
+        commands = mocker.spy(cli, "invoke")
+        scenario.test_dps_unit_capacity_owned_lifecycle(mocker.Mock())
+
+    assert not runtime.resources
+    assert runtime.resource_counts == [1, 1, 0, 1, 0]
+    writes = [(request.method, urlsplit(request.url).path, json.loads(request.body) if request.body else None)
+              for request in runtime.requests if request.method in ("PUT", "DELETE")]
+    names = [f"clitest-dps-{kind}-{uid[:12]}" for kind in ("unit1", "unitdefault")]
+    assert [(method, path.rsplit("/", 1)[1]) for method, path, _ in writes] == [
+        ("PUT", names[0]), ("PUT", names[0]), ("DELETE", names[0]),
+        ("PUT", names[1]), ("DELETE", names[1]),
+    ]
+    for method, _, body in writes:
+        if method == "PUT":
+            assert body["sku"]["capacity"] == 1
+            assert body["properties"]["disableLocalAuth"] is True
+            assert body["tags"]["runUid"] == uid
+    assert writes[1][2]["tags"]["unitValidation"] == "passed"
+    for kind in ("unit1", "unitdefault"):
+        assert json.loads((tmp_path / f"created-{kind}.json").read_text())["create_completed"] is True
+        assert json.loads((tmp_path / f"deleted-{kind}.json").read_text())["delete_completed"] is True
+    creates = [call.args[0] for call in commands.call_args_list if call.args[0].startswith("iot dps create")]
+    assert len(creates) == 4
+    assert creates[0].endswith("--unit 0") and creates[1].endswith("--unit 1")
+    assert creates[2].endswith("--unit -1") and "--unit" not in creates[3]
+    updates = [call.args[0] for call in commands.call_args_list if call.args[0].startswith("iot dps update")]
+    assert len(updates) == 3
+    assert updates[0].endswith("sku.capacity=0") and updates[1].endswith("sku.capacity=-1")
+    assert updates[2].endswith("tags.unitValidation=passed")
+    assert sum(call.args[0].startswith("iot dps list") for call in commands.call_args_list) == 2
+
+
+def test_dps_actual_local_auth_update_lifecycle_keeps_tags_object(dps_management_cli, mocker):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    from azext_iot.tests.dps.core import test_dps_disable_local_auth_int as scenario
+
+    runtime = dps_management_cli
+    runtime.resource["tags"] = {"intTest": "true", "runUid": "a" * 32, "kind": "dla"}
+    runtime.resource["properties"]["disableLocalAuth"] = False
+    cli = EmbeddedCLI()
+    cli.az_cli = runtime.cli
+    mocker.patch.object(scenario, "cli", cli)
+    scenario.test_dps_update_disable_local_auth({
+        "name": "dps", "resourceGroup": "rg", "dps": deepcopy(runtime.resource),
+    })
+    writes = [json.loads(request.body) for request in runtime.requests if request.method == "PUT"]
+    assert len(writes) == 3
+    assert [body["properties"]["disableLocalAuth"] for body in writes] == [True, True, False]
+    assert all(isinstance(body["tags"], dict) for body in writes)
+    assert writes[1]["tags"]["testtag"] == "value"
 
 
 def test_dps_unit_help_and_internal_update_argument_are_not_public(dps_management_cli, capsys):
     code, _, output = dps_management_cli.invoke("create", ["--help"])
     assert code == 0
     assert "Integer minimum: 1" in " ".join((output + capsys.readouterr().out).split())
-    for option in ("--unit", "--dps-capacity-edited"):
+    code, _, output = dps_management_cli.invoke("update", ["--help"])
+    assert code == 0
+    help_output = (output + capsys.readouterr().out).lower()
+    assert "--ids" in help_output
+    assert "--unit" not in help_output and "dps_capacity_edited" not in help_output
+    assert "dps-capacity-edited" not in help_output
+    for option in ("--unit", "--dps-capacity-edited", "--__DPS_CAPACITY_EDITED"):
         code, _, _ = dps_management_cli.invoke("update", [option, "1"])
         assert code != 0
     assert dps_management_cli.requests == []
