@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 COMBINATION_FIELDS = ("service", "python", "region")
 MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[2] / "azext_iot/tests/dps/_phase_manifest.py"))
+FOCUSED = runpy.run_path(str(Path(__file__).resolve().with_name("_focused_live.py")))
 
 
 def evaluate_dps_phases(result_dir):
@@ -24,18 +25,25 @@ def evaluate_dps_phases(result_dir):
     try:
         receipt = json.loads((result_dir / "dps-phases.json").read_text(encoding="utf-8"))
         phases = receipt["phases"]
+        if not FOCUSED["matches"](receipt, None):
+            raise ValueError("focused/debug evidence cannot qualify the full DPS suite")
         if (receipt["schema"] != 1 or receipt["status"] != "passed"
                 or [phase["name"] for phase in phases] != list(MANIFEST["PHASE_NAMES"])
                 or not receipt["baseline"]["capacity"]["ready"]):
             raise ValueError("incomplete/failed DPS phase summary")
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
         for phase in phases:
+            if not FOCUSED["matches"](phase, None):
+                raise ValueError("focused/debug phase cannot qualify the full DPS suite")
             name = phase["name"]
             folder = result_dir / "dps-phases" / name
             if json.loads((folder / "result.json").read_text(encoding="utf-8")) != phase:
                 raise ValueError(f"{name}: phase result differs from aggregate")
             if not (folder / "output.log").is_file():
                 raise ValueError(f"{name}: missing redacted phase log")
+            stages = folder / "receipts" / "pytest.json"
+            if stages.exists() and not FOCUSED["matches"](json.loads(stages.read_text(encoding="utf-8")), None):
+                raise ValueError("focused/debug stage evidence cannot qualify the full DPS suite")
             cleanup = phase["cleanup"]
             owned = cleanup["owned_ids"]
             if (phase["status"] != "passed" or phase["exit_code"] != 0
@@ -51,7 +59,10 @@ def evaluate_dps_phases(result_dir):
                 ):
                     raise ValueError(f"{name}: missing pre-create ownership receipt")
             results = phase["results"]
-            cases = list(ET.parse(folder / "junit.xml").getroot().iter("testcase"))
+            junit = ET.parse(folder / "junit.xml").getroot()
+            cases = list(junit.iter("testcase"))
+            if junit.get("mode", "full") != "full":
+                raise ValueError("focused/debug JUnit cannot qualify the full DPS suite")
             expected = MANIFEST["expected_nodeids"](name)
             identities = [MANIFEST["junit_nodeid"](case) for case in cases]
             selections = [json.loads(path.read_text(encoding="utf-8"))
@@ -60,6 +71,7 @@ def evaluate_dps_phases(result_dir):
                     or len(cases) != len(expected) or set(identities) != expected
                     or results["nodeids"] != sorted(expected) or not selections
                     or any(value.get("nodeids") != sorted(expected) or value.get("selected") != len(expected)
+                           or not FOCUSED["matches"](value, None)
                            for value in selections)
                     or results["passed"] != len(expected) or results["failures"] or results["errors"] or results["skipped"]
                     or any(any(case.find(outcome) is not None for outcome in ("failure", "error", "skipped")) for case in cases)):

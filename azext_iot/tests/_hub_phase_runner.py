@@ -33,6 +33,7 @@ HUB_LIMIT = 50  # Conservative documented subscription limit; includes every for
 # destinations and a separate only-Hubs fixture. Reserve conservatively; the
 # observer also rechecks all-subscription Hub capacity at each actual Hub create.
 SLOTS = {"regular": 8, "entra": 4, "sas": 1}
+FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 
 
 def selection():
@@ -47,13 +48,13 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def phase_errors(receipt, expected, suite, phase, run_id):
+def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
     errors = []
     if (receipt.get("schemaVersion") != 1 or receipt.get("suite") != suite or receipt.get("phase") != phase
             or receipt.get("runId") != run_id or receipt.get("finished") is not True
             or receipt.get("exitstatus") != 0 or receipt.get("errors")
             or receipt.get("expected") != expected or receipt.get("collected") != expected
-            or len(set(expected)) != len(expected)):
+            or len(set(expected)) != len(expected) or not FOCUSED["matches"](receipt, debug)):
         errors.append("phase identity, completion or exact collection failed")
     reports = receipt.get("reports", {})
     if set(reports) != set(expected) or any(
@@ -66,6 +67,8 @@ def phase_errors(receipt, expected, suite, phase, run_id):
 def write_junit(receipt, expected, path):
     """Publish only manifest identities and outcomes, never captured output or tracebacks."""
     suite = ET.Element("testsuite", name="hub-" + receipt["phase"], tests=str(len(expected)))
+    if receipt.get("mode") == "debug":
+        suite.set("mode", "debug")
     failures = 0
     for node in expected:
         module, _, name = node.rpartition("::")
@@ -81,7 +84,7 @@ def write_junit(receipt, expected, path):
     os.chmod(path, 0o600)
 
 
-def sas_errors(data, expected):
+def sas_errors(data, expected, *, debug=None):
     """Validate existing SAS evidence without changing its membership/receipt format."""
     owned = helper()
     errors = []
@@ -93,7 +96,7 @@ def sas_errors(data, expected):
             or len(set(value.casefold() for value in ids.values())) != 4
             or sorted(data.get("passed", [])) != sorted(expected)
             or sorted(data.get("absent", [])) != sorted(ids)
-            or data.get("cleanupFailures") != {}):
+            or data.get("cleanupFailures") != {} or not FOCUSED["matches"](data, debug)):
         errors.append("invalid SAS ownership, passes or cleanup")
     if ids:
         prefix = f"/subscriptions/{owned['SUBSCRIPTION']}/resourceGroups/{owned['GROUP']}/providers/"
@@ -122,7 +125,7 @@ def sas_errors(data, expected):
     return errors
 
 
-def evaluate_hub_phases(result_dir):
+def evaluate_hub_phases(result_dir, *, debug=False):
     """Pure JSON gate, no pytest/Azure imports. Return {passed: bool, errors: list}.
 
     Load with runpy.run_path(path) to bypass Azure-dependent package __init__ files.
@@ -133,13 +136,18 @@ def evaluate_hub_phases(result_dir):
         output = Path(result_dir)
         summary = read_json(output / "hub-phases.json")
         suite = summary["suite"]
-        names = selection()["phases"](suite)
+        requested = summary.get("debug", {})
+        request = FOCUSED["select"](suite, requested.get("phase"), requested.get("requestedNodes")) if debug else {}
+        if debug and (not isinstance(request, dict) or request != requested):
+            raise ValueError("Invalid debug provenance")
+        names = (request["phase"],) if request else selection()["phases"](suite)
         results = summary["phases"]
         owned = helper()
         if (summary.get("schemaVersion") != 1
                 or (summary.get("subscription"), summary.get("resourceGroup"), summary.get("region"),
                     summary.get("endpoint")) != (owned["SUBSCRIPTION"], owned["GROUP"], owned["REGION"], owned["ARM"])
-                or summary.get("status") != "passed" or summary.get("cancelled") is not False
+                or summary.get("status") != ("debug-passed" if debug else "passed")
+                or not FOCUSED["matches"](summary, request) or summary.get("cancelled") is not False
                 or summary.get("finished") is not True or [p["name"] for p in results] != list(names)):
             errors.append("incomplete, cancelled, duplicate or missing phase execution")
         if len({p["runId"] for p in results}) != len(results) or any(not p["runId"] for p in results):
@@ -150,19 +158,22 @@ def evaluate_hub_phases(result_dir):
             if name not in names:
                 errors.append("unexpected phase")
                 continue
-            expected = list(selection()["nodes"](suite, name))
-            errors.extend(phase_errors(read_json(output / name / "pytest.json"), expected, suite, name, run_id))
-            cases = list(ET.parse(output / name / "junit.xml").getroot().iter("testcase"))
+            expected = request["requestedNodes"] if request else list(selection()["nodes"](suite, name))
+            errors.extend(phase_errors(read_json(output / name / "pytest.json"), expected, suite, name, run_id,
+                                       debug=request))
+            junit = ET.parse(output / name / "junit.xml").getroot()
+            cases = list(junit.iter("testcase"))
             if ([case.get("classname", "") + "::" + case.get("name", "") for case in cases] != expected
-                    or any(list(case) for case in cases)):
+                    or any(list(case) for case in cases) or junit.get("mode", "full") != ("debug" if debug else "full")):
                 errors.append("missing or unsuccessful sanitized JUnit coverage")
             if (result.get("status") != "passed" or result.get("exit_code") != 0
-                    or result.get("timed_out") is not False or result.get("interrupted") is not False):
+                    or result.get("timed_out") is not False or result.get("interrupted") is not False
+                    or not FOCUSED["matches"](result, request)):
                 errors.append("phase execution failed")
             cleanup = read_json(output / name / "cleanup.json")
             evidence = read_json(output / name / "ownership.json")
             if name == "sas":
-                errors.extend(sas_errors(evidence, expected))
+                errors.extend(sas_errors(evidence, expected, debug=request))
                 ids = sorted(value.casefold() for value in evidence["ids"].values())
                 if result.get("sasRunUid") != evidence.get("runUid"):
                     errors.append("SAS receipt identity mismatch")
@@ -184,13 +195,14 @@ def evaluate_hub_phases(result_dir):
     return {"passed": not errors, "errors": errors}
 
 
-def environment(base, suite, phase, folder, run_id, subscription, group):
+def environment(base, suite, phase, folder, run_id, subscription, group, *, debug=None):
     forbidden = {
         "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_XDIST_WORKER_COUNT", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
         "PYTEST_XDIST_AUTO_NUM_WORKERS", "PYTEST_CURRENT_TEST",
         "AZURE_IOT_AUTH_TYPE", "AZURE_IOT_CONNECTION_STRING", "AZURE_DEFAULTS_GROUP", "AZURE_DEFAULTS_LOCATION",
         "azext_iot_testhub", "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_ep_rg",
         "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer",
+        FOCUSED["ENV"], FOCUSED["DPS_ARGS_ENV"],
     }
     for key, value in base.items():
         managed = key.startswith(("AZEXT_IOT_HUB_", "azext_iot_hubsas_", "azext_iot_dps_", "AZURE_IOT_"))
@@ -209,17 +221,19 @@ def environment(base, suite, phase, folder, run_id, subscription, group):
         azext_iot_hubsas_subscription=subscription, azext_iot_hubsas_receipt=str(folder / "ownership.json"),
     )
     result["AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE"] = "login"
+    if debug:
+        result[FOCUSED["ENV"]] = json.dumps(debug)
     return result
 
 
-def command(suite, phase):
+def command(suite, phase, *, debug=None):
     return [
         sys.executable, "-m", "pytest", "-c", str(ROOT / "setup.cfg"),
         "--rootdir", str(ROOT), "--confcutdir", str(ROOT), "-p", "azext_iot.tests._hub_suite_plugin",
         "-p", "no:rerunfailures", "-n", "0", "--timeout=900", "--integration-progress-interval=60",
         "-o", "faulthandler_timeout=300", "-o", "addopts=", "-o", "env=", "-o", "log_cli=false",
         "--cov=azext_iot", "--cov-append", "--cov-config", str(ROOT / ".coveragerc"), "--cov-report=",
-        "--capture=fd", "-vv", *selection()["nodes"](suite, phase),
+        "--capture=fd", "-vv", *(debug["requestedNodes"] if debug else selection()["nodes"](suite, phase)),
     ]
 
 
@@ -280,7 +294,10 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path):
     return result
 
 
-def run(suite, subscription, group, region, output, arm=None, execute=None, base=None):
+def run(suite, subscription, group, region, output, arm=None, execute=None, base=None, *,
+        debug_phase=None, debug_nodes=None):
+    debug = FOCUSED["select"](suite, debug_phase, debug_nodes)
+    sys.path.insert(0, str(ROOT))
     from azext_iot.tests._dps_phase_runner import child, require_linux, write_json
     require_linux()
     owned = helper()
@@ -288,22 +305,25 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         raise ValueError("Controller is restricted to the authorized canary scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
-    environment(base, suite, BUDGETS[suite][0][0], output, "preflight", subscription, group)
+    budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
+    environment(base, suite, budgets[0][0], output, "preflight", subscription, group, debug=debug)
     output.mkdir(parents=True, exist_ok=False)
     cancel = threading.Event()
     previous = {sig: signal.signal(sig, lambda *_: cancel.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     summary = {
         "schemaVersion": 1, "suite": suite, "status": "failed", "cancelled": False, "finished": False,
         "subscription": subscription, "resourceGroup": group, "region": region, "endpoint": owned["ARM"],
-        "runnerSeconds": sum(runtime + CLEANUP for _, runtime in BUDGETS[suite]) + RESERVE,
-        "phases": [{"name": name, "status": "blocked", "runId": uuid4().hex} for name, _ in BUDGETS[suite]],
+        "runnerSeconds": sum(runtime + CLEANUP for _, runtime in budgets) + RESERVE,
+        "phases": [{"name": name, "status": "blocked", "runId": uuid4().hex,
+                    **FOCUSED["provenance"](debug)} for name, _ in budgets],
+        **FOCUSED["provenance"](debug),
     }
     summary_path = output / "hub-phases.json"
     write_json(summary_path, summary)
-    deadline = time.monotonic() + sum(runtime + CLEANUP for _, runtime in BUDGETS[suite]) + RESERVE
+    deadline = time.monotonic() + summary["runnerSeconds"]
     try:
         arm = arm or owned["Arm"]()
-        for result, (phase, runtime) in zip(summary["phases"], BUDGETS[suite]):
+        for result, (phase, runtime) in zip(summary["phases"], budgets):
             if cancel.is_set():
                 break
             arm.deadline = min(deadline, time.monotonic() + RESERVE)
@@ -315,14 +335,14 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 break
             folder = output / phase
             folder.mkdir()
-            env = environment(base, suite, phase, folder, result["runId"], subscription, group)
+            env = environment(base, suite, phase, folder, result["runId"], subscription, group, debug=debug)
             result.update(status="running", runtimeSeconds=runtime, cleanupSeconds=CLEANUP)
             write_json(summary_path, summary)
             # pytest node args are repository-relative; retain every inherited dependency path.
             cwd = Path.cwd()
             try:
                 os.chdir(ROOT)
-                execution = (execute or child)(command(suite, phase), env, folder / "output.log",
+                execution = (execute or child)(command(suite, phase, debug=debug), env, folder / "output.log",
                                                runtime, CLEANUP, cancel.is_set)
             finally:
                 os.chdir(cwd)
@@ -332,7 +352,8 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 evidence = read_json(folder / "ownership.json")
                 if phase == "sas":
                     result["sasRunUid"] = evidence["runUid"]
-                    errors = sas_errors(evidence, list(selection()["nodes"](suite, phase)))
+                    errors = sas_errors(evidence, debug["requestedNodes"] if debug else
+                                        list(selection()["nodes"](suite, phase)), debug=debug)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
@@ -341,9 +362,10 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                                               min(deadline, execution["cleanup_deadline"]), folder / "ownership.json")
                     write_json(folder / "ownership.json", evidence)
                 receipt = read_json(folder / "pytest.json")
-                expected = list(selection()["nodes"](suite, phase))
+                expected = debug["requestedNodes"] if debug else list(selection()["nodes"](suite, phase))
                 write_junit(receipt, expected, folder / "junit.xml")
-                receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"])
+                receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
+                result["receiptErrors"] = receipt_errors
                 result["status"] = "passed" if (
                     not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
                     and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
@@ -359,12 +381,14 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
     except Exception as error:
         summary["errorType"] = type(error).__name__
     finally:
+        if debug:
+            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
         summary["cancelled"] = cancel.is_set()
         summary["finished"] = True
         write_json(summary_path, summary)
         for sig, handler in previous.items():
             signal.signal(sig, handler)
-    return 0 if evaluate_hub_phases(output)["passed"] else 1
+    return 0 if evaluate_hub_phases(output, debug=bool(debug))["passed"] else 1
 
 
 def main():
@@ -374,9 +398,14 @@ def main():
     parser.add_argument("--resource-group", required=True)
     parser.add_argument("--region", required=True)
     parser.add_argument("--output", default="test-result/hub-phases")
+    FOCUSED["add_arguments"](parser)
     args = parser.parse_args()
     try:
-        return run(args.suite, args.subscription, args.resource_group, args.region, args.output)
+        return run(args.suite, args.subscription, args.resource_group, args.region, args.output,
+                   debug_phase=args.debug_phase, debug_nodes=args.debug_node)
+    except ValueError as error:
+        print("Hub controller rejected launch: " + str(error), flush=True)
+        return 1
     except Exception as error:
         print("Hub controller rejected launch: " + type(error).__name__, flush=True)
         return 1

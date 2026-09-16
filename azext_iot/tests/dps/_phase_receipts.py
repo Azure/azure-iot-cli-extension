@@ -16,6 +16,7 @@ from filelock import FileLock
 import pytest
 
 from azext_iot.tests.dps import _phase
+from azext_iot.tests import _focused_live as focused
 from azext_iot.tests.dps._phase_manifest import normalize_nodeid
 
 DIRECTORY_ENV = "azext_iot_dps_phase_receipts"
@@ -46,6 +47,7 @@ def write(name, payload, exclusive=False):
     payload = {
         "phase": _phase.get_phase(), "run_uid": uid, "subscription": subscription,
         "recorded_at": datetime.now(timezone.utc).isoformat(), **payload,
+        **focused.provenance(focused.from_environment(os.environ, "DPS", _phase.get_phase())),
     }
     destination = directory / name
     with FileLock(str(destination) + ".lock"):

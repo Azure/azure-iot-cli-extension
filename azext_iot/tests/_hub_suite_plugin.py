@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from azext_iot.tests import _hub_suite_manifest as manifest
+from azext_iot.tests import _focused_live as focused
 
 
 def result_errors(expected, collected, reports, exitstatus, finished):
@@ -68,7 +69,8 @@ def pytest_load_initial_conftests(early_config, parser, args):
     if not suite or not phase:
         raise pytest.UsageError("Hub selection plugin requires explicit suite and phase.")
     try:
-        expected = manifest.nodes(
+        debug = focused.from_environment(os.environ, suite, phase)
+        expected = tuple(debug["requestedNodes"]) if debug else manifest.nodes(
             suite, phase, linked_metadata=os.getenv("AZEXT_IOT_HUB_LINKED_METADATA") == "1",
         )
     except ValueError as error:
@@ -80,7 +82,7 @@ def pytest_load_initial_conftests(early_config, parser, args):
     receipt, run_id = os.getenv("AZEXT_IOT_HUB_RECEIPT"), os.getenv("AZEXT_IOT_HUB_RUN_ID")
     if not receipt or not run_id:
         raise pytest.UsageError("Hub phase requires a new receipt path and controller run ID.")
-    runtime = PhaseReceipt(suite, phase, expected, Path(receipt), run_id)
+    runtime = PhaseReceipt(suite, phase, expected, Path(receipt), run_id, debug=debug)
     early_config.pluginmanager.register(runtime, "hub-suite-receipt")
     ownership_path = os.getenv("AZEXT_IOT_HUB_OWNERSHIP")
     if ownership_path:
@@ -100,13 +102,14 @@ def pytest_load_initial_conftests(early_config, parser, args):
 class PhaseReceipt:
     """Record only credential-free node identities and outcomes, never tracebacks."""
 
-    def __init__(self, suite, phase, expected, path, run_id):
+    def __init__(self, suite, phase, expected, path, run_id, *, debug=None):
         self.path = path
         self.data = {
             "schemaVersion": 1, "suite": suite, "phase": phase, "runId": run_id,
             "expected": list(expected), "collected": [], "reports": {},
             "finished": False, "exitstatus": None, "errors": ["phase incomplete"],
             "cleanup": {"pytestTeardown": "incomplete", "resourceAbsence": "not-attested"},
+            **focused.provenance(debug),
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         # Exclusive reservation: never reuse a stale successful receipt.
@@ -127,7 +130,9 @@ class PhaseReceipt:
         self.data["collected"] = [item.nodeid for item in items]
         self.write()
         if self.data["collected"] != self.data["expected"]:
-            raise pytest.UsageError("Hub phase expanded membership/order differs from the manifest.")
+            raise pytest.UsageError(f"{self.data['suite']} phase expanded membership/order differs from the manifest.")
+        if self.data["suite"] == "DPS":
+            return
         metadata = {case.node: case for case in manifest.contract()}
         for item in items:
             case = metadata[item.nodeid]

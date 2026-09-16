@@ -26,6 +26,7 @@ from azure.core.exceptions import HttpResponseError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests._dps_phase_runner import Redactor
+from azext_iot.tests import _focused_live as focused
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
 
@@ -78,8 +79,8 @@ def sanitize(text, redactor=None):
 
 
 def validate_selection(config):
-    if tuple(arg.removeprefix("./") for arg in config.args) != NODES:
-        raise pytest.UsageError("HubSAS requires exactly its eight node arguments, with upload first.")
+    if tuple(arg.removeprefix("./") for arg in config.args) != selected_nodes():
+        raise pytest.UsageError("HubSAS requires exactly its selected node arguments, with upload first when included.")
     if (
         config.getoption("numprocesses", default=None) not in (None, 0)
         or config.getoption("keyword", default="")
@@ -95,6 +96,21 @@ def validate_selection(config):
         raise pytest.UsageError("HubSAS cannot borrow externally pinned resources.")
     if config.getoption("reruns", default=0):
         raise pytest.UsageError("HubSAS does not permit scenario reruns.")
+
+
+def selected_nodes():
+    try:
+        debug = focused.from_environment(os.environ, "HubData", "sas")
+    except ValueError as error:
+        raise pytest.UsageError(str(error)) from error
+    if debug:
+        if (os.getenv("AZEXT_IOT_HUB_SUITE"), os.getenv("AZEXT_IOT_HUB_PHASE")) != ("HubData", "sas"):
+            raise pytest.UsageError("Focused HubSAS requires its owned HubData controller.")
+        expected = tuple(debug["requestedNodes"])
+        if not set(expected).issubset(NODES):
+            raise pytest.UsageError("Focused HubSAS selection differs from its auth manifest.")
+        return expected
+    return NODES
 
 
 def require_posix_timers():
@@ -171,6 +187,8 @@ class BackgroundTasks:
 
 class HubSasPhase:
     def __init__(self, config, hub, storage, group, location):
+        self.expected = selected_nodes()
+        self.debug = focused.from_environment(os.environ, "HubData", "sas")
         self.config = config
         self.hub, self.storage, self.group, self.location = hub, storage, group, location
         self.subscription = os.getenv("azext_iot_hubsas_subscription", "").strip()
@@ -219,6 +237,7 @@ class HubSasPhase:
             "consumerGroupIds": sorted(self.allowed - {value.casefold() for value in self.ids.values()}),
             "deviceIds": self.device_ids,
             "cleanupFailures": self.cleanup_failures,
+            **focused.provenance(self.debug),
         }, indent=2), encoding="utf-8")
         temporary.replace(self.path)
 
@@ -429,8 +448,12 @@ class HubSasPhase:
         if self.started:
             raise HubSasError("The first HubSAS setup failed; resource creation will not be replayed.")
         self.started = True
-        if scenario._testMethodName != "test_device_upload_file":  # pylint: disable=protected-access
-            raise HubSasError("File-upload setup must create the cohort first.")
+        first = self.expected[0].rsplit("::", 1)[-1]
+        if scenario._testMethodName != first:  # pylint: disable=protected-access
+            raise HubSasError(
+                f"The first selected HubSAS case ({first}) must create the cohort first."
+                if self.debug else "File-upload setup must create the cohort first."
+            )
         if any(self.read(kind) is not None for kind in self.ids):
             raise HubSasError("A planned HubSAS ID already exists; refusing adoption or cleanup.")
         self.command(
@@ -549,8 +572,8 @@ class HubSasPhase:
 
     @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, items):
-        if tuple(item.nodeid for item in items) != NODES:
-            raise pytest.UsageError("HubSAS collection changed the exact required node order.")
+        if tuple(item.nodeid for item in items) != self.expected:
+            raise pytest.UsageError("HubSAS collection changed the exact selected node order.")
 
     def pytest_collection_finish(self, session):
         self.pytest_collection_modifyitems(session.items)
@@ -587,7 +610,7 @@ class HubSasPhase:
     def check_results(self, session):
         required = {"PUT " + resource_id.casefold() for resource_id in self.ids.values()}
         if (
-            self.bad_report or self.passed != set(NODES) or self.absent != set(self.ids)
+            self.bad_report or self.passed != set(self.expected) or self.absent != set(self.ids)
             or not required.issubset(self.sent)
         ):
             session.exitstatus = pytest.ExitCode.TESTS_FAILED
