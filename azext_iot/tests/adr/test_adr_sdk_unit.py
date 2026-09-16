@@ -83,7 +83,7 @@ def _invoke_ca(cli, action, pki, tmp_path, *, no_wait=False, query=None):
     args = ["iot", "adr", "ns", "ca", action, "-n", "ca", "--ns", "namespace", "-g", "rg", "-o", "json"]
     if action == "activate":
         path = tmp_path / "chain.pem"
-        path.write_text(pki["chain"], encoding="utf-8")
+        path.write_bytes(pki["chain"].encode("utf-8"))
         args.extend(["--certificate-chain-file", str(path)])
     else:
         args.append("--yes")
@@ -295,6 +295,7 @@ def test_activation_warning_wire_preserves_original_text(
         mocked_response.add("GET", CA_URL, json=_ca_resource(pki, "activate", completed=True))
     begin = mocker.spy(wire_client.certificate_authorities, "begin_activate")
     code, output = _invoke_ca(ca_wire_cli, "activate", pki, tmp_path, no_wait=no_wait)
+    assert (tmp_path / "chain.pem").read_bytes() == pki["chain"].encode("utf-8")
     assert code == 0, ca_wire_cli.result.error
     expected = {"future": "not yet valid", "margin": "365 days", "extensions": "missing requested",
                 "missing-csr": "not verified", "bad-csr": "not verified"}

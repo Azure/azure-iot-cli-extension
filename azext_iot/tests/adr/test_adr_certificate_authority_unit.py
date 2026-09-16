@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import errno
+import os
 from unittest.mock import Mock
 
 import pytest
@@ -648,6 +649,8 @@ def signing_directory(tmp_path):
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
+    if os.name != "posix":
+        pytest.skip("The POSIX signing recipe cannot establish private-key ACLs on this platform.")
     with TemporaryDirectory(dir=tmp_path, prefix="private-pki-") as directory:
         yield Path(directory)
 
@@ -755,6 +758,7 @@ def test_live_collision_never_deletes_borrowed_ca(mocker):
 
 
 @pytest.mark.parametrize("signer_fails", [False, True])
+@pytest.mark.skipif(os.name != "posix", reason="The POSIX signing recipe does not establish Windows private-key ACLs.")
 def test_live_private_key_directory_removed_after_failure(signer_fails, ca_pki, mocker):
     from contextlib import contextmanager
     from pathlib import Path
