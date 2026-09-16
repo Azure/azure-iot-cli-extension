@@ -654,10 +654,14 @@ def test_real_sdk_ack_and_background_debug_logs_are_redacted_after_observe(
 def test_reader_does_not_change_outer_process_timer(tracker_factory, mocked_response):
     import signal
 
-    if not hasattr(signal, "setitimer"):
+    alarm = getattr(signal, "SIGALRM", None)
+    timer = getattr(signal, "ITIMER_REAL", None)
+    get_timer = getattr(signal, "getitimer", None)
+    set_timer = getattr(signal, "setitimer", None)
+    if alarm is None or timer is None or not callable(get_timer) or not callable(set_timer):
         pytest.skip("POSIX timer assertion; bounded-read tests also run natively on Windows.")
-    previous_handler = signal.getsignal(signal.SIGALRM)
-    previous_timer = signal.getitimer(signal.ITIMER_REAL)
+    previous_handler = signal.getsignal(alarm)
+    previous_timer = get_timer(timer)
     if previous_timer[0]:
         # Never replace the runner's actual item timeout.
         tracker = tracker_factory[0]()
@@ -665,22 +669,22 @@ def test_reader_does_not_change_outer_process_timer(tracker_factory, mocked_resp
         mocked_response.add("GET", CA_LOCATION, status=204)
         submit(tracker)
         tracker.wait()
-        assert signal.getsignal(signal.SIGALRM) == previous_handler
-        remaining, interval = signal.getitimer(signal.ITIMER_REAL)
+        assert signal.getsignal(alarm) == previous_handler
+        remaining, interval = get_timer(timer)
         assert 0 < remaining <= previous_timer[0] and interval == previous_timer[1]
         return
     try:
-        signal.setitimer(signal.ITIMER_REAL, 10, 2)
+        set_timer(timer, 10, 2)
         tracker = tracker_factory[0]()
         mocked_response.add("POST", ACTION_URL, status=202, headers={"Location": CA_LOCATION})
         mocked_response.add("GET", CA_LOCATION, status=204)
         submit(tracker)
         tracker.wait()
-        remaining, interval = signal.getitimer(signal.ITIMER_REAL)
+        remaining, interval = get_timer(timer)
         assert 9 < remaining < 10 and interval == 2
-        assert signal.getsignal(signal.SIGALRM) == previous_handler
+        assert signal.getsignal(alarm) == previous_handler
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
+        set_timer(timer, 0)
 
 
 @pytest.mark.parametrize("actual", ["activate", "revokeAndRotate"])
