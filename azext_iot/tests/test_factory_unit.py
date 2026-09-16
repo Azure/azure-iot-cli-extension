@@ -238,6 +238,95 @@ def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, moc
     assert credential.get_token.call_args.args == tuple(cloud_config["expected_scopes"])
 
 
+class TestIotHubModelessLroPolling:
+    @pytest.mark.parametrize(
+        ("operation_group_name", "operation_name"),
+        [
+            ("private_endpoint_connections", "begin_update"),
+            ("private_endpoint_connections", "begin_delete"),
+            ("iot_hub_resource", "begin_create_or_update"),
+            ("iot_hub_resource", "begin_delete"),
+        ],
+    )
+    @pytest.mark.usefixtures("cli_profile")
+    def test_factory_injects_safe_polling_for_affected_operations(
+        self, mocker, operation_group_name, operation_name
+    ):
+        mock_client_cls = mocker.patch("azext_iot.sdk.iothub.mgmt.IotHubClient")
+        mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
+        polling_cls = mocker.patch("azext_iot._factory._ModelessJsonARMPolling")
+        result_callback = mocker.Mock()
+
+        client = mock_client_cls.return_value
+        operation_group = getattr(client, operation_group_name)
+        operation_group._config.polling_interval = 30
+        operation_group._config.base_url = "https://management.azure.com"
+        original_operation = getattr(operation_group, operation_name)
+
+        from azext_iot._factory import iot_hub_service_factory
+
+        service_client = iot_hub_service_factory(_build_cli_ctx(mocker, CLOUD_CONFIGS[0]))
+        getattr(getattr(service_client, operation_group_name), operation_name)(
+            "argument",
+            polling_interval=5,
+            cls=result_callback,
+        )
+
+        polling_cls.assert_called_once_with(
+            timeout=5,
+            path_format_arguments={"endpoint": "https://management.azure.com"},
+            result_callback=result_callback,
+        )
+        original_operation.assert_called_once_with(
+            "argument",
+            polling_interval=5,
+            cls=result_callback,
+            polling=polling_cls.return_value,
+        )
+
+    @pytest.mark.parametrize("polling", [False, object()])
+    @pytest.mark.usefixtures("cli_profile")
+    def test_factory_preserves_explicit_polling(self, mocker, polling):
+        mock_client_cls = mocker.patch("azext_iot.sdk.iothub.mgmt.IotHubClient")
+        mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
+        polling_cls = mocker.patch("azext_iot._factory._ModelessJsonARMPolling")
+
+        client = mock_client_cls.return_value
+        original_operation = client.iot_hub_resource.begin_create_or_update
+
+        from azext_iot._factory import iot_hub_service_factory
+
+        service_client = iot_hub_service_factory(_build_cli_ctx(mocker, CLOUD_CONFIGS[0]))
+        service_client.iot_hub_resource.begin_create_or_update("argument", polling=polling)
+
+        polling_cls.assert_not_called()
+        original_operation.assert_called_once_with("argument", polling=polling)
+
+    def test_safe_polling_deserializes_json_and_applies_result_callback(self, mocker):
+        from azext_iot._factory import _ModelessJsonARMPolling
+
+        pipeline_response = mocker.MagicMock()
+        pipeline_response.http_response.content = b'{"name": "hub"}'
+        pipeline_response.http_response.json.return_value = {"name": "hub"}
+        result_callback = mocker.Mock(return_value="transformed")
+        polling = _ModelessJsonARMPolling(result_callback=result_callback)
+
+        result = polling._deserialize_response(pipeline_response)
+
+        assert result == "transformed"
+        result_callback.assert_called_once_with(pipeline_response, {"name": "hub"}, {})
+
+    def test_safe_polling_returns_none_for_empty_response(self, mocker):
+        from azext_iot._factory import _ModelessJsonARMPolling
+
+        pipeline_response = mocker.MagicMock()
+        pipeline_response.http_response.content = b""
+        polling = _ModelessJsonARMPolling()
+
+        assert polling._deserialize_response(pipeline_response) is None
+        pipeline_response.http_response.json.assert_not_called()
+
+
 class TestSdkResolverHostnames:
     def _target(self, **overrides):
         target = {

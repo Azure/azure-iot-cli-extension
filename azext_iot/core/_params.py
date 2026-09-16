@@ -21,7 +21,13 @@ from azure.cli.command_modules.iot.shared import (EndpointType,
 
 
 from .custom import KeyType, SimpleAccessRights
-from .shared import IotDpsSku, IotHubSku, AccessRightsDescription, IotHubAuthenticationType
+from .shared import (
+    AccessRightsDescription,
+    IotDpsSku,
+    IotHubAuthenticationType,
+    IotHubConnectionProfile,
+    IotHubSku,
+)
 from azure.cli.command_modules.iot._validators import (validate_policy_permissions,
                                                        validate_retention_days,
                                                        validate_fileupload_notification_max_delivery_count,
@@ -427,6 +433,19 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('hub_name', completer=None)
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub. Default is the location of target resource group.')
+        c.argument(
+            'connection_profile',
+            options_list=['--connection-profile'],
+            arg_type=get_enum_type(IotHubConnectionProfile),
+            help='Connection profile for the IoT Hub. The MqttV5 profile '
+                 'cannot be changed after the hub is created.',
+            is_preview=True,
+        )
+        c.argument(
+            'yes',
+            options_list=['--yes', '-y'],
+            help='Do not prompt for confirmation when creating an IoT Hub with the MqttV5 connection profile.'
+        )
         c.argument('enable_data_residency', arg_type=get_three_state_flag(),
                    options_list=['--enforce-data-residency', '--edr'],
                    help='Enforce data residency for this IoT Hub by disabling cross-region disaster recovery. '

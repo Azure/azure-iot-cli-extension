@@ -18,6 +18,10 @@ def patch_core_help():
         helps[
             "iot hub create"
         ] += """
+  - name: Create an IoT Hub with the MQTT 5 connection profile.
+    text: >
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --unit 1
+        --connection-profile MqttV5 --yes
   - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
     text: >
         az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId

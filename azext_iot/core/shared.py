@@ -104,6 +104,13 @@ class IotHubSku(Enum):
     GEN2 = "GEN2"
 
 
+class IotHubConnectionProfile(Enum):
+    """The connection profile used by an IoT Hub."""
+
+    CLASSIC = "Classic"
+    MQTT_V5 = "MqttV5"
+
+
 class IotDpsSku(Enum):
     """DPS SKU name."""
 
