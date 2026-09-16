@@ -36,7 +36,7 @@ PHASES = (
 RUNNER_SECONDS = 110 * 60
 READ_SECONDS = 60
 DPS_LIMIT = 10  # Conservative subscription default; the DPS SDK exposes no quota-read operation.
-REQUIRED_SLOTS = 2
+REQUIRED_SLOTS = 3  # Two shared DPS fixtures plus one sequential capacity-validation resource.
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 
 
@@ -558,7 +558,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         write_json(summary_path, summary)
         baseline_ids = {resource["id"].lower() for resource in baseline}
         if not summary["baseline"]["capacity"]["ready"]:
-            raise PhaseError("Initial subscription capacity cannot support two managed DPS fixtures.")
+            raise PhaseError("Initial subscription capacity cannot support three managed DPS slots.")
         records = []
         with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
             for index, (name, runtime, cleanup) in enumerate(PHASES):
@@ -574,7 +574,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     previous_ids = set(prior["cleanup"]["owned_ids"])
                     present = [resource for record in records if (resource := reader.get(record)) is not None]
                     inventory = reader.inventory()
-                    fresh = capacity(inventory, required=1 if name == "local-auth-toggle" else REQUIRED_SLOTS)
+                    fresh = capacity(inventory, required=1 if name == "local-auth-toggle" else 2)
                     listed = [resource for resource in inventory
                               if resource["id"].lower() in {value.lower() for value in previous_ids}]
                     absent = not present and not listed

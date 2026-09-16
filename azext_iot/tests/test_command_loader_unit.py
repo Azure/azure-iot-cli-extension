@@ -12,13 +12,21 @@ service command groups (command_map.py, params.py, _help.py).
 """
 
 from pathlib import Path
+from copy import deepcopy
+from io import StringIO
+import json
+import re
+from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
+import responses
 import yaml
-from azure.cli.core import AzCommandsLoader
+from azure.cli.core import AzCommandsLoader, MainCommandsLoader
 from azure.cli.core.commands.events import EVENT_INVOKER_PRE_LOAD_ARGUMENTS
 from azure.cli.core.mock import DummyCli
 from azure.cli.core.parser import AzCliCommandParser
+from azure.core.credentials import AccessToken
 
 
 _NAMESPACE_ARGUMENTS = [
@@ -438,3 +446,227 @@ def test_rest_registration_keeps_csr_timeout_and_operation_status(hub_dps_parser
         assert parsed.csr == "request.pem" and parsed.timeout == 7
     else:
         assert parsed.operation_id == "op"
+
+
+class _DpsManagementCommandsLoader(MainCommandsLoader):
+    def load_command_table(self, args):
+        from azext_iot import IoTExtCommandsLoader
+
+        loader = IoTExtCommandsLoader(self.cli_ctx)
+        self.command_table = {
+            name: command for name, command in loader.load_command_table(args).items()
+            if name in ("iot dps create", "iot dps update")
+        }
+        self.cmd_to_loader_map = {name: [loader] for name in self.command_table}
+        return self.command_table
+
+
+@pytest.fixture
+def dps_management_cli(mocker):
+    from azext_iot import _factory
+    from azure.mgmt.resource import ResourceManagementClient
+
+    subscription = "00000000-0000-0000-0000-000000000001"
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
+    mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
+    management_factory = mocker.spy(_factory, "_iot_dps_management_client")
+    mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value=subscription)
+    profile_guard = mocker.patch("azure.cli.core._profile.Profile.__init__", side_effect=AssertionError("Live Profile"))
+    resource_client = ResourceManagementClient(credential, subscription)
+    location_factory = mocker.patch(
+        "azext_iot.core.custom.resource_service_factory", return_value=resource_client,
+    )
+    cli = DummyCli(commands_loader_cls=_DpsManagementCommandsLoader)
+    cli.data["subscription_id"] = subscription
+    resource_id = (
+        f"/subscriptions/{subscription}/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps"
+    )
+    state = SimpleNamespace(
+        cli=cli, location_factory=location_factory, management_factory=management_factory,
+        requests=[], status=201, available=True, lro=False,
+        resource={"id": resource_id, "name": "dps", "location": "centraluseuap",
+                  "sku": {"name": "S1", "capacity": 1}, "properties": {"provisioningState": "Succeeded"}},
+    )
+
+    def respond(request):
+        state.requests.append(request)
+        path = urlsplit(request.url).path
+        if request.method == "POST":
+            assert path.lower().endswith("/checkprovisioningservicenameavailability")
+            return 200, {}, json.dumps({"nameAvailable": state.available, "message": "Name is taken"})
+        if path.lower().endswith("/resourcegroups/rg"):
+            return 200, {}, json.dumps({"id": path, "name": "rg", "location": "centraluseuap"})
+        if path.endswith("/unit-operation"):
+            return 200, {}, json.dumps({"status": "Succeeded"})
+        assert path == resource_id
+        if request.method == "PUT":
+            if state.status >= 400:
+                return state.status, {}, json.dumps({"error": {"code": "UnitServiceError", "message": "Service rejected"}})
+            state.resource.update(json.loads(request.body))
+            state.resource.setdefault("properties", {})["provisioningState"] = "Succeeded"
+            if state.lro:
+                return 201, {"Azure-AsyncOperation": "https://centraluseuap.management.azure.com/unit-operation",
+                             "Retry-After": "0"}, json.dumps(state.resource)
+            return state.status, {}, json.dumps(state.resource)
+        assert request.method == "GET"
+        return 200, {}, json.dumps(state.resource)
+
+    def invoke(action, arguments):
+        output = StringIO()
+        try:
+            code = cli.invoke(["iot", "dps", action, "-n", "dps", "-g", "rg", *arguments], out_file=output)
+        except SystemExit as error:
+            code = error.code
+        return code, cli.result, output.getvalue()
+
+    state.invoke = invoke
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
+        for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+            network.add_callback(method, re.compile(r"https://.*"), callback=respond, content_type="application/json")
+        yield state
+    resource_client.close()
+    profile_guard.assert_not_called()
+
+
+@pytest.mark.parametrize("unit", [
+    ["--unit", "0"], ["--unit", "-1"], ["--unit", "-999"], ["--unit=0"], ["--unit=-1"],
+    ["--unit", "1.5"], ["--unit", "text"], ["--unit"],
+])
+@pytest.mark.parametrize("location", [[], ["--location", "centraluseuap"]])
+def test_dps_invalid_unit_actual_invocation_never_reaches_management(dps_management_cli, unit, location, caplog):
+    runtime = dps_management_cli
+    runtime.available = False
+    code, result, output = runtime.invoke(
+        "create", [*location, "--tags", "purpose=unit", "--system-assigned-mi", *unit],
+    )
+    assert code != 0
+    assert not output.strip()
+    if unit not in (["--unit", "1.5"], ["--unit", "text"], ["--unit"]):
+        assert "--unit must be an integer greater than or equal to 1" in str(result.error)
+    else:
+        assert code == 2
+        diagnostic = caplog.text
+        assert "invalid int value" in diagnostic or "expected one argument" in diagnostic
+    assert runtime.requests == []
+    runtime.location_factory.assert_not_called()
+    runtime.management_factory.assert_not_called()
+
+
+@pytest.mark.parametrize("unit,capacity", [
+    ([], 1), (["--unit", "1"], 1), (["--unit", "2"], 2), (["--unit", "999999999"], 999999999),
+])
+@pytest.mark.parametrize("location", [[], ["--location", "centraluseuap"]])
+def test_dps_valid_unit_actual_cli_to_sdk_json(dps_management_cli, unit, capacity, location):
+    runtime = dps_management_cli
+    code, result, output = runtime.invoke("create", [*location, *unit])
+    assert code == 0, result.error
+    assert json.loads(output)["sku"]["capacity"] == capacity
+    writes = [request for request in runtime.requests if request.method == "PUT"]
+    assert len(writes) == 1
+    body = json.loads(writes[0].body)
+    assert body["sku"] == {"name": "S1", "capacity": capacity}
+    assert body["location"] == "centraluseuap"
+    assert body["properties"] == {}
+    assert all("api-version=2026-06-01-preview" in request.url for request in runtime.requests
+               if "Microsoft.Devices" in request.url)
+    assert runtime.location_factory.call_count == (0 if location else 1)
+
+
+def test_dps_create_options_and_real_lro_are_preserved(dps_management_cli):
+    runtime = dps_management_cli
+    runtime.lro = True
+    identity = (
+        "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/"
+        "providers/Microsoft.ManagedIdentity/userAssignedIdentities/user"
+    )
+    code, result, _ = runtime.invoke("create", [
+        "--unit", "2", "--location", "centraluseuap", "--tags", "purpose=unit",
+        "--system-assigned-mi", "--user-assigned-mi", identity, "--disable-local-auth", "false",
+        "--enforce-data-residency", "true",
+    ])
+    assert code == 0, result.error
+    body = json.loads(next(request.body for request in runtime.requests if request.method == "PUT"))
+    assert body["sku"]["capacity"] == 2
+    assert body["tags"] == {"purpose": "unit"}
+    assert body["properties"] == {"disableLocalAuth": False, "enableDataResidency": True}
+    assert body["identity"]["userAssignedIdentities"] == {identity: {}}
+    assert "SystemAssigned" in body["identity"]["type"]
+    assert any("/unit-operation" in request.url for request in runtime.requests)
+    assert result.result["properties"]["provisioningState"] == "Succeeded"
+
+
+def test_dps_valid_create_service_error_remains_visible(dps_management_cli):
+    dps_management_cli.status = 409
+    code, result, _ = dps_management_cli.invoke("create", ["--unit", "1", "--location", "centraluseuap"])
+    assert code != 0
+    assert "Service rejected" in str(result.error)
+    assert len([request for request in dps_management_cli.requests if request.method == "PUT"]) == 1
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--set", "sku.capacity=0"], ["--set", "sku.capacity=-1"], ["--set", "sku.capacity=1.5"],
+    ["--set", "sku.capacity=true"], ["--set", "sku.capacity=null"], ["--set", "sku.capacity=text"],
+    ["--set", "sku.capacity=1", "--force-string"], ["--remove", "sku.capacity"], ["--remove", "sku"],
+    ["--set", 'sku={"name":"S1","capacity":0}'], ["--set", 'sku={"name":"S1"}'],
+    ["--set", "sku=null"], ["--set", "sku=[]"], ["--set", "sku=1"],
+    ["--set", "sku.CAPACITY=0"], ["--set", 'SKU={"capacity":0}'],
+    ["--set", "sku.capacity=2", "--set", "sku.capacity=0"],
+    ["--remove", "sku", "--set", 'sku={"capacity":0}'],
+    ["--set", "sku..capacity=0"], ["--set", ".sku.capacity=-1"],
+    ["--set", "..sku...capacity=1.5"], ["--set", "sku.capacity.=true"],
+    ["--set", ".sku..capacity=null"], ["--remove", ".sku.capacity"],
+    ["--set", '.sku={"name":"S1","capacity":0}'],
+])
+@pytest.mark.parametrize("baseline", [0, 1])
+def test_dps_generic_final_explicit_capacity_invalid_never_writes(dps_management_cli, arguments, baseline):
+    runtime = dps_management_cli
+    runtime.resource["sku"]["capacity"] = baseline
+    before = deepcopy(runtime.resource)
+    code, result, _ = runtime.invoke("update", arguments)
+    assert code != 0
+    assert "sku.capacity must be an integer greater than or equal to 1" in str(result.error)
+    assert [request.method for request in runtime.requests] == ["GET"]
+    assert runtime.resource == before
+
+
+@pytest.mark.parametrize("arguments,capacity", [
+    (["--set", "sku.capacity=1"], 1), (["--set", "sku.capacity=2"], 2),
+    (["--set", "sku.capacity=0", "--set", "sku.capacity=2"], 2),
+    (["--remove", "sku.capacity", "--set", "sku.capacity=1"], 1),
+    (["--set", 'sku={"name":"S1","capacity":2}'], 2),
+    (["--set", "sku..capacity=2"], 2),
+    (["--set", ".sku.capacity=0", "--set", "sku.capacity.=2"], 2),
+])
+def test_dps_generic_capacity_validates_final_ordered_edits(dps_management_cli, arguments, capacity):
+    code, result, _ = dps_management_cli.invoke("update", arguments)
+    assert code == 0, result.error
+    writes = [request for request in dps_management_cli.requests if request.method == "PUT"]
+    assert len(writes) == 1
+    assert json.loads(writes[0].body)["sku"]["capacity"] == capacity
+
+
+@pytest.mark.parametrize("sku", [{}, {"name": "S1"}, {"capacity": None}, {"capacity": 0}, None])
+@pytest.mark.parametrize("arguments", [
+    ["--set", "tags.purpose=unit"], ["--tags", "purpose=unit"],
+    ["--system-assigned-mi"], ["--remove", "tags.old"],
+])
+def test_dps_unrelated_update_does_not_validate_baseline_capacity(dps_management_cli, sku, arguments):
+    runtime = dps_management_cli
+    runtime.resource["tags"] = {"old": "value"}
+    if sku is None:
+        runtime.resource.pop("sku")
+    else:
+        runtime.resource["sku"] = sku
+    code, result, _ = runtime.invoke("update", arguments)
+    assert code == 0, result.error
+    assert len([request for request in runtime.requests if request.method == "PUT"]) == 1
+
+
+def test_dps_unit_help_and_internal_update_argument_are_not_public(dps_management_cli, capsys):
+    code, _, output = dps_management_cli.invoke("create", ["--help"])
+    assert code == 0
+    assert "Integer minimum: 1" in " ".join((output + capsys.readouterr().out).split())
+    for option in ("--unit", "--dps-capacity-edited"):
+        code, _, _ = dps_management_cli.invoke("update", [option, "1"])
+        assert code != 0
+    assert dps_management_cli.requests == []

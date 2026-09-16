@@ -55,6 +55,7 @@ from azext_iot.core.shared import (
     ManagedServiceIdentityType,
     RenewKeyType,
 )
+from azext_iot.core._validators import validate_dps_capacity_update, validate_dps_unit
 from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
 
 logger = get_logger(__name__)
@@ -211,6 +212,7 @@ def iot_dps_create(
     disable_local_auth=None,
 ):
     """Create a DPS instance with optional managed identities."""
+    validate_dps_unit(unit)
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
@@ -252,7 +254,10 @@ def iot_dps_update(
     mi_user_assigned=None,
     cmd=None,
     disable_local_auth=None,
+    dps_capacity_edited=False,
 ):
+    if dps_capacity_edited:
+        validate_dps_capacity_update(parameters)
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     if tags is not None:
         parameters["tags"] = tags

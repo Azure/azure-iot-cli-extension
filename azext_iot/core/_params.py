@@ -21,6 +21,7 @@ from azure.cli.command_modules.iot.shared import (EndpointType,
 
 
 from .custom import KeyType, SimpleAccessRights
+from ._validators import validate_dps_create_unit
 from .shared import IotDpsSku, IotHubSku, AccessRightsDescription, IotHubAuthenticationType
 from azure.cli.command_modules.iot._validators import (validate_policy_permissions,
                                                        validate_retention_days,
@@ -73,12 +74,16 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    'Default is the location of target resource group.')
         c.argument('sku', arg_type=get_enum_type(IotDpsSku),
                    help='Pricing tier for the IoT Hub Device Provisioning Service.')
-        c.argument('unit', help='Units in your IoT Hub Device Provisioning Service.', type=int)
+        c.argument('unit', help='Units in your IoT Hub Device Provisioning Service. Integer minimum: 1.',
+                   type=int, validator=validate_dps_create_unit)
         c.argument('enable_data_residency', arg_type=get_three_state_flag(),
                    options_list=['--enforce-data-residency', '--edr'],
                    help='Enforce data residency for this IoT Hub Device Provisioning Service by disabling '
                    'cross geo-pair disaster recovery. This property is immutable once set on the resource. '
                    'Only available in select regions. Learn more at https://aka.ms/dpsdr')
+
+    with self.argument_context('iot dps update') as c:
+        c.ignore('dps_capacity_edited')
 
     # plan to slowly align this with extension naming patterns - n should be aligned with dps_name
     for subgroup in ['linked-hub', 'certificate']:

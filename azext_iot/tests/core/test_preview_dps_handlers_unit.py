@@ -149,6 +149,14 @@ def test_dps_create_unavailable_name_does_not_write(preview_mgmt):
     client.iot_dps_resource.begin_create_or_update.assert_not_called()
 
 
+@pytest.mark.parametrize("unit", [0, -1, -999, None, True, False, 1.5, "1"])
+def test_dps_direct_create_guard_precedes_all_client_access(mocker, unit):
+    cmd, client = mocker.Mock(), mocker.Mock()
+    with pytest.raises(InvalidArgumentValueError, match="--unit.*greater than or equal to 1"):
+        custom.iot_dps_create(cmd, client, "dps", "rg", unit=unit)
+    assert cmd.mock_calls == client.mock_calls == []
+
+
 @pytest.mark.parametrize("disable_local_auth,expected", [(None, None), (True, True), (False, False)])
 def test_dps_create_local_auth_default(preview_mgmt, disable_local_auth, expected):
     cmd, client, _, _, _ = preview_mgmt

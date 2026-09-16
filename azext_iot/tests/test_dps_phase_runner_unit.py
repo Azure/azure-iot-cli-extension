@@ -95,7 +95,7 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["capacity"]["count"] == 3  # Neither hardcoded eight nor assumed empty.
     assert reader.inventories == 6  # Baseline, each cleanup, and both pre-phase gates.
-    assert len(reader.gets) == 13  # Three IDs per old phase, rechecked before the next; one toggle DPS.
+    assert len(reader.gets) == 17  # Five regular IDs and three SAS IDs, each rechecked, then one toggle DPS.
     assert not GATE(tmp_path)
     for phase in RUNNER["MANIFEST"]["PHASE_NAMES"]:
         folder = tmp_path / "dps-phases" / phase
@@ -176,7 +176,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
 
         def get(record):
             original_get(record)
-            return {"id": record["id"], "state": "Deleting"} if len(reader.gets) > 3 else None
+            return {"id": record["id"], "state": "Deleting"} if len(reader.gets) > 5 else None
         reader.get = get
 
     def execute(*args):
@@ -234,7 +234,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     else:
         assert phases[1]["status"] == "blocked"
         if defect == "reappeared":
-            assert len(phases[1]["gate"]["remaining"]) == 3
+            assert len(phases[1]["gate"]["remaining"]) == 5
 
 
 @pytest.mark.parametrize("pin", [
