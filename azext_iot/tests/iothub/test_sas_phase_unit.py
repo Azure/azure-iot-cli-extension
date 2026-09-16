@@ -446,6 +446,62 @@ def test_logging_filter_retains_pem_state_across_records(phase):
     assert "secret-value" not in "".join(results)
 
 
+@pytest.mark.parametrize("key_type", ["PRIVATE KEY", "EC PRIVATE KEY", "RSA PRIVATE KEY"])
+def test_ca_uri_factory_preserves_sas_pem_record_stream(phase, key_type, monkeypatch):
+    from azext_iot.tests.adr._certificate_action_tracker import _protect_action_logs
+
+    monkeypatch.setattr(logging, "_logRecordFactory", logging.LogRecord)
+    _protect_action_logs()
+    ca_factory = logging.getLogRecordFactory()
+    begin, end = f"-----BEGIN {key_type}-----", f"-----END {key_type}-----"
+    for text in (begin, end, "ordinary diagnostic " + "a" * 64, "Why? Keep this diagnostic."):
+        assert ca_factory("test", logging.ERROR, "", 0, text, (), None).getMessage() == text
+    phase.install()
+    factory = logging.getLogRecordFactory()
+    results = [
+        factory("test", logging.ERROR, "", 0, line, (), None).getMessage()
+        for line in (
+            begin, "secret-value", end, "ordinary diagnostic",
+            "https://management.azure.com/status?opaque=secret-value",
+            '{"Authorization": "Bearer secret-value"}',
+        )
+    ]
+    assert "secret-value" not in "".join(results)
+    assert "ordinary diagnostic" in results[3]
+    assert results[4] == "[URL omitted]"
+
+
+@pytest.mark.parametrize("protected", [False, True], ids=["sas-only", "ca-then-sas"])
+def test_ca_uri_factory_and_sas_filter_redact_exception_and_stack_records(phase, monkeypatch, protected):
+    from azext_iot.tests.adr._certificate_action_tracker import _protect_action_logs
+
+    monkeypatch.setattr(logging, "_logRecordFactory", logging.LogRecord)
+    if protected:
+        _protect_action_logs()
+    phase.install()
+    factory = logging.getLogRecordFactory()
+    records = []
+    for text in (
+        "-----BEGIN PRIVATE KEY-----", "secret-value", "-----END PRIVATE KEY-----",
+        '{"Authorization": "Bearer secret-value"}',
+        "https://management.azure.com/status?opaque=secret-value",
+        "ordinary diagnostic",
+    ):
+        error = RuntimeError(text)
+        records.append(factory("test", logging.ERROR, "", 0, "", (), (RuntimeError, error, None)))
+    output = "".join(logging.Formatter().format(record) for record in records)
+    assert "secret-value" not in output
+    assert "ordinary diagnostic" in output
+    assert all(record.exc_info is None for record in records)
+    stack = factory(
+        "test", logging.ERROR, "", 0, "stack diagnostic", (), None, sinfo=(
+            "-----BEGIN PRIVATE KEY-----\nsecret-value\n-----END PRIVATE KEY-----\n"
+            "https://management.azure.com/status?opaque=secret-value"
+        ),
+    )
+    assert "secret-value" not in logging.Formatter().format(stack)
+
+
 def test_pytest_report_and_junit_are_sanitized_before_artifacts(phase, tmp_path):
     from _pytest.reports import TestReport
     from _pytest.junitxml import LogXML

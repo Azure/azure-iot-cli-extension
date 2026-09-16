@@ -246,6 +246,9 @@ class HubSasPhase:
                 record.msg, record.args = sanitize(record.getMessage(), redactor), ()
                 if record.exc_info:
                     record.exc_text = sanitize("".join(traceback.format_exception(*record.exc_info)), redactor)
+                    record.exc_info = None
+                elif record.exc_text:
+                    record.exc_text = sanitize(record.exc_text, redactor)
                 if record.stack_info:
                     record.stack_info = sanitize(record.stack_info, redactor)
             return record

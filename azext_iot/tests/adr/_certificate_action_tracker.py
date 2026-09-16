@@ -21,32 +21,21 @@ from knack.util import CLIError
 from urllib3.util import Timeout
 
 from azext_iot.adr.providers.base import _retry_after_seconds
-from azext_iot.tests._dps_phase_runner import Redactor
 
 
 def _protect_action_logs():
     # Native SDK pollers can outlive both observe() and fixture cleanup. Keep a
-    # stateless redactor for the process lifetime, without retaining signed URLs.
+    # URI-only redactor for the process lifetime, without retaining signed URLs.
+    # PEM/credential stream redactors must still receive their original boundaries.
     previous = logging.getLogRecordFactory()
     if getattr(previous, "_adr_action_redactor", False):
         return
 
     def sanitize(text):
         # A Location may be relative, and unknown query names are just as
-        # sensitive as "sig". Redact before the generic credential patterns.
-        text = re.sub(r"""([^\s'"<>?]+\?)[^\s'"<>]+""", r"\1***", text)
-        redactor = Redactor()
-        pieces, position = [], 0
-        # Preserve ARM paths used to identify quarantine targets; the phase
-        # redactor's bare-base64 heuristic otherwise mistakes those for keys.
-        for match in re.finditer(r"""(?:https?://|/subscriptions/)[^\s'"<>]+""", text, re.IGNORECASE):
-            pieces.extend(redactor.line(line) for line in text[position:match.start()].splitlines(keepends=True))
-            path, query, _ = match[0].partition("?")
-            path = re.sub(r"(://)[^/@]+@", r"\1***@", path)
-            pieces.append(path + ("?***" if query else ""))
-            position = match.end()
-        pieces.extend(redactor.line(line) for line in text[position:].splitlines(keepends=True))
-        return "".join(pieces)
+        # sensitive as "sig".
+        text = re.sub(r"""([^\s'"<>?]*/[^\s'"<>?]*\?)[^\s'"<>]+""", r"\1***", text)
+        return re.sub(r"""(https?://)[^\s/'"<>@]+@""", r"\1***@", text, flags=re.IGNORECASE)
 
     def factory(*args, **kwargs):
         record = previous(*args, **kwargs)

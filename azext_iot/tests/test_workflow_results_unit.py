@@ -380,8 +380,13 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 26
+        assert len(nodes) == 30
         assert expected <= nodes
+        assert {
+            "test_adr_certificate_authority_int.py::TestADRCAActions::" + name
+            for name in ("test_external_activation_recipe", "test_external_activation_no_wait",
+                         "test_microsoft_revocation", "test_microsoft_revocation_no_wait")
+        } <= nodes
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 

@@ -12,7 +12,7 @@ import shlex
 import weakref
 from contextlib import contextmanager
 from threading import Event, current_thread, main_thread
-from time import monotonic, sleep
+from time import monotonic
 from urllib.parse import urlsplit
 
 import pytest
@@ -557,15 +557,17 @@ def test_real_wall_clock_deadline_discards_late_reads(
     stage, cleanup, tracker_factory, mocked_response, mocker,
 ):
     factory, _, token = tracker_factory
-    tracker = factory(timeout=0.02, clock=monotonic, sleeper=lambda _seconds: None)
+    tracker = factory(timeout=0.5, clock=monotonic, sleeper=lambda _seconds: None)
     mocked_response.add("POST", ACTION_URL, status=202, headers={"Location": CA_LOCATION})
     submit(tracker)
-    entered, finished = Event(), Event()
+    entered, finished, release = Event(), Event(), Event()
 
     def delayed(value):
         entered.set()
         try:
-            sleep(0.15)
+            # Leave startup margin on Windows, but hold the stage beyond the
+            # asserted caller budget: a synchronous read would take 3 seconds.
+            release.wait(3)
             return value
         finally:
             finished.set()
@@ -577,17 +579,23 @@ def test_real_wall_clock_deadline_discards_late_reads(
     else:
         mocked_response.add("GET", CA_LOCATION, json={"status": "Succeeded"})
         mocker.patch.object(requests.Response, "json", side_effect=lambda: delayed({"status": "Succeeded"}))
-    start = monotonic()
-    with pytest.raises(AssertionError, match="Timed out"):
-        tracker.wait(cleanup=cleanup)
-    elapsed = monotonic() - start
-    assert entered.is_set() and elapsed < 0.10
-    reader = tracker._reader
-    with pytest.raises(AssertionError, match="in flight|Timed out"):
-        tracker.wait(cleanup=True)
-    assert tracker._reader is reader
-    assert finished.wait(1)
-    reader.join(1)
+    try:
+        start = monotonic()
+        with pytest.raises(AssertionError, match="Timed out"):
+            tracker.wait(cleanup=cleanup)
+        elapsed = monotonic() - start
+        assert entered.is_set() and elapsed < 1
+        assert not finished.is_set()
+        reader = tracker._reader
+        with pytest.raises(AssertionError, match="in flight|Timed out"):
+            tracker.wait(cleanup=True)
+        assert tracker._reader is reader
+        assert not tracker.terminal and not tracker.succeeded
+    finally:
+        release.set()
+        if tracker._reader is not None:
+            tracker._reader.join(3)
+    assert finished.is_set()
     assert not reader.is_alive()
     assert not tracker.terminal and not tracker.succeeded
     assert sum(call.request.method == "GET" for call in mocked_response.calls) == (0 if stage == "auth" else 1)

@@ -29,6 +29,9 @@ ROOT_TYPES = {
 ROUTE_REJECTION_NODE = (
     "azext_iot/tests/iothub/message_endpoint/test_iothub_message_route_int.py::test_route_lifecycle"
 )
+ENDPOINT_REJECTION_NODE = (
+    "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::test_iot_endpoint_force_delete"
+)
 
 
 def planned_root(resource_id):
@@ -59,9 +62,34 @@ def literal_tree(value):
 
 
 def expected_rejection(mutation):
-    return (mutation.get("status") == 400 and mutation.get("method") == "PUT"
-            and mutation.get("validation") == "missing-route-endpoint"
-            and mutation.get("node") == ROUTE_REJECTION_NODE and bool(mutation.get("fingerprint")))
+    return (
+        mutation.get("status") == 400 and mutation.get("method") == "PUT"
+        and (mutation.get("validation"), mutation.get("node")) in (
+            ("missing-route-endpoint", ROUTE_REJECTION_NODE),
+            ("referenced-endpoint-removal", ENDPOINT_REJECTION_NODE),
+        ) and bool(mutation.get("fingerprint"))
+    )
+
+
+def routing_rejection(node, routing, previous):
+    endpoints = {"events"} | {ep["name"] for group in routing.get("endpoints", {}).values() for ep in group}
+    if node == ROUTE_REJECTION_NODE:
+        if any(re.fullmatch(r"ep[0-9a-f]{30}", name) and name not in endpoints
+               for route in routing.get("routes", []) for name in route.get("endpointNames", [])):
+            return "missing-route-endpoint"
+    elif node == ENDPOINT_REJECTION_NODE:
+        previous_endpoints = {ep["name"] for group in previous.get("endpoints", {}).values() for ep in group}
+        removed = previous_endpoints - endpoints
+        references = {
+            name for kind in ("routes", "enrichments") for item in routing.get(kind, [])
+            for name in item.get("endpointNames", [])
+        }
+        # The negative command removes owned endpoints but intentionally retains
+        # their routes/enrichments; the following --force update is distinct.
+        if (removed and removed & references and all(re.fullmatch(r"ep[0-9a-f]{10}", name) for name in removed)
+                and all(routing.get(kind, []) == previous.get(kind, []) for kind in ("routes", "enrichments"))):
+            return "referenced-endpoint-removal"
+    return None
 
 
 def pending_mutation(mutation):
@@ -200,16 +228,27 @@ def observe_get(data, resource_id, status, resource):
         if resource_id == root and status == 200:
             if (resource.get("id", "").casefold() != root
                     or resource.get("tags", {}).get(OWNER_TAG) != data["runId"]):
+                data.setdefault("violationDetails", []).append({
+                    "reason": "Observed root ownership changed", "method": "GET", "resourcePath": root,
+                    "idMatches": resource.get("id", "").casefold() == root,
+                    "ownerMatches": resource.get("tags", {}).get(OWNER_TAG) == data["runId"],
+                })
                 raise OwnershipError("Observed resource no longer belongs to this phase")
             if (record["mutations"][0]["status"] in (200, 201, 202)
                     and not record["mutations"][0].get("responseError")):
                 record["resolved"] = True
-            if ("/microsoft.resources/deployments/" in root
-                    and resource.get("properties", {}).get("provisioningState", "").casefold() == "succeeded"):
-                record["deploymentSucceeded"] = True
+            if "/microsoft.resources/deployments/" in root:
+                record["deploymentSucceeded"] = (
+                    resource.get("properties", {}).get("provisioningState", "").casefold() == "succeeded"
+                    and all(m["status"] in (200, 201, 202) and not m.get("responseError") and not m.get("pollingFailed")
+                            for m in record["mutations"])
+                )
         for mutation in record["mutations"]:
             if mutation["id"] != resource_id or not pending_mutation(mutation):
                 continue
+            if (status == 200 and resource.get("properties", {}).get("provisioningState", "").casefold()
+                    in ("failed", "canceled", "cancelled")):
+                mutation["pollingFailed"] = True
             if mutation.get("pollingFailed"):
                 confirmed = False
             elif mutation["method"] == "DELETE":
@@ -228,7 +267,7 @@ def observe_get(data, resource_id, status, resource):
             if confirmed:
                 mutation["reconciled"] = True
         record["uncertain"] = any(
-            m["status"] is None or m.get("responseError") or pending_mutation(m)
+            m["status"] is None or m.get("responseError") or m.get("pollingFailed") or pending_mutation(m)
             or m["status"] in (408, 429) or (isinstance(m["status"], int) and m["status"] >= 500)
             for m in record["mutations"]
         )
@@ -250,7 +289,7 @@ def _reconcile(arm, data, deadline, save):
             continue
         mutations = record.get("mutations", [])
         if not mutations or any(
-            m.get("status") is None or m.get("responseError") or m.get("status") in (408, 429)
+            m.get("status") is None or m.get("responseError") or m.get("pollingFailed") or m.get("status") in (408, 429)
             or (isinstance(m.get("status"), int) and m["status"] >= 500) for m in mutations
         ):
             return
@@ -273,8 +312,14 @@ def _reconcile(arm, data, deadline, save):
             if time.monotonic() >= deadline:
                 break
             status, resource = arm.request("GET", target, api)
-            observe_get(data, target, status, resource)
+            try:
+                observe_get(data, target, status, resource)
+            except OwnershipError:
+                save()
+                raise
             save()
+            if any(m.get("pollingFailed") for record in data["resources"].values() for m in record["mutations"]):
+                return
         pending = targets()
         if pending:
             time.sleep(min(1, max(0, deadline - time.monotonic())))
@@ -329,7 +374,7 @@ def ownership_errors(data, run_id, phase):
                 or not record.get("attempted") or record.get("ownerTag") != run_id):
             errors.append("invalid pre-create evidence")
         if (record.get("uncertain") or not record.get("resolved")
-                or any(m.get("responseError") for m in record.get("mutations", []))):
+                or any(m.get("responseError") or m.get("pollingFailed") for m in record.get("mutations", []))):
             errors.append("unresolved mutation; no replay permitted")
         mutations = record.get("mutations", [])
         if not mutations or mutations[0].get("method") != "PUT":
@@ -584,12 +629,13 @@ class Observer:
         mutation = {"method": method, "id": resource_id, "apiVersion": api, "status": None,
                     "fingerprint": fingerprint, "node": self.current_node}
         if (root == resource_id and roots[root]["resolved"] and method == "PUT"
-                and "/iothubs/" in root and self.current_node == ROUTE_REJECTION_NODE):
-            routing = body.get("properties", {}).get("routing", {})
-            endpoints = {"events"} | {ep["name"] for group in routing.get("endpoints", {}).values() for ep in group}
-            if any(re.fullmatch(r"ep[0-9a-f]{32}", name) and name not in endpoints
-                   for route in routing.get("routes", []) for name in route.get("endpointNames", [])):
-                mutation["validation"] = "missing-route-endpoint"
+                and "/iothubs/" in root and self.current_node in (ROUTE_REJECTION_NODE, ENDPOINT_REJECTION_NODE)):
+            validation = routing_rejection(
+                self.current_node, body.get("properties", {}).get("routing", {}),
+                resource.get("properties", {}).get("routing", {}),
+            )
+            if validation:
+                mutation["validation"] = validation
         roots[root]["uncertain"] = True
         roots[root]["mutations"].append(mutation)
         self.save()
@@ -690,13 +736,50 @@ class Observer:
         target = resource_id.casefold()
         record = self.data["resources"].get(target, {})
         if (not scope_id(target) or len(target.split("/")) != 9
-                or "/".join(target.split("/")[6:8]) != resource_type or record.get("id") != target
-                or not record.get("resolved") or record.get("uncertain")):
+                or "/".join(target.split("/")[6:8]) != resource_type or record.get("id") != target):
+            self.reject("Reference requires an exact resolved owned root")
+        if record.get("uncertain") or not record.get("resolved"):
+            # Reconcile only this tree and its acknowledged deployment dependencies.
+            # Other roots may be in teardown; never turn a reference into a sweep.
+            resources = {target: record}
+            for mutation in record["mutations"]:
+                if mutation.get("deployment"):
+                    deployment = mutation["deployment"]
+                    resources[deployment] = self.data["resources"][deployment]
+            evidence = dict(self.data, resources=resources, violations=[],
+                            violationDetails=self.data.setdefault("violationDetails", []))
+            errors = ownership_errors(evidence, self.data["runId"], self.data["phase"])
+            if errors and set(errors) <= {
+                "unresolved mutation; no replay permitted", "unreconciled asynchronous acceptance",
+            } and any(pending_mutation(m) for m in record["mutations"]):
+                deadline = min(self.arm.deadline or float("inf"), time.monotonic() + 60)
+                self._verify(reconcile, self.arm, evidence, deadline, self.save)
+        if (not record.get("resolved") or record.get("uncertain")
+                or any(m.get("pollingFailed") for m in record["mutations"])):
             self.reject("Reference requires an exact resolved owned root")
         status, resource = self._read(target, record["apiVersion"])
         if (status != 200 or resource.get("id", "").casefold() != target
                 or resource.get("tags", {}).get(OWNER_TAG) != self.data["runId"]):
             self.reject("Referenced root ownership changed")
+
+    def require_owned_export(self, resource_id):
+        target = resource_id.casefold()
+        root = next((key for key in self.data["resources"]
+                     if target == key or target.startswith(key + "/")), None)
+        if not scope_id(target) or root is None:
+            self.reject("Export requires an exact owned resource subset")
+        record = self.data["resources"][root]
+        mutations = [m for m in record["mutations"] if m["id"] == target]
+        if target != root and (
+            not mutations or mutations[-1]["method"] not in ("PUT", "PATCH", "POST")
+            or any(m["status"] not in (200, 201, 202, 204) for m in mutations)
+        ):
+            self.reject("Export requires an exact owned resource subset")
+        self.require_owned_reference(root, "/".join(root.split("/")[6:8]))
+        if target != root:
+            status, resource = self._read(target, mutations[-1]["apiVersion"])
+            if status != 200 or resource.get("id", "").casefold() != target:
+                self.reject("Export descendant identity changed")
 
     def require_owned_endpoint(self, hostname):
         suffixes = {
@@ -808,15 +891,12 @@ class Observer:
                             or not resources or not isinstance(resources, list)
                             or not isinstance(body.get("options", ""), str)
                             or body.get("options", "").casefold() not in ("", "skipallparameterization")
-                            or any(not isinstance(value, str) or value.casefold() not in owner.data["resources"]
-                                   or not owner.data["resources"][value.casefold()]["resolved"]
-                                   or owner.data["resources"][value.casefold()]["uncertain"] for value in resources)):
+                            or any(not isinstance(value, str) for value in resources)):
                         owner.reject("Export requires an exact owned resource subset")
                     if len({value.casefold() for value in resources}) != len(resources):
                         owner.reject("Export requires distinct exact owned resources")
                     for value in resources:
-                        target = value.casefold()
-                        owner.require_owned_reference(target, target.split("/providers/")[1].rsplit("/", 1)[0])
+                        owner.require_owned_export(value)
                     readonly = True
                 if method == "POST" and action in ("$testnew", "$testall"):
                     route_root = resource_id.rsplit("/routing/routes/", 1)

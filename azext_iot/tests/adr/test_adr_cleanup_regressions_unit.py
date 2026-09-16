@@ -149,7 +149,11 @@ def test_absence_wait_requires_actual_absence_and_does_not_retry_read_errors():
 
 
 class CertificateScenario:
-    def __init__(self):
+    _observe_additional_policy = staticmethod(
+        ca_scenario.TestADRCertificateAuthorityLifecycle._observe_additional_policy
+    )
+
+    def __init__(self, additional_policy):
         self.resources = {}
         self.commands = []
         self.deleting = set()
@@ -158,6 +162,7 @@ class CertificateScenario:
         self.delete_error_removes_backend = False
         self.create_error = None
         self.race_to_absence = False
+        self.additional_policy = additional_policy
 
     @staticmethod
     def not_found():
@@ -179,12 +184,22 @@ class CertificateScenario:
         if kwargs.get("expect_failure"):
             return Mock()
         if action == "create":
+            if name == "additionalpolicy" and self.additional_policy == "absent":
+                error = HttpResponseError(message="PolicyRejected: service rejection")
+                error.status_code = 409
+                raise error
             properties = (
                 {"certificate": {"validityPeriodInDays": 30}}
                 if kind == "policy" else
                 {"certificateAuthorityType": "Root" if name == "rootca" else "ICA"}
             )
             self.resources[key] = {"name": name, "properties": properties}
+            if name == "additionalpolicy" and self.additional_policy == "persisted-rejection":
+                raise CLIError(
+                    "The operation did not succeed (provisioningState='Failed'). "
+                    "The resource-status response did not include a detailed error. "
+                    "Check Azure Activity Log for this resource around the operation time."
+                )
             if name == self.create_error:
                 raise CLIError("create failed after persistence")
         elif action == "update":
@@ -216,14 +231,14 @@ class CertificateScenario:
         return [command for command in self.commands if " delete " in command]
 
 
-@pytest.fixture
-def certificate_scenario(monkeypatch):
+@pytest.fixture(params=["allowed", "absent", "persisted-rejection"])
+def certificate_scenario(monkeypatch, request):
     monkeypatch.setattr(ca_scenario, "generate_adr_namespace_name", lambda: "owned-namespace")
     monkeypatch.setattr(
         ca_scenario, "wait_for_resource_absent",
         lambda test, command: wait_for_resource_absent(test, command, timeout=0, interval=0),
     )
-    return CertificateScenario()
+    return CertificateScenario(request.param)
 
 
 @pytest.mark.parametrize("race", [False, True])
@@ -232,8 +247,11 @@ def test_ca_cleanup_waits_for_delete_and_child_absence_before_parents(certificat
     scenario.race_to_absence = race
     scenario.run()
     assert not scenario.resources
+    expected = ["leafpolicy", "issuingca", "rootca", "owned-namespace"]
+    if scenario.additional_policy != "absent":
+        expected.insert(0, "additionalpolicy")
     assert [shlex.split(command)[shlex.split(command).index("-n") + 1]
-            for command in scenario.deletions()] == ["leafpolicy", "issuingca", "rootca", "owned-namespace"]
+            for command in scenario.deletions()] == expected
     for command in scenario.deletions():
         assert "--no-wait" not in shlex.split(command)
         delete_index = scenario.commands.index(command)
@@ -247,12 +265,16 @@ def test_ca_lingering_policy_blocks_all_parents_and_retains_ownership(certificat
     monkeypatch.setattr(ca_scenario, "CleanupLedger", lambda: ledger)
     with pytest.raises(AssertionError, match="resource is still readable"):
         scenario.run()
-    assert len(scenario.deletions()) == 1
-    assert len(scenario.resources) == 4
-    assert {action[0] for action in ledger._actions} == {"policy", "ica", "root", "namespace"}
+    allocated = scenario.additional_policy != "absent"
+    assert len(scenario.deletions()) == 1 + allocated
+    assert len(scenario.resources) == 4 + allocated
+    expected = {"policy", "ica", "root", "namespace"}
+    if allocated:
+        expected.add("additional-policy")
+    assert {action[0] for action in ledger._actions} == expected
     scenario.lingering_policy = False
     assert not ledger.cleanup()
-    assert len(scenario.deletions()) == 4
+    assert len(scenario.deletions()) == 4 + allocated
     assert not scenario.resources
 
 
@@ -263,7 +285,7 @@ def test_ca_rejected_ica_delete_preserves_root_and_namespace(certificate_scenari
     scenario.delete_error_removes_backend = backend_absent
     with pytest.raises(CLIError, match="CannotDeleteResource"):
         scenario.run()
-    assert len(scenario.deletions()) == 2
+    assert len(scenario.deletions()) == 2 + (scenario.additional_policy != "absent")
     assert ("ca", "rootca") in scenario.resources
     assert ("namespace", "owned-namespace") in scenario.resources
 
