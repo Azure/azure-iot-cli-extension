@@ -582,6 +582,7 @@ def test_real_state_export_deployment_comparison_and_cleanup(transport, monkeypa
     cmd.get_models.return_value = ExportTemplateRequest
     cmd.supported_api_version.return_value = True
     exported_ids = []
+    deployment_names = []
 
     def invoke(command, **_kwargs):
         args = shlex.split(command)
@@ -591,6 +592,7 @@ def test_real_state_export_deployment_comparison_and_cleanup(transport, monkeypa
             result = custom.export_group_as_template(cmd, ownership.GROUP, resource_ids=selected, skip_all_params=True)
         elif args[:3] == ["deployment", "group", "create"]:
             path = Path(args[args.index("--template-file") + 1])
+            deployment_names.append(path.stem)
             model = Deployment(properties=DeploymentProperties(mode="Incremental", template=path.read_text(encoding="utf-8")))
             result = deployments.deployments.begin_create_or_update(
                 ownership.GROUP, path.stem, model,
@@ -631,7 +633,8 @@ def test_real_state_export_deployment_comparison_and_cleanup(transport, monkeypa
     exported = custom.export_group_as_template(cmd, ownership.GROUP, resource_ids=selected, skip_all_params=True)
     assert len(exported["resources"]) == 2
     assert exported_ids == [[HUB], [HUB], [destination]]
-    deployment = PREFIX + "microsoft.resources/deployments/arm_deployment-" + provider.hub_name
+    assert len(deployment_names) == 1
+    deployment = PREFIX + "microsoft.resources/deployments/" + deployment_names[0]
     assert "location" not in wire.resources[deployment]
     assert wire.resources[deployment]["tags"][ownership.OWNER_TAG] == "uid"
     puts = [urlsplit(call[1]).path.casefold() for call in wire.calls if call[0] == "PUT"]
@@ -742,7 +745,7 @@ def test_no_location_deployment_get_still_requires_current_exact_ownership(trans
 
 
 @pytest.mark.parametrize("damage", [
-    "missing-region", "foreign-region", "foreign-group", "arbitrary-deployment", "other-resource",
+    "missing-region", "foreign-region", "foreign-group", "arbitrary-deployment", "arbitrary-temp-name", "other-resource",
 ])
 def test_no_location_history_does_not_relax_literal_deployment_target_authorization(transport, damage):
     from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
@@ -757,6 +760,8 @@ def test_no_location_history_does_not_relax_literal_deployment_target_authorizat
         deployment = deployment.replace(ownership.GROUP, "foreign-group")
     elif damage == "arbitrary-deployment":
         deployment = PREFIX + "microsoft.resources/deployments/unplanned"
+    elif damage == "arbitrary-temp-name":
+        deployment = PREFIX + "microsoft.resources/deployments/iot-hub-state-not-a-generated-name"
     else:
         template["resources"][0]["type"] = "Microsoft.Resources/deploymentScripts"
     with pytest.raises(ownership.OwnershipError):
