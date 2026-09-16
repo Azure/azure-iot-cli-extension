@@ -32,6 +32,74 @@ def fake_cli(mocker):
     return client
 
 
+@pytest.mark.parametrize("names,deleted", [
+    ([], []),
+    (["unrelated-endpoint"], []),
+    (["QUEUE-SYSTEMID", "unrelated-endpoint"], ["queue-systemid"]),
+    (
+        ["storagecontainer-systemid", "eventhub-systemid", "queue-systemid"],
+        ["eventhub-systemid", "queue-systemid", "storagecontainer-systemid"],
+    ),
+])
+def test_system_endpoint_cleanup_only_updates_existing_endpoints(fake_cli, mocker, names, deleted):
+    calls = []
+
+    def invoke(args, out_file):
+        assert args[-2:] == ["-o", "json"]
+        args = args[:-2]
+        assert args[:3] == ["iot", "hub", "routing-endpoint"]
+        assert args[4:8] == ["--hub-name", "owned-hub", "-g", "owned-rg"]
+        assert "--no-wait" not in args
+        calls.append(args)
+        if args[3] == "list":
+            assert args[8:] == ["--query", "*[].name"]
+            out_file.write(json.dumps(names))
+        else:
+            assert args[3] == "delete"
+            out_file.write("{}")
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    subject.delete_system_endpoints("owned-hub", "owned-rg")
+    assert calls[0][3] == "list"
+    assert [args[-1] for args in calls[1:]] == deleted
+
+
+@pytest.mark.parametrize("names", [None, {}, "", [None], [""], [1], [{"name": "eventhub-systemid"}]])
+def test_system_endpoint_cleanup_rejects_invalid_names_before_any_write(fake_cli, mocker, names):
+    def invoke(args, out_file):
+        assert args[:4] == ["iot", "hub", "routing-endpoint", "list"]
+        out_file.write(json.dumps(names))
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    with pytest.raises(CLIInternalError, match="invalid routing endpoint names"):
+        subject.delete_system_endpoints("owned-hub", "owned-rg")
+    fake_cli.invoke.assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["list", "delete"])
+@pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero"])
+def test_system_endpoint_cleanup_propagates_failure_without_replay(fake_cli, mocker, operation, failure_kind):
+    error = BadRequestError("Endpoint operation failed")
+    calls = []
+
+    def invoke(args, out_file):
+        calls.append(args[3])
+        if args[3] == operation:
+            fake_cli.result.error = error if failure_kind == "cli_error" else None
+            return 7
+        out_file.write(json.dumps(["eventhub-systemid", "queue-systemid"]))
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    with pytest.raises(BadRequestError if failure_kind == "cli_error" else CLIInternalError) as raised:
+        subject.delete_system_endpoints("owned-hub", "owned-rg")
+    if failure_kind == "cli_error":
+        assert raised.value is error
+    assert calls == (["list"] if operation == "list" else ["list", "delete"])
+
+
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
 @pytest.mark.parametrize("scenario,failed_operation,expected_events", [
     ("test_migrate_dataplane", None, ["migrate", "ready", "compare"]),

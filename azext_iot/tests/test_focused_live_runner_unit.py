@@ -6,6 +6,7 @@
 
 """Offline focused-controller proofs; no live collection or resource provisioning."""
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ from unittest.mock import Mock
 import xml.etree.ElementTree as ET
 
 import pytest
+from coverage import CoverageData
 from tox.config.loader import str_convert as tox_convert
 
 from azext_iot.tests import _focused_live as focused
@@ -40,6 +42,7 @@ def isolated(monkeypatch):
         focused.ENV, focused.DPS_ARGS_ENV, "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_testhub",
         "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer", "azext_iot_dps_test_phase",
         "azext_iot_dps_run_uid", "azext_iot_dps_phase_receipts", "azext_iot_dps_junit", "azext_iot_dps_workers",
+        "azext_iot_dps_coverage_file", "COVERAGE_FILE",
         "azext_iot_hub_auth_phase", "AZEXT_IOT_HUB_SUITE", "AZEXT_IOT_HUB_PHASE",
         "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
     ):
@@ -165,6 +168,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         debug = json.loads(env[focused.ENV])
         expected = debug["requestedNodes"]
         assert command[-len(expected):] == expected
+        report = Path(env["COVERAGE_FILE"]).with_name("coverage.xml")
+        assert f"--cov-report=xml:{report}" in command
         result = full_execute(command, env, log, runtime, cleanup, cancelled)
         path = Path(env["AZEXT_IOT_HUB_RECEIPT"])
         receipt = hub.read_json(path)
@@ -198,8 +203,9 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
 @pytest.mark.parametrize("suite,phase", [("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas")])
 @pytest.mark.parametrize("whole", [False, True])
 def test_hub_debug_success_is_not_full_qualification(tmp_path, monkeypatch, suite, phase, whole):
-    result, summary, output, calls, _ = run_hub(tmp_path, monkeypatch, suite, phase, whole=whole)
+    result, summary, output, calls, captured = run_hub(tmp_path, monkeypatch, suite, phase, whole=whole)
     assert result == 0 and calls == [phase]
+    assert captured[0]["COVERAGE_FILE"] == str(output / phase / ".coverage")
     assert summary["status"] == "debug-passed" and summary["qualifiesFullSuite"] is False
     assert summary["runnerSeconds"] == dict(hub.BUDGETS[suite])[phase] + hub.CLEANUP + hub.RESERVE
     assert hub.evaluate_hub_phases(output, debug=True) == {"passed": True, "errors": []}
@@ -237,6 +243,8 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         debug = json.loads(env[focused.ENV])
         expected = debug["requestedNodes"]
         assert shlex.split(env[focused.DPS_ARGS_ENV])[-len(expected):] == expected
+        report = Path(env["azext_iot_dps_coverage_file"]).with_name("coverage.xml")
+        assert f"--cov-report=xml:{report}" in shlex.split(env[focused.DPS_ARGS_ENV])
         assert (runtime, cleanup) == {name: (run, clean) for name, run, clean in dps.PHASES}[phase]
         # Reuse the existing fake ARM/JUnit producer, then retain only the requested collection.
         regular_env = dict(env, azext_iot_dps_workers="0" if phase == "local-auth-toggle" else "7")
@@ -282,6 +290,7 @@ def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, m
     assert summary["phases"][0]["cleanup"]["complete"] is True
     assert summary["phases"][0]["results"]["stage_errors"] == []
     assert captured[0]["azext_iot_dps_test_phase"] == phase
+    assert captured[0]["azext_iot_dps_coverage_file"] == str(tmp_path / "dps-phases" / phase / ".coverage")
     assert GATE["evaluate_dps_phases"](tmp_path)
     assert "UNSAFE_CAPTURED_CREDENTIAL" not in (tmp_path / "dps-phases" / phase / "junit.xml").read_text()
 
@@ -682,3 +691,299 @@ sys.exit(pytest.main([
     assert receipt["collected"] == receipt["expected"] == ["test_local.py::test_requested"]
     assert receipt["finished"] is True
     assert bool(receipt["errors"]) == (outcome != "passed")
+
+
+def coverage_process(directory, module, arguments, environment):
+    """Run real tox config/synthetic pytest, never live plugins, under a private socket guard."""
+    private = dict(os.environ, **environment)
+    for key in tuple(private):
+        if key.startswith(("PYTEST_", "COV_CORE_", "TOX_", "COVERAGE_")) and key != "COVERAGE_FILE":
+            private.pop(key)
+    private.update(
+        AZURE_CONFIG_DIR=str(directory / "private-cli"), AZURE_TEST_RUN_LIVE="False",
+        AZURE_CORE_COLLECT_TELEMETRY="0", AZURE_CORE_CHECK_VERSION="no", AZURE_EXTENSION_USE_DYNAMIC_INSTALL="no",
+        PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS="", PYTHONDONTWRITEBYTECODE="1",
+        PYTHONPATH=os.pathsep.join(dict.fromkeys(map(os.path.abspath, sys.path))),
+    )
+    proof = """
+import runpy
+import socket
+import sys
+def forbidden(*args, **kwargs):
+    raise AssertionError("Offline coverage proof attempted network")
+socket.socket.connect = forbidden
+socket.socket.connect_ex = forbidden
+socket.getaddrinfo = forbidden
+module = sys.argv.pop(1)
+sys.argv[0] = module
+runpy.run_module(module, run_name="__main__")
+"""
+    return subprocess.run(
+        [sys.executable, "-c", proof, module, *arguments], cwd=directory, env=private,
+        capture_output=True, text=True, check=False, timeout=40,
+    )
+
+
+def dps_tox_coverage_environment(directory, environment, service="DPS"):
+    """Inspect the actual repository tox factor/env expansion without creating an environment."""
+    rendered = coverage_process(directory, "tox", [
+        "c", "-c", str(ROOT / "tox.ini"), "--workdir", str(directory / "tox"),
+        "-e", service + "-int", "-k", "set_env",
+    ], environment)
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+    return dict(
+        line.strip().split("=", 1) for line in rendered.stdout.splitlines()
+        if line.startswith("  ") and "=" in line
+    )
+
+
+@pytest.mark.parametrize("service", ["HubControl", "DPS"])
+@pytest.mark.parametrize("existing_branch", [False, True], ids=["existing-statements", "existing-branches"])
+def test_real_debug_coverage_is_fresh_concurrent_and_does_not_combine_shared_database(
+    tmp_path, monkeypatch, service, existing_branch,
+):
+    workspace = tmp_path / "synthetic checkout"
+    workspace.mkdir()
+    (workspace / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (workspace / "coverage.ini").write_text(
+        f"[run]\nbranch = {not existing_branch}\n", encoding="utf-8",
+    )
+    (workspace / "sample.py").write_text(
+        "def choose(value):\n    if value:\n        return 1\n    return 0\n", encoding="utf-8",
+    )
+    (workspace / "test_sample.py").write_text(
+        "from sample import choose\n"
+        "def test_body():\n    assert choose(True) == 1\n    print('BODY_PASSED')\n", encoding="utf-8",
+    )
+    shared = workspace / ".coverage"
+    baseline = CoverageData(basename=str(shared))
+    if existing_branch:
+        baseline.add_arcs({str(workspace / "sample.py"): [(-1, 1), (1, -1)]})
+    else:
+        baseline.add_lines({str(workspace / "sample.py"): [1]})
+    baseline.write()
+    original = shared.read_bytes()
+    shared_xml = workspace / "coverage.xml"
+    shared_xml.write_bytes(b"<coverage existing='preserve-user-report' />")
+    original_xml = shared_xml.read_bytes()
+    arguments = [
+        "-c", str(workspace / "pytest.ini"), "--rootdir", str(workspace), "--confcutdir", str(workspace),
+        "-p", "pytest_cov.plugin", "-p", "no:cacheprovider", "-q", "-s", "test_sample.py::test_body",
+        "--cov=sample", "--cov-append", "--cov-config", str(workspace / "coverage.ini"), "--cov-report=",
+    ]
+    # Demonstrate the real old bug: the body passes, then pytest-cov's combine fails.
+    old = coverage_process(workspace, "pytest", arguments, {"COVERAGE_FILE": str(shared)})
+    assert old.returncode == 3, old.stdout + old.stderr
+    assert "BODY_PASSED" in old.stdout
+    assert "Can't combine" in old.stdout + old.stderr
+    assert shared.read_bytes() == original
+
+    destinations = []
+    reports = []
+    for index in range(2):
+        output = tmp_path / f"debug output {index}"
+        if service == "DPS":
+            result, _, captured = run_dps(output, monkeypatch, "regular")
+            assert result == 0
+            managed = captured[0]["azext_iot_dps_coverage_file"]
+            expanded = dps_tox_coverage_environment(output, captured[0])
+            assert expanded["COVERAGE_FILE"] == managed
+            destination = Path(expanded["COVERAGE_FILE"])
+            assert destination == output / "dps-phases" / "regular" / ".coverage"
+            rendered = coverage_process(output, "tox", [
+                "c", "-c", str(ROOT / "tox.ini"), "--workdir", str(output / "tox"),
+                "-e", "DPS-int", "-k", "commands",
+            ], captured[0])
+            assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+            command = tox_commands(rendered.stdout)[-1]
+        else:
+            result, _, _, _, captured = run_hub(output, monkeypatch, service, "regular")
+            assert result == 0
+            destination = Path(captured[0]["COVERAGE_FILE"])
+            assert destination == output / "hub-phases" / "regular" / ".coverage"
+            command = hub.command(
+                service, "regular", debug=json.loads(captured[0][focused.ENV]), folder=destination.parent,
+            )
+        report_options = [value for value in command if value.startswith("--cov-report=")]
+        assert report_options == [f"--cov-report=xml:{destination.with_name('coverage.xml')}"]
+        reports.append(report_options[0])
+        assert destination.is_absolute() and not destination.exists()
+        destinations.append(destination)
+    assert len(set(destinations)) == 2
+
+    # Both synthetic pytest processes run at once from the same checkout, as local
+    # debug controllers can. They must never combine each other's or the old data.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(
+                coverage_process, workspace, "pytest", [*arguments[:-1], report], {"COVERAGE_FILE": str(destination)},
+            )
+            for destination, report in zip(destinations, reports)
+        ]
+        for future in futures:
+            result = future.result(timeout=50)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "BODY_PASSED" in result.stdout and "1 passed" in result.stdout
+    for destination in destinations:
+        measured = CoverageData(basename=str(destination))
+        measured.read()
+        assert measured.has_arcs() is not existing_branch
+        source = next(name for name in measured.measured_files() if Path(name) == workspace / "sample.py")
+        assert measured.lines(source)
+        xml = ET.parse(destination.with_name("coverage.xml")).getroot()
+        assert xml.tag == "coverage" and int(xml.get("lines-covered")) > 0
+    assert shared.read_bytes() == original
+    assert shared_xml.read_bytes() == original_xml
+
+
+@pytest.mark.parametrize("suite,phase", [("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas")])
+def test_hub_debug_overrides_ambient_coverage_without_changing_full_mode(tmp_path, suite, phase):
+    base = {"COVERAGE_FILE": str(tmp_path / "existing-user-coverage")}
+    folder = tmp_path / "unique debug output" / phase
+    debug = focused.select(suite, phase, nodes(suite, phase)[:1])
+    full = hub.environment(base, suite, phase, folder, "run-id", SUB, GROUP)
+    isolated_env = hub.environment(base, suite, phase, folder, "run-id", SUB, GROUP, debug=debug)
+    assert base["COVERAGE_FILE"] == full["COVERAGE_FILE"]
+    assert isolated_env["COVERAGE_FILE"] == str(folder / ".coverage")
+    assert "COVERAGE_FILE" not in hub.environment({}, suite, phase, folder, "run-id", SUB, GROUP)
+    for mode in (None, debug):
+        command = hub.command(suite, phase, debug=mode)
+        assert "--cov=azext_iot" in command and "--cov-append" in command
+        assert command[command.index("--cov-config") + 1] == str(ROOT / ".coveragerc")
+        assert "--no-cov" not in command
+    assert not folder.exists()  # Environment construction cannot erase/create coverage.
+
+
+@pytest.mark.parametrize("debug", [False, True])
+@pytest.mark.parametrize("ambient", ["", "ambient-coverage"])
+def test_dps_rejects_ambient_managed_coverage_before_inventory_or_execution(tmp_path, monkeypatch, debug, ambient):
+    monkeypatch.setenv("azext_iot_dps_coverage_file", ambient)
+    reader, execute = Mock(reads=[]), Mock()
+    with monkeypatch.context() as patch:
+        patch.setattr(dps.signal, "signal", lambda *_: None)
+        result = dps.run(
+            SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute,
+            debug_phase="regular" if debug else None, debug_nodes=nodes("DPS", "regular")[:1] if debug else None,
+        )
+    assert result == 1
+    reader.inventory.assert_not_called()
+    execute.assert_not_called()
+    assert hub.read_json(tmp_path / "dps-phases.json")["error"]["type"] == "PhaseError"
+
+
+def test_dps_full_mode_keeps_global_coverage_and_ignores_unmanaged_ambient_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("COVERAGE_FILE", str(tmp_path / "must-not-use"))
+    captured = []
+
+    def execute(command, env, *args):
+        captured.append(env)
+        return _execution(command, env, *args)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(dps.signal, "signal", lambda *_: None)
+        assert dps.run(SUB, GROUP, tmp_path / "dps-phases", DpsReader(), execute=execute) == 0
+    assert len(captured) == 3
+    for environment in captured:
+        assert "azext_iot_dps_coverage_file" not in environment
+        assert dps_tox_coverage_environment(tmp_path, environment)["COVERAGE_FILE"] == ".coverage"
+    assert not (tmp_path / "must-not-use").exists()
+
+
+@pytest.mark.parametrize("service", ["HubControl", "HubData", "ADR", "ADU"])
+def test_dps_coverage_bridge_does_not_expand_other_tox_services(tmp_path, service):
+    expanded = dps_tox_coverage_environment(tmp_path, {
+        "azext_iot_hub_subscription": SUB,
+        "azext_iot_dps_coverage_file": str(tmp_path / "managed dps only"),
+        "COVERAGE_FILE": str(tmp_path / "unmanaged ambient"),
+    }, service=service)
+    assert "COVERAGE_FILE" not in expanded
+
+
+@pytest.mark.parametrize("service", ["HubControl", "DPS"])
+def test_real_full_coverage_still_appends_prior_phase_data_to_checkout_default(tmp_path, service):
+    shared = tmp_path / ".coverage"
+    earlier = str(tmp_path / "earlier_phase.py")
+    baseline = CoverageData(basename=str(shared))
+    baseline.add_lines({earlier: [1]})
+    baseline.write()
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "coverage.ini").write_text("[run]\nbranch = False\n", encoding="utf-8")
+    (tmp_path / "test_current.py").write_text("def test_body():\n    assert True\n", encoding="utf-8")
+    if service == "DPS":
+        environment = {"COVERAGE_FILE": dps_tox_coverage_environment(tmp_path, {})["COVERAGE_FILE"]}
+        assert environment["COVERAGE_FILE"] == ".coverage"
+    else:
+        environment = hub.environment({}, service, "regular", tmp_path / "full-phase", "run", SUB, GROUP)
+        assert "COVERAGE_FILE" not in environment
+    result = coverage_process(tmp_path, "pytest", [
+        "-c", str(tmp_path / "pytest.ini"), "--rootdir", str(tmp_path), "--confcutdir", str(tmp_path),
+        "-p", "pytest_cov.plugin", "-p", "no:cacheprovider", "-q", "test_current.py::test_body",
+        "--cov=test_current", "--cov-append", "--cov-config", str(tmp_path / "coverage.ini"), "--cov-report=",
+    ], environment)
+    assert result.returncode == 0, result.stdout + result.stderr
+    combined = CoverageData(basename=str(shared))
+    combined.read()
+    assert combined.has_arcs() is False
+    assert combined.lines(earlier) == [1]
+    current = next(name for name in combined.measured_files() if Path(name) == tmp_path / "test_current.py")
+    assert combined.lines(current)
+
+
+@pytest.mark.parametrize("service,phase", [
+    ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
+    ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
+])
+@pytest.mark.parametrize("debug", [False, True], ids=["full-300s", "debug-no-periodic-dumps"])
+def test_effective_faulthandler_options_keep_deadlines_and_failure_tracebacks(
+    tmp_path, monkeypatch, service, phase, debug,
+):
+    if service == "DPS":
+        environment = {}
+        if debug:
+            result, _, captured = run_dps(tmp_path, monkeypatch, phase)
+            assert result == 0
+            environment = captured[0]
+        rendered = coverage_process(tmp_path, "tox", [
+            "c", "-c", str(ROOT / "tox.ini"), "--workdir", str(tmp_path / "tox"),
+            "-e", "DPS-int", "-k", "commands",
+        ], environment)
+        assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+        command = tox_commands(rendered.stdout)[-1]
+    else:
+        selection = focused.select(service, phase, nodes(service, phase)[:1]) if debug else None
+        command = hub.command(service, phase, debug=selection)
+    dumps = [
+        value for previous, value in zip(command, command[1:])
+        if previous == "-o" and value.startswith("faulthandler_timeout=")
+    ]
+    expected = 0 if debug else 300
+    assert dumps == (
+        ["faulthandler_timeout=300", "faulthandler_timeout=0"] if service == "DPS" and debug
+        else [f"faulthandler_timeout={expected}"]
+    )
+    assert "--timeout=900" in command
+    assert "--integration-progress-interval=60" in command
+    assert not {"no:timeout", "no:faulthandler", "--tb=no"}.intersection(command)
+    if not debug:
+        reports = [value for value in command if value.startswith("--cov-report")]
+        assert reports == ([] if service == "DPS" else ["--cov-report="])
+
+    # Let real pytest parse the ordered options, not just a hand-written last-wins
+    # approximation. Collect only synthetic local tests; keep real timeout plugin
+    # enabled and demonstrate that an ordinary failing test still has its traceback.
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "test_diagnostics.py").write_text(
+        "def test_effective_options(pytestconfig):\n"
+        f"    assert float(pytestconfig.getini('faulthandler_timeout')) == {expected}\n"
+        "    assert pytestconfig.getoption('timeout') == 900\n"
+        "def test_failure():\n    raise AssertionError('FAILURE_TRACEBACK_PRESERVED')\n",
+        encoding="utf-8",
+    )
+    result = coverage_process(tmp_path, "pytest", [
+        "-c", str(tmp_path / "pytest.ini"), "--rootdir", str(tmp_path), "--confcutdir", str(tmp_path),
+        "-p", "pytest_timeout", "-p", "no:cacheprovider", "--timeout=900",
+        *[argument for value in dumps for argument in ("-o", value)], "-q", "test_diagnostics.py",
+    ], {})
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "1 failed, 1 passed" in result.stdout, result.stdout + result.stderr
+    assert "AssertionError: FAILURE_TRACEBACK_PRESERVED" in result.stdout

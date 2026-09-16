@@ -563,13 +563,15 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 if os.environ.get(name, "").strip()]
         if pins:
             raise PhaseError("Isolated DPS phases reject supplied resource pins: " + ", ".join(pins))
-        if any(os.environ.get(name) for name in (
+        if "azext_iot_dps_coverage_file" in os.environ or any(os.environ.get(name) for name in (
             "azext_iot_dps_test_phase", "azext_iot_dps_run_uid", "azext_iot_dps_phase_receipts",
             "azext_iot_dps_junit", "azext_iot_dps_interrupt_timeout",
             "azext_iot_dps_workers",
             FOCUSED["ENV"], FOCUSED["DPS_ARGS_ENV"],
         )):
-            raise PhaseError("The serial runner owns phase/UID/receipt/JUnit/cleanup options; unset conflicting overrides.")
+            raise PhaseError(
+                "The serial runner owns phase/UID/receipt/JUnit/coverage/cleanup options; unset conflicting overrides."
+            )
         if debug and any(os.environ.get(name) for name in (
             "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
             "PYTEST_XDIST_AUTO_NUM_WORKERS", "PYTEST_XDIST_WORKER_COUNT",
@@ -623,10 +625,17 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_dps_junit=str(raw_junit))
                 if debug:
                     environment[FOCUSED["ENV"]] = json.dumps(debug)
+                    # DPS-int maps only this controller-managed value through tox;
+                    # full phases retain checkout-wide .coverage aggregation.
+                    environment["azext_iot_dps_coverage_file"] = str((folder / ".coverage").resolve())
+                    # These args follow tox's base 300s dump option. Only debug
+                    # disables periodic stacks; pytest/phase/cleanup deadlines stay.
                     environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join([
                         "-c", str(ROOT / "setup.cfg"), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
                         "-p", "azext_iot.tests._focused_live_plugin", "-o", "env=", "-o", "addopts=",
-                        "-o", "log_cli=false", "--capture=fd", *debug["requestedNodes"],
+                        "-o", "log_cli=false", "-o", "faulthandler_timeout=0",
+                        f"--cov-report=xml:{folder / 'coverage.xml'}",
+                        "--capture=fd", *debug["requestedNodes"],
                     ])
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)

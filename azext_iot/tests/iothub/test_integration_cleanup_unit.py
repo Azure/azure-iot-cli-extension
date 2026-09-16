@@ -146,9 +146,10 @@ def test_dynamic_hub_cleanup_has_bounded_retries_and_truthful_result(
     )
     client = _cli_outcomes(mocker, outcomes)
     sleep = mocker.patch.object(fixtures, "sleep")
-    request = SimpleNamespace(session=SimpleNamespace(
-        items=[SimpleNamespace(nodeid="test_owned_int.py::test_case")],
-    ))
+    request = SimpleNamespace(
+        config=SimpleNamespace(pluginmanager=SimpleNamespace(get_plugin=lambda _: None)),
+        session=SimpleNamespace(items=[SimpleNamespace(nodeid="test_owned_int.py::test_case")]),
+    )
     cleanup = fixtures._cleanup_dynamic_hub.__wrapped__(request)
     next(cleanup)
     with pytest.raises(CLIInternalError if fails else StopIteration):

@@ -339,16 +339,19 @@ def clean_up_hub_dataplane(hub):
 
 
 def delete_system_endpoints(hub_name, rg):
-    # delete is a no-op
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n eventhub-systemid"
-    )
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n queue-systemid"
-    )
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n storagecontainer-systemid"
-    )
+    # Deleting an absent endpoint still submits a full Hub update and waits for its LRO.
+    # Project names only, avoiding credential-bearing CLI output.
+    names = _invoke_setup(
+        f'iot hub routing-endpoint list --hub-name {hub_name} -g {rg} --query "*[].name"'
+    ).as_json()
+    if not isinstance(names, list) or any(not isinstance(name, str) or not name for name in names):
+        raise CLIInternalError("IoT Hub state setup received invalid routing endpoint names.")
+    existing = {name.casefold() for name in names}
+    for name in ("eventhub-systemid", "queue-systemid", "storagecontainer-systemid"):
+        if name in existing:
+            _invoke_setup(
+                f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n {name}"
+            )
 
 
 # Dataplane main compare commands
