@@ -16,6 +16,11 @@ on:
         type: string
         required: false
         default: ""
+      adr-revoke-certificates:
+        description: "Opt in to revocation scenarios using only newly created, test-owned ADR CAs."
+        type: boolean
+        required: false
+        default: false
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -71,6 +76,11 @@ on:
         type: string
         required: false
         default: ""
+      adr-revoke-certificates:
+        description: "Opt in to revocation scenarios using only newly created, test-owned ADR CAs."
+        type: boolean
+        required: false
+        default: false
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -362,6 +372,7 @@ jobs:
           azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}
+          azext_iot_adr_revoke_certificates: ${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}
           ADR_TEST_FILTER: ${{ inputs['adr-test-filter'] }}
         run: |
           set -o pipefail

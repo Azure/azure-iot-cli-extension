@@ -259,6 +259,22 @@ def _integration_run_step():
     return next(step for step in workflow["jobs"]["int-test"]["steps"] if step.get("id") == "run_tests")
 
 
+def test_adr_revocation_workflow_opt_in_is_typed_default_off_and_adr_only():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    triggers = workflow.get("on", workflow.get(True))
+    for trigger in ("workflow_call", "workflow_dispatch"):
+        setting = triggers[trigger]["inputs"]["adr-revoke-certificates"]
+        assert setting["type"] == "boolean"
+        assert setting["required"] is False and setting["default"] is False
+        assert "newly created, test-owned ADR CAs" in setting["description"]
+    assert len(triggers["workflow_dispatch"]["inputs"]) <= 25
+    assert _integration_run_step()["env"]["azext_iot_adr_revoke_certificates"] == (
+        "${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}"
+    )
+    assert "azext_iot_adr_revoke_certificates" not in workflow.get("env", {})
+    assert "adr-revoke-certificates" not in _integration_run_step()["run"]
+
+
 def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
