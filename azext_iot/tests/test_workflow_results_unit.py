@@ -28,6 +28,55 @@ SUCCESSFUL_JOBS = {
 }
 
 
+@pytest.fixture
+def macos_openssl_step():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["tox"]["steps"]
+    selected = next(step for step in steps if step.get("name") == "Select OpenSSL 3 for CSR signing")
+    assert steps.index(selected) < next(i for i, step in enumerate(steps) if step.get("name") == "Setup test suite")
+    return selected
+
+
+def test_native_openssl_selection_is_scoped_to_macos(macos_openssl_step):
+    assert macos_openssl_step["if"] == "runner.os == 'macOS'"
+    assert macos_openssl_step["shell"] == "bash"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
+@pytest.mark.parametrize("capability", ["ready", "missing", "unsupported"])
+def test_native_openssl_selection_proves_capabilities_before_changing_path(macos_openssl_step, tmp_path, capability):
+    bash, openssl = shutil.which("bash"), shutil.which("openssl")
+    assert bash and openssl
+    prefix = Path(openssl).resolve().parents[1]
+    if capability != "ready":
+        prefix = tmp_path / "openssl"
+        if capability == "unsupported":
+            binary = prefix / "bin" / "openssl"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("#!/bin/sh\nprintf 'OpenSSL without required signing options\\n'\n", encoding="utf-8")
+            binary.chmod(0o700)
+    output = tmp_path / "github-path"
+    brew = """
+brew() {
+  test "$#" -eq 2
+  test "$1" = --prefix
+  test "$2" = openssl@3
+  printf '%s\\n' "$OPENSSL_PREFIX"
+}
+"""
+    result = subprocess.run(
+        [bash, "-c", brew + macos_openssl_step["run"]],
+        env=dict(os.environ, OPENSSL_PREFIX=str(prefix), GITHUB_PATH=str(output)),
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    if capability == "ready":
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert output.read_text(encoding="utf-8") == str(prefix / "bin") + "\n"
+    else:
+        assert result.returncode != 0
+        assert not output.exists()
+
+
 @pytest.mark.parametrize("helper,option", [
     ("_dps_phase_runner.py", "--subscription"),
     ("_evaluate_test_results.py", "--results-dir"),
