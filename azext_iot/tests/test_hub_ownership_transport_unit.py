@@ -8,6 +8,8 @@
 
 from copy import deepcopy
 import json
+from pathlib import Path
+import shlex
 import signal
 import sys
 import threading
@@ -34,6 +36,7 @@ DATABASE = COSMOS + "/sqldatabases/routedb"
 CONTAINER = DATABASE + "/containers/routecontainer"
 NAMESPACE = PREFIX + "microsoft.eventhub/namespaces/aziotclitest" + "c" * 12
 IDENTITY = PREFIX + "microsoft.managedidentity/userassignedidentities/aziotclitest" + "d" * 12
+CERTIFICATE = HUB + "/certificates/cert1"
 
 
 class Credential:
@@ -48,6 +51,7 @@ class Wire:
         self.accepted = {}
         self.operations = {}
         self.identity_headers = {}
+        self.receipt = None
 
     def send(self, request, **kwargs):
         assert urlsplit(request.url).hostname == urlsplit(ownership.ARM).hostname
@@ -75,6 +79,41 @@ class Wire:
             return (200, self.resources[target], {}) if target in self.resources else (404, None, {})
         if request.method == "PUT":
             body = ownership.request_body(request.body)
+            if "/microsoft.resources/deployments/" in target:
+                receipt = json.loads(self.receipt.read_text(encoding="utf-8"))
+                record = receipt["resources"][target]
+                assert record["before"] == 404 and record["mutations"][-1]["status"] is None
+                for item in body["properties"]["template"]["resources"]:
+                    names = item["name"].split("/")
+                    resource_id = PREFIX + "microsoft.devices/iothubs/" + names[0].casefold()
+                    if len(names) == 2:
+                        resource_id += "/certificates/" + names[1].casefold()
+                    assert resource_id in record["deploymentTargets"]
+                    mutations = [mutation for root in receipt["resources"].values() for mutation in root["mutations"]
+                                 if mutation.get("deployment") == target and mutation["id"] == resource_id]
+                    assert len(mutations) == 1 and mutations[0]["status"] is None
+                    assert mutations[0]["before"] == (200 if resource_id in self.resources else 404)
+                    resource = dict(deepcopy(item), id=resource_id)
+                    if len(names) == 1:
+                        resource["properties"]["provisioningState"] = "Succeeded"
+                    self.resources[resource_id] = resource
+                # RG deployment history is not a regional resource and does not
+                # echo the submitted template or a top-level location.
+                resource = {
+                    "id": target, "name": target.rsplit("/", 1)[1], "type": "Microsoft.Resources/deployments",
+                    "tags": body["tags"], "properties": {
+                        "provisioningState": "Succeeded", "mode": "Incremental",
+                        "timestamp": "2026-09-16T00:00:00Z", "duration": "PT1M",
+                        "correlationId": "00000000-0000-0000-0000-000000000001",
+                        "outputResources": [{"id": value} for value in record["deploymentTargets"]],
+                    },
+                }
+                self.resources[target] = resource
+                operation = target + "/operationStatuses/offline"
+                self.operations[operation.casefold()] = target, "azure-asyncoperation"
+                return 201, dict(resource, properties={"provisioningState": "Accepted"}), {
+                    "azure-asyncoperation": ownership.ARM + operation, "retry-after": "0",
+                }
             resource = dict(deepcopy(body), id=target, name=target.rsplit("/", 1)[1])
             if "/sqldatabases/" not in target:
                 resource.setdefault("properties", {})["provisioningState"] = "Succeeded"
@@ -98,7 +137,21 @@ class Wire:
             return 204, None, {}
         assert request.method == "POST"
         if target.endswith("/exporttemplate"):
-            return 200, {"template": {"resources": [self.resources[HUB]]}}, {}
+            selected = ownership.request_body(request.body)["resources"]
+            resources = [
+                {k: deepcopy(v) for k, v in resource.items() if k not in ("id", "etag")}
+                for key, resource in self.resources.items()
+                if any(key == value.casefold() or key.startswith(value.casefold() + "/certificates/") for value in selected)
+            ]
+            for resource in resources:
+                resource.get("properties", {}).pop("provisioningState", None)
+                if resource.get("type", "").casefold() == "microsoft.devices/iothubs/certificates":
+                    parent = resource["dependsOn"][0].split("'")[3]
+                    resource["name"] = parent + "/" + resource["name"].rsplit("/", 1)[-1]
+            return 200, {"template": {
+                "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                "contentVersion": "1.0.0.0", "parameters": {}, "variables": {}, "resources": resources,
+            }}, {}
         assert target in (HUB + "/routing/routes/$testall", HUB + "/routing/routes/$testnew")
         return 200, {"routes": []}, {}
 
@@ -115,6 +168,7 @@ def transport(tmp_path, monkeypatch):
     monkeypatch.setattr(Profile, "get_raw_token", lambda *_args, **_kwargs: (("Bearer", "offline-only", {}), None, None))
     arm = ownership.Arm()
     observer = ownership.Observer(tmp_path / "owner.json", "uid", "regular", arm)
+    wire.receipt = observer.path
     observer.install()
     try:
         yield observer, arm, wire
@@ -212,7 +266,7 @@ def test_relative_arm_operation_headers_remain_lros(transport, header, status):
 
 @pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
 def test_real_aaz_identity_actual_operation_header_is_not_synchronous_metadata(transport, monkeypatch, header):
-    observer, _, wire = transport
+    observer, arm, wire = transport
     operation = (
         f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.ManagedIdentity/"
         f"locations/{ownership.REGION}/operations/offline"
@@ -225,6 +279,7 @@ def test_real_aaz_identity_actual_operation_header_is_not_synchronous_metadata(t
     mutation = record["mutations"][0]
     assert record["uncertain"] and mutation["awaitingProvisioning"]
     assert mutation["polling"][header.casefold()] == ownership.polling_key(operation)
+    arm.deadline = time.monotonic()
     with pytest.raises(ownership.OwnershipError, match="Reference requires"):
         observer.require_owned_reference(IDENTITY, "microsoft.managedidentity/userassignedidentities")
 
@@ -480,13 +535,233 @@ def test_real_cli_export_serialization_keeps_exact_resource_subset(transport, mo
     cmd.get_models.return_value = ExportTemplateRequest
     cmd.supported_api_version.return_value = True
     result = custom.export_group_as_template(cmd, ownership.GROUP, resource_ids=[HUB], skip_all_params=True)
-    assert result["resources"][0]["id"] == HUB
+    assert result["resources"][0]["name"] == HUB.rsplit("/", 1)[1]
     assert len(observer.data["resources"][HUB]["mutations"]) == 1
     posts = [call for call in wire.calls if call[0] == "POST"]
     assert len(posts) == 1
     assert json.loads(posts[0][4]) == {
         "resources": [HUB], "options": "SkipAllParameterization", "outputFormat": "Json",
     }
+
+
+@pytest.mark.parametrize("create", [False, True])
+@pytest.mark.parametrize("explicit_children", [False, True])
+def test_real_state_export_deployment_comparison_and_cleanup(transport, monkeypatch, tmp_path, create, explicit_children):
+    from azure.cli.command_modules.resource import custom
+    from azure.mgmt.resource.resources import ResourceManagementClient
+    from azure.mgmt.resource.resources.v2024_11_01.models import ExportTemplateRequest
+    from azure.mgmt.resource.deployments import DeploymentsMgmtClient
+    from azure.mgmt.resource.deployments.models import Deployment, DeploymentProperties
+    from azext_iot.iothub.providers import state
+    from azext_iot.sdk.iothub.mgmt import IotHubClient
+    from azext_iot.tests.iothub.state import _state_helpers
+    from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
+
+    observer, arm, wire = transport
+    monkeypatch.chdir(tmp_path)
+    template = fixture_template()
+    hub = template["resources"][0]
+    cert = {
+        "type": "Microsoft.Devices/IotHubs/certificates", "apiVersion": hub["apiVersion"],
+        "name": hub["name"] + "/cert1", "properties": {"certificate": "offline-public-certificate", "isVerified": True},
+        "dependsOn": [f"[resourceId('Microsoft.Devices/IotHubs', '{hub['name']}')]"],
+    }
+    wire.submit("PUT", HUB, hub)
+    wire.submit("PUT", CERTIFICATE, cert)
+    destination = HUB.replace("a" * 18, "e" * 18)
+    if not create:
+        wire.submit("PUT", destination, dict(hub, name=destination.rsplit("/", 1)[1]))
+    client = ResourceManagementClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM)
+    deployments = DeploymentsMgmtClient(
+        Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM,
+        per_call_policies=[custom.JsonCTemplatePolicy()], polling_interval=0,
+    )
+    hubs = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM)
+    monkeypatch.setattr(custom, "_resource_client_factory", lambda _ctx: client)
+    cmd = Mock()
+    cmd.get_models.return_value = ExportTemplateRequest
+    cmd.supported_api_version.return_value = True
+    exported_ids = []
+
+    def invoke(command, **_kwargs):
+        args = shlex.split(command)
+        if args[:2] == ["group", "export"]:
+            selected = args[args.index("--resource-ids") + 1:args.index("--skip-all-params")]
+            exported_ids.append(selected)
+            result = custom.export_group_as_template(cmd, ownership.GROUP, resource_ids=selected, skip_all_params=True)
+        elif args[:3] == ["deployment", "group", "create"]:
+            path = Path(args[args.index("--template-file") + 1])
+            model = Deployment(properties=DeploymentProperties(mode="Incremental", template=path.read_text(encoding="utf-8")))
+            result = deployments.deployments.begin_create_or_update(
+                ownership.GROUP, path.stem, model,
+            ).result(timeout=3).as_dict()
+            result["resourceGroup"] = ownership.GROUP
+        else:
+            assert args[:3] == ["iot", "hub", "show"]
+            name = args[args.index("-n") + 1]
+            result = hubs.iot_hub_resource.get(ownership.GROUP, name)
+        return Mock(as_json=lambda: result, success=lambda: True, output=json.dumps(result), get_error=lambda: None)
+
+    bridge = Mock(invoke=invoke)
+    monkeypatch.setattr(state, "cli", bridge)
+    monkeypatch.setattr(_state_helpers, "cli", bridge)
+    discovery = Mock()
+    discovery.find_resource.side_effect = lambda name, group: dict(
+        hubs.iot_hub_resource.get(group, name), resourcegroup=group,
+    )
+    discovery.get_target.side_effect = lambda name, **_kwargs: {
+        "entity": name + ".azure-devices.net", "resourcegroup": ownership.GROUP, "name": name,
+    }
+    provider = state.StateProvider.__new__(state.StateProvider)
+    provider.discovery, provider.rg, provider.login, provider.auth_type = discovery, ownership.GROUP, None, "login"
+    provider.hub_name = hub["name"]
+    provider.target = discovery.get_target(provider.hub_name)
+    path = str(tmp_path / "state.json")
+    provider.save_state(path, hub_aspects=["arm"])
+    provider.hub_name = destination.rsplit("/", 1)[1]
+    provider.target = None if create else discovery.get_target(provider.hub_name)
+    provider.upload_state(path, hub_aspects=["arm"])
+    record = observer.data["resources"][destination]
+    assert record["uncertain"]  # SDK has polled the deployment, not its certificate target.
+    checkpoint = len(wire.calls)
+    _state_helpers.compare_hubs_controlplane(hub["name"], provider.hub_name, ownership.GROUP)
+    assert not record["uncertain"]
+    assert all(call[0] in ("GET", "POST") for call in wire.calls[checkpoint:])
+    selected = [destination, destination + "/certificates/cert1"] if explicit_children else [destination]
+    exported = custom.export_group_as_template(cmd, ownership.GROUP, resource_ids=selected, skip_all_params=True)
+    assert len(exported["resources"]) == 2
+    assert exported_ids == [[HUB], [HUB], [destination]]
+    deployment = PREFIX + "microsoft.resources/deployments/arm_deployment-" + provider.hub_name
+    assert "location" not in wire.resources[deployment]
+    assert wire.resources[deployment]["tags"][ownership.OWNER_TAG] == "uid"
+    puts = [urlsplit(call[1]).path.casefold() for call in wire.calls if call[0] == "PUT"]
+    assert puts.count(deployment) == 1 and puts.count(destination) == (0 if create else 1)
+    assert record["mutations"][-1]["reconciled"]
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+    cleanup = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 3, observer.path)
+    assert cleanup["complete"] and set(cleanup["absentIds"]) == {HUB, destination, deployment}
+    assert set(cleanup["absentDescendantIds"]) == {CERTIFICATE, destination + "/certificates/cert1"}
+    assert not wire.resources
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+
+
+@pytest.mark.parametrize("damage", ["unknown", "timeout", "throttled", "server", "failed", "cancelled", "response"])
+def test_export_reconciliation_never_replays_unknown_or_terminal_failed_operations(transport, damage):
+    observer, arm, wire = transport
+    create_hub(wire)
+    observer.prepare("PUT", HUB, "test", {"properties": {"disableLocalAuth": True}})
+    status = {"unknown": None, "timeout": 408, "throttled": 429, "server": 503}.get(damage, 202)
+    record = observer.data["resources"][HUB]
+    mutation = record["mutations"][-1]
+    mutation["status"] = status
+    if damage in ("failed", "cancelled"):
+        failed = deepcopy(wire.resources[HUB])
+        failed["properties"]["provisioningState"] = damage
+        ownership.observe_get(observer.data, HUB, 200, failed)
+    elif damage == "response":
+        mutation["responseError"] = True
+    # A later successful-looking GET cannot reverse failed/ambiguous evidence.
+    ownership.observe_get(observer.data, HUB, 200, wire.resources[HUB])
+    observer.save()
+    checkpoint = len(wire.calls)
+    with pytest.raises(ownership.OwnershipError, match="Reference requires"):
+        wire.submit("POST", HUB.split("/providers/")[0] + "/exportTemplate", {"resources": [HUB]})
+    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+        wire.submit("PUT", HUB, {"properties": {"disableLocalAuth": True}})
+    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 1, observer.path)
+    assert not result["complete"] and record["uncertain"]
+    assert not any(call[0] != "GET" for call in wire.calls[checkpoint:])
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+
+
+@pytest.mark.parametrize("damage", ["unobserved", "deleted", "wrong-id", "foreign-root", "foreign-group", "unknown"])
+def test_explicit_export_child_needs_exact_receipt_and_current_root_and_child(transport, damage):
+    observer, _, wire = transport
+    create_hub(wire)
+    if damage != "unobserved":
+        wire.submit("PUT", CERTIFICATE, {"properties": {"certificate": "public"}})
+    target = CERTIFICATE
+    if damage == "deleted":
+        wire.submit("DELETE", CERTIFICATE)
+    elif damage == "wrong-id":
+        wire.resources[CERTIFICATE]["id"] = CERTIFICATE + "-other"
+    elif damage == "foreign-root":
+        wire.resources[HUB]["tags"][ownership.OWNER_TAG] = "foreign"
+    elif damage == "foreign-group":
+        target = target.replace(ownership.GROUP, "foreign-group")
+    elif damage == "unknown":
+        record = observer.data["resources"][HUB]
+        record["mutations"][-1]["status"], record["uncertain"] = None, True
+    with pytest.raises(ownership.OwnershipError):
+        wire.submit("POST", HUB.split("/providers/")[0] + "/exportTemplate", {"resources": [target]})
+    assert not any(call[0] == "POST" for call in wire.calls)
+
+
+def test_export_reconciliation_is_bounded_to_the_requested_owned_tree(transport):
+    observer, arm, wire = transport
+    wire.submit("PUT", NAMESPACE, {"location": ownership.REGION})
+    observer.prepare("PUT", NAMESPACE, "test", {})
+    wire.resources[NAMESPACE]["tags"][ownership.OWNER_TAG] = "foreign"
+    wire.accepted[HUB] = "azure-asyncoperation", 202
+    create_hub(wire)
+    assert observer.data["resources"][HUB]["uncertain"]
+    checkpoint = len(wire.calls)
+    deadline = time.monotonic() + 2
+    arm.deadline = deadline
+    wire.submit("POST", HUB.split("/providers/")[0] + "/exportTemplate", {"resources": [HUB]})
+    assert arm.deadline == deadline and not observer.data["resources"][HUB]["uncertain"]
+    assert observer.data["resources"][NAMESPACE]["uncertain"]
+    assert all(NAMESPACE not in call[1] for call in wire.calls[checkpoint:])
+    assert all(call[0] in ("GET", "POST") for call in wire.calls[checkpoint:])
+
+
+@pytest.mark.parametrize("damage", ["owner", "group", "id"])
+def test_no_location_deployment_get_still_requires_current_exact_ownership(transport, damage):
+    from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
+    observer, _, wire = transport
+    deployment = PREFIX + "microsoft.resources/deployments/arm_deployment-" + HUB.rsplit("/", 1)[1]
+    wire.submit("PUT", deployment, {"properties": {"mode": "Incremental", "template": fixture_template()}})
+    resource = wire.resources[deployment]
+    assert "location" not in resource
+    if damage == "owner":
+        resource["tags"][ownership.OWNER_TAG] = "foreign"
+    else:
+        resource["id"] = resource["id"].replace(ownership.GROUP, "foreign-group") if damage == "group" else HUB
+    checkpoint = len(wire.calls)
+    with pytest.raises(ownership.OwnershipError, match="no longer belongs"):
+        wire.submit("GET", deployment)
+    detail = json.loads(observer.path.read_text(encoding="utf-8"))["violationDetails"][-1]
+    assert detail == {
+        "reason": "Observed root ownership changed", "method": "GET", "resourcePath": deployment,
+        "idMatches": damage == "owner", "ownerMatches": damage != "owner",
+    }
+    with pytest.raises(ownership.OwnershipError):
+        observer.require_owned_reference(HUB, "microsoft.devices/iothubs")
+    assert all(call[0] == "GET" for call in wire.calls[checkpoint:])
+    assert "foreign" not in observer.path.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("damage", [
+    "missing-region", "foreign-region", "foreign-group", "arbitrary-deployment", "other-resource",
+])
+def test_no_location_history_does_not_relax_literal_deployment_target_authorization(transport, damage):
+    from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
+    observer, _, wire = transport
+    template = fixture_template()
+    deployment = PREFIX + "microsoft.resources/deployments/arm_deployment-" + HUB.rsplit("/", 1)[1]
+    if damage == "missing-region":
+        del template["resources"][0]["location"]
+    elif damage == "foreign-region":
+        template["resources"][0]["location"] = "westus"
+    elif damage == "foreign-group":
+        deployment = deployment.replace(ownership.GROUP, "foreign-group")
+    elif damage == "arbitrary-deployment":
+        deployment = PREFIX + "microsoft.resources/deployments/unplanned"
+    else:
+        template["resources"][0]["type"] = "Microsoft.Resources/deploymentScripts"
+    with pytest.raises(ownership.OwnershipError):
+        wire.submit("PUT", deployment, {"properties": {"mode": "Incremental", "template": template}})
+    assert not wire.calls and not observer.data["resources"]
 
 
 @pytest.mark.parametrize("damage", [

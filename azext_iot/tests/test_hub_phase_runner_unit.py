@@ -689,11 +689,13 @@ def test_parent_reconciles_only_acknowledged_async_acceptance(tmp_path, status, 
 
 
 def test_route_definitive_rejection_is_evidence_not_a_pass_and_distinct_update_allowed(wire, monkeypatch):
+    from azext_iot.tests.iothub.message_endpoint.test_iothub_message_route_int import generate_names
+
     observer, _, _, _, submit = wire
     hub_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
     submit("PUT", hub_id, {"properties": {"disableLocalAuth": True}})
     observer.current_node = ownership.ROUTE_REJECTION_NODE
-    invalid = {"properties": {"routing": {"routes": [{"endpointNames": ["ep" + "a" * 32]}], "endpoints": {}}}}
+    invalid = {"properties": {"routing": {"routes": [{"endpointNames": generate_names(prefix="ep")}], "endpoints": {}}}}
     original = observer.original_send
     monkeypatch.setattr(observer, "original_send", Mock(return_value=Mock(status_code=400)))
     submit("PUT", hub_id, invalid)
@@ -705,6 +707,46 @@ def test_route_definitive_rejection_is_evidence_not_a_pass_and_distinct_update_a
     assert runner.phase_errors({}, [ownership.ROUTE_REJECTION_NODE], "HubControl", "regular", "uid")
     with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
         submit("PUT", hub_id, invalid)
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 408, 429, 500])
+@pytest.mark.parametrize("damage", [None, "other-node", "no-removal", "no-reference", "changed-routes", "foreign-name"])
+def test_endpoint_rejection_requires_actual_fixture_removal_and_unchanged_references(wire, monkeypatch, status, damage):
+    from copy import deepcopy
+    from azext_iot.tests.iothub.message_endpoint.test_iothub_message_endpoint_int import generate_ep_names
+
+    observer, _, _, _, submit = wire
+    hub_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
+    endpoint = generate_ep_names()[0] if damage != "foreign-name" else "unplanned-endpoint"
+    routing = {
+        "endpoints": {"serviceBusTopics": [{"name": endpoint}]},
+        "routes": [{"name": "route", "endpointNames": [endpoint]}],
+        "enrichments": [{"key": "key", "endpointNames": [endpoint], "value": "value"}],
+    }
+    submit("PUT", hub_id, {"properties": {"disableLocalAuth": True, "routing": routing}})
+    observer.current_node = ownership.ENDPOINT_REJECTION_NODE if damage != "other-node" else "other-node"
+    invalid = deepcopy(routing)
+    invalid["endpoints"]["serviceBusTopics"] = []
+    if damage == "no-removal":
+        invalid["endpoints"] = deepcopy(routing["endpoints"])
+    elif damage == "no-reference":
+        invalid["routes"], invalid["enrichments"] = [], []
+    elif damage == "changed-routes":
+        invalid["routes"][0]["name"] = "different-route"
+    body = {"properties": {"routing": invalid}}
+    original = observer.original_send
+    monkeypatch.setattr(observer, "original_send", Mock(return_value=Mock(status_code=status)))
+    submit("PUT", hub_id, body)
+    mutation = observer.data["resources"][hub_id]["mutations"][-1]
+    assert ownership.expected_rejection(mutation) is (status == 400 and damage is None)
+    assert bool(ownership.ownership_errors(observer.data, "uid", "regular")) is not (status == 400 and damage is None)
+    if status == 400 and damage is None:
+        monkeypatch.setattr(observer, "original_send", original)
+        with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+            submit("PUT", hub_id, body)
+        invalid["routes"], invalid["enrichments"] = [], []
+        submit("PUT", hub_id, body)
+        assert not observer.data["resources"][hub_id]["uncertain"]
 
 
 @pytest.mark.parametrize("status", [202, 429, 500, None])
