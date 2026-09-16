@@ -668,7 +668,9 @@ class Observer:
         hub_id = prefix + "microsoft.devices/iothubs/" + hub.get("name", "").casefold()
         name = resource_id.rsplit("/", 1)[1]
         if (not scope_id(hub_id) or not planned_root(hub_id)
-                or not (name == "arm_deployment-" + hub["name"].casefold() or re.fullmatch(r"[0-9a-f]{32}", name))
+                or not (name == "arm_deployment-" + hub["name"].casefold()
+                        or re.fullmatch(r"[0-9a-f]{32}", name)
+                        or re.fullmatch(r"iot-hub-state-[a-z0-9_]{8}", name))
                 or hub.get("location", "").casefold() != REGION
                 or hub.get("properties", {}).get("disableLocalAuth") is not True):
             self.reject("Unplanned state deployment Hub/name/location/auth")
