@@ -208,7 +208,10 @@ def test_workflow_failure_propagation_is_wired():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     assert not jobs["int-test"].get("continue-on-error", False)
-    assert jobs["int-test"]["strategy"]["fail-fast"] is False
+    bundle = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_bundle.yml").read_text(encoding="utf-8"))
+    assert bundle["jobs"]["cohort"]["strategy"]["fail-fast"] is False
+    assert _integration_service_job()["strategy"]["fail-fast"] is False
+    assert not _integration_service_job().get("continue-on-error", False)
     gate = jobs["int-test-gate"]
     assert set(gate["needs"]) == {"setup", "unit-test", "int-test"}
     assert not any(step.get("continue-on-error", False) for step in gate["steps"])
@@ -231,7 +234,7 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     assert budgets == {"HubControl": "190", "HubData": "360", "ADR": "120"}
     for suite, phases in BUDGETS.items():
         assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
-    assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
+    assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
 def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_and_gate():
@@ -239,24 +242,29 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     assert '"DPS|azext_iot/tests/dps|DPS-int|120"' in matrix["run"]
-    setup = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Setup tox test environment")
+    steps = _integration_service_job()["steps"]
+    setup = next(step for step in steps if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
-    step = next(step for step in jobs["int-test"]["steps"] if step.get("id") == "run_tests")
+    step = next(step for step in steps if step.get("id") == "run_tests")
     assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
     assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
     assert "certificate coverage is not configured in this workflow" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
-    assert '--subscription "${{ env.TEST_SUBSCRIPTION_ID }}"' in step["run"]
+    assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
     assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
     assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
-    assert "tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install" in step["run"]
-    upload = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Upload test result")
+    assert 'tox r -e "$TEST_TOX_ENV" --skip-pkg-install' in step["run"]
+    upload = next(step for step in steps if step["name"] == "Upload test result")
     assert upload["with"]["path"] == "test-result/"
 
 
+def _integration_service_job():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_cohort.yml").read_text(encoding="utf-8"))
+    return workflow["jobs"]["service"]
+
+
 def _integration_run_step():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    return next(step for step in workflow["jobs"]["int-test"]["steps"] if step.get("id") == "run_tests")
+    return next(step for step in _integration_service_job()["steps"] if step.get("id") == "run_tests")
 
 
 def test_adr_revocation_workflow_opt_in_is_typed_default_off_and_adr_only():
@@ -300,14 +308,6 @@ def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
 
 def _run_integration_shell(tmp_path, service, expression, exit_code=0):
     script = _integration_run_step()["run"]
-    for key, value in {
-        "matrix.config.service": service,
-        "matrix.config.tox_env": f"{service}-int",
-        "env.TEST_SUBSCRIPTION_ID": "offline-subscription",
-        "env.RESOURCE_GROUP": "offline-rg",
-        "matrix.config.region": "centraluseuap",
-    }.items():
-        script = script.replace("${{ " + key + " }}", value)
     # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
     script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
     script = script.replace(".tox/ADR-int/bin/python", '"$OFFLINE_PYTHON"')
@@ -319,6 +319,8 @@ tee() { cat; }
     return subprocess.run(
         ["bash", "-c", stubs + script], cwd=tmp_path,
         env=dict(os.environ, ADR_TEST_FILTER=expression, OFFLINE_PYTHON=sys.executable,
+                 TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
+                 TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
                  OFFLINE_EXIT_CODE=str(exit_code)),
         capture_output=True, text=True, timeout=20, check=False,
     )
@@ -455,7 +457,7 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 
-def test_hub_workflow_uses_two_public_suites_and_scoped_serial_consumers():
+def test_hub_workflow_uses_two_public_suites_and_one_scoped_bundle():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
     inputs = triggers["workflow_dispatch"]["inputs"]
@@ -465,9 +467,13 @@ def test_hub_workflow_uses_two_public_suites_and_scoped_serial_consumers():
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
     assert step["env"]["INPUT_TEST_HUB_CONTROL"] == "${{ inputs.testHubControl }}"
     job = workflow["jobs"]["int-test"]
-    assert job["strategy"]["max-parallel"] == 1
+    assert "strategy" not in job
+    assert job["uses"] == "./.github/workflows/int_test_bundle.yml"
     assert job["concurrency"]["cancel-in-progress"] is False
     assert job["concurrency"]["group"] == "integration-live-${{ needs.setup.outputs.live-scope }}"
+    service = _integration_service_job()
+    assert "concurrency" not in service
+    assert "max-parallel" not in service["strategy"]
     assert '"${TEST_SUBSCRIPTION_ID,,}" "${RESOURCE_GROUP,,}" | sha256sum' in step["run"]
     env = _integration_run_step()["env"]
     assert env["azext_iot_testhub_location"] == "${{ matrix.config.region }}"

@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import runpy
 import select
+import shlex
 import signal
 import subprocess
 import sys
@@ -38,6 +39,7 @@ READ_SECONDS = 60
 DPS_LIMIT = 10  # Conservative subscription default; the DPS SDK exposes no quota-read operation.
 REQUIRED_SLOTS = 2
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
+FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 
 
 class PhaseError(RuntimeError):
@@ -373,7 +375,7 @@ def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=t
         sleep(15)  # GET-only observation; never repeat DELETE, including alreadyDeleting resources.
 
 
-def safe_junit(raw, destination, phase, selected):
+def safe_junit(raw, destination, phase, selected, *, debug=None):
     if not raw.is_file():
         return {"valid": False, "reason": "Missing JUnit result"}
     try:
@@ -381,9 +383,14 @@ def safe_junit(raw, destination, phase, selected):
     except (ET.ParseError, OSError):
         return {"valid": False, "reason": "Unreadable JUnit result"}
     counts = {"tests": len(cases), "failures": 0, "errors": 0, "skipped": 0, "passed": 0}
-    expected = MANIFEST["expected_nodeids"](phase)
+    expected = (
+        {MANIFEST["normalize_nodeid"](node) for node in debug["requestedNodes"]} if debug
+        else MANIFEST["expected_nodeids"](phase)
+    )
     identities = []
     output = ET.Element("testsuite", name=f"dps-{phase}")
+    if debug:
+        output.set("mode", "debug")
     for case in cases:
         identity = MANIFEST["junit_nodeid"](case)
         known = identity in expected
@@ -411,10 +418,13 @@ def safe_junit(raw, destination, phase, selected):
     return counts
 
 
-def selection_count(receipts, phase):
+def selection_count(receipts, phase, *, debug=None):
     values = [json.loads(path.read_text(encoding="utf-8")) for path in receipts.glob("selection-*.json")]
-    expected = sorted(MANIFEST["expected_nodeids"](phase))
-    if not values or any(value.get("selected") != len(expected) or value.get("nodeids") != expected for value in values):
+    expected = sorted(MANIFEST["normalize_nodeid"](node) for node in debug["requestedNodes"]) if debug else sorted(
+        MANIFEST["expected_nodeids"](phase)
+    )
+    if not values or any(value.get("selected") != len(expected) or value.get("nodeids") != expected
+                         or not FOCUSED["matches"](value, debug) for value in values):
         raise PhaseError("Missing/inconsistent collection receipts.")
     return len(expected)
 
@@ -518,18 +528,24 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     }
 
 
-def run(subscription, group, output, reader, execute=child, clock=time.monotonic):
-    output = Path(output)
+def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *, debug_phase=None, debug_nodes=None):
+    debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
+    phases = tuple(value for value in PHASES if not debug or value[0] == debug["phase"])
+    output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)  # A rerun must not overwrite phase evidence.
     summary_path = output.parent / "dps-phases.json"
     if summary_path.exists():
         raise PhaseError("A DPS phase summary already exists; refusing to overwrite it.")
-    deadline = clock() + RUNNER_SECONDS
+    reserve = RUNNER_SECONDS - sum(runtime + cleanup for _, runtime, cleanup in PHASES)
+    runner_seconds = sum(runtime + cleanup for _, runtime, cleanup in phases) + reserve if debug else RUNNER_SECONDS
+    deadline = clock() + runner_seconds
     reader.deadline = deadline
     summary = {
         "schema": 1, "status": "failed", "subscription": subscription, "resource_group": group,
-        "endpoint": ARM, "region": "centraluseuap", "started_at": utc(), "runner_seconds": RUNNER_SECONDS,
-        "phases": [{"name": name, "status": "blocked", "reason": "Not started"} for name, _, _ in PHASES],
+        "endpoint": ARM, "region": "centraluseuap", "started_at": utc(), "runner_seconds": runner_seconds,
+        "phases": [{"name": name, "status": "blocked", "reason": "Not started",
+                    **FOCUSED["provenance"](debug)} for name, _, _ in phases],
+        **FOCUSED["provenance"](debug),
     }
     write_json(summary_path, summary)
     cancel = Event()
@@ -551,8 +567,14 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
             "azext_iot_dps_test_phase", "azext_iot_dps_run_uid", "azext_iot_dps_phase_receipts",
             "azext_iot_dps_junit", "azext_iot_dps_interrupt_timeout",
             "azext_iot_dps_workers",
+            FOCUSED["ENV"], FOCUSED["DPS_ARGS_ENV"],
         )):
             raise PhaseError("The serial runner owns phase/UID/receipt/JUnit/cleanup options; unset conflicting overrides.")
+        if debug and any(os.environ.get(name) for name in (
+            "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
+            "PYTEST_XDIST_AUTO_NUM_WORKERS", "PYTEST_XDIST_WORKER_COUNT",
+        )):
+            raise PhaseError("Focused DPS rejects ambient pytest selection/plugin overrides.")
         baseline = reader.inventory()
         summary["baseline"] = {"resources": baseline, "capacity": capacity(baseline), "at": utc()}
         write_json(summary_path, summary)
@@ -561,7 +583,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
             raise PhaseError("Initial subscription capacity cannot support two managed DPS fixtures.")
         records = []
         with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
-            for index, (name, runtime, cleanup) in enumerate(PHASES):
+            for index, (name, runtime, cleanup) in enumerate(phases):
                 result = summary["phases"][index]
                 if cancel.is_set() or clock() + runtime + cleanup + READ_SECONDS > deadline:
                     result["reason"] = "Cancelled or insufficient remaining runtime/cleanup budget"
@@ -597,24 +619,43 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_dps_test_subscription=subscription,
                                    azext_iot_dps_test_resource_group=group, azext_iot_testrg=group,
                                    azext_iot_dps_test_location="centraluseuap", azext_iot_testhub_location="centraluseuap",
-                                   azext_iot_dps_workers="0" if name == "local-auth-toggle" else "7",
+                                   azext_iot_dps_workers="0" if debug or name == "local-auth-toggle" else "7",
                                    azext_iot_dps_junit=str(raw_junit))
+                if debug:
+                    environment[FOCUSED["ENV"]] = json.dumps(debug)
+                    environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join([
+                        "-c", str(ROOT / "setup.cfg"), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
+                        "-p", "azext_iot.tests._focused_live_plugin", "-o", "env=", "-o", "addopts=",
+                        "-o", "log_cli=false", "--capture=fd", *debug["requestedNodes"],
+                    ])
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)
                 result.pop("reason", None)
                 write_json(summary_path, summary)
                 print(f"[DPS phases] START {name}; runtime={runtime}s cleanup={cleanup}s", flush=True)
-                execution = execute(
-                    [sys.executable, "-m", "tox", "r", "-e", "DPS-int", "--skip-pkg-install"],
-                    environment, folder / "output.log", runtime, cleanup, cancel.is_set,
-                )
+                cwd = Path.cwd()
+                try:
+                    os.chdir(ROOT)
+                    execution = execute(
+                        [sys.executable, "-m", "tox", "r", "-e", "DPS-int", "--skip-pkg-install"],
+                        environment, folder / "output.log", runtime, cleanup, cancel.is_set,
+                    )
+                finally:
+                    os.chdir(cwd)
                 result.update({key: value for key, value in execution.items() if key != "cleanup_deadline"})
                 records = []
                 try:
-                    selected = selection_count(receipts, name)
-                    result["results"] = safe_junit(raw_junit, folder / "junit.xml", name, selected)
+                    selected = selection_count(receipts, name, debug=debug)
+                    result["results"] = safe_junit(raw_junit, folder / "junit.xml", name, selected, debug=debug)
                     result["results"]["selected"] = selected
-                except (OSError, ValueError, KeyError, PhaseError):
+                    if debug:
+                        stages = json.loads((receipts / "pytest.json").read_text(encoding="utf-8"))
+                        errors = runpy.run_path(str(ROOT / "azext_iot/tests/_hub_phase_runner.py"))["phase_errors"](
+                            stages, debug["requestedNodes"], "DPS", name, uid, debug=debug,
+                        )
+                        result["results"]["stage_errors"] = errors
+                        result["results"]["valid"] = result["results"]["valid"] and not errors
+                except (OSError, ValueError, KeyError, TypeError, AttributeError, PhaseError):
                     result["results"] = {"valid": False, "reason": "Missing/invalid collection or JUnit results"}
                 try:
                     records = ownership(receipts, name, uid, subscription, group, baseline_ids)
@@ -654,6 +695,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
             "message": str(error) if isinstance(error, PhaseError) else "Diagnostic omitted to protect credentials",
         }
     finally:
+        if debug:
+            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
         summary["finished_at"] = utc()
         summary["arm_reads"] = getattr(reader, "reads", [])
         write_json(summary_path, summary)
@@ -661,7 +704,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         thread.join(timeout=1)
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
-    return 0 if summary["status"] == "passed" else 1
+    return 0 if summary["status"] == ("debug-passed" if debug else "passed") else 1
 
 
 def main():
@@ -670,16 +713,22 @@ def main():
     parser.add_argument("--resource-group", required=True)
     parser.add_argument("--region", choices=["centraluseuap"], default="centraluseuap")
     parser.add_argument("--output", default="test-result/dps-phases")
+    FOCUSED["add_arguments"](parser)
     args = parser.parse_args()
     args.subscription = str(UUID(args.subscription))
     if not args.resource_group.strip():
         parser.error("--resource-group must not be empty")
     logging.getLogger("azure").setLevel(logging.ERROR)
     try:
+        FOCUSED["select"]("DPS", args.debug_phase, args.debug_node)
+    except ValueError as error:
+        parser.error(str(error))
+    try:
         require_linux()  # Public entry: no profiles, credentials, ARM reads, output writes, or children before this.
         with bounded_read():
             reader = ArmReader(args.subscription)
-        return run(args.subscription, args.resource_group, args.output, reader)
+        return run(args.subscription, args.resource_group, args.output, reader,
+                   debug_phase=args.debug_phase, debug_nodes=args.debug_node)
     except Exception as error:
         diagnostic = str(error) if isinstance(error, PhaseError) else type(error).__name__
         print(f"[DPS phases] failed before launch: {diagnostic}", flush=True)

@@ -430,8 +430,11 @@ class WorkerStop:
 
 
 def start_worker(session):
+    from azext_iot.tests import _focused_live as focused
     config = receipts.settings()
-    if not config or (not hasattr(session.config, "workerinput") and _phase.get_phase() != _phase.LOCAL_AUTH_TOGGLE):
+    debug = focused.from_environment(os.environ, "DPS", _phase.get_phase())
+    if not config or (not hasattr(session.config, "workerinput") and _phase.get_phase() != _phase.LOCAL_AUTH_TOGGLE
+                      and not debug):
         return
     require_linux()
     directory = config[0]

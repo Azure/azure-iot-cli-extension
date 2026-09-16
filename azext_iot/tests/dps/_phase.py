@@ -9,6 +9,7 @@
 import os
 
 import pytest
+from azext_iot.tests import _focused_live as focused
 from azext_iot.tests.dps._phase_manifest import expected_nodeids, normalize_nodeid, resource_kinds
 
 PHASE_ENV = "azext_iot_dps_test_phase"
@@ -50,6 +51,9 @@ def configure(config):
     )
     if get_phase() == LOCAL_AUTH_TOGGLE and config.getoption("numprocesses", default=None) not in (None, 0):
         raise pytest.UsageError("The DPS local-auth-toggle phase must run serially with -n 0.")
+    debug = focused.from_environment(os.environ, "DPS", get_phase())
+    if debug and config.pluginmanager.get_plugin("dps-focused-receipt") is None:
+        raise pytest.UsageError("Focused DPS must load its pre-import selection plugin through the controller.")
 
 
 def select_items(config, items):
@@ -65,7 +69,8 @@ def select_items(config, items):
         item_phase = LOCAL_AUTH_TOGGLE if local_auth_toggle else SERVICE_SAS if service_sas else REGULAR
         (selected if not pending_certificate and item_phase == phase else deselected).append(item)
     if phase != REGULAR or explicit_phase:
-        expected = expected_nodeids(phase)
+        debug = focused.from_environment(os.environ, "DPS", phase)
+        expected = {normalize_nodeid(node) for node in debug["requestedNodes"]} if debug else expected_nodeids(phase)
         actual = {
             normalize_nodeid(item.nodeid)
             for item in selected
