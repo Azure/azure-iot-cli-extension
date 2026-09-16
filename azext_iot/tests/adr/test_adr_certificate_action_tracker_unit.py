@@ -601,6 +601,17 @@ def test_real_sdk_ack_and_background_debug_logs_are_redacted_after_observe(
     mocked_response.add("POST", ACTION_URL, status=202, headers={"Location": signed, "Retry-After": "0"})
     mocked_response.add("GET", signed, status=204)
     caplog.set_level(logging.DEBUG)
+    # Earlier real CLI invocations may have reconfigured SDK logging.
+    sdk_loggers = {
+        logging.getLogger("azure.core.pipeline.policies._universal"),
+        wire_client._config.http_logging_policy.logger,
+        logging.getLogger("azure.core.pipeline.transport"),
+    }
+    for sdk_logger in sdk_loggers:
+        caplog.set_level(logging.DEBUG, logger=sdk_logger.name)
+        mocker.patch.object(sdk_logger, "disabled", False)
+        mocker.patch.object(sdk_logger, "handlers", [caplog.handler])
+        mocker.patch.object(sdk_logger, "propagate", False)
     released, started = Event(), Event()
     from azure.core.polling.base_polling import LROBasePolling
 
