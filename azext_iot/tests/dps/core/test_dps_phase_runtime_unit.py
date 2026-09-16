@@ -64,6 +64,44 @@ def _owned(kind):
     return ARM + f"/subscriptions/{SUB_B}/resourceGroups/group/providers/Microsoft.Devices/{resource_type}/owned"
 
 
+@pytest.mark.parametrize("determinant", [False, True])
+def test_cleanup_progress_survives_closed_pytest_capture(scope, monkeypatch, determinant):
+    from io import StringIO
+    from azure.cli.core.commands import progress
+
+    captured = (scope / "captured-stderr").open("w+", encoding="utf-8")
+    captured.close()
+    current = StringIO()
+    original = progress.get_progress_view
+    # Azure CLI binds stderr in this function's default argument at import.
+    monkeypatch.setattr(original, "__defaults__", (False, captured, None))
+    monkeypatch.setattr(sys, "stderr", current)
+    assert captured.closed
+    assert progress.get_progress_view().out is captured
+    with pytest.raises(ValueError, match="closed file"):
+        progress.get_progress_view().flush()
+    cli = EmbeddedCLI().az_cli
+    stale = cli.get_progress_controller(det=determinant)
+    assert stale.active_progress.out is captured
+
+    with runtime.activate(SUB_B):
+        controller = cli.get_progress_controller(det=determinant)
+        assert controller is stale
+        view = controller.active_progress
+        assert view.out is current
+        view.flush()
+        explicit = (scope / "explicit-output").open("w+", encoding="utf-8")
+        view = progress.get_progress_view(outstream=explicit)
+        assert view.out is explicit
+        view.flush()
+        explicit.close()
+        # Explicitly invalid streams remain errors; the scope must not swallow them.
+        with pytest.raises(ValueError, match="closed file"):
+            view.flush()
+    assert progress.get_progress_view is original
+    assert not current.closed
+
+
 @responses.activate
 @pytest.mark.parametrize("factory_name,kind", [
     ("iot_hub_service_factory", "hub"), ("adr_iot_hub_service_factory", "hub"),

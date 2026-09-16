@@ -223,16 +223,22 @@ def environment(base, suite, phase, folder, run_id, subscription, group, *, debu
     result["AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE"] = "login"
     if debug:
         result[FOCUSED["ENV"]] = json.dumps(debug)
+        # Debug evidence is fresh and phase-local, never appended to a checkout's
+        # possibly incompatible (statement/branch) or concurrently written database.
+        result["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
     return result
 
 
-def command(suite, phase, *, debug=None):
+def command(suite, phase, *, debug=None, folder=None):
     return [
         sys.executable, "-m", "pytest", "-c", str(ROOT / "setup.cfg"),
         "--rootdir", str(ROOT), "--confcutdir", str(ROOT), "-p", "azext_iot.tests._hub_suite_plugin",
         "-p", "no:rerunfailures", "-n", "0", "--timeout=900", "--integration-progress-interval=60",
-        "-o", "faulthandler_timeout=300", "-o", "addopts=", "-o", "env=", "-o", "log_cli=false",
-        "--cov=azext_iot", "--cov-append", "--cov-config", str(ROOT / ".coveragerc"), "--cov-report=",
+        # Debug keeps real deadlines/tracebacks, but opts out of periodic stack dumps.
+        "-o", "faulthandler_timeout=0" if debug else "faulthandler_timeout=300",
+        "-o", "addopts=", "-o", "env=", "-o", "log_cli=false",
+        "--cov=azext_iot", "--cov-append", "--cov-config", str(ROOT / ".coveragerc"),
+        f"--cov-report=xml:{(folder / 'coverage.xml').resolve()}" if debug and folder else "--cov-report=",
         "--capture=fd", "-vv", *(debug["requestedNodes"] if debug else selection()["nodes"](suite, phase)),
     ]
 
@@ -342,7 +348,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
             cwd = Path.cwd()
             try:
                 os.chdir(ROOT)
-                execution = (execute or child)(command(suite, phase, debug=debug), env, folder / "output.log",
+                execution = (execute or child)(command(suite, phase, debug=debug, folder=folder), env, folder / "output.log",
                                                runtime, CLEANUP, cancel.is_set)
             finally:
                 os.chdir(cwd)

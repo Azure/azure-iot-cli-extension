@@ -6,7 +6,9 @@
 
 from time import sleep
 from typing import Optional, List
+import json
 import os
+from pathlib import Path
 
 import pytest
 from azure.cli.core.azclierror import AzCLIError, CLIInternalError
@@ -97,6 +99,65 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             )
 
 
+def _dynamic_hub_was_unused(request):
+    import requests
+    from azext_iot.tests import _focused_live, _hub_ownership as ownership
+    from azext_iot.tests._hub_suite_plugin import PhaseReceipt
+
+    runtime = request.config.pluginmanager.get_plugin("hub-suite-receipt")
+    suite, phase, run_id, owner_path, receipt_path = (
+        os.getenv("AZEXT_IOT_HUB_" + name) for name in ("SUITE", "PHASE", "RUN_ID", "OWNERSHIP", "RECEIPT")
+    )
+    if (runtime is None and all(value is None for value in (suite, phase, run_id, owner_path, receipt_path))
+            and _focused_live.ENV not in os.environ):
+        return False
+    observer = getattr(runtime, "observer", None)
+    if (not isinstance(runtime, PhaseReceipt) or not isinstance(observer, ownership.Observer)
+            or (suite, phase) not in (("HubControl", "regular"), ("HubData", "entra"))
+            or not run_id or not owner_path or not receipt_path
+            or not Path(owner_path).is_absolute() or not Path(receipt_path).is_absolute()
+            or observer.path != Path(owner_path) or runtime.path != Path(receipt_path)
+            or not isinstance(runtime.data, dict) or runtime.data.get("schemaVersion") != 1
+            or (runtime.data.get("suite"), runtime.data.get("phase"), runtime.data.get("runId")) != (suite, phase, run_id)):
+        raise ownership.OwnershipError("Cannot determine shared Hub usage: missing or mismatched phase runtime.")
+    if json.loads(runtime.path.read_text(encoding="utf-8")) != runtime.data:
+        raise ownership.OwnershipError("Cannot determine shared Hub usage: phase receipt differs from runtime.")
+
+    # The observer is installed before constructors and records every initial PUT.
+    # Its locked, durable ledger proves non-use without discovering/adopting a Hub.
+    with observer.lock:
+        data = observer.data
+        if (not isinstance(data, dict) or data.get("schemaVersion") != 1
+                or data.get("installed") is not True or observer.original_send is None
+                or requests.Session.send is observer.original_send
+                or (data.get("phase"), data.get("runId")) != (phase, run_id)
+                or not isinstance(data.get("resources"), dict) or not isinstance(data.get("violations"), list)):
+            raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid observer receipt.")
+        if json.loads(observer.path.read_text(encoding="utf-8")) != data:
+            raise ownership.OwnershipError("Cannot determine shared Hub usage: observer receipt differs from runtime.")
+        for resource_id, record in data["resources"].items():
+            if (not ownership.scope_id(resource_id) or resource_id != resource_id.casefold()
+                    or not isinstance(record, dict) or record.get("id") != resource_id
+                    or record.get("ownerTag") != run_id or record.get("before") != 404
+                    or record.get("attempted") is not True
+                    or not isinstance(record.get("apiVersion"), str) or not record["apiVersion"]
+                    or not isinstance(record.get("mutations"), list)
+                    or not isinstance(record.get("resolved"), bool) or not isinstance(record.get("uncertain"), bool)):
+                raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid pre-create record.")
+            for mutation in record["mutations"]:
+                if (not isinstance(mutation, dict) or not ownership.scope_id(mutation.get("id"))
+                        or not (mutation["id"] == resource_id or mutation["id"].startswith(resource_id + "/"))
+                        or mutation.get("method") not in ("PUT", "PATCH", "DELETE", "POST")):
+                    raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid mutation record.")
+        resource_id = (
+            f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{ENTITY_RG}"
+            f"/providers/Microsoft.Devices/IotHubs/{ENTITY_NAME}"
+        ).casefold()
+        if not ownership.scope_id(resource_id) or not ownership.planned_root(resource_id):
+            raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid dynamic Hub scope.")
+        return resource_id not in data["resources"]
+
+
 @pytest.fixture(scope='session', autouse=True)
 def _cleanup_dynamic_hub(request):
     """Session-scoped fixture to delete dynamically created hubs after all tests complete.
@@ -116,6 +177,9 @@ def _cleanup_dynamic_hub(request):
         and not iothub_settings.env.azext_iot_testhub
         and not _sas_phase.enabled()
     ):
+        if _dynamic_hub_was_unused(request):
+            logger.info("Skipping unused dynamically named hub; no creation began in this owned run: %s", ENTITY_NAME)
+            return
         logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
         for attempt in range(3):
             try:

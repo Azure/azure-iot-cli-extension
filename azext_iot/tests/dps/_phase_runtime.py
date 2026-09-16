@@ -313,6 +313,7 @@ def assign_role_assignment_once(
 def activate(subscription, existing=()):
     """Pin only this pytest process; leave shared profiles/cloud and product defaults untouched."""
     from azure.cli.core._profile import Profile
+    from azure.cli.core.commands import progress
     from azure.cli.core.profiles import ResourceType
     from azure.cli.core.profiles._shared import get_client_class
     from azure.mgmt.authorization import AuthorizationManagementClient
@@ -326,6 +327,14 @@ def activate(subscription, existing=()):
 
     original_init = EmbeddedCLI.__init__
     original_invoke = EmbeddedCLI.invoke
+    original_progress_view = progress.get_progress_view
+
+    def progress_view(determinant=False, outstream=None, spinner=None):
+        # pytest may close its capture file before session-finish cleanup.
+        # Do not reuse Azure CLI's stderr default bound at module import.
+        return original_progress_view(
+            determinant=determinant, outstream=sys.stderr if outstream is None else outstream, spinner=spinner,
+        )
 
     def cli_init(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
@@ -382,6 +391,7 @@ def activate(subscription, existing=()):
 
     target = subscription
     with ExitStack() as stack:
+        stack.enter_context(patch.object(progress, "get_progress_view", progress_view))
         stack.enter_context(patch.object(EmbeddedCLI, "__init__", cli_init))
         stack.enter_context(patch.object(EmbeddedCLI, "invoke", invoke))
         for instance in existing:
