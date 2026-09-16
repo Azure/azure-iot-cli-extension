@@ -68,7 +68,7 @@ def test_failed_link_guidance_renders_scoped_update_with_existing_identity(
     assert commands[0] in message
     assert "roles are incomplete" not in message
     assert "exact remediation commands" not in message
-    assert "Correlation id: corr." in message
+    assert "Correlation ID from the resource-status response: corr." in message
     assert namespace == original
 
 

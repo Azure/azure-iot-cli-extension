@@ -255,6 +255,15 @@ def mock_poller():
     return _create_mock_poller
 
 
+@pytest.fixture
+def ca_pki(monkeypatch):
+    from azext_iot.tests.adr._certificate_fixtures import NOW, certificate_fixture
+    from azext_iot.adr.providers import certificate_helpers
+
+    monkeypatch.setattr(certificate_helpers, "datetime", Mock(now=lambda _tz: NOW))
+    return certificate_fixture()
+
+
 # Operation groups reached by `az iot adr ns` commands. Specced strictly so an SDK
 # regeneration that renames or removes one of these methods fails a unit test.
 _SPECCED_OPERATION_GROUPS = (

@@ -6,8 +6,10 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, RequiredArgumentMissingError
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azure.core.exceptions import AzureError, HttpResponseError
+from knack.log import get_logger
 
 from azext_iot.adr.common import (
     DEFAULT_NS_CA_KEY_TYPE,
@@ -16,8 +18,13 @@ from azext_iot.adr.common import (
     compose_namespace_child_arm_id,
 )
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.certificate_helpers import (
+    log_activation_error_hint,
+    validate_external_certificate_chain,
+)
 
 _CA_CHILD_TYPE = "certificateAuthorities"
+logger = get_logger(__name__)
 
 
 class CertificateAuthorityProvider(ADRProvider):
@@ -167,23 +174,29 @@ class CertificateAuthorityProvider(ADRProvider):
         certificate_chain: str,
         **kwargs,
     ):
-        self._validate_action_issuer(
+        certificate_authority = self._validate_action_issuer(
             certificate_authority_name=certificate_authority_name,
             namespace_name=namespace_name,
             resource_group_name=resource_group_name,
             expected_issuer_type=CertificateAuthorityIssuerType.external.value,
             action="activate",
         )
+        validate_external_certificate_chain(certificate_chain, certificate_authority)
         body = {"certificateChain": certificate_chain}
-        poller = self.client.certificate_authorities.begin_activate(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            certificate_authority_name=certificate_authority_name,
-            body=body,
-        )
-        return self._wait(
+        try:
+            poller = self.client.certificate_authorities.begin_activate(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                certificate_authority_name=certificate_authority_name,
+                body=body,
+            )
+        except HttpResponseError as error:
+            log_activation_error_hint(error)
+            raise
+        return self._action_result(
             poller,
             f"Activating certificate authority '{certificate_authority_name}' on namespace {namespace_name}...",
+            certificate_authority_name, namespace_name, resource_group_name, "activate",
             **kwargs,
         )
 
@@ -200,11 +213,34 @@ class CertificateAuthorityProvider(ADRProvider):
             namespace_name=namespace_name,
             certificate_authority_name=certificate_authority_name,
         )
-        return self._wait(
+        return self._action_result(
             poller,
             f"Revoking certificate authority '{certificate_authority_name}' on namespace {namespace_name}...",
+            certificate_authority_name, namespace_name, resource_group_name, "revoke",
             **kwargs,
         )
+
+    def _action_result(
+        self, poller, status_message, certificate_authority_name, namespace_name,
+        resource_group_name, action, **kwargs,
+    ):
+        if kwargs.pop("no_wait", False):
+            return poller
+        try:
+            self._wait(poller, status_message, **kwargs)
+        except (HttpResponseError, AzureResponseError) as error:
+            if action == "activate":
+                log_activation_error_hint(error)
+            raise
+        try:
+            return self.show(certificate_authority_name, namespace_name, resource_group_name)
+        except AzureError:
+            logger.error(
+                "The %s action completed for certificate authority '%s', but reading the updated "
+                "resource failed. The following error is from that read; do not blindly repeat the action.",
+                action, certificate_authority_name,
+            )
+            raise
 
     def _validate_action_issuer(
         self,
@@ -229,3 +265,4 @@ class CertificateAuthorityProvider(ADRProvider):
                 f"Certificate authority '{certificate_authority_name}' cannot be {action}d. "
                 f"The {action} operation requires an ICA with issuerType '{expected_issuer_type}'."
             )
+        return certificate_authority
