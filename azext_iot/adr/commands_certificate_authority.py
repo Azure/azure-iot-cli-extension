@@ -90,6 +90,7 @@ def adr_ca_activate(
     namespace_name: str,
     resource_group_name: str,
     certificate_chain_file: str,
+    no_wait: bool = False,
     **kwargs,
 ):
     from azext_iot.common.utility import read_file_content
@@ -107,15 +108,20 @@ def adr_ca_activate(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
         certificate_chain=certificate_chain,
+        no_wait=no_wait,
         **kwargs,
     )
 
 
-def adr_ca_revoke(cmd, certificate_authority_name: str, namespace_name: str, resource_group_name: str, **kwargs):
+def adr_ca_revoke(
+    cmd, certificate_authority_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, **kwargs,
+):
     provider = CertificateAuthorityProvider(cmd)
     return provider.revoke(
         certificate_authority_name=certificate_authority_name,
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
+        no_wait=no_wait,
         **kwargs,
     )

@@ -139,7 +139,8 @@ def load_adr_help():
     - ICA with a Microsoft issuer: signed by a root CA in the same namespace. Pass the issuing
       CA's name with --issuer-ca-name.
     - ICA with an External issuer: signed by an external PKI. After creation the service returns
-      a CSR; sign it and complete activation with 'az iot adr ns ca activate'.
+      a CSR; sign that CSR (do not generate a replacement ICA key) and complete activation with
+      'az iot adr ns ca activate'. See activate help for a complete external ECC signing recipe.
   examples:
     - name: Create a service-managed root certificate authority
       text: az iot adr ns ca create -n myRootCA --ns myNamespace -g myResourceGroup --type Root
@@ -201,10 +202,44 @@ def load_adr_help():
   long-summary: |
     Use this after creating an ICA with --issuer-type External and signing the service-generated
     CSR with your external PKI. The certificate chain file must be in PEM
-    format with certificates ordered from leaf to root.
+    format with certificates ordered from leaf to root. Sign the actual service CSR and preserve
+    its requested extensions. OpenSSL x509 -req does not copy them by default: the recipe below
+    requires an OpenSSL version supporting -copy_extensions copy and req -addext.
+    Protect the external root private key; use this disposable test root only for testing.
+    Remaining validity is measured at activation, not issuance. A service rejection has been
+    observed below 365 days remaining; this is not a universal service-policy guarantee.
+    Allow operational margin and ensure the root covers the ICA's entire validity. The example's
+    730 days is illustrative, not mandatory. clientAuth is not the only permitted EKU assumed
+    by the CLI; preserve the extensions requested in your CSR.
+    Local preflight rejects deterministic certificate defects and warns about unconfirmed
+    policy constraints; backend validation remains authoritative.
+    Successful waited activation returns a fresh CA resource. --no-wait returns submission only,
+    without an added completion wait or output read.
   examples:
     - name: Activate an externally issued ICA
       text: az iot adr ns ca activate -n myExternalICA --ns myNamespace -g myResourceGroup --certificate-chain-file ./signed-chain.pem
+    - name: Create a disposable ECC root, sign the service CSR, and activate (Bash; supported OpenSSL required)
+      text: |
+        (
+          set -eu
+          umask 077
+          pki=$(mktemp -d)
+          trap 'rm -f "$pki/root.key" "$pki/root.pem" "$pki/ica.csr" "$pki/ica.pem" "$pki/chain.pem"; rmdir "$pki"' EXIT
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:secp384r1 -nodes \\
+            -keyout "$pki/root.key" -out "$pki/root.pem" -days 3650 -subj "/CN=Disposable ADR Root" \\
+            -addext "basicConstraints=critical,CA:TRUE,pathlen:2" \\
+            -addext "keyUsage=critical,keyCertSign,cRLSign"
+          az iot adr ns ca create -n myExternalICA --ns myNamespace -g myResourceGroup \\
+            --type ICA --issuer-type External --key-type ECC
+          az iot adr ns ca show -n myExternalICA --ns myNamespace -g myResourceGroup \\
+            --query properties.issuer.certificateSigningRequest -o tsv > "$pki/ica.csr"
+          openssl req -in "$pki/ica.csr" -noout -text
+          openssl x509 -req -in "$pki/ica.csr" -CA "$pki/root.pem" -CAkey "$pki/root.key" \\
+            -set_serial 2 -days 730 -sha384 -copy_extensions copy -out "$pki/ica.pem"
+          cat "$pki/ica.pem" "$pki/root.pem" > "$pki/chain.pem"
+          az iot adr ns ca activate -n myExternalICA --ns myNamespace -g myResourceGroup \\
+            --certificate-chain-file "$pki/chain.pem"
+        )
   """
 
     helps[
@@ -215,6 +250,10 @@ def load_adr_help():
   long-summary: |
     Applies only to an ICA whose issuerType is 'Microsoft'. The service revokes the current
     certificate and issues a replacement signed by the same root CA.
+    Successful waited revocation returns a fresh CA resource; --no-wait returns submission only
+    without an added completion wait or output read. Microsoft issuers may not expose status or
+    thumbprint. Fields are returned as supplied by the service. provisioningState describes the
+    resource operation; it does not prove that an old certificate is rejected.
   examples:
     - name: Revoke a certificate authority
       text: az iot adr ns ca revoke -n myCA --ns myNamespace -g myResourceGroup

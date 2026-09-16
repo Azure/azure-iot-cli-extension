@@ -282,29 +282,38 @@ class ADRProvider(object):
                 )
                 if not isinstance(error, dict):
                     error = {}
-                message = error.get("message")
+                message = ADRProvider._error_text(error)
                 ep_state = status.get("status") or endpoint.get("linkingState")
                 if message:
                     return f"endpoint '{name}': {message}"
                 if ep_state and str(ep_state).lower() == "failed":
                     return f"endpoint '{name}' is in a 'Failed' state"
-        error = props.get("error") or body.get("error") or {}
-        if isinstance(error, dict) and error.get("message"):
-            code = error.get("code")
-            return f"{code}: {error['message']}" if code else error["message"]
+        for error in (props.get("error"), body.get("error")):
+            detail = ADRProvider._error_text(error)
+            if detail:
+                return detail
         return ""
 
-    def _format_failure(self, state, body, response):
-        """Build an actionable error message for a terminal Failed/Canceled LRO.
+    @staticmethod
+    def _error_text(error):
+        if not isinstance(error, dict):
+            return ""
+        return ": ".join(
+            value.strip() for key in ("code", "message")
+            if isinstance(value := error.get(key), str) and value.strip()
+        )
 
-        Surfaces the backend's endpoint-level reason (when present) plus the GET's
-        correlation id, instead of just the bare provisioningState, so the failure
-        is diagnosable without hunting through the activity log.
-        """
+    def _format_failure(self, state, body, response, source="resource-status response"):
+        """Preserve observed errors and label correlation by the response source."""
         message = f"The operation did not succeed (provisioningState='{state}')."
         detail = self._extract_failure_detail(body)
         if detail:
             message += f" {detail}" if detail.endswith((".", "!", "?")) else f" {detail}."
+        else:
+            message += f" The {source} did not include a detailed error."
+        resource_id = body.get("id") if isinstance(body, dict) else None
+        if isinstance(resource_id, str) and resource_id:
+            message += f" Resource: {resource_id}."
         if detail and "not authorized" in detail.lower():
             message += (
                 " Verify access for the identity and resource named in the service error. "
@@ -324,9 +333,8 @@ class ADRProvider(object):
         headers = getattr(response, "headers", None)
         corr = headers.get("x-ms-correlation-request-id") if headers is not None else None
         if corr:
-            message += f" Correlation id: {corr}."
-        else:
-            message += " Inspect the service activity log using the operation's correlation id."
+            message += f" Correlation ID from the {source}: {corr}."
+        message += " Check Azure Activity Log for this resource around the operation time."
         return message
 
     def _poll_provisioning_state(
@@ -373,7 +381,9 @@ class ADRProvider(object):
                 last_body = self._initial_response_body(initial_response)
                 state = ((last_body or {}).get("properties") or {}).get("provisioningState")
                 if state in _PROVISIONING_FAILURES:
-                    raise AzureResponseError(self._format_failure(state, last_body, initial_response))
+                    raise AzureResponseError(
+                        self._format_failure(state, last_body, initial_response, "initial operation response")
+                    )
                 # A headerless PUT/PATCH may still be provisioning. Only
                 # completed inline responses can bypass resource polling.
                 if state == _PROVISIONING_SUCCEEDED or state is None:
@@ -460,7 +470,7 @@ class ADRProvider(object):
                 )
                 if last_status in _PROVISIONING_FAILURES:
                     raise AzureResponseError(
-                        self._format_failure(last_status, body or {}, response)
+                        self._format_failure(last_status, body or {}, response, "Location-status response")
                     )
                 if code != 202 and (
                     last_status == _PROVISIONING_SUCCEEDED or last_status is None

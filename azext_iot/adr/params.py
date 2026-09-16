@@ -185,7 +185,9 @@ def load_adr_arguments(self, _):
             "certificate_chain_file",
             options_list=["--certificate-chain-file", "--ccf"],
             help="Path to a PEM file containing the signed certificate chain for an externally issued "
-                 "ICA. Certificates must be ordered from leaf to root.",
+                 "ICA. Certificates must be ordered from leaf to root, match the service CSR key, "
+                 "and preserve requested extensions. Allow remaining-validity margin at activation; "
+                 "see activate help for the OpenSSL recipe and observed service constraints.",
         )
 
     # Certificate Policy (nested under a certificate authority) arguments

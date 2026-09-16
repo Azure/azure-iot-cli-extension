@@ -108,6 +108,34 @@ def _fake_time():
     return clock, sleeper, sleeps
 
 
+@pytest.mark.parametrize("error,detail", [
+    ({"code": "OnlyCode"}, "OnlyCode"), ({"message": "Only message"}, "Only message"),
+    ({"code": None, "message": "useful"}, "useful"), ({}, ""), (None, ""),
+    ("invalid", ""), ({"code": 3, "message": []}, ""), ({"code": "  ", "message": None}, ""),
+])
+@pytest.mark.parametrize("source", ["resource-status response", "Location-status response", "initial operation response"])
+def test_partial_failure_details_and_provenance(fixture_adr_provider, error, detail, source):
+    body = {"id": "/subscriptions/sub/resourceGroups/rg/resource", "properties": {"error": error}}
+    response = SimpleNamespace(headers={"x-ms-correlation-request-id": "observed", "Authorization": "secret-sentinel"})
+    message = fixture_adr_provider._format_failure("Failed", body, response, source)
+    assert "provisioningState='Failed'" in message
+    assert f"Correlation ID from the {source}: observed" in message
+    assert "Resource: /subscriptions/sub/resourceGroups/rg/resource" in message
+    assert "Activity Log" in message
+    assert ("did not include a detailed error" in message) == (not detail)
+    if detail:
+        assert detail in message
+    assert "None" not in message
+    assert "secret-sentinel" not in message
+    fixture_adr_provider.client.send_request.assert_not_called()
+
+
+def test_unusable_properties_error_does_not_hide_top_level_detail():
+    assert ADRProvider._extract_failure_detail(
+        {"properties": {"error": {"code": None}}, "error": {"code": "Useful"}}
+    ) == "Useful"
+
+
 @pytest.mark.parametrize("method", ["PATCH", "DELETE"])
 def test_poll_provisioning_state_raises_4xx_immediately(
     fixture_adr_provider, method,
@@ -377,7 +405,7 @@ def test_format_failure_includes_authorization_guidance_and_correlation_id(
     assert "roles are incomplete" not in message
     assert "exact remediation commands" not in message
     assert "\naz iot" not in message
-    assert "Correlation id: correlation-id." in message
+    assert "Correlation ID from the resource-status response: correlation-id." in message
 
 
 @pytest.mark.parametrize(
@@ -399,7 +427,7 @@ def test_format_failure_uses_activity_log_fallback(
         "Canceled", body, response
     )
 
-    assert "Inspect the service activity log" in message
+    assert "Check Azure Activity Log for this resource around the operation time" in message
     assert "Correlation id:" not in message
 
 
