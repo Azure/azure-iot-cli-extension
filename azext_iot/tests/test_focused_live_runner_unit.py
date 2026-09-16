@@ -527,7 +527,7 @@ def test_real_tox_configuration_preserves_install_and_routes_only_controller_sel
     assert Path(installation[installation.index("--target") + 1]).parts[-2:] == ("azure-cli-extensions", "azure-iot")
     launch = commands[-1]
     if service == "DPS":
-        assert launch[0] == "pytest" and "-k" not in launch
+        assert launch[:3] == ["python", "-m", "pytest"] and "-k" not in launch
         assert launch[launch.index("-p") + 1] == "azext_iot.tests._focused_live_plugin"
         assert expected[0] in launch and "./azext_iot/tests/dps" not in launch
         assert launch[launch.index("-n") + 1] == "0"
@@ -558,6 +558,74 @@ def test_dps_outer_tox_environment_only_prepares_controller(tmp_path):
     lines = completed.stdout.splitlines()
     assert "commands = " in lines and "commands_pre = " in lines
     assert "  ." in lines and "  azure-cli" in lines
+
+
+def test_dps_tox_loads_early_plugin_from_checkout_not_testless_wheel(tmp_path):
+    installed = tmp_path / "extension"
+    (installed / "azext_iot").mkdir(parents=True)
+    (installed / "azext_iot/__init__.py").write_text("", encoding="utf-8")
+    scripts = tmp_path / "bin"
+    scripts.mkdir()
+    console = scripts / "pytest-entrypoint.py"
+    console.write_text(
+        "from pytest import console_main\nraise SystemExit(console_main())\n", encoding="utf-8",
+    )
+    guard = tmp_path / "guard"
+    guard.mkdir()
+    network_attempt = tmp_path / "network-attempt"
+    (guard / "sitecustomize.py").write_text(
+        "import socket\nfrom pathlib import Path\n"
+        "def forbidden(*args, **kwargs):\n"
+        f"    Path({str(network_attempt)!r}).write_text('denied')\n"
+        "    raise AssertionError('Bootstrap regression attempted network')\n"
+        "socket.socket.connect = forbidden\n"
+        "socket.socket.connect_ex = forbidden\n"
+        "socket.getaddrinfo = forbidden\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "pytest.ini"
+    config.write_text("[pytest]\n", encoding="utf-8")
+    # Preserve interpreter dependencies, but reproduce tox's testless extension
+    # preceding the checkout when a console entrypoint supplies sys.path[0].
+    dependencies = [os.path.abspath(path) for path in sys.path if Path(path).resolve() != ROOT]
+    environment = dict(
+        os.environ, PYTHONPATH=os.pathsep.join(dict.fromkeys([str(guard), str(installed), *dependencies])),
+        PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS="", PYTEST_PLUGINS="", PYTHONDONTWRITEBYTECODE="1",
+        AZURE_CONFIG_DIR=str(tmp_path / "profile"), AZURE_TEST_RUN_LIVE="False",
+        AZURE_CORE_COLLECT_TELEMETRY="0", AZURE_CORE_CHECK_VERSION="no",
+        azext_iot_dps_test_phase="local-auth-toggle", azext_iot_dps_phase_receipts=str(tmp_path / "receipts"),
+    )
+    environment[focused.ENV] = json.dumps({
+        "suite": "DPS", "phase": "local-auth-toggle", "requestedNodes": ["unknown"],
+    })
+    arguments = [
+        "-c", str(config), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
+        "-p", "azext_iot.tests._focused_live_plugin", "--help",
+    ]
+    baseline = subprocess.run(
+        [sys.executable, str(console), *arguments], cwd=ROOT, env=environment,
+        capture_output=True, text=True, check=False, timeout=30,
+    )
+    assert baseline.returncode != 0
+    assert "No module named 'azext_iot.tests'" in baseline.stderr
+    rendered = subprocess.run(
+        [sys.executable, "-m", "tox", "c", "-c", str(ROOT / "tox.ini"),
+         "--workdir", str(tmp_path / "tox"), "-e", "DPS-int", "-k", "commands"],
+        cwd=ROOT, capture_output=True, text=True, check=False, timeout=30,
+    )
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+    launch = tox_commands(rendered.stdout)[-1]
+    prefix = [sys.executable, str(console)] if launch[0] == "pytest" else [sys.executable, *launch[1:3]]
+    result = subprocess.run(
+        [*prefix, *arguments], cwd=ROOT, env=environment,
+        capture_output=True, text=True, check=False, timeout=30,
+    )
+    # The actual launcher must reach the real early selection guard, not import
+    # a test module, collect scenarios or provision anything.
+    assert result.returncode == 4, result.stdout + result.stderr
+    assert "Debug selection contains unknown, excluded or out-of-phase nodes" in result.stderr
+    assert not network_attempt.exists()
+    assert not (tmp_path / "receipts").exists()
 
 
 @pytest.mark.parametrize("outcome", ["passed", "skipped", "teardown-failed"])
