@@ -5,9 +5,11 @@
 # --------------------------------------------------------------------------------------------
 
 import shlex
+from time import monotonic, sleep
 from urllib.parse import quote
 
 import pytest
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._log import LogKind as L, _log, timed_step
@@ -16,7 +18,44 @@ from azext_iot.tests.adr.conftest import (
 )
 
 
+CONSISTENCY_TIMEOUT = 30 * 60
+CONSISTENCY_POLL_INTERVAL = 30
+
+
 class TestADRNamespaceCrud(ADRLiveScenarioTest):
+    def _namespace_is_listed(self, name, group_args):
+        namespaces = self.cmd(f"iot adr ns list {group_args}").get_output_in_json()
+        return name in {namespace["name"] for namespace in namespaces}
+
+    def _cmd_with_consistency_retry(self, command, name, group_args):
+        deadline = monotonic() + CONSISTENCY_TIMEOUT
+        while True:
+            try:
+                return self.cmd(command)
+            except ResourceNotFoundError:
+                if not self._namespace_is_listed(name, group_args) or monotonic() >= deadline:
+                    raise
+            sleep(CONSISTENCY_POLL_INTERVAL)
+
+    def _delete_with_consistency_retry(self, command, name, group_args):
+        deadline = monotonic() + CONSISTENCY_TIMEOUT
+        while True:
+            try:
+                self.cmd(command)
+            except ResourceNotFoundError:
+                pass
+            except HttpResponseError as error:
+                status_code = error.status_code or getattr(error.response, "status_code", None)
+                if status_code != 200:
+                    raise
+            if not self._namespace_is_listed(name, group_args):
+                return
+            if monotonic() >= deadline:
+                raise AssertionError(
+                    f"Namespace '{name}' remained listed after {CONSISTENCY_TIMEOUT} seconds."
+                )
+            sleep(CONSISTENCY_POLL_INTERVAL)
+
     def test_namespace_crud_lifecycle(self):
         if not TEST_RG:
             pytest.skip("Set azext_iot_adr_resource_group or azext_iot_testrg to an existing disposable-test resource group.")
@@ -54,11 +93,17 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                 self.cmd(f"iot adr ns show -n {name}-missing {group_args}", expect_failure=True)
 
             with timed_step("Step 4 > Update tags and messaging"):
-                updated = self.cmd(f"iot adr ns update {args} --tags env=test purpose=ci").get_output_in_json()
+                updated = self._cmd_with_consistency_retry(
+                    f"iot adr ns update {args} --tags env=test purpose=ci", name, group_args
+                ).get_output_in_json()
                 assert updated["tags"] == {"env": "test", "purpose": "ci"}
-                updated = self.cmd(f"iot adr ns update {args} --tags owner=adr-tests").get_output_in_json()
+                updated = self._cmd_with_consistency_retry(
+                    f"iot adr ns update {args} --tags owner=adr-tests", name, group_args
+                ).get_output_in_json()
                 assert updated["tags"] == {"owner": "adr-tests"}
-                updated = self.cmd(f"iot adr ns update {args} --messaging-endpoints '{{{{}}}}'").get_output_in_json()
+                updated = self._cmd_with_consistency_retry(
+                    f"iot adr ns update {args} --messaging-endpoints '{{{{}}}}'", name, group_args
+                ).get_output_in_json()
                 assert not updated["properties"].get("messaging", {}).get("endpoints")
                 self.cmd(f"iot adr ns wait {args} --updated")
 
@@ -73,7 +118,7 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                 assert identity["type"] == "SystemAssigned"
 
             with timed_step("Step 6 > Delete namespace"):
-                self.cmd(f"iot adr ns delete {args} --yes")
+                self._delete_with_consistency_retry(f"iot adr ns delete {args} --yes", name, group_args)
                 self.cmd(f"iot adr ns wait {args} --deleted")
                 deleted = True
                 self.cmd(f"iot adr ns show {args}", expect_failure=True)
@@ -82,6 +127,6 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
             if not deleted:
                 with timed_step("Cleanup > Delete disposable namespace"):
                     try:
-                        self.cmd(f"iot adr ns delete {args} --yes")
+                        self._delete_with_consistency_retry(f"iot adr ns delete {args} --yes", name, group_args)
                     except Exception:
                         _log(L.WARN, "Namespace cleanup failed; remove '%s' from resource group '%s'.", name, TEST_RG)

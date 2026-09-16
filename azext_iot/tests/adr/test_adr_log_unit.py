@@ -159,6 +159,7 @@ def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, 
     test.cmd = Mock(wraps=test.cmd)
     mocker.patch.object(scenario, "TEST_RG", "test-rg")
     mocker.patch.object(scenario, "TEST_SUBSCRIPTION", None)
+    mocker.patch.object(test, "_namespace_is_listed", return_value=False)
     execution = mocker.patch("azure.cli.testsdk.base.execute", autospec=True)
     namespace_name = "test-namespace"
     created = {
