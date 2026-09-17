@@ -21,6 +21,7 @@ from azext_iot.adr.providers.link_preflight import (
     get_target,
     validate_target_state,
 )
+from azext_iot.adr.rbac import LinkRbacManager
 
 HUB_ID = (
     "/subscriptions/target-sub/resourceGroups/target-rg/providers/"
@@ -229,6 +230,79 @@ def test_rbac_manager_is_created_lazily():
         assert provider._rbac_manager() is manager_type.return_value
         assert provider._rbac_manager() is manager_type.return_value
     manager_type.assert_called_once_with(provider.cmd.cli_ctx)
+
+
+@pytest.mark.parametrize("operation", ["add", "update"])
+@pytest.mark.parametrize("outbound_uami", [False, True])
+@pytest.mark.parametrize("inbound_uami", [False, True])
+@pytest.mark.parametrize("authorized", [False, True])
+def test_su_runtime_uses_exact_two_roles_for_selected_identities(
+    mocker, operation, outbound_uami, inbound_uami, authorized,
+):
+    provider = _provider()
+    namespace = _namespace()
+    namespace["identity"]["type"] = "SystemAssigned,UserAssigned"
+    namespace["identity"]["userAssignedIdentities"] = {UAMI: {"principalId": "namespace-user"}}
+    if outbound_uami:
+        namespace["properties"]["outboundIdentity"] = {
+            "type": "UserAssigned", "userAssignedIdentity": UAMI.upper() + "/",
+        }
+    su_id = HUB_ID.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.DeviceUpdate/updateInstances/su")
+    endpoint = {
+        "endpointType": "Microsoft.DeviceUpdate/updateInstances",
+        "resourceId": su_id, "inboundCallerIdentity": {"type": "SystemAssigned"},
+    }
+    if operation == "update":
+        namespace["properties"]["updating"] = {"endpoints": {"su": endpoint}}
+    provider.client.namespaces.get.return_value = namespace
+    target = _hub()
+    target["id"] = su_id
+    provider._get_target = MagicMock(return_value=target)
+    provider._wait = MagicMock(return_value={})
+    manager = LinkRbacManager(provider.cmd.cli_ctx, cli=MagicMock())
+    provider._rbac = manager
+    mocker.patch.object(manager, "_assignment_exists", return_value=False)
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    visible = mocker.patch.object(manager, "_wait_for_assignments")
+    grants = mocker.patch.object(manager, "_invoke_json", return_value={"id": "assignment"})
+    network = mocker.patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network/Graph"))
+    kwargs = {"mi_user_assigned": UAMI.upper()} if inbound_uami else {"mi_system_assigned": True}
+    if operation == "add":
+        kwargs["su_resource_id"] = su_id
+    invoke = getattr(provider, f"su_{operation}")
+    if not authorized:
+        with pytest.raises(AzureResponseError, match="No link mutation"):
+            invoke("su", "ns", "ns-rg", **kwargs)
+        grants.assert_not_called()
+        visible.assert_not_called()
+        provider.client.namespaces.begin_update.assert_not_called()
+    else:
+        invoke("su", "ns", "ns-rg", **kwargs)
+        ns_principal = "namespace-user" if outbound_uami else "namespace-principal"
+        su_principal = "hub-user" if inbound_uami else "hub-system"
+        assert [call.args[0] for call in grants.call_args_list] == [
+            f"role assignment create --assignee-object-id '{ns_principal}' "
+            f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{su_id}'",
+            f"role assignment create --assignee-object-id '{su_principal}' "
+            f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' --scope '{NS_ID}'",
+        ]
+        assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "ns-sub"]
+        visible.assert_called_once_with([
+            (ns_principal, "Contributor", su_id),
+            (su_principal, "Azure Device Registry Contributor", NS_ID),
+        ])
+        provider.client.namespaces.begin_update.assert_called_once()
+        written = provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]
+        assert set(written) == {"updating"}
+        written_endpoint = written["updating"]["endpoints"]["su"]
+        assert written_endpoint["resourceId"] == su_id
+        expected_identity = (
+            {"type": "UserAssigned", "userAssignedIdentity": UAMI.upper()}
+            if inbound_uami else {"type": "SystemAssigned"}
+        )
+        assert written_endpoint["inboundCallerIdentity"] == expected_identity
+    network.assert_not_called()
 
 
 def test_preflight_requires_namespace_resource_id():
@@ -465,7 +539,7 @@ def test_dps_add_rejects_occupied_non_dps_endpoint_name(
         ),
     ],
 )
-def test_bundled_add_rejects_topology_and_name_collisions(
+def test_combined_add_rejects_topology_and_name_collisions(
     fixture_link_provider, properties, message
 ):
     namespace = _namespace()
@@ -485,3 +559,6 @@ def test_bundled_add_rejects_topology_and_name_collisions(
             dps_id,
             dps_mi_system_assigned=True,
         )
+    fixture_link_provider._preflight_link.assert_not_called()
+    fixture_link_provider._rbac.ensure_many.assert_not_called()
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()

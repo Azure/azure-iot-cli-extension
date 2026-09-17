@@ -707,6 +707,120 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     scenario.cleanup_full_infra.assert_called_once()
 
 
+@pytest.mark.parametrize("failure", [
+    None, "combined", "final_dps", "final_hub", "setup", "grants", "hub_failed", "hub_timeout", "namespace_not_empty",
+])
+def test_sequential_scenario_exercises_combined_command_without_helper_recovery(monkeypatch, failure):
+    from azext_iot.adr.rbac import LinkRbacManager
+    from azext_iot.tests.adr._helpers import wait_for_condition
+
+    scenario = Mock()
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(
+        link_scenarios, "wait_for_condition",
+        lambda *args, **kwargs: wait_for_condition(*args, **kwargs, clock=clock, sleeper=clock.sleep),
+    )
+    manager = LinkRbacManager(scenario.cli_ctx, cli=Mock())
+    manager._assignment_exists = Mock(return_value=False)
+    manager._caller_can_assign = Mock(return_value=True)
+    manager._current_assignee_object_id = Mock(return_value="caller")
+    manager._invoke_json = Mock()
+    manager._wait_for_assignments = Mock(
+        side_effect=RuntimeError("synthetic grants failure") if failure == "grants" else None,
+    )
+    monkeypatch.setattr(link_scenarios, "LinkRbacManager", Mock(return_value=manager))
+    created = []
+    identity = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
+    dps = {
+        "name": "dps-primary", "resourceId": DPS_ID, "endpointType": DPS_ENDPOINT_TYPE,
+        "inboundCallerIdentity": identity, "linkingState": "Succeeded",
+    }
+    hub = {
+        "name": "primary", "resourceId": HUB_ID, "endpointType": IOT_HUB_ENDPOINT_TYPE,
+        "inboundCallerIdentity": identity, "linkingState": "Succeeded",
+        "provisioning": {"availability": "Available", "allocationWeight": 1},
+    }
+    monkeypatch.setattr(link_scenarios, "generate_adr_namespace_name", lambda: "ns")
+    monkeypatch.setattr(link_scenarios, "generate_dps_name", lambda: "dps")
+    monkeypatch.setattr(link_scenarios, "generate_hub_name", lambda: "hub")
+    monkeypatch.setattr(link_scenarios, "generate_identity_name", lambda: "uami")
+    dps_readiness, hub_readiness = Mock(), Mock()
+    monkeypatch.setattr(link_scenarios, "link_dps_with_readiness", dps_readiness)
+    monkeypatch.setattr(link_scenarios, "link_hub_with_readiness", hub_readiness)
+
+    def create(command, *, kind, name, resource_group):
+        if failure == "setup":
+            raise RuntimeError("synthetic setup failure")
+        created.append(kind)
+        if kind == "hub":
+            assert "--no-wait" in command
+        return _output({
+            "id": {"identity": UAMI_ID, "namespace": NS_ID, "dps": DPS_ID, "hub": HUB_ID}[kind],
+            "principalId": "uami-principal",
+            "identity": {"type": "SystemAssigned", "principalId": "ns-principal"},
+            "properties": {"provisioningState": "Succeeded"},
+        })
+
+    def command(text):
+        if text.startswith("iot hub show "):
+            state = {"hub_failed": "Failed", "hub_timeout": "Creating"}.get(failure, "Active")
+            return _output({"id": HUB_ID, "properties": {"state": state}})
+        if text.startswith("iot adr ns show "):
+            properties = {"provisioningState": "Succeeded"}
+            if failure == "namespace_not_empty":
+                properties["provisioning"] = {"endpoints": {"unexpected": dps}}
+            return _output({"id": NS_ID, "properties": properties})
+        if text.startswith("iot adr ns link add "):
+            assert clock() >= 300
+            manager._wait_for_assignments.assert_called_once()
+            assert f"--dps-id {DPS_ID} --dps-user-assigned-mi {UAMI_ID}" in text
+            assert f"--hub-id {HUB_ID} --hub-user-assigned-mi {UAMI_ID}" in text
+            assert "--hub-availability Available --hub-weight 1" in text
+            if failure == "combined":
+                raise RuntimeError("synthetic combined command failure")
+            return _output({"properties": {"provisioningState": "Succeeded"}})
+        if text.startswith("iot adr ns link hub list "):
+            return _output([{**hub, "linkingState": "Failed" if failure == "final_hub" else "Succeeded"}])
+        if text.startswith("iot adr ns link dps list "):
+            return _output([{**dps, "linkingState": "Failed" if failure == "final_dps" else "Succeeded"}])
+        raise AssertionError(f"Unexpected command: {text}")
+
+    scenario.create_owned_resource.side_effect = create
+    scenario.cmd.side_effect = command
+    run = link_scenarios.TestADRLinkSequentialAdd.test_adr_link_sequential_add
+    if failure:
+        error_type = RuntimeError if failure in {"setup", "combined", "grants"} else AssertionError
+        with pytest.raises(error_type):
+            run(scenario)
+    else:
+        run(scenario)
+    commands = _commands(scenario)
+    setup_failed = failure in {"setup", "grants", "hub_failed", "hub_timeout", "namespace_not_empty"}
+    assert sum(text.startswith("iot adr ns link add ") for text in commands) == (0 if setup_failed else 1)
+    if failure != "setup":
+        assert created == ["identity", "namespace", "hub", "dps"]
+        assignments = [shlex.split(item.args[0]) for item in manager._invoke_json.call_args_list]
+        assert assignments == [
+            ["role", "assignment", "create", "--assignee-object-id", principal,
+             "--assignee-principal-type", "ServicePrincipal", "--role", role, "--scope", scope]
+            for principal, role, scope in (
+                ("ns-principal", "Contributor", DPS_ID),
+                ("uami-principal", "Contributor", NS_ID),
+                ("ns-principal", "Contributor", HUB_ID),
+                ("ns-principal", "IoT Hub Data Contributor", HUB_ID),
+            )
+        ]
+        assert clock() <= 600
+        if not setup_failed:
+            assert clock.sleeps == [30] * 10
+    if failure is None or failure.startswith("final_"):
+        assert sum(" link hub list " in text or " link dps list " in text for text in commands) == 2
+    dps_readiness.assert_not_called()
+    hub_readiness.assert_not_called()
+    scenario.cleanup_full_infra.assert_called_once()
+
+
 @pytest.mark.parametrize("registered_hubs,projection,hub_overrides,expected_failure", [
     ([], [], {}, None),
     ([{"hostName": "classic.azure-devices.net"}], [{"hostName": "classic.azure-devices.net"}], {}, None),

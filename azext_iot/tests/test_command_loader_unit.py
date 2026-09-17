@@ -378,6 +378,20 @@ def test_link_command_parser_leaves_subscription_for_current_account_default(
     assert parsed._subscription is None  # pylint: disable=protected-access
 
 
+@pytest.mark.parametrize("no_wait", [False, True])
+def test_combined_link_parser_exposes_dependency_wait_options(management_command_parser, no_wait):
+    command_name = "iot adr ns link add"
+    arguments = [
+        *command_name.split(), *_LINK_PARSER_CASES[command_name],
+        "--timeout", "60", "--interval", "1",
+    ]
+    if no_wait:
+        arguments.append("--no-wait")
+    parsed = management_command_parser.parse_args(arguments)
+    assert parsed.timeout == 60 and parsed.interval == 1
+    assert bool(parsed.no_wait) is no_wait
+
+
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 @pytest.mark.parametrize("value,expected", [(None, None), ("true", True), ("false", False)])
 def test_resource_create_local_auth_option(management_command_parser, kind, value, expected):

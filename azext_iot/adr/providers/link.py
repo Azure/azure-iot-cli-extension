@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from time import monotonic, sleep
 from typing import Optional
 
 from azure.cli.core.azclierror import (
@@ -12,7 +13,9 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
+from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
+from knack.util import CLIError
 
 from azext_iot._factory import (
     adr_iot_hub_service_factory,
@@ -24,7 +27,7 @@ from azext_iot.adr.common import (
     IOT_HUB_ENDPOINT_TYPE,
     SU_ENDPOINT_TYPE,
 )
-from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import (
     MI_MUTEX_MSG as _MI_MUTEX_MSG,
     build_dps_endpoint_body as _build_dps_endpoint_body,
@@ -47,6 +50,12 @@ from azext_iot.adr.providers.link_preflight import (
     TargetLookup,
     get_target,
     preflight_target,
+)
+from azext_iot.adr.providers.wait import (
+    DEFAULT_WAIT_INTERVAL,
+    WaitEvaluation,
+    namespace_links_succeeded,
+    wait_for_resource,
 )
 from azext_iot.adr.rbac import LinkRbacManager
 from azext_iot.adr.topology import (
@@ -643,7 +652,61 @@ class LinkProvider(ADRProvider):
             if endpoint_is_type(ep, SU_ENDPOINT_TYPE)
         ]
 
-    # Bundled link add
+    # Combined DPS-first link add
+
+    def _wait_for_dps_link(
+        self, namespace_name, resource_group_name, endpoint_name, expected, *, deadline=None, **kwargs
+    ):
+        """Require the exact persisted DPS dependency, not just a completed namespace LRO."""
+        timeout = kwargs.get("timeout_sec", _ADR_LRO_TIMEOUT_SECONDS)
+        if deadline is None:
+            deadline = monotonic() + timeout
+        latest_namespace = None
+
+        def get_before_deadline():
+            nonlocal latest_namespace
+            if monotonic() >= deadline:
+                raise CLIError(f"DPS linking timed out after {timeout} seconds.")
+            latest_namespace = self._get_namespace(namespace_name, resource_group_name)
+            if monotonic() >= deadline:
+                raise CLIError(f"DPS linking timed out after {timeout} seconds.")
+            return latest_namespace
+
+        def succeeded(namespace):
+            endpoint = _get_provisioning_endpoints(namespace).get(endpoint_name)
+            state = (namespace.get("properties") or {}).get("provisioningState")
+            evaluation = namespace_links_succeeded(namespace, dps_endpoint_name=endpoint_name)
+            if evaluation.failure or state in {"Failed", "Canceled", "Cancelled"}:
+                return WaitEvaluation(
+                    False, f"{evaluation.failure or ''} {self._format_failure(state, namespace, None)}".strip(),
+                )
+            if endpoint:
+                actual_identity = dict(endpoint.get("inboundCallerIdentity") or {})
+                expected_identity = dict(expected["inboundCallerIdentity"])
+                for identity in (actual_identity, expected_identity):
+                    if isinstance(identity.get("userAssignedIdentity"), str):
+                        identity["userAssignedIdentity"] = identity["userAssignedIdentity"].casefold()
+                if (
+                    str(endpoint.get("resourceId") or "").casefold() != expected["resourceId"].casefold()
+                    or actual_identity != expected_identity
+                ):
+                    return WaitEvaluation(False, f"DPS link '{endpoint_name}' target or inbound identity changed.")
+                if endpoint.get("linkingState") in {"Canceled", "Cancelled"}:
+                    return WaitEvaluation(False, f"DPS link '{endpoint_name}' was canceled.")
+            return WaitEvaluation(
+                bool(endpoint and state == "Succeeded" and endpoint.get("linkingState") == "Succeeded"),
+                observation=f"namespace={state!r}; {evaluation.observation}",
+            )
+
+        wait_for_resource(
+            self.cmd.cli_ctx,
+            get_before_deadline,
+            succeeded,
+            timeout=timeout,
+            interval=kwargs.get("wait_sec", DEFAULT_WAIT_INTERVAL),
+            sleeper=lambda delay: sleep(min(delay, max(0, deadline - monotonic()))),
+        )
+        return latest_namespace
 
     def link_add(
         self,
@@ -661,13 +724,18 @@ class LinkProvider(ADRProvider):
         hub_allocation_weight: Optional[int] = None,
         **kwargs,
     ):
-        """Bundled link: add a Hub + DPS in a single namespace PATCH.
+        """Preflight both targets, link DPS successfully, then submit the Hub link.
 
-        The DPS entry is serialized into ``properties.provisioning.endpoints`` and the Hub
-        entry into ``properties.messaging.endpoints`` in the same request. DPS is applied
-        first because provisioning endpoints land before messaging endpoints in the
-        materialized body order below.
+        Even with no_wait, the DPS dependency must reach linkingState Succeeded.
+        Only the final Hub operation may be returned without waiting. Partial
+        completion is preserved on failure; never replay adds or roll back DPS.
         """
+        timeout = kwargs.setdefault("timeout_sec", _ADR_LRO_TIMEOUT_SECONDS)
+        interval = kwargs.setdefault("wait_sec", DEFAULT_WAIT_INTERVAL)
+        if timeout <= 0:
+            raise InvalidArgumentValueError("--timeout must be greater than zero.")
+        if interval <= 0:
+            raise InvalidArgumentValueError("--interval must be greater than zero.")
         # Validate both ARM IDs up front; reject overflow/collisions before
         # composing the body or touching RBAC.
         parsed_dps = _parse_dps_resource_id(dps_resource_id)
@@ -721,16 +789,56 @@ class LinkProvider(ADRProvider):
         self._rbac_manager().ensure_many(rbac_requests)
         self._warn_if_hub_classically_linked(existing, parsed_hub, hub)
 
-        # DPS-first ordering in the bundled PATCH body.
-        properties = {
-            "properties": {
-                "provisioning": {"endpoints": {dps_endpoint_name: dps_body}},
-                "messaging": {"endpoints": {hub_endpoint_name: hub_body}},
-            }
-        }
-        poller = self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            properties=properties,
-        )
-        return self._wait(poller, f"Linking Hub + DPS on namespace {namespace_name}...", **kwargs)
+        no_wait = kwargs.pop("no_wait", False)
+        dps_deadline = monotonic() + timeout
+        try:
+            dps_poller = self._patch_endpoints(
+                namespace_name, resource_group_name, "provisioning", {dps_endpoint_name: dps_body},
+                f"Linking DPS on namespace {namespace_name} before submitting Hub...",
+                no_wait=True,
+            )
+            remaining = dps_deadline - monotonic()
+            if remaining <= 0:
+                raise CLIError(f"DPS linking timed out after {timeout} seconds.")
+            self._wait(
+                dps_poller, f"Waiting for DPS linking on namespace {namespace_name}...",
+                **{**kwargs, "timeout_sec": remaining},
+            )
+            linked_namespace = self._wait_for_dps_link(
+                namespace_name, resource_group_name, dps_endpoint_name, dps_body,
+                deadline=dps_deadline, **kwargs,
+            )
+        except (CLIError, HttpResponseError):
+            logger.warning(
+                "DPS linking did not complete; the Hub link was NOT submitted. Inspect 'iot adr ns link dps show'. "
+                "If the DPS endpoint is Failed, use 'iot adr ns link dps update' with its existing identity, "
+                "then wait for Succeeded before using 'iot adr ns link hub add'. "
+                "Do not rerun combined link add while the DPS endpoint exists. No rollback was attempted."
+            )
+            raise
+
+        try:
+            if hub_endpoint_name in _get_messaging_endpoints(linked_namespace):
+                raise ArgumentUsageError(
+                    f"Messaging endpoint '{hub_endpoint_name}' appeared while DPS was linking. "
+                    "The existing Hub endpoint will not be changed."
+                )
+            if hub_endpoint_count(linked_namespace) >= 10:
+                raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
+            logger.warning(
+                "DPS link '%s' target and identity verified with linkingState Succeeded; submitting Hub link '%s'.",
+                dps_endpoint_name, hub_endpoint_name,
+            )
+            return self._patch_endpoints(
+                namespace_name, resource_group_name, "messaging", {hub_endpoint_name: hub_body},
+                f"Linking Hub on namespace {namespace_name} after DPS Succeeded...",
+                no_wait=no_wait, **kwargs,
+            )
+        except (CLIError, HttpResponseError):
+            logger.warning(
+                "DPS linking succeeded, but the Hub operation did not complete. The DPS link was not rolled back. "
+                "Inspect 'iot adr ns link hub show': if the endpoint is Failed, use 'iot adr ns link hub update' "
+                "with its existing identity; if absent, use 'iot adr ns link hub add'. "
+                "For a pending endpoint, use 'iot adr ns link hub wait'. Do not rerun combined link add."
+            )
+            raise

@@ -993,10 +993,19 @@ def test_show_missing_endpoint_raises(
         )
 
 
-def test_bundled_link_add_keeps_create_only_hub_fields(
+def test_combined_link_add_keeps_create_only_hub_fields(
     fixture_link_provider, mock_poller
 ):
-    fixture_link_provider.client.namespaces.get.return_value = _namespace()
+    fixture_link_provider.client.namespaces.get.side_effect = [
+        _namespace(),
+        {"properties": {
+            "provisioningState": "Succeeded",
+            "provisioning": {"endpoints": {"dps": _endpoint(
+                DPS_ENDPOINT_TYPE, DPS_ID, linkingState="Succeeded",
+                inboundCallerIdentity={"type": "SystemAssigned"},
+            )}},
+        }},
+    ]
     fixture_link_provider.client.namespaces.begin_update.return_value = mock_poller(
         {}
     )
@@ -1014,17 +1023,18 @@ def test_bundled_link_add_keeps_create_only_hub_fields(
         hub_allocation_weight=25,
     )
 
-    body = fixture_link_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]["properties"]
-    assert list(body) == ["provisioning", "messaging"]
+    writes = fixture_link_provider.client.namespaces.begin_update.call_args_list
+    assert len(writes) == 2
+    assert list(writes[0].kwargs["properties"]["properties"]) == ["provisioning"]
+    body = writes[1].kwargs["properties"]["properties"]
+    assert list(body) == ["messaging"]
     assert body["messaging"]["endpoints"]["hub"]["provisioning"] == {
         "availability": "Available",
         "allocationWeight": 25,
     }
 
 
-def test_bundled_link_add_rejects_existing_dps(fixture_link_provider):
+def test_combined_link_add_rejects_existing_dps(fixture_link_provider):
     fixture_link_provider.client.namespaces.get.return_value = _namespace(
         dps={"existing": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)}
     )

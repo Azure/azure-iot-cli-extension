@@ -13,7 +13,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-import requests
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
@@ -21,13 +20,11 @@ from azure.cli.core.azclierror import (
 from azure.cli.core.cloud import AZURE_CHINA_CLOUD, AZURE_PUBLIC_CLOUD, AZURE_US_GOV_CLOUD
 
 from azext_iot.adr.rbac import (
-    ADU_FIRST_PARTY_APP_ID,
-    GRAPH_SERVICE_PRINCIPALS_URL,
+    ADR_CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
-    SU_DATA_ROLE,
     _scope_subscription,
     format_role_requirements,
     resolve_linked_resource_principal,
@@ -73,12 +70,6 @@ def token_profile(mocker):
     return profile
 
 
-def _graph_response(principals):
-    response = MagicMock()
-    response.json.return_value = {"value": principals}
-    return response
-
-
 def _namespace(outbound=None):
     properties = {}
     if outbound is not None:
@@ -109,20 +100,27 @@ def _resource():
 
 
 def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
-    assert LINK_ROLE_MATRIX["hub"][1].role == HUB_DATA_ROLE
-    assert (
-        LINK_ROLE_MATRIX["su"][1].principal,
-        LINK_ROLE_MATRIX["su"][1].role,
-        LINK_ROLE_MATRIX["su"][1].scope,
-    ) == ("namespace", SU_DATA_ROLE, "target")
-    assert "namespace outbound MI -> Device Update Administrator on SU" in (
-        format_role_requirements("su")
-    )
-    assert {rule.principal for rule in LINK_ROLE_MATRIX["su"]} == {
-        "namespace",
-        "linked",
-        "adu_first_party",
+    # Independent contracts: do not derive expected grants from the matrix under test.
+    assert {
+        kind: [(rule.principal, rule.role, rule.scope) for rule in rules]
+        for kind, rules in LINK_ROLE_MATRIX.items()
+    } == {
+        "hub": [
+            ("namespace", "Contributor", "target"),
+            ("namespace", "IoT Hub Data Contributor", "target"),
+            ("linked", "Contributor", "namespace"),
+        ],
+        "dps": [("namespace", "Contributor", "target"), ("linked", "Contributor", "namespace")],
+        "su": [
+            ("namespace", "Contributor", "target"),
+            ("linked", "Azure Device Registry Contributor", "namespace"),
+        ],
     }
+    assert ADR_CONTRIBUTOR_ROLE == "Azure Device Registry Contributor"
+    assert format_role_requirements("su") == (
+        "namespace outbound MI -> Contributor on SU; "
+        "SU selected inbound MI -> Azure Device Registry Contributor on namespace"
+    )
     assert all(
         rule.principal != "signed_in_user"
         for rules in LINK_ROLE_MATRIX.values()
@@ -476,80 +474,54 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment(token_profi
     assert not any("role assignment create" in command for command in commands)
 
 
-def test_su_resolves_first_party_principal_and_includes_its_assignment(token_profile):
+def test_su_creates_exact_two_service_grants_without_graph(token_profile, mocker):
     cli = MagicMock()
     cli.invoke.side_effect = [
-        _result([]),
-        _result([]),
         _result([]),
         _result([]),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         _result({"id": "created-1"}),
         _result({"id": "created-2"}),
-        _result({"id": "created-3"}),
-        _result({"id": "created-4"}),
         _result([{"id": "visible-1"}]),
         _result([{"id": "visible-2"}]),
-        _result([{"id": "visible-3"}]),
-        _result([{"id": "visible-4"}]),
     ]
-    graph_get = MagicMock(
-        return_value=_graph_response([{"id": "adu-object-id"}])
-    )
+    network = mocker.patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network/Graph"))
     cli_ctx = SimpleNamespace(cloud=AZURE_PUBLIC_CLOUD)
     raw_token = token_profile.return_value.get_raw_token
     raw_token.side_effect = [
-        (("Bearer", "graph-access-token", {}), "sub", "tenant"),
         (("Bearer", _access_token("owner-object-id"), {}), "sub", "tenant"),
     ]
-    manager = LinkRbacManager(cli_ctx, cli=cli, graph_get=graph_get)
+    manager = LinkRbacManager(cli_ctx, cli=cli)
+    target = TARGET_SCOPE.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.DeviceUpdate/updateInstances/su")
 
     manager.ensure(
-        "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
+        "su", NS_SCOPE, target, "ns-principal", "su-principal"
     )
 
     commands = [call.args[0] for call in cli.invoke.call_args_list]
     assert [call.kwargs for call in raw_token.call_args_list] == [
-        {
-            "subscription": "sub",
-            "resource": AZURE_PUBLIC_CLOUD.endpoints.microsoft_graph_resource_id,
-        },
         {"subscription": "sub", "resource": None},
     ]
     assert not any("get-access-token" in command for command in commands)
-    graph_get.assert_called_once_with(
-        GRAPH_SERVICE_PRINCIPALS_URL,
-        headers={"Authorization": "Bearer graph-access-token"},
-        params={
-            "$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'",
-            "$select": "id",
-        },
-        timeout=30,
-    )
-    assert any(
-        "role assignment create" in command
-        and "--assignee-object-id 'adu-object-id'" in command
-        for command in commands
-    )
-    assert any(
-        "role assignment create" in command
-        and "--assignee-object-id 'ns-principal'" in command
-        and f"--role '{SU_DATA_ROLE}'" in command
-        and f"--scope '{TARGET_SCOPE}'" in command
-        for command in commands
-    )
+    assert [command for command in commands if command.startswith("role assignment create ")] == [
+        "role assignment create --assignee-object-id 'ns-principal' "
+        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{target}'",
+        "role assignment create --assignee-object-id 'su-principal' "
+        f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' --scope '{NS_SCOPE}'",
+    ]
+    assert all("--fill-principal-name false" in command for command in commands if " list " in command)
+    network.assert_not_called()
 
 
 @pytest.mark.parametrize("authorized", [True, False])
-def test_su_missing_data_role_is_scoped_and_privilege_gated(mocker, authorized):
+def test_su_missing_registry_role_is_scoped_and_privilege_gated(mocker, authorized):
     scope = TARGET_SCOPE.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.DeviceUpdate/updateInstances/su")
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    mocker.patch.object(manager, "_resolve_adu_principal", return_value="adu-principal")
     mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
     mocker.patch.object(
         manager, "_assignment_exists",
-        side_effect=lambda _principal, role, _scope: role != SU_DATA_ROLE,
+        side_effect=lambda _principal, role, _scope: role != ADR_CONTRIBUTOR_ROLE,
     )
     privilege = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
     invoke = mocker.patch.object(manager, "_invoke_json")
@@ -558,37 +530,33 @@ def test_su_missing_data_role_is_scoped_and_privilege_gated(mocker, authorized):
     if authorized:
         manager.ensure("su", NS_SCOPE, scope, "ns-principal", "su-principal")
         invoke.assert_called_once_with(
-            "role assignment create --assignee-object-id 'ns-principal' "
-            f"--assignee-principal-type ServicePrincipal --role '{SU_DATA_ROLE}' "
-            f"--scope '{scope}'",
+            "role assignment create --assignee-object-id 'su-principal' "
+            "--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' "
+            f"--scope '{NS_SCOPE}'",
             subscription="sub",
         )
-        wait.assert_called_once_with([("ns-principal", SU_DATA_ROLE, scope)])
+        wait.assert_called_once_with([("su-principal", "Azure Device Registry Contributor", NS_SCOPE)])
     else:
-        with pytest.raises(AzureResponseError, match=SU_DATA_ROLE):
+        with pytest.raises(AzureResponseError, match="Azure Device Registry Contributor"):
             manager.ensure("su", NS_SCOPE, scope, "ns-principal", "su-principal")
         invoke.assert_not_called()
         wait.assert_not_called()
-    privilege.assert_called_once_with("caller", scope)
+    privilege.assert_called_once_with("caller", NS_SCOPE)
 
 
-def test_su_reports_unresolvable_first_party_principal():
+def test_su_existing_roles_need_neither_token_nor_graph(token_profile, mocker):
     cli = MagicMock()
     cli.invoke.side_effect = [
         _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
-        _result([{"id": "existing"}]),
     ]
-    manager = LinkRbacManager(
-        MagicMock(),
-        cli=cli,
-        graph_get=MagicMock(return_value=_graph_response([])),
-    )
+    network = mocker.patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network/Graph"))
+    manager = LinkRbacManager(MagicMock(), cli=cli)
 
-    with pytest.raises(AzureResponseError, match="first-party"):
-        manager.ensure(
-            "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
-        )
+    manager.ensure("su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal")
+    assert cli.invoke.call_count == 2
+    token_profile.assert_not_called()
+    network.assert_not_called()
 
 
 @pytest.mark.parametrize("token", [None, "", 123])
@@ -604,7 +572,7 @@ def test_access_token_requires_nonempty_string(token_profile, token):
     cli.invoke.assert_not_called()
 
 
-@pytest.mark.parametrize("resource", [None, "https://graph.microsoft.com/"])
+@pytest.mark.parametrize("resource", [None, "https://management.azure.com/"])
 def test_access_token_does_not_log_secret(token_profile, mocker, caplog, resource):
     token = "synthetic-bearer-token-do-not-log"
     token_profile.return_value.get_raw_token.return_value = (
@@ -640,32 +608,26 @@ def test_access_token_does_not_log_secret(token_profile, mocker, caplog, resourc
 def test_tokens_use_host_cloud_and_target_subscription(token_profile, cloud):
     cli_ctx = SimpleNamespace(cloud=cloud, data={"subscription_id": "hosting-sub"})
     cli = MagicMock()
-    graph_get = MagicMock(return_value=_graph_response([{"id": "adu-object-id"}]))
-    manager = LinkRbacManager(cli_ctx, cli=cli, graph_get=graph_get)
+    manager = LinkRbacManager(cli_ctx, cli=cli)
     raw_token = token_profile.return_value.get_raw_token
     raw_token.side_effect = [
         (("Bearer", _access_token("target-caller"), {}), "target-sub", "target-tenant"),
-        (("Bearer", "synthetic-graph-token", {}), "target-sub", "target-tenant"),
         (("Bearer", _access_token("other-caller"), {}), "other-sub", "other-tenant"),
     ]
 
     assert manager._current_assignee_object_id("target-sub") == "target-caller"
-    assert manager._resolve_adu_principal("target-sub") == "adu-object-id"
     assert manager._current_assignee_object_id("other-sub") == "other-caller"
     # Caches remain subscription-scoped, not scoped to the hosting CLI login.
     assert manager._current_assignee_object_id("target-sub") == "target-caller"
-    assert manager._resolve_adu_principal("target-sub") == "adu-object-id"
 
     assert [call.kwargs for call in token_profile.call_args_list] == [
         {"cli_ctx": cli_ctx}
-    ] * 3
+    ] * 2
     assert [call.kwargs for call in raw_token.call_args_list] == [
         {"subscription": "target-sub", "resource": None},
-        {"subscription": "target-sub", "resource": cloud.endpoints.microsoft_graph_resource_id},
         {"subscription": "other-sub", "resource": None},
     ]
     cli.invoke.assert_not_called()
-    graph_get.assert_called_once()
 
 
 @pytest.mark.parametrize("error", [
@@ -682,27 +644,16 @@ def test_access_token_profile_failure_propagates(token_profile, error):
     manager.cli.invoke.assert_not_called()
 
 
-def test_su_reports_graph_query_failure():
+def test_su_assignment_lookup_failure_stops_before_grants(mocker):
     cli = MagicMock()
-    cli.invoke.side_effect = [
-        _result([{"id": "existing"}]),
-        _result([{"id": "existing"}]),
-        _result([{"id": "existing"}]),
-    ]
-    response = _graph_response([])
-    response.raise_for_status.side_effect = requests.RequestException(
-        "graph unavailable"
-    )
-    manager = LinkRbacManager(
-        MagicMock(),
-        cli=cli,
-        graph_get=MagicMock(return_value=response),
-    )
-
-    with pytest.raises(AzureResponseError, match="query Microsoft Graph"):
-        manager.ensure(
-            "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
-        )
+    cli.invoke.side_effect = AzureResponseError("assignment lookup denied")
+    manager = LinkRbacManager(MagicMock(), cli=cli)
+    privilege = mocker.patch.object(manager, "_caller_can_assign")
+    with pytest.raises(AzureResponseError, match="assignment lookup denied"):
+        manager.ensure("su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal")
+    cli.invoke.assert_called_once()
+    assert cli.invoke.call_args.args[0].startswith("role assignment list ")
+    privilege.assert_not_called()
 
 
 def test_missing_current_assignee_stops_before_privilege_checks(token_profile):
@@ -871,7 +822,6 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
     mocker.patch.object(manager, "_assignment_exists", return_value=False)
     mocker.patch.object(manager, "_caller_can_assign", return_value=True)
-    mocker.patch.object(manager, "_resolve_adu_principal", return_value="adu-principal")
     mocker.patch.object(manager, "_wait_for_assignments")
     caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
     target = TARGET_SCOPE.replace("/sub/", "/target-sub/")
@@ -893,11 +843,13 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     assert "Completed these role-assignment creation requests" in caplog.text
     assert "service authorization may still need time to propagate" in caplog.text
     assert f"namespace outbound MI -> Contributor on {link_type.upper()}" in caplog.text
-    assert f"{link_type.upper()} selected inbound MI -> Contributor on namespace" in caplog.text
+    role = "Azure Device Registry Contributor" if link_type == "su" else "Contributor"
+    assert f"{link_type.upper()} selected inbound MI -> {role} on namespace" in caplog.text
     assert "principalId=ns-principal" in caplog.text
     assert "principalId=linked-principal" in caplog.text
     if link_type == "su":
-        assert "ADU first-party app -> Contributor on SU; principalId=adu-principal" in caplog.text
+        assert invoke.call_count == 2
+        assert "ADU first-party" not in caplog.text
     assert "caller-object-id" not in caplog.text
     assert _access_token() not in caplog.text
     assert capsys.readouterr().out == ""

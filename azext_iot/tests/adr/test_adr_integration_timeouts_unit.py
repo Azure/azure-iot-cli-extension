@@ -29,7 +29,7 @@ def test_cold_su_scenarios_include_existing_readiness_and_cleanup_budgets(scenar
 
 @pytest.mark.parametrize("scenario", [
     instances.TestADRUpdateInstanceValidation.test_update_instance_validation_negatives,
-    links.TestADRLinkBundledAdd.test_adr_link_bundled_add,
+    links.TestADRLinkSequentialAdd.test_adr_link_sequential_add,
     ca.TestADRCertificateAuthorityLifecycle.test_adr_certificate_authority_lifecycle,
 ])
 def test_ordinary_adr_scenarios_keep_the_default_timeout(scenario):

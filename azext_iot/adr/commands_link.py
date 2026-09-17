@@ -6,7 +6,9 @@
 
 from typing import Optional
 
+from azext_iot.adr.providers.base import _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link import LinkProvider
+from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
 
 
 def adr_link_hub_add(
@@ -235,7 +237,7 @@ def adr_link_su_list(
     )
 
 
-# ==================== link add (bundled) ====================
+# ==================== link add (combined DPS-first) ====================
 
 
 def adr_link_add(
@@ -254,6 +256,8 @@ def adr_link_add(
     hub_availability: Optional[str] = None,
     hub_allocation_weight: Optional[int] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.link_add(
@@ -270,4 +274,6 @@ def adr_link_add(
         hub_availability=hub_availability,
         hub_allocation_weight=hub_allocation_weight,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
