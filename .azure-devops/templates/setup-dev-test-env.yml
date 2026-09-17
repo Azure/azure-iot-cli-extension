@@ -15,6 +15,12 @@ steps:
     parameters:
       pythonVersion: ${{ parameters.pythonVersion }}
 
+  - bash: |
+      source scripts/select-openssl.sh
+      echo "##vso[task.prependpath]$openssl_bin"
+    displayName: Select OpenSSL 3 for CSR signing
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
       - template: install-azure-cli-min.yml
   - ${{ elseif eq(parameters.azureCLIVersion, 'released') }}:
