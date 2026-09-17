@@ -6,9 +6,10 @@
 
 """Serial Hub controller. Gate from stdlib-only checkout via runpy.run_path(__file__).
 
-HubControl: 155m execution + 15m cleanup + 5m admission = 175m controller.
+HubControl: 190m execution + 15m cleanup + 5m admission = 210m controller.
 HubData: 210m Entra + 100m SAS + 15m cleanup EACH + 5m admission = 345m controller.
-Use 190m/360m jobs respectively, leaving another 15m for external setup.
+Use 225m/360m jobs respectively, leaving another 15m for external setup.
+Control includes margin for the observed late state teardown and final TLS cases.
 Cleanup is a shared child-unwind/parent-verification budget, never an extra grace.
 """
 
@@ -25,7 +26,7 @@ from uuid import uuid4
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-BUDGETS = {"HubControl": (("regular", 155 * 60),), "HubData": (("entra", 210 * 60), ("sas", 100 * 60))}
+BUDGETS = {"HubControl": (("regular", 190 * 60),), "HubData": (("entra", 210 * 60), ("sas", 100 * 60))}
 CLEANUP = 15 * 60
 RESERVE = 5 * 60
 HUB_LIMIT = 50  # Conservative documented subscription limit; includes every foreign Hub.
