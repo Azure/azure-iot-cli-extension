@@ -28,23 +28,41 @@ SUCCESSFUL_JOBS = {
 }
 
 
-@pytest.fixture
-def macos_openssl_step():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["tox"]["steps"]
-    selected = next(step for step in steps if step.get("name") == "Select OpenSSL 3 for CSR signing")
-    assert steps.index(selected) < next(i for i, step in enumerate(steps) if step.get("name") == "Setup test suite")
-    return selected
+@pytest.fixture(params=["github", "ado"])
+def macos_openssl_step(request):
+    if request.param == "github":
+        workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))
+        steps = workflow["jobs"]["tox"]["steps"]
+        selected = next(step for step in steps if step.get("name") == "Select OpenSSL 3 for CSR signing")
+        assert steps.index(selected) < next(i for i, step in enumerate(steps) if step.get("name") == "Setup test suite")
+    else:
+        template = yaml.safe_load(
+            (REPOSITORY_ROOT / ".azure-devops/templates/setup-dev-test-env.yml").read_text(encoding="utf-8")
+        )
+        steps = template["steps"]
+        selected = next(step for step in steps if step.get("displayName") == "Select OpenSSL 3 for CSR signing")
+        assert steps.index(selected) < next(
+            i for i, step in enumerate(steps) if step.get("template") == "download-install-local-azure-iot-cli-extension.yml"
+        )
+    return request.param, selected
 
 
 def test_native_openssl_selection_is_scoped_to_macos(macos_openssl_step):
-    assert macos_openssl_step["if"] == "runner.os == 'macOS'"
-    assert macos_openssl_step["shell"] == "bash"
+    provider, step = macos_openssl_step
+    if provider == "github":
+        assert step["if"] == "runner.os == 'macOS'"
+        assert step["shell"] == "bash"
+        script = step["run"]
+    else:
+        assert step["condition"] == "and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))"
+        script = step["bash"]
+    assert "source scripts/select-openssl.sh" in script
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
 @pytest.mark.parametrize("capability", ["ready", "missing", "unsupported"])
 def test_native_openssl_selection_proves_capabilities_before_changing_path(macos_openssl_step, tmp_path, capability):
+    provider, step = macos_openssl_step
     bash, openssl = shutil.which("bash"), shutil.which("openssl")
     assert bash and openssl
     prefix = Path(openssl).resolve().parents[1]
@@ -65,16 +83,24 @@ brew() {
 }
 """
     result = subprocess.run(
-        [bash, "-c", brew + macos_openssl_step["run"]],
+        [bash, "-c", brew + (step["run"] if provider == "github" else step["bash"])],
+        cwd=REPOSITORY_ROOT,
         env=dict(os.environ, OPENSSL_PREFIX=str(prefix), GITHUB_PATH=str(output)),
         capture_output=True, text=True, timeout=20, check=False,
     )
+    ado_path = f"##vso[task.prependpath]{prefix / 'bin'}"
     if capability == "ready":
         assert result.returncode == 0, result.stdout + result.stderr
-        assert output.read_text(encoding="utf-8") == str(prefix / "bin") + "\n"
+        if provider == "github":
+            assert output.read_text(encoding="utf-8") == str(prefix / "bin") + "\n"
+            assert ado_path not in result.stdout
+        else:
+            assert ado_path in result.stdout.splitlines()
+            assert not output.exists()
     else:
         assert result.returncode != 0
         assert not output.exists()
+        assert "##vso[task.prependpath]" not in result.stdout
 
 
 @pytest.mark.parametrize("helper,option", [

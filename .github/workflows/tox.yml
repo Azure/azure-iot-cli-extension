@@ -44,11 +44,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -euo pipefail
-          openssl_bin="$(brew --prefix openssl@3)/bin"
-          "$openssl_bin/openssl" version
-          "$openssl_bin/openssl" x509 -help 2>&1 | grep -- '-copy_extensions'
-          "$openssl_bin/openssl" req -help 2>&1 | grep -- '-addext'
+          source scripts/select-openssl.sh
           echo "$openssl_bin" >> "$GITHUB_PATH"
       - name: Setup test suite
         run: |
