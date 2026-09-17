@@ -326,6 +326,20 @@ def test_combined_link_parser_exposes_dependency_wait_options(management_command
     assert bool(parsed.no_wait) is no_wait
 
 
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+@pytest.mark.parametrize("action", ["add", "update"])
+@pytest.mark.parametrize("custom", [False, True])
+def test_atomic_link_root_parser_exposes_recovery_options(management_command_parser, kind, action, custom):
+    command = f"iot adr ns link {kind} {action}"
+    arguments = [*command.split(), *_LINK_PARSER_CASES[command]]
+    if custom:
+        arguments.extend(["--timeout", "91", "--interval", "2", "--no-wait"])
+    parsed = management_command_parser.parse_args(arguments)
+    assert parsed.timeout == (91 if custom else 600)
+    assert parsed.interval == (2 if custom else 30)
+    assert bool(parsed.no_wait) is custom
+
+
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 @pytest.mark.parametrize("value,expected", [(None, None), ("true", True), ("false", False)])
 def test_resource_create_local_auth_option(management_command_parser, kind, value, expected):

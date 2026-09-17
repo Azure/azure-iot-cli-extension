@@ -278,7 +278,9 @@ def test_su_runtime_uses_exact_two_roles_for_selected_identities(
         visible.assert_not_called()
         provider.client.namespaces.begin_update.assert_not_called()
     else:
-        invoke("su", "ns", "ns-rg", **kwargs)
+        # This test isolates RBAC and submission. Waited readback/recovery has
+        # deterministic service-state coverage in test_adr_link_propagation_unit.
+        invoke("su", "ns", "ns-rg", no_wait=True, **kwargs)
         ns_principal = "namespace-user" if outbound_uami else "namespace-principal"
         su_principal = "hub-user" if inbound_uami else "hub-system"
         assert [call.args[0] for call in grants.call_args_list] == [

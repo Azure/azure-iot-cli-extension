@@ -23,6 +23,8 @@ def adr_link_hub_add(
     availability: Optional[str] = None,
     allocation_weight: Optional[int] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.hub_add(
@@ -35,6 +37,8 @@ def adr_link_hub_add(
         availability=availability,
         allocation_weight=allocation_weight,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 
@@ -47,6 +51,8 @@ def adr_link_hub_update(
     mi_system_assigned: bool = False,
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.hub_update(
@@ -56,6 +62,8 @@ def adr_link_hub_update(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 
@@ -100,6 +108,8 @@ def adr_link_dps_add(
     mi_system_assigned: bool = False,
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.dps_add(
@@ -110,6 +120,8 @@ def adr_link_dps_add(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 
@@ -122,6 +134,8 @@ def adr_link_dps_update(
     mi_system_assigned: bool = False,
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.dps_update(
@@ -131,6 +145,8 @@ def adr_link_dps_update(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 
@@ -175,6 +191,8 @@ def adr_link_su_add(
     mi_system_assigned: bool = False,
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.su_add(
@@ -185,6 +203,8 @@ def adr_link_su_add(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 
@@ -197,6 +217,8 @@ def adr_link_su_update(
     mi_system_assigned: bool = False,
     mi_user_assigned: Optional[str] = None,
     no_wait: bool = False,
+    timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
+    interval: int = DEFAULT_WAIT_INTERVAL,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.su_update(
@@ -206,6 +228,8 @@ def adr_link_su_update(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
+        timeout_sec=timeout,
+        wait_sec=interval,
     )
 
 

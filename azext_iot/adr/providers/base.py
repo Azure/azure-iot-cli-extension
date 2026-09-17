@@ -111,6 +111,14 @@ _ADR_LRO_TIMEOUT_SECONDS = 10 * 60
 _ADR_LRO_MAX_DELAY_SECONDS = 30
 
 
+class ADRResourceStateError(AzureResponseError):
+    """A structured terminal resource failure, distinct from transport/CLI errors."""
+
+    def __init__(self, message, body):
+        super().__init__(message)
+        self.body = body
+
+
 def _retry_after_seconds(response, fallback: float) -> float:
     """Return a positive integer Retry-After, case-insensitively."""
     value = None
@@ -139,6 +147,7 @@ def _poll_with_deadline(
     timeout_sec: float = _ADR_LRO_TIMEOUT_SECONDS,
     clock: Callable = monotonic,
     sleeper: Callable = sleep,
+    deadline_guard=None,
 ):
     """Poll until an inspector reports completion or the deadline expires."""
     deadline = clock() + max(0, timeout_sec)
@@ -153,7 +162,11 @@ def _poll_with_deadline(
             if deadline - clock() <= 0:
                 break
 
+        if deadline_guard:
+            deadline_guard()
         response = request()
+        if deadline_guard:
+            deadline_guard()
         complete, value = inspect_response(response)
         if complete:
             return value
@@ -196,7 +209,21 @@ class ADRProvider(object):
         """
         if POLL_PROVISIONING_STATE_WORKAROUND:
             return self._poll_provisioning_state(poller, **kwargs)
+        if kwargs.get("deadline_guard"):
+            return self._bounded_poller_result(poller, **kwargs)
         return wait_for_terminal_state(poller, **kwargs)
+
+    @staticmethod
+    def _bounded_poller_result(poller, *, deadline_guard, sleeper=sleep, wait_sec=LRO_POLL_WAIT_SEC, **_):
+        # Azure Core result(timeout=...) may return None while unfinished.
+        # Do not interpret that as completion or bypass the real polling method.
+        deadline_guard()
+        while not poller.done():
+            sleeper(wait_sec)
+            deadline_guard()
+        result = poller.result()
+        deadline_guard()
+        return result
 
     @staticmethod
     def _poller_initial_response(poller):
@@ -344,6 +371,8 @@ class ADRProvider(object):
         timeout_sec: int = _ADR_LRO_TIMEOUT_SECONDS,
         clock=None,
         sleeper=None,
+        deadline_guard=None,
+        resource_observer=None,
         **_,
     ):
         """TEMPORARY: resolve an LRO by polling the resource's ``provisioningState``.
@@ -379,16 +408,24 @@ class ADRProvider(object):
         if url and method in _RESOURCE_MUTATION_METHODS:
             if initial_response is not None and not self._poller_is_async(poller):
                 last_body = self._initial_response_body(initial_response)
+                if deadline_guard:
+                    deadline_guard()
+                if resource_observer:
+                    resource_observer(last_body)
                 state = ((last_body or {}).get("properties") or {}).get("provisioningState")
                 if state in _PROVISIONING_FAILURES:
-                    raise AzureResponseError(
-                        self._format_failure(state, last_body, initial_response, "initial operation response")
+                    raise ADRResourceStateError(
+                        self._format_failure(state, last_body, initial_response, "initial operation response"), last_body
                     )
                 # A headerless PUT/PATCH may still be provisioning. Only
                 # completed inline responses can bypass resource polling.
                 if state == _PROVISIONING_SUCCEEDED or state is None:
                     return last_body
         else:
+            if deadline_guard:
+                return self._bounded_poller_result(
+                    poller, deadline_guard=deadline_guard, sleeper=sleeper or sleep, wait_sec=wait_sec,
+                )
             if poller.done():
                 return poller.result()
             return wait_for_terminal_state(poller, wait_sec=wait_sec)
@@ -396,19 +433,30 @@ class ADRProvider(object):
         def inspect_response(response):
             nonlocal last_body
             code = response.status_code
+            if deadline_guard and not 200 <= code < 300:
+                # Link recovery must not hide unrelated HTTP errors, including
+                # the canary's async-status 500, behind authorization retries.
+                try:
+                    response.raise_for_status()
+                    raise HttpResponseError(message=f"Unexpected resource-status HTTP {code}.", response=response)
+                except HttpResponseError as error:
+                    error.adr_resource_read_failure = True
+                    raise
             if code == 404:
                 if is_delete:
                     return True, None  # resource removed -> delete complete
                 return False, None  # not readable yet -> retry
             if 200 <= code < 300:
                 last_body = response.json() if code != 204 else None
+                if resource_observer:
+                    resource_observer(last_body)
                 state = ((last_body or {}).get("properties") or {}).get("provisioningState")
                 # A readable resource can retain its old successful state
                 # after DELETE has been accepted. Only 404 confirms removal.
                 if not is_delete and (state == _PROVISIONING_SUCCEEDED or state is None):
                     return True, last_body
                 if state in _PROVISIONING_FAILURES:
-                    raise AzureResponseError(self._format_failure(state, last_body, response))
+                    raise ADRResourceStateError(self._format_failure(state, last_body, response), last_body)
                 return False, None
             if code in (408, 429) or code >= 500:
                 return False, None
@@ -425,8 +473,16 @@ class ADRProvider(object):
                 + (f" (last provisioningState='{state}')." if state else ".")
             )
 
+        def request_resource():
+            try:
+                return self.client.send_request(HttpRequest("GET", url))
+            except HttpResponseError as error:
+                if deadline_guard:
+                    error.adr_resource_read_failure = True
+                raise
+
         return _poll_with_deadline(
-            lambda: self.client.send_request(HttpRequest("GET", url)),
+            request_resource,
             inspect_response,
             timeout_message,
             initial_response=initial_response,
@@ -434,6 +490,7 @@ class ADRProvider(object):
             timeout_sec=timeout_sec,
             clock=clock or monotonic,
             sleeper=sleeper or sleep,
+            deadline_guard=deadline_guard,
         )
 
     def _poll_location(

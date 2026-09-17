@@ -160,7 +160,8 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     provider._rbac.ensure.assert_not_called()
     provider.client.namespaces.begin_update.assert_not_called()
 
-    getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", **identity_args)
+    # Prove public update preflight/submission independently of service readiness.
+    getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **identity_args)
     provider._rbac.ensure.assert_called_once_with(
         link_type=kind, namespace_scope=NS_ID, target_scope=target_id,
         namespace_principal_id="namespace-principal",
