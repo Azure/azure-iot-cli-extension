@@ -512,14 +512,15 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
         return resource_is_absent(self, f"{command} show {arguments}", description=kind)
 
-    def _delete_owned_resource(self, kind, name, resource_group):
+    def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
         if self._resource_is_absent(kind, name, resource_group):
             return
         command = self._RESOURCE_COMMANDS[kind]
         arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
         confirmation = " --yes" if kind in {"namespace", "su"} else ""
+        wait_option = " --no-wait" if no_wait else ""
         try:
-            self.cmd(f"{command} delete {arguments}{confirmation}")
+            self.cmd(f"{command} delete {arguments}{confirmation}{wait_option}")
         except SystemExit as error:
             if error.code == 3 and is_resource_not_found_error(error):
                 return

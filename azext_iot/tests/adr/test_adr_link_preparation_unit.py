@@ -6,9 +6,11 @@
 
 from types import SimpleNamespace
 from unittest.mock import Mock, call
+import shlex
 
 import pytest
-from azure.cli.core.azclierror import AzureResponseError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, RequiredArgumentMissingError
+from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 
 from azext_iot.adr.rbac import LinkRbacManager
@@ -32,6 +34,7 @@ def preparation(monkeypatch):
     monkeypatch.setattr("requests.sessions.Session.request", network)
     manager = LinkRbacManager(test.cli_ctx, cli=Mock())
     manager._current_assignee_object_id = Mock(return_value="caller")
+    manager.ensure = Mock()
     monkeypatch.setattr(subject, "LinkRbacManager", Mock(return_value=manager))
     monkeypatch.setattr(subject, "TEST_SUBSCRIPTION", "configured-sub")
     monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", "")
@@ -116,12 +119,30 @@ def test_reader_experiment_rejects_borrowed_fixture_before_identity_or_mutations
 
 @pytest.mark.parametrize("probe_reader", [False, True])
 def test_su_keeps_normal_reader_fixture_but_omits_it_before_opt_in_discovery(preparation, monkeypatch, probe_reader):
-    test, _, _ = preparation
+    test, manager, _ = preparation
     monkeypatch.setattr(subject, "_SU_READER_PROBE", probe_reader)
     identity_id = "/subscriptions/configured-sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id"
     su_id = "/subscriptions/configured-sub/resourceGroups/rg/providers/Microsoft.DeviceUpdate/updateInstances/su"
-    test.create_owned_resource = Mock(side_effect=[Mock(get_output_in_json=lambda: {"id": identity_id}), Mock()])
-    monkeypatch.setattr(subject, "wait_for_resource_succeeded", Mock(return_value={"id": su_id}))
+    ns_id = "/subscriptions/configured-sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
+    test.create_owned_resource = Mock(side_effect=[
+        Mock(get_output_in_json=lambda: {"id": identity_id, "principalId": "uami"}),
+        Mock(get_output_in_json=lambda: {
+            "id": ns_id, "identity": {"type": "SystemAssigned", "principalId": "namespace"},
+        }),
+        Mock(),
+    ])
+    waits = []
+
+    def wait(*_args, **_kwargs):
+        waits.append(True)
+        if len(waits) == 2:
+            if probe_reader:
+                test.assign_role.assert_not_called()
+            else:
+                test.assign_role.assert_called_once_with("caller", "Device Update Reader", su_id, assignee_type=None)
+        return {"id": su_id}
+
+    monkeypatch.setattr(subject, "wait_for_condition", wait)
     test.cmd.side_effect = RuntimeError("stop at Update Instance identity inspection")
     with pytest.raises(RuntimeError, match="identity inspection"):
         subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
@@ -129,6 +150,82 @@ def test_su_keeps_normal_reader_fixture_but_omits_it_before_opt_in_discovery(pre
         test.assign_role.assert_not_called()
     else:
         test.assign_role.assert_called_once_with("caller", "Device Update Reader", su_id, assignee_type=None)
+    manager.ensure.assert_not_called()
+
+
+@pytest.mark.parametrize("failure", [None, "failed", "timeout", "preauthorized"])
+def test_owned_su_waits_only_for_resource_and_leaves_fresh_roles_to_native_link(monkeypatch, failure):
+    from azext_iot.tests.adr._helpers import wait_for_condition
+
+    test = Mock()
+    manager = Mock()
+    manager._current_assignee_object_id.return_value = "caller"
+    monkeypatch.setattr(subject, "LinkRbacManager", Mock(return_value=manager))
+    monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", "")
+    monkeypatch.setattr(subject, "_SU_READER_PROBE", True)
+    names = iter(["ns", "denied"])
+    monkeypatch.setattr(subject, "generate_adr_namespace_name", lambda: next(names))
+    now = [0]
+    created = []
+    prefix = "/subscriptions/sub/resourceGroups/rg/providers/"
+    identity_id = prefix + "Microsoft.ManagedIdentity/userAssignedIdentities/id"
+    namespace_id = prefix + "Microsoft.DeviceRegistry/namespaces/ns"
+    su_id = prefix + "Microsoft.DeviceUpdate/updateInstances/su"
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    monkeypatch.setattr(
+        subject, "wait_for_condition",
+        lambda *args, **kwargs: wait_for_condition(*args, **kwargs, clock=lambda: now[0], sleeper=sleep),
+    )
+
+    def create(command, *, kind, **_kwargs):
+        created.append(kind)
+        if kind == "identity":
+            value = {"id": identity_id, "principalId": "uami"}
+        elif kind == "namespace":
+            value = {"id": namespace_id, "identity": {"type": "SystemAssigned", "principalId": "namespace"}}
+        else:
+            assert kind == "su" and "--no-wait" in command
+            value = None
+        return Mock(get_output_in_json=lambda: value)
+
+    def invoke(command):
+        if command.startswith("iot adr ns su instance show "):
+            state = {"failed": "Failed", "timeout": "Creating"}.get(failure, "Succeeded")
+            value = {"id": su_id, "properties": {"provisioningState": state}}
+        elif command.startswith("resource show --ids "):
+            assert now[0] == 0
+            value = {"identity": {"principalId": "su-sami", "userAssignedIdentities": {identity_id: {}}}}
+        elif command.startswith("identity show --ids "):
+            value = {"principalId": "uami"}
+        elif command.startswith("iot adr ns link su add --ns denied "):
+            raise RequiredArgumentMissingError(subject.MI_REQUIRED_MSG)
+        elif command.startswith("iot adr ns link su add --ns ns "):
+            assert now[0] == 0
+            assert subject._NATIVE_LINK_OPTIONS in command
+            manager.ensure.assert_not_called()
+            raise RuntimeError("stop at actual UAMI link")
+        elif command.startswith("role assignment list "):
+            value = [{"id": "preexisting"}] if failure == "preauthorized" else []
+        else:
+            raise AssertionError(f"Unexpected command: {command}")
+        return Mock(get_output_in_json=lambda: value)
+
+    test.create_owned_resource.side_effect = create
+    test.cmd.side_effect = invoke
+    with pytest.raises(AssertionError if failure else RuntimeError):
+        subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
+    assert now[0] <= 3600
+    if failure:
+        assert not any("link su add --ns ns " in item.args[0] for item in test.cmd.call_args_list)
+    else:
+        assert now[0] == 0
+    manager.ensure.assert_not_called()
+    manager.ensure_many.assert_not_called()
+    test.assign_role.assert_not_called()
+    test.cleanup_full_infra.assert_called_once()
 
 
 def test_su_borrowed_targets_survive_cleanup_after_namespace_creation(preparation, monkeypatch):
@@ -197,6 +294,10 @@ def test_su_identity_prerequisites_distinguish_owned_resources(preparation, monk
         "/subscriptions/configured-sub/resourceGroups/rg/providers/"
         "Microsoft.DeviceUpdate/updateInstances/testsuowned123"
     )
+    namespace_id = (
+        "/subscriptions/configured-sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/owned-ns"
+    )
     su_id = SU_ID if supplied else owned_su_id
     identity = {"principalId": "sami", "userAssignedIdentities": {requested_id: {}}}
     if case == "missing_sami":
@@ -208,18 +309,25 @@ def test_su_identity_prerequisites_distinguish_owned_resources(preparation, monk
     elif case == "case_varied_uami":
         identity["userAssignedIdentities"] = {"different-uami": {}, requested_id.upper(): {}}
     provisioned = Mock(return_value={"id": su_id})
-    monkeypatch.setattr(subject, "wait_for_resource_succeeded", provisioned)
+    monkeypatch.setattr(subject, "wait_for_condition", provisioned)
 
     outputs = []
     commands = []
     if not supplied:
         outputs.extend([
-            CLIError("ResourceNotFound (404)"), Mock(get_output_in_json=lambda: {"id": requested_id}),
+            CLIError("ResourceNotFound (404)"),
+            Mock(get_output_in_json=lambda: {"id": requested_id, "principalId": "uami"}),
+            CLIError("ResourceNotFound (404)"),
+            Mock(get_output_in_json=lambda: {
+                "id": namespace_id, "identity": {"type": "SystemAssigned", "principalId": "namespace"},
+            }),
             CLIError("ResourceNotFound (404)"), Mock(),
         ])
         commands.extend([
             call("identity show -n owned-uami -g rg"),
             call(f"identity create -n owned-uami -g rg --location {subject.TEST_LOCATION}"),
+            call("iot adr ns show -n owned-ns -g rg"),
+            call(f"iot adr ns create -n owned-ns -g rg --location {subject.TEST_LOCATION}"),
             call("iot adr ns su instance show -n testsuowned123 -g rg"),
             call(
                 "iot adr ns su instance create -n testsuowned123 -g rg "
@@ -256,8 +364,10 @@ def test_su_identity_prerequisites_distinguish_owned_resources(preparation, monk
         outputs.append(RuntimeError(expected_message))
         commands.append(call("iot adr ns show -n owned-ns -g rg"))
     if not supplied:
-        outputs.extend(Mock() for _ in range(4))
+        outputs.extend(Mock() for _ in range(6))
         commands.extend([
+            call("iot adr ns show -n owned-ns -g rg"),
+            call("iot adr ns delete -n owned-ns -g rg --yes"),
             call("iot adr ns su instance show -n testsuowned123 -g rg"),
             call("iot adr ns su instance delete -n testsuowned123 -g rg --yes"),
             call("identity show -n owned-uami -g rg"),
@@ -278,11 +388,11 @@ def test_su_identity_prerequisites_distinguish_owned_resources(preparation, monk
     if supplied:
         provisioned.assert_not_called()
     else:
-        provisioned.assert_called_once_with(
-            test, "iot adr ns su instance show -n testsuowned123 -g rg",
-            max_polls=subject.SU_PROVISIONING_MAX_POLLS,
-            poll_interval=subject.SU_PROVISIONING_POLL_INTERVAL,
-        )
+        assert provisioned.call_count == 2
+        assert provisioned.call_args_list[0].kwargs["timeout"] == 120
+        assert provisioned.call_args.kwargs["max_attempts"] == subject.SU_PROVISIONING_MAX_POLLS
+        assert provisioned.call_args.kwargs["interval"] == subject.SU_PROVISIONING_POLL_INTERVAL
+        manager.ensure.assert_not_called()
 
 
 def test_owned_identity_regression_rejects_unexpected_scenario_skip(preparation, monkeypatch):
@@ -294,3 +404,157 @@ def test_owned_identity_regression_rejects_unexpected_scenario_skip(preparation,
         test_su_identity_prerequisites_distinguish_owned_resources(
             preparation, monkeypatch, False, "missing_sami",
         )
+
+
+@pytest.mark.parametrize("failure", [
+    None, "add", "update", "pending-add", "pending-update", "preauthorized-sami", "role-read", "discovery",
+])
+def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_terminal_results(monkeypatch, failure):
+    from copy import deepcopy
+    from azext_iot.tests.adr._helpers import wait_for_condition
+
+    scenario = Mock()
+    manager = Mock()
+    manager._current_assignee_object_id.return_value = "caller"
+    manager.ensure.side_effect = manager.ensure_many.side_effect = AssertionError("Fixture service-role grants forbidden")
+    monkeypatch.setattr(subject, "LinkRbacManager", Mock(return_value=manager))
+    monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", "")
+    monkeypatch.setattr(subject, "_SU_READER_PROBE", False)
+    names = iter(["ns", "denied"])
+    monkeypatch.setattr(subject, "generate_adr_namespace_name", lambda: next(names))
+    waits = Mock(side_effect=AssertionError("No test-side link wait/repair"))
+    monkeypatch.setattr(subject, "_wait_for_linking_succeeded", waits)
+    monkeypatch.setattr(subject, "link_dps_with_readiness", waits)
+    monkeypatch.setattr(subject, "link_hub_with_readiness", waits)
+    sleep = Mock(side_effect=AssertionError("No preauthorization delay for ready resources"))
+    monkeypatch.setattr(
+        subject, "wait_for_condition",
+        lambda *args, **kwargs: wait_for_condition(*args, **kwargs, clock=lambda: 0, sleeper=sleep),
+    )
+    prefix = "/subscriptions/sub/resourceGroups/rg/providers/"
+    identity_id = prefix + "Microsoft.ManagedIdentity/userAssignedIdentities/uami"
+    namespace_id = prefix + "Microsoft.DeviceRegistry/namespaces/ns"
+    su_id = prefix + "Microsoft.DeviceUpdate/updateInstances/su"
+    namespace = {
+        "id": namespace_id, "identity": {"type": "SystemAssigned", "principalId": "namespace-sami"},
+        "properties": {"provisioningState": "Succeeded"},
+    }
+    native_commands, role_observations = [], []
+    endpoint = None
+
+    def output(value):
+        return Mock(get_output_in_json=lambda: deepcopy(value))
+
+    def create(command, *, kind, **_):
+        if kind == "identity":
+            return output({"id": identity_id, "principalId": "su-uami"})
+        if kind == "namespace":
+            return output(namespace)
+        assert kind == "su" and "--no-wait" in command
+        return output(None)
+
+    def invoke(command, expect_failure=False):
+        nonlocal endpoint
+        if command.startswith("iot adr ns su instance show "):
+            return output({"id": su_id, "properties": {"provisioningState": "Succeeded"}})
+        if command.startswith("resource show --ids "):
+            return output({"identity": {"principalId": "su-sami", "userAssignedIdentities": {identity_id: {}}}})
+        if command.startswith("identity show --ids "):
+            return output({"principalId": "su-uami"})
+        if command.startswith("role assignment list "):
+            if failure == "role-read":
+                raise HttpResponseError("role-read failed")
+            args = shlex.split(command)
+            principal = args[args.index("--assignee-object-id") + 1]
+            role = args[args.index("--role") + 1]
+            scope = args[args.index("--scope") + 1]
+            present = bool(native_commands) if principal != "su-sami" else len(native_commands) == 2
+            if principal == "su-sami" and failure == "preauthorized-sami":
+                present = True
+            role_observations.append((principal, role, scope, present))
+            return output([{"id": "native-created"}] if present else [])
+        if command.startswith("iot adr ns link su add "):
+            if "--ns denied " in command:
+                raise RequiredArgumentMissingError(subject.MI_REQUIRED_MSG)
+            if "su-cap-rejected-link" in command:
+                raise ArgumentUsageError(subject.SU_CAP_EXCEEDED_MSG)
+            if expect_failure:
+                assert endpoint is not None
+                return output(None)
+            action = "add"
+            inbound = {"type": "UserAssigned", "userAssignedIdentity": identity_id}
+            assert not native_commands
+        elif command.startswith("iot adr ns link su update "):
+            action = "update"
+            inbound = {"type": "SystemAssigned"}
+            assert len(native_commands) == 1
+        else:
+            if command.startswith("iot adr ns link su show "):
+                return output({"name": "su-primary", **endpoint})
+            if command.startswith("iot adr ns link su list "):
+                return output([{"name": "su-primary", **endpoint}])
+            if command.startswith("iot adr ns link su wait "):
+                assert endpoint["linkingState"] == "Succeeded"
+                return output(None)
+            if command.startswith(("iot adr ns su instance update ", "iot adr ns su instance create ")):
+                raise ArgumentUsageError("identity is used by an active ADR link")
+            if command.startswith(("iot adr ns su software-update ", "iot adr ns su device-class ")):
+                if failure == "discovery":
+                    raise HttpResponseError("discovery failed")
+                return output([])
+            raise AssertionError(f"Unexpected command: {command}")
+        native_commands.append(command)
+        assert subject._NATIVE_LINK_OPTIONS in command and "--no-wait" not in command
+        if failure == action:
+            raise HttpResponseError(f"{action} failed")
+        endpoint = {
+            "endpointType": "Microsoft.DeviceUpdate/updateInstances", "resourceId": su_id,
+            "inboundCallerIdentity": inbound,
+            "linkingState": "InProgress" if failure == "pending-" + action else "Succeeded",
+            "serviceAddress": "owned.api.adu.microsoft.com",
+        }
+        return output({**namespace, "properties": {
+            "provisioningState": "Succeeded", "updating": {"endpoints": {"su-primary": endpoint}},
+        }})
+
+    scenario.create_owned_resource.side_effect = create
+    scenario.cmd.side_effect = invoke
+    if failure:
+        with pytest.raises(AssertionError if failure.startswith(("pending-", "preauthorized")) else HttpResponseError):
+            subject.TestADRLinkSU.test_adr_link_su_lifecycle(scenario)
+    else:
+        subject.TestADRLinkSU.test_adr_link_su_lifecycle(scenario)
+    expected_calls = 0 if failure == "role-read" else 1 if failure in {
+        "add", "pending-add", "preauthorized-sami", "discovery",
+    } else 2
+    assert len(native_commands) == expected_calls
+    if failure is None:
+        assert role_observations == [
+            ("namespace-sami", "Contributor", su_id, False),
+            ("su-uami", "Azure Device Registry Contributor", namespace_id, False),
+            ("namespace-sami", "Contributor", su_id, True),
+            ("su-uami", "Azure Device Registry Contributor", namespace_id, True),
+            ("su-sami", "Azure Device Registry Contributor", namespace_id, False),
+            ("namespace-sami", "Contributor", su_id, True),
+            ("su-sami", "Azure Device Registry Contributor", namespace_id, True),
+        ]
+    scenario.assign_role.assert_called_once_with("caller", "Device Update Reader", su_id, assignee_type=None)
+    manager.ensure.assert_not_called()
+    manager.ensure_many.assert_not_called()
+    waits.assert_not_called()
+    sleep.assert_not_called()
+    scenario.cleanup_full_infra.assert_called_once()
+
+
+@pytest.mark.parametrize("scenario", [
+    subject.TestADRLinkSequentialAdd.test_adr_link_sequential_add,
+    subject.TestADRLinkSU.test_adr_link_su_lifecycle,
+])
+def test_fresh_link_scenarios_do_not_import_fixture_service_role_recovery(scenario):
+    import inspect
+
+    source = inspect.getsource(scenario)
+    assert ".ensure(" not in source and ".ensure_many(" not in source
+    assert "_ROLE_SETTLE_SECONDS" not in source
+    assert "link_dps_with_readiness(" not in source and "link_hub_with_readiness(" not in source
+    assert "_NATIVE_LINK_OPTIONS" in source

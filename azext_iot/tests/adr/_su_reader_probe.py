@@ -6,12 +6,17 @@
 
 """Opt-in, owned-resource experiment; never production caller authorization."""
 
+from time import monotonic
 from urllib.parse import urlsplit
 
 from azure.core.exceptions import HttpResponseError
 from msrestazure.tools import parse_resource_id
 
+from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.adr._log import LogKind, _log
+
+
+_READER_ROLE_SETTLE_SECONDS = 180
 
 
 class SUReaderProbe:
@@ -80,6 +85,23 @@ class SUReaderProbe:
             self.caller_id, "Device Update Reader", self.resource_id, assignee_type=None,
         )
         assert self.assignment_id, "The SU Reader probe could not establish its scoped fixture role."
+        prepared_at = monotonic()
+        _log(
+            LogKind.WARN,
+            "SU Reader probe: allow %ds after the scoped fixture grant before the single discovery replay; "
+            "ARM visibility alone does not prove effective data-plane access.",
+            _READER_ROLE_SETTLE_SECONDS,
+        )
+        wait_for_condition(
+            lambda: self.scenario.cmd(
+                f"role assignment list --assignee-object-id {self.caller_id} "
+                f"--role 'Device Update Reader' --scope '{self.resource_id}' --fill-principal-name false"
+            ).get_output_in_json(),
+            lambda assignments: bool(assignments) and monotonic() - prepared_at >= _READER_ROLE_SETTLE_SECONDS,
+            description="owned fixture Reader visibility and propagation allowance before one replay",
+            timeout=300,
+            interval=10,
+        )
         _log(LogKind.RESULT, "SU Reader probe fixture assignment=%s; repeating the identical command once",
              self.assignment_id)
         return self._invoke(command)
