@@ -17,6 +17,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".azure-devops/templates/run-tests-parallel.yml"
+# Allow cold Git Bash startup on Windows while keeping offline execution bounded.
+OFFLINE_BASH_TIMEOUT = 30
 CONTROLLER_ENV = (
     "azext_iot_dps_test_phase", "azext_iot_dps_phase_receipts", "azext_iot_dps_run_uid",
     "azext_iot_dps_test_subscription", "azext_iot_dps_test_resource_group",
@@ -127,7 +129,7 @@ def _execute(tmp_path, overrides=None, exit_code=0):
     result = subprocess.run(
         [bash, "-c", 'pytest() { printf "%s\\n" "$*" "$azext_iot_testdps" >> "$PYTEST_RECORD"; '
          'return "$PYTEST_EXIT"; }\n' + script],
-        env=environment, cwd=tmp_path, capture_output=True, text=True, timeout=5, check=False,
+        env=environment, cwd=tmp_path, capture_output=True, text=True, timeout=OFFLINE_BASH_TIMEOUT, check=False,
     )
     return result, record.read_text(encoding="utf-8").splitlines() if record.exists() else []
 
@@ -264,7 +266,7 @@ def test_ado_hub_controller_failure_and_service_connection_mismatch_fail_job(exi
         'python() { printf "%s\\n" "$@"; return "$OFFLINE_EXIT"; }\n'
     )
     result = subprocess.run(
-        [bash, "-c", stubs + script], cwd=ROOT, capture_output=True, text=True, timeout=10, check=False,
+        [bash, "-c", stubs + script], cwd=ROOT, capture_output=True, text=True, timeout=OFFLINE_BASH_TIMEOUT, check=False,
         env=dict(os.environ, azext_iot_hub_subscription="authorized", azext_iot_testrg="cli-int-test-rg",
                  azext_iot_testhub_location="centraluseuap", OFFLINE_SUBSCRIPTION=subscription,
                  OFFLINE_EXIT=str(exit_code)),
