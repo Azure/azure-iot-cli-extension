@@ -252,6 +252,7 @@ def state_backend(mocker, fake_cli):
     }
     deleted = []
     clients = {}
+    identities = {name: {} for name in states}
 
     def delete(name, kind, item_id):
         deleted.append((name, kind, item_id))
@@ -274,6 +275,12 @@ def state_backend(mocker, fake_cli):
     def invoke(args, out_file):
         fake_cli.result.error = None
         name = args[args.index("--hub-name") + 1]
+        if args[:4] == ["iot", "hub", "device-identity", "show"]:
+            out_file.write(json.dumps(identities[name][args[args.index("-d") + 1]]))
+            return 0
+        if args[:5] == ["iot", "hub", "device-identity", "children", "add"]:
+            parent, child = args[args.index("-d") + 1], args[args.index("--cl") + 1]
+            identities[name][child]["parentScopes"] = [identities[name][parent]["deviceScope"]]
         if args[:3] == ["iot", "hub", "query"]:
             assert args[args.index("-q") + 1] == "select deviceId from devices"
             out_file.write(json.dumps([{"deviceId": device} for device in sorted(states[name]["devices"])]))
@@ -291,6 +298,11 @@ def state_backend(mocker, fake_cli):
                 fake_cli.result.error = BadRequestError("ConfigurationAlreadyExists")
                 return 1
             states[name][kind].add(item_id)
+            if kind == "devices":
+                identities[name][item_id] = {
+                    "deviceId": item_id, "capabilities": {"iotEdge": "--edge-enabled" in args},
+                    "deviceScope": f"ms-azure-iot-edge://{item_id}-{name}", "parentScopes": [],
+                }
         out_file.write("{}")
         return 0
 
@@ -303,6 +315,7 @@ def state_backend(mocker, fake_cli):
     return SimpleNamespace(
         hubs=[{"name": "origin", "rg": "rg"}, {"name": "destination", "rg": "rg"}, {"name": "unrelated"}],
         states=states, clients=clients, deleted=deleted, invoke=invoke, role_assignment=role_assignment,
+        identities=identities,
     )
 
 
@@ -827,6 +840,7 @@ def comparison_data(mocker, fake_cli, tmp_path):
         config_ids=[subject.generate_generic_id() for _ in range(3)],
         device_ids=subject.generate_device_names(6),
     )
+    owned.parent_ids = dict.fromkeys(owned.device_ids)
     configs = [
         {
             "id": config_id, "content": {"setting": "value"}, "metrics": {}, "priority": 1,
@@ -855,6 +869,14 @@ def comparison_data(mocker, fake_cli, tmp_path):
         "identity": identity, "modules": [module], "module_twin": module_twin, "children": [],
     }
     views = {"origin": deepcopy(origin), "destination": deepcopy(origin)}
+    for name, view in views.items():
+        view["identity"] = {
+            device_id: {
+                **deepcopy(identity), "deviceId": device_id, "capabilities": {"iotEdge": True},
+                "deviceScope": f"ms-azure-iot-edge://{device_id}-{name}", "parentScopes": [],
+            }
+            for device_id in owned.device_ids
+        }
     exported = {
         "configurations": {
             "admConfigurations": {config["id"]: deepcopy(config) for config in configs[:1]},
@@ -879,7 +901,7 @@ def comparison_data(mocker, fake_cli, tmp_path):
         name, kind = key = _comparison_read_key(args)
         counts[key] += 1
         response = overrides[key](counts[key]) if key in overrides else views[name][kind]
-        if kind == "twin":
+        if kind in ("twin", "identity", "children") and isinstance(response, dict):
             response = response[args[args.index("-d") + 1]]
         out_file.write(json.dumps(response))
         return 0
@@ -1044,17 +1066,24 @@ def test_authoritative_comparison_preserves_auth_types_and_parent_checks(compari
     elif auth_type == "selfSigned":
         authentication["x509Thumbprint"] = {"primaryThumbprint": "unit-primary", "secondaryThumbprint": "unit-secondary"}
     ids = comparison_data.owned.device_ids
+    comparison_data.owned.parent_ids = {
+        device_id: None if device_id == ids[0] else ids[0] for device_id in ids
+    }
     for view in comparison_data.views.values():
-        view["identity"]["authentication"] = deepcopy(authentication)
         for device_id, twin in view["twin"].items():
-            twin["capabilities"]["iotEdge"] = edge
-            if device_id != ids[0]:
-                twin["parentScopes"] = [f"ms-azure-iot-edge://{ids[0]}-generation"]
+            identity = view["identity"][device_id]
+            identity["authentication"] = deepcopy(authentication)
+            identity["capabilities"]["iotEdge"] = twin["capabilities"]["iotEdge"] = edge or device_id == ids[0]
+            scopes = [] if device_id == ids[0] else [view["identity"][ids[0]]["deviceScope"]]
+            identity["parentScopes"] = scopes
+            twin["parentScopes"] = deepcopy(scopes)
+        view["children"] = {
+            device_id: ids[1:] if device_id == ids[0] else [] for device_id in ids
+        }
     for device_id, device in comparison_data.exported["devices"].items():
         device["identity"]["authentication"] = deepcopy(authentication)
-        device["twin"]["capabilities"]["iotEdge"] = edge
-        if device_id != ids[0]:
-            device["parent"] = ids[0]
+        device["twin"]["capabilities"]["iotEdge"] = edge or device_id == ids[0]
+        device["parent"] = comparison_data.owned.parent_ids[device_id]
     comparison_data.compare(mode)
 
 
@@ -1093,7 +1122,7 @@ def test_owned_ids_do_not_bypass_detailed_value_mismatches(comparison_data, mode
     for mode in ("migration", "file")
     for hub in ("origin", "destination")
     for kind in ("configs", "deployments", "devices", "identity", "twin", "modules", "module_twin", "children")
-    if mode == "migration" or (hub == "origin" and kind != "children")
+    if mode == "migration" or hub == "origin"
 ])
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
 def test_comparison_cli_read_errors_propagate_without_retry(
@@ -1122,3 +1151,198 @@ def test_comparison_cli_read_errors_propagate_without_retry(
         assert str(raised.value) == "IoT Hub state command failed with exit code 7."
     assert failed_reads == [kind]
     subject.time.sleep.assert_not_called()
+
+
+def _edge_chain(data):
+    root, child, grandchild = data.owned.device_ids[:3]
+    data.owned.parent_ids[child] = root
+    data.owned.parent_ids[grandchild] = child
+    for view in data.views.values():
+        view["children"] = {device_id: [] for device_id in data.owned.device_ids}
+        for device_id, parent_id in data.owned.parent_ids.items():
+            if parent_id:
+                view["identity"][device_id]["parentScopes"] = [view["identity"][parent_id]["deviceScope"]]
+                view["children"][parent_id].append(device_id)
+    for device_id, parent_id in data.owned.parent_ids.items():
+        data.exported["devices"][device_id]["parent"] = parent_id
+    return root, child, grandchild
+
+
+@pytest.fixture
+def topology_clock(mocker):
+    from azext_iot.tests.iothub import _integration_helpers
+
+    clock = SimpleNamespace(now=0.0, sleeps=[])
+
+    def sleep(seconds):
+        clock.sleeps.append(seconds)
+        clock.now += seconds
+
+    mocker.patch.object(subject.time, "monotonic", side_effect=lambda: clock.now)
+    mocker.patch.object(_integration_helpers, "monotonic", side_effect=lambda: clock.now)
+    mocker.patch.object(_integration_helpers, "sleep", side_effect=sleep)
+    return clock
+
+
+def test_topology_is_planned_before_any_write_and_copied_to_destination(
+    mocker, fake_cli, state_backend, state_request, tmp_path
+):
+    plan = subject._OwnedDataplaneState()
+    original_type = subject._OwnedDataplaneState
+    mocker.patch.object(subject, "_OwnedDataplaneState", side_effect=[plan, original_type()])
+
+    def invoke(args, out_file):
+        assert len(plan.parent_ids) == 6
+        assert sum(parent is not None for parent in plan.parent_ids.values()) == 2
+        if not state_backend.states["origin"]["configs"]:
+            assert not plan.device_ids, "Planned topology must not adopt unconfirmed device creates."
+        return state_backend.invoke(args, out_file)
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    fixture = _state_fixture(state_backend, state_request, tmp_path)
+    hubs = next(fixture)
+    assert hubs[1]["state_data"].parent_ids == plan.parent_ids
+    assert hubs[1]["state_data"].parent_ids is not plan.parent_ids
+    fixture.close()
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
+def test_authoritative_topology_uses_each_hubs_own_scope(comparison_data, mode):
+    root, child, _ = _edge_chain(comparison_data)
+    assert (comparison_data.views["origin"]["identity"][root]["deviceScope"]
+            != comparison_data.views["destination"]["identity"][root]["deviceScope"])
+    comparison_data.compare(mode)
+    assert comparison_data.owned.parent_ids[child] == root
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
+@pytest.mark.parametrize("damage", ["wrong_parent", "missing", "empty", "foreign_scope", "root_has_parent"])
+def test_wrong_authoritative_topology_fails_before_query_retry(comparison_data, mode, damage):
+    root, child, _ = _edge_chain(comparison_data)
+    view = comparison_data.views["destination" if mode == "migration" else "origin"]["identity"]
+    if damage == "missing":
+        view[child].pop("parentScopes")
+    elif damage == "empty":
+        view[child]["parentScopes"] = []
+    elif damage == "root_has_parent":
+        view[root]["parentScopes"] = [view[child]["deviceScope"]]
+    else:
+        view[child]["parentScopes"] = [
+            view[child]["deviceScope"] if damage == "wrong_parent" else "ms-azure-iot-edge://foreign-generation"
+        ]
+    with pytest.raises(AssertionError, match="expected parent"):
+        comparison_data.compare(mode)
+    assert not any(count for (_, kind), count in comparison_data.counts.items() if kind == "children")
+    subject.time.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("damage", ["missing", "empty", "wrong"])
+def test_file_topology_requires_expected_parent_even_when_absent(comparison_data, damage):
+    _, child, _ = _edge_chain(comparison_data)
+    device = comparison_data.exported["devices"][child]
+    if damage == "missing":
+        device.pop("parent")
+    else:
+        device["parent"] = "" if damage == "empty" else "unowned-parent"
+    with pytest.raises(AssertionError, match="Exported device.*expected parent"):
+        comparison_data.compare("file")
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
+@pytest.mark.parametrize("bad_rows", [[], ["wrong-child"], ["duplicate", "duplicate"]])
+@pytest.mark.parametrize("converges", [False, True])
+def test_children_query_lag_is_bounded_and_exact(comparison_data, topology_clock, mode, bad_rows, converges):
+    root, child, _ = _edge_chain(comparison_data)
+    name = "destination" if mode == "migration" else "origin"
+    good = comparison_data.views[name]["children"]
+
+    def observe(_attempt):
+        result = deepcopy(good)
+        if not converges or topology_clock.now < 10:
+            result[root] = [child if value == "duplicate" else value for value in bad_rows]
+        return result
+
+    comparison_data.overrides[(name, "children")] = observe
+    comparison_data.owned.query_deadline = 25
+    if converges:
+        comparison_data.compare(mode)
+        assert topology_clock.now == 10
+    else:
+        with pytest.raises(AssertionError, match="children of.*Query visibility"):
+            comparison_data.compare(mode)
+        assert topology_clock.now == 25
+        assert topology_clock.sleeps == [10, 10, 5]
+
+
+def test_membership_and_all_parent_queries_share_existing_deadline(
+    mocker, comparison_data, topology_clock
+):
+    root, child, _ = _edge_chain(comparison_data)
+    owned = comparison_data.owned
+    mocker.patch.object(subject, "QUERY_VISIBILITY_TIMEOUT", 20)
+
+    def membership(_command):
+        topology_clock.now += 8
+        return SimpleNamespace(as_json=lambda: [{"deviceId": device_id} for device_id in owned.device_ids])
+
+    mocker.patch.object(subject, "_invoke_setup", side_effect=membership)
+    subject._wait_for_dataplane_query("--hub-name destination", owned)
+    assert owned.query_deadline == 20
+    good = comparison_data.views["origin"]["children"]
+
+    def children(_attempt):
+        topology_clock.now += 3
+        return good
+
+    comparison_data.overrides[("origin", "children")] = children
+    with pytest.raises(AssertionError, match="deadline"):
+        comparison_data.compare("migration")
+    # 8s membership + four 3s child queries exhausts the one 20s window.
+    assert topology_clock.now == 20
+    assert comparison_data.counts[("origin", "children")] == 4
+    assert comparison_data.counts[("destination", "children")] == 0
+    assert owned.parent_ids[child] == root
+    assert not topology_clock.sleeps
+
+
+def test_children_query_rpc_cannot_return_late_success(comparison_data, topology_clock):
+    _edge_chain(comparison_data)
+    comparison_data.owned.query_deadline = 5
+
+    def slow_read(_attempt):
+        topology_clock.now += 6
+        return comparison_data.views["origin"]["children"]
+
+    comparison_data.overrides[("origin", "children")] = slow_read
+    with pytest.raises(AssertionError, match="Query visibility deadline"):
+        comparison_data.compare("migration")
+    assert comparison_data.counts[("origin", "children")] == 1
+    assert comparison_data.counts[("destination", "children")] == 0
+    assert not topology_clock.sleeps
+
+
+@pytest.mark.parametrize("auth_type", ["sas", "selfSigned", "certificateAuthority"])
+def test_topology_reads_authoritative_identities_for_every_auth_type(comparison_data, auth_type):
+    root, child, _ = _edge_chain(comparison_data)
+    for identity in comparison_data.views["origin"]["identity"].values():
+        identity["authentication"] = {"type": auth_type}
+    # Deliberately stale query rows have no relationship data. Neither keys nor
+    # twin parentScopes are prerequisites for authoritative topology validation.
+    identities = subject._read_topology(subject._hub_auth({"name": "origin", "rg": "rg"}), comparison_data.owned)
+    assert identities[child]["parentScopes"] == [identities[root]["deviceScope"]]
+    assert comparison_data.counts[("origin", "identity")] == len(comparison_data.owned.device_ids)
+    assert comparison_data.counts[("origin", "devices")] == 0
+    assert comparison_data.counts[("origin", "children")] == 0
+
+
+@pytest.mark.parametrize("failure", [HttpResponseError("Forbidden"), RuntimeError("Transport failed")])
+def test_children_query_errors_propagate_once_without_sleep(mocker, comparison_data, topology_clock, failure):
+    _edge_chain(comparison_data)
+    read = mocker.patch.object(subject, "_invoke_state", side_effect=failure)
+    with pytest.raises(type(failure)) as raised:
+        subject._wait_for_children_queries(
+            (("origin", comparison_data.views["origin"]["identity"]),), comparison_data.owned,
+        )
+    assert raised.value is failure
+    assert read.call_count == 1
+    assert not topology_clock.sleeps

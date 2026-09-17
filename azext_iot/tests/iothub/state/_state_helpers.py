@@ -13,7 +13,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import List
+from typing import Dict, List, Optional
 from azure.core.exceptions import HttpResponseError
 from msrestazure.azure_exceptions import CloudError
 from azext_iot.common.shared import DeviceAuthApiType
@@ -60,6 +60,9 @@ def _invoke_setup(command: str) -> EmbeddedCLI:
 class _OwnedDataplaneState:
     config_ids: List[str] = field(default_factory=list)
     device_ids: List[str] = field(default_factory=list)
+    # Plan before writes; device_ids separately records successful creates for cleanup.
+    parent_ids: Dict[str, Optional[str]] = field(default_factory=dict)
+    query_deadline: Optional[float] = None
 
 
 def _state_service_sdk(hub):
@@ -104,14 +107,25 @@ def _hub_auth(hub):
 
 def _wait_for_dataplane_query(hub_auth, owned):
     assert owned.device_ids, "IoT Hub state readiness requires owned device IDs."
+    owned.query_deadline = time.monotonic() + QUERY_VISIBILITY_TIMEOUT
     return wait_for_query_ids(
         lambda: _invoke_setup(f'iot hub query {hub_auth} -q "select deviceId from devices"').as_json(),
         owned.device_ids,
         id_key="deviceId",
+        timeout=_query_time_remaining(owned.query_deadline),
     )
 
 
 def _setup_hub_dataplane_state(hub_auth, owned):
+    device_groups = [
+        (device_type, generate_device_names(3, edge=device_type == "edge"))
+        for device_type in DEVICE_TYPES
+    ]
+    for device_type, ids in device_groups:
+        owned.parent_ids.update({
+            device_id: ids[index - 1] if device_type == "edge" and index else None
+            for index, device_id in enumerate(ids)
+        })
     # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
     labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
     labels = json.dumps(labels)
@@ -158,9 +172,7 @@ def _setup_hub_dataplane_state(hub_auth, owned):
     edge_content_v1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_v1.json")
 
     # populate hub with devices
-    for device_type in DEVICE_TYPES:
-        device_count = 3
-        device_ids = generate_device_names(device_count, edge=device_type == "edge")
+    for device_type, device_ids in device_groups:
         module_id = generate_device_names(1)[0]
         edge_enabled = "--edge-enabled" if device_type == "edge" else ""
 
@@ -273,11 +285,13 @@ def setup_hub_states_dataplane(provisioned_only_iot_hubs_module, request, tmp_pa
             _require_empty_dataplane(hub)
         owned = hubs[0]["state_data"]
         _setup_hub_dataplane_state(_hub_auth(hubs[0]), owned)
+        _read_topology(_hub_auth(hubs[0]), owned)
         _wait_for_dataplane_query(_hub_auth(hubs[0]), owned)
         # A failed migration can still have written part of this dataset to an empty destination.
         for hub in hubs[1:]:
             hub["state_data"].config_ids.extend(owned.config_ids)
             hub["state_data"].device_ids.extend(owned.device_ids)
+            hub["state_data"].parent_ids.update(owned.parent_ids)
         yield hubs
 
 
@@ -386,6 +400,62 @@ def _read_device_for_comparison(device_id, hub_auth):
     return device
 
 
+def _query_time_remaining(deadline):
+    remaining = deadline - time.monotonic()
+    assert remaining > 0, "Dataplane query visibility deadline exhausted."
+    return remaining
+
+
+def _read_topology(hub_auth, owned):
+    """Authoritative relationships fail immediately, independently of query lag."""
+    _assert_owned_ids(owned.parent_ids, owned.device_ids, "planned topology")
+    identities = {}
+    for device_id in owned.device_ids:
+        identity = _invoke_state(f"iot hub device-identity show {hub_auth} -d {device_id}").as_json()
+        actual_id = identity.get("deviceId")
+        assert actual_id == device_id, f"{hub_auth}: expected identity {device_id}, observed {actual_id}"
+        identities[device_id] = identity
+    for device_id, parent_id in owned.parent_ids.items():
+        expected = []
+        if parent_id is not None:
+            assert parent_id in identities, f"Unowned expected parent {parent_id} for {device_id}"
+            parent = identities[parent_id]
+            assert parent["capabilities"]["iotEdge"], f"Expected edge parent {parent_id}"
+            scope = parent.get("deviceScope")
+            assert isinstance(scope, str) and scope, f"Parent {parent_id} has no deviceScope"
+            expected = [scope]
+        observed = identities[device_id].get("parentScopes", [])
+        assert observed == expected, (
+            f"{hub_auth}: device {device_id}, expected parent {parent_id}, "
+            f"expected parentScopes {expected}, observed {observed}"
+        )
+    return identities
+
+
+def _wait_for_children_queries(hubs, owned):
+    # Real scenarios establish this deadline in ID readiness. Standalone helper
+    # callers get one window, never a fresh window per Hub/parent/query attempt.
+    deadline = owned.query_deadline
+    if deadline is None:
+        deadline = time.monotonic() + QUERY_VISIBILITY_TIMEOUT
+        owned.query_deadline = deadline
+    for hub_auth, identities in hubs:
+        for device_id, identity in identities.items():
+            if not identity["capabilities"]["iotEdge"]:
+                continue
+            expected = [child for child, parent in owned.parent_ids.items() if parent == device_id]
+            try:
+                wait_for_query_ids(
+                    lambda: _invoke_state(
+                        f"iot hub device-identity children list -d {device_id} {hub_auth}"
+                    ).as_json(),
+                    expected, timeout=_query_time_remaining(deadline),
+                )
+                assert time.monotonic() <= deadline, "Dataplane query visibility deadline exhausted."
+            except AssertionError as error:
+                raise AssertionError(f"{hub_auth}: children of {device_id}: {error}") from error
+
+
 def compare_hubs_dataplane(origin_auth: str, dest_auth: str, owned: _OwnedDataplaneState):
     def compare_configurations():
         orig_hub_configs = _invoke_state(f"iot hub configuration list {origin_auth}").as_json()
@@ -416,6 +486,8 @@ def compare_hubs_dataplane(origin_auth: str, dest_auth: str, owned: _OwnedDatapl
         return orig_hub_identities, dest_hub_identities
 
     orig_hub_identities, dest_hub_identities = _compare_dataplane_with_retry(compare_device_ids)
+    origin_topology = _read_topology(origin_auth, owned)
+    dest_topology = _read_topology(dest_auth, owned)
 
     dest_hub_identities_dict = {}
     for id in dest_hub_identities:
@@ -463,16 +535,7 @@ def compare_hubs_dataplane(origin_auth: str, dest_auth: str, owned: _OwnedDatapl
 
             compare_module_twins(module_twin, target_module_twin)
 
-        # compare children
-        if device["capabilities"]["iotEdge"]:
-            orig_children = _invoke_state(
-                f"iot hub device-identity children list -d {device['deviceId']} {origin_auth}"
-            ).as_json()
-            dest_children = _invoke_state(
-                f"iot hub device-identity children list -d {device['deviceId']} {dest_auth}"
-            ).as_json()
-
-            assert orig_children == dest_children
+    _wait_for_children_queries(((origin_auth, origin_topology), (dest_auth, dest_topology)), owned)
 
 
 def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDataplaneState):
@@ -486,6 +549,12 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
         (config["id"] for config in file_configs + file_deploys), owned.config_ids, "exported configurations"
     )
     _assert_owned_ids(file_devices, owned.device_ids, "exported devices")
+    _assert_owned_ids(owned.parent_ids, owned.device_ids, "planned topology")
+    for device_id, parent_id in owned.parent_ids.items():
+        observed_parent = file_devices[device_id].get("parent")
+        assert observed_parent == parent_id, (
+            f"Exported device {device_id}: expected parent {parent_id}, observed {observed_parent}"
+        )
 
     def compare_configurations():
         hub_configs = _invoke_state(f"iot hub configuration list {hub_auth}").as_json()
@@ -507,6 +576,7 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
 
     hub_devices = _compare_dataplane_with_retry(read_devices)
     assert len(file_devices) == len(hub_devices)
+    topology = _read_topology(hub_auth, owned)
 
     for device in hub_devices:
         device = _read_device_for_comparison(device["deviceId"], hub_auth)
@@ -544,10 +614,7 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
             assert module["authentication"] == target_module["authentication"]
             compare_module_twins(module_twin, target_module_twin)
 
-        # compare parent
-        if device.get("parentScopes"):
-            device_parent = device["parentScopes"][0].split("://")[1]
-            assert file_device["parent"] == device_parent[:device_parent.rfind("-")]
+    _wait_for_children_queries(((hub_auth, topology),), owned)
 
 
 def get_hub_resource_id_with_retry(hub_name: str, rg: str, tries: int = 6, delay: int = 15) -> str:

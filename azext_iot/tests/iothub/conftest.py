@@ -38,6 +38,9 @@ RG = settings.env.azext_iot_testrg
 HUB_NAME = settings.env.azext_iot_testhub
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
+# A failed private-Hub lifecycle must not consume an extra slot while later
+# module fixtures provision their reserved Hubs. Never retry an uncertain create/delete.
+_isolated_hub_pending = None
 
 
 @pytest.fixture(autouse=True)
@@ -414,7 +417,54 @@ def provisioned_only_iot_hubs_module(request) -> dict:
         _iot_hubs_removal(result)
 
 
-def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
+def _require_absent_hub(name):
+    try:
+        _invoke_fixture(f"iot hub show -n {name} -g {RG}")
+    except (AzCLIError, CloudError, HttpResponseError) as error:
+        if is_not_found(error):
+            return
+        raise
+    raise CLIInternalError(f"Private test Hub '{name}' is not confirmed absent.")
+
+
+@pytest.fixture()
+def fixture_isolated_hub(request):
+    """Bind only this unittest case to a fresh owned Hub, through unittest teardown.
+
+    The shared scenario Hub remains untouched. This function-scoped Hub is gone
+    before the state module pools start; unresolved cleanup blocks their provisioning.
+    """
+    global _isolated_hub_pending
+    if _sas_phase.enabled() or settings.env.azext_iot_testhub:
+        raise CLIInternalError("Private Hub scenarios require dynamically owned Entra fixtures.")
+    scenario = request.instance
+    fields = ("entity_name", "entity_rg", "host_name", "device_host_name", "region", "_generated_device_ids")
+    original = {name: getattr(scenario, name) for name in fields}
+    hubs = _iot_hubs_provisioner(request, require_new=True)
+    try:
+        hub = hubs[0]
+        assign_iot_hub_dataplane_rbac_role(hubs)
+        props = hub["hub"]["properties"]
+        scenario.entity_name, scenario.entity_rg = hub["name"], hub["rg"]
+        scenario.host_name = props["hostName"]
+        scenario.device_host_name = props.get("deviceHostName") or scenario.host_name
+        scenario.region = hub["hub"]["location"]
+        scenario._generated_device_ids = []
+        yield hub
+    finally:
+        for name, value in original.items():
+            setattr(scenario, name, value)
+        _iot_hubs_removal(hubs)
+        _require_absent_hub(hubs[0]["name"])
+        _isolated_hub_pending = None
+
+
+def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None, require_new=False):
+    global _isolated_hub_pending
+    if _isolated_hub_pending:
+        raise CLIInternalError(
+            f"Private test Hub '{_isolated_hub_pending}' is unresolved; refusing additional Hub provisioning."
+        )
     hub_marker = get_closest_marker(request)
     desired_location = HUB_TEST_LOCATION
     desired_tags = None
@@ -433,6 +483,8 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
         desired_storage = hub_marker.kwargs.get("storage")
         desired_count = hub_marker.kwargs.get("count", 1)
 
+    if require_new and desired_count != 1:
+        raise CLIInternalError("A private scenario requires exactly one fresh Hub.")
     hub_results = []
     for _ in range(desired_count):
         name = generate_hub_id()
@@ -451,7 +503,12 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
+        if require_new:
+            _require_absent_hub(name)
+            _isolated_hub_pending = name
+            hub_obj = _invoke_fixture(base_create_command).as_json()
+        else:
+            hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
         assert_hub_policy(hub_obj)
         hub_results.append({
             "hub": hub_obj,

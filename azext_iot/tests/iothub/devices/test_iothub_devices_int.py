@@ -22,6 +22,8 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubDevices, self).__init__(test_case)
 
+    @pytest.mark.usefixtures("fixture_isolated_hub")
+    @pytest.mark.hub_infrastructure(count=1)
     @pytest.mark.timeout(
         900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
     )

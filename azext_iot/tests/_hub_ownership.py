@@ -98,8 +98,8 @@ def pending_mutation(mutation):
             and not mutation.get("reconciled"))
 
 
-def arm_location(url):
-    """Accept explicit ARM URLs and subscription-root relative references only."""
+def _arm_read_location(url):
+    """Validate read origin/subscription without mistaking resource GETs for LRO URLs."""
     if not isinstance(url, str) or not url or re.search(r"[\s\\]", url):
         raise OwnershipError("Unplanned ARM polling URL")
     if url.casefold().startswith("subscriptions/"):
@@ -113,17 +113,27 @@ def arm_location(url):
     if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
             or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
             or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
-            or any(part in ("", ".", "..") for part in parsed.path.split("/")[1:])):
+            or any(part in (".", "..") for part in parsed.path.split("/")[1:])):
         raise OwnershipError("Unplanned ARM polling URL")
+    return parsed
+
+
+def arm_location(url):
+    """Accept explicit ARM URLs and subscription-root relative references only."""
+    parsed = _arm_read_location(url)
     parts = parsed.path.casefold().split("/")
-    if parts[3] == "resourcegroups" and (len(parts) < 5 or parts[4] != GROUP):
+    if (any(not part for part in parts[1:])
+            or (parts[3] == "resourcegroups" and (len(parts) < 5 or parts[4] != GROUP))):
         raise OwnershipError("Unplanned ARM polling URL")
     return parsed
 
 
 def polling_key(url):
     """Correlate only an acknowledged ARM operation, without persisting URL secrets."""
-    parsed = arm_location(url)
+    return _polling_fingerprint(arm_location(url))
+
+
+def _polling_fingerprint(parsed):
     query = sorted((key, value) for key, value in parse_qsl(parsed.query) if key.casefold() != "api-version")
     return hashlib.sha256(json.dumps([parsed.path.casefold(), query]).encode()).hexdigest()
 
@@ -162,15 +172,18 @@ def response_polling(mutation, headers, resource, run_id):
 
 def observe_poll(data, url, status, resource, headers=None):
     """LRO status is evidence only for the mutation whose response supplied the URL."""
-    key = polling_key(url)
+    key = _polling_fingerprint(_arm_read_location(url))
     for record in data["resources"].values():
         for mutation in record["mutations"]:
             if not pending_mutation(mutation):
                 continue
             polling = mutation.get("polling", {})
-            state = (resource or {}).get("status", "").casefold()
             if key not in polling.values():
                 continue
+            # A negative resource GET may name another RG or an empty SDK parent
+            # segment. Only a correlated poll must meet the stricter LRO path rules.
+            arm_location(url)
+            state = (resource or {}).get("status", "").casefold()
             location = (headers or {}).get("location")
             if (status == 202 and key == polling.get("location") and not polling.get("azure-asyncoperation")
                     and isinstance(location, str) and location):

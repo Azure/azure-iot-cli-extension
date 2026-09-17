@@ -167,6 +167,8 @@ class TestADRCAActions(ADRLiveScenarioTest):
             tracker.assert_no_submission()
 
     def _tracked_ca_action(self, before, command, action):
+        # Reject local formatting errors before registering a mutation receipt.
+        self._apply_kwargs(command)
         tracker = self._new_ca_tracker(before["id"], action)
         with tracker.observe():
             result = self.cmd(command)
@@ -227,8 +229,8 @@ class TestADRCAActions(ADRLiveScenarioTest):
                 pending,
                 f"iot adr ns ca activate -n ica {scope} --ccf {shlex.quote(str(chain))}"
                 + (" --no-wait" if no_wait else (
-                    " --query '{id:id,name:name,properties:properties,"
-                    "prov:properties.provisioningState,status:properties.issuer.status}'"
+                    " --query '{{id:id,name:name,properties:properties,"
+                    "prov:properties.provisioningState,status:properties.issuer.status}}'"
                 )),
                 "activate",
             )
