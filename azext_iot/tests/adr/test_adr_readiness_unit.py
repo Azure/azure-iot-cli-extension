@@ -707,12 +707,34 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     scenario.cleanup_full_infra.assert_called_once()
 
 
-@pytest.mark.parametrize("projection", [
-    [{"hostName": "secondary.azure-devices.net"}],
-    [{"name": "SECONDARY.azure-devices.net"}],
-    [],
+@pytest.mark.parametrize("registered_hubs,projection,hub_overrides,expected_failure", [
+    ([], [], {}, None),
+    ([{"hostName": "classic.azure-devices.net"}], [{"hostName": "classic.azure-devices.net"}], {}, None),
+    ([{"name": "CLASSIC.azure-devices.net"}], [{"name": "CLASSIC.azure-devices.net"}], {}, None),
+    ([{"name": "classic.azure-devices.net"}], [], {}, "brownfieldHubs"),
+    ([], [{"name": "secondary.azure-devices.net"}], {}, "brownfieldHubs"),
+    (
+        [{"name": "classic.azure-devices.net", "connectionString": "synthetic-original-credential"}],
+        [{"name": "classic.azure-devices.net", "connectionString": "synthetic-changed-credential"}],
+        {}, "brownfieldHubs",
+    ),
+    ([], [], {"resourceId": HUB_ID + "-other"}, "Namespace Hub resource ID"),
+    ([], [], {"linkingState": "Failed"}, "Namespace Hub linkingState"),
+    ([], [], {"linkingState": "InProgress"}, "Namespace Hub linkingState"),
+    ([], [], {
+        "inboundCallerIdentity": {"type": "SystemAssigned", "userAssignedIdentity": UAMI_ID},
+    }, "Namespace Hub inbound identity type"),
+    ([], [], {
+        "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID + "-other"},
+    }, "Namespace Hub selected UAMI"),
+    ([], [], {
+        "resourceId": HUB_ID.upper(),
+        "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID.upper()},
+    }, None),
 ])
-def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(monkeypatch, projection):
+def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
+    monkeypatch, registered_hubs, projection, hub_overrides, expected_failure,
+):
     scenario = Mock()
     scenario.setup_full_infra.return_value = {"identity_resource_id": UAMI_ID}
     scenario.create_owned_resource.return_value = _output({
@@ -735,7 +757,14 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(monkey
         if "linked-hub" in text:
             raise AssertionError("The namespace-linked DPS Hub list is read-only")
         if text.startswith("iot dps show "):
-            return _output({"id": DPS_ID})
+            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
+        if text.startswith("rest "):
+            assert shlex.split(text) == [
+                "rest", "--method", "get", "--url",
+                f"{link_scenarios._ADR_CANARY_ARM_ENDPOINT}{DPS_ID}?api-version={link_scenarios._ADR_DPS_API_VERSION}",
+                "--resource", link_scenarios.TEST_ARM_RESOURCE,
+            ]
+            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
         if "dps-cap-rejected" in text:
             raise ArgumentUsageError(link_scenarios.DPS_CAP_EXCEEDED_MSG)
         if (
@@ -745,15 +774,17 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(monkey
             raise ArgumentUsageError("identity is used by an active ADR link")
         if text.startswith("iot adr ns link dps show "):
             dps_shows.append(text)
-            # The early show/list step precedes Hub linking. Only the later
-            # projection check may require the service-managed registration.
             return _output({
-                "name": "dps-primary", "brownfieldHubs": projection if len(dps_shows) == 2 else [],
+                "name": "dps-primary", "brownfieldHubs": projection if len(dps_shows) == 2 else registered_hubs,
             })
         if text.startswith("iot adr ns link dps list "):
             return _output([{"name": "dps-primary"}])
         if text.startswith("iot adr ns link hub show "):
-            return _output({"name": "secondary"})
+            return _output({
+                "name": "secondary", "resourceId": HUB_ID, "linkingState": "Succeeded",
+                "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID},
+                **hub_overrides,
+            })
         if text.startswith("iot adr ns link hub list "):
             return _output([{"name": "secondary"}])
         if text.startswith("iot hub show "):
@@ -764,19 +795,24 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(monkey
         return _output(None)
 
     scenario.cmd.side_effect = command
-    expected_error = RuntimeError if projection else AssertionError
+    expected_error = AssertionError if expected_failure else RuntimeError
     with pytest.raises(expected_error) as caught:
         link_scenarios.TestADRLinkLifecycle.test_adr_link_lifecycle(scenario)
-    if projection:
-        assert str(caught.value) == "stop after projection assertion"
+    if expected_failure:
+        assert expected_failure in str(caught.value)
     else:
-        assert "brownfieldHubs" in str(caught.value)
-    assert len(dps_shows) == 2
+        assert str(caught.value) == "stop after projection assertion"
+    assert "synthetic-original-credential" not in str(caught.value)
+    assert "synthetic-changed-credential" not in str(caught.value)
+    hub_failure = expected_failure is not None and expected_failure.startswith("Namespace Hub")
+    assert len(dps_shows) == (1 if hub_failure else 2)
     assert events.index("dps ready") < events.index("hub ready")
-    projection_index = max(i for i, text in enumerate(events) if text == dps_shows[-1])
-    assert events.index("hub ready") < projection_index
+    if not hub_failure:
+        projection_index = max(i for i, text in enumerate(events) if text == dps_shows[-1])
+        assert events.index("hub ready") < projection_index
     assert not any("linked-hub" in text for text in _commands(scenario))
-    assert any("link dps update" in text for text in _commands(scenario)) is bool(projection)
+    assert sum(text.startswith("rest ") for text in _commands(scenario)) == (0 if hub_failure else 1)
+    assert any("link dps update" in text for text in _commands(scenario)) is (expected_failure is None)
     scenario.cleanup_full_infra.assert_called_once()
 
 

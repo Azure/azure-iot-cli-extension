@@ -46,6 +46,7 @@ import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
 from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
+from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT, _ADR_DPS_API_VERSION
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
@@ -60,6 +61,7 @@ from azext_iot.tests.adr._readiness import (
     LINK_READINESS_TIMEOUT, link_dps_with_readiness, link_hub_with_readiness,
 )
 from azext_iot.tests.adr.conftest import (
+    TEST_ARM_RESOURCE,
     TEST_LOCATION,
     TEST_RG,
     TEST_SUBSCRIPTION,
@@ -154,8 +156,8 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     2. Step 1: create a standalone DPS without classic Hub registrations,
        then ``link dps add`` to attach the DPS to the namespace
     3. Step 2: ``link dps show`` / ``list`` projects the DPS endpoint
-    4. Step 3-4: secondary Hub linked with **UAMI**; the read-only DPS
-       ``brownfieldHubs`` projection must enumerate this namespace-linked Hub
+    4. Step 3-4: secondary Hub linked with **UAMI**; verify its namespace
+       endpoint and the read-only DPS ``brownfieldHubs`` projection separately
     5. Step 5-6: tertiary Hub linked with **SAMI** + multi-hub list assertion
     6. Step 7-8: ``link hub update`` rotates inbound identities
     7. Step 9: ``link dps update`` rotates DPS identity
@@ -200,7 +202,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             # model, and link tests add endpoint entries explicitly.
 
             # DPS must be linked before adding namespace Hubs. Once linked,
-            # its Hub list is service-managed and cannot be seeded manually.
+            # its classic Hub registrations are read-only.
             with timed_step("Step 1 ❯ link dps add"):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
@@ -322,6 +324,17 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 assert shown.get("name") == secondary_endpoint, (
                     f"link hub show did not surface name field: {shown}"
                 )
+                assert shown["resourceId"].casefold() == hub_id.casefold(), (
+                    "Namespace Hub resource ID does not match the linked Hub."
+                )
+                assert shown["linkingState"] == "Succeeded", "Namespace Hub linkingState must be Succeeded."
+                assert shown["inboundCallerIdentity"]["type"] == "UserAssigned", (
+                    "Namespace Hub inbound identity type must be UserAssigned."
+                )
+                assert (
+                    shown["inboundCallerIdentity"]["userAssignedIdentity"].casefold()
+                    == identity_resource_id.casefold()
+                ), "Namespace Hub selected UAMI does not match the requested identity."
 
                 listed = self.cmd(
                     f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
@@ -395,17 +408,20 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Hub list returned %d entry/entries", len(names))
 
             with timed_step("Verify read-only DPS projection after namespace Hub linking"):
-                # Do not call classic linked-hub create here: DPS rejects Hub
-                # list mutations while namespace linking is Succeeded/InProgress.
-                # Keep the membership assertion against the actual projection.
+                # brownfieldHubs projects existing DPS registrations, not the
+                # namespace messaging endpoints. Never seed this read-only list.
                 shown = self.cmd(
                     f"iot adr ns link dps show --ns {namespace_name} -g {rg} -n {dps_endpoint}"
                 ).get_output_in_json()
-                brownfield_names = {
-                    str(hub.get("hostName") or hub.get("name") or "").casefold().split(".")[0]
-                    for hub in shown["brownfieldHubs"]
-                }
-                assert secondary_hub.casefold() in brownfield_names, shown
+                dps_url = f"{_ADR_CANARY_ARM_ENDPOINT}{dps_id}?api-version={_ADR_DPS_API_VERSION}"
+                dps = self.cmd(
+                    f"rest --method get --url {shlex.quote(dps_url)} --resource {shlex.quote(TEST_ARM_RESOURCE)}"
+                ).get_output_in_json()
+                assert isinstance(shown["brownfieldHubs"], list)
+                # Compare all fields without including registration credentials
+                # in assertion failure output.
+                matches_dps = shown["brownfieldHubs"] == ((dps.get("properties") or {}).get("iotHubs") or [])
+                assert matches_dps, "brownfieldHubs must match the DPS resource's existing registrations."
                 self.cmd(
                     f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
                     f"-n {dps_endpoint} --user-assigned-mi {identity_resource_id}"
