@@ -211,7 +211,7 @@ def test_ado_hub_public_jobs_are_serial_with_full_budgets_and_no_folder_selectio
     trigger = yaml.safe_load((ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     hub_jobs = [job for job in trigger["jobs"] if job["job"].startswith("Hub")]
     assert [job["job"] for job in hub_jobs] == ["HubControl", "HubData"]
-    assert [job["timeoutInMinutes"] for job in hub_jobs] == [190, 360]
+    assert [job["timeoutInMinutes"] for job in hub_jobs] == [225, 360]
     assert hub_jobs[1]["dependsOn"] == "HubControl"
     assert {"testDPS", "testADU", "testADR"}.issubset(hub_jobs[0]["dependsOn"])
     for job in hub_jobs:
