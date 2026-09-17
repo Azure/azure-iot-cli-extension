@@ -781,8 +781,20 @@ def load_adr_arguments(self, _):
             help="Device class identifier.",
         )
 
-    # Bundled link add
+    # Combined DPS-first link add
     with self.argument_context("iot adr ns link add") as context:
+        context.argument(
+            "timeout", options_list=["--timeout"], type=int, arg_group="Wait Condition",
+            help="Maximum wait in seconds for DPS linking, including its update, and separately for the final Hub operation.",
+        )
+        context.argument(
+            "interval", options_list=["--interval"], type=int, arg_group="Wait Condition",
+            help="Polling interval in seconds. Must be greater than zero.",
+        )
+        context.argument(
+            "no_wait",
+            help="Wait for DPS linking to succeed, then return without waiting for the final Hub operation.",
+        )
         context.argument(
             "namespace_name",
             options_list=["--namespace", "--ns"],

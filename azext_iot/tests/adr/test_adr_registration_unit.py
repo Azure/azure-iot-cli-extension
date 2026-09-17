@@ -378,6 +378,7 @@ def test_load_adr_arguments():
         "--den",
     ]
     assert "--dps-name" in bundled["dps_endpoint_name"]["options_list"]
+    assert "Wait for DPS linking to succeed" in bundled["no_wait"]["help"]
     for scope, registered in arguments.items():
         if not scope.startswith("iot adr ns link"):
             continue
@@ -709,6 +710,18 @@ def test_help_surface_matches_2026_commands_and_su_type():
         "iot adr ns group create"
     ]
     assert "once per hour" in helps["iot adr ns group refresh"]
+    combined_help = " ".join(helps["iot adr ns link add"].split())
+    assert "before submitting a separate Hub update" in combined_help
+    assert "--no-wait still waits for this DPS dependency" in combined_help
+    assert "Partial completion is not rolled back" in combined_help
+    assert "single namespace PATCH" not in combined_help
+    assert "one round-trip" not in combined_help
+    su_help = " ".join(helps["iot adr ns link su add"].split())
+    assert "namespace outbound MI -> Contributor on SU" in su_help
+    assert "SU selected inbound MI -> Azure Device Registry Contributor on namespace" in su_help
+    assert "exactly two service-to-service grants" in su_help
+    assert "Device Update Administrator" not in su_help
+    assert "No ADU first-party service principal or Microsoft Graph lookup is required" in su_help
 
     assert not any(
         command.startswith(

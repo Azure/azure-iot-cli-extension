@@ -607,7 +607,9 @@ def load_adr_help():
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
-    The namespace identity's Device Update data role enables service-to-service updates and reports.
+    These are exactly two service-to-service grants. The configured namespace outbound identity
+    and the selected Update Instance inbound identity each support SAMI or an attached UAMI.
+    No ADU first-party service principal or Microsoft Graph lookup is required.
     Missing assignments are created only for an inherited Owner or User Access Administrator.
     A newly created assignment must become visible within the 180-second preflight deadline
     before PATCH. This link workflow never grants the signed-in user Software Updates content roles.
@@ -1042,12 +1044,17 @@ def load_adr_help():
         "iot adr ns link add"
     ] = f"""
   type: command
-  short-summary: Link a Hub and a DPS to a Device Registry namespace in a single operation.
+  short-summary: Link DPS first, then a Hub, to a Device Registry namespace.
   long-summary: |
-    Composes a single namespace PATCH that adds both a DPS provisioning endpoint and an IoT Hub
-    messaging endpoint. The DPS entry is serialized first to satisfy DPS-first ordering.
-    Equivalent to running 'link dps add' followed by 'link hub add' but as one round-trip.
-    Rejected if the namespace already has a linked DPS.
+    Validates both targets, endpoint names, identity selections, and required RBAC before
+    changing namespace endpoints. Submits a DPS-only namespace update and waits for the exact
+    DPS endpoint to reach linkingState Succeeded before submitting a separate Hub update.
+    --no-wait still waits for this DPS dependency; it skips waiting only for the final Hub operation.
+    Rejected if the namespace already has a linked DPS. A DPS failure or timeout prevents Hub submission.
+    Partial completion is not rolled back. Inspect failed endpoints with link dps show or link hub show
+    and repair persisted failures with the corresponding link update, preserving the existing identity.
+    After DPS succeeds, use link hub add only if the Hub endpoint is absent; use link hub wait if pending.
+    Do not rerun combined link add when the DPS endpoint already exists.
     Required roles are taken from the same authoritative matrices used by atomic adds:
     {format_role_requirements("dps")}; {format_role_requirements("hub")}.
   examples:
@@ -1084,7 +1091,7 @@ def load_adr_help():
   examples:
     - name: Wait until all configured namespace links succeed
       text: az iot adr ns link wait --ns myNamespace -g myResourceGroup
-    - name: Wait for the Hub and DPS created by bundled link add
+    - name: Wait for the Hub and DPS created by combined DPS-first link add
       text: |
         az iot adr ns link wait --ns myNamespace -g myResourceGroup \\
           --hub-endpoint-name primary-hub --dps-endpoint-name primary-dps

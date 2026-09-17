@@ -13,7 +13,7 @@ Validates the namespace-linking surface exposed as ``iot adr ns link ...``:
   enumeration surfaced by ``dps show`` (DPS-side ``properties.iotHubs[]``)
 * ``link hub add / update / show / list`` — both UAMI and SAMI inbound caller
   identities, multi-hub list, identity rotation via ``hub update``
-* ``link add`` bundled Hub+DPS PATCH in a single round trip
+* Combined ``link add`` — DPS must succeed before the command submits a Hub link
 * ``link su add / update / show / list`` — Software Updates updating
   endpoints with UAMI/SAMI identity rotation. Optionally set
   ``azext_iot_adr_update_instance_id`` to a pre-provisioned Update Instance
@@ -39,7 +39,7 @@ This is not a generic Failed/403 retry and does not extend SU readiness.
 import os
 import re
 import shlex
-import time
+from time import monotonic
 from typing import Optional
 
 import pytest
@@ -60,6 +60,7 @@ from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr._readiness import (
     LINK_READINESS_TIMEOUT, link_dps_with_readiness, link_hub_with_readiness,
 )
+from azext_iot.tests.adr._su_reader_probe import SUReaderProbe
 from azext_iot.tests.adr.conftest import (
     TEST_ARM_RESOURCE,
     TEST_LOCATION,
@@ -77,15 +78,17 @@ from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
 )
-from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
+from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
 
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
 _SU_UPDATE_INSTANCE_ID = os.getenv(_SU_UPDATE_INSTANCE_ENV, "").strip()
+_SU_READER_PROBE = os.getenv("azext_iot_adr_su_probe_reader", "").lower() in {"1", "true", "yes"}
 _LINKING_POLL_ATTEMPTS = int(
     os.getenv("azext_iot_adr_su_link_poll_attempts", "240")
 )
 _LINKING_POLL_INTERVAL_SECONDS = 10
+_COMBINED_ROLE_SETTLE_SECONDS = 300
 
 
 def _assert_cli_failure(test_case, command: str, expected_message: str):
@@ -634,16 +637,17 @@ class TestADRLinkRecovery(ADRLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
-    """``iot adr ns link add`` bundled Hub+DPS in one PATCH (P4).
+class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
+    """The combined command links DPS successfully before submitting the Hub link.
 
-    Tests the single round-trip variant that links both a Hub messaging endpoint
-    and a DPS provisioning endpoint at once, with the DPS entry serialized first
-    to satisfy the DPS-first ordering constraint server-side.
+    Preauthorize fresh standalone targets while the Hub provisions, leaving the
+    namespace empty. Exercise the production DPS dependency wait and existing-role
+    preflights with one combined invocation, without link recovery. The bounded
+    propagation allowance is not independent proof of effective service access.
     """
 
-    def test_adr_link_bundled_add(self):
-        _log(LogKind.TEST, "test_adr_link_bundled_add")
+    def test_adr_link_sequential_add(self):
+        _log(LogKind.TEST, "test_adr_link_sequential_add")
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
         hub_name = generate_hub_name()
@@ -651,78 +655,104 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
         identity_name = generate_identity_name()
 
         try:
-            # We need a UAMI, namespace, AND a separately created Hub and DPS to
-            # link. We deliberately do NOT use setup_full_infra here because we
-            # want the namespace to start with zero linked endpoints so we can
-            # observe the bundled add adding both at once.
-            with timed_step("Setup 1/4 ❯ Create UAMI"):
+            # Start with no endpoints so the combined command owns both link writes.
+            with timed_step("Setup 1/6 > Create UAMI"):
                 identity = self.create_owned_resource(
                     f"identity create -n {identity_name} -g {rg} --location {TEST_LOCATION}",
                     kind="identity", name=identity_name, resource_group=rg,
                 ).get_output_in_json()
                 identity_resource_id = identity["id"]
 
-            with timed_step("Setup 2/4 ❯ Create ADR namespace (no Hub link)"):
-                self.create_owned_resource(
+            with timed_step("Setup 2/6 > Create ADR namespace (no links)"):
+                namespace = self.create_owned_resource(
                     f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}",
                     kind="namespace", name=namespace_name, resource_group=rg,
-                )
-
-            with timed_step("Setup 3/4 ❯ Create standalone Standard Hub"):
-                hub = self.create_owned_resource(
-                    f"iot hub create -n {hub_name} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
-                    f"--user-assigned-mi {identity_resource_id} "
-                    "--disable-local-auth true",
-                    kind="hub", name=hub_name, resource_group=rg,
                 ).get_output_in_json()
+                assert namespace["properties"]["provisioningState"] == "Succeeded", namespace
+
+            with timed_step("Setup 3/6 > Start standalone Standard Hub asynchronously"):
+                self.create_owned_resource(
+                    f"iot hub create -n {hub_name} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
+                    f"--user-assigned-mi {identity_resource_id} --disable-local-auth true --no-wait",
+                    kind="hub", name=hub_name, resource_group=rg,
+                )
+                hub = wait_for_condition(
+                    lambda: self.cmd(f"iot hub show -n {hub_name} -g {rg}").get_output_in_json(),
+                    lambda resource: bool(resource.get("id")),
+                    description="owned Hub materialization before scoped RBAC preparation",
+                    timeout=120,
+                )
                 hub_id = hub["id"]
 
-            with timed_step("Setup 4/4 ❯ Create standalone DPS"):
+            with timed_step("Setup 4/6 > Create standalone DPS while Hub provisions"):
                 dps = self.create_owned_resource(
                     f"iot dps create --name {dps_name} -g {rg} --location {TEST_LOCATION} --disable-local-auth true "
                     f"--user-assigned-mi {identity_resource_id}",
                     kind="dps", name=dps_name, resource_group=rg,
                 ).get_output_in_json()
                 dps_id = dps["id"]
+                assert dps["properties"]["provisioningState"] == "Succeeded", dps
 
-            # Allow role assignments to propagate
-            time.sleep(30)
+            with timed_step("Setup 5/6 > Preauthorize exact Hub/DPS service roles (four deduplicated grants)"):
+                namespace_principal = resolve_namespace_outbound_principal(namespace)
+                LinkRbacManager(self.cli_ctx).ensure_many([
+                    {
+                        "link_type": kind,
+                        "namespace_scope": namespace["id"],
+                        "target_scope": target_id,
+                        "namespace_principal_id": namespace_principal,
+                        "linked_principal_id": identity["principalId"],
+                    }
+                    for kind, target_id in (("dps", dps_id), ("hub", hub_id))
+                ])
+                prepared_at = monotonic()
+                _log(
+                    LogKind.WARN,
+                    "Preauthorized fixture: service-role assignments visible; allow at least %ds "
+                    "for propagation, overlapping remaining Hub provisioning. No endpoint submitted.",
+                    _COMBINED_ROLE_SETTLE_SECONDS,
+                )
 
-            with timed_step("Step 1 ❯ link add (bundled Hub + DPS in one PATCH)"):
-                bundled_cmd = (
+            with timed_step("Setup 6/6 > Bounded Hub readiness and RBAC propagation allowance"):
+                wait_for_condition(
+                    lambda: self.cmd(f"iot hub show -n {hub_name} -g {rg}").get_output_in_json(),
+                    lambda resource: resource["properties"]["state"] == "Active"
+                    and monotonic() - prepared_at >= _COMBINED_ROLE_SETTLE_SECONDS,
+                    is_terminal_failure=lambda resource: any(
+                        resource["properties"].get(field) in {"Failed", "Canceled", "Cancelled"}
+                        for field in ("state", "provisioningState")
+                    ),
+                    description="owned Hub Active and preauthorized fixture propagation allowance",
+                    timeout=600,
+                    interval=30,
+                    describe=lambda resource: (
+                        f"Hub state={resource['properties'].get('state')}; "
+                        f"role allowance elapsed={monotonic() - prepared_at:.0f}s"
+                    ),
+                )
+                namespace = self.cmd(
+                    f"iot adr ns show -n {namespace_name} -g {rg}"
+                ).get_output_in_json()
+                assert namespace["properties"]["provisioningState"] == "Succeeded", namespace
+                for section in ("messaging", "provisioning", "updating"):
+                    assert not (namespace["properties"].get(section) or {}).get("endpoints"), namespace
+                _log(
+                    LogKind.OK, "Preauthorized fixture ready after %.0fs; namespace still has no endpoints",
+                    monotonic() - prepared_at,
+                )
+
+            with timed_step("Step 1 ❯ Combined link add: DPS Succeeded before Hub submission"):
+                result = self.cmd(
                     f"iot adr ns link add --ns {namespace_name} -g {rg} "
-                    f"--hub-endpoint-name primary --hub-id {hub_id} "
-                    f"--hub-user-assigned-mi {identity_resource_id} "
-                    f"--hub-availability Available --hub-weight 1 "
                     f"--dps-endpoint-name dps-primary --dps-id {dps_id} "
-                    f"--dps-user-assigned-mi {identity_resource_id}"
-                )
-                _log(LogKind.CMD, "az %s", bundled_cmd)
-                self.cmd(bundled_cmd)
-                self.cmd(
-                    f"iot adr ns link wait --ns {namespace_name} "
-                    f"-g {rg} --hub-endpoint-name primary "
-                    "--dps-endpoint-name dps-primary"
-                )
-                _wait_for_linking_succeeded(
-                    self,
-                    "hub",
-                    namespace_name,
-                    rg,
-                    "primary",
-                    expected_identity_type="UserAssigned",
-                )
-                _wait_for_linking_succeeded(
-                    self,
-                    "dps",
-                    namespace_name,
-                    rg,
-                    "dps-primary",
-                    expected_identity_type="UserAssigned",
-                )
-                _log(LogKind.OK, "Bundled link add succeeded")
+                    f"--dps-user-assigned-mi {identity_resource_id} "
+                    f"--hub-endpoint-name primary --hub-id {hub_id} "
+                    f"--hub-user-assigned-mi {identity_resource_id} --hub-availability Available --hub-weight 1"
+                ).get_output_in_json()
+                assert result["properties"]["provisioningState"] == "Succeeded", result
+                _log(LogKind.OK, "Combined DPS-first link add returned the final Succeeded namespace")
 
-            with timed_step("Step 2 ❯ Verify both endpoints landed"):
+            with timed_step("Step 2 ❯ Verify both exact endpoints remain Succeeded"):
                 hubs = self.cmd(
                     f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
@@ -731,7 +761,17 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert len(hubs) == 1, f"Expected 1 hub link, got {hubs}"
                 assert len(dpss) == 1, f"Expected 1 DPS link, got {dpss}"
-                _log(LogKind.OK, "Bundled add produced both endpoints")
+                for endpoint, name, resource_id in (
+                    (dpss[0], "dps-primary", dps_id), (hubs[0], "primary", hub_id),
+                ):
+                    assert endpoint["name"] == name, endpoint
+                    assert endpoint["resourceId"].casefold() == resource_id.casefold(), endpoint
+                    assert endpoint["linkingState"] == "Succeeded", endpoint
+                    identity = endpoint["inboundCallerIdentity"]
+                    assert identity["type"] == "UserAssigned", endpoint
+                    assert identity["userAssignedIdentity"].casefold() == identity_resource_id.casefold(), endpoint
+                assert hubs[0]["provisioning"] == {"availability": "Available", "allocationWeight": 1}, hubs
+                _log(LogKind.OK, "Sequential DPS-first adds produced both exact endpoints in Succeeded")
 
         finally:
             self.cleanup_full_infra()
@@ -743,7 +783,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
 
     Mirrors the Hub/DPS link lifecycle for the ``iot adr ns link su`` surface:
 
-    Resolve the ADU first-party principal before provisioning any test resources.
+    Resolve the test caller's ARM identity before provisioning any test resources.
     1. Create an Update Instance with SAMI and UAMI identities, or borrow
        ``azext_iot_adr_update_instance_id`` without deleting it during cleanup.
     2. Create an ADR namespace and authorize the update instance identities.
@@ -751,6 +791,11 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
     4. Step 2: ``link su show`` / ``list`` surface the single entry.
     5. Step 3: data-plane list commands verify the materialized service address.
     6. Step 4: ``link su update`` rotates the inbound caller identity UAMI → SAMI.
+
+    Opt in to ``azext_iot_adr_su_probe_reader=true`` only with a fresh owned
+    Update Instance to test discovery before adding the fixture caller's Reader
+    role. Existing/inherited caller access is reported, not removed; normal
+    runs retain the least-privilege Reader fixture independently of service MI roles.
 
     What is intentionally NOT covered here (covered by unit tests):
     - MI mutually-exclusive rejection
@@ -781,12 +826,14 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             properties = endpoint.get("properties") or endpoint
             return (properties.get("inboundCallerIdentity") or {}).get("type")
 
-        with timed_step("Preflight > Resolve ADU first-party service principal"):
+        if _SU_READER_PROBE:
+            assert is_owned_su, "The Reader experiment requires a fresh owned Update Instance."
+        with timed_step("Preflight > Resolve test caller ARM identity"):
             subscription_id = (
                 parse_resource_id(su_id)["subscription"] if su_id else TEST_SUBSCRIPTION
             )
             rbac_manager = LinkRbacManager(self.cli_ctx)
-            adu_principal_id = rbac_manager._resolve_adu_principal(  # pylint: disable=protected-access
+            caller_id = rbac_manager._current_assignee_object_id(  # pylint: disable=protected-access
                 subscription_id
             )
         try:
@@ -816,12 +863,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             parsed_su_id = parse_resource_id(su_id)
             su_name = parsed_su_id["name"]
             su_rg = parsed_su_id["resource_group"]
-            caller_id = rbac_manager._current_assignee_object_id(  # pylint: disable=protected-access
-                parsed_su_id["subscription"]
-            )
-            assert self.assign_role(
-                caller_id, "Device Update Reader", su_id, assignee_type=None
-            ) is not None, "The SU data-plane fixture requires a reader role for its caller."
+            if not _SU_READER_PROBE:
+                assert self.assign_role(
+                    caller_id, "Device Update Reader", su_id, assignee_type=None
+                ) is not None, "The SU data-plane fixture requires a reader role for its caller."
             with timed_step("Setup 1/3 ❯ Resolve Update Instance SAMI and UAMI"):
                 update_instance = self.cmd(
                     f"resource show --ids {su_id}"
@@ -894,19 +939,13 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
                 self.cmd(add_cmd)
-                principals = {
-                    "namespace": namespace_principal_id,
-                    "linked": identity_principal_id,
-                    "adu_first_party": adu_principal_id,
-                }
-                scopes = {"target": su_id, "namespace": ns["id"]}
-                for rule in LINK_ROLE_MATRIX["su"]:
-                    assignee = principals[rule.principal]
-                    role = rule.role
-                    scope = scopes[rule.scope]
+                for assignee, role, scope in (
+                    (namespace_principal_id, "Contributor", su_id),
+                    (identity_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                ):
                     assignments = self.cmd(
-                        f"role assignment list --assignee {assignee} "
-                        f"--role '{role}' --scope '{scope}' --include-inherited"
+                        f"role assignment list --assignee-object-id {assignee} "
+                        f"--role '{role}' --scope '{scope}' --include-inherited --fill-principal-name false"
                     ).get_output_in_json()
                     assert assignments, (
                         f"Automatic link RBAC did not establish {role} for "
@@ -950,6 +989,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 assert _identity_type(shown) == "UserAssigned", (
                     f"Expected UserAssigned inbound identity, saw: {_identity_type(shown)}"
                 )
+                assert shown["resourceId"].casefold() == su_id.casefold(), shown
+                assert shown["inboundCallerIdentity"]["userAssignedIdentity"].casefold() == identity_resource_id.casefold(), shown
 
                 listed = self.cmd(
                     f"iot adr ns link su list --ns {namespace_name} -g {rg}"
@@ -976,43 +1017,47 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Software Updates list returned 1 entry")
 
             with timed_step("Step 3 > Software Updates data-plane discovery"):
-                updates = self.cmd(
+                discover = (
+                    SUReaderProbe(self, caller_id, su_id, shown["serviceAddress"]).cmd
+                    if _SU_READER_PROBE else self.cmd
+                )
+                updates = discover(
                     f"iot adr ns su software-update list --ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
-                classes = self.cmd(
+                classes = discover(
                     f"iot adr ns su device-class list --ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 assert isinstance(updates, list)
                 assert isinstance(classes, list)
-                providers = self.cmd(
+                providers = discover(
                     "iot adr ns su software-update catalog provider list "
                     f"--ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 assert isinstance(providers, list)
                 if providers:
                     provider = providers[0]
-                    names = self.cmd(
+                    names = discover(
                         "iot adr ns su software-update catalog name list "
                         f"--ns {namespace_name} -g {rg} "
                         f"--update-provider '{provider}'"
                     ).get_output_in_json()
                     assert isinstance(names, list)
                     if names:
-                        versions = self.cmd(
+                        versions = discover(
                             "iot adr ns su software-update catalog version list "
                             f"--ns {namespace_name} -g {rg} "
                             f"--update-provider '{provider}' "
                             f"--update-name '{names[0]}'"
                         ).get_output_in_json()
                         assert isinstance(versions, list)
-                statuses = self.cmd(
+                statuses = discover(
                     "iot adr ns su software-update operation-status list "
                     f"--ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 assert isinstance(statuses, list)
                 if statuses:
                     operation_id = statuses[0]["operationId"]
-                    shown_status = self.cmd(
+                    shown_status = discover(
                         "iot adr ns su software-update "
                         "operation-status show "
                         f"--ns {namespace_name} -g {rg} "
@@ -1044,6 +1089,15 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 assert _identity_type(shown) == "SystemAssigned", (
                     f"Expected SystemAssigned after rotation, saw: {_identity_type(shown)}"
                 )
+                assert shown["resourceId"].casefold() == su_id.casefold(), shown
+                for assignee, role, scope in (
+                    (namespace_principal_id, "Contributor", su_id),
+                    (sami_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                ):
+                    assert self.cmd(
+                        f"role assignment list --assignee-object-id {assignee} "
+                        f"--role '{role}' --scope '{scope}' --include-inherited --fill-principal-name false"
+                    ).get_output_in_json(), f"Missing {role} for {assignee} on {scope} after SAMI rotation."
                 with pytest.raises(
                     ArgumentUsageError, match="active ADR link"
                 ):

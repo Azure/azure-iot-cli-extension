@@ -8,15 +8,10 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
-import requests
 from azure.cli.core.azclierror import AzureResponseError, RequiredArgumentMissingError
 from knack.util import CLIError
 
-from azext_iot.adr.rbac import (
-    ADU_FIRST_PARTY_APP_ID,
-    GRAPH_SERVICE_PRINCIPALS_URL,
-    LinkRbacManager,
-)
+from azext_iot.adr.rbac import LinkRbacManager
 from azext_iot.tests.adr import test_adr_link_int as subject
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
 
@@ -32,82 +27,45 @@ def preparation(monkeypatch):
     test = ADRFullInfraHelper()
     test.cmd = Mock()
     test.assign_role = Mock()
-    test.cli_ctx = SimpleNamespace(cloud=SimpleNamespace(
-        endpoints=SimpleNamespace(microsoft_graph_resource_id="https://graph.microsoft.com"),
-    ))
-    response = Mock()
-    response.json.return_value = {"value": [{"id": "adu-principal"}]}
-    manager = LinkRbacManager(test.cli_ctx, cli=Mock(), graph_get=Mock(return_value=response))
-    manager._access_token = Mock(return_value="test-token")
+    test.cli_ctx = SimpleNamespace()
+    network = Mock(side_effect=AssertionError("Unexpected network/Graph request"))
+    monkeypatch.setattr("requests.sessions.Session.request", network)
+    manager = LinkRbacManager(test.cli_ctx, cli=Mock())
+    manager._current_assignee_object_id = Mock(return_value="caller")
     monkeypatch.setattr(subject, "LinkRbacManager", Mock(return_value=manager))
     monkeypatch.setattr(subject, "TEST_SUBSCRIPTION", "configured-sub")
     monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", "")
-    return test, manager, response
+    monkeypatch.setattr(subject, "_SU_READER_PROBE", False)
+    return test, manager, network
 
 
 @pytest.mark.parametrize("fixture_id,subscription", [("", "configured-sub"), (SU_ID, "fixture-sub")])
-@pytest.mark.parametrize("error_type", [requests.HTTPError, requests.Timeout])
-def test_su_graph_failure_precedes_all_resource_and_role_mutations(
-    preparation, monkeypatch, fixture_id, subscription, error_type,
+def test_su_caller_identity_failure_precedes_all_resource_and_role_mutations(
+    preparation, monkeypatch, fixture_id, subscription,
 ):
-    test, manager, response = preparation
+    test, manager, network = preparation
     monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", fixture_id)
-    if error_type is requests.HTTPError:
-        response.status_code = 403
-        error = error_type("403 Client Error: Forbidden", response=response)
-        response.raise_for_status.side_effect = error
-    else:
-        error = error_type("Graph request timed out")
-        manager._graph_get.side_effect = error
+    error = AzureResponseError("Could not resolve caller ARM identity")
+    manager._current_assignee_object_id.side_effect = error
 
-    with pytest.raises(AzureResponseError, match="Could not query Microsoft Graph") as failure:
+    with pytest.raises(AzureResponseError, match="caller ARM identity") as failure:
         subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
 
-    assert failure.value.__cause__ is error
-    manager._access_token.assert_called_once_with(
-        subscription, resource="https://graph.microsoft.com",
-    )
-    assert manager._graph_get.call_args.args == (GRAPH_SERVICE_PRINCIPALS_URL,)
-    assert manager._graph_get.call_args.kwargs["params"] == {
-        "$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'", "$select": "id",
-    }
-    assert manager._graph_get.call_args.kwargs["timeout"] == 30
+    assert failure.value is error
+    manager._current_assignee_object_id.assert_called_once_with(subscription)
+    network.assert_not_called()
     test.cmd.assert_not_called()
     test.assign_role.assert_not_called()
     manager.cli.invoke.assert_not_called()
 
 
-def test_su_missing_adu_principal_fails_before_resources(preparation):
-    test, manager, response = preparation
-    response.json.return_value = {"value": []}
-
-    with pytest.raises(AzureResponseError, match="Could not resolve the ADU first-party"):
-        subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
-
-    test.cmd.assert_not_called()
-    test.assign_role.assert_not_called()
-    manager.cli.invoke.assert_not_called()
-
-
-def test_su_token_failure_fails_before_graph_or_resources(preparation):
-    test, manager, _ = preparation
-    manager._access_token.side_effect = AzureResponseError("Could not acquire an access token")
-
-    with pytest.raises(AzureResponseError, match="Could not acquire an access token"):
-        subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
-
-    manager._graph_get.assert_not_called()
-    test.cmd.assert_not_called()
-    test.assign_role.assert_not_called()
-
-
-def test_su_successful_graph_preparation_precedes_provisioning(preparation):
-    test, manager, response = preparation
+def test_su_prepares_caller_arm_identity_without_graph_before_provisioning(preparation):
+    test, manager, network = preparation
     events = []
 
-    def graph_get(*_args, **_kwargs):
-        events.append("graph")
-        return response
+    def caller(subscription):
+        events.append("caller " + subscription)
+        return "caller"
 
     def command(value):
         events.append(value)
@@ -117,21 +75,20 @@ def test_su_successful_graph_preparation_precedes_provisioning(preparation):
             raise RuntimeError("Stop at the first provisioning command")
         return Mock(get_output_in_json=lambda: [])
 
-    manager._graph_get.side_effect = graph_get
+    manager._current_assignee_object_id.side_effect = caller
     test.cmd.side_effect = command
 
     with pytest.raises(RuntimeError, match="Stop at the first provisioning command"):
         subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
 
-    assert events[0] == "graph"
+    assert events[0] == "caller configured-sub"
     assert events[1].startswith("identity show ")
     assert events[2].startswith("identity create ")
-    assert manager._adu_principal_ids == {"configured-sub": "adu-principal"}
-    manager._graph_get.assert_called_once()
+    network.assert_not_called()
 
 
 def test_su_borrowed_fixture_is_not_deleted_on_setup_failure(preparation, monkeypatch):
-    test, manager, _ = preparation
+    test, manager, network = preparation
     monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", SU_ID)
     manager._current_assignee_object_id = Mock(return_value="caller")
 
@@ -139,10 +96,39 @@ def test_su_borrowed_fixture_is_not_deleted_on_setup_failure(preparation, monkey
     with pytest.raises(RuntimeError, match="fixture lookup failed"):
         subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
 
-    manager._graph_get.assert_called_once()
+    network.assert_not_called()
     assert test.cmd.call_count == 1
     assert test.cmd.call_args.args[0] == f"resource show --ids {SU_ID}"
     assert test._owned_resources == {}
+
+
+def test_reader_experiment_rejects_borrowed_fixture_before_identity_or_mutations(preparation, monkeypatch):
+    test, manager, network = preparation
+    monkeypatch.setattr(subject, "_SU_UPDATE_INSTANCE_ID", SU_ID)
+    monkeypatch.setattr(subject, "_SU_READER_PROBE", True)
+    with pytest.raises(AssertionError, match="fresh owned"):
+        subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
+    manager._current_assignee_object_id.assert_not_called()
+    test.cmd.assert_not_called()
+    test.assign_role.assert_not_called()
+    network.assert_not_called()
+
+
+@pytest.mark.parametrize("probe_reader", [False, True])
+def test_su_keeps_normal_reader_fixture_but_omits_it_before_opt_in_discovery(preparation, monkeypatch, probe_reader):
+    test, _, _ = preparation
+    monkeypatch.setattr(subject, "_SU_READER_PROBE", probe_reader)
+    identity_id = "/subscriptions/configured-sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id"
+    su_id = "/subscriptions/configured-sub/resourceGroups/rg/providers/Microsoft.DeviceUpdate/updateInstances/su"
+    test.create_owned_resource = Mock(side_effect=[Mock(get_output_in_json=lambda: {"id": identity_id}), Mock()])
+    monkeypatch.setattr(subject, "wait_for_resource_succeeded", Mock(return_value={"id": su_id}))
+    test.cmd.side_effect = RuntimeError("stop at Update Instance identity inspection")
+    with pytest.raises(RuntimeError, match="identity inspection"):
+        subject.TestADRLinkSU.test_adr_link_su_lifecycle(test)
+    if probe_reader:
+        test.assign_role.assert_not_called()
+    else:
+        test.assign_role.assert_called_once_with("caller", "Device Update Reader", su_id, assignee_type=None)
 
 
 def test_su_borrowed_targets_survive_cleanup_after_namespace_creation(preparation, monkeypatch):

@@ -13,7 +13,6 @@ import json
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
-import requests
 from knack.log import get_logger
 from azure.cli.core._profile import Profile
 from azure.cli.core.azclierror import (
@@ -27,15 +26,11 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 logger = get_logger(__name__)
 CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
-SU_DATA_ROLE = "Device Update Administrator"
+ADR_CONTRIBUTOR_ROLE = "Azure Device Registry Contributor"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
-ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
-GRAPH_SERVICE_PRINCIPALS_URL = (
-    "https://graph.microsoft.com/v1.0/servicePrincipals"
-)
 
 
 @dataclass(frozen=True)
@@ -60,9 +55,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
-        RoleRule("namespace", SU_DATA_ROLE, "target"),
-        RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
-        RoleRule("adu_first_party", CONTRIBUTOR_ROLE, "target"),
+        RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
     ),
 }
 
@@ -183,7 +176,6 @@ def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
         "linked": f"{link_type.upper()} selected inbound MI",
-        "adu_first_party": "ADU first-party app",
     }
     scopes = {"namespace": "namespace", "target": link_type.upper()}
     return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
@@ -211,13 +203,10 @@ class LinkRbacManager:
         *,
         clock=None,
         sleeper=None,
-        graph_get=None,
         propagation_timeout: int = RBAC_PROPAGATION_TIMEOUT_SECONDS,
     ):
         self._cli_ctx = cli_ctx
         self.cli = cli or EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
-        self._graph_get = graph_get or requests.get
-        self._adu_principal_ids = {}
         self._caller_object_ids = {}
         self._clock = clock or monotonic
         self._sleep = sleeper or sleep
@@ -259,40 +248,6 @@ class LinkRbacManager:
                 f"'{subscription_id}'."
             )
         return access_token
-
-    def _resolve_adu_principal(self, subscription_id: str) -> str:
-        if subscription_id not in self._adu_principal_ids:
-            access_token = self._access_token(
-                subscription_id,
-                resource=self._cli_ctx.cloud.endpoints.microsoft_graph_resource_id,
-            )
-            try:
-                response = self._graph_get(
-                    GRAPH_SERVICE_PRINCIPALS_URL,
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    params={
-                        "$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'",
-                        "$select": "id",
-                    },
-                    timeout=30,
-                )
-                response.raise_for_status()
-                principals = response.json().get("value") or []
-            except (requests.RequestException, ValueError) as error:
-                raise AzureResponseError(
-                    "Could not query Microsoft Graph for the ADU first-party "
-                    "service principal."
-                ) from error
-            self._adu_principal_ids[subscription_id] = (
-                principals[0].get("id") if principals else None
-            )
-            if not self._adu_principal_ids[subscription_id]:
-                raise AzureResponseError(
-                    "Could not resolve the ADU first-party service principal. "
-                    f"Resolve application ID {ADU_FIRST_PARTY_APP_ID} and grant "
-                    "it Contributor on the Update Instance."
-                )
-        return self._adu_principal_ids[subscription_id]
 
     def _assignment_exists(
         self, principal_id: str, role: str, scope: str
@@ -466,13 +421,7 @@ class LinkRbacManager:
                 "target": request["target_scope"],
             }
             for rule in LINK_ROLE_MATRIX[link_type]:
-                principal_id = (
-                    self._resolve_adu_principal(
-                        _scope_subscription(scopes["target"])
-                    )
-                    if rule.principal == "adu_first_party"
-                    else principals.get(rule.principal)
-                )
+                principal_id = principals.get(rule.principal)
                 # Hub inbound identity is optional. There is no principal to grant
                 # in that direction when the endpoint omits it.
                 if not principal_id:
