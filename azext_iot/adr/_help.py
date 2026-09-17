@@ -372,6 +372,11 @@ def load_adr_help():
     Add and update use namespace PATCH. Show and list expose each endpoint's
     top-level linkingState. This group does not provide unlink or composite
     resource-delete commands; namespace and target lifecycles are managed separately.
+    Waited add/update commands require the actual endpoint to reach Succeeded. They recover only
+    confirmed AdrMiNotAuthorized, using an unchanged endpoint update and verified existing service-role
+    assignments. Positive --timeout/--interval values default to 600/30 seconds. The mutation/recovery
+    budget starts after initial RBAC preflight; effective authorization adds no propagation delay.
+    Atomic --no-wait and the terminal Hub stage of combined --no-wait do not recover later failures.
   """
 
     helps[
@@ -435,6 +440,11 @@ def load_adr_help():
     principal, and automatic RBAC preflight. Newly created assignments must become visible
     before namespace mutation.
     ARM assignment visibility does not guarantee that the linked service already honors access.
+    Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
+    rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
+    mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
+    --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
+    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
     After verifying access and allowing recent assignments to propagate, retry a persisted
     failed endpoint with update, not add, preserving its existing identity and endpoint
     settings. There is no need to delete the linked Hub to retry the link.
@@ -530,6 +540,11 @@ def load_adr_help():
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
     ARM assignment visibility does not guarantee that the linked service already honors access.
+    Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
+    rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
+    mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
+    --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
+    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
     After verifying access and allowing recent assignments to propagate, retry a persisted
     failed endpoint with update, not add, passing its existing inbound identity. There is no
     need to delete the linked DPS to retry the link.
@@ -637,6 +652,11 @@ def load_adr_help():
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
     ARM assignment visibility does not guarantee that the linked service already honors access.
+    Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
+    rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
+    mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
+    --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
+    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
     After verifying access and allowing recent assignments to propagate, retry a persisted
     failed endpoint with update, not add, passing its existing inbound identity. There is no
     need to delete the linked Update Instance to retry the link.
@@ -1050,6 +1070,12 @@ def load_adr_help():
     changing namespace endpoints. Submits a DPS-only namespace update and waits for the exact
     DPS endpoint to reach linkingState Succeeded before submitting a separate Hub update.
     --no-wait still waits for this DPS dependency; it skips waiting only for the final Hub operation.
+    Both waited stages recover only confirmed AdrMiNotAuthorized on the unchanged endpoint after
+    verifying required service-role assignments. Recovery uses endpoint update, never another add.
+    --timeout (600 seconds) is one shared mutation/recovery budget for both stages after initial RBAC
+    preflight, including RPCs, polling and bounded 30/60/120-second backoff. --interval defaults to 30
+    seconds. Both must be positive. No delay is added when authorization already works.
+    Terminal Hub --no-wait does not observe or recover later asynchronous failures.
     Rejected if the namespace already has a linked DPS. A DPS failure or timeout prevents Hub submission.
     Partial completion is not rolled back. Inspect failed endpoints with link dps show or link hub show
     and repair persisted failures with the corresponding link update, preserving the existing identity.

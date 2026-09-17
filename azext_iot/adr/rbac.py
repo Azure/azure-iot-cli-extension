@@ -31,6 +31,11 @@ OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
+LINK_ROLE_IDS = {
+    CONTRIBUTOR_ROLE: "b24988ac-6180-42a0-ab88-20f7382dd24c",
+    HUB_DATA_ROLE: "4fc6c259-987e-4a07-842e-c321cc9d413f",
+    ADR_CONTRIBUTOR_ROLE: "a5c3590a-3a1a-4cd4-9648-ea0a32b15137",
+}
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,24 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
 
 def _normalized_id(resource_id: str) -> str:
     return (resource_id or "").rstrip("/").casefold()
+
+
+def _assignment_scope_applies(assignment_scope: str, scope: str, *, inherited_at_scope: bool = False) -> bool:
+    assignment_scope, scope = _normalized_id(assignment_scope), _normalized_id(scope)
+    if not assignment_scope or not scope:
+        return False
+    if scope == assignment_scope or scope.startswith(assignment_scope + "/"):
+        return True
+    # Management groups are hierarchy ancestors, not resource-ID prefixes.
+    # Only ARM's list_for_scope(scope, filter='atScope()') can establish their
+    # applicability here; a subscription-wide/unscoped list cannot.
+    parts = assignment_scope.split("/")
+    return (
+        inherited_at_scope
+        and len(parts) == 5
+        and parts[:4] == ["", "providers", "microsoft.management", "managementgroups"]
+        and bool(parts[4])
+    )
 
 
 def _scope_subscription(scope: str) -> Optional[str]:
@@ -250,8 +273,13 @@ class LinkRbacManager:
         return access_token
 
     def _assignment_exists(
-        self, principal_id: str, role: str, scope: str
+        self, principal_id: str, role: str, scope: str, *, strict=False
     ) -> bool:
+        if strict and (not isinstance(scope, str) or not scope.startswith("/")):
+            raise InvalidArgumentValueError("An explicit ARM scope is required for recovery role verification.")
+        # Azure CLI uses ARM list_for_scope with atScope() for this explicit
+        # --scope. --include-inherited retains its applicable ancestor results,
+        # including management groups; no extra hierarchy/Graph lookup is needed.
         assignments = self._invoke_json(
             "role assignment list "
             f"--assignee-object-id '{principal_id}' "
@@ -259,7 +287,44 @@ class LinkRbacManager:
             "--include-inherited --fill-principal-name false",
             subscription=_scope_subscription(scope),
         )
-        return bool(assignments)
+        if not strict:
+            return bool(assignments)
+        if not isinstance(assignments, list) or any(not isinstance(item, dict) for item in assignments):
+            raise AzureResponseError("Malformed role-assignment response during link recovery preflight.")
+        for assignment in assignments:
+            assignment_scope = _normalized_id(assignment.get("scope"))
+            if (
+                _normalized_id(assignment.get("principalId")) == _normalized_id(principal_id)
+                and _normalized_id(assignment.get("roleDefinitionId")).rsplit("/", 1)[-1] == LINK_ROLE_IDS[role]
+                and _assignment_scope_applies(assignment_scope, scope, inherited_at_scope=True)
+                and not assignment.get("condition")
+                and not assignment.get("conditionVersion")
+            ):
+                return True
+        return False
+
+    def verify_many(self, requests: Iterable[dict], *, guard) -> None:
+        """Read-only recovery preflight: exact existing roles, principals and scopes.
+
+        Conditions are not proof of unconditional service access. Missing or
+        conditional grants stop recovery; this method never creates assignments.
+        """
+        for request in requests:
+            principals = {"namespace": request["namespace_principal_id"], "linked": request.get("linked_principal_id")}
+            scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
+            for rule in LINK_ROLE_MATRIX[request["link_type"]]:
+                principal = principals[rule.principal]
+                if not principal:
+                    continue
+                guard()
+                exists = self._assignment_exists(principal, rule.role, scopes[rule.scope], strict=True)
+                guard()
+                if not exists:
+                    raise AzureResponseError(
+                        f"Cannot confirm unconditional {rule.role} for principalId={principal} "
+                        f"at scope={scopes[rule.scope]}. Recovery stopped without another namespace mutation. "
+                        "Verify the required service-role assignment; no broader roles or caller data access were granted."
+                    )
 
     def _current_assignee_object_id(self, subscription_id: str) -> str:
         if subscription_id in self._caller_object_ids:

@@ -781,11 +781,28 @@ def load_adr_arguments(self, _):
             help="Device class identifier.",
         )
 
+    for kind in ("hub", "dps", "su"):
+        for action in ("add", "update"):
+            with self.argument_context(f"iot adr ns link {kind} {action}") as context:
+                context.argument(
+                    "timeout", options_list=["--timeout"], type=int, arg_group="Wait Condition",
+                    help="Positive mutation/recovery budget in seconds after initial RBAC preflight. Default: 600.",
+                )
+                context.argument(
+                    "interval", options_list=["--interval"], type=int, arg_group="Wait Condition",
+                    help="Positive polling interval in seconds. Default: 30.",
+                )
+                context.argument(
+                    "no_wait", options_list=["--no-wait"], action="store_true",
+                    help="Return after submission without observing endpoint readiness or recovering later failures.",
+                )
+
     # Combined DPS-first link add
     with self.argument_context("iot adr ns link add") as context:
         context.argument(
             "timeout", options_list=["--timeout"], type=int, arg_group="Wait Condition",
-            help="Maximum wait in seconds for DPS linking, including its update, and separately for the final Hub operation.",
+            help="Positive shared mutation/recovery budget in seconds for DPS and Hub "
+                 "after initial RBAC preflight. Default: 600.",
         )
         context.argument(
             "interval", options_list=["--interval"], type=int, arg_group="Wait Condition",

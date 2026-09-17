@@ -18,7 +18,7 @@ from knack.util import CLIError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link import LinkProvider
-from azext_iot.adr.providers.wait import wait_for_resource
+from azext_iot.tests.adr.test_adr_link_propagation_unit import Clock
 from azext_iot.tests.adr.test_adr_link_unit import DPS_ID, HUB_ID, UAMI_ID
 
 NS_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
@@ -51,15 +51,11 @@ def combined(fixture_link_provider, mocker):
     }
     provider.client.namespaces.get.side_effect = [initial, ready]
     provider.client.namespaces.begin_update.return_value = Mock()
+    provider._get_target = Mock(side_effect=AzureResponseError("synthetic recovery preflight failure"))
     mocker.patch.object(provider, "_await_terminal", side_effect=lambda poller, **_: poller.result())
-    mocker.patch("azext_iot.adr.providers.wait.IndeterminateProgressBar")
-    # Exercise the real waiter/condition, but bound synthetic observations without sleeping.
-    mocker.patch(
-        "azext_iot.adr.providers.link.wait_for_resource",
-        side_effect=lambda ctx, getter, condition, **_: wait_for_resource(
-            ctx, getter, condition, timeout=3, interval=1, sleeper=lambda _: None,
-        ),
-    )
+    clock = Clock()
+    mocker.patch("azext_iot.adr.providers.link.monotonic", side_effect=clock.time)
+    mocker.patch("azext_iot.adr.providers.link.sleep", side_effect=clock.sleep)
     return provider, args, initial, ready
 
 
@@ -88,11 +84,11 @@ def test_combined_preflights_both_then_waits_exact_dps_before_hub(combined, no_w
     # A completed namespace LRO is NOT sufficient: the first endpoint GET is still InProgress.
     dps_poller.result.return_value = deepcopy(ready)
     hub_poller.result.return_value = final
-    observations = iter([initial, pending, ready])
+    observations = iter([initial, pending, ready, final])
 
     def get(**_):
         ns = next(observations)
-        if ns is not initial:
+        if ns is not initial and ns is not final:
             events.append("GET DPS " + ns["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"])
         return ns
 
@@ -128,7 +124,7 @@ def test_combined_preflights_both_then_waits_exact_dps_before_hub(combined, no_w
     ]
     dps_poller.result.assert_called_once()
     assert hub_poller.result.call_count == (0 if no_wait else 1)
-    assert result is (hub_poller if no_wait else final)
+    assert result is hub_poller if no_wait else result == final
     assert final["properties"]["updating"] == initial["properties"]["updating"]
     assert all(final["properties"][section]["endpoints"]["future"] == initial["properties"][section]["endpoints"]["future"]
                for section in ("provisioning", "messaging"))
@@ -167,14 +163,12 @@ def test_combined_dps_failure_or_timeout_never_submits_hub(combined, failure, no
         [service_error] if failure == "GET-error" else [observed] * 3
     )
     with pytest.raises((CLIError, HttpResponseError)) as caught:
-        provider.link_add(**args, no_wait=no_wait)
+        provider.link_add(**args, no_wait=no_wait, timeout_sec=3, wait_sec=1)
     if failure == "GET-error":
         assert caught.value is service_error
     elif failure == "Failed":
-        assert "AdrMiNotAuthorized" in str(caught.value)
-        assert "az iot adr ns link dps update" in str(caught.value)
-        assert UAMI_ID in str(caught.value)
-    elif failure in {"InProgress", "missing", "nested-status-only", "namespace-Updating"}:
+        assert "AdrMiNotAuthorized" in caplog.text
+    elif failure in {"InProgress", "missing", "namespace-Updating"}:
         assert "timed out" in str(caught.value)
     provider.client.namespaces.begin_update.assert_called_once()
     assert list(provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]) == ["provisioning"]
@@ -287,7 +281,6 @@ def test_combined_deadline_includes_dps_lro_and_get_time(combined, mocker, scena
     elapsed = [0.0]
     sleeps = []
     mocker.patch("azext_iot.adr.providers.link.monotonic", side_effect=lambda: elapsed[0])
-    mocker.patch("azext_iot.adr.providers.link.wait_for_resource", side_effect=wait_for_resource)
     observed = deepcopy(ready)
     if scenario == "pending":
         observed["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"] = "InProgress"
@@ -333,7 +326,7 @@ def test_combined_wrapper_forwards_wait_options(combined, mocker):
 @pytest.mark.parametrize("submission_seconds", [2, 3, 4])
 @pytest.mark.parametrize("no_wait", [False, True])
 def test_combined_submission_time_is_deducted_before_dps_lro_wait(combined, mocker, submission_seconds, no_wait):
-    provider, args, _, _ = combined
+    provider, args, initial, ready = combined
     elapsed = [0.0]
     mocker.patch("azext_iot.adr.providers.link.monotonic", side_effect=lambda: elapsed[0])
 
@@ -350,8 +343,16 @@ def test_combined_submission_time_is_deducted_before_dps_lro_wait(combined, mock
         provider.client.namespaces.begin_update.assert_called_once()
         provider.client.namespaces.get.assert_called_once()
     else:
+        # The waited terminal Hub now needs its own actual Succeeded readback.
+        final = deepcopy(ready)
+        final["properties"]["messaging"]["endpoints"]["hub"] = {
+            "endpointType": IOT_HUB_ENDPOINT_TYPE, "resourceId": HUB_ID, "linkingState": "Succeeded",
+            "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID},
+            "provisioning": {"availability": "Available", "allocationWeight": 25},
+        }
+        provider.client.namespaces.get.side_effect = [initial, ready, final]
         provider.link_add(**args, no_wait=no_wait, timeout_sec=3)
         assert provider._await_terminal.call_args_list[0].kwargs["timeout_sec"] == 1
         if not no_wait:
-            assert provider._await_terminal.call_args_list[1].kwargs["timeout_sec"] == 3
+            assert provider._await_terminal.call_args_list[1].kwargs["timeout_sec"] == 1
         assert provider.client.namespaces.begin_update.call_count == 2

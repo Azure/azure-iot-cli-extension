@@ -44,6 +44,7 @@ def patch_namespace_endpoints(
     endpoints_patch: dict,
     status_message: str,
     no_wait: bool = False,
+    polling=None,
     **kwargs,
 ):
     """Submit one section-shaped namespace endpoint PATCH."""
@@ -54,6 +55,7 @@ def patch_namespace_endpoints(
         resource_group_name=resource_group_name,
         namespace_name=namespace_name,
         properties=properties,
+        **({"polling": polling} if polling is not None else {}),
     )
     return wait_operation(
         poller,

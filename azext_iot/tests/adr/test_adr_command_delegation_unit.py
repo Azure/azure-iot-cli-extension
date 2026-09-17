@@ -475,6 +475,8 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
         mi_system_assigned=True,
         mi_user_assigned=None,
         no_wait=True,
+        timeout_sec=600,
+        wait_sec=30,
     )
 
 
@@ -1040,4 +1042,7 @@ def test_simple_command_wrappers_delegate(
     expected.pop("cmd")
     expected.pop("client", None)
     expected.update(expected.pop("kwargs", {}))
+    if module is commands_link and "timeout" in expected:
+        expected["timeout_sec"] = expected.pop("timeout")
+        expected["wait_sec"] = expected.pop("interval")
     getattr(provider, provider_method).assert_called_once_with(**expected)

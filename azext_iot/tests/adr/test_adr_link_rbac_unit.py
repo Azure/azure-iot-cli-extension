@@ -8,9 +8,11 @@ import base64
 from io import StringIO
 import json
 import logging
+import re
 import shlex
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -18,13 +20,17 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
 )
 from azure.cli.core.cloud import AZURE_CHINA_CLOUD, AZURE_PUBLIC_CLOUD, AZURE_US_GOV_CLOUD
+from azure.core.credentials import AccessToken
+from azure.mgmt.authorization import AuthorizationManagementClient
 
 from azext_iot.adr.rbac import (
     ADR_CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
+    LINK_ROLE_IDS,
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
+    _assignment_scope_applies,
     _scope_subscription,
     format_role_requirements,
     resolve_linked_resource_principal,
@@ -137,6 +143,113 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
     )
     assert _scope_subscription(TARGET_SCOPE) == "sub"
     assert _scope_subscription("/") is None
+
+
+@pytest.mark.parametrize("assignment_scope,trusted,expected", [
+    ("/providers/Microsoft.Management/managementGroups/parent", True, True),
+    ("/providers/Microsoft.Management/managementGroups/parent", False, False),
+    ("/providers/Microsoft.Management/managementGroups/unrelated", False, False),
+    ("/providers/Microsoft.Management/managementGroups/parent/children/other", True, False),
+    ("/providers/Microsoft.Management/managementGroups", True, False),
+    ("/providers/Other/managementGroups/parent", True, False),
+    ("/subscriptions/other", True, False),
+    ("/subscriptions/sub/resourceGroups/other", True, False),
+    (NS_SCOPE + "/children/child", True, False),
+    ("/subscriptions/sub", False, True),
+    (NS_SCOPE.upper(), False, True),
+])
+def test_recovery_scope_requires_authoritative_inheritance_for_management_groups(assignment_scope, trusted, expected):
+    assert _assignment_scope_applies(assignment_scope, NS_SCOPE, inherited_at_scope=trusted) is expected
+
+
+@pytest.mark.parametrize("scope", [None, "", "subscriptions/sub"])
+def test_strict_recovery_cannot_fall_back_to_unscoped_role_list(scope):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    with pytest.raises(InvalidArgumentValueError, match="explicit ARM scope"):
+        manager._assignment_exists("principal", "Contributor", scope, strict=True)
+    manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("scenario,expected", [
+    ("applicable", True), ("unrelated", False), ("wrong-principal", False), ("wrong-role", False),
+    ("conditional", False), ("condition-version", False), ("foreign-subscription", False),
+])
+def test_strict_management_group_roles_use_actual_cli_arm_at_scope_query(mocker, mocked_response, scenario, expected):
+    """The real CLI and Authorization SDK must retain only ARM-applicable ancestors."""
+    from azure.cli.command_modules.role import custom as role_commands
+
+    principal = "11111111-1111-1111-1111-111111111111"
+    role_id = "/subscriptions/sub/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS["Contributor"]
+    assignment = {
+        "id": "/providers/Microsoft.Management/managementGroups/parent/providers/Microsoft.Authorization/roleAssignments/one",
+        "name": "one", "type": "Microsoft.Authorization/roleAssignments",
+        "properties": {"principalId": principal, "roleDefinitionId": role_id,
+                       "scope": "/providers/Microsoft.Management/managementGroups/parent"},
+    }
+    changes = {
+        "wrong-principal": {"principalId": "22222222-2222-2222-2222-222222222222"},
+        "wrong-role": {"roleDefinitionId": role_id + "-different"},
+        "conditional": {"condition": "restricted", "conditionVersion": "2.0"},
+        "condition-version": {"conditionVersion": "2.0"},
+        "foreign-subscription": {"scope": "/subscriptions/unrelated"},
+    }
+    assignment["properties"].update(changes.get(scenario, {}))
+    queries = []
+
+    def role_assignments(request):
+        parsed = urlsplit(request.url)
+        query = parse_qs(parsed.query)
+        queries.append((parsed.path, query))
+        if (
+            parsed.path == NS_SCOPE + "/providers/Microsoft.Authorization/roleAssignments"
+            and query.get("$filter") == ["atScope()"]
+        ):
+            # ARM excludes an unrelated management group from scoped results.
+            applicable = [] if scenario == "unrelated" else [assignment]
+        else:
+            # An unscoped response may contain a matching but unrelated MG grant.
+            applicable = [assignment]
+        return 200, {"Content-Type": "application/json"}, json.dumps({"value": applicable})
+
+    mocked_response.add_callback(
+        "GET", re.compile(r"https://management\.azure\.com/.*/roleAssignments(?:\?.*)?$"), callback=role_assignments,
+    )
+    if scenario not in {"unrelated", "wrong-principal", "wrong-role"}:
+        mocked_response.add(
+            "GET", "https://management.azure.com" + NS_SCOPE + "/providers/Microsoft.Authorization/roleDefinitions",
+            json={"value": [{"id": role_id, "name": LINK_ROLE_IDS["Contributor"],
+                             "properties": {"roleName": "Contributor", "type": "BuiltInRole"}}]},
+        )
+    credential = MagicMock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("offline-unit-token", 4102444800)
+    graph = mocker.patch.object(role_commands, "_get_object_stubs", side_effect=AssertionError("Graph is forbidden"))
+    mocker.patch.object(role_commands, "_graph_client_factory", return_value=MagicMock())
+    mocker.patch.object(role_commands, "_resolve_role_id", return_value=role_id)
+    cli = MagicMock()
+    manager = LinkRbacManager(MagicMock(), cli=cli)
+
+    def invoke(command, **kwargs):
+        parts = shlex.split(command)
+        assert parts[:3] == ["role", "assignment", "list"]
+        assert "--include-inherited" in parts
+        assert parts[parts.index("--fill-principal-name") + 1] == "false"
+        assert kwargs == {"subscription": "sub"}
+        return _result(role_commands.list_role_assignments(
+            MagicMock(), scope=parts[parts.index("--scope") + 1],
+            assignee_object_id=parts[parts.index("--assignee-object-id") + 1],
+            role=parts[parts.index("--role") + 1], include_inherited=True, fill_principal_name=False,
+        ))
+
+    cli.invoke.side_effect = invoke
+    with AuthorizationManagementClient(credential, "sub", retry_total=0) as client:
+        mocker.patch.object(role_commands, "_auth_client_factory", return_value=client)
+        assert manager._assignment_exists(principal, "Contributor", NS_SCOPE, strict=True) is expected
+    assert len(queries) == 1
+    path, query = queries[0]
+    assert path == NS_SCOPE + "/providers/Microsoft.Authorization/roleAssignments"
+    assert query["$filter"] == ["atScope()"]
+    cli.invoke.assert_called_once()
+    graph.assert_not_called()
 
 
 def test_namespace_outbound_principal_defaults_to_system_identity():

@@ -5,7 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import inspect
-from unittest.mock import Mock
+from copy import deepcopy
+from unittest.mock import Mock, patch
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -48,6 +49,31 @@ UAMI_ID = (
     "/subscriptions/sub/resourceGroups/rg/providers/"
     "Microsoft.ManagedIdentity/userAssignedIdentities/identity"
 )
+
+
+@pytest.fixture
+def fixture_link_provider(fixture_link_provider):
+    """Provide post-PATCH service readback for these endpoint serialization tests.
+
+    Keep the real recovery entrypoint; detailed failure/time behavior lives in
+    test_adr_link_propagation_unit, not in the legacy sparse namespace fixtures.
+    """
+    provider = fixture_link_provider
+    operation = provider._patch_link
+
+    def patch_link(namespace, namespace_name, resource_group_name, section, endpoints_patch, status_message, **kwargs):
+        readback = deepcopy(namespace)
+        properties = readback.setdefault("properties", {})
+        properties["provisioningState"] = "Succeeded"
+        endpoints = properties.setdefault(section, {}).setdefault("endpoints", {})
+        endpoints.update({name: {**deepcopy(body), "linkingState": "Succeeded"}
+                          for name, body in endpoints_patch.items()})
+        with patch.object(provider, "_get_namespace", return_value=readback):
+            return operation(namespace, namespace_name, resource_group_name, section,
+                             endpoints_patch, status_message, **kwargs)
+
+    provider._patch_link = patch_link
+    return provider
 
 
 def _namespace(*, hubs=None, dps=None, su=None):
