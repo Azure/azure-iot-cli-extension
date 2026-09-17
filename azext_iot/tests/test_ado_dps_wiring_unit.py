@@ -23,6 +23,43 @@ CONTROLLER_ENV = (
 )
 
 
+def test_ado_hub_suite_has_a_nonempty_constrained_unset_default():
+    text = TEMPLATE.read_text(encoding="utf-8")
+    template = yaml.safe_load(text)
+    parameter = next(item for item in template["parameters"] if item["name"] == "hubSuite")
+    # ADO rejects an empty string in an allowed-values list before running any job.
+    assert parameter == {
+        "name": "hubSuite", "type": "string", "default": "sentinel",
+        "values": ["sentinel", "HubControl", "HubData"],
+    }
+    conditions = re.findall(r"if (?:eq|ne)\(parameters\.hubSuite, ([^)]*)\)", text)
+    assert conditions
+    assert set(conditions) == {"'sentinel'"}
+
+
+@pytest.mark.parametrize("caller", ["merge.yml", "templates/trigger-tests.yml"])
+def test_ado_callers_keep_explicit_owned_suites_and_unset_non_hub_defaults(caller):
+    pipeline = yaml.safe_load((ROOT / ".azure-devops" / caller).read_text(encoding="utf-8"))
+    calls = [
+        (job["job"], step["parameters"])
+        for job in pipeline["jobs"] for step in job.get("steps", [])
+        if step.get("template", "").endswith("run-tests-parallel.yml")
+    ]
+    assert calls
+    for job, parameters in calls:
+        if job in ("HubControl", "HubData"):
+            assert parameters["hubSuite"] == job
+        else:
+            assert "hubSuite" not in parameters
+        if caller == "merge.yml":
+            assert parameters["runUnitTests"] is True
+            assert parameters["runIntTests"] is False
+    if caller == "merge.yml":
+        assert {job for job, _ in calls} == {
+            "run_unit_tests_ubuntu", "run_unit_tests_macOs", "run_unit_tests_windows",
+        }
+
+
 def _script():
     template = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
     integration = next(
@@ -130,10 +167,10 @@ def _hub_wiring():
     )
     task = next(step for step in integration if step.get("task") == "AzureCLI@2")
     script = next(value["inlineScript"] for key, value in task["inputs"].items()
-                  if "ne(parameters.hubSuite, '')" in key)
+                  if "ne(parameters.hubSuite, 'sentinel')" in key)
     admission = next(
         child for step in template["steps"] for key, children in step.items()
-        if "ne(parameters.hubSuite, '')" in key for child in children
+        if "ne(parameters.hubSuite, 'sentinel')" in key for child in children
         if child.get("task") == "PythonScript@0"
     )
     return template, task, script, admission
@@ -147,19 +184,19 @@ def test_ado_hub_uses_shared_controller_without_legacy_pins_or_hidden_failures()
     assert '--resource-group "$azext_iot_testrg"' in script
     assert '--region "$azext_iot_testhub_location" --output test-result/hub-phases' in script
     assert "set -euo pipefail" in script
-    assert task["${{ if ne(parameters.hubSuite, '') }}"]["continueOnError"] is False
+    assert task["${{ if ne(parameters.hubSuite, 'sentinel') }}"]["continueOnError"] is False
     assert task["${{ else }}"]["continueOnError"] is True  # Preserve unrelated DPS behavior.
     assert admission["displayName"].endswith("before Azure login")
-    sentinel = next(step for step in template["steps"] if "${{ if eq(parameters.hubSuite, '') }}" in step)
-    assert sentinel["${{ if eq(parameters.hubSuite, '') }}"][0]["template"] == "set-testenv-sentinel.yml"
+    sentinel = next(step for step in template["steps"] if "${{ if eq(parameters.hubSuite, 'sentinel') }}" in step)
+    assert sentinel["${{ if eq(parameters.hubSuite, 'sentinel') }}"][0]["template"] == "set-testenv-sentinel.yml"
     hub_publish = [child for step in template["steps"] for key, children in step.items()
-                   if "ne(parameters.hubSuite, '')" in key for child in children
+                   if "ne(parameters.hubSuite, 'sentinel')" in key for child in children
                    if child.get("task") == "PublishBuildArtifacts@1"]
     assert {step["inputs"]["pathToPublish"] for step in hub_publish} == {
         "test-result/", ".coverage.${{ parameters.name }}",
     }
     junit = [child for step in template["steps"] for key, children in step.items()
-             if "ne(parameters.hubSuite, '')" in key for child in children
+             if "ne(parameters.hubSuite, 'sentinel')" in key for child in children
              if child.get("task") == "PublishTestResults@2"]
     assert len(junit) == 1
     assert junit[0]["inputs"]["testResultsFiles"] == "test-result/hub-phases/**/junit.xml"
