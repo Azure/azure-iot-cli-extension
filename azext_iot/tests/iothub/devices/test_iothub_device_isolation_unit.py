@@ -10,12 +10,14 @@ from copy import deepcopy
 from functools import partial
 from shlex import split
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import jmespath
 import pytest
 from requests import Response
-from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
-from azure.core.exceptions import HttpResponseError
+from azure.cli.core.azclierror import CLIInternalError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError
+from knack.util import CLIError
 
 from azext_iot.tests import helpers, iothub
 from azext_iot.tests.iothub import conftest as infrastructure
@@ -42,7 +44,7 @@ def isolated_backend(mocker):
         _generated_device_ids=[],
     )
     backend = SimpleNamespace(
-        active={"shared"}, registries={"shared": {}}, commands=[], deletes=[], peak=1,
+        active={"shared"}, registries={"shared": {}}, commands=[], reads=[], deletes=[], peak=1,
         failure=None, scenario=scenario, stale=["device7", "device_5", "device_6", "device_7"],
     )
     scenario.cli_ctx = SimpleNamespace()
@@ -55,11 +57,7 @@ def isolated_backend(mocker):
         name = _arg(args, "-n", "--hub-name")
         assert _arg(args, "-g", "--resource-group") == infrastructure.RG
         if args[:3] == ["iot", "hub", "show"]:
-            if backend.failure == "preflight":
-                raise CLIInternalError("Hub preflight failed")
-            if name not in backend.active and backend.failure != "collision":
-                raise ResourceNotFoundError("Not found")
-            output = {"name": name}
+            raise CLIError(f"An IotHub '{name}' under resource group '{infrastructure.RG}' was not found.")
         elif args[:3] == ["iot", "hub", "create"]:
             assert name not in backend.active
             assert name.startswith("aziotclitest-hub-")
@@ -96,6 +94,20 @@ def isolated_backend(mocker):
 
     mocker.patch.object(infrastructure.cli, "invoke", side_effect=invoke)
     mocker.patch.object(helpers.cli, "invoke", side_effect=invoke)
+
+    def read_hub(*, resource_group_name, resource_name):
+        assert resource_group_name == infrastructure.RG
+        backend.reads.append(resource_name)
+        if backend.failure == "preflight":
+            raise CLIInternalError("Hub preflight failed")
+        if resource_name not in backend.active and backend.failure != "collision":
+            error = HttpResponseError(message="Hub not found")
+            error.status_code = 404
+            raise error
+        return {"name": resource_name}
+
+    client = mocker.patch.object(infrastructure, "iot_hub_service_factory").return_value.__enter__.return_value
+    client.iot_hub_resource.get.side_effect = read_hub
     backend.roles = mocker.patch.object(infrastructure, "assign_iot_hub_dataplane_rbac_role")
     marker = SimpleNamespace(kwargs={"count": 1})
     backend.request = SimpleNamespace(
@@ -131,6 +143,62 @@ def isolated_backend(mocker):
 
 def _fixture(backend):
     return infrastructure.fixture_isolated_hub.__wrapped__(backend.request)
+
+
+@pytest.mark.parametrize("status", [200, 401, 403, 404, 429, 500])
+def test_private_absence_requires_exact_arm_get_404(mocker, status):
+    from azext_iot.sdk.iothub.mgmt import IotHubClient
+    from azext_iot.tests import _hub_ownership as ownership
+    from azext_iot.tests.test_hub_ownership_transport_unit import Credential, Wire
+
+    name = "aziotclitest-hub-" + "a" * 18
+    path = (
+        f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{infrastructure.RG}"
+        f"/providers/Microsoft.Devices/IotHubs/{name}"
+    )
+    wire = Wire()
+    wire.handle = mocker.Mock(return_value=(status, {"error": {"code": "TestError", "message": "offline"}}, {}))
+    mocker.patch("requests.Session.send", side_effect=lambda request, **kwargs: wire.send(request, **kwargs))
+    client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM, retry_total=0)
+    factory = mocker.patch.object(infrastructure, "iot_hub_service_factory", return_value=client)
+    command = mocker.patch.object(infrastructure.cli, "invoke", side_effect=AssertionError("No CLI discovery"))
+    if status == 404:
+        infrastructure._require_absent_hub(name)
+    elif status == 200:
+        with pytest.raises(CLIInternalError, match="not confirmed absent"):
+            infrastructure._require_absent_hub(name)
+    else:
+        with pytest.raises(HttpResponseError) as raised:
+            infrastructure._require_absent_hub(name)
+        assert raised.value.status_code == status
+    factory.assert_called_once_with(infrastructure.cli.az_cli)
+    command.assert_not_called()
+    assert len(wire.calls) == 1
+    assert wire.calls[0][0] == "GET"
+    assert urlsplit(wire.calls[0][1]).path == path
+
+
+@pytest.mark.parametrize("error", [
+    CLIError("An IotHub 'private' under resource group 'rg' was not found."),
+    ServiceRequestError("Transport failure"),
+    HttpResponseError(message="No HTTP response"),
+])
+def test_private_absence_does_not_infer_404_from_other_errors(mocker, error):
+    client = mocker.patch.object(infrastructure, "iot_hub_service_factory").return_value.__enter__.return_value
+    client.iot_hub_resource.get.side_effect = error
+    with pytest.raises(type(error)) as raised:
+        infrastructure._require_absent_hub("private")
+    assert raised.value is error
+    client.iot_hub_resource.get.assert_called_once_with(resource_group_name=infrastructure.RG, resource_name="private")
+
+
+def test_private_absence_does_not_accept_factory_404(mocker):
+    error = HttpResponseError(message="Client setup failed")
+    error.status_code = 404
+    mocker.patch.object(infrastructure, "iot_hub_service_factory", side_effect=error)
+    with pytest.raises(HttpResponseError) as raised:
+        infrastructure._require_absent_hub("private")
+    assert raised.value is error
 
 
 def _run_identity_body(backend, mocker, extra_query_row=False):
@@ -258,6 +326,8 @@ def test_identity_private_lifetime_fits_existing_four_hub_reservation(isolated_b
     next(fixture)
     assert backend.peak == 2  # one shared Hub plus the function-scoped private Hub
     fixture.close()
+    assert backend.reads == [backend.deletes[0], backend.deletes[0]]
+    assert not any(args[:3] == ["iot", "hub", "show"] for args in backend.commands)
     # Even conservatively overlapping BOTH existing state pools costs only four:
     # shared + two dataplane Hubs + the separate negative-state module's Hub.
     backend.marker.kwargs["count"] = 2

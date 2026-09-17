@@ -16,6 +16,7 @@ from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
+from azext_iot._factory import iot_hub_service_factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
@@ -420,12 +421,14 @@ def provisioned_only_iot_hubs_module(request) -> dict:
 
 
 def _require_absent_hub(name):
-    try:
-        _invoke_fixture(f"iot hub show -n {name} -g {RG}")
-    except (AzCLIError, CloudError, HttpResponseError) as error:
-        if is_not_found(error):
-            return
-        raise
+    # CLI show may infer absence from global name availability; require an exact ARM 404.
+    with iot_hub_service_factory(cli.az_cli) as client:
+        try:
+            client.iot_hub_resource.get(resource_group_name=RG, resource_name=name)
+        except HttpResponseError as error:
+            if error.status_code == 404:
+                return
+            raise
     raise CLIInternalError(f"Private test Hub '{name}' is not confirmed absent.")
 
 
