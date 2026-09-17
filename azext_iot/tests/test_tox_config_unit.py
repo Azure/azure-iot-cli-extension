@@ -6,6 +6,7 @@
 
 from configparser import ConfigParser
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -60,9 +61,10 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
     root = Path(__file__).resolve().parents[2]
     config.read(root / "tox.ini")
     section = config[INTEGRATION_ENVIRONMENT]
+    startup = "python -m pytest" if service == "DPS" else "pytest"
     command = next(
         line.strip() for line in section["commands"].splitlines()
-        if line.strip().startswith(f"{service}: pytest ")
+        if line.strip().startswith(f"{service}: {startup} ")
     )
     assert "--timeout=900" in command
     assert "--integration-progress-interval=60" in command
@@ -85,13 +87,45 @@ def test_public_hub_tox_uses_managed_controller_with_explicit_scope_and_no_filte
     config.read(Path(__file__).resolve().parents[2] / "tox.ini")
     section = config[INTEGRATION_ENVIRONMENT]
     commands = section["commands"]
-    assert f"{suite}: python -m azext_iot.tests._hub_phase_runner --suite {suite}" in commands
+    assert f"{suite}: python {{toxinidir}}/azext_iot/tests/_hub_phase_runner.py --suite {suite}" in commands
     assert "--subscription {env:azext_iot_hub_subscription}" in commands
     assert "--resource-group {env:azext_iot_testrg:cli-int-test-rg}" in commands
     assert "--region {env:azext_iot_testhub_location:centraluseuap}" in commands
     assert "--output test-result/hub-phases" in commands
-    hub_lines = [line for line in commands.splitlines() if line.startswith("Hub")]
-    assert all("{posargs}" not in line and "pytest " not in line for line in hub_lines)
+    hub_lines = [
+        line.strip() for line in commands.splitlines()
+        if line.strip().startswith((f"{suite}: ", "HubControl,HubData: "))
+    ]
+    # Only controller-owned arguments may be forwarded, never a raw pytest command/filter.
+    assert hub_lines == [
+        f"{suite}: python {{toxinidir}}/azext_iot/tests/_hub_phase_runner.py --suite {suite} \\",
+        "HubControl,HubData:    --subscription {env:azext_iot_hub_subscription} \\",
+        "HubControl,HubData:    --resource-group {env:azext_iot_testrg:cli-int-test-rg} \\",
+        "HubControl,HubData:    --region {env:azext_iot_testhub_location:centraluseuap}"
+        " --output test-result/hub-phases {posargs}",
+    ]
     assert "HubSAS" not in commands and "HubMgmt" not in commands
     assert "hubsas_subscription" not in section["setenv"]
     assert "azext_iot_testhub_location={env:azext_iot_testhub_location:centraluseuap}" in section["setenv"]
+
+
+@pytest.mark.parametrize("suite", ["HubControl", "HubData"])
+@pytest.mark.parametrize("arguments", [
+    ["-k", "test_example"],
+    ["-m", "integration"],
+    ["--collect-only"],
+    ["--", "-k", "test_example"],
+    ["azext_iot/tests/iothub/core/test_example_int.py::test_example"],
+])
+def test_public_hub_controller_rejects_pytest_posargs_before_launch(mocker, monkeypatch, suite, arguments):
+    from azext_iot.tests import _hub_phase_runner
+
+    launch = mocker.patch.object(_hub_phase_runner, "run")
+    monkeypatch.setattr(sys, "argv", [
+        "_hub_phase_runner.py", "--suite", suite, "--subscription", "offline-subscription",
+        "--resource-group", "offline-group", "--region", "centraluseuap", *arguments,
+    ])
+    with pytest.raises(SystemExit) as error:
+        _hub_phase_runner.main()
+    assert error.value.code == 2
+    launch.assert_not_called()

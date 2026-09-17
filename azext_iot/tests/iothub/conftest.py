@@ -189,8 +189,10 @@ def _cleanup_dynamic_hub(request):
     """
     yield
     live = os.getenv("AZURE_TEST_RUN_LIVE", "").casefold() == "true"
+    hub_directory = Path(__file__).resolve().parent
     integration_selected = any(
-        "_int.py" in item.nodeid for item in request.session.items
+        item.path.name.endswith("_int.py") and hub_directory in item.path.resolve().parents
+        for item in request.session.items
     )
     if (
         live

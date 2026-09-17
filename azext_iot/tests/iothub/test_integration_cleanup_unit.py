@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -148,7 +149,9 @@ def test_dynamic_hub_cleanup_has_bounded_retries_and_truthful_result(
     sleep = mocker.patch.object(fixtures, "sleep")
     request = SimpleNamespace(
         config=SimpleNamespace(pluginmanager=SimpleNamespace(get_plugin=lambda _: None)),
-        session=SimpleNamespace(items=[SimpleNamespace(nodeid="test_owned_int.py::test_case")]),
+        session=SimpleNamespace(items=[SimpleNamespace(
+            path=Path(fixtures.__file__).resolve().parent / "test_owned_int.py",
+        )]),
     )
     cleanup = fixtures._cleanup_dynamic_hub.__wrapped__(request)
     next(cleanup)
@@ -157,6 +160,61 @@ def test_dynamic_hub_cleanup_has_bounded_retries_and_truthful_result(
     assert client.invoke.call_count == attempts
     assert sleep.call_count == attempts - 1
     assert all(call.args == (30,) for call in sleep.call_args_list)
+
+
+@pytest.mark.parametrize("relative_path,selected", [
+    ("iothub/core/test_example_int.py", True),
+    ("iothub/test_example_unit.py", False),
+    ("iothub/test_example_int.py.txt", False),
+    ("adr/test_example_int.py", False),
+    ("dps/core/test_example_int.py", False),
+    ("iothub_other/test_example_int.py", False),
+], ids=["hub", "unit", "wrong-suffix", "adr", "dps", "sibling"])
+def test_dynamic_hub_cleanup_selects_only_actual_hub_integration_paths(mocker, monkeypatch, relative_path, selected):
+    monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "true")
+    mocker.patch.object(fixtures, "iothub_settings", SimpleNamespace(env=SimpleNamespace(azext_iot_testhub=None)))
+    mocker.patch.object(fixtures._sas_phase, "enabled", return_value=False)
+    unused = mocker.patch.object(fixtures, "_dynamic_hub_was_unused", return_value=False)
+    delete = mocker.patch.object(fixtures, "_delete_fixture_resource")
+    request = SimpleNamespace(session=SimpleNamespace(items=[SimpleNamespace(
+        path=Path(fixtures.__file__).resolve().parent.parent / relative_path,
+        nodeid=f"{relative_path}::test_cleanup[test_other_int.py]",
+    )]))
+
+    cleanup = fixtures._cleanup_dynamic_hub.__wrapped__(request)
+    next(cleanup)
+    delete.assert_not_called()
+    with pytest.raises(StopIteration):
+        next(cleanup)
+
+    assert unused.call_count == int(selected)
+    assert delete.call_count == int(selected)
+
+
+@pytest.mark.parametrize("live", [None, "false", "true"])
+@pytest.mark.parametrize("existing_hub", [None, "borrowed"])
+@pytest.mark.parametrize("sas", [False, True])
+def test_dynamic_hub_cleanup_preserves_live_existing_and_sas_guards(mocker, monkeypatch, live, existing_hub, sas):
+    if live is None:
+        monkeypatch.delenv("AZURE_TEST_RUN_LIVE", raising=False)
+    else:
+        monkeypatch.setenv("AZURE_TEST_RUN_LIVE", live)
+    mocker.patch.object(fixtures, "iothub_settings", SimpleNamespace(env=SimpleNamespace(azext_iot_testhub=existing_hub)))
+    mocker.patch.object(fixtures._sas_phase, "enabled", return_value=sas)
+    unused = mocker.patch.object(fixtures, "_dynamic_hub_was_unused", return_value=False)
+    delete = mocker.patch.object(fixtures, "_delete_fixture_resource")
+    request = SimpleNamespace(session=SimpleNamespace(items=[SimpleNamespace(
+        path=Path(fixtures.__file__).resolve().parent / "core/test_owned_int.py",
+    )]))
+
+    cleanup = fixtures._cleanup_dynamic_hub.__wrapped__(request)
+    next(cleanup)
+    with pytest.raises(StopIteration):
+        next(cleanup)
+
+    allowed = live == "true" and existing_hub is None and not sas
+    assert unused.call_count == int(allowed)
+    assert delete.call_count == int(allowed)
 
 
 @pytest.fixture
