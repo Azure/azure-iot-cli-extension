@@ -707,6 +707,79 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     scenario.cleanup_full_infra.assert_called_once()
 
 
+@pytest.mark.parametrize("projection", [
+    [{"hostName": "secondary.azure-devices.net"}],
+    [{"name": "SECONDARY.azure-devices.net"}],
+    [],
+])
+def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(monkeypatch, projection):
+    scenario = Mock()
+    scenario.setup_full_infra.return_value = {"identity_resource_id": UAMI_ID}
+    scenario.create_owned_resource.return_value = _output({
+        "id": HUB_ID, "identity": {"type": "SystemAssigned, UserAssigned"},
+    })
+    monkeypatch.setattr(link_scenarios, "generate_adr_namespace_name", lambda: "ns")
+    monkeypatch.setattr(link_scenarios, "generate_dps_name", lambda: "dps")
+    monkeypatch.setattr(link_scenarios, "generate_hub_name", Mock(side_effect=["primary", "secondary", "tertiary"]))
+    events = []
+    monkeypatch.setattr(
+        link_scenarios, "link_dps_with_readiness", lambda *_args: events.append("dps ready"),
+    )
+    monkeypatch.setattr(
+        link_scenarios, "link_hub_with_readiness", lambda *_args: events.append("hub ready"),
+    )
+    dps_shows = []
+
+    def command(text):
+        events.append(text)
+        if "linked-hub" in text:
+            raise AssertionError("The namespace-linked DPS Hub list is read-only")
+        if text.startswith("iot dps show "):
+            return _output({"id": DPS_ID})
+        if "dps-cap-rejected" in text:
+            raise ArgumentUsageError(link_scenarios.DPS_CAP_EXCEEDED_MSG)
+        if (
+            " identity remove " in text or " --remove identity." in text
+            or text.startswith("iot hub create ")
+        ):
+            raise ArgumentUsageError("identity is used by an active ADR link")
+        if text.startswith("iot adr ns link dps show "):
+            dps_shows.append(text)
+            # The early show/list step precedes Hub linking. Only the later
+            # projection check may require the service-managed registration.
+            return _output({
+                "name": "dps-primary", "brownfieldHubs": projection if len(dps_shows) == 2 else [],
+            })
+        if text.startswith("iot adr ns link dps list "):
+            return _output([{"name": "dps-primary"}])
+        if text.startswith("iot adr ns link hub show "):
+            return _output({"name": "secondary"})
+        if text.startswith("iot adr ns link hub list "):
+            return _output([{"name": "secondary"}])
+        if text.startswith("iot hub show "):
+            return _output({"properties": {"deviceRegistry": {"namespaceResourceId": NS_ID}}})
+        if text.startswith("iot adr ns link dps update "):
+            raise RuntimeError("stop after projection assertion")
+        assert any(part in text for part in (" wait ", "iot hub update ", "iot hub message-route ")), text
+        return _output(None)
+
+    scenario.cmd.side_effect = command
+    expected_error = RuntimeError if projection else AssertionError
+    with pytest.raises(expected_error) as caught:
+        link_scenarios.TestADRLinkLifecycle.test_adr_link_lifecycle(scenario)
+    if projection:
+        assert str(caught.value) == "stop after projection assertion"
+    else:
+        assert "brownfieldHubs" in str(caught.value)
+    assert len(dps_shows) == 2
+    assert events.index("dps ready") < events.index("hub ready")
+    projection_index = max(i for i, text in enumerate(events) if text == dps_shows[-1])
+    assert events.index("hub ready") < projection_index
+    assert not any("linked-hub" in text for text in _commands(scenario))
+    assert any("link dps update" in text for text in _commands(scenario)) is bool(projection)
+    scenario.cleanup_full_infra.assert_called_once()
+
+
 def test_real_namespace_not_empty_translation_survives_testsdk_context_loss():
     original = HttpResponseError(message=(
         "(NamespaceNotEmpty) Namespace cannot be deleted while it contains child resources: "
