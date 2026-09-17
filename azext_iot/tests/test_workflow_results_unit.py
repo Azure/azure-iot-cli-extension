@@ -257,7 +257,10 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubControl": "190", "HubData": "360", "ADR": "120"}
+    assert budgets == {"HubControl": "225", "HubData": "360", "ADR": "120"}
+    ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
+    ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
+    assert ado_budgets == {"HubControl": 225, "HubData": 360}
     for suite, phases in BUDGETS.items():
         assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
