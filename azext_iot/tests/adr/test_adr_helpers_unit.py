@@ -89,6 +89,34 @@ def test_existing_resource_is_never_overwritten_or_recorded_for_cleanup():
     helper.cmd.assert_not_called()
 
 
+@pytest.mark.parametrize("kind", ["su", "namespace", "identity"])
+@pytest.mark.parametrize("wait_failed", [False, True])
+def test_su_lifecycle_cleanup_waits_for_exact_absence_after_one_async_delete(monkeypatch, kind, wait_failed):
+    from azext_iot.tests.adr import test_adr_link_int as link_scenarios
+
+    scenario = object.__new__(link_scenarios.TestADRLinkSU)
+    scenario.cmd = Mock()
+    wait = Mock(side_effect=AssertionError("SU deletion not complete") if wait_failed else None)
+    monkeypatch.setattr(link_scenarios, "wait_for_resource_absent", wait)
+    if kind == "su" and wait_failed:
+        with pytest.raises(AssertionError, match="SU deletion not complete"):
+            scenario._delete_owned_resource(kind, "owned", "rg")
+    else:
+        scenario._delete_owned_resource(kind, "owned", "rg")
+    prefix = {"su": "iot adr ns su instance", "namespace": "iot adr ns", "identity": "identity"}[kind]
+    suffix = " --yes --no-wait" if kind == "su" else (" --yes" if kind == "namespace" else "")
+    assert scenario.cmd.call_args_list == [
+        call(f"{prefix} show -n owned -g rg"),
+        call(f"{prefix} delete -n owned -g rg{suffix}"),
+    ]
+    if kind == "su":
+        wait.assert_called_once_with(
+            scenario, "iot adr ns su instance show -n owned -g rg", timeout=3600, interval=10,
+        )
+    else:
+        wait.assert_not_called()
+
+
 @pytest.mark.parametrize("primary_failure", [False, True])
 def test_full_infra_cleanup_reports_independent_failures_and_preserves_primary(primary_failure, caplog):
     helper = _owned_helper("identity", "namespace", "hub")
