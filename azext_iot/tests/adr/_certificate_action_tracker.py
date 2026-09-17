@@ -83,9 +83,9 @@ class CertificateActionTracker:
         self._cli_ctx = cli_ctx
         self._action_path = resource_id + "/" + action
         namespace = resource_id.rsplit("/certificateAuthorities/", 1)[0]
+        self._regional_scope = f"/subscriptions/{subscription}/providers/Microsoft.DeviceRegistry/locations/{location}"
         self._result_scopes = (
-            namespace, resource_id,
-            f"/subscriptions/{subscription}/providers/Microsoft.DeviceRegistry/locations/{location}",
+            namespace, resource_id, self._regional_scope,
         )
         self._timeout = timeout
         self._clock = clock
@@ -134,6 +134,11 @@ class CertificateActionTracker:
                 parts.path, re.IGNORECASE,
             ):
                 return parts.geturl()
+        if re.fullmatch(
+            re.escape(self._regional_scope) + r"/asyncOperationStatuses/[a-zA-Z0-9._-]+",
+            parts.path, re.IGNORECASE,
+        ):
+            return parts.geturl()
         return None
 
     @contextmanager

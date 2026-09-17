@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 import pytest
 import requests
+from azure.core.exceptions import ServiceRequestError
 from knack.util import CLIError
 
 from azext_iot.tests.adr._certificate_action_tracker import CertificateActionTracker
@@ -31,6 +32,8 @@ wire_client = sdk.wire_client
 RID = urlsplit(CA_URL).path
 ACTION_URL = CA_URL + "/revokeAndRotate"
 SECRET = "not-a-real-secret-do-not-render"
+REGIONAL_SCOPE = f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.DeviceRegistry/locations/centraluseuap"
+ASYNC_STATUS_PATH = REGIONAL_SCOPE + "/asyncOperationStatuses/1.owned-operation"
 
 
 @pytest.fixture
@@ -57,6 +60,218 @@ def tracker_factory(mocker):
 def submit(tracker, url=ACTION_URL):
     with tracker.observe():
         return requests.post(url, timeout=1)
+
+
+@pytest.fixture
+def live_action_scenario(ca_wire_cli, tracker_factory, mocker):
+    mocker.patch("azure.cli.testsdk.base.get_dummy_cli", return_value=ca_wire_cli)
+    for name, value in (
+        ("TEST_SUBSCRIPTION", SUBSCRIPTION), ("TEST_ARM_ENDPOINT", "https://management.azure.com"),
+        ("TEST_ARM_RESOURCE", "https://management.azure.com"), ("TEST_LOCATION", "centraluseuap"),
+    ):
+        mocker.patch.object(live, name, value)
+    mocker.patch.object(live, "CertificateActionTracker", side_effect=tracker_factory[0])
+    scenario = live.TestADRCAActions("test_external_activation_recipe")
+    scenario.setUp()
+    scenario._owned_ca_ids = {RID}
+    scenario._ca_actions = {}
+    try:
+        yield scenario
+    finally:
+        scenario.doCleanups()
+
+
+def test_actual_waited_activation_recipe_formats_and_projects_one_post(
+    live_action_scenario, ca_wire_cli, ca_pki, mocked_response, mocker, tmp_path,
+):
+    from azext_iot.tests.adr._certificate_fixtures import NOW
+
+    scenario = live_action_scenario
+    resource_id = RID.rsplit("/", 1)[0] + "/ica"
+    resource_url = "https://management.azure.com" + resource_id
+    before = dict(sdk._ca_resource(ca_pki, "activate"), id=resource_id, name="ica")
+    after = dict(sdk._ca_resource(ca_pki, "activate", completed=True), id=resource_id, name="ica")
+    scenario._owned_ca_ids = {resource_id, resource_id.rsplit("/certificateAuthorities/", 1)[0]}
+    scenario.kwargs.update(namespace_name="namespace", resource_group="rg")
+
+    @contextmanager
+    def owned():
+        yield "--ns {namespace_name} -g {resource_group}", before
+        scenario._ca_actions[resource_id].wait(cleanup=True)
+
+    mocker.patch.object(scenario, "_owned_target", owned)
+    mocker.patch.object(live, "datetime", mocker.Mock(now=lambda _tz: NOW))
+    chain = tmp_path / "chain.pem"
+    chain.write_text(ca_pki["chain"], encoding="utf-8")
+    mocker.patch.object(scenario, "_sign_service_csr", return_value=chain)
+    raw_fields = mocker.patch.object(scenario, "_assert_raw_fields")
+    negative_chains = mocker.spy(live, "negative_certificate_chains")
+    rejected = mocker.spy(scenario, "_rejected_ca_action")
+    tracked = mocker.spy(scenario, "_tracked_ca_action")
+    invoke = mocker.spy(ca_wire_cli, "invoke")
+    posts = []
+
+    def resource(_request):
+        return 200, {}, json.dumps(after if posts else before)
+
+    def activate(request):
+        posts.append(request)
+        return 204, {}, ""
+
+    mocked_response.add_callback("GET", resource_url, callback=resource)
+    mocked_response.add_callback("POST", resource_url + "/activate", callback=activate)
+    mocked_response.add("GET", resource_url.rsplit("/", 1)[0] + "/nonexistent-owned-ca", status=404, json={
+        "error": {"code": "ResourceNotFound", "message": "CA missing"},
+    })
+
+    scenario.test_external_activation_recipe()
+
+    assert rejected.call_count == len(negative_chains.spy_return) + 2
+    assert len(posts) == 1
+    assert json.loads(posts[0].body) == {"certificateChain": ca_pki["chain"]}
+    assert sum(call.request.method == "POST" for call in mocked_response.calls) == 1
+    assert set(scenario._ca_actions) == {resource_id}
+    assert scenario._ca_actions[resource_id].succeeded
+    raw_fields.assert_called_once_with(dict(after, resourceGroup="rg"))
+    assert tracked.spy_return.get_output_in_json() == {
+        "id": resource_id, "name": "ica", "properties": after["properties"],
+        "prov": "Succeeded", "status": "Active",
+    }
+    command = tracked.call_args.args[1]
+    assert "{namespace_name}" in command and "{resource_group}" in command
+    old_command = command.replace("{{id:", "{id:").replace("status}}'", "status}'")
+    invocation_count = invoke.call_count
+    with pytest.raises(KeyError, match="Key 'id' not found"):
+        scenario.cmd(old_command)
+    assert invoke.call_count == invocation_count
+    assert len(posts) == 1
+
+
+@pytest.mark.parametrize("command,error", [
+    ("iot adr ns ca activate --query '{id:id}'", KeyError),
+    ("iot adr ns ca activate --ns {unregistered_namespace}", KeyError),
+    ("iot adr ns ca activate --query '{'", ValueError),
+])
+def test_formatting_rejection_precedes_tracker_registration_and_cli(
+    command, error, live_action_scenario, ca_wire_cli, mocked_response, mocker,
+):
+    scenario = live_action_scenario
+    register = mocker.spy(scenario, "_new_ca_tracker")
+    cmd = mocker.spy(scenario, "cmd")
+    invoke = mocker.spy(ca_wire_cli, "invoke")
+    with pytest.raises(error):
+        scenario._tracked_ca_action({"id": RID}, command, "activate")
+    register.assert_not_called()
+    cmd.assert_not_called()
+    invoke.assert_not_called()
+    assert scenario._ca_actions == {}
+    assert not mocked_response.calls
+
+
+@pytest.mark.parametrize("lost_ack", [False, True])
+def test_execution_failure_retains_receipt_and_no_replay(
+    lost_ack, live_action_scenario, mocked_response, mocker,
+):
+    scenario = live_action_scenario
+    command = "iot adr ns ca revoke -n ca --ns namespace -g rg -y --no-wait"
+    if lost_ack:
+        mocked_response.add("GET", CA_URL, json={
+            "properties": {"certificateAuthorityType": "ICA", "issuer": {"issuerType": "Microsoft"}},
+        })
+        mocked_response.add("POST", ACTION_URL, body=requests.ConnectionError("POST acknowledgement lost"))
+        error, message = ServiceRequestError, "acknowledgement lost"
+    else:
+        mocker.patch.object(scenario, "cmd", side_effect=CLIError("local execution failed"))
+        error, message = CLIError, "local execution failed"
+    with pytest.raises(error, match=message):
+        scenario._tracked_ca_action({"id": RID}, command, "revokeAndRotate")
+    tracker = scenario._ca_actions[RID]
+    assert tracker.submitted == lost_ack
+    assert tracker.acknowledgement_status is None
+    with pytest.raises(AssertionError, match="quarantine"):
+        tracker.wait(cleanup=True)
+    with pytest.raises(AssertionError, match="Refusing to replay"):
+        scenario._tracked_ca_action({"id": RID}, command, "revokeAndRotate")
+    assert scenario._ca_actions[RID] is tracker
+    assert not tracker.terminal
+    assert sum(call.request.method == "POST" for call in mocked_response.calls) == int(lost_ack)
+
+
+@pytest.mark.parametrize("endpoint", ["https://management.azure.com", "https://centraluseuap.management.azure.com"])
+@pytest.mark.parametrize("relative", [False, True])
+def test_regional_async_status_location_keeps_exact_scope(endpoint, relative, tracker_factory, mocked_response):
+    tracker = tracker_factory[0](endpoint=endpoint)
+    location = ASYNC_STATUS_PATH if relative else endpoint + ASYNC_STATUS_PATH
+    action_url = endpoint + RID + "/revokeAndRotate"
+    mocked_response.add("POST", action_url, status=202, headers={"Location": location})
+    mocked_response.add("GET", endpoint + ASYNC_STATUS_PATH, json={"status": "Succeeded"})
+    submit(tracker, action_url)
+    tracker.wait()
+    assert tracker.succeeded and tracker.acknowledgement_status == 202
+    assert [call.request.method for call in mocked_response.calls] == ["POST", "GET"]
+    tracker_factory[2].assert_called_once_with(resource="https://management.azure.com", subscription=SUBSCRIPTION)
+
+
+@pytest.mark.parametrize("location", [
+    "https://foreign.invalid" + ASYNC_STATUS_PATH,
+    "https://centraluseuap.management.azure.com" + ASYNC_STATUS_PATH,
+    "http://management.azure.com" + ASYNC_STATUS_PATH,
+    "https://user:password@management.azure.com" + ASYNC_STATUS_PATH,
+    ASYNC_STATUS_PATH.replace(SUBSCRIPTION, "11111111-1111-1111-1111-111111111111"),
+    ASYNC_STATUS_PATH.replace("centraluseuap", "westus"),
+    ASYNC_STATUS_PATH.replace("Microsoft.DeviceRegistry", "Microsoft.Other"),
+    RID.rsplit("/certificateAuthorities/", 1)[0] + "/asyncOperationStatuses/op",
+    RID + "/asyncOperationStatuses/op",
+    ASYNC_STATUS_PATH + "#fragment",
+    ASYNC_STATUS_PATH.replace("1.owned-operation", "%2e%2e"),
+    ASYNC_STATUS_PATH.replace("1.owned-operation", "%252e%252e"),
+    ASYNC_STATUS_PATH.replace("1.owned-operation", "op%2fescape"),
+    ASYNC_STATUS_PATH.replace("/asyncOperationStatuses/", "/../westus/asyncOperationStatuses/"),
+    ASYNC_STATUS_PATH.replace("/asyncOperationStatuses/", "//asyncOperationStatuses/"),
+    ASYNC_STATUS_PATH.replace("/asyncOperationStatuses/", "\\asyncOperationStatuses/"),
+    ASYNC_STATUS_PATH.replace("1.owned-operation", ""),
+    ASYNC_STATUS_PATH + "/child",
+    ASYNC_STATUS_PATH + " ",
+])
+def test_unapproved_async_status_locations_remain_quarantined(location, tracker_factory, mocked_response):
+    tracker = tracker_factory[0]()
+    mocked_response.add("POST", ACTION_URL, status=202, headers={"Location": location})
+    submit(tracker)
+    for cleanup in (False, True):
+        with pytest.raises(AssertionError, match="quarantine"):
+            tracker.wait(cleanup=cleanup)
+    assert len(mocked_response.calls) == 1
+    assert not tracker.terminal
+    tracker_factory[2].assert_not_called()
+
+
+def test_regional_status_403_quarantines_without_replay_or_privilege_fallback(
+    live_action_scenario, tracker_factory, mocked_response, mocker, caplog,
+):
+    scenario = live_action_scenario
+    tracker = tracker_factory[0]()
+    scenario._ca_actions[RID] = tracker
+    command = mocker.spy(scenario, "cmd")
+    location = "https://management.azure.com" + ASYNC_STATUS_PATH
+    mocked_response.add("POST", ACTION_URL, status=202, headers={"Location": location})
+    mocked_response.add("GET", location, status=403, json={"error": {"message": SECRET}})
+    submit(tracker)
+    for cleanup in (False, True):
+        with pytest.raises(AssertionError, match="status GET rejected with HTTP 403") as error:
+            tracker.wait(cleanup=cleanup)
+        assert SECRET not in str(error.value) + caplog.text
+    with pytest.raises(AssertionError, match="Refusing to replay"):
+        scenario._tracked_ca_action({"id": RID}, "iot adr ns ca revoke -n ca --ns namespace -g rg -y", "revokeAndRotate")
+    command.assert_not_called()
+    assert not tracker.terminal and not tracker.succeeded
+    assert tracker.acknowledgement_status == 202 and tracker._url == location
+    assert scenario._ca_actions[RID] is tracker
+    assert [(call.request.method, call.request.url) for call in mocked_response.calls] == [
+        ("POST", ACTION_URL), ("GET", location), ("GET", location),
+    ]
+    assert tracker_factory[2].call_args_list == [
+        mocker.call(resource="https://management.azure.com", subscription=SUBSCRIPTION),
+    ] * 2
 
 
 @pytest.mark.parametrize("initial,final,body", [
