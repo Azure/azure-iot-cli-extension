@@ -154,8 +154,8 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     2. Step 1: create a standalone DPS without classic Hub registrations,
        then ``link dps add`` to attach the DPS to the namespace
     3. Step 2: ``link dps show`` / ``list`` projects the DPS endpoint
-    4. Step 3-4: secondary Hub linked with **UAMI**, then registered on DPS;
-       ``brownfieldHubs`` must enumerate this already namespace-linked Hub
+    4. Step 3-4: secondary Hub linked with **UAMI**; the read-only DPS
+       ``brownfieldHubs`` projection must enumerate this namespace-linked Hub
     5. Step 5-6: tertiary Hub linked with **SAMI** + multi-hub list assertion
     6. Step 7-8: ``link hub update`` rotates inbound identities
     7. Step 9: ``link dps update`` rotates DPS identity
@@ -199,8 +199,8 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             # properties.messaging.endpoints collection is the only ownership
             # model, and link tests add endpoint entries explicitly.
 
-            # A classic DPS registration must not reference a Hub absent from
-            # the namespace. Seed it only after the namespace Hub link succeeds.
+            # DPS must be linked before adding namespace Hubs. Once linked,
+            # its Hub list is service-managed and cannot be seeded manually.
             with timed_step("Step 1 ❯ link dps add"):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
@@ -394,12 +394,10 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "Hub list returned %d entry/entries", len(names))
 
-            with timed_step("Verify classic DPS projection after namespace Hub linking"):
-                self.cmd(
-                    f"iot dps linked-hub create --dps-name {dps_name} -g {rg} "
-                    f"--hub-name {secondary_hub} --hub-resource-group {rg} "
-                    f"--authentication-type UserAssigned --user-assigned-identity {identity_resource_id}"
-                )
+            with timed_step("Verify read-only DPS projection after namespace Hub linking"):
+                # Do not call classic linked-hub create here: DPS rejects Hub
+                # list mutations while namespace linking is Succeeded/InProgress.
+                # Keep the membership assertion against the actual projection.
                 shown = self.cmd(
                     f"iot adr ns link dps show --ns {namespace_name} -g {rg} -n {dps_endpoint}"
                 ).get_output_in_json()
