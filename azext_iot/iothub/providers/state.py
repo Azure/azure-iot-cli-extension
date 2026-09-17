@@ -543,9 +543,14 @@ class StateProvider(IoTHubProvider):
 
             # create the device identity from the device twin
             # primary and secondary keys show up in the "show" output but not in the "list" output
+            # x509Thumbprint is not always present on the twin (for example sas or certificate
+            # authority authenticated devices), so fall back to an empty thumbprint pair
             authentication = {
                 "type": device_twin.pop("authenticationType"),
-                "x509Thumbprint": device_twin.pop("x509Thumbprint")
+                "x509Thumbprint": device_twin.pop("x509Thumbprint", None) or {
+                    "primaryThumbprint": None,
+                    "secondaryThumbprint": None,
+                }
             }
             if authentication["type"] == DeviceAuthApiType.sas.value:
                 # Cannot retrieve the sas key for some reason - throw out the device
