@@ -6,6 +6,7 @@
 
 import json
 import os
+import tempfile
 from typing import Dict, List, Optional
 
 from azure.cli.core.azclierror import (AzCLIError, BadRequestError,
@@ -55,6 +56,50 @@ def _endpoint_resource_name(endpoint_uri: str) -> str:
     account) parsed from a routing endpoint URI -- i.e. the first label of the host."""
     from urllib.parse import urlparse
     return (urlparse(endpoint_uri).hostname or "").split(".")[0]
+
+
+def _write_state_file(hub_state: dict, state_file: str):
+    """Serialize the hub state to state_file atomically.
+
+    The state is written to a temporary file in the destination directory and then moved into
+    place, so an interrupted or failing write can never truncate a previously good state file.
+    """
+    destination = os.path.abspath(state_file)
+    directory = os.path.dirname(destination) or "."
+
+    file_descriptor, temp_path = tempfile.mkstemp(
+        prefix=os.path.basename(destination) + ".", suffix=".partial", dir=directory
+    )
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
+            json.dump(hub_state, f, indent=4, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, destination)
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                logger.debug("Could not remove temporary state file %s.", temp_path)
+        raise
+
+
+def _write_fallback_state_file(hub_state: dict, hub_name: Optional[str]) -> Optional[str]:
+    """Best effort dump of an already collected hub state to a temporary file.
+
+    Returns the path written, or None if even the fallback location is unusable.
+    """
+    try:
+        file_descriptor, fallback_path = tempfile.mkstemp(
+            prefix="iot-hub-state-{}-".format(hub_name or "export"), suffix=".json"
+        )
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
+            json.dump(hub_state, f, indent=4, sort_keys=True)
+        return fallback_path
+    except Exception as fallback_error:
+        logger.debug("Could not write fallback state file: %s", fallback_error)
+        return None
 
 
 class StateProvider(IoTHubProvider):
@@ -109,13 +154,20 @@ class StateProvider(IoTHubProvider):
         hub_state = self.process_hub_to_dict(self.target, hub_aspects)
 
         try:
-            with open(state_file, 'w', encoding='utf-8') as f:
-                json.dump(hub_state, f, indent=4, sort_keys=True)
-
+            _write_state_file(hub_state, state_file)
             logger.info(usr_msgs.SAVE_STATE_MSG.format(self.hub_name, state_file))
-
-        except FileNotFoundError:
-            raise FileOperationError(usr_msgs.FILE_NOT_FOUND_ERROR.format(state_file))
+        except OSError as write_error:
+            # Collecting the hub state can take hours on large hubs. Never discard it just
+            # because the requested destination turned out to be unusable - fall back to a
+            # temporary file and tell the user where to find it.
+            fallback_file = _write_fallback_state_file(hub_state, self.hub_name)
+            if fallback_file:
+                raise FileOperationError(
+                    usr_msgs.SAVE_STATE_FALLBACK_ERROR.format(state_file, write_error, fallback_file)
+                )
+            if isinstance(write_error, FileNotFoundError):
+                raise FileOperationError(usr_msgs.FILE_NOT_FOUND_ERROR.format(state_file))
+            raise FileOperationError(usr_msgs.SAVE_STATE_WRITE_ERROR.format(state_file, write_error))
 
     def upload_state(self, state_file: str, replace: bool = False, hub_aspects: Optional[List[str]] = None):
         """Main command that uses hub state from file to recreate the hub state"""
