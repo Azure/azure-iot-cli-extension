@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from pathlib import Path
 import subprocess
 from typing import Optional
 from unittest.mock import MagicMock, Mock, create_autospec, patch
@@ -193,10 +194,12 @@ def run_adr_integration_preflight(config):
 @pytest.fixture(scope="session", autouse=True)
 def adr_integration_preflight(request):
     """Validate mandatory live-test infrastructure once per ADR integration run."""
-    integration_items = [
-        item for item in request.session.items if "_int.py" in item.nodeid
-    ]
-    if not integration_items:
+    adr_directory = Path(__file__).resolve().parent
+    # Unit parameter IDs can contain integration node IDs from other services.
+    if not any(
+        item.path.name.endswith("_int.py") and adr_directory in item.path.resolve().parents
+        for item in request.session.items
+    ):
         return
 
     run_adr_integration_preflight(request.config)
@@ -230,7 +233,7 @@ def mock_wait_for_terminal_state(request, monkeypatch):
 
     Skipped for integration tests (_int.py) which need real polling delays.
     """
-    if "_int" in request.node.nodeid:
+    if request.node.path.name.endswith("_int.py"):
         return
 
     def fast_wait(poller, **kwargs):

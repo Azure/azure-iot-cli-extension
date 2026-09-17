@@ -9,6 +9,7 @@
 from copy import deepcopy
 import json
 import logging
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -87,7 +88,12 @@ def owned_phase(tmp_path, monkeypatch, request):
     manager = SimpleNamespace(get_plugin=Mock(return_value=runtime))
     fixture_request = SimpleNamespace(
         config=SimpleNamespace(pluginmanager=manager),
-        session=SimpleNamespace(items=[SimpleNamespace(nodeid=node) for node in expected]),
+        session=SimpleNamespace(items=[
+            SimpleNamespace(
+                nodeid=node, path=Path(fixtures.__file__).resolve().parents[3] / node.partition("::")[0],
+            )
+            for node in expected
+        ]),
     )
 
     def invoke(command, **kwargs):
@@ -348,7 +354,9 @@ def test_existing_non_dynamic_and_sas_cleanup_remain_separate(owned_phase, monke
     elif bypass == "offline":
         monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "false")
     else:
-        fixture.request.session.items = [SimpleNamespace(nodeid="test_example_unit.py::test_case")]
+        fixture.request.session.items = [SimpleNamespace(
+            path=Path(fixtures.__file__).resolve().parent / "test_example_unit.py",
+        )]
     with pytest.raises(StopIteration):
         finish_cleanup(fixture.request)
     fixture.manager.get_plugin.assert_not_called()
