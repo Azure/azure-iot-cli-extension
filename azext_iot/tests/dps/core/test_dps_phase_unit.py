@@ -37,7 +37,7 @@ def _regular_items():
 @pytest.mark.parametrize("phase", [_phase.REGULAR, _phase.SERVICE_SAS])
 def test_pending_cross_service_certificate_tests_are_not_wired_into_these_phases(monkeypatch, mocker, phase):
     monkeypatch.setenv(_phase.PHASE_ENV, phase)
-    certificates = [_item(f"certificate.py::{name}[login]") for name in _phase.PENDING_CERTIFICATE_TESTS]
+    certificates = [_item(f"test_certificate_int.py::{name}[login]") for name in _phase.PENDING_CERTIFICATE_TESTS]
     items = _regular_items() + _sas_items() + certificates
     _phase.select_items(mocker.Mock(), items)
     assert not any(item in items for item in certificates)
@@ -123,7 +123,7 @@ def test_requested_sas_phase_cannot_succeed_with_missing_or_extra_cases(monkeypa
     elif invalid_selection == "filtered":
         items.pop()
     elif invalid_selection == "unexpected":
-        items[-1] = _item("other.py::unexpected", True)
+        items[-1] = _item("test_other_int.py::unexpected", True)
     else:
         items.append(items[0])
     config = mocker.Mock()

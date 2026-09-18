@@ -71,6 +71,20 @@ def test_default_selection_never_runs_policy_toggles(monkeypatch, mocker):
     assert not items
 
 
+def test_explicit_toggle_ignores_unit_parameter_ids_naming_integration_files(isolated, mocker):
+    expected = _items()
+    unit = SimpleNamespace(
+        nodeid="test_fixture_unit.py::test_contract[test_dps_disable_local_auth_int.py]",
+        path=Path(__file__),
+        get_closest_marker=lambda marker: live.pytestmark if marker == _phase.LOCAL_AUTH_TOGGLE_MARKER else None,
+    )
+    items = expected + [unit]
+    config = mocker.Mock()
+    _phase.select_items(config, items)
+    assert items == expected
+    config.hook.pytest_deselected.assert_called_once_with(items=[unit])
+
+
 @pytest.mark.parametrize("defect", ["missing", "duplicate", "unexpected", "empty"])
 def test_toggle_requires_exact_three_cases(isolated, mocker, defect):
     items = _items()
