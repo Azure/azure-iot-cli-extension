@@ -46,11 +46,11 @@ on:
         type: boolean
         default: true
       testHubControl:
-        description: "Run owned IoT Hub control-plane tests"
+        description: "Run IoT Hub control-plane tests"
         type: boolean
         default: true
       testHubData:
-        description: "Run owned IoT Hub data-plane tests (Entra and SAS)"
+        description: "Run IoT Hub data-plane tests"
         type: boolean
         default: true
       testADU:
