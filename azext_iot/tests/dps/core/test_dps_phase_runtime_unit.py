@@ -700,7 +700,8 @@ def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker, unlink_on_r
 @pytest.mark.skipif(sys.platform != "linux", reason="Receipt-enabled DPS workers require Linux.")
 @pytest.mark.timeout(15)
 @pytest.mark.parametrize("outcome", ["success", "uncertain-visible", "uncertain", "cancelled", "terminated"])
-def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocker, outcome):
+@pytest.mark.parametrize("release_delay", [0.05, 0.75], ids=["normal", "delayed-release"])
+def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocker, outcome, release_delay):
     from azext_iot.tests import helpers
 
     owned = _owned("hub").removeprefix(ARM)
@@ -737,7 +738,10 @@ def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocke
         if label == "waiter":
             waiter_started.set()
         try:
-            runtime.assign_role_assignment_once("role", owned, "caller-alias", max_tries=10, wait=0.05)
+            # Successful contention must tolerate process scheduling and receipt fsync.
+            # Deadline behavior is covered independently; negative visibility cases stay short.
+            max_tries = 100 if outcome in ("success", "uncertain-visible") else 10
+            runtime.assign_role_assignment_once("role", owned, "caller-alias", max_tries=max_tries, wait=0.05)
         except BaseException as error:  # pylint: disable=broad-except
             results.put((label, type(error).__name__))
         else:
@@ -752,7 +756,7 @@ def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocke
         assert creating.wait(5)
         waiter.start()
         assert waiter_started.wait(5)
-        time.sleep(0.05)
+        time.sleep(release_delay)
         assert reads.value == creates.value == 1  # Waiter is behind the real cross-process FileLock.
         if outcome == "terminated":
             os.kill(owner.pid, signal.SIGTERM)
