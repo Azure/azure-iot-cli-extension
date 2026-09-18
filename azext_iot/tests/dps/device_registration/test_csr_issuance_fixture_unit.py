@@ -560,10 +560,10 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
             if failure == "create":
                 raise ForbiddenError("create rejected")
             assert "--query" in args and "primaryKey" not in args[args.index("--query") + 1]
-            body = dict(
-                registrationId=enrollment_id, namespaceName=resource["namespace"],
-                certificateAuthorityName=resource["ca"], certificatePolicyName=resource["policy"],
-            )
+            body = {
+                "registrationId": enrollment_id, "namespaceName": resource["namespace"],
+                "certificateAuthorityName": resource["ca"], "certificatePolicyName": resource["policy"],
+            }
         elif "enrollment delete" in command:
             existing = False
             body = None
