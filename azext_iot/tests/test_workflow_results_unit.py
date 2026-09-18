@@ -270,14 +270,14 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert '"DPS|azext_iot/tests/dps|DPS-int|120"' in matrix["run"]
+    assert '"DPS|azext_iot/tests/dps|DPS-int|150"' in matrix["run"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in steps if step.get("id") == "run_tests")
     assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
     assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
-    assert "certificate coverage is not configured in this workflow" in step["run"]
+    assert "including owned CSR issuance" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
     assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]

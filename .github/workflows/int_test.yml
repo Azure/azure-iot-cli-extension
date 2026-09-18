@@ -142,7 +142,7 @@ jobs:
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
             # Regular -> service-SAS -> serial local-auth-toggle; certificate is not wired.
-            "DPS|azext_iot/tests/dps|DPS-int|120"
+            "DPS|azext_iot/tests/dps|DPS-int|150"
             # Controller ceilings 210/345 minutes plus 15 minutes external setup; GH cap is 360.
             "HubControl|azext_iot/tests/iothub|HubControl-int|225"
             "HubData|azext_iot/tests/iothub|HubData-int|360"

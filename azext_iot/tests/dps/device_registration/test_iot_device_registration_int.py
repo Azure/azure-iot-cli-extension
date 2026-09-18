@@ -4,9 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Deadline registration coverage, with opt-in certificate-issuance prerequisites."""
+"""Deadline registration and self-contained, receipt-owned certificate issuance."""
 
-import os
+from shlex import quote
 
 import pytest
 from azure.cli.core.azclierror import UnauthorizedError
@@ -14,21 +14,12 @@ from azure.cli.core.azclierror import UnauthorizedError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.dps.device_registration import check_hub_device
+from azext_iot.tests.dps._csr import temporary_csr
+from azext_iot.tests.dps._csr_issuance import enrollment, invoke
 from azext_iot.tests.generators import generate_names
 
 
 cli = EmbeddedCLI()
-
-
-def _required_environment(*names):
-    values = {name: os.getenv(name, "").strip() for name in names}
-    missing = [name for name, value in values.items() if not value]
-    if missing:
-        pytest.skip(
-            "Set these variables for DPS device 2026-11-02 integration "
-            f"coverage: {', '.join(missing)}"
-        )
-    return values
 
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
@@ -70,41 +61,38 @@ def test_register_without_csr_deadline_contract(provisioned_iot_dps_module, time
 
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
-def test_register_and_issue_certificate_contract(timeout):
-    values = _required_environment(
-        "azext_iot_dps_device_name",
-        "azext_iot_dps_device_resource_group",
-        "azext_iot_dps_device_id_scope",
-        "azext_iot_dps_device_registration_id",
-        "azext_iot_dps_device_csr_path",
+@pytest.mark.timeout(2700)
+def test_register_and_issue_certificate_contract(provisioned_csr_issuance, tmp_path, timeout):
+    resource = provisioned_csr_issuance
+    dps = resource["dps"]
+    registration_id = generate_names()
+    context = (
+        f"--dps-name {dps['name']} -g {dps['resourceGroup']} "
+        f"--id-scope {dps['dps']['properties']['idScope']} --registration-id {registration_id} --auth-type login"
     )
-    command = (
-        "iot device registration create "
-        f"--dps-name '{values['azext_iot_dps_device_name']}' "
-        f"--resource-group '{values['azext_iot_dps_device_resource_group']}' "
-        f"--id-scope '{values['azext_iot_dps_device_id_scope']}' "
-        f"--registration-id '{values['azext_iot_dps_device_registration_id']}' "
-        f"--csr '{values['azext_iot_dps_device_csr_path']}' --auth-type login"
-    )
-    if timeout is not None:
-        command += f" --timeout {timeout}"
-    result = cli.invoke(command, capture_stderr=True).as_json()
+    with temporary_csr(tmp_path, registration_id) as csr, enrollment(resource, registration_id) as ownership:
+        command = f"iot device registration create {context} --csr {quote(str(csr))}"
+        if timeout is not None:
+            command += f" --timeout {timeout}"
+        ownership.before_submit()
+        result = invoke(command).as_json()
+        ownership.record_result(result)
 
-    assert result["operationId"]
-    assert result["status"] == "assigned"
-    state = result.get("registrationState") or {}
-    assert state.get("connectionProfile") in {"Classic", "MqttV5"}
-    assert state.get("issuedCertificateChain")
-    assert state.get("registryDeviceExternalId")
+        assert result["operationId"]
+        assert result["status"] == "assigned"
+        state = result["registrationState"]
+        assert state["registrationId"] == registration_id
+        assert state["deviceId"] == registration_id
+        properties = resource["hub"]["hub"]["properties"]
+        assert state["assignedHub"] in {properties["hostName"], properties["deviceHostName"]}
+        assert state["connectionProfile"] in {"Classic", "MqttV5"}
+        assert state["issuedCertificateChain"]
+        assert state["registryDeviceExternalId"]
 
-    followed = cli.invoke(
-        "iot device registration operation-status "
-        f"--dps-name '{values['azext_iot_dps_device_name']}' "
-        f"--resource-group '{values['azext_iot_dps_device_resource_group']}' "
-        f"--id-scope '{values['azext_iot_dps_device_id_scope']}' "
-        f"--registration-id '{values['azext_iot_dps_device_registration_id']}' "
-        f"--operation-id '{result['operationId']}' --auth-type login",
-        capture_stderr=True,
-    ).as_json()
-    assert followed["operationId"] == result["operationId"]
-    assert followed["status"] == "assigned"
+        followed = invoke(
+            f"iot device registration operation-status {context} --operation-id {quote(result['operationId'])}"
+        ).as_json()
+        ownership.record_result(followed)
+        assert followed["operationId"] == result["operationId"]
+        assert followed["status"] == "assigned"
+        assert followed["registrationState"]["registrationId"] == registration_id

@@ -79,8 +79,8 @@ def test_selection_is_explicit_exact_branch_known_and_canonical(suite, phase):
      "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets"),
     ("HubData", "linked-metadata",
      "azext_iot/tests/iothub/metadata/test_hub_metadata_int.py::test_linked_metadata_state_and_service_bulk_portability"),
-    ("DPS", "regular", "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py::"
-     "test_register_and_issue_certificate_contract[default]"),
+    ("DPS", "regular", "azext_iot/tests/dps/enrollment/test_iot_dps_enrollment_int.py::"
+     "test_dps_enrollment_adr_certificate_reference_round_trip"),
 ])
 def test_excluded_or_separately_opted_in_nodes_are_not_debug_authority(suite, phase, node):
     with pytest.raises(ValueError):
@@ -232,8 +232,9 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None):
-    chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
+    if chosen is None:
+        chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
 
     def execute(command, env, log, runtime, cleanup, cancelled):
@@ -251,6 +252,11 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         result = _execution(command, regular_env, log, runtime, cleanup, cancelled)
         directory = Path(env["azext_iot_dps_phase_receipts"])
         short = [dps.MANIFEST["normalize_nodeid"](node) for node in expected]
+        if phase == "regular" and short and set(short) <= dps.MANIFEST["CSR_NODEIDS"]:
+            for kind in dps.MANIFEST["resource_kinds"](phase):
+                if kind not in dps.MANIFEST["CSR_RESOURCE_KINDS"]:
+                    (directory / f"owned-{kind}.json").unlink()
+                    (directory / f"created-{kind}.json").unlink()
         for path in directory.glob("selection-*.json"):
             path.write_text(json.dumps({"selected": len(short), "nodeids": sorted(short), **focused.provenance(debug)}))
         tree = ET.parse(env["azext_iot_dps_junit"])
@@ -268,6 +274,11 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         if defect == "uncertain":
             for path in directory.glob("created-*.json"):
                 path.unlink()
+        elif defect == "wrong-resource-type":
+            path = directory / "owned-csrns.json"
+            record = json.loads(path.read_text())
+            record["id"] = record["id"].replace("Microsoft.DeviceRegistry/namespaces", "Microsoft.Devices/provisioningServices")
+            path.write_text(json.dumps(record))
         if defect in ("timed_out", "interrupted"):
             result[defect] = True
         return result
@@ -316,6 +327,115 @@ def test_debug_does_not_reduce_conservative_capacity(tmp_path, monkeypatch, suit
         result, summary, _, _, captured = run_hub(tmp_path, monkeypatch, suite, phase, reader=HubReader(49))
     assert result == 1 and summary["status"] == "debug-failed"
     assert not captured
+
+
+def csr_nodes():
+    return sorted(focused.DPS_PREFIX + node for node in dps.MANIFEST["CSR_NODEIDS"])
+
+
+@pytest.mark.parametrize("count", [7, 9, 10])
+@pytest.mark.parametrize("variant", ["default", "deadline", "both"])
+def test_csr_only_debug_reserves_one_dps_with_consistent_metadata(tmp_path, monkeypatch, count, variant):
+    chosen = [node for node in csr_nodes() if variant == "both" or node.endswith(f"[{variant}]")]
+    reader = DpsReader(count)
+    for index, resource in enumerate(reader.resources):
+        resource["location"] = "centraluseuap" if index < 4 else "westus"
+    result, summary, captured = run_dps(tmp_path, monkeypatch, "regular", chosen=chosen, reader=reader)
+    allowed = count < 10
+    assert result == (0 if allowed else 1)
+    assert summary["status"] == ("debug-passed" if allowed else "debug-failed")
+    assert summary["qualifiesFullSuite"] is False
+    assert summary["debug"] == focused.select("DPS", "regular", chosen)
+    capacity = summary["baseline"]["capacity"]
+    assert (capacity["count"], capacity["required"], capacity["limit"], capacity["ready"]) == (count, 1, 10, allowed)
+    assert len(captured) == (1 if allowed else 0)
+    assert GATE["evaluate_dps_phases"](tmp_path)
+    if allowed:
+        phase = summary["phases"][0]
+        assert phase["cleanup"]["complete"]
+        assert phase["cleanup"]["capacity"] == capacity
+        saved = hub.read_json(tmp_path / "dps-phases/regular/result.json")
+        assert saved == phase
+        receipts = tmp_path / "dps-phases/regular/receipts"
+        records = [hub.read_json(path) for path in receipts.glob("owned-*.json")]
+        assert {record["kind"] for record in records} == set(dps.MANIFEST["CSR_RESOURCE_KINDS"])
+        assert sum("/provisioningServices/" in record["id"] for record in records) == 1
+        assert set(reader.gets).isdisjoint(capacity["ids"])
+    else:
+        assert "1 managed DPS slot" in summary["error"]["message"]
+        assert not reader.gets
+
+
+@pytest.mark.parametrize("defect", ["uncertain", "wrong-resource-type"])
+def test_one_slot_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect):
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(7), defect=defect,
+    )
+    assert len(captured) == 1
+    assert result == 1 and summary["status"] == "debug-failed"
+    assert summary["baseline"]["capacity"]["required"] == 1
+    assert not summary["phases"][0]["cleanup"]["complete"]
+    assert GATE["evaluate_dps_phases"](tmp_path)
+
+
+@pytest.mark.parametrize("selection", ["full", "empty-full", "mixed", "other", "service-sas", "local-auth-toggle"])
+def test_seven_existing_dps_still_block_all_non_csr_only_selections(tmp_path, monkeypatch, selection):
+    if selection in ("full", "empty-full"):
+        execute = Mock()
+        result = dps.run(
+            SUB, GROUP, tmp_path / "dps-phases", DpsReader(7), execute=execute,
+            debug_nodes=[] if selection == "empty-full" else None,
+        )
+        summary = hub.read_json(tmp_path / "dps-phases.json")
+        execute.assert_not_called()
+    else:
+        phase = selection if selection in ("service-sas", "local-auth-toggle") else "regular"
+        chosen = nodes("DPS", phase)[:1] + (csr_nodes() if selection == "mixed" else [])
+        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, chosen=chosen, reader=DpsReader(7))
+        assert not captured
+    assert result == 1
+    assert summary["baseline"]["capacity"]["required"] == 4
+    assert summary["baseline"]["capacity"]["limit"] == 10
+    assert summary["baseline"]["capacity"]["ready"] is False
+
+
+@pytest.mark.parametrize("defect", ["empty", "duplicate", "unknown", "no-phase", "wrong-phase"])
+def test_invalid_csr_debug_is_rejected_before_inventory_or_launch(tmp_path, defect):
+    phase, chosen = "regular", csr_nodes()
+    if defect == "empty":
+        chosen = []
+    elif defect == "duplicate":
+        chosen.append(chosen[0])
+    elif defect == "unknown":
+        chosen.append(chosen[0] + "-unknown")
+    elif defect == "no-phase":
+        phase = None
+    else:
+        phase = "service-sas"
+    reader, execute = Mock(), Mock()
+    with pytest.raises(ValueError):
+        dps.run(SUB, GROUP, tmp_path / "must-not-exist", reader, execute=execute,
+                debug_phase=phase, debug_nodes=chosen)
+    reader.inventory.assert_not_called()
+    execute.assert_not_called()
+    assert not (tmp_path / "must-not-exist").exists()
+
+
+@pytest.mark.parametrize("defect", ["empty", "suite", "phase", "manifest", "nodes", "duplicate"])
+def test_capacity_cannot_trust_a_forged_or_stale_debug_envelope(defect):
+    debug = focused.select("DPS", "regular", csr_nodes())
+    if defect == "empty":
+        debug = {}
+    elif defect == "nodes":
+        debug["requestedNodes"] = []
+    elif defect == "duplicate":
+        debug["requestedNodes"].append(debug["requestedNodes"][0])
+    else:
+        field = "manifestSha256" if defect == "manifest" else defect
+        debug[field] = "foreign"
+    with pytest.raises((ValueError, dps.PhaseError)):
+        dps.required_slots(debug)
+    assert dps.required_slots() == 4
 
 
 @pytest.mark.parametrize("platform", ["win32", "darwin"])

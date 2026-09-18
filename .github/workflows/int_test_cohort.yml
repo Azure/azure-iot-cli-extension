@@ -137,7 +137,7 @@ jobs:
           set -o pipefail
           run_service() {
             if [ "$TEST_SERVICE" = "DPS" ]; then
-              echo "DPS coverage: regular, service-SAS and serial local-auth-toggle; certificate coverage is not configured in this workflow."
+              echo "DPS coverage: regular (including owned CSR issuance), service-SAS and serial local-auth-toggle."
               .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
                 --region "$TEST_REGION"

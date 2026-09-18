@@ -30,16 +30,16 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 ARM = "https://centraluseuap.management.azure.com"
 PHASES = (
-    ("regular", 20 * 60, 5 * 60),
+    ("regular", 45 * 60, 10 * 60),
     ("service-sas", 40 * 60, 10 * 60),
     ("local-auth-toggle", 20 * 60, 5 * 60),
 )
-RUNNER_SECONDS = 110 * 60
+RUNNER_SECONDS = 140 * 60
 READ_SECONDS = 60
-DPS_LIMIT = 10  # Conservative subscription default; the DPS SDK exposes no quota-read operation.
-REQUIRED_SLOTS = 3  # Two shared DPS fixtures plus one sequential capacity-validation resource.
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
+DPS_LIMIT = MANIFEST["DPS_LIMIT"]
+REQUIRED_SLOTS = MANIFEST["REGULAR_REQUIRED_DPS_SLOTS"]
 
 
 class PhaseError(RuntimeError):
@@ -204,6 +204,7 @@ class ArmReader:
         from azext_iot._factory import _ADR_DPS_API_VERSION, _ADR_IOT_HUB_API_VERSION
         from azext_iot.sdk.dps.mgmt import IotDpsClient
         from azext_iot.sdk.iothub.mgmt import IotHubClient
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
         self.subscription = subscription
         self.deadline = None
@@ -247,6 +248,7 @@ class ArmReader:
             )
         self.dps = client(IotDpsClient, _ADR_DPS_API_VERSION)
         self.hub = client(IotHubClient, _ADR_IOT_HUB_API_VERSION)
+        self.adr = client(DeviceRegistryMgmtClient, "2026-11-02-preview")
 
     @staticmethod
     def snapshot(resource):
@@ -270,9 +272,12 @@ class ArmReader:
         from azure.core.exceptions import HttpResponseError
         with bounded_read(self.deadline):
             try:
-                if record["kind"] == "hub":
+                if record["kind"] in ("hub", "csrhub"):
                     resource = self.hub.iot_hub_resource.get(
                         resource_group_name=record["resource_group"], resource_name=record["name"])
+                elif record["kind"] == "csrns":
+                    resource = self.adr.namespaces.get(
+                        resource_group_name=record["resource_group"], namespace_name=record["name"])
                 else:
                     resource = self.dps.iot_dps_resource.get(
                         resource_group_name=record["resource_group"], provisioning_service_name=record["name"])
@@ -281,6 +286,21 @@ class ArmReader:
                     return None
                 raise
             return self.snapshot(resource)
+
+
+def required_slots(debug=None):
+    """Only manifest-validated CSR-only debug selections own a single dedicated DPS."""
+    if debug is None:
+        return REQUIRED_SLOTS
+    if not isinstance(debug, dict):
+        raise PhaseError("Capacity selection requires a validated focused-selection envelope.")
+    validated = FOCUSED["select"]("DPS", debug.get("phase"), debug.get("requestedNodes"))
+    if not validated or validated != debug:
+        raise PhaseError("Capacity selection does not match the current validated debug manifest.")
+    selected = {MANIFEST["normalize_nodeid"](node) for node in validated["requestedNodes"]}
+    if validated["phase"] == "regular" and selected and selected <= MANIFEST["CSR_NODEIDS"]:
+        return 1
+    return REQUIRED_SLOTS
 
 
 def capacity(inventory, required=REQUIRED_SLOTS):
@@ -302,10 +322,9 @@ def ownership(receipts, phase, uid, subscription, group, baseline):
     for path in sorted(receipts.glob("owned-*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         kind = record.get("kind")
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         expected_id = (
-            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/Microsoft.Devices/"
-            f"{resource_type}/{record.get('name')}"
+            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/"
+            f"{MANIFEST['resource_type'](kind)}/{record.get('name')}"
         )
         expected_uid = uid if phase == "regular" else f"{uid}-{phase}"
         if (kind not in MANIFEST["resource_kinds"](phase) or record.get("run_uid") != uid
@@ -340,7 +359,7 @@ def recorded_ids(receipts):
     return result
 
 
-def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=time.sleep):
+def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=time.sleep, *, required=REQUIRED_SLOTS):
     remaining = []
     while True:
         remaining = []
@@ -369,7 +388,7 @@ def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=t
             ]
             if uncertain:
                 return {"complete": False, "remaining": uncertain, "reason": "Uncertain creates cannot be replayed"}
-            return {"complete": True, "remaining": [], "capacity": capacity(inventory), "verified_at": utc()}
+            return {"complete": True, "remaining": [], "capacity": capacity(inventory, required=required), "verified_at": utc()}
         if clock() + READ_SECONDS + 15 >= deadline:
             return {"complete": False, "remaining": remaining, "reason": "Owned resources still present at cleanup bound"}
         sleep(15)  # GET-only observation; never repeat DELETE, including alreadyDeleting resources.
@@ -530,6 +549,7 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
 
 def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *, debug_phase=None, debug_nodes=None):
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
+    slots = required_slots(debug)
     phases = tuple(value for value in PHASES if not debug or value[0] == debug["phase"])
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)  # A rerun must not overwrite phase evidence.
@@ -578,11 +598,11 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         )):
             raise PhaseError("Focused DPS rejects ambient pytest selection/plugin overrides.")
         baseline = reader.inventory()
-        summary["baseline"] = {"resources": baseline, "capacity": capacity(baseline), "at": utc()}
+        summary["baseline"] = {"resources": baseline, "capacity": capacity(baseline, required=slots), "at": utc()}
         write_json(summary_path, summary)
         baseline_ids = {resource["id"].lower() for resource in baseline}
         if not summary["baseline"]["capacity"]["ready"]:
-            raise PhaseError("Initial subscription capacity cannot support three managed DPS slots.")
+            raise PhaseError(f"Initial subscription capacity cannot support {slots} managed DPS slot(s).")
         records = []
         with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
             for index, (name, runtime, cleanup) in enumerate(phases):
@@ -670,7 +690,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     records = ownership(receipts, name, uid, subscription, group, baseline_ids)
                     reader.deadline = min(execution["cleanup_deadline"], deadline)
                     result["cleanup"] = verify_cleanup(
-                        reader, records, uid, reader.deadline, clock=clock,
+                        reader, records, uid, reader.deadline, clock=clock, required=slots,
                     )
                     result["cleanup"]["owned_ids"] = [record["id"] for record in records]
                     result["cleanup"]["absent_ids"] = (

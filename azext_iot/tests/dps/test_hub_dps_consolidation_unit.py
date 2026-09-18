@@ -34,11 +34,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from azure.core.pipeline import PipelineContext, PipelineRequest
 from azure.core.rest import HttpRequest
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding
-from cryptography.x509.oid import NameOID
 
 from azext_iot import _factory, _validators
 from azext_iot.dps.providers import device_registration as device
@@ -49,16 +45,13 @@ from azext_iot.dps.services._csr import normalize_csr
 from azext_iot.dps.services._enrollment import handle_service_error
 from azext_iot.operations import dps
 from azext_iot.tests.dps.device_registration import compare_registrations
+from azext_iot.tests.dps._csr import generate_csr
 
 
 @pytest.fixture
 def csr_material():
-    key = ec.generate_private_key(ec.SECP256R1())
-
     def make(names=("reg",)):
-        request = x509.CertificateSigningRequestBuilder().subject_name(
-            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name) for name in names])
-        ).sign(key, hashes.SHA256())
+        _, request = generate_csr(names)
         return request.public_bytes(Encoding.PEM).decode(), request.public_bytes(Encoding.DER)
 
     return make

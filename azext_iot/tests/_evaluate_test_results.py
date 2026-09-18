@@ -32,6 +32,12 @@ def evaluate_dps_phases(result_dir):
                 or not receipt["baseline"]["capacity"]["ready"]):
             raise ValueError("incomplete/failed DPS phase summary")
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
+        admission = receipt["baseline"]["capacity"]
+        if (admission["required"] != MANIFEST["REGULAR_REQUIRED_DPS_SLOTS"]
+                or admission["limit"] != MANIFEST["DPS_LIMIT"] or admission["count"] != len(baseline)
+                or set(admission["ids"]) != baseline
+                or admission["count"] + admission["required"] > admission["limit"]):
+            raise ValueError("full DPS qualification requires conservative four-slot subscription admission")
         for phase in phases:
             if not FOCUSED["matches"](phase, None):
                 raise ValueError("focused/debug phase cannot qualify the full DPS suite")
@@ -45,6 +51,9 @@ def evaluate_dps_phases(result_dir):
             if stages.exists() and not FOCUSED["matches"](json.loads(stages.read_text(encoding="utf-8")), None):
                 raise ValueError("focused/debug stage evidence cannot qualify the full DPS suite")
             cleanup = phase["cleanup"]
+            if (cleanup["capacity"]["required"] != MANIFEST["REGULAR_REQUIRED_DPS_SLOTS"]
+                    or cleanup["capacity"]["limit"] != MANIFEST["DPS_LIMIT"]):
+                raise ValueError(f"{name}: cleanup capacity policy does not match full qualification")
             owned = cleanup["owned_ids"]
             if (phase["status"] != "passed" or phase["exit_code"] != 0
                     or phase["timed_out"] is not False or phase["interrupted"] is not False
@@ -52,11 +61,10 @@ def evaluate_dps_phases(result_dir):
                     or not owned or set(owned) != set(cleanup["absent_ids"])
                     or baseline.intersection(resource.lower() for resource in owned)):
                 raise ValueError(f"{name}: unsuccessful execution or unproven owned-resource cleanup")
+            ownership = [json.loads(path.read_text(encoding="utf-8"))
+                         for path in (folder / "receipts").glob("owned-*.json")]
             for resource in owned:
-                if not any(
-                    json.loads(path.read_text(encoding="utf-8")).get("id") == resource
-                    for path in (folder / "receipts").glob("owned-*.json")
-                ):
+                if not any(record.get("id") == resource for record in ownership):
                     raise ValueError(f"{name}: missing pre-create ownership receipt")
             results = phase["results"]
             junit = ET.parse(folder / "junit.xml").getroot()
@@ -64,6 +72,14 @@ def evaluate_dps_phases(result_dir):
             if junit.get("mode", "full") != "full":
                 raise ValueError("focused/debug JUnit cannot qualify the full DPS suite")
             expected = MANIFEST["expected_nodeids"](name)
+            if MANIFEST["CSR_NODEIDS"] <= expected:
+                for kind in MANIFEST["CSR_RESOURCE_KINDS"]:
+                    records = [record for record in ownership if record.get("kind") == kind]
+                    if len(records) != 1 or records[0].get("id") not in owned:
+                        raise ValueError(f"{name}: missing dedicated CSR {kind} ownership/cleanup evidence")
+                    suffix = f"/providers/{MANIFEST['resource_type'](kind)}/{records[0]['name']}"
+                    if not records[0]["id"].lower().endswith(suffix.lower()):
+                        raise ValueError(f"{name}: wrong resource type in CSR {kind} receipt")
             identities = [MANIFEST["junit_nodeid"](case) for case in cases]
             selections = [json.loads(path.read_text(encoding="utf-8"))
                           for path in (folder / "receipts").glob("selection-*.json")]

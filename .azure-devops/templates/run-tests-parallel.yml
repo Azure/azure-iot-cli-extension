@@ -150,8 +150,8 @@ steps:
                 echo "Legacy Azure DevOps DPS coverage rejects isolated phase overrides; use the GitHub DPS controller with explicit scope." >&2
                 exit 2
               fi
-              echo "DPS coverage: legacy regular only. Service-SAS and owned local-auth-toggle coverage run through the GitHub DPS controller."
-              pytest -vv ${{ parameters.path }} -k "_int.py" --ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+              echo "DPS coverage: legacy partial regular only, not full qualification. Owned CSR issuance, service-SAS and local-auth-toggle coverage require the GitHub DPS controller."
+              pytest -vv ${{ parameters.path }} -k "_int.py and not test_register_and_issue_certificate_contract" --ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
           ${{ if contains(parameters.path, 'azext_iot/tests/adr') }}:
             inlineScript: |
               export COVERAGE_FILE=.coverage.${{ parameters.name }}

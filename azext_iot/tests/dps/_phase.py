@@ -22,7 +22,6 @@ SERVICE_SAS_NODEIDS = expected_nodeids(SERVICE_SAS)
 PENDING_CERTIFICATE_TESTS = {
     "test_dps_enrollment_adr_certificate_reference_round_trip",
     "test_dps_enrollment_group_adr_certificate_reference_round_trip",
-    "test_register_and_issue_certificate_contract",
 }
 
 

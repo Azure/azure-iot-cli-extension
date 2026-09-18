@@ -17,7 +17,7 @@ import pytest
 
 from azext_iot.tests.dps import _phase
 from azext_iot.tests import _focused_live as focused
-from azext_iot.tests.dps._phase_manifest import normalize_nodeid
+from azext_iot.tests.dps._phase_manifest import normalize_nodeid, resource_type
 
 DIRECTORY_ENV = "azext_iot_dps_phase_receipts"
 RUN_UID_ENV = "azext_iot_dps_run_uid"
@@ -84,10 +84,9 @@ def before_create(name, resource_group, run_uid, kind):
     expected_uid = uid if phase == _phase.REGULAR else f"{uid}-{phase}"
     if run_uid != expected_uid or kind not in _phase.resource_kinds(phase) or resource_group != expected_group:
         raise RuntimeError("Resource create does not match this phase's run UID/kind/resource group.")
-    resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
     write(f"owned-{kind}.json", {
         "name": name, "kind": kind, "resource_group": resource_group,
-        "id": f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/Microsoft.Devices/{resource_type}/{name}",
+        "id": f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/{resource_type(kind)}/{name}",
         "tags": {"intTest": "true", "runUid": run_uid, "kind": kind},
         "create_attempted": True,
     }, exclusive=True)
