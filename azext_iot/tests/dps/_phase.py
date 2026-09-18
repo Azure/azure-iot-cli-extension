@@ -60,6 +60,10 @@ def select_items(config, items):
     explicit_phase = PHASE_ENV in os.environ
     selected, deselected = [], []
     for item in items:
+        # Pytest -k also matches parameter IDs, including unit cases naming integration files.
+        if explicit_phase and not item.path.name.endswith("_int.py"):
+            deselected.append(item)
+            continue
         service_sas = item.get_closest_marker(SERVICE_SAS_MARKER) is not None
         local_auth_toggle = item.get_closest_marker(LOCAL_AUTH_TOGGLE_MARKER) is not None
         pending_certificate = (

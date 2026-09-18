@@ -7,6 +7,7 @@
 from copy import deepcopy
 import inspect
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -43,6 +44,7 @@ def _items():
     return [
         SimpleNamespace(
             nodeid="azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py::" + name,
+            path=Path(live.__file__),
             get_closest_marker=lambda marker: live.pytestmark if marker == _phase.LOCAL_AUTH_TOGGLE_MARKER else None,
         )
         for name, value in vars(live).items() if name.startswith("test_") and inspect.isfunction(value)
