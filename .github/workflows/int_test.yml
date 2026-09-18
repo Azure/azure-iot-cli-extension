@@ -163,8 +163,9 @@ jobs:
             "HubControl|azext_iot/tests/iothub|HubControl-int|225"
             "HubData|azext_iot/tests/iothub|HubData-int|360"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
-            # SU readiness already allows an hour; ordinary ADR items retain their 15-minute cap.
-            "ADR|azext_iot/tests/adr|ADR-int|120"
+            # Serial ADR includes a 175-minute SU link envelope and a separate 75-minute SU lifecycle.
+            # Reserve the hosted-job ceiling; per-operation waits and ordinary 15-minute caps stay unchanged.
+            "ADR|azext_iot/tests/adr|ADR-int|360"
           )
 
           # --- Determine which services to include ---

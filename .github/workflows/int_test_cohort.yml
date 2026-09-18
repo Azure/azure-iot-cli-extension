@@ -174,8 +174,15 @@ jobs:
           printf '%s\n' "$TEST_SERVICE" > test-result/service.txt
           printf '%s\n' "$TEST_PYTHON" > test-result/python.txt
           printf '%s\n' "$TEST_REGION" > test-result/region.txt
-          # Extract failed/errored test names from pytest output
-          if [ -f test-output.log ]; then
+          # ADR persists metadata-only outcomes before every phase hook returns.
+          # Never overwrite them with an empty final-summary scrape after cancellation.
+          if [ "$TEST_SERVICE" = "ADR" ]; then
+            if [ ! -f test-result/integration-outcomes.json ] || [ ! -f test-result/failures.txt ]; then
+              printf '%s\n' 'ADR incremental test evidence is missing; execution/coverage is unproven.' >> test-result/failures.txt
+            elif [ "$TEST_STATUS" != "success" ] && [ ! -s test-result/failures.txt ]; then
+              printf '%s\n' 'ADR job did not succeed; inspect status.txt and integration-outcomes.json.' >> test-result/failures.txt
+            fi
+          elif [ -f test-output.log ]; then
             grep -E '^(FAILED|ERROR) azext_iot/tests/[^ ]+::' test-output.log | \
               sed 's/^FAILED //;s/^ERROR //;s/ - .*$//' > test-result/failures.txt || true
           fi

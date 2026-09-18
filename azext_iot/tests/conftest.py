@@ -474,6 +474,10 @@ def pytest_addoption(parser):
         "--integration-progress-interval", type=int, default=0,
         help="Emit credential-free integration phase progress every N seconds (0 disables).",
     )
+    parser.addoption(
+        "--integration-results-dir", default=None,
+        help="Persist metadata-only serial integration outcomes and incomplete/failure evidence after every phase.",
+    )
 
 
 def pytest_configure(config):
@@ -482,8 +486,13 @@ def pytest_configure(config):
     interval = config.getoption("integration_progress_interval")
     if interval < 0:
         raise pytest.UsageError("--integration-progress-interval must be nonnegative.")
+    results_dir = config.getoption("integration_results_dir")
+    if results_dir and config.getoption("numprocesses", default=0):
+        raise pytest.UsageError("--integration-results-dir requires serial pytest (-n 0).")
     config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
-    config.pluginmanager.register(IntegrationProgress(config, interval), "iot-integration-progress")
+    config.pluginmanager.register(
+        IntegrationProgress(config, interval, results_dir=results_dir), "iot-integration-progress",
+    )
 
 
 class ImmediateIntegrationReports:

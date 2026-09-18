@@ -240,7 +240,10 @@ class LinkProvider(ADRProvider):
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
             self._rbac_manager().verify_many(requests, guard=deadline.remaining)
 
-        return LinkRecovery(self, namespace, section, name, expected, budget, verify).run(
+        return LinkRecovery(
+            self, namespace, section, name, expected, budget, verify,
+            authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
+        ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,
                 # The waited canary path owns resource polling. Do not also

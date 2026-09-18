@@ -247,7 +247,7 @@ def test_matrix_cohorts_preserve_every_selected_combination_once(tmp_path, servi
     assert Counter(identity(config) for cohort in cohorts for config in cohort["configs"]) == Counter(
         identity(config) for config in flat
     )
-    ceilings = {"DPS": 150, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 120}
+    ceilings = {"DPS": 150, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 360}
     for cohort in cohorts:
         configs = cohort["configs"]
         actual_services = {config["service"] for config in configs}
@@ -344,7 +344,8 @@ def test_execution_and_result_shells_never_interpolate_raw_github_inputs():
 
 @POSIX_WORKFLOW
 @pytest.mark.parametrize("status", ["success", "failure", "cancelled"])
-def test_result_artifact_contract_survives_extraction_and_keeps_phase_evidence(tmp_path, status):
+@pytest.mark.parametrize("service", ["ADR", "ADU"])
+def test_result_artifact_contract_survives_extraction_and_keeps_phase_evidence(tmp_path, status, service):
     public, _, cohort = _workflows()
     steps = {step["name"]: step for step in cohort["jobs"]["service"]["steps"]}
     for name in ("Record test result", "Upload test result", "Upload coverage artifact"):
@@ -360,16 +361,22 @@ def test_result_artifact_contract_survives_extraction_and_keeps_phase_evidence(t
     (tmp_path / "test-output.log").write_text(
         "FAILED azext_iot/tests/adr/example_int.py::test_example - message\n", encoding="utf-8",
     )
+    failure = "azext_iot/tests/adr/example_int.py::test_example"
+    if service == "ADR":
+        failure += " [case 1] - failed phase(s): call"
+        (result_dir / "integration-outcomes.json").write_text('{"schema": 1, "session_finished": false}')
+        (result_dir / "failures.txt").write_text(failure + "\n")
     result = subprocess.run(
         ["bash", "-c", record["run"]], cwd=tmp_path, capture_output=True, text=True, timeout=15, check=False,
-        env=dict(os.environ, TEST_STATUS=status, TEST_SERVICE="ADR", TEST_PYTHON="3.13", TEST_REGION="centraluseuap"),
+        env=dict(os.environ, TEST_STATUS=status, TEST_SERVICE=service, TEST_PYTHON="3.13", TEST_REGION="centraluseuap"),
     )
     assert result.returncode == 0, result.stdout + result.stderr
     for field, value in {
-        "status": status, "service": "ADR", "python": "3.13", "region": "centraluseuap",
-        "failures": "azext_iot/tests/adr/example_int.py::test_example",
+        "status": status, "service": service, "python": "3.13", "region": "centraluseuap", "failures": failure,
     }.items():
         assert (result_dir / f"{field}.txt").read_text(encoding="utf-8") == value + "\n"
+    if service == "ADR":
+        assert (result_dir / "integration-outcomes.json").read_text() == '{"schema": 1, "session_finished": false}'
     for folder in ("hub-phases", "dps-phases"):
         assert (result_dir / folder / "receipt.json").read_text(encoding="utf-8") == '{"preserve": true}'
     suffix = "${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}"
