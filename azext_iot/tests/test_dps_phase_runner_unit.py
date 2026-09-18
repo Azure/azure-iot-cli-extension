@@ -832,14 +832,21 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker):
 
 @responses.activate
 @pytest.mark.parametrize("kind", ["csrdps", "csrhub", "csrns"])
-def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind):
+@pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
+def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind, platform):
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
     resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/owned"
     responses.add(responses.GET, RUNNER["ARM"] + resource_id, status=404)
     reader = RUNNER["ArmReader"](SUB)
+    # Exercise SDK routing on every OS; timer/platform enforcement has separate tests.
+    bounded = mocker.Mock(side_effect=nullcontext)
+    mocker.patch.dict(
+        RUNNER["ArmReader"].get.__globals__, bounded_read=bounded, sys=SimpleNamespace(platform=platform),
+    )
     assert reader.get({"kind": kind, "name": "owned", "resource_group": GROUP}) is None
     assert len(responses.calls) == 1
+    bounded.assert_called_once_with(reader.deadline)
 
 
 def test_regular_admission_accounts_for_dedicated_csr_dps():

@@ -9,6 +9,7 @@
 from copy import deepcopy
 from contextlib import nullcontext
 import json
+import os
 from pathlib import Path
 import shlex
 from types import SimpleNamespace
@@ -424,7 +425,9 @@ def test_unorchestrated_csr_fails_before_provisioning(monkeypatch, mocker):
     provision.assert_not_called()
 
 
-def test_temporary_csr_is_fresh_matching_protected_and_removed_after_error(tmp_path):
+def test_temporary_csr_is_fresh_matching_protected_and_removed_after_error(tmp_path, mocker):
+    open_file = mocker.spy(os, "open")
+    make_directory = mocker.spy(os, "mkdir")
     public_keys = []
     directories = []
     for registration_id in ("first", "second"):
@@ -436,8 +439,14 @@ def test_temporary_csr_is_fresh_matching_protected_and_removed_after_error(tmp_p
                 assert request.is_signature_valid
                 assert request.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == registration_id
                 assert request.public_key().public_numbers() == private.public_key().public_numbers()
-                assert path.stat().st_mode & 0o777 == key_path.stat().st_mode & 0o777 == 0o600
-                assert path.parent.stat().st_mode & 0o777 == 0o700
+                for material in (path, key_path):
+                    open_file.assert_any_call(material, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                make_directory.assert_any_call(str(path.parent), 0o700)
+                # Windows stat reports DOS attributes, not POSIX permission bits.
+                # Still verify exclusive creation and requested modes on every OS.
+                if os.name == "posix":
+                    assert path.stat().st_mode & 0o777 == key_path.stat().st_mode & 0o777 == 0o600
+                    assert path.parent.stat().st_mode & 0o777 == 0o700
                 directories.append(path.parent)
                 public_keys.append(private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo))
                 raise ValueError("body")
