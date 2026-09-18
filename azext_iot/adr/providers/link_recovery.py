@@ -7,6 +7,7 @@
 """Bounded, identity-preserving recovery of confirmed link authorization failures."""
 
 from copy import deepcopy
+import re
 from time import monotonic, sleep
 
 from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError
@@ -22,6 +23,20 @@ logger = get_logger(__name__)
 AUTHORIZATION_DELAYS = (30, 60, 120)
 ACTIVE_STATES = {"Accepted", "Creating", "Updating", "InProgress", "Running"}
 TERMINAL_FAILURES = {"Failed", "Canceled", "Cancelled"}
+_GUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
+_LINK_INITIATE_AUTHORIZATION = re.compile(
+    r"The namespace's managed identity is not authorized to link the (?P<service>Hub|DPS) resource\. "
+    r"Grant it access on the resource, then resubmit the request\. "
+    r"\((?P=service) resource reported: \[AuthorizationFailed\] "
+    rf"The client '{_GUID}' with object id '(?P<principal>{_GUID})' "
+    r"does not have authorization to perform action '(?P<action>[^'\r\n]+)' "
+    r"over scope '(?P<scope>[^'\r\n]+)' or the scope is invalid\. "
+    r"If access was recently granted, please refresh your credentials\.\)"
+)
+_LINK_INITIATE_ACTIONS = {
+    "hub": ("Hub", "Microsoft.Devices/IotHubs/linkInitiate/action"),
+    "dps": ("DPS", "Microsoft.Devices/provisioningServices/linkInitiate/action"),
+}
 
 
 def validate_options(timeout, interval):
@@ -99,11 +114,12 @@ def _known_http_authorization(error):
 class LinkRecovery:
     """One endpoint UPDATE loop; never invokes public add or replaces collections."""
 
-    def __init__(self, provider, namespace, section, name, expected, budget, verify):
+    def __init__(self, provider, namespace, section, name, expected, budget, verify, *, authorization_request=None):
         self.provider, self.section, self.name = provider, section, name
         self.kind = {"provisioning": "dps", "messaging": "hub", "updating": "su"}[section]
         self.expected = _normalized(endpoint_update_body(expected))
         self.namespace_identity = _namespace_identity(namespace)
+        self.authorization_request = deepcopy(authorization_request)
         self.snapshot = None
         self.budget, self.verify = budget, verify
         self.progressed = True
@@ -166,13 +182,49 @@ class LinkRecovery:
         # repeatedly resubmitting an already accepted recovery PATCH.
         self.inspect(namespace)
 
-    @staticmethod
-    def authorized_failure(endpoint):
+    def authorized_failure(self, endpoint):
         error = endpoint.get("linkingError")
-        return (
-            endpoint.get("linkingState") == "Failed"
-            and isinstance(error, dict)
-            and error.get("code") == "AdrMiNotAuthorized"
+        if endpoint.get("linkingState") != "Failed" or not isinstance(error, dict):
+            return False
+        if error.get("code") == "AdrMiNotAuthorized":
+            return True
+        return self._bound_link_initiate_authorization(error)
+
+    def _bound_link_initiate_authorization(self, error):
+        """Recognize only the observed service envelope, bound to original preflight.
+
+        LinkInitiateFailed also covers invalid requests. Its code alone, a 403,
+        or authorization-looking text cannot authorize a recovery PATCH. The
+        denied object ID (not the application's client ID), exact target and
+        exact linkInitiate action must all match the original RBAC request.
+        Recovery still re-preflights and verifies grants twice before writing.
+        """
+        request = self.authorization_request
+        if (
+            self.kind not in _LINK_INITIATE_ACTIONS
+            or error.get("code") != "LinkInitiateFailed"
+            or set(error) - {"code", "message"}
+            or not isinstance(error.get("message"), str)
+            or not isinstance(request, dict)
+            or request.get("link_type") != self.kind
+        ):
+            return False
+        principal = request.get("namespace_principal_id")
+        target = request.get("target_scope")
+        namespace = request.get("namespace_scope")
+        if (
+            not isinstance(principal, str) or not re.fullmatch(_GUID, principal)
+            or not isinstance(target, str) or target.casefold() != self.expected["resourceId"]
+            or not isinstance(namespace, str) or namespace.casefold() != self.namespace_identity["id"]
+        ):
+            return False
+        match = _LINK_INITIATE_AUTHORIZATION.fullmatch(error["message"])
+        service, action = _LINK_INITIATE_ACTIONS[self.kind]
+        return bool(
+            match and match["service"] == service
+            and match["principal"].casefold() == principal.casefold()
+            and match["action"].casefold() == action.casefold()
+            and match["scope"].casefold() == target.casefold()
         )
 
     def run(self, *, submit, get, status_message, no_wait=False, **kwargs):
