@@ -20,6 +20,9 @@ import pytest
 
 from azext_iot.tests.dps import _phase, _phase_receipts as receipts
 from azext_iot.tests.dps import conftest as fixtures
+from azext_iot.tests.dps import _csr_issuance as csr
+from azext_iot.tests.dps import _csr_registry as registry
+from azext_iot.tests.dps._phase_manifest import resource_type
 
 ROOT = Path(__file__).resolve().parents[4]
 UID = "d" * 32
@@ -53,9 +56,8 @@ class LocalResources:
     def create(self, uid, kind):
         name = f"unit-lifetime-{kind}"
         receipts.before_create(name, GROUP, uid, kind)
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         resource = {
-            "id": f"/subscriptions/{SUB}/resourceGroups/{GROUP}/providers/Microsoft.Devices/{resource_type}/{name}",
+            "id": f"/subscriptions/{SUB}/resourceGroups/{GROUP}/providers/{resource_type(kind)}/{name}",
             "name": name, "tags": {"intTest": "true", "runUid": uid, "kind": kind},
             "properties": {"provisioningState": "Succeeded"},
         }
@@ -93,6 +95,20 @@ def local(tmp_path, monkeypatch, mocker):
         mocker.patch.object(fixtures, name, side_effect=store.find)
     for name in ("_delete_dps", "_delete_hub"):
         mocker.patch.object(fixtures, name, side_effect=store.delete)
+    mocker.patch.object(csr, "find_namespace", side_effect=store.find)
+    mocker.patch.object(csr, "delete_namespace", side_effect=store.delete)
+    client = mocker.patch.object(registry, "adr_service_factory").return_value
+
+    def namespace_get(resource_group_name, namespace_name):
+        assert resource_group_name == GROUP
+        resource = store.find(namespace_name)
+        if resource is None:
+            from azure.core.exceptions import ResourceNotFoundError
+
+            raise ResourceNotFoundError(response=SimpleNamespace(status_code=404, reason="Not Found", headers={}))
+        return resource
+
+    client.namespaces.get.side_effect = namespace_get
     mocker.patch.object(fixtures.cli, "invoke", side_effect=AssertionError("No CLI calls in lifetime tests"))
     return store
 
@@ -184,6 +200,45 @@ def test_controller_attempts_all_owned_cleanup_dps_before_hub_and_propagates_err
         assert (local.find(f"unit-lifetime-{kind}") is not None) == (kind == failure)
         if kind == failure:
             assert fixtures._read_state(local.paths(UID, kind)[1])["refcount"] == 1
+
+
+def test_real_controller_final_references_delete_csr_namespace_before_its_targets(local):
+    for kind in ("h", "nh", "hub", "csrhub", "csrdps", "csrns"):
+        fixtures._shared_acquire(UID, kind, local.create, local.find)
+        fixtures._shared_release(UID, kind, local.delete)
+        assert fixtures._read_state(local.paths(UID, kind)[1])["refcount"] == 1
+    assert all(event["action"] == "create" for event in local.events())
+    fixtures.pytest_sessionfinish(_session())
+    deleted = [event["name"].removeprefix("unit-lifetime-") for event in local.events() if event["action"] == "delete"]
+    assert deleted == ["h", "nh", "hub", "csrns", "csrdps", "csrhub"]
+    assert all(local.find(f"unit-lifetime-{kind}") is None for kind in deleted)
+
+
+def test_quarantined_registry_intent_retains_dedicated_targets_at_controller_release(local):
+    for kind in ("h", "hub", "csrdps", "csrhub"):
+        fixtures._shared_acquire(UID, kind, local.create, local.find)
+        fixtures._shared_release(UID, kind, local.delete)
+    receipts.write("csr-registry-intent-pending.json", {"key": "pending", "namespace_id": "owned-namespace"})
+    with pytest.raises(AssertionError, match="quarantined"):
+        fixtures.pytest_sessionfinish(_session())
+    assert [event["name"] for event in local.events() if event["action"] == "delete"] == [
+        "unit-lifetime-h", "unit-lifetime-hub",
+    ]
+    for kind in ("csrdps", "csrhub"):
+        assert local.find(f"unit-lifetime-{kind}") is not None
+        assert fixtures._read_state(local.paths(UID, kind)[1])["refcount"] == 1
+
+
+def test_setup_failure_without_namespace_claim_still_releases_owned_targets(local):
+    for kind in ("csrhub", "csrdps"):
+        fixtures._shared_acquire(UID, kind, local.create, local.find)
+        fixtures._shared_release(UID, kind, local.delete)
+    assert not (local.root / "receipts" / "owned-csrns.json").exists()
+    fixtures.pytest_sessionfinish(_session())
+    assert [event["name"] for event in local.events() if event["action"] == "delete"] == [
+        "unit-lifetime-csrdps", "unit-lifetime-csrhub",
+    ]
+    assert all(local.find(f"unit-lifetime-{kind}") is None for kind in ("csrdps", "csrhub"))
 
 
 @pytest.mark.parametrize("kind", ["h", "nh", "hub"])

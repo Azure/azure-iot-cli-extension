@@ -57,11 +57,10 @@ def evaluate_dps_phases(result_dir):
                     or len(inventory) != len(set(inventory))
                     or set(inventory).intersection(resource.lower() for resource in owned)):
                 raise ValueError(f"{name}: unsuccessful execution or unproven owned-resource cleanup")
+            ownership = [json.loads(path.read_text(encoding="utf-8"))
+                         for path in (folder / "receipts").glob("owned-*.json")]
             for resource in owned:
-                if not any(
-                    json.loads(path.read_text(encoding="utf-8")).get("id") == resource
-                    for path in (folder / "receipts").glob("owned-*.json")
-                ):
+                if not any(record.get("id") == resource for record in ownership):
                     raise ValueError(f"{name}: missing pre-create ownership receipt")
             results = phase["results"]
             junit = ET.parse(folder / "junit.xml").getroot()
@@ -69,6 +68,14 @@ def evaluate_dps_phases(result_dir):
             if junit.get("mode", "full") != "full":
                 raise ValueError("focused/debug JUnit cannot qualify the full DPS suite")
             expected = MANIFEST["expected_nodeids"](name)
+            if MANIFEST["CSR_NODEIDS"] <= expected:
+                for kind in MANIFEST["CSR_RESOURCE_KINDS"]:
+                    records = [record for record in ownership if record.get("kind") == kind]
+                    if len(records) != 1 or records[0].get("id") not in owned:
+                        raise ValueError(f"{name}: missing dedicated CSR {kind} ownership/cleanup evidence")
+                    suffix = f"/providers/{MANIFEST['resource_type'](kind)}/{records[0]['name']}"
+                    if not records[0]["id"].lower().endswith(suffix.lower()):
+                        raise ValueError(f"{name}: wrong resource type in CSR {kind} receipt")
             identities = [MANIFEST["junit_nodeid"](case) for case in cases]
             selections = [json.loads(path.read_text(encoding="utf-8"))
                           for path in (folder / "receipts").glob("selection-*.json")]

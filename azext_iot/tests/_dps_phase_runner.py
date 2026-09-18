@@ -30,11 +30,11 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 ARM = "https://centraluseuap.management.azure.com"
 PHASES = (
-    ("regular", 20 * 60, 5 * 60),
+    ("regular", 45 * 60, 10 * 60),
     ("service-sas", 40 * 60, 10 * 60),
     ("local-auth-toggle", 20 * 60, 5 * 60),
 )
-RUNNER_SECONDS = 110 * 60
+RUNNER_SECONDS = 140 * 60
 READ_SECONDS = 60
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
@@ -202,6 +202,7 @@ class ArmReader:
         from azext_iot._factory import _ADR_DPS_API_VERSION, _ADR_IOT_HUB_API_VERSION
         from azext_iot.sdk.dps.mgmt import IotDpsClient
         from azext_iot.sdk.iothub.mgmt import IotHubClient
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
         self.subscription = subscription
         self.deadline = None
@@ -245,6 +246,7 @@ class ArmReader:
             )
         self.dps = client(IotDpsClient, _ADR_DPS_API_VERSION)
         self.hub = client(IotHubClient, _ADR_IOT_HUB_API_VERSION)
+        self.adr = client(DeviceRegistryMgmtClient, "2026-11-02-preview")
 
     @staticmethod
     def snapshot(resource):
@@ -268,9 +270,12 @@ class ArmReader:
         from azure.core.exceptions import HttpResponseError
         with bounded_read(self.deadline):
             try:
-                if record["kind"] == "hub":
+                if record["kind"] in ("hub", "csrhub"):
                     resource = self.hub.iot_hub_resource.get(
                         resource_group_name=record["resource_group"], resource_name=record["name"])
+                elif record["kind"] == "csrns":
+                    resource = self.adr.namespaces.get(
+                        resource_group_name=record["resource_group"], namespace_name=record["name"])
                 else:
                     resource = self.dps.iot_dps_resource.get(
                         resource_group_name=record["resource_group"], provisioning_service_name=record["name"])
@@ -297,10 +302,9 @@ def ownership(receipts, phase, uid, subscription, group, baseline):
     for path in sorted(receipts.glob("owned-*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         kind = record.get("kind")
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         expected_id = (
-            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/Microsoft.Devices/"
-            f"{resource_type}/{record.get('name')}"
+            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/"
+            f"{MANIFEST['resource_type'](kind)}/{record.get('name')}"
         )
         expected_uid = uid if phase == "regular" else f"{uid}-{phase}"
         if (kind not in MANIFEST["resource_kinds"](phase) or record.get("run_uid") != uid

@@ -24,3 +24,6 @@ def load_dps_commands(self, _):
         is_preview=True
     ) as cmd_group:
         cmd_group.command("create", "create_device_registration")
+        cmd_group.show_command(
+            "operation-status", "show_device_registration_operation"
+        )

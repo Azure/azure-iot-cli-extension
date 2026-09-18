@@ -203,7 +203,7 @@ def test_flat_matrix_preserves_exact_cartesian_membership_budgets_names_and_arti
         return config["service"], config["python"], config["region"]
 
     assert Counter(identity(config) for config in flat) == Counter(expected)
-    ceilings = {"DPS": 120, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 360}
+    ceilings = {"DPS": 150, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 360}
     job = _workflows()[0]["jobs"]["int-test"]
     uploads = [step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
     names, artifacts = [], []

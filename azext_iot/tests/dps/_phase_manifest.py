@@ -9,6 +9,19 @@
 from pathlib import Path
 
 PHASE_NAMES = ("regular", "service-sas", "local-auth-toggle")
+CSR_RESOURCE_KINDS = ("csrns", "csrdps", "csrhub")
+CSR_NODEIDS = frozenset(
+    f"device_registration/test_iot_device_registration_int.py::test_register_and_issue_certificate_contract[{option}]"
+    for option in ("default", "deadline")
+)
+
+
+def resource_type(kind):
+    if kind in ("hub", "csrhub"):
+        return "Microsoft.Devices/IotHubs"
+    if kind == "csrns":
+        return "Microsoft.DeviceRegistry/namespaces"
+    return "Microsoft.Devices/provisioningServices"
 
 
 LIFECYCLES = {
@@ -39,6 +52,7 @@ REGULAR_BASE_NODEIDS = frozenset(
     f"{module}::{name}[login]" for module, names in LIFECYCLES.items() for name in names
 ) | {
     "core/test_dps_discovery_int.py::test_dps_discovery",
+    "core/test_dps_unit_capacity_int.py::test_dps_unit_capacity_owned_lifecycle",
     "core/test_dps_discovery_int.py::test_dps_targets[key]",
     "core/test_dps_discovery_int.py::test_dps_targets[login]",
 } | {
@@ -68,7 +82,10 @@ def resource_kinds(phase):
         return ("dla",)
     if phase not in ("regular", "service-sas"):
         raise ValueError("Unknown DPS phase.")
-    return ("h", "nh", "hub")
+    return (
+        ("h", "nh", "hub", "unit1", "unitdefault", *CSR_RESOURCE_KINDS)
+        if phase == "regular" else ("h", "nh", "hub")
+    )
 
 
 def expected_nodeids(phase):
@@ -85,7 +102,7 @@ def expected_nodeids(phase):
         f"device_registration/test_iot_device_registration_int.py::test_register_without_csr_deadline_contract[{option}]"
         for option in ("default", "deadline")
     } if modern.is_file() else set()
-    return REGULAR_BASE_NODEIDS | extra
+    return REGULAR_BASE_NODEIDS | extra | (CSR_NODEIDS if modern.is_file() else set())
 
 
 def normalize_nodeid(nodeid):

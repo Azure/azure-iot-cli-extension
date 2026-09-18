@@ -304,14 +304,14 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert '"DPS|azext_iot/tests/dps|DPS-int|120"' in matrix["run"]
+    assert '"DPS|azext_iot/tests/dps|DPS-int|150"' in matrix["run"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in steps if step.get("id") == "run_tests")
     assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
     assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
-    assert "certificate coverage is not configured in this workflow" in step["run"]
+    assert "including owned CSR issuance" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
     assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
@@ -600,13 +600,13 @@ def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, s
     assert any("Hub phase evidence" in error for error in errors)
 
 
-def test_hub_data_manifest_preserves_exact_six_sas_nodes_and_normal_auth_default():
+def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_default():
     from azext_iot.tests.iothub._sas_phase import NODES
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra", "sas")
-    assert len(nodes("HubData", "entra")) == 42
+    assert len(nodes("HubData", "entra")) == 44
     assert len(nodes("HubControl", "regular")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 

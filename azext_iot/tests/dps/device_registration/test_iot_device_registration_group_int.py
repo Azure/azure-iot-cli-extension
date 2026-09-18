@@ -118,7 +118,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Use id scope - compute_key should work without login; group id is not needed
@@ -134,7 +134,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Recreate with computed device key (and id scope); group id is not needed for the registration
@@ -158,7 +158,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
         check_hub_device(cli, device_id1, "sas", hub, key=device_key)
         device1_registration = registration["registrationState"]
@@ -253,7 +253,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
 
@@ -377,7 +377,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == devices[0][0]
         assert registration["registrationState"]["registrationId"] == devices[0][0]
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         cli.invoke(

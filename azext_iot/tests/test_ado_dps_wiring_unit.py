@@ -80,13 +80,15 @@ def test_ado_dps_template_has_one_honestly_scoped_legacy_invocation():
     commands = [line.strip() for line in script.splitlines() if line.strip().startswith("pytest ")]
     assert len(commands) == 1
     command = commands[0]
-    assert command.startswith('pytest -vv ${{ parameters.path }} -k "_int.py"')
+    assert command.startswith(
+        'pytest -vv ${{ parameters.path }} -k "_int.py and not test_register_and_issue_certificate_contract"'
+    )
     assert "--ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py" in command
     assert "-n ${{ parameters.num_threads }}" in command
     assert "--reruns ${{ parameters.num_reruns }}" in command
     assert "--junitxml=junit/test-iotext-int.xml" in command
-    assert "legacy regular only" in script
-    assert "Service-SAS and owned local-auth-toggle coverage run through the GitHub DPS controller" in script
+    assert "legacy partial regular only, not full qualification" in script
+    assert "Owned CSR issuance, service-SAS and local-auth-toggle coverage require the GitHub DPS controller" in script
     assert "_dps_phase_runner.py" not in script
     assert "unset " not in script
     assert not re.search(r"(?:export\s+)?azext_iot_dps_test_phase=", script)
@@ -144,7 +146,8 @@ def test_ado_legacy_script_runs_once_preserves_pins_and_propagates_pytest_exit(t
     assert arguments[arguments.index("-n") + 1] == "6"
     assert "--ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py" in arguments
     assert calls[1] == "supplied-unit-pin"
-    assert "legacy regular only" in result.stdout
+    assert "legacy partial regular only, not full qualification" in result.stdout
+    assert "test_register_and_issue_certificate_contract" in arguments
 
 
 @pytest.mark.parametrize("override", [

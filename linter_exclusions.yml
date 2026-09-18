@@ -52,6 +52,12 @@ iot hub device-twin update:
     auth_type_dataplane:
       rule_exclusions:
         - no_parameter_defaults_for_update_commands
+iot hub digital-twin update:
+  parameters:
+    # Authentication selects request credentials; it does not update a resource field.
+    auth_type_dataplane:
+      rule_exclusions:
+        - no_parameter_defaults_for_update_commands
 iot hub distributed-tracing update:
   parameters:
     auth_type_dataplane:
@@ -292,9 +298,6 @@ iot hub:
     - require_wait_command_if_no_wait
 
 # These asynchronous POST actions do not expose a retrievable provisioning-state resource.
-iot adr ns registry-device auth-profile:
-  rule_exclusions:
-    - require_wait_command_if_no_wait
 iot adr ns report:
   rule_exclusions:
     - require_wait_command_if_no_wait

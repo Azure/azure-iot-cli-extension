@@ -121,15 +121,77 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
 
+The combined Hub/DPS preview's regular DPS phase requires both CSR issuance
+variants. They no longer accept pre-created DPS/enrollment/CSR environment
+variables. The phase controller owns a dedicated Hub, DPS, and ADR namespace,
+links the pair with native bounded propagation recovery, and creates a
+service-managed root CA, Microsoft-issued intermediate CA, and leaf policy.
+Both variants reuse that infrastructure but generate independent enrollments,
+EC keys and CSRs. Bootstrap keys are discovered internally by native registration,
+not placed in CLI arguments. Private material is mode 0600 in a temporary mode
+0700 directory and is removed even when registration fails. Certificate-chain
+encoding/order is not assumed; the response contract remains JSON.
+
+Run the focused local proof from the combined checkout with its prepared tox
+environments and extension installed:
+
+```bash
+.tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
+  --subscription <subscription-id> --resource-group <owned-test-rg> \
+  --region centraluseuap --output <new-evidence-directory> --debug-phase regular \
+  --debug-node 'azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py::test_register_and_issue_certificate_contract[default]' \
+  --debug-node 'azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py::test_register_and_issue_certificate_contract[deadline]'
+```
+
+This debug selection is explicitly non-qualifying for the full suite; omit both
+debug options for full qualification. Missing or skipped required CSR cases fail
+the regular gate. The legacy pinned-resource/cross-platform Azure DevOps template
+explicitly excludes these owned-only cases and labels its results partial,
+not full DPS qualification. Linux, an authenticated canary-enabled subscription, registered
+Microsoft.Devices/Microsoft.DeviceRegistry providers, and permission to manage
+the owned resources and their scoped role assignments are required. The regular
+suite includes three long-lived DPS plus sequential product capacity/SKU cases,
+two S1 Hubs, and one namespace with two CAs/one policy. CSR-only local debug
+selections still use their dedicated owned resources and remain nonqualifying.
+
 Hub and DPS controllers do not perform subscription quota admission or reserve
 slots. Inventory and exact-resource reads remain mandatory for collision,
 ownership, known-resource reconciliation and verified cleanup, not quota counting.
 Azure provisioning rejections, including quota errors, fail the run; they are not
 suppressed. No resource ownership, scoped RBAC, quarantine or full-result checks
-are bypassed. This branch retains its existing DPS case manifest and runtime
-budgets, with regular, service-SAS and local-auth phases ordered internally.
-Local focused-debug runs remain nonqualifying.
-See [workflow selection and safety](docs/tox-testing.md#integration-workflow-topology).
+are bypassed. See [workflow selection and safety](docs/tox-testing.md#integration-workflow-topology).
+
+Do not supply pinned shared resources. Caller data roles
+use the existing DPS/Hub fixtures; native linking creates only its required
+service-to-service roles. No first-party Graph/Device Update grant is added.
+
+Regular runtime/cleanup budgets are 45/10 minutes; the full controller is bounded
+at 140 minutes within the 150-minute CI service job. Cleanup is never skipped or
+converted into a pass: policy, issuing CA, root CA, namespace, DPS, then Hub are
+removed in dependency order with exact ownership receipts and final ARM absence
+evidence. Before registration submission, persist the unique enrollment/device
+and target intent plus an authoritative RegistryDevice baseline. Capture the
+registration correlation before assertions, resolve `registryDeviceExternalId`
+against the SDK's `properties.externalDeviceId`, and delete only the exact newly
+owned RegistryDevice ARM ID before namespace/CA cleanup. External IDs are never
+used as ARM names. Registration/enrollment records are removed only after this
+descendant cleanup. If an operation ID is available, cleanup may read native
+operation-status to resolve a partial response; it never resubmits registration.
+If no authoritative external-ID mapping is available, or the match is ambiguous,
+pre-existing or changed, cleanup fails explicitly and quarantines the namespace,
+dedicated DPS/Hub and enrollment evidence for reconciliation. It never deletes
+all enumerated devices or guesses a backend-generated ID. RegistryDevice DELETE
+is submitted once through the declared SDK with resource-GET absence polling;
+an uncertain delete is not replayed. Unexpected namespace children also fail
+cleanup qualification.
+
+Ambiguous ownership is a persistent conflict: later disappearance of one match
+does not authorize deleting the survivor. Final DPS/Hub release requires both
+RegistryDevice completion and, if the namespace was claimed, its exact completed
+deletion receipt plus a fresh scoped ARM 404. CA or namespace cleanup failures
+retain target references even after device cleanup succeeds. Controller cleanup
+reports all failures and propagates the first original error rather than masking
+it with a later release guard.
 
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`

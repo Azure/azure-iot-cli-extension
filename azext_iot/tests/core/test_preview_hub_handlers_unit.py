@@ -170,7 +170,8 @@ def test_policy_create_deduplicates_permissions(preview_mgmt, permissions):
     assert policies[1]["keyName"] == "new"
     assert {right.lower() for right in policies[1]["rights"].split(", ")} == set(permissions)
     client.iot_hub_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", resource_name="hub", iot_hub_description=hub, etag="hub-etag"
+        resource_group_name="rg", resource_name="hub", iot_hub_description=custom._hub_description_for_write(hub),
+        **custom.hub_etag_arguments(hub),
     )
 
 
@@ -360,7 +361,6 @@ def test_hub_create_default_put_contract(preview_mgmt):
     assert body["properties"]["eventHubEndpoints"] == {"events": {"retentionTimeInDays": 1, "partitionCount": 4}}
     assert body["properties"]["storageEndpoints"]["$default"] == {
         "sasTtlAsIso8601": timedelta(hours=1), "connectionString": "", "containerName": "",
-        "authenticationType": None, "identity": None,
     }
     assert body["properties"]["enableFileUploadNotifications"] is False
     assert body["properties"]["disableLocalAuth"] is True
@@ -405,7 +405,7 @@ def test_hub_create_existing_lookup_errors(preview_mgmt, status):
 def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
-    assignment = mocker.patch.object(custom, "assign_identity")
+    assignment = mocker.patch.object(custom, "create_role_assignment")
     client.iot_hub_resource.begin_create_or_update.return_value = mocker.Mock(spec=LROPoller)
     poller = custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/one", "/two"]
@@ -417,11 +417,10 @@ def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
     callback(polling_method)
     assert assignment.call_count == 2
     for call, scope in zip(assignment.call_args_list, ["/one", "/two"]):
-        context, getter, setter = call.args
+        context, principal = call.args
         assert context is cmd.cli_ctx
+        assert principal == "principal"
         assert call.kwargs == {"identity_role": "Reader", "identity_scope": scope}
-        assert getter()["identity"] == {"type": "SystemAssigned", "principalId": "principal"}
-        assert setter(getter()) is getter()
     error = HttpResponseError(message="creation failed")
     polling_method.resource.side_effect = error
     with pytest.raises(HttpResponseError) as raised:
@@ -433,25 +432,29 @@ def test_hub_create_assigns_roles_with_completed_azure_core_poller(mocker, previ
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
     result = {"identity": {"principalId": "principal"}}
-    poller = LROPoller(None, result, lambda response: response, NoPolling())
+    response = mocker.Mock()
+    response.http_response.status_code = 200
+    response.http_response.json.return_value = result
+    poller = LROPoller(None, response, lambda value: value.http_response.json(), NoPolling())
     client.iot_hub_resource.begin_create_or_update.return_value = poller
-    assignment = mocker.patch.object(custom, "assign_identity")
+    assignment = mocker.patch.object(custom, "create_role_assignment")
 
     assert custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/scope"]
     ) is poller
 
     assert poller.result() is result
-    assignment.assert_called_once()
-    _, getter, _ = assignment.call_args.args
-    assert getter()["identity"]["principalId"] == "principal"
-    assert assignment.call_args.kwargs == {"identity_role": "Reader", "identity_scope": "/scope"}
+    assignment.assert_called_once_with(
+        cmd.cli_ctx, "principal", identity_role="Reader", identity_scope="/scope"
+    )
 
 
 def test_hub_identity_show_and_scoped_assignment(mocker, preview_mgmt):
-    cmd, client, hub, _, _ = preview_mgmt
+    cmd, client, hub, _, wait = preview_mgmt
     assert custom.iot_hub_identity_show(cmd, client, "hub") == hub["identity"]
-    assignment = mocker.patch.object(custom, "assign_identity", return_value=hub)
+    hub["identity"]["principalId"] = "principal"
+    wait.return_value = hub
+    assignment = mocker.patch.object(custom, "create_role_assignment")
     assert custom.iot_hub_identity_assign(
         cmd, client, "hub", system_identity=True, identity_role="Reader", identity_scopes=["/one", "/two"]
     ) == hub["identity"]
@@ -471,13 +474,13 @@ def test_device_scope_is_parent_only_when_creating_edge_device(is_update, edge_e
         is_update=is_update, device_id="device", auth_method="sas", edge_enabled=edge_enabled,
         pk="primary", sk="secondary", device_scope="scope",
     )
-    assert device.device_id == "device"
-    assert device.capabilities.iot_edge is edge_enabled
-    assert device.authentication.symmetric_key.primary_key == "primary"
-    assert device.authentication.symmetric_key.secondary_key == "secondary"
+    assert device["deviceId"] == "device"
+    assert device["capabilities"]["iotEdge"] is edge_enabled
+    assert device["authentication"]["symmetricKey"]["primaryKey"] == "primary"
+    assert device["authentication"]["symmetricKey"]["secondaryKey"] == "secondary"
     if edge_enabled and not is_update:
-        assert device.parent_scopes == ["scope"]
-        assert device.device_scope is None
+        assert device["parentScopes"] == ["scope"]
+        assert "deviceScope" not in device
     else:
-        assert device.device_scope == "scope"
-        assert device.parent_scopes is None
+        assert device["deviceScope"] == "scope"
+        assert "parentScopes" not in device

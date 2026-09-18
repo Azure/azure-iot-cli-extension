@@ -12,18 +12,18 @@ from azext_iot.iothub.providers.base import (
     IoTHubProvider,
     CloudError,
 )
-from azext_iot.sdk.iothub.service.operations.digital_twin_operations import DigitalTwinOperations
+from azext_iot.iothub._client import HubOperationGroup
 
 
 logger = get_logger(__name__)
 
 
 class PnPRuntimeProvider(IoTHubProvider):
-    def __init__(self, cmd, hub_name=None, rg=None, login=None):
+    def __init__(self, cmd, hub_name=None, rg=None, login=None, auth_type_dataplane=None):
         super(PnPRuntimeProvider, self).__init__(
-            cmd=cmd, hub_name=hub_name, rg=rg, login=login
+            cmd=cmd, hub_name=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane,
         )
-        self.runtime_sdk: DigitalTwinOperations = self.get_sdk(
+        self.runtime_sdk: HubOperationGroup = self.get_sdk(
             SdkType.service_sdk
         ).digital_twin
 
@@ -36,9 +36,6 @@ class PnPRuntimeProvider(IoTHubProvider):
         connect_timeout=None,
         response_timeout=None,
     ):
-        # Prevent msrest locking up shell
-        self.runtime_sdk.config.retry_policy.retries = 1
-
         try:
             if payload:
                 payload = process_json_arg(payload, argument_name="payload")

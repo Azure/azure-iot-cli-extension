@@ -4,10 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import logging
+from contextlib import closing
 from types import SimpleNamespace
 
 import pytest
+import responses
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     AuthenticationError,
@@ -24,6 +27,8 @@ from azext_iot.iothub.providers.device_messaging import (
     _simulate_get_default_properties,
 )
 from azext_iot.common.shared import DeviceAuthApiType, SettleType, ProtocolType
+from azext_iot.tests.iothub.test_dataplane_adapter_unit import adapter
+from azext_iot.tests.iothub.test_dataplane_wire_unit import ENDPOINT
 
 logging.disable(logging.CRITICAL)
 
@@ -310,7 +315,7 @@ class TestUploadFile:
     def test_upload_success(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         p.device_sdk.device.create_file_upload_sas_uri.return_value.response.json.return_value = {
             "hostName": "host",
@@ -328,7 +333,7 @@ class TestUploadFile:
     def test_upload_error(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         handler = mocker.patch(f"{dm_path}.handle_service_exception")
         p.device_sdk.device.create_file_upload_sas_uri.side_effect = _cloud_error(mocker)
@@ -451,6 +456,45 @@ class TestSimulateDevice:
         p.simulate_device(protocol_type="http", msg_count=1, msg_interval=1, receive_settle="complete")
         thread.return_value.start.assert_called_once()
         handle.assert_called_once_with("complete")
+
+    @pytest.mark.parametrize("cancelled", [False, True])
+    def test_simulate_http_sends_json_through_real_transport(self, mocker, cancelled):
+        p = _provider(mocker)
+        mocker.patch("tqdm.tqdm", side_effect=lambda items, **_: items)
+        mocker.patch.object(p, "_d2c_get_device_auth_props", return_value={"authentication": {}})
+        event = mocker.patch("threading.Event")
+        event.return_value.wait.return_value = cancelled
+        thread = mocker.patch("threading.Thread")
+        thread.return_value.is_alive.return_value = False
+        thread.return_value.start.side_effect = lambda: thread.call_args.kwargs["target"](
+            *thread.call_args.kwargs["args"]
+        )
+        data = "value = + & \u00e9\n"
+
+        with closing(adapter("device")) as client, responses.RequestsMock() as network:
+            p.device_sdk = client
+            network.add("POST", ENDPOINT + "/devices/dev1/messages/events", status=204)
+            p.simulate_device(protocol_type="http", data=data, msg_count=2, msg_interval=1)
+
+            message_count = 1 if cancelled else 2
+            assert len(network.calls) == message_count
+            for index, call in enumerate(network.calls, start=1):
+                payload = json.loads(call.request.body)
+                assert payload["data"] == f"{data} #{index}"
+                assert isinstance(payload["id"], str) and payload["id"]
+                assert isinstance(payload["timestamp"], str) and payload["timestamp"]
+                assert call.request.headers["content-type"] == "application/json"
+                assert call.request.headers["content-encoding"] == "utf-8"
+            assert event.return_value.wait.call_count == message_count
+        event.return_value.set.assert_called_once()
+
+    def test_simulate_interrupt_cancels_sender(self, mocker):
+        p = _provider(mocker)
+        event = mocker.patch("threading.Event")
+        mocker.patch.object(p, "_d2c_get_device_auth_props", side_effect=KeyboardInterrupt)
+        with pytest.raises(SystemExit):
+            p.simulate_device(protocol_type="http", msg_count=1, msg_interval=1)
+        event.return_value.set.assert_called_once()
 
     def test_simulate_internal_error(self, mocker):
         p = _provider(mocker)

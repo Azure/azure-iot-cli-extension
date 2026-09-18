@@ -45,3 +45,9 @@ def mode2_iot_login_handler(cmd, namespace):
 def process_top(namespace):
     if hasattr(namespace, "top"):
         namespace.top = _process_top(top=namespace.top)
+
+
+def process_dps_top(namespace):
+    """Retain CLI -1/unlimited while allowing a zero-item DPS query."""
+    if hasattr(namespace, "top") and namespace.top != 0:
+        namespace.top = _process_top(top=namespace.top)

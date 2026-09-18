@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Opt-in, serial ownership boundary for the six existing Hub local-auth cases."""
+"""Opt-in, serial ownership boundary for the Hub local-auth and preview cases."""
 
 import json
 import logging
@@ -41,6 +41,8 @@ NODES = (
     MESSAGING + "test_hub_monitor_events",
     MESSAGING + "test_hub_monitor_feedback",
     ROOT + "messaging/test_iothub_c2d_messages_int.py::TestIoTHubC2DMessages::test_iothub_c2d_messages_http",
+    ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_identity_roundtrip",
+    ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_responding_digital_twin",
 )
 AUTH_TYPES = ("key", "login", "cstring")
 PINS = ("azext_iot_testhub", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer")
@@ -64,7 +66,7 @@ def enabled():
 
 def require_runtime():
     if ACTIVE is None:
-        raise HubSasError("HubSAS must use its validated six-node pytest entry point.")
+        raise HubSasError("HubSAS must use its validated eight-node pytest entry point.")
     return ACTIVE
 
 

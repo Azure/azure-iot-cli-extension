@@ -62,8 +62,7 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
     for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
         name = f"owned-{uid[:8]}-{kind}"
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
-        resource_id = PREFIX + resource_type + "/" + name
+        resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/" + name
         _json(directory / f"owned-{kind}.json", dict(
             metadata, kind=kind, name=name, resource_group=GROUP, id=resource_id, create_attempted=True,
             tags={"intTest": "true", "runUid": uid if phase == "regular" else uid + "-" + phase, "kind": kind},
@@ -96,7 +95,7 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["resources"] == reader.resources
     assert reader.inventories == 6  # Baseline, each cleanup, and both pre-phase gates.
-    assert len(reader.gets) == 13  # Three IDs per old phase, rechecked before the next; one toggle DPS.
+    assert len(reader.gets) == 23  # Eight regular IDs and three SAS IDs, each rechecked, then one toggle DPS.
     ids = RUNNER["inventory_ids"](reader.resources)
     assert all(phase["gate"]["inventory_ids"] == ids for phase in summary["phases"][1:])
     assert all(phase["cleanup"]["inventory_ids"] == ids for phase in summary["phases"])
@@ -180,7 +179,8 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
 
         def get(record):
             original_get(record)
-            return {"id": record["id"], "state": "Deleting"} if len(reader.gets) > 3 else None
+            regular_resources = len(RUNNER["MANIFEST"]["resource_kinds"]("regular"))
+            return {"id": record["id"], "state": "Deleting"} if len(reader.gets) > regular_resources else None
         reader.get = get
 
     def execute(*args):
@@ -239,7 +239,39 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     else:
         assert phases[1]["status"] == "blocked"
         if defect == "reappeared":
-            assert len(phases[1]["gate"]["remaining"]) == 3
+            assert len(phases[1]["gate"]["remaining"]) == len(RUNNER["MANIFEST"]["resource_kinds"]("regular"))
+
+
+@pytest.mark.parametrize("nodeid", sorted(RUNNER["MANIFEST"]["CSR_NODEIDS"]))
+@pytest.mark.parametrize("defect", ["missing", "skipped"])
+def test_final_gate_requires_each_csr_variant(tmp_path, nodeid, defect):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    path = tmp_path / "dps-phases/regular/junit.xml"
+    tree = ET.parse(path)
+    case = next(case for case in tree.getroot() if RUNNER["MANIFEST"]["junit_nodeid"](case) == nodeid)
+    if defect == "missing":
+        tree.getroot().remove(case)
+    else:
+        ET.SubElement(case, "skipped")
+    tree.write(path)
+    assert GATE(tmp_path)
+
+
+@pytest.mark.parametrize("kind", RUNNER["MANIFEST"]["CSR_RESOURCE_KINDS"])
+def test_csr_passes_cannot_mask_missing_dedicated_resource_evidence(tmp_path, kind):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    folder = tmp_path / "dps-phases/regular"
+    receipt = folder / "receipts" / f"owned-{kind}.json"
+    resource_id = json.loads(receipt.read_text())["id"]
+    receipt.unlink()
+    summary_path = tmp_path / "dps-phases.json"
+    summary = json.loads(summary_path.read_text())
+    phase = summary["phases"][0]
+    for key in ("owned_ids", "absent_ids"):
+        phase["cleanup"][key].remove(resource_id)
+    _json(summary_path, summary)
+    _json(folder / "result.json", phase)
+    assert GATE(tmp_path)
 
 
 @pytest.mark.parametrize("pin", [
@@ -297,8 +329,9 @@ def test_runner_cli_rejects_removed_limit_before_authentication(mocker, value):
     arguments = ["runner", "--subscription", SUB, "--resource-group", GROUP]
     if value is not None:
         arguments += ["--dps-capacity-limit", value]
-    reader, execute, platform_check = mocker.Mock(), mocker.Mock(return_value=0), mocker.Mock()
+    reader, execute = mocker.Mock(), mocker.Mock(return_value=0)
     mocker.patch.object(sys, "argv", arguments)
+    platform_check = mocker.Mock()
     mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute,
                       bounded_read=nullcontext, require_linux=platform_check)
     if value is None:
@@ -752,6 +785,26 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker):
     token.assert_called_once_with(subscription=SUB, resource="https://management.azure.com/")
     assert reader.dps._config.api_version == "2026-06-01-preview"  # pylint: disable=protected-access
     assert reader.hub._config.api_version == "2026-10-01-preview"  # pylint: disable=protected-access
+    assert reader.adr._config.api_version == "2026-11-02-preview"  # pylint: disable=protected-access
+
+
+@responses.activate
+@pytest.mark.parametrize("kind", ["csrdps", "csrhub", "csrns"])
+@pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
+def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind, platform):
+    mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
+                 return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
+    resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/owned"
+    responses.add(responses.GET, RUNNER["ARM"] + resource_id, status=404)
+    reader = RUNNER["ArmReader"](SUB)
+    # Exercise SDK routing on every OS; timer/platform enforcement has separate tests.
+    bounded = mocker.Mock(side_effect=nullcontext)
+    mocker.patch.dict(
+        RUNNER["ArmReader"].get.__globals__, bounded_read=bounded, sys=SimpleNamespace(platform=platform),
+    )
+    assert reader.get({"kind": kind, "name": "owned", "resource_group": GROUP}) is None
+    assert len(responses.calls) == 1
+    bounded.assert_called_once_with(reader.deadline)
 
 
 @pytest.mark.parametrize("section", ["cleanup", "gate"])

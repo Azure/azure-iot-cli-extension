@@ -44,6 +44,24 @@ STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 _isolated_hub_pending = None
 
 
+@pytest.fixture(autouse=True)
+def hub_sdk_wire_bridge(monkeypatch):
+    """Route legacy unit spies through the generated request, not a fake operation."""
+    from unittest.mock import Mock
+    from azure.core.pipeline.transport import RequestsTransport
+    from msrest.service_client import ServiceClient
+    from azext_iot.tests.iothub._sdk_wire import legacy_spy_response
+
+    original = RequestsTransport.send
+
+    def send(transport, request, **kwargs):
+        if isinstance(ServiceClient.send, Mock):
+            return legacy_spy_response(request)
+        return original(transport, request, **kwargs)
+
+    monkeypatch.setattr(RequestsTransport, "send", send)
+
+
 def pytest_configure(config):
     if _sas_phase.enabled():
         _sas_phase.require_posix_timers()
