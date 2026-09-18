@@ -81,12 +81,24 @@ In order to list all recognized environments, you can type `tox -av`, which will
 
 ![image](https://user-images.githubusercontent.com/13545962/217683727-1ec36d2c-e055-4677-a5a9-8f87cdcc987b.png)
 
+## Integration workflow topology
+
+`int_test.yml` runs a direct service × Python × region matrix after setup and unit
+tests succeed. Every selected combination, including ADU, is independently eligible
+to run, with `fail-fast: false`, no parallelism cap and no workflow/job concurrency
+lock. Job names and result/coverage artifacts identify the service, Python and region.
+The result gate checks the complete selected matrix independently of coverage reporting.
+
+Owned Hub/DPS controllers still sequence their internal phases; ADR still uses
+serial pytest. This scheduling does not grant admission or reserve capacity:
+the existing canary scope, owned-resource and live headroom checks still apply.
+Overlapping runs and additional Python/region combinations can consume resources
+concurrently; the former bounded-cohort reservation does not apply.
+
 ## ADR live-test budgets
 
 The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
-The root integration workflow passes this budget through the reusable bundle and
-cohort to the service job; reusable callers do not impose a shorter runner timeout.
-The existing same-scope concurrency lock remains held until the bundle completes.
+The root integration matrix applies this budget directly to each ADR service job.
 The job ceiling does not extend per-operation provisioning waits.
 
 ADR runs serially. Its SU-link case already allows 175 minutes for provisioning,
