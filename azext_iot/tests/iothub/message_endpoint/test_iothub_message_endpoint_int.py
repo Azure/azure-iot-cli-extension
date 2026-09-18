@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import Optional
+from functools import partial
 from uuid import uuid4
 import pytest
 from azure.cli.core.azclierror import BadRequestError
@@ -12,6 +13,7 @@ from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import invoke_checked
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
@@ -616,6 +618,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
 
 def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
+    invoke = partial(invoke_checked, cli, description="Storage endpoint lifecycle command")
     iot_hub_objs, storage_obj = provisioned_storage_with_identity_module
     iot_hub_obj = iot_hub_objs[0]["hub"]
 
@@ -624,7 +627,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} -y -f".format(
             iot_hub, iot_rg
         )
@@ -637,7 +640,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     default_file_format = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
     # use connection string - note how the connection string needs to have entity path and the
     # endpoint uri and path are left blank
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
             iot_hub, iot_rg, endpoint_names[0], iot_rg, storage_cs, container_name
         )
@@ -656,7 +659,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=300
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
@@ -666,7 +669,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # Use hub identity with no defaults
     custom_file_format = default_file_format.replace("/", "_")
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
             iot_hub,
@@ -694,7 +697,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=10
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
         )
@@ -703,7 +706,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # Use user identity
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity {} -b {} -w {}".format(
             iot_hub,
@@ -732,7 +735,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=500
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
         )
@@ -741,13 +744,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # List
-    endpoint_list = cli.invoke(
+    endpoint_list = invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
         )
     ).as_json()
 
-    storage_list = cli.invoke(
+    storage_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
@@ -758,7 +761,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # Update
     # Keybased -> System, change all optional props
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity [system] -b {} -w {} --ff {}".format(
             iot_hub,
@@ -786,7 +789,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=50
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
@@ -796,7 +799,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # System -> User, change some optional props
     custom_file_format = default_file_format.replace("/", "_")
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity {} -b {}".format(
             iot_hub,
@@ -823,7 +826,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=10
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
         )
@@ -832,7 +835,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # User -> Keybased, change no optional props
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} "
         "-c {}".format(
             iot_hub,
@@ -857,7 +860,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=500
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
         )
@@ -866,14 +869,14 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # Delete one event hub endpoint
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
     )
 
     # ensure that only one got deleted
-    storage_list = cli.invoke(
+    storage_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
@@ -882,13 +885,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert len(storage_list) == 2
 
     # Delete all event hub endpoints
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
             iot_hub, iot_rg, "storage-container"
         )
     )
 
-    endpoint_list = cli.invoke(
+    endpoint_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
