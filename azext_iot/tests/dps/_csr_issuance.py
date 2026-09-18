@@ -18,6 +18,7 @@ from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import adr_service_factory
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_condition
 from azext_iot.tests.dps import conftest as fixtures, _phase, _phase_receipts as receipts, _phase_runtime as runtime
 from azext_iot.tests.helpers import invoke_checked
@@ -30,7 +31,9 @@ WAIT_OPTIONS = "--timeout 600 --interval 10"
 
 
 def invoke(command):
-    return invoke_checked(fixtures.cli, command, description="Owned CSR issuance command")
+    # Knack retains a failed command's --query handler; never share it with the next command.
+    cli = EmbeddedCLI(cli_ctx=fixtures.cli.az_cli)
+    return invoke_checked(cli, command, description="Owned CSR issuance command")
 
 
 def _optional(command, *, dataplane=False):
@@ -252,10 +255,12 @@ def enrollment(resource, enrollment_id):
             f"--adr-namespace {resource['namespace']} --adr-ca-name {resource['ca']} "
             f"--adr-cert-policy-name {resource['policy']} --query {quote(projection)}"
         ).as_json()
-        assert created == {
+        expected = {
             "registrationId": enrollment_id, "namespaceName": resource["namespace"],
             "certificateAuthorityName": resource["ca"], "certificatePolicyName": resource["policy"],
         }
+        observed = {key: created.get(key) for key in expected} if isinstance(created, dict) else type(created).__name__
+        assert created == expected, f"CSR enrollment references differ: expected {expected}, observed {observed}"
         ownership = RegistryDeviceOwnership(resource, enrollment_id)
         yield ownership
     finally:

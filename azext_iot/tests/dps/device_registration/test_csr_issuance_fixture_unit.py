@@ -23,8 +23,13 @@ from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key
 from cryptography.x509.oid import NameOID
+from knack.cli import CLI
+from knack.events import EVENT_INVOKER_FILTER_RESULT
+from knack.query import CLIQuery
+from knack.util import CommandResultItem
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.dps import _csr_issuance as csr, _phase, _phase_manifest as manifest
 from azext_iot.tests.dps._csr import temporary_csr
@@ -476,6 +481,59 @@ def test_data_plane_translation_survives_real_arm_show_exception_boundary(mocker
         with pytest.raises(CLIError) as raised:
             csr._optional("iot dps enrollment show", dataplane=True)
         assert raised.value.__cause__ is cause
+
+
+def test_expected_404_query_cannot_filter_the_next_enrollment_result(resource, tmp_path, mocker, caplog):
+    record = {}
+    contexts = []
+    returned = []
+
+    class OfflineInvocation:
+        def __init__(self, cli_ctx, **_kwargs):
+            self.cli_ctx = cli_ctx
+            self.data = {"output": "json"}
+
+        def execute(self, args):
+            if "--query" in args:
+                CLIQuery.handle_query_parameter(self.cli_ctx, args=SimpleNamespace(
+                    _jmespath_query=CLIQuery.jmespath_type(args[args.index("--query") + 1]),
+                ))
+            if "show" in args and (not record or "registration" in args):
+                cause = HttpResponseError(response=SimpleNamespace(status_code=404, reason="Not Found", headers={}))
+                raise ResourceNotFoundError("EnrollmentNotFound") from cause
+            if "create" in args:
+                record.update({
+                    "registrationId": args[args.index("--enrollment-id") + 1],
+                    "namespaceName": resource["namespace"],
+                    "certificateAuthorityName": resource["ca"],
+                    "certificatePolicyName": resource["policy"],
+                    "attestation": {"symmetricKey": {"primaryKey": "DO-NOT-LOG-BOOTSTRAP-KEY"}},
+                })
+            if "delete" in args:
+                record.clear()
+            event = {"result": deepcopy(record)}
+            self.cli_ctx.raise_event(EVENT_INVOKER_FILTER_RESULT, event_data=event)
+            returned.append(event["result"])
+            return CommandResultItem(event["result"])
+
+    def fresh_context():
+        context = CLI(cli_name="csr-offline", config_dir=str(tmp_path), invocation_cls=OfflineInvocation)
+        context.data = {"subscription_id": SUB}
+        contexts.append(context)
+        return context
+
+    mocker.patch("azext_iot.common.embedded_cli.get_default_cli", side_effect=fresh_context)
+    mocker.patch.object(csr.fixtures, "cli", EmbeddedCLI())
+    owner = mocker.patch("azext_iot.tests.dps._csr_registry.RegistryDeviceOwnership").return_value
+    with caplog.at_level("DEBUG", logger="azext_iot.common.embedded_cli"):
+        for registration_id in ("first", "second"):
+            with csr.enrollment(resource, registration_id) as ownership:
+                assert ownership is owner
+    assert owner.cleanup.call_count == 2
+    assert not record
+    assert len(contexts) == 11  # Shared fixture context plus one isolated context per command.
+    assert [value["registrationId"] for value in returned if isinstance(value, dict) and value] == ["first", "second"]
+    assert "DO-NOT-LOG-BOOTSTRAP-KEY" not in caplog.text
 
 
 @pytest.mark.parametrize("timeout", [None, 180])
