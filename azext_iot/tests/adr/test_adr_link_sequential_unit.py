@@ -7,6 +7,7 @@
 """Offline proofs for the combined command's DPS-before-Hub mutation boundary."""
 
 from copy import deepcopy
+from types import MethodType
 from unittest.mock import Mock
 
 import pytest
@@ -225,7 +226,7 @@ def test_combined_validates_both_ids_and_identity_selections_before_preflight(co
 
 def test_combined_real_hub_validation_fails_before_queued_dps_rbac(combined):
     provider, args, _, _ = combined
-    provider._preflight_link = LinkProvider._preflight_link.__get__(provider)
+    provider._preflight_link = MethodType(LinkProvider._preflight_link, provider)
     target = {
         "location": "centraluseuap", "properties": {"provisioningState": "Succeeded"},
         "identity": {"userAssignedIdentities": {UAMI_ID: {"principalId": "target-user"}}},

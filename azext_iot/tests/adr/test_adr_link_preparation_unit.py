@@ -440,7 +440,7 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
         "properties": {"provisioningState": "Succeeded"},
     }
     native_commands, role_observations = [], []
-    endpoint = None
+    endpoint = {}
 
     def output(value):
         return Mock(get_output_in_json=lambda: deepcopy(value))
@@ -479,7 +479,7 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
             if "su-cap-rejected-link" in command:
                 raise ArgumentUsageError(subject.SU_CAP_EXCEEDED_MSG)
             if expect_failure:
-                assert endpoint is not None
+                assert endpoint
                 return output(None)
             action = "add"
             inbound = {"type": "UserAssigned", "userAssignedIdentity": identity_id}
@@ -490,8 +490,10 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
             assert len(native_commands) == 1
         else:
             if command.startswith("iot adr ns link su show "):
+                assert endpoint
                 return output({"name": "su-primary", **endpoint})
             if command.startswith("iot adr ns link su list "):
+                assert endpoint
                 return output([{"name": "su-primary", **endpoint}])
             if command.startswith("iot adr ns link su wait "):
                 assert endpoint["linkingState"] == "Succeeded"
