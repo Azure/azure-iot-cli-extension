@@ -12,14 +12,20 @@ import json
 from pathlib import Path
 import shlex
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
+import responses
 from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError
-from azure.core.exceptions import HttpResponseError
+from azure.cli.core.commands.arm import show_exception_handler
+from azure.core.credentials import AccessToken
+from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key
 from cryptography.x509.oid import NameOID
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.dps import _csr_issuance as csr, _phase, _phase_manifest as manifest
 from azext_iot.tests.dps._csr import temporary_csr
 from azext_iot.tests.dps.device_registration import test_iot_device_registration_int as scenario
@@ -114,7 +120,140 @@ def namespace_commands(scope, resource, mocker):
     backend = NamespaceCommands(resource)
     mocker.patch.object(csr, "invoke", side_effect=backend)
     mocker.patch.object(csr, "find_namespace", side_effect=lambda _name: backend.resources.get("namespace"))
+    mocker.patch.object(csr, "find_child", side_effect=lambda _name, label: backend.resources.get(label))
     return backend
+
+
+@pytest.fixture
+def arm_commands(scope, resource, mocker):
+    backend = NamespaceCommands(resource)
+    backend.get_responses, backend.get_calls, backend.transport_error = {}, [], None
+    endpoint = "https://centraluseuap.management.azure.com"
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
+    backend.client = DeviceRegistryMgmtClient(credential, SUB, base_url=endpoint, retry_total=0)
+    backend.factory = mocker.patch.object(csr, "adr_service_factory", return_value=backend.client)
+    mocker.patch.object(csr, "invoke", side_effect=backend)
+    paths = {backend.namespace_id: "namespace"}
+    paths.update({backend.namespace_id + "/" + path: label
+                  for label, _, _, path, _ in csr._children(resource["namespace"])})
+
+    def respond(request):
+        assert request.method == "GET"
+        assert parse_qs(urlsplit(request.url).query) == {"api-version": ["2026-11-02-preview"]}
+        label = paths[urlsplit(request.url).path]
+        if backend.transport_error is not None:
+            raise backend.transport_error
+        status, body = backend.get_responses.get(label, (
+            (200, backend.resources[label]) if label in backend.resources
+            else (404, {"error": {"code": "ResourceNotFound", "message": "Expected absent resource"}})
+        ))
+        backend.get_calls.append((label, status))
+        return status, {"Content-Type": "application/json"}, json.dumps(body)
+
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
+        for path in paths:
+            network.add_callback(responses.GET, endpoint + path, callback=respond)
+        yield backend
+    backend.client.close()
+
+
+def test_real_sdk_absence_probes_complete_setup_and_dependency_ordered_cleanup(arm_commands, resource, scope):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    csr.delete_namespace(name)
+    for label in ("namespace", "root", "ica", "policy"):
+        assert arm_commands.get_calls.count((label, 404)) == 2
+    assert all(call.kwargs == {"subscription_id": SUB} for call in arm_commands.factory.call_args_list)
+    assert json.loads((scope / "deleted-csrns.json").read_text())["delete_completed"] is True
+    assert not arm_commands.resources
+    assert sum(" show " in command for command in arm_commands.commands) == 3  # Present-child readback only.
+    assert not any("iot adr ns show " in command for command in arm_commands.commands)
+    deletes = [command for command in arm_commands.commands if " delete " in command]
+    assert [command.split(" -n ")[1].split()[0] for command in deletes] == [
+        csr.POLICY, csr.ISSUING_CA, csr.ROOT_CA, name,
+    ]
+
+
+def test_real_arm_show_handler_exits_on_sdk_404_but_scoped_probe_returns_absent(arm_commands, resource, mocker):
+    mocker.patch("azure.cli.core.azclierror.ResourceNotFoundError.send_telemetry")
+    with pytest.raises(HttpResponseError) as missing:
+        arm_commands.client.certificate_authorities.get(
+            resource_group_name="rg", namespace_name=resource["namespace"], certificate_authority_name=csr.ROOT_CA,
+        )
+    assert missing.value.status_code == 404
+    with pytest.raises(SystemExit) as exited:
+        show_exception_handler(missing.value)
+    assert exited.value.code == 3
+    assert csr.find_child(resource["namespace"], "root") is None
+    assert arm_commands.get_calls == [("root", 404), ("root", 404)]
+    assert not arm_commands.commands
+
+
+@pytest.mark.parametrize("label", ["namespace", "root", "ica", "policy"])
+@pytest.mark.parametrize("status", [400, 401, 403, 409, 500])
+def test_scoped_sdk_absence_wait_never_swallows_other_http_errors(arm_commands, resource, label, status):
+    arm_commands.get_responses[label] = (status, {"error": {"code": "ResourceNotFound", "message": "Not a 404"}})
+    with pytest.raises(HttpResponseError) as raised:
+        csr._wait_arm_absent(
+            lambda: csr.find_namespace(resource["namespace"]) if label == "namespace"
+            else csr.find_child(resource["namespace"], label),
+            "owned absence",
+        )
+    assert raised.value.status_code == status
+    assert arm_commands.get_calls == [(label, status)]
+    assert not arm_commands.commands
+
+
+@pytest.mark.parametrize("label", ["namespace", "root", "ica", "policy"])
+@pytest.mark.parametrize("body", [None, {}, [], {"id": None}, {"id": ""}])
+def test_scoped_sdk_null_or_malformed_success_cannot_prove_absence(arm_commands, resource, label, body):
+    arm_commands.get_responses[label] = (200, body)
+    with pytest.raises(AssertionError, match="Malformed ARM GET"):
+        if label == "namespace":
+            csr.find_namespace(resource["namespace"])
+        else:
+            csr.find_child(resource["namespace"], label)
+    assert not arm_commands.commands
+
+
+def test_scoped_sdk_transport_failure_is_not_absence(arm_commands, resource):
+    arm_commands.transport_error = RequestsConnectionError("Offline transport failure")
+    with pytest.raises(ServiceRequestError, match="Offline transport failure"):
+        csr.find_child(resource["namespace"], "root")
+    assert not arm_commands.commands
+
+
+def test_precreate_sdk_rejection_preserves_error_and_never_claims_or_creates_ca(arm_commands, resource, scope):
+    arm_commands.get_responses["root"] = (403, {"error": {"code": "AuthorizationFailed"}})
+    with pytest.raises(HttpResponseError) as raised:
+        csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    assert raised.value.status_code == 403
+    assert not (scope / "csr-child-root.json").exists()
+    assert not any("ns ca create" in command for command in arm_commands.commands)
+    assert not arm_commands.resources
+    assert json.loads((scope / "deleted-csrns.json").read_text())["delete_completed"] is True
+
+
+@pytest.mark.parametrize("label", ["namespace", "root", "ica", "policy"])
+def test_postdelete_sdk_error_cannot_record_namespace_cleanup_completion(arm_commands, resource, scope, mocker, label):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    target = {"namespace": name, "root": csr.ROOT_CA, "ica": csr.ISSUING_CA, "policy": csr.POLICY}[label]
+
+    def invoke(command):
+        result = arm_commands(command)
+        if f" delete -n {target} " in command:
+            arm_commands.get_responses[label] = (403, {"error": {"code": "AuthorizationFailed"}})
+        return result
+
+    mocker.patch.object(csr, "invoke", side_effect=invoke)
+    with pytest.raises(HttpResponseError) as raised:
+        csr.delete_namespace(name)
+    assert raised.value.status_code == 403
+    completed = scope / "deleted-csrns.json"
+    assert not completed.exists() or not json.loads(completed.read_text()).get("delete_completed")
+    assert sum(f" delete -n {target} " in command for command in arm_commands.commands) == 1
+    if label != "namespace":
+        assert "namespace" in arm_commands.resources
+        assert not any("iot adr ns delete " in command for command in arm_commands.commands)
 
 
 def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(namespace_commands, resource, scope):
@@ -313,6 +452,30 @@ def test_enrollment_absence_accepts_only_authoritative_not_found(mocker, status)
     else:
         with pytest.raises(ForbiddenError):
             csr._optional("show", dataplane=True)
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 500])
+def test_data_plane_translation_survives_real_arm_show_exception_boundary(mocker, status):
+    from knack.util import CLIError
+    from azext_iot.dps.services._enrollment import handle_service_error
+
+    cause = HttpResponseError(response=SimpleNamespace(
+        status_code=status, reason="error", headers={}, json=lambda: {"errorCode": status, "message": "DPS error"},
+    ))
+
+    def translated_show(_command):
+        try:
+            handle_service_error(cause)
+        except CLIError as error:
+            show_exception_handler(error)
+
+    mocker.patch.object(csr, "invoke", side_effect=translated_show)
+    if status == 404:
+        assert csr._optional("iot dps enrollment show", dataplane=True) is None
+    else:
+        with pytest.raises(CLIError) as raised:
+            csr._optional("iot dps enrollment show", dataplane=True)
+        assert raised.value.__cause__ is cause
 
 
 @pytest.mark.parametrize("timeout", [None, 180])

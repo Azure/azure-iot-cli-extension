@@ -58,7 +58,6 @@ def wire(tmp_path, monkeypatch, mocker):
         "dps": {"name": "dps", "resourceGroup": "rg", "dps": resources["dps"]},
         "hub": {"name": "hub", "rg": "rg", "hub": resources["hub"]},
     }
-    mocker.patch.object(csr, "find_namespace", side_effect=lambda _name: resources.get("ns"))
     for name in ("dps", "hub"):
         mocker.patch.object(csr.fixtures, f"_find_{name}_by_name", return_value=resources[name])
     credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
@@ -164,8 +163,6 @@ def controller(wire, mocker):
         if "ns delete " in command:
             client.namespaces.begin_delete(resource_group_name="rg", namespace_name="ns", polling=False)
             body = None
-        elif "ns show " in command:
-            body = client.namespaces.get(resource_group_name="rg", namespace_name="ns")
         else:
             raise AssertionError(command)
         return SimpleNamespace(as_json=lambda: body)
@@ -194,7 +191,11 @@ def test_real_sdk_resolves_external_id_to_distinct_arm_name_and_deletes_only_own
     owner.cleanup()
     assert set(wire.devices) == {"preexisting", "unrelated-new"}
     assert [path for method, path in wire.calls if method == "DELETE"] == [wire.collection + "/arm-generated-name"]
-    assert all(path == wire.collection or path.startswith(wire.collection + "/") for _, path in wire.calls)
+    assert all(
+        (method == "GET" and path == wire.namespace_id)
+        or path == wire.collection or path.startswith(wire.collection + "/")
+        for method, path in wire.calls
+    )
     assert wire.factory.call_args.kwargs["subscription_id"] == SUB
     registry.require_registry_cleanup_resolved()
 
@@ -293,11 +294,10 @@ def test_registry_completion_does_not_release_controller_targets_until_namespace
             "properties": {"provisioningState": "Succeeded"},
         }
         receipts.write("csr-child-root.json", {"id": child["id"], "tags": child["tags"]})
+        mocker.patch.object(csr, "find_child", return_value=child)
         original = csr.invoke
 
         def ca_failure(command):
-            if "ns ca show " in command:
-                return SimpleNamespace(as_json=lambda: child)
             if "ns ca delete " in command:
                 raise HttpResponseError(
                     message="CA cleanup rejected",
@@ -371,7 +371,7 @@ def test_malformed_or_cross_scope_paging_fails_before_registration_intent(wire, 
     wire.list_body = body
     with pytest.raises(AssertionError, match="Malformed|pagination"):
         start(wire)
-    assert len(wire.calls) == 1
+    assert wire.calls == [("GET", wire.namespace_id), ("GET", wire.collection)]
     assert not list(wire.directory.glob("csr-registry-intent-*.json"))
 
 
@@ -421,7 +421,7 @@ def test_concurrent_target_change_refuses_registration_intent(wire, target):
         wire.resources["ns"]["properties"]["provisioning"]["endpoints"]["dps"]["resourceId"] += "-other"
     with pytest.raises(AssertionError):
         owner.before_submit()
-    assert not wire.calls
+    assert wire.calls == [("GET", wire.namespace_id)]
     assert not list(wire.directory.glob("csr-registry-intent-*.json"))
 
 

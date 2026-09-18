@@ -10,7 +10,6 @@ from contextlib import contextmanager, ExitStack
 import json
 from shlex import quote
 from time import time
-from types import SimpleNamespace
 
 import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
@@ -19,7 +18,7 @@ from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import adr_service_factory
-from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_resource_absent
+from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_condition
 from azext_iot.tests.dps import conftest as fixtures, _phase, _phase_receipts as receipts, _phase_runtime as runtime
 from azext_iot.tests.helpers import invoke_checked
 
@@ -35,6 +34,7 @@ def invoke(command):
 
 
 def _optional(command, *, dataplane=False):
+    """DPS data-plane probes preserve their translated service errors."""
     try:
         return invoke(command).as_json()
     except (HttpResponseError, CloudError, CLIError) as error:
@@ -46,15 +46,50 @@ def _optional(command, *, dataplane=False):
         raise
 
 
-def find_namespace(name):
+def _arm_get(getter, **scope):
+    """Avoid CLI ARM show, which converts an expected SDK 404 into SystemExit(3)."""
     try:
-        return adr_service_factory(fixtures.cli.az_cli).namespaces.get(
-            resource_group_name=fixtures.ENTITY_RG, namespace_name=name,
-        )
+        resource = getter(**scope)
     except HttpResponseError as error:
         if error.status_code == 404:
             return None
         raise
+    if not isinstance(resource, dict) or not isinstance(resource.get("id"), str) or not resource["id"]:
+        raise AssertionError("Malformed ARM GET response cannot establish resource presence or absence.")
+    return resource
+
+
+def _arm_client():
+    config = receipts.settings()
+    if config is None:
+        raise AssertionError("CSR ARM probes require the receipt-owned subscription and resource group.")
+    return adr_service_factory(fixtures.cli.az_cli, subscription_id=config[2]), config[3]
+
+
+def find_namespace(name):
+    client, group = _arm_client()
+    return _arm_get(client.namespaces.get, resource_group_name=group, namespace_name=name)
+
+
+def find_child(namespace, label):
+    client, group = _arm_client()
+    scope = {"resource_group_name": group, "namespace_name": namespace}
+    if label == "policy":
+        return _arm_get(
+            client.certificate_policies.get, **scope,
+            certificate_authority_name=ISSUING_CA, certificate_policy_name=POLICY,
+        )
+    return _arm_get(
+        client.certificate_authorities.get, **scope,
+        certificate_authority_name={"root": ROOT_CA, "ica": ISSUING_CA}[label],
+    )
+
+
+def _wait_arm_absent(fetch, description):
+    wait_for_condition(
+        fetch, lambda resource: resource is None, description=description,
+        timeout=600, interval=10, is_retryable_error=lambda _error: False,
+    )
 
 
 def _children(namespace):
@@ -108,7 +143,7 @@ def delete_namespace(name):
             "subscription": record["subscription"], "phase": record["phase"],
         }.items()):
             raise AssertionError("CSR child receipt does not match its owned namespace.")
-        child = _optional(f"{command} show {arguments}")
+        child = find_child(name, label)
         if child is None:
             continue
         if child["id"].lower() != expected_id.lower() or any(
@@ -117,15 +152,11 @@ def delete_namespace(name):
             raise AssertionError("Refusing CSR child deletion after an ownership change.")
         if child["properties"].get("provisioningState") != "Deleting":
             invoke(f"{command} delete {arguments} -y")
-        wait_for_resource_absent(
-            SimpleNamespace(cmd=invoke), f"{command} show {arguments}", timeout=600, interval=10,
-        )
+        _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
     if receipts.before_delete(name, find_namespace(name)):
         with runtime.owned_write(name, "DELETE"):
             invoke(f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
-        wait_for_resource_absent(
-            SimpleNamespace(cmd=invoke), f"iot adr ns show -n {name} -g {fixtures.ENTITY_RG}", timeout=600, interval=10,
-        )
+        _wait_arm_absent(lambda: find_namespace(name), "owned CSR namespace absence")
         receipts.after_delete(name)
 
 
@@ -161,7 +192,7 @@ def _create_namespace(run_uid, kind, dps, hub):
 
         record = receipts._owned(name)  # pylint: disable=protected-access
         for label, command, arguments, child_path, options in _children(name):
-            if _optional(f"{command} show {arguments}") is not None:
+            if find_child(name, label) is not None:
                 raise AssertionError(f"Refusing to overwrite existing CSR {label}.")
             receipts.write(f"csr-child-{label}.json", {
                 "id": record["id"] + "/" + child_path, "tags": record["tags"],
