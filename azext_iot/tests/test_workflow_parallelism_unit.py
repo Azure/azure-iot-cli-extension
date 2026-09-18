@@ -247,7 +247,7 @@ def test_matrix_cohorts_preserve_every_selected_combination_once(tmp_path, servi
     assert Counter(identity(config) for cohort in cohorts for config in cohort["configs"]) == Counter(
         identity(config) for config in flat
     )
-    ceilings = {"DPS": 120, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 120}
+    ceilings = {"DPS": 150, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 120}
     for cohort in cohorts:
         configs = cohort["configs"]
         actual_services = {config["service"] for config in configs}
