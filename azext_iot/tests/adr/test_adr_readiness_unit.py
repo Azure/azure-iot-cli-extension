@@ -809,7 +809,7 @@ def test_sequential_scenario_exercises_combined_command_without_helper_recovery(
         assert not any("role assignment create " in command for command in commands)
         assert clock() <= 600
         if not setup_failed:
-            assert clock.sleeps == []
+            assert not clock.sleeps
     if failure is None or failure.startswith("final_"):
         assert sum(" link hub list " in text or " link dps list " in text for text in commands) == 2
     dps_readiness.assert_not_called()

@@ -8,7 +8,7 @@
 
 from copy import deepcopy
 import json
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -218,8 +218,10 @@ def test_unrelated_http_errors_propagate_unchanged_without_retry(mocker, stage, 
             if h.patches:
                 raise error
         h.get_hook = fail
+    elif stage == "submit":
+        h.submit_error = error
     else:
-        setattr(h, stage + "_error", error)
+        h.wait_error = error
     with pytest.raises(HttpResponseError) as caught:
         h.run()
     assert caught.value is error
@@ -384,7 +386,7 @@ def test_combined_dps_auth_deadline_prevents_hub(mocker, caplog):
 def test_real_azure_core_poller_result_is_not_replaced_with_timeout_none(mocker):
     h = Harness(mocker)
     mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", False)
-    h.provider._await_terminal = LinkProvider._await_terminal.__get__(h.provider)
+    h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     response = {"real": "result"}
     poller = LROPoller(Mock(), response, lambda value: value, NoPolling())
     budget = LinkDeadline(10, 1, clock=h.clock.time, sleeper=h.clock.sleep)
@@ -402,7 +404,7 @@ def test_unknown_cli_error_is_not_treated_as_structured_authorization(mocker):
 
 def _real_resource_pollers(h, mocker):
     """Real Azure Core pollers with canary metadata; no background network."""
-    h.provider._await_terminal = LinkProvider._await_terminal.__get__(h.provider)
+    h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     pollers = []
     url = "https://centraluseuap.management.azure.com" + NS_ID + "?api-version=2026-11-02-preview"
 
@@ -768,7 +770,7 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
 ):
     """Drive the generated client, HTTP transport, real provider and base waiter."""
     h = Harness(mocker)
-    h.provider._await_terminal = LinkProvider._await_terminal.__get__(h.provider)
+    h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     patch_times, requests, bodies = [], [], []
     base_url = "https://centraluseuap.management.azure.com"
     url = base_url + NS_ID
