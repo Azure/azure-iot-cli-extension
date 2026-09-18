@@ -17,6 +17,7 @@ from azure.cli.core.azclierror import (
     BadRequestError,
     CLIInternalError,
     InvalidArgumentValueError,
+    ManualInterrupt,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
@@ -27,6 +28,7 @@ from azure.cli.core.commands.arm import assign_identity
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
+from knack.prompting import prompt_y_n
 from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
@@ -45,6 +47,7 @@ from azext_iot.core.shared import (
     IdentityType,
     IotDpsSku,
     IotHubAuthenticationType,
+    IotHubConnectionProfile,
     IotHubSku,
     ManagedServiceIdentityType,
     RenewKeyType,
@@ -56,6 +59,9 @@ logger = get_logger(__name__)
 # Identity types
 SYSTEM_ASSIGNED = 'SystemAssigned'
 NONE_IDENTITY = 'None'
+MQTT_V5_CREATE_CONFIRMATION = (
+    "The MqttV5 connection profile is permanent and cannot be changed after the IoT Hub is created. Continue?"
+)
 
 
 # CUSTOM TYPE
@@ -75,6 +81,13 @@ class SimpleAccessRights(Enum):
     registry_write = AccessRights.REGISTRY_WRITE
     service_connect = AccessRights.SERVICE_CONNECT
     device_connect = AccessRights.DEVICE_CONNECT
+
+
+def _is_mqtt_v5_profile(connection_profile):
+    return (
+        isinstance(connection_profile, str)
+        and connection_profile.casefold() == IotHubConnectionProfile.MQTT_V5.value.casefold()
+    )
 
 
 def _get_resource_group_from_hub(hub):
@@ -934,6 +947,8 @@ def iot_hub_create(
     location=None,
     sku=IotHubSku.S1.value,
     unit=1,
+    connection_profile: Optional[str] = None,
+    yes: bool = False,
     partition_count=4,
     retention_day=1,
     c2d_ttl=1,
@@ -990,6 +1005,13 @@ def iot_hub_create(
             "to enable it. Check command help (-h) for more information on this property's usage and implications."
         )
 
+    if (
+        _is_mqtt_v5_profile(connection_profile)
+        and not yes
+        and not prompt_y_n(msg=MQTT_V5_CREATE_CONFIRMATION, default='n')
+    ):
+        raise ManualInterrupt("Operation was aborted because MQTT 5 profile creation was not confirmed.")
+
     sku = {"name": sku, "capacity": unit}
 
     event_hub_dic = {}
@@ -1023,6 +1045,10 @@ def iot_hub_create(
                     "disableDeviceSAS": disable_device_sas,
                     "disableModuleSAS": disable_module_sas}
     properties["enableFileUploadNotifications"] = enable_fileupload_notifications
+    if connection_profile is not None:
+        properties["connectionProfile"] = connection_profile
+    if _is_mqtt_v5_profile(connection_profile):
+        properties["routing"] = {"endpoints": {}}
 
     # TODO - CMS Preview - Hub Create ADR property validation
     _validate_and_set_adr_properties(
