@@ -196,8 +196,32 @@ def test_incremental_option_rejects_parallel_writers_before_starting_pytest(mock
 
 
 def _record_step():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text())
+    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     return next(step for step in workflow["jobs"]["int-test"]["steps"] if step["name"] == "Record test result")
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "windows-crlf"])
+def test_record_step_reads_utf8_workflow_under_windows_default_encoding(tmp_path, monkeypatch, newline):
+    relative = ".github/workflows/int_test.yml"
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    workflow = tmp_path / relative
+    workflow.parent.mkdir(parents=True)
+    workflow.write_bytes(source.replace("\n", newline).encode("utf-8"))
+
+    def windows_read_text(path, encoding=None, errors=None, **kwargs):
+        # Reproduce Windows' non-UTF-8 default on every test platform.
+        with path.open(encoding=encoding or "cp1252", errors=errors, **kwargs) as stream:
+            return stream.read()
+
+    monkeypatch.setattr(Path, "read_text", windows_read_text)
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    # The actual workflow contains box-drawing text that CP1252 cannot decode.
+    with pytest.raises(UnicodeDecodeError):
+        workflow.read_text()
+    step = _record_step()
+    assert step["name"] == "Record test result"
+    assert step["if"] == "${{ always() }}"
+    assert "ADR incremental test evidence is missing" in step["run"]
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow record step.")
