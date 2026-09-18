@@ -306,12 +306,13 @@ def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, m
     assert "UNSAFE_CAPTURED_CREDENTIAL" not in (tmp_path / "dps-phases" / phase / "junit.xml").read_text()
 
 
+@pytest.mark.parametrize("limit", [10, 100])
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
 ])
-def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect):
-    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect)
+def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect, limit):
+    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect, capacity_limit=limit)
     assert result == 1 and summary["status"] == "debug-failed"
     if defect == "uncertain":
         assert summary["phases"][0]["cleanup"]["complete"] is False
