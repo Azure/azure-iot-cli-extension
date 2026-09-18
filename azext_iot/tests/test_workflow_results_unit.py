@@ -257,12 +257,33 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubControl": "225", "HubData": "360", "ADR": "120"}
+    assert budgets == {"HubControl": "225", "HubData": "360", "ADR": "360"}
     ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
     assert ado_budgets == {"HubControl": 225, "HubData": 360}
     for suite, phases in BUDGETS.items():
         assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
+    assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
+
+
+def test_adr_budget_reaches_service_job_without_a_shorter_reusable_caller_ceiling():
+    from azext_iot.tests.adr._helpers import SU_LIFECYCLE_TIMEOUT
+    from azext_iot.tests.adr.test_adr_link_int import _SU_LINK_LIFECYCLE_TIMEOUT
+
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    matrix = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
+    budget = int(re.search(r'"ADR\|[^"]+\|(\d+)"', matrix["run"])[1])
+    assert budget == 360
+    assert SU_LIFECYCLE_TIMEOUT == 75 * 60
+    assert _SU_LINK_LIFECYCLE_TIMEOUT == 175 * 60
+    # Observed non-SU prefix ~52m, two remaining 15m cases and 10m reporting margin.
+    assert budget * 60 >= _SU_LINK_LIFECYCLE_TIMEOUT + SU_LIFECYCLE_TIMEOUT + (53 + 30 + 10) * 60
+    outer = workflow["jobs"]["int-test"]
+    bundle = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_bundle.yml").read_text(encoding="utf-8"))
+    cohort = bundle["jobs"]["cohort"]
+    assert outer["uses"] == "./.github/workflows/int_test_bundle.yml"
+    assert cohort["uses"] == "./.github/workflows/int_test_cohort.yml"
+    assert "timeout-minutes" not in outer and "timeout-minutes" not in cohort
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 

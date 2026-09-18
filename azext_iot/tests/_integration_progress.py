@@ -10,6 +10,8 @@ from time import monotonic
 
 import pytest
 
+from azext_iot.tests._integration_results import IntegrationResults, case_label
+
 
 @dataclass
 class _ActiveTest:
@@ -21,7 +23,7 @@ class _ActiveTest:
 class IntegrationProgress:
     """Report controller-side phase metadata without exposing captured command output."""
 
-    def __init__(self, config, interval, clock=monotonic):
+    def __init__(self, config, interval, clock=monotonic, *, results_dir=None):
         self.config = config
         self.interval = interval
         self.clock = clock
@@ -31,6 +33,8 @@ class IntegrationProgress:
         self._thread = None
         self._reporter = None
         self._finishing = False
+        self._results_dir = results_dir
+        self._results = None
 
     @staticmethod
     def _is_integration(nodeid):
@@ -39,13 +43,15 @@ class IntegrationProgress:
     @staticmethod
     def _label(nodeid):
         # Parameter IDs can contain credentials; only display the test's code address.
-        return nodeid.partition("[")[0]
+        return case_label(nodeid)
 
     def _write(self, message):
         self._reporter.write_line(f"[integration progress] {message}")
         self._reporter.flush()
 
     def pytest_sessionstart(self):
+        if self._results_dir and not hasattr(self.config, "workerinput"):
+            self._results = IntegrationResults(self._results_dir)
         if self.interval <= 0 or hasattr(self.config, "workerinput"):
             return
         self._reporter = self.config.pluginmanager.getplugin("terminalreporter")
@@ -54,7 +60,13 @@ class IntegrationProgress:
         self._thread = Thread(target=self._heartbeat, name="iot-integration-progress", daemon=True)
         self._thread.start()
 
+    def pytest_collection_finish(self, session):
+        if self._results is not None:
+            self._results.select(item.nodeid for item in session.items if self._is_integration(item.nodeid))
+
     def pytest_runtest_logstart(self, nodeid):
+        if self._results is not None and self._is_integration(nodeid):
+            self._results.start(nodeid)
         if self._reporter is None or not self._is_integration(nodeid):
             return
         with self._lock:
@@ -63,6 +75,8 @@ class IntegrationProgress:
             self._write(f"START setup: {self._label(nodeid)}")
 
     def pytest_runtest_logreport(self, report):
+        if self._results is not None and self._is_integration(report.nodeid):
+            self._results.report(report)
         if self._reporter is None or not self._is_integration(report.nodeid):
             return
         with self._lock:
@@ -111,11 +125,13 @@ class IntegrationProgress:
             self._thread = None
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-    def pytest_sessionfinish(self):
+    def pytest_sessionfinish(self, exitstatus):
         with self._lock:
             self._finishing = True
         try:
-            yield
+            outcome = yield
+            if self._results is not None:
+                self._results.finish(exitstatus if outcome.excinfo is None else 3)
         finally:
             self._shutdown()
 

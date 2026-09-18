@@ -81,3 +81,37 @@ In order to list all recognized environments, you can type `tox -av`, which will
 
 ![image](https://user-images.githubusercontent.com/13545962/217683727-1ec36d2c-e055-4677-a5a9-8f87cdcc987b.png)
 
+## ADR live-test budgets
+
+The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
+The root integration workflow passes this budget through the reusable bundle and
+cohort to the service job; reusable callers do not impose a shorter runner timeout.
+The existing same-scope concurrency lock remains held until the bundle completes.
+This is a job-budget change, not an increase to provisioning or recovery waits.
+
+ADR runs serially. Its SU-link case already allows 175 minutes for provisioning,
+native link recovery and cleanup, followed later by a separate 75-minute SU-instance
+lifecycle. Ordinary cases retain their 15-minute cap. Two completed-job logs showed
+the latter lifecycle starting about 109 minutes into a former 120-minute job:
+SU-link alone consumed 56–63 minutes. Preserving its full existing envelope plus
+the observed other work and reporting margin requires about 342 minutes.
+
+360 minutes is practical headroom, **not a guarantee of full coverage or success**.
+All case maxima combined exceed one hosted job. A cancellation must be reported
+as incomplete, with failures/skips and unstarted cases preserved; backend failures
+must not be skipped, suppressed, or converted to successful coverage.
+
+`ADR-int` writes `test-result/integration-outcomes.json` and `failures.txt` after
+collection, each case start and each setup/call/teardown report. These files are
+atomically replaced and flushed before returning from the hook, so a killed job
+retains failed, active/incomplete and unstarted cases without requiring pytest's
+final summary or JUnit shutdown. `session_finished: false` is not a passing run.
+Skips remain explicitly skipped, not passed coverage. The GitHub always-run result
+step preserves these files rather than replacing them with a final-summary scrape.
+
+The opt-in `--integration-results-dir` is for serial pytest (`-n 0`) only and does
+not change other services' reporting. Receipts include only code addresses,
+per-selection case numbers, phase/outcome enums and numeric durations: parameter
+values, errors, captured logs and skip reasons are never persisted. Repeated
+parameter cases have distinct numbers even when their sanitized addresses match.
+These are test-execution receipts, **not proof that Azure resources were cleaned up**.
