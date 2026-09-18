@@ -1043,6 +1043,51 @@ def test_simple_command_wrappers_delegate(
     expected.pop("client", None)
     expected.update(expected.pop("kwargs", {}))
     if module is commands_link and "timeout" in expected:
-        expected["timeout_sec"] = expected.pop("timeout")
-        expected["wait_sec"] = expected.pop("interval")
+        timeout = expected.pop("timeout")
+        interval = expected.pop("interval")
+        expected["timeout_sec"] = 600 if timeout is None else timeout
+        expected["wait_sec"] = 30 if interval is None else interval
     getattr(provider, provider_method).assert_called_once_with(**expected)
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+@pytest.mark.parametrize(
+    "options,expected_timeout,expected_interval",
+    [
+        ({}, 600, 30),
+        ({"timeout": None, "interval": None}, 600, 30),
+        ({"timeout": 91}, 91, 30),
+        ({"interval": 2}, 600, 2),
+        ({"timeout": 91, "interval": 2}, 91, 2),
+        # Explicit invalid values must reach provider validation, not become defaults.
+        ({"timeout": 0, "interval": 0}, 0, 0),
+        ({"timeout": -1, "interval": -2}, -1, -2),
+    ],
+)
+@pytest.mark.parametrize("no_wait", [False, True])
+def test_link_update_resolves_omitted_recovery_options(
+    mocker, cmd, kind, options, expected_timeout, expected_interval, no_wait
+):
+    provider = _patch_provider(mocker, commands_link, "LinkProvider")
+    command = getattr(commands_link, f"adr_link_{kind}_update")
+
+    command(
+        cmd,
+        Mock(),
+        endpoint_name="endpoint",
+        namespace_name=NS,
+        resource_group_name=RG,
+        no_wait=no_wait,
+        **options,
+    )
+
+    getattr(provider, f"{kind}_update").assert_called_once_with(
+        endpoint_name="endpoint",
+        namespace_name=NS,
+        resource_group_name=RG,
+        mi_system_assigned=False,
+        mi_user_assigned=None,
+        no_wait=no_wait,
+        timeout_sec=expected_timeout,
+        wait_sec=expected_interval,
+    )
