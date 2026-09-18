@@ -256,10 +256,28 @@ def test_progress_allows_bounded_recovery_but_never_suppresses_persistent_failur
     scenario = Scenario()
     scenario.states = (["InProgress"] + ["Failed"] * 4) * 30
     with pytest.raises(AssertionError, match="Timed out"):
-        scenario.run()
-    assert scenario.clock.now == readiness.LINK_READINESS_TIMEOUT == 240
+        scenario.run(timeout=240)
+    assert scenario.clock.now == 240
     assert scenario.write_times == [0, 20, 80, 140, 190]
     assert sum(" add " in command for command in scenario.writes) == 1
+
+
+def test_accepted_recovery_can_finish_after_four_minutes_without_replay():
+    scenario = Scenario()
+    scenario.states = ["Failed", "Failed"] + ["InProgress"] * 30 + ["Succeeded"]
+    scenario.run()
+    assert 240 < scenario.clock.now < readiness.LINK_READINESS_TIMEOUT == 600
+    assert len(scenario.writes) == 2
+    assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
+
+
+def test_accepted_recovery_still_stops_at_native_default_deadline():
+    scenario = Scenario()
+    scenario.states = ["Failed", "Failed"] + ["InProgress"] * 70
+    with pytest.raises(AssertionError, match="Timed out"):
+        scenario.run()
+    assert scenario.clock.now == readiness.LINK_READINESS_TIMEOUT == 600
+    assert len(scenario.writes) == 2
 
 
 def test_update_preflight_failure_is_not_swallowed_or_bypassed():

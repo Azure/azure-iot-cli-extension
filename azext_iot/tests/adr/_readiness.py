@@ -25,7 +25,7 @@ from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
-from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
@@ -33,7 +33,7 @@ from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
 
 
-LINK_READINESS_TIMEOUT = 240
+LINK_READINESS_TIMEOUT = _ADR_LRO_TIMEOUT_SECONDS
 HUB_LINK_READINESS_TIMEOUT = LINK_READINESS_TIMEOUT  # Existing test-helper import compatibility.
 _OWNED_LINK_TYPES = {
     "hub": ("messaging", IOT_HUB_ENDPOINT_TYPE),
