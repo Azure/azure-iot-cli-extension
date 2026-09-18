@@ -62,7 +62,7 @@ class TestIoTHubDiscovery:
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
         fake_name = "COOLIoTHub"
-        fake_hostname = f"{fake_name}.azure-devices-provisioning.net"
+        fake_hostname = f"{fake_name}.service.azure-devices.net"
         fake_rg = "COOLRG"
 
         target = discovery.get_target(

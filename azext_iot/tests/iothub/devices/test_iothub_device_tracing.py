@@ -6,15 +6,11 @@
 
 import pytest
 
-from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.tests.iothub import IoTLiveScenarioTest, DATAPLANE_AUTH_TYPES
 
 # The current implementation of preview distributed tracing commands do not work with a cstring.
 
-custom_auth_types = [
-    AuthenticationTypeDataplane.key.value,
-    AuthenticationTypeDataplane.login.value,
-]
+custom_auth_types = DATAPLANE_AUTH_TYPES
 
 
 class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
@@ -25,7 +21,7 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
         # Region specific test
         if self.region not in ["West US 2", "North Europe", "Southeast Asia"]:
             pytest.skip(
-                msg="Skipping distributed-tracing tests. IoT Hub not in supported region!"
+                reason="Distributed tracing is not supported in the required centraluseuap Hub test region."
             )
             return
 

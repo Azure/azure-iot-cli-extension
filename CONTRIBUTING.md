@@ -121,6 +121,16 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
 
+Hub and DPS controllers do not perform subscription quota admission or reserve
+slots. Inventory and exact-resource reads remain mandatory for collision,
+ownership, known-resource reconciliation and verified cleanup, not quota counting.
+Azure provisioning rejections, including quota errors, fail the run; they are not
+suppressed. No resource ownership, scoped RBAC, quarantine or full-result checks
+are bypassed. This branch retains its existing DPS case manifest and runtime
+budgets, with regular, service-SAS and local-auth phases ordered internally.
+Local focused-debug runs remain nonqualifying.
+See [workflow selection and safety](docs/tox-testing.md#integration-workflow-topology).
+
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`
 

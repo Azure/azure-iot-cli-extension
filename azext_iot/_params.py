@@ -1304,13 +1304,14 @@ def load_arguments(self, _):
             arg_group="ADR Credential Policy"
         )
 
-    with self.argument_context("iot dps enrollment-group show") as context:
-        context.argument(
-            "show_keys",
-            options_list=["--show-keys", "--keys"],
-            arg_type=get_three_state_flag(),
-            help="Include attestation keys and information in enrollment group results.",
-        )
+    for action in ("create", "update", "show"):
+        with self.argument_context(f"iot dps enrollment-group {action}") as context:
+            context.argument(
+                "show_keys",
+                options_list=["--show-keys", "--keys"],
+                arg_type=get_three_state_flag(),
+                help="Include symmetric key values in enrollment group results. Hidden by default.",
+            )
 
     with self.argument_context("iot dps enrollment-group compute-device-key") as context:
         context.argument(

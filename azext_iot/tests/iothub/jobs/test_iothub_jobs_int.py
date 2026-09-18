@@ -7,14 +7,32 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
+
+
+def _log_job_device_statistics(job, expected_count):
+    statistics = job.get("deviceJobStatistics") or {}
+    counters = {
+        name: statistics.get(name)
+        for name in ("deviceCount", "succeededCount", "failedCount", "pendingCount", "runningCount")
+    }
+    # CLI logging configuration can suppress INFO; retain these in pytest's failure output.
+    print(
+        f"Hub job {job['jobId']}: expected devices={expected_count}; "
+        f"service statistics={json.dumps(counters, sort_keys=True)}",
+        flush=True,
+    )
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubJobs, self).__init__(test_case)
 
+    @pytest.mark.timeout(900 + 2 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
     def test_jobs(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 2
@@ -32,15 +50,24 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                     )
                 )
 
-            self._wait_for_query_devices(device_ids_twin_tags + device_ids_twin_props, auth_phase)
-
             # Focus is on scheduleUpdateTwin jobs until we improve JIT device simulation
 
             # Update twin tags scenario
             self.kwargs["twin_patch_tags"] = '{"tags": {"deviceClass": "Class1, Class2, Class3"}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_tags))
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f'iot hub query -n {self.host_name} -g {self.entity_rg} '
+                        f'-q "select deviceId from devices where {query_condition}"',
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                device_ids_twin_tags,
+                id_key="deviceId",
+            )
 
-            self.cmd(
+            tag_job = self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub job create --job-id {self.job_ids[0]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
@@ -59,7 +86,8 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                     ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
-            )
+            ).get_output_in_json()
+            _log_job_device_statistics(tag_job, device_count)
 
             for device_id in device_ids_twin_tags:
                 wait_for_assertion(
@@ -75,8 +103,19 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Update twin desired properties
             self.kwargs["twin_patch_props"] = '{"properties": {"desired": {"arbitrary": "value"}}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_props))
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f'iot hub query -n {self.host_name} -g {self.entity_rg} '
+                        f'-q "select deviceId from devices where {query_condition}"',
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                device_ids_twin_props,
+                id_key="deviceId",
+            )
 
-            self.cmd(
+            property_job = self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub job create --job-id {self.job_ids[1]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
@@ -95,7 +134,17 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                     ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
-            )
+            ).get_output_in_json()
+            _log_job_device_statistics(property_job, device_count)
+
+            for device_id in device_ids_twin_props:
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=[self.check("properties.desired.arbitrary", "value")],
+                )
 
             # Error - omit queryCondition when scheduleUpdateTwin or scheduleDeviceMethod
 
@@ -243,22 +292,6 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             ).get_output_in_json()
 
             self.validate_job_list(jobs_set=job_result_set)
-
-    def _wait_for_query_devices(self, device_ids, auth_phase):
-        expected_ids = set(device_ids)
-        query_condition = "deviceId in ['{}']".format("','".join(device_ids))
-
-        def check():
-            devices = self.cmd(
-                self.set_cmd_auth_type(
-                    f'iot hub query -q "select deviceId from devices where {query_condition}" '
-                    f"-n {self.host_name} -g {self.entity_rg}",
-                    auth_type=auth_phase,
-                )
-            ).get_output_in_json()
-            assert {device["deviceId"] for device in devices} == expected_ids
-
-        wait_for_assertion(check)
 
     def validate_job_list(self, jobs_set):
         filtered_job_ids_result = {}

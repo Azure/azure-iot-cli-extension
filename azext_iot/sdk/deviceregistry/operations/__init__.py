@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from ._operations import Operations  # type: ignore
 from ._operations import OperationStatusOperations  # type: ignore
+from ._operations import AsyncOperationStatusOperations  # type: ignore
 from ._operations import AssetsOperations  # type: ignore
 from ._operations import AssetEndpointProfilesOperations  # type: ignore
 from ._operations import BillingContainersOperations  # type: ignore
@@ -25,6 +26,16 @@ from ._operations import NamespaceDiscoveredDevicesOperations  # type: ignore
 from ._operations import SchemaRegistriesOperations  # type: ignore
 from ._operations import SchemasOperations  # type: ignore
 from ._operations import SchemaVersionsOperations  # type: ignore
+from ._operations import CertificateAuthoritiesOperations  # type: ignore
+from ._operations import CertificatePoliciesOperations  # type: ignore
+from ._operations import GroupsOperations  # type: ignore
+from ._operations import JobsOperations  # type: ignore
+from ._operations import JobRunsOperations  # type: ignore
+from ._operations import JobRunsByNamespaceOperations  # type: ignore
+from ._operations import RegistryDevicesOperations  # type: ignore
+from ._operations import RegistryDeviceAttributesOperations  # type: ignore
+from ._operations import RegistryDeviceCapabilitiesOperations  # type: ignore
+from ._operations import RegistryDeviceAuthenticationProfilesOperations  # type: ignore
 
 from ._patch import __all__ as _patch_all
 from ._patch import *
@@ -33,6 +44,7 @@ from ._patch import patch_sdk as _patch_sdk
 __all__ = [
     "Operations",
     "OperationStatusOperations",
+    "AsyncOperationStatusOperations",
     "AssetsOperations",
     "AssetEndpointProfilesOperations",
     "BillingContainersOperations",
@@ -44,6 +56,16 @@ __all__ = [
     "SchemaRegistriesOperations",
     "SchemasOperations",
     "SchemaVersionsOperations",
+    "CertificateAuthoritiesOperations",
+    "CertificatePoliciesOperations",
+    "GroupsOperations",
+    "JobsOperations",
+    "JobRunsOperations",
+    "JobRunsByNamespaceOperations",
+    "RegistryDevicesOperations",
+    "RegistryDeviceAttributesOperations",
+    "RegistryDeviceCapabilitiesOperations",
+    "RegistryDeviceAuthenticationProfilesOperations",
 ]
 __all__.extend([p for p in _patch_all if p not in __all__])  # pyright: ignore
 _patch_sdk()
