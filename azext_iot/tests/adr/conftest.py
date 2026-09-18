@@ -54,7 +54,6 @@ OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_su_probe_reader",
     "azext_iot_adr_run_resource_parity_int",
     "azext_iot_adr_reports_enabled",
-    "azext_iot_adr_revoke_certificates",
     "azext_iot_adr_ca_auth_profile_name",
     "azext_iot_adr_job_run_resource_group",
     "azext_iot_adr_job_run_namespace",

@@ -52,9 +52,8 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 
 # DPS instance strategy (timestamp + run-tag + age-based GC)
 # ----------------------------------------------------------
-# A subscription is limited to 10 DPS instances, the subscription is shared with the team, and
-# several integration runs may execute concurrently. To stay within quota and never accumulate
-# orphans we:
+# The subscription is shared with the team and several integration runs may execute
+# concurrently. To preserve ownership and never accumulate orphans we:
 #   * Name each instance with a UTC timestamp + a per-run token + a kind suffix so concurrent runs
 #     never collide (DPS names also map to globally-unique DNS).
 #   * Tag each instance (intTest/runUid/kind/createdEpoch) so it can be discovered and garbage

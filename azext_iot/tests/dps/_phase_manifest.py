@@ -9,22 +9,11 @@
 from pathlib import Path
 
 PHASE_NAMES = ("regular", "service-sas", "local-auth-toggle")
-DPS_LIMIT = 10  # Conservative subscription default; no SDK quota-read operation is available.
-REGULAR_REQUIRED_DPS_SLOTS = 4
 CSR_RESOURCE_KINDS = ("csrns", "csrdps", "csrhub")
 CSR_NODEIDS = frozenset(
     f"device_registration/test_iot_device_registration_int.py::test_register_and_issue_certificate_contract[{option}]"
     for option in ("default", "deadline")
 )
-
-
-def parse_capacity_limit(value):
-    """Accept only an explicit positive integer, never booleans or numeric coercions."""
-    if isinstance(value, str) and value.isascii() and value.isdecimal() and not value.startswith("0"):
-        value = int(value)
-    if type(value) is not int or value <= 0:
-        raise ValueError("DPS capacity limit must be a positive base-10 integer (default: 10).")
-    return value
 
 
 def resource_type(kind):

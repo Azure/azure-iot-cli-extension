@@ -619,10 +619,10 @@ def test_ambiguous_or_conflicting_body_cannot_fake_success(body, tracker_factory
 
 
 @pytest.mark.parametrize("acknowledgement", [204, 202])
-def test_opted_in_live_scenario_uses_real_wrapper_and_operation_evidence(
+def test_live_scenario_without_opt_in_uses_real_wrapper_and_operation_evidence(
     acknowledgement, tracker_factory, ca_wire_cli, mocked_response, mocker, monkeypatch,
 ):
-    monkeypatch.setenv("azext_iot_adr_revoke_certificates", "true")
+    monkeypatch.delenv("azext_iot_adr_revoke_certificates", raising=False)
     mocker.patch("azure.cli.testsdk.base.get_dummy_cli", return_value=ca_wire_cli)
     scenario = live.TestADRCAActions("test_microsoft_revocation_no_wait")
     scenario.setUp()
@@ -696,7 +696,7 @@ def test_negative_live_commands_track_unexpected_post_before_cleanup(
         [("malformed", "invalid PEM", ("malformed",))] if failure == "invalid-chain" else []
     ))
     microsoft = failure in ("wrong-root", "wrong-ica")
-    monkeypatch.setenv("azext_iot_adr_revoke_certificates", "true")
+    monkeypatch.delenv("azext_iot_adr_revoke_certificates", raising=False)
     count = 3 if microsoft else 2
     mocker.patch.object(live, "resource_is_absent", side_effect=[True] * count + [False] * count)
     mocker.patch.object(live, "wait_for_resource_absent")

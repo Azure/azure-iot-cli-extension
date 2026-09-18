@@ -150,31 +150,16 @@ explicitly excludes these owned-only cases and labels its results partial,
 not full DPS qualification. Linux, an authenticated canary-enabled subscription, registered
 Microsoft.Devices/Microsoft.DeviceRegistry providers, and permission to manage
 the owned resources and their scoped role assignments are required. The regular
-admission reserves four DPS slots (three long-lived DPS plus one sequential
-capacity case), two S1 Hubs, and one namespace with two CAs/one policy. Only a
-validated, nonempty regular debug selection containing exclusively either or
-both required CSR nodes reserves one DPS slot, matching its single dedicated
-pair. Its admission and cleanup capacity reports use that same requirement:
-with the default limit, seven or nine existing subscription DPS are allowed; ten are not. Full regular
-qualification and mixed/other debug selections retain four-slot admission.
-The conservative default is ten DPS instances across all regions. A run may
-explicitly use an operator-confirmed limit for its selected subscription:
-pass `--dps-capacity-limit 100` to the local controller, or set
-`dps-capacity-limit` to `"100"` on the Integration Tests or Build and Publish
-Release manual workflow. The confirmed 100-instance limit for subscription
-`a386d5ea-ea90-441a-8263-d816368c84a1` does not apply to other subscriptions or
-unconfigured runs; every workflow and local default remains ten. This input
-does not change Azure quota, bypass inventory/ownership checks, or authorize
-foreign-resource deletion. Values must be positive base-10 integers, not
-booleans, fractions, empty strings or expressions.
+suite includes three long-lived DPS plus sequential product capacity/SKU cases,
+two S1 Hubs, and one namespace with two CAs/one policy. CSR-only local debug
+selections still use their dedicated owned resources and remain nonqualifying.
 
-The selected limit is recorded consistently in initial admission, fresh
-pre-phase gates and cleanup capacity receipts. The independent workflow gate
-receives the same trusted workflow input, rather than trusting receipt limits.
-When evaluating local artifacts with `_evaluate_test_results.py`, supply
-`--expected-dps-capacity-limit 100` explicitly for a run admitted with 100;
-the default evaluator rejects such receipts. A raised limit does not make a
-focused/debug run qualify as a full suite or change its required slot count.
+Hub and DPS controllers do not perform subscription quota admission or reserve
+slots. Inventory and exact-resource reads remain mandatory for collision,
+ownership, known-resource reconciliation and verified cleanup, not quota counting.
+Azure provisioning rejections, including quota errors, fail the run; they are not
+suppressed. No resource ownership, scoped RBAC, quarantine or full-result checks
+are bypassed. See [workflow selection and safety](docs/tox-testing.md#integration-workflow-topology).
 
 Do not supply pinned shared resources. Caller data roles
 use the existing DPS/Hub fixtures; native linking creates only its required

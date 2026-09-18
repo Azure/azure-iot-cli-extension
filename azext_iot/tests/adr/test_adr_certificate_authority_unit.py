@@ -631,17 +631,20 @@ def test_self_issued_rollover_requires_leaf_to_verified_root_order():
     validate_external_certificate_chain(valid, resource, now=NOW)
 
 
-@pytest.mark.parametrize("value", ["", "false", "0"])
+@pytest.mark.parametrize("value", [None, "", "false", "0", "true"])
 @pytest.mark.parametrize("no_wait", [False, True])
-def test_live_revocation_gate_precedes_all_resource_work(value, no_wait, monkeypatch, mocker):
+def test_live_revocation_always_requires_owned_provisioning(value, no_wait, monkeypatch, mocker):
     from azext_iot.tests.adr.test_adr_certificate_authority_int import TestADRCAActions
 
-    monkeypatch.setenv("azext_iot_adr_revoke_certificates", value)
+    if value is None:
+        monkeypatch.delenv("azext_iot_adr_revoke_certificates", raising=False)
+    else:
+        monkeypatch.setenv("azext_iot_adr_revoke_certificates", value)
     scenario = TestADRCAActions("test_microsoft_revocation")
-    owned = mocker.patch.object(scenario, "_owned_target")
-    with pytest.raises(pytest.skip.Exception, match="explicit"):
+    owned = mocker.patch.object(scenario, "_owned_target", side_effect=CLIError("owned provisioning required"))
+    with pytest.raises(CLIError, match="owned provisioning required"):
         scenario._microsoft_revocation(no_wait=no_wait)
-    owned.assert_not_called()
+    owned.assert_called_once_with(microsoft=True)
 
 
 @pytest.fixture
@@ -690,10 +693,10 @@ def test_external_ca_help_recipe_and_output_contract():
     assert "does not prove" in helps["iot adr ns ca revoke"]
 
 
-def test_live_no_wait_revoke_opt_in_reaches_owned_provisioning(monkeypatch, mocker):
+def test_live_no_wait_revoke_without_opt_in_reaches_owned_provisioning(monkeypatch, mocker):
     from azext_iot.tests.adr.test_adr_certificate_authority_int import TestADRCAActions
 
-    monkeypatch.setenv("azext_iot_adr_revoke_certificates", "true")
+    monkeypatch.delenv("azext_iot_adr_revoke_certificates", raising=False)
     scenario = TestADRCAActions("test_microsoft_revocation_no_wait")
     owned = mocker.patch.object(scenario, "_owned_target", side_effect=CLIError("owned provisioning reached"))
     with pytest.raises(CLIError, match="owned provisioning reached"):

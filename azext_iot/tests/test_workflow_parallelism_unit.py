@@ -86,14 +86,10 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
     assert set(triggers) == {"workflow_call", "workflow_dispatch"}
     for trigger in triggers.values():
         declared = trigger["inputs"]
-        assert declared["adr-test-filter"]["type"] == "string"
-        assert declared["adr-test-filter"]["default"] == ""
-        assert declared["adr-revoke-certificates"]["type"] == "boolean"
-        assert declared["adr-revoke-certificates"]["default"] is False
-        for name in ("resource-group", "subscription-id", "dps-capacity-limit", "python-versions", "regions"):
+        assert not {"adr-test-filter", "adr-revoke-certificates", "dps-capacity-limit"}.intersection(declared)
+        for name in ("resource-group", "subscription-id", "python-versions", "regions"):
             assert declared[name]["type"] == "string" and declared[name]["required"] is False
         assert declared["resource-group"]["default"] == "cli-int-test-rg"
-        assert declared["dps-capacity-limit"]["default"] == "10"
         assert declared["regions"]["default"] == "centraluseuap"
         assert declared["python-versions"]["default"] == "3.13"
     assert public["permissions"] == {"contents": "read", "id-token": "write"}
@@ -113,8 +109,7 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
         assert dispatch[f"test{service}"]["default"] is True
     assert set(dispatch) == {
         *(f"test{service}" for service in SERVICES),
-        "adr-test-filter", "adr-revoke-certificates", "python-versions", "regions", "resource-group", "subscription-id",
-        "dps-capacity-limit",
+        "python-versions", "regions", "resource-group", "subscription-id",
     }
 
 

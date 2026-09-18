@@ -232,7 +232,7 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, capacity_limit=10):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
     if chosen is None:
         chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
@@ -286,17 +286,17 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen, capacity_limit=capacity_limit)
+                         debug_phase=phase, debug_nodes=chosen)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
 @pytest.mark.parametrize("whole", [False, True])
-def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, monkeypatch, phase, whole):
+def test_dps_debug_phase_keeps_ownership_cleanup_and_never_qualifies(tmp_path, monkeypatch, phase, whole):
     result, summary, captured = run_dps(tmp_path, monkeypatch, phase, whole=whole)
     assert result == 0 and summary["status"] == "debug-passed"
     assert [value["name"] for value in summary["phases"]] == [phase]
-    assert summary["baseline"]["capacity"]["required"] == dps.REQUIRED_SLOTS
+    assert summary["baseline"]["resources"] == DpsReader().resources
     assert summary["runner_seconds"] <= dps.RUNNER_SECONDS
     assert summary["phases"][0]["cleanup"]["complete"] is True
     assert summary["phases"][0]["results"]["stage_errors"] == []
@@ -306,13 +306,12 @@ def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, m
     assert "UNSAFE_CAPTURED_CREDENTIAL" not in (tmp_path / "dps-phases" / phase / "junit.xml").read_text()
 
 
-@pytest.mark.parametrize("limit", [10, 100])
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
 ])
-def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect, limit):
-    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect, capacity_limit=limit)
+def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect):
+    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect)
     assert result == 1 and summary["status"] == "debug-failed"
     if defect == "uncertain":
         assert summary["phases"][0]["cleanup"]["complete"] is False
@@ -321,109 +320,93 @@ def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, 
 
 
 @pytest.mark.parametrize("suite,phase", [("HubData", "entra"), ("DPS", "regular")])
-def test_debug_does_not_reduce_conservative_capacity(tmp_path, monkeypatch, suite, phase):
+def test_debug_ignores_foreign_resource_count_but_never_qualifies(tmp_path, monkeypatch, suite, phase):
     if suite == "DPS":
-        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, reader=DpsReader(9))
+        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, reader=DpsReader(1000))
+        assert GATE["evaluate_dps_phases"](tmp_path)
     else:
-        result, summary, _, _, captured = run_hub(tmp_path, monkeypatch, suite, phase, reader=HubReader(49))
-    assert result == 1 and summary["status"] == "debug-failed"
-    assert not captured
+        result, summary, output, _, captured = run_hub(tmp_path, monkeypatch, suite, phase, reader=HubReader(1000))
+        assert not hub.evaluate_hub_phases(output)["passed"]
+    assert result == 0 and summary["status"] == "debug-passed"
+    assert len(captured) == 1
 
 
 def csr_nodes():
     return sorted(focused.DPS_PREFIX + node for node in dps.MANIFEST["CSR_NODEIDS"])
 
 
-@pytest.mark.parametrize("count", [7, 9, 10])
+@pytest.mark.parametrize("count", [7, 10, 1000])
 @pytest.mark.parametrize("variant", ["default", "deadline", "both"])
-def test_csr_only_debug_reserves_one_dps_with_consistent_metadata(tmp_path, monkeypatch, count, variant):
+def test_csr_only_debug_keeps_dedicated_owned_resources_without_quota_admission(tmp_path, monkeypatch, count, variant):
     chosen = [node for node in csr_nodes() if variant == "both" or node.endswith(f"[{variant}]")]
     reader = DpsReader(count)
     for index, resource in enumerate(reader.resources):
         resource["location"] = "centraluseuap" if index < 4 else "westus"
     result, summary, captured = run_dps(tmp_path, monkeypatch, "regular", chosen=chosen, reader=reader)
-    allowed = count < 10
-    assert result == (0 if allowed else 1)
-    assert summary["status"] == ("debug-passed" if allowed else "debug-failed")
+    assert result == 0
+    assert summary["status"] == "debug-passed"
     assert summary["qualifiesFullSuite"] is False
     assert summary["debug"] == focused.select("DPS", "regular", chosen)
-    capacity = summary["baseline"]["capacity"]
-    assert (capacity["count"], capacity["required"], capacity["limit"], capacity["ready"]) == (count, 1, 10, allowed)
-    assert len(captured) == (1 if allowed else 0)
+    assert summary["baseline"]["resources"] == reader.resources
+    assert len(captured) == 1
     assert GATE["evaluate_dps_phases"](tmp_path)
-    if allowed:
-        phase = summary["phases"][0]
-        assert phase["cleanup"]["complete"]
-        assert phase["cleanup"]["capacity"] == capacity
-        saved = hub.read_json(tmp_path / "dps-phases/regular/result.json")
-        assert saved == phase
-        receipts = tmp_path / "dps-phases/regular/receipts"
-        records = [hub.read_json(path) for path in receipts.glob("owned-*.json")]
-        assert {record["kind"] for record in records} == set(dps.MANIFEST["CSR_RESOURCE_KINDS"])
-        assert sum("/provisioningServices/" in record["id"] for record in records) == 1
-        assert set(reader.gets).isdisjoint(capacity["ids"])
-    else:
-        assert "1 managed DPS slot" in summary["error"]["message"]
-        assert not reader.gets
+    phase = summary["phases"][0]
+    assert phase["cleanup"]["complete"]
+    assert phase["cleanup"]["inventory_ids"] == dps.inventory_ids(reader.resources)
+    saved = hub.read_json(tmp_path / "dps-phases/regular/result.json")
+    assert saved == phase
+    receipts = tmp_path / "dps-phases/regular/receipts"
+    records = [hub.read_json(path) for path in receipts.glob("owned-*.json")]
+    assert {record["kind"] for record in records} == set(dps.MANIFEST["CSR_RESOURCE_KINDS"])
+    assert sum("/provisioningServices/" in record["id"] for record in records) == 1
+    assert set(reader.gets).isdisjoint(dps.inventory_ids(reader.resources))
 
 
-@pytest.mark.parametrize("selection,count,required,allowed", [
-    ("csr", 99, 1, True), ("csr", 100, 1, False),
-    ("mixed", 96, 4, True), ("mixed", 97, 4, False),
-    ("other", 96, 4, True), ("other", 97, 4, False),
-])
-def test_explicit_limit_keeps_focused_slot_policy_and_nonqualification(
-    tmp_path, monkeypatch, selection, count, required, allowed,
-):
+@pytest.mark.parametrize("selection", ["csr", "mixed", "other"])
+def test_focused_selection_keeps_cleanup_and_nonqualification_without_quota(tmp_path, monkeypatch, selection):
     chosen = csr_nodes() if selection == "csr" else nodes("DPS", "regular")[:1]
     if selection == "mixed":
         chosen += csr_nodes()
     result, summary, captured = run_dps(
-        tmp_path, monkeypatch, "regular", chosen=chosen, reader=DpsReader(count), capacity_limit=100,
+        tmp_path, monkeypatch, "regular", chosen=chosen, reader=DpsReader(1000),
     )
-    assert result == (0 if allowed else 1)
+    assert result == 0
     assert summary["qualifiesFullSuite"] is False
-    assert summary["baseline"]["capacity"]["required"] == required
-    assert summary["baseline"]["capacity"]["limit"] == 100
-    assert len(captured) == (1 if allowed else 0)
-    assert GATE["evaluate_dps_phases"](tmp_path, expected_capacity_limit=100)
-    if allowed:
-        assert summary["phases"][0]["cleanup"]["capacity"]["required"] == required
-        assert summary["phases"][0]["cleanup"]["capacity"]["limit"] == 100
+    assert len(captured) == 1
+    assert GATE["evaluate_dps_phases"](tmp_path)
+    assert summary["phases"][0]["cleanup"]["complete"]
 
 
-@pytest.mark.parametrize("limit", [10, 100])
 @pytest.mark.parametrize("defect", ["uncertain", "wrong-resource-type"])
-def test_one_slot_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect, limit):
+def test_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect):
     result, summary, captured = run_dps(
-        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(7), defect=defect, capacity_limit=limit,
+        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(1000), defect=defect,
     )
     assert len(captured) == 1
     assert result == 1 and summary["status"] == "debug-failed"
-    assert summary["baseline"]["capacity"]["required"] == 1
     assert not summary["phases"][0]["cleanup"]["complete"]
     assert GATE["evaluate_dps_phases"](tmp_path)
 
 
 @pytest.mark.parametrize("selection", ["full", "empty-full", "mixed", "other", "service-sas", "local-auth-toggle"])
-def test_seven_existing_dps_still_block_all_non_csr_only_selections(tmp_path, monkeypatch, selection):
+def test_all_dps_selections_run_without_quota_but_only_full_evidence_qualifies(tmp_path, monkeypatch, selection):
     if selection in ("full", "empty-full"):
-        execute = Mock()
-        result = dps.run(
-            SUB, GROUP, tmp_path / "dps-phases", DpsReader(7), execute=execute,
+        execute = Mock(side_effect=_execution)
+        result = FULL_DPS_RUN(
+            SUB, GROUP, tmp_path / "dps-phases", DpsReader(1000), execute=execute,
             debug_nodes=[] if selection == "empty-full" else None,
         )
         summary = hub.read_json(tmp_path / "dps-phases.json")
-        execute.assert_not_called()
+        assert execute.call_count == 3
+        assert not GATE["evaluate_dps_phases"](tmp_path)
     else:
         phase = selection if selection in ("service-sas", "local-auth-toggle") else "regular"
         chosen = nodes("DPS", phase)[:1] + (csr_nodes() if selection == "mixed" else [])
-        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, chosen=chosen, reader=DpsReader(7))
-        assert not captured
-    assert result == 1
-    assert summary["baseline"]["capacity"]["required"] == 4
-    assert summary["baseline"]["capacity"]["limit"] == 10
-    assert summary["baseline"]["capacity"]["ready"] is False
+        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, chosen=chosen, reader=DpsReader(1000))
+        assert len(captured) == 1
+        assert GATE["evaluate_dps_phases"](tmp_path)
+    assert result == 0
+    assert len(summary["baseline"]["resources"]) == 1000
 
 
 @pytest.mark.parametrize("defect", ["empty", "duplicate", "unknown", "no-phase", "wrong-phase"])
@@ -449,7 +432,7 @@ def test_invalid_csr_debug_is_rejected_before_inventory_or_launch(tmp_path, defe
 
 
 @pytest.mark.parametrize("defect", ["empty", "suite", "phase", "manifest", "nodes", "duplicate"])
-def test_capacity_cannot_trust_a_forged_or_stale_debug_envelope(defect):
+def test_debug_selection_cannot_trust_a_forged_or_stale_envelope(defect):
     debug = focused.select("DPS", "regular", csr_nodes())
     if defect == "empty":
         debug = {}
@@ -460,9 +443,8 @@ def test_capacity_cannot_trust_a_forged_or_stale_debug_envelope(defect):
     else:
         field = "manifestSha256" if defect == "manifest" else defect
         debug[field] = "foreign"
-    with pytest.raises((ValueError, dps.PhaseError)):
-        dps.required_slots(debug)
-    assert dps.required_slots() == 4
+    with pytest.raises(ValueError):
+        focused.from_environment({focused.ENV: json.dumps(debug)}, "DPS", "regular")
 
 
 @pytest.mark.parametrize("platform", ["win32", "darwin"])

@@ -9,12 +9,11 @@ ADR certificate authority and policy integration tests.
 
 Exercises the `iot adr ns ca` and `iot adr ns ca policy` command surfaces against a
 namespace. External activation uses a disposable ECC root and the documented OpenSSL
-CSR-signing recipe. Microsoft revocation is explicitly opt-in and uses only owned CAs.
+CSR-signing recipe. Microsoft revocation always runs using only newly created, owned CAs.
 
 Run via ``tox -e ADR-int``.
 """
 
-import os
 import shlex
 import subprocess
 from contextlib import contextmanager
@@ -260,8 +259,6 @@ class TestADRCAActions(ADRLiveScenarioTest):
         self._external_activation(no_wait=True)
 
     def _microsoft_revocation(self, no_wait=False):
-        if os.getenv("azext_iot_adr_revoke_certificates", "").lower() not in ("1", "true", "yes"):
-            pytest.skip("Microsoft revocation requires explicit azext_iot_adr_revoke_certificates opt-in.")
         with self._owned_target(microsoft=True) as (scope, before):
             with TemporaryDirectory(prefix="adr-rejected-activation-") as directory:
                 path = Path(directory) / "unused.pem"

@@ -11,16 +11,6 @@ on:
         type: string
         required: false
         default: "auto"
-      adr-test-filter:
-        description: "ADR-only pytest -k expression; empty runs the full ADR integration suite."
-        type: string
-        required: false
-        default: ""
-      adr-revoke-certificates:
-        description: "Opt in to revocation scenarios using only newly created, test-owned ADR CAs."
-        type: boolean
-        required: false
-        default: false
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -41,11 +31,6 @@ on:
         type: string
         required: false
         default: ""
-      dps-capacity-limit:
-        description: "Confirmed DPS instance limit for the selected subscription/run; otherwise keep 10."
-        type: string
-        required: false
-        default: "10"
     secrets:
       AZURE_CLIENT_ID:
         required: true
@@ -76,16 +61,6 @@ on:
         description: "Run ADR tests"
         type: boolean
         default: true
-      adr-test-filter:
-        description: "ADR-only pytest -k expression; empty runs the full ADR integration suite."
-        type: string
-        required: false
-        default: ""
-      adr-revoke-certificates:
-        description: "Opt in to revocation scenarios using only newly created, test-owned ADR CAs."
-        type: boolean
-        required: false
-        default: false
       python-versions:
         description: "Python versions (comma-separated: 3.10,3.11,3.12,3.13)"
         type: string
@@ -106,11 +81,6 @@ on:
         type: string
         required: false
         default: "a386d5ea-ea90-441a-8263-d816368c84a1"
-      dps-capacity-limit:
-        description: "Confirmed DPS instance limit for the selected subscription/run; otherwise keep 10."
-        type: string
-        required: false
-        default: "10"
 
 permissions:
   contents: "read"
@@ -134,12 +104,6 @@ jobs:
           sparse-checkout: |
             azext_iot/tests
 
-      - name: "Validate DPS capacity limit"
-        env:
-          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
-        run: >-
-          python3 -c 'import os, runpy;
-          runpy.run_path("azext_iot/tests/dps/_phase_manifest.py")["parse_capacity_limit"](os.environ["DPS_CAPACITY_LIMIT"])'
       - name: "Build test matrix"
         id: matrix
         env:
@@ -328,7 +292,7 @@ jobs:
     timeout-minutes: ${{ matrix.config.timeout }}
     # All selected service/Python/region combinations are independently eligible,
     # including ADU. Owned controllers still sequence their internal auth phases.
-    # Scheduling is not admission: live scope/headroom checks remain required.
+    # Scheduling never authorizes resource mutation: ownership/scope checks remain required.
     strategy:
       fail-fast: false
       matrix:
@@ -413,9 +377,6 @@ jobs:
           azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}
-          azext_iot_adr_revoke_certificates: ${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}
-          ADR_TEST_FILTER: ${{ inputs['adr-test-filter'] }}
-          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
         run: |
           set -o pipefail
           run_service() {
@@ -423,14 +384,7 @@ jobs:
               echo "DPS coverage: regular (including owned CSR issuance), service-SAS and serial local-auth-toggle."
               .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
-                --region "$TEST_REGION" --dps-capacity-limit "$DPS_CAPACITY_LIMIT"
-            elif [ "$TEST_SERVICE" = "ADR" ] && [ -n "$ADR_TEST_FILTER" ]; then
-              # Reject malformed expressions before wrapping, so parentheses cannot escape the integration-only guard.
-              .tox/ADR-int/bin/python -c \
-                'import os; from _pytest.mark.expression import Expression; Expression.compile(os.environ["ADR_TEST_FILTER"])' \
-                || return $?
-              tox r -e "$TEST_TOX_ENV" --skip-pkg-install -- \
-                -k "(_int.py) and (${ADR_TEST_FILTER})"
+                --region "$TEST_REGION"
             else
               tox r -e "$TEST_TOX_ENV" --skip-pkg-install
             fi
@@ -509,10 +463,8 @@ jobs:
           UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
           INTEGRATION_RESULT: ${{ needs.int-test.result }}
           GATE_JOB_RESULT: ${{ job.status }}
-          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
         run: >-
           python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results
-          --expected-dps-capacity-limit "$DPS_CAPACITY_LIMIT"
 
   combine-coverage:
     name: "Combine coverage reports"

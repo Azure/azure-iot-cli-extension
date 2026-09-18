@@ -349,11 +349,6 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
         "azext_iot_adr_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
         "azext_iot_adr_resource_group": "${{ env.RESOURCE_GROUP }}",
         "azext_iot_adr_location": "${{ matrix.config.region }}",
-        "azext_iot_adr_revoke_certificates": (
-            "${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}"
-        ),
-        "ADR_TEST_FILTER": "${{ inputs['adr-test-filter'] }}",
-        "DPS_CAPACITY_LIMIT": "${{ inputs['dps-capacity-limit'] }}",
     }
     assert steps["Az CLI login"]["with"] == {
         "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
@@ -362,50 +357,30 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
     assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["OIDC Token refresh service"]["run"]
 
 
-def test_adr_revocation_workflow_opt_in_is_typed_default_off_and_adr_only():
+def test_workflow_runs_full_selected_services_without_removed_controls():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
     for trigger in ("workflow_call", "workflow_dispatch"):
-        setting = triggers[trigger]["inputs"]["adr-revoke-certificates"]
-        assert setting["type"] == "boolean"
-        assert setting["required"] is False and setting["default"] is False
-        assert "newly created, test-owned ADR CAs" in setting["description"]
+        assert not {"adr-test-filter", "adr-revoke-certificates", "dps-capacity-limit"}.intersection(
+            triggers[trigger]["inputs"],
+        )
     assert len(triggers["workflow_dispatch"]["inputs"]) <= 25
-    assert _integration_run_step()["env"]["azext_iot_adr_revoke_certificates"] == (
-        "${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}"
-    )
-    assert "azext_iot_adr_revoke_certificates" not in workflow.get("env", {})
-    assert "adr-revoke-certificates" not in _integration_run_step()["run"]
-
-
-def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    triggers = workflow.get("on", workflow.get(True))
-    for trigger in ("workflow_call", "workflow_dispatch"):
-        setting = triggers[trigger]["inputs"]["adr-test-filter"]
-        assert setting["type"] == "string"
-        assert setting["required"] is False
-        assert setting["default"] == ""
-        assert "ADR-only" in setting["description"]
-    # Existing service defaults must not change when the filter is introduced.
     assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
     for service in ("DPS", "HubControl", "HubData", "ADU", "ADR"):
         assert triggers["workflow_dispatch"]["inputs"][f"test{service}"]["default"] is True
     assert "testHubSAS" not in triggers["workflow_dispatch"]["inputs"]
     step = _integration_run_step()
-    assert step["env"]["ADR_TEST_FILTER"] == "${{ inputs['adr-test-filter'] }}"
-    assert "adr-test-filter" not in step["run"]
-    assert '-k "(_int.py) and (${ADR_TEST_FILTER})"' in step["run"]
-    assert 'Expression.compile(os.environ["ADR_TEST_FILTER"])' in step["run"]
+    for name in ("ADR_TEST_FILTER", "azext_iot_adr_revoke_certificates", "DPS_CAPACITY_LIMIT"):
+        assert name not in step["env"] and name not in step["run"]
+    assert " -k " not in step["run"]
     assert not step.get("continue-on-error", False)
     assert "|| true" not in step["run"]
 
 
-def _run_integration_shell(tmp_path, service, expression, exit_code=0, capacity_limit="10"):
+def _run_integration_shell(tmp_path, service, expression, exit_code=0):
     script = _integration_run_step()["run"]
     # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
     script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
-    script = script.replace(".tox/ADR-int/bin/python", '"$OFFLINE_PYTHON"')
     stubs = """
 tox() { printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
 dps_controller() { printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
@@ -413,10 +388,10 @@ tee() { cat; }
 """
     return subprocess.run(
         ["bash", "-c", stubs + script], cwd=tmp_path,
-        env=dict(os.environ, ADR_TEST_FILTER=expression, OFFLINE_PYTHON=sys.executable,
+        env=dict(os.environ, ADR_TEST_FILTER=expression,
                  TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
                  TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
-                 OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT=capacity_limit),
+                 OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
         capture_output=True, text=True, timeout=20, check=False,
     )
 
@@ -424,7 +399,7 @@ tee() { cat; }
 @pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
 @pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData", "ADU"])
 @pytest.mark.parametrize("expression", ["", "test_adr_job_lifecycle or test_adr_job_validation_negatives"])
-def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service, expression):
+def test_workflow_always_runs_full_service_despite_obsolete_environment(tmp_path, service, expression):
     result = _run_integration_shell(tmp_path, service, expression)
     assert result.returncode == 0, result.stdout + result.stderr
     arguments = result.stdout.splitlines()
@@ -432,62 +407,36 @@ def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service
         assert arguments[1:] == [
             "dps_controller", "azext_iot/tests/_dps_phase_runner.py",
             "--subscription", "offline-subscription", "--resource-group", "offline-rg",
-            "--region", "centraluseuap", "--dps-capacity-limit", "10",
+            "--region", "centraluseuap",
         ]
     else:
         expected = ["tox", "r", "-e", f"{service}-int", "--skip-pkg-install"]
-        if service == "ADR" and expression:
-            expected += ["--", "-k", f"(_int.py) and ({expression})"]
         assert arguments == expected
 
 
-def test_capacity_input_defaults_and_trusted_evaluator_forwarding():
+def test_removed_inputs_are_absent_from_all_workflow_callers():
     workflows = [yaml.safe_load((REPOSITORY_ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
                  for name in ("int_test.yml", "release_workflow.yml")]
     for workflow in workflows:
         triggers = workflow.get("on", workflow.get(True))
         for trigger in triggers.values():
-            setting = trigger["inputs"]["dps-capacity-limit"]
-            assert setting["type"] == "string" and setting["default"] == "10" and setting["required"] is False
+            assert not {"dps-capacity-limit", "adr-test-filter", "adr-revoke-certificates"}.intersection(trigger["inputs"])
     public, release = workflows
-    assert release["jobs"]["int_test"]["with"]["dps-capacity-limit"] == "${{ inputs['dps-capacity-limit'] }}"
-    run = _integration_run_step()
-    assert run["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
-    assert '--dps-capacity-limit "$DPS_CAPACITY_LIMIT"' in run["run"]
+    assert "dps-capacity-limit" not in release["jobs"]["int_test"]["with"]
     gate = next(step for step in public["jobs"]["int-test-gate"]["steps"] if step["name"] == "Evaluate per-service results")
-    assert gate["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
-    assert '--expected-dps-capacity-limit "$DPS_CAPACITY_LIMIT"' in gate["run"]
-    assert "${{" not in gate["run"]  # Bind via a quoted environment argument, not executable interpolation.
-
-
-@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
-@pytest.mark.parametrize("value", ["10", "100", "", "0", "-1", "100.0", "100 200", "true"])
-def test_workflow_capacity_validation_and_literal_shell_forwarding(tmp_path, value):
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["setup"]["steps"]
-    validation = next(step for step in steps if step["name"] == "Validate DPS capacity limit")
-    checkout = next(step for step in steps if step["name"] == "Checkout source")
-    assert checkout["with"]["sparse-checkout"].strip() == "azext_iot/tests"
-    assert "with" not in validation and "uses" not in validation
-    assert steps.index(checkout) < steps.index(validation)
-    assert steps.index(validation) < next(i for i, step in enumerate(steps) if step.get("id") == "matrix")
-    assert validation["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
-    result = subprocess.run(
-        ["bash", "-c", validation["run"]], cwd=REPOSITORY_ROOT, capture_output=True, text=True, timeout=20, check=False,
-        env=dict(os.environ, DPS_CAPACITY_LIMIT=value),
-    )
-    assert (result.returncode == 0) is (value in ("10", "100"))
-    forwarded = _run_integration_shell(tmp_path, "DPS", "", capacity_limit=value)
-    assert forwarded.returncode == 0  # Stub only; the real parser rejects the invalid literal.
-    assert forwarded.stdout.splitlines()[-2:] == ["--dps-capacity-limit", value]
+    assert "DPS_CAPACITY_LIMIT" not in gate["env"]
+    assert gate["run"].strip() == "python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results"
+    for path in (REPOSITORY_ROOT / ".github/workflows").glob("*.yml"):
+        text = path.read_text(encoding="utf-8")
+        assert not any(name in text for name in ("dps-capacity-limit", "adr-test-filter", "adr-revoke-certificates"))
 
 
 @pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
 @pytest.mark.parametrize("expression", ["and", "test_job) or _unit.py or (test_job", '$(printf UNEXPECTED); "quoted"'])
-def test_adr_workflow_rejects_invalid_or_shell_input_without_running_tox(tmp_path, expression):
+def test_adr_workflow_ignores_obsolete_filter_without_interpreting_it(tmp_path, expression):
     result = _run_integration_shell(tmp_path, "ADR", expression)
-    assert result.returncode != 0
-    assert "tox\n" not in result.stdout
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == ["tox", "r", "-e", "ADR-int", "--skip-pkg-install"]
     assert "\nUNEXPECTED\n" not in result.stdout
 
 
@@ -505,7 +454,7 @@ def test_workflow_preserves_failure_usage_and_no_selection_exit_codes(tmp_path, 
     ("does_not_match_any_test", 5),
     ("and", 4),
 ])
-def test_adr_filter_overrides_tox_keyword_without_selecting_unit_tests(tmp_path, expression, exit_code):
+def test_local_adr_filter_overrides_tox_keyword_without_selecting_unit_tests(tmp_path, expression, exit_code):
     # Isolated, portable pytest collection: no repository conftest, credentials or live fixtures.
     config = tmp_path / "pytest.ini"
     config.write_text("[pytest]\n", encoding="utf-8")
@@ -524,7 +473,7 @@ def test_adr_filter_overrides_tox_keyword_without_selecting_unit_tests(tmp_path,
 
 
 @pytest.mark.parametrize("filtered", [False, True], ids=["full-adr", "five-ca-job-cases"])
-def test_adr_workflow_filter_collects_existing_cases_offline(tmp_path, monkeypatch, filtered):
+def test_full_adr_and_local_debug_collect_existing_cases_offline(tmp_path, monkeypatch, filtered):
     expected = {
         "test_adr_certificate_authority_int.py::TestADRCertificateAuthorityLifecycle"
         "::test_adr_certificate_authority_lifecycle",

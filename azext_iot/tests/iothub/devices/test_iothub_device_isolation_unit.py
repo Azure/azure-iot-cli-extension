@@ -318,8 +318,8 @@ def test_private_lifecycle_never_adopts_or_replays_and_blocks_uncertain_capacity
         assert infrastructure._isolated_hub_pending is None
 
 
-def test_identity_private_lifetime_fits_existing_four_hub_reservation(isolated_backend):
-    from azext_iot.tests import _hub_phase_runner, _hub_suite_manifest
+def test_identity_private_lifetime_and_state_pool_cleanup(isolated_backend):
+    from azext_iot.tests import _hub_suite_manifest
 
     backend = isolated_backend
     fixture = _fixture(backend)
@@ -336,7 +336,7 @@ def test_identity_private_lifetime_fits_existing_four_hub_reservation(isolated_b
     backend.marker.kwargs["count"] = 1
     negative = infrastructure.provisioned_only_iot_hubs_module.__wrapped__(backend.request)
     next(negative)
-    assert backend.peak == _hub_phase_runner.SLOTS["entra"] == 4
+    assert backend.peak == 4
     with pytest.raises(StopIteration):
         next(negative)
     with pytest.raises(StopIteration):
