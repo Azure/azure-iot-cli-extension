@@ -47,6 +47,7 @@ LINKS = {
     "hub": ("messaging", IOT_HUB_ENDPOINT_TYPE, "secondary"),
     "dps": ("provisioning", DPS_ENDPOINT_TYPE, "dps-primary"),
 }
+NAMESPACE_IDENTITY = {"type": "SystemAssigned", "principalId": "11111111-1111-4111-8111-111111111111"}
 
 
 @pytest.fixture(params=["hub", "dps"])
@@ -388,6 +389,7 @@ def _namespace(ns_state="Failed", state="Failed", expected=None, message=None, *
     }
     return {
         "id": NS_ID,
+        "identity": deepcopy(NAMESPACE_IDENTITY),
         "properties": {
             "provisioningState": ns_state,
             section: {"endpoints": {name: endpoint}},
@@ -396,9 +398,25 @@ def _namespace(ns_state="Failed", state="Failed", expected=None, message=None, *
 
 
 def _link(scenario, clock, expected=None, *, kind="hub", **kwargs):
+    # Existing transcripts below describe commands after submission. Supply the
+    # new pre-add namespace snapshot separately; the alignment regressions also
+    # exercise this GET, its deadline and identity failures directly.
+    first = True
+
+    def command(text):
+        nonlocal first
+        if first:
+            first = False
+            assert text == "iot adr ns show -n ns -g rg"
+            return _output({
+                "id": NS_ID, "identity": deepcopy(NAMESPACE_IDENTITY),
+                "properties": {"provisioningState": "Succeeded"},
+            })
+        return scenario.cmd(text)
+
     helper = readiness.link_hub_with_readiness if kind == "hub" else readiness.link_dps_with_readiness
     return helper(
-        scenario, _add(kind), "ns", "rg", LINKS[kind][2], expected or _expected(kind),
+        SimpleNamespace(cmd=command), _add(kind), "ns", "rg", LINKS[kind][2], expected or _expected(kind),
         clock=clock, sleeper=clock.sleep, **kwargs,
     )
 

@@ -8,8 +8,9 @@
 
 Only exact resource GET HTTP 404 proves cleanup absence. Accepted namespace
 deletes are polled, never replayed. Hub/DPS recovery is restricted to the observed
-namespace-MI read-authorization failure after a persisted link write; it neither
-changes grants nor treats ARM role visibility as effective authorization.
+namespace-MI read-authorization failure or strictly bound linkInitiate denial
+after a persisted link write. It neither adds fixture grants nor treats ARM role
+visibility as effective authorization.
 """
 
 import re
@@ -26,6 +27,8 @@ from msrestazure.azure_exceptions import CloudError
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
+from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
+from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
 
@@ -221,7 +224,27 @@ def _read_authorization_failure(endpoint):
         f"The namespace's managed identity is not authorized to read the linked resource '{target}'. "
         "Grant it read access on the resource, then resubmit the request."
     )
-    return error.get("message") == message
+    # LinkInitiateFailed must always use the production principal/action/scope
+    # binding, never this older message-only read-authorization compatibility path.
+    return error.get("code") != "LinkInitiateFailed" and error.get("message") == message
+
+
+def _authorization_failure(namespace, endpoint, binding):
+    """Keep the legacy read shape; share the production linkInitiate classifier."""
+    properties = namespace["properties"]
+    if namespace.get("error") or properties.get("error"):
+        return False
+    # Only the canonical structured linkingError may authorize the new retry.
+    # Conflicting/alternate error envelopes must not be hidden by a matching one.
+    error = endpoint.get("linkingError") or {}
+    if error.get("code") != "LinkInitiateFailed":
+        return _read_authorization_failure(endpoint)
+    if (
+        endpoint.get("error") or (endpoint.get("status") or {}).get("error")
+        or (endpoint.get("provisioningStatus") or {}).get("error")
+    ):
+        return False
+    return binding.authorized_failure(endpoint)
 
 
 def link_hub_with_readiness(
@@ -265,16 +288,36 @@ def link_with_readiness(
     assert tokens[:6] == ["iot", "adr", "ns", "link", link_kind, "add"], "Expected a matching owned link add"
     label = "Hub" if link_kind == "hub" else "DPS"
     budget = _Deadline(timeout, clock, sleeper, f"owned {label} link readiness")
-    budget.call(scenario.cmd, command + " --no-wait")
     show = "iot adr ns show " + shlex.join(["-n", namespace_name, "-g", resource_group])
     expected = deepcopy(expected_endpoint)
     expected["endpointType"] = endpoint_type
+    original = budget.call(scenario.cmd, show).get_output_in_json()
+    namespace_id = original.get("id")
+    expected_path = f"/resourceGroups/{resource_group}/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}"
+    assert isinstance(namespace_id, str) and namespace_id.casefold().endswith(expected_path.casefold()), (
+        "Namespace snapshot does not match the intended link scope"
+    )
+    # Use only LinkRecovery's pure classifier/snapshot, never its mutation loop:
+    # this scenario deliberately exercises no-wait submission and GET readiness.
+    binding = LinkRecovery(
+        provider=None, namespace=original, section=section, name=endpoint_name,
+        expected=expected, budget=None, verify=None,
+        authorization_request={
+            "link_type": link_kind, "namespace_scope": namespace_id,
+            "target_scope": expected["resourceId"],
+            "namespace_principal_id": resolve_namespace_outbound_principal(original),
+        },
+    )
+    budget.call(scenario.cmd, command + " --no-wait")
     expected = _endpoint_settings(expected)
     progressed = True  # The initial add is never replayed.
     retries = 0
     retry_at = None
     while True:
         namespace = budget.call(scenario.cmd, show).get_output_in_json()
+        assert _namespace_identity(namespace) == binding.namespace_identity, (
+            "Namespace resource or configured outbound identity changed; recovery stopped"
+        )
         properties = namespace["properties"]
         ns_state = properties.get("provisioningState")
         endpoint = (properties.get(section) or {}).get("endpoints", {}).get(endpoint_name)
@@ -303,7 +346,7 @@ def link_with_readiness(
             retry_at = None
         elif any(_link_state(other) in _ACTIVE_STATES for other in others):
             retry_at = None
-        elif ns_state == "Failed" and state == "Failed" and _read_authorization_failure(endpoint):
+        elif ns_state == "Failed" and state == "Failed" and _authorization_failure(namespace, endpoint, binding):
             if progressed:
                 if retry_at is None:
                     retry_at = budget.clock() + min(10 * (retries + 1), 30)
