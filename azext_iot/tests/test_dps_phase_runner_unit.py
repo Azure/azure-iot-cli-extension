@@ -372,14 +372,18 @@ def test_runner_cli_limit_is_validated_before_authentication(mocker, value):
         arguments += ["--dps-capacity-limit", value]
     reader, execute = mocker.Mock(), mocker.Mock(return_value=0)
     mocker.patch.object(sys, "argv", arguments)
-    mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute, bounded_read=nullcontext)
+    platform_check = mocker.Mock()
+    mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute,
+                      bounded_read=nullcontext, require_linux=platform_check)
     if value in (None, "100", "1"):
         assert RUNNER["main"]() == 0
+        platform_check.assert_called_once_with()
         assert execute.call_args.kwargs["capacity_limit"] == (10 if value is None else int(value))
     else:
         with pytest.raises(SystemExit) as error:
             RUNNER["main"]()
         assert error.value.code == 2
+        platform_check.assert_not_called()
         reader.assert_not_called()
         execute.assert_not_called()
 
