@@ -18,6 +18,15 @@ CSR_NODEIDS = frozenset(
 )
 
 
+def parse_capacity_limit(value):
+    """Accept only an explicit positive integer, never booleans or numeric coercions."""
+    if isinstance(value, str) and value.isascii() and value.isdecimal() and not value.startswith("0"):
+        value = int(value)
+    if type(value) is not int or value <= 0:
+        raise ValueError("DPS capacity limit must be a positive base-10 integer (default: 10).")
+    return value
+
+
 def resource_type(kind):
     if kind in ("hub", "csrhub"):
         return "Microsoft.Devices/IotHubs"

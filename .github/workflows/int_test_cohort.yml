@@ -15,6 +15,10 @@ on:
         type: string
         required: false
         default: ""
+      dps-capacity-limit:
+        type: string
+        required: false
+        default: "10"
       adr-test-filter:
         type: string
         default: ""
@@ -133,6 +137,7 @@ jobs:
           azext_iot_adr_location: ${{ matrix.config.region }}
           azext_iot_adr_revoke_certificates: ${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}
           ADR_TEST_FILTER: ${{ inputs['adr-test-filter'] }}
+          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
         run: |
           set -o pipefail
           run_service() {
@@ -140,7 +145,7 @@ jobs:
               echo "DPS coverage: regular (including owned CSR issuance), service-SAS and serial local-auth-toggle."
               .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
-                --region "$TEST_REGION"
+                --region "$TEST_REGION" --dps-capacity-limit "$DPS_CAPACITY_LIMIT"
             elif [ "$TEST_SERVICE" = "ADR" ] && [ -n "$ADR_TEST_FILTER" ]; then
               # Reject malformed expressions before wrapping, so parentheses cannot escape the integration-only guard.
               .tox/ADR-int/bin/python -c \

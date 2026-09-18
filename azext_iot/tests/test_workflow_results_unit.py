@@ -335,7 +335,7 @@ def test_adr_workflow_filter_is_optional_and_bound_only_through_environment():
     assert "|| true" not in step["run"]
 
 
-def _run_integration_shell(tmp_path, service, expression, exit_code=0):
+def _run_integration_shell(tmp_path, service, expression, exit_code=0, capacity_limit="10"):
     script = _integration_run_step()["run"]
     # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
     script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
@@ -350,7 +350,7 @@ tee() { cat; }
         env=dict(os.environ, ADR_TEST_FILTER=expression, OFFLINE_PYTHON=sys.executable,
                  TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
                  TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
-                 OFFLINE_EXIT_CODE=str(exit_code)),
+                 OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT=capacity_limit),
         capture_output=True, text=True, timeout=20, check=False,
     )
 
@@ -366,13 +366,55 @@ def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service
         assert arguments[1:] == [
             "dps_controller", "azext_iot/tests/_dps_phase_runner.py",
             "--subscription", "offline-subscription", "--resource-group", "offline-rg",
-            "--region", "centraluseuap",
+            "--region", "centraluseuap", "--dps-capacity-limit", "10",
         ]
     else:
         expected = ["tox", "r", "-e", f"{service}-int", "--skip-pkg-install"]
         if service == "ADR" and expression:
             expected += ["--", "-k", f"(_int.py) and ({expression})"]
         assert arguments == expected
+
+
+def test_capacity_input_defaults_and_trusted_evaluator_forwarding():
+    workflows = [yaml.safe_load((REPOSITORY_ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
+                 for name in ("int_test.yml", "int_test_bundle.yml", "int_test_cohort.yml", "release_workflow.yml")]
+    for workflow in workflows:
+        triggers = workflow.get("on", workflow.get(True))
+        for trigger in triggers.values():
+            setting = trigger["inputs"]["dps-capacity-limit"]
+            assert setting["type"] == "string" and setting["default"] == "10" and setting["required"] is False
+    public, bundle, _cohort, release = workflows
+    for job in (public["jobs"]["int-test"], bundle["jobs"]["cohort"], release["jobs"]["int_test"]):
+        assert job["with"]["dps-capacity-limit"] == "${{ inputs['dps-capacity-limit'] }}"
+    run = _integration_run_step()
+    assert run["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
+    assert '--dps-capacity-limit "$DPS_CAPACITY_LIMIT"' in run["run"]
+    gate = next(step for step in public["jobs"]["int-test-gate"]["steps"] if step["name"] == "Evaluate per-service results")
+    assert gate["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
+    assert '--expected-dps-capacity-limit "$DPS_CAPACITY_LIMIT"' in gate["run"]
+    assert "${{" not in gate["run"]  # Bind via a quoted environment argument, not executable interpolation.
+
+
+@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
+@pytest.mark.parametrize("value", ["10", "100", "", "0", "-1", "100.0", "100 200", "true"])
+def test_workflow_capacity_validation_and_literal_shell_forwarding(tmp_path, value):
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["setup"]["steps"]
+    validation = next(step for step in steps if step["name"] == "Validate DPS capacity limit")
+    checkout = next(step for step in steps if step["name"] == "Checkout source")
+    assert checkout["with"]["sparse-checkout"].strip() == "azext_iot/tests"
+    assert "with" not in validation and "uses" not in validation
+    assert steps.index(checkout) < steps.index(validation)
+    assert steps.index(validation) < next(i for i, step in enumerate(steps) if step.get("id") == "matrix")
+    assert validation["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
+    result = subprocess.run(
+        ["bash", "-c", validation["run"]], cwd=REPOSITORY_ROOT, capture_output=True, text=True, timeout=20, check=False,
+        env=dict(os.environ, DPS_CAPACITY_LIMIT=value),
+    )
+    assert (result.returncode == 0) is (value in ("10", "100"))
+    forwarded = _run_integration_shell(tmp_path, "DPS", "", capacity_limit=value)
+    assert forwarded.returncode == 0  # Stub only; the real parser rejects the invalid literal.
+    assert forwarded.stdout.splitlines()[-2:] == ["--dps-capacity-limit", value]
 
 
 @pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")

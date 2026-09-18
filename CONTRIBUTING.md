@@ -155,10 +155,28 @@ capacity case), two S1 Hubs, and one namespace with two CAs/one policy. Only a
 validated, nonempty regular debug selection containing exclusively either or
 both required CSR nodes reserves one DPS slot, matching its single dedicated
 pair. Its admission and cleanup capacity reports use that same requirement:
-seven or nine existing subscription DPS are allowed; ten are not. Full regular
+with the default limit, seven or nine existing subscription DPS are allowed; ten are not. Full regular
 qualification and mixed/other debug selections retain four-slot admission.
-The subscription cap stays ten, across all regions; there is no quota override
-or foreign-resource deletion. Do not supply pinned shared resources. Caller data roles
+The conservative default is ten DPS instances across all regions. A run may
+explicitly use an operator-confirmed limit for its selected subscription:
+pass `--dps-capacity-limit 100` to the local controller, or set
+`dps-capacity-limit` to `"100"` on the Integration Tests or Build and Publish
+Release manual workflow. The confirmed 100-instance limit for subscription
+`a386d5ea-ea90-441a-8263-d816368c84a1` does not apply to other subscriptions or
+unconfigured runs; every workflow and local default remains ten. This input
+does not change Azure quota, bypass inventory/ownership checks, or authorize
+foreign-resource deletion. Values must be positive base-10 integers, not
+booleans, fractions, empty strings or expressions.
+
+The selected limit is recorded consistently in initial admission, fresh
+pre-phase gates and cleanup capacity receipts. The independent workflow gate
+receives the same trusted workflow input, rather than trusting receipt limits.
+When evaluating local artifacts with `_evaluate_test_results.py`, supply
+`--expected-dps-capacity-limit 100` explicitly for a run admitted with 100;
+the default evaluator rejects such receipts. A raised limit does not make a
+focused/debug run qualify as a full suite or change its required slot count.
+
+Do not supply pinned shared resources. Caller data roles
 use the existing DPS/Hub fixtures; native linking creates only its required
 service-to-service roles. No first-party Graph/Device Update grant is added.
 

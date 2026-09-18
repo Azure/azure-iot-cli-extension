@@ -232,7 +232,7 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, capacity_limit=10):
     if chosen is None:
         chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
@@ -286,7 +286,7 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=phase, debug_nodes=chosen, capacity_limit=capacity_limit)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
 
 
@@ -366,10 +366,36 @@ def test_csr_only_debug_reserves_one_dps_with_consistent_metadata(tmp_path, monk
         assert not reader.gets
 
 
-@pytest.mark.parametrize("defect", ["uncertain", "wrong-resource-type"])
-def test_one_slot_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect):
+@pytest.mark.parametrize("selection,count,required,allowed", [
+    ("csr", 99, 1, True), ("csr", 100, 1, False),
+    ("mixed", 96, 4, True), ("mixed", 97, 4, False),
+    ("other", 96, 4, True), ("other", 97, 4, False),
+])
+def test_explicit_limit_keeps_focused_slot_policy_and_nonqualification(
+    tmp_path, monkeypatch, selection, count, required, allowed,
+):
+    chosen = csr_nodes() if selection == "csr" else nodes("DPS", "regular")[:1]
+    if selection == "mixed":
+        chosen += csr_nodes()
     result, summary, captured = run_dps(
-        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(7), defect=defect,
+        tmp_path, monkeypatch, "regular", chosen=chosen, reader=DpsReader(count), capacity_limit=100,
+    )
+    assert result == (0 if allowed else 1)
+    assert summary["qualifiesFullSuite"] is False
+    assert summary["baseline"]["capacity"]["required"] == required
+    assert summary["baseline"]["capacity"]["limit"] == 100
+    assert len(captured) == (1 if allowed else 0)
+    assert GATE["evaluate_dps_phases"](tmp_path, expected_capacity_limit=100)
+    if allowed:
+        assert summary["phases"][0]["cleanup"]["capacity"]["required"] == required
+        assert summary["phases"][0]["cleanup"]["capacity"]["limit"] == 100
+
+
+@pytest.mark.parametrize("limit", [10, 100])
+@pytest.mark.parametrize("defect", ["uncertain", "wrong-resource-type"])
+def test_one_slot_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect, limit):
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(7), defect=defect, capacity_limit=limit,
     )
     assert len(captured) == 1
     assert result == 1 and summary["status"] == "debug-failed"

@@ -303,14 +303,18 @@ def required_slots(debug=None):
     return REQUIRED_SLOTS
 
 
-def capacity(inventory, required=REQUIRED_SLOTS):
+def capacity(inventory, required=REQUIRED_SLOTS, *, limit=DPS_LIMIT):
+    limit = MANIFEST["parse_capacity_limit"](limit)
     ids = [resource["id"].lower() for resource in inventory]
     if len(ids) != len(set(ids)):
         raise PhaseError("Subscription inventory contains duplicate IDs; capacity is not proven.")
     return {
-        "ready": len(ids) + required <= DPS_LIMIT, "count": len(ids),
-        "limit": DPS_LIMIT, "required": required, "ids": sorted(ids),
-        "limit_source": "conservative DPS subscription default (no SDK quota-read operation)",
+        "ready": len(ids) + required <= limit, "count": len(ids),
+        "limit": limit, "required": required, "ids": sorted(ids),
+        "limit_source": (
+            "conservative DPS subscription default (no SDK quota-read operation)" if limit == DPS_LIMIT
+            else "explicit operator-confirmed subscription/run limit (no SDK quota-read operation)"
+        ),
     }
 
 
@@ -359,7 +363,9 @@ def recorded_ids(receipts):
     return result
 
 
-def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=time.sleep, *, required=REQUIRED_SLOTS):
+def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=time.sleep, *,
+                   required=REQUIRED_SLOTS, limit=DPS_LIMIT):
+    limit = MANIFEST["parse_capacity_limit"](limit)
     remaining = []
     while True:
         remaining = []
@@ -388,7 +394,8 @@ def verify_cleanup(reader, records, uid, deadline, clock=time.monotonic, sleep=t
             ]
             if uncertain:
                 return {"complete": False, "remaining": uncertain, "reason": "Uncertain creates cannot be replayed"}
-            return {"complete": True, "remaining": [], "capacity": capacity(inventory, required=required), "verified_at": utc()}
+            return {"complete": True, "remaining": [],
+                    "capacity": capacity(inventory, required=required, limit=limit), "verified_at": utc()}
         if clock() + READ_SECONDS + 15 >= deadline:
             return {"complete": False, "remaining": remaining, "reason": "Owned resources still present at cleanup bound"}
         sleep(15)  # GET-only observation; never repeat DELETE, including alreadyDeleting resources.
@@ -547,7 +554,9 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     }
 
 
-def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *, debug_phase=None, debug_nodes=None):
+def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *,
+        debug_phase=None, debug_nodes=None, capacity_limit=DPS_LIMIT):
+    capacity_limit = MANIFEST["parse_capacity_limit"](capacity_limit)
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
     slots = required_slots(debug)
     phases = tuple(value for value in PHASES if not debug or value[0] == debug["phase"])
@@ -598,7 +607,9 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         )):
             raise PhaseError("Focused DPS rejects ambient pytest selection/plugin overrides.")
         baseline = reader.inventory()
-        summary["baseline"] = {"resources": baseline, "capacity": capacity(baseline, required=slots), "at": utc()}
+        summary["baseline"] = {
+            "resources": baseline, "capacity": capacity(baseline, required=slots, limit=capacity_limit), "at": utc(),
+        }
         write_json(summary_path, summary)
         baseline_ids = {resource["id"].lower() for resource in baseline}
         if not summary["baseline"]["capacity"]["ready"]:
@@ -618,7 +629,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     previous_ids = set(prior["cleanup"]["owned_ids"])
                     present = [resource for record in records if (resource := reader.get(record)) is not None]
                     inventory = reader.inventory()
-                    fresh = capacity(inventory, required=1 if name == "local-auth-toggle" else 2)
+                    fresh = capacity(inventory, required=1 if name == "local-auth-toggle" else 2, limit=capacity_limit)
                     listed = [resource for resource in inventory
                               if resource["id"].lower() in {value.lower() for value in previous_ids}]
                     absent = not present and not listed
@@ -690,7 +701,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     records = ownership(receipts, name, uid, subscription, group, baseline_ids)
                     reader.deadline = min(execution["cleanup_deadline"], deadline)
                     result["cleanup"] = verify_cleanup(
-                        reader, records, uid, reader.deadline, clock=clock, required=slots,
+                        reader, records, uid, reader.deadline, clock=clock, required=slots, limit=capacity_limit,
                     )
                     result["cleanup"]["owned_ids"] = [record["id"] for record in records]
                     result["cleanup"]["absent_ids"] = (
@@ -742,6 +753,8 @@ def main():
     parser.add_argument("--resource-group", required=True)
     parser.add_argument("--region", choices=["centraluseuap"], default="centraluseuap")
     parser.add_argument("--output", default="test-result/dps-phases")
+    parser.add_argument("--dps-capacity-limit", type=MANIFEST["parse_capacity_limit"], default=DPS_LIMIT,
+                        help="Operator-confirmed DPS instance limit for this subscription/run (default: 10).")
     FOCUSED["add_arguments"](parser)
     args = parser.parse_args()
     args.subscription = str(UUID(args.subscription))
@@ -757,7 +770,7 @@ def main():
         with bounded_read():
             reader = ArmReader(args.subscription)
         return run(args.subscription, args.resource_group, args.output, reader,
-                   debug_phase=args.debug_phase, debug_nodes=args.debug_node)
+                   debug_phase=args.debug_phase, debug_nodes=args.debug_node, capacity_limit=args.dps_capacity_limit)
     except Exception as error:
         diagnostic = str(error) if isinstance(error, PhaseError) else type(error).__name__
         print(f"[DPS phases] failed before launch: {diagnostic}", flush=True)
