@@ -4,10 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Offline topology, matrix and artifact contracts for the locked integration bundle."""
+"""Offline topology, matrix and artifact contracts for flat integration jobs."""
 
 from collections import Counter
-import hashlib
 import itertools
 import json
 import os
@@ -22,9 +21,8 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
-FILES = ("int_test.yml", "int_test_bundle.yml", "int_test_cohort.yml")
+FILES = ("int_test.yml",)
 SERVICES = ("DPS", "HubControl", "HubData", "ADU", "ADR")
-OWNED_SERVICES = {"DPS", "HubControl", "HubData", "ADR"}
 SUBSCRIPTION = "a386d5ea-ea90-441a-8263-d816368c84a1"
 POSIX_WORKFLOW = pytest.mark.skipif(
     sys.platform != "linux" or not shutil.which("bash") or not shutil.which("jq"),
@@ -58,82 +56,62 @@ def _matrix(tmp_path, **overrides):
     return result, outputs
 
 
-def test_scope_lock_surrounds_all_cohorts_and_parallel_services():
-    public, bundle, cohort = _workflows()
-    caller = public["jobs"]["int-test"]
-    assert caller["needs"] == ["setup", "unit-test"]
-    assert "needs.unit-test.result == 'success'" in caller["if"]
-    assert caller["concurrency"] == {
-        "group": "integration-live-${{ needs.setup.outputs.live-scope }}",
-        "cancel-in-progress": False,
+def test_flat_matrix_makes_all_combinations_concurrently_eligible_without_wrappers_or_locks():
+    public = _workflows()[0]
+    assert set(public["jobs"]) == {"setup", "unit-test", "int-test", "int-test-gate", "combine-coverage"}
+    job = public["jobs"]["int-test"]
+    assert job["needs"] == ["setup", "unit-test"]
+    assert job["if"] == (
+        "${{ needs.setup.result == 'success' && needs.unit-test.result == 'success' && "
+        "(needs.setup.outputs.matrix || '[]') != '[]' }}"
+    )  # No service-specific dependency or ADU eligibility restriction.
+    assert not {"uses", "with", "secrets"}.intersection(job)
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["strategy"] == {
+        "fail-fast": False, "matrix": {"config": "${{ fromJson(needs.setup.outputs.matrix || '[]') }}"},
     }
-    assert caller["uses"] == "./.github/workflows/int_test_bundle.yml"
-    assert caller["with"]["cohorts"] == "${{ needs.setup.outputs.cohorts }}"
-    assert "strategy" not in caller  # Exactly one scope-lock contender per run.
-    assert set(bundle["jobs"]) == {"cohort"}
-    serial = bundle["jobs"]["cohort"]
-    assert serial["uses"] == "./.github/workflows/int_test_cohort.yml"
-    assert serial["strategy"] == {
-        "fail-fast": False, "max-parallel": 1, "matrix": {"cohort": "${{ fromJson(inputs.cohorts) }}"},
-    }
-    assert serial["with"]["configs"] == "${{ toJson(matrix.cohort.configs) }}"
-    assert set(cohort["jobs"]) == {"service"}
-    parallel = cohort["jobs"]["service"]
-    assert parallel["strategy"] == {
-        "fail-fast": False, "matrix": {"config": "${{ fromJson(inputs.configs) }}"},
-    }
-    assert "needs" not in parallel  # No DPS -> HubControl -> HubData -> ADR chain.
-    for workflow in (public, bundle, cohort):
-        assert "concurrency" not in workflow
-        for job in workflow["jobs"].values():
-            if job is not caller:
-                assert "concurrency" not in job  # No pending sibling cancellation or nested lock deadlock.
-            assert not job.get("continue-on-error", False)
-    for job in (serial, parallel):
-        assert "if" not in job  # A failed service/cohort must not suppress the others.
+    assert public["jobs"]["setup"]["outputs"] == {"matrix": "${{ steps.matrix.outputs.matrix }}"}
+    assert "concurrency" not in public
+    for value in public["jobs"].values():
+        assert "concurrency" not in value
+        assert "max-parallel" not in value.get("strategy", {})
+        assert not value.get("continue-on-error", False)
+    for name in ("int_test_bundle.yml", "int_test_cohort.yml"):
+        assert not (ROOT / ".github/workflows" / name).exists()
 
 
-def test_internal_calls_use_supported_keywords_and_forward_typed_inputs_and_oidc():
-    # GitHub's "Supported keywords for jobs that call a reusable workflow".
-    # In particular these calls cannot have runs-on, env, steps or timeout-minutes.
-    supported = {"name", "uses", "with", "secrets", "strategy", "needs", "if", "concurrency", "permissions"}
-    public, bundle, cohort = _workflows()
-    callers = (public["jobs"]["int-test"], bundle["jobs"]["cohort"])
-    for caller, callee in zip(callers, (bundle, cohort)):
-        assert set(caller) <= supported
-        assert caller["secrets"] == "inherit"
-        triggers = _triggers(callee)
-        assert set(triggers) == {"workflow_call"}  # Internal only; no new public dispatch/suites.
-        declared = triggers["workflow_call"]["inputs"]
-        assert set(caller["with"]) == set(declared)
+def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
+    public = _workflows()[0]
+    triggers = _triggers(public)
+    assert set(triggers) == {"workflow_call", "workflow_dispatch"}
+    for trigger in triggers.values():
+        declared = trigger["inputs"]
         assert declared["adr-test-filter"]["type"] == "string"
         assert declared["adr-test-filter"]["default"] == ""
         assert declared["adr-revoke-certificates"]["type"] == "boolean"
         assert declared["adr-revoke-certificates"]["default"] is False
-        assert declared["resource-group"] == {"type": "string", "required": True}
-        assert declared["subscription-id"] == {"type": "string", "required": False, "default": ""}
-        assert declared["dps-capacity-limit"] == {"type": "string", "required": False, "default": "10"}
-        assert "inputs['adr-test-filter']" in caller["with"]["adr-test-filter"]
-        assert "inputs['adr-revoke-certificates']" in caller["with"]["adr-revoke-certificates"]
-        assert triggers["workflow_call"]["secrets"] == {
-            "AZURE_CLIENT_ID": {"required": True}, "AZURE_TENANT_ID": {"required": True},
-            "AZURE_SUBSCRIPTION_ID": {"required": False},
-        }
-    for workflow in (public, bundle, cohort):
-        assert workflow["permissions"] == {"contents": "read", "id-token": "write"}
-    # Forward the unresolved input across BOTH call boundaries. Resolve the fallback
-    # only in workflow env, identically for root setup's scope hash and the cohort.
-    assert callers[0]["with"]["resource-group"] == public["env"]["RESOURCE_GROUP"]
-    assert callers[0]["with"]["subscription-id"] == "${{ inputs['subscription-id'] }}"
-    for name in ("resource-group", "subscription-id", "dps-capacity-limit"):
-        assert callers[1]["with"][name] == "${{ inputs['" + name + "'] }}"
-    assert cohort["env"] == {
-        "RESOURCE_GROUP": "${{ inputs['resource-group'] }}",
-        "TEST_SUBSCRIPTION_ID": public["env"]["TEST_SUBSCRIPTION_ID"],
+        for name in ("resource-group", "subscription-id", "dps-capacity-limit", "python-versions", "regions"):
+            assert declared[name]["type"] == "string" and declared[name]["required"] is False
+        assert declared["resource-group"]["default"] == "cli-int-test-rg"
+        assert declared["dps-capacity-limit"]["default"] == "10"
+        assert declared["regions"]["default"] == "centraluseuap"
+        assert declared["python-versions"]["default"] == "3.13"
+    assert public["permissions"] == {"contents": "read", "id-token": "write"}
+    assert public["env"] == {
+        "RESOURCE_GROUP": "${{ inputs['resource-group'] || 'cli-int-test-rg' }}",
+        "TEST_SUBSCRIPTION_ID": "${{ inputs['subscription-id'] || secrets.AZURE_SUBSCRIPTION_ID }}",
     }
-    assert _triggers(public)["workflow_call"]["secrets"]["AZURE_SUBSCRIPTION_ID"] == {"required": True}
-    assert _triggers(public)["workflow_call"]["inputs"]["subscription-id"]["default"] == ""
-    assert set(_triggers(public)["workflow_dispatch"]["inputs"]) == {
+    assert triggers["workflow_call"]["secrets"] == {
+        name: {"required": True} for name in ("AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID")
+    }
+    assert triggers["workflow_call"]["inputs"]["subscription-id"]["default"] == ""
+    assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
+    dispatch = triggers["workflow_dispatch"]["inputs"]
+    assert dispatch["subscription-id"]["default"] == SUBSCRIPTION
+    for service in SERVICES:
+        assert dispatch[f"test{service}"]["type"] == "boolean"
+        assert dispatch[f"test{service}"]["default"] is True
+    assert set(dispatch) == {
         *(f"test{service}" for service in SERVICES),
         "adr-test-filter", "adr-revoke-certificates", "python-versions", "regions", "resource-group", "subscription-id",
         "dps-capacity-limit",
@@ -154,7 +132,8 @@ def test_reusable_job_with_uses_only_officially_supported_expression_contexts():
     # Official context-availability row jobs.<job_id>.with.<with_id>.
     # A schema-valid job can still be invalid if it uses secrets or env here.
     allowed = {"github", "needs", "strategy", "matrix", "inputs", "vars"}
-    for workflow in _workflows():
+    release = yaml.safe_load((ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    for workflow in (*_workflows(), release):
         for job in workflow["jobs"].values():
             if "uses" in job:
                 for name, value in job.get("with", {}).items():
@@ -175,8 +154,8 @@ def test_expression_context_check_detects_unsupported_dot_and_bracket_access(con
     ("", SUBSCRIPTION),  # Reusable caller with empty input and required root fallback.
     (SUBSCRIPTION, "unused-offline-fallback"),  # Explicit input wins at both ends.
 ])
-def test_subscription_resolution_matches_setup_scope_and_cohort_login(tmp_path, explicit, fallback):
-    public, bundle, cohort = _workflows()
+def test_subscription_resolution_is_shared_by_setup_and_direct_service_login(tmp_path, explicit, fallback):
+    public = _workflows()[0]
     inherited = {"AZURE_CLIENT_ID": "offline-client", "AZURE_TENANT_ID": "offline-tenant"}
     if fallback is not None:
         inherited["AZURE_SUBSCRIPTION_ID"] = fallback
@@ -192,75 +171,67 @@ def test_subscription_resolution_matches_setup_scope_and_cohort_login(tmp_path, 
         return next((references[term] for term in terms if references[term]), "")
 
     setup_subscription = resolve(public["env"]["TEST_SUBSCRIPTION_ID"], explicit)
-    forwarded = explicit
-    for caller, callee in (
-        (public["jobs"]["int-test"], bundle), (bundle["jobs"]["cohort"], cohort),
-    ):
-        forwarded = resolve(caller["with"]["subscription-id"], forwarded)
-        assert forwarded == explicit  # In particular, an empty input stays empty.
-        contract = _triggers(callee)["workflow_call"]
-        assert all(name in inherited for name, spec in contract["secrets"].items() if spec["required"])
-        assert contract["inputs"]["subscription-id"]["required"] is False
-        assert caller["secrets"] == "inherit"
-    live_subscription = resolve(cohort["env"]["TEST_SUBSCRIPTION_ID"], forwarded)
-    assert setup_subscription == live_subscription == SUBSCRIPTION
+    assert setup_subscription == SUBSCRIPTION
+    for name in ("setup", "int-test"):
+        assert "TEST_SUBSCRIPTION_ID" not in public["jobs"][name].get("env", {})
+        for step in public["jobs"][name]["steps"]:
+            assert "TEST_SUBSCRIPTION_ID" not in step.get("env", {})
     result, outputs = _matrix(tmp_path, TEST_SUBSCRIPTION_ID=setup_subscription)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert outputs["live-scope"] == hashlib.sha256(f"{live_subscription}/cli-int-test-rg".encode()).hexdigest()
-    login = next(step for step in cohort["jobs"]["service"]["steps"] if step["name"] == "Az CLI login")
+    assert set(outputs) == {"matrix"}
+    login = next(step for step in public["jobs"]["int-test"]["steps"] if step["name"] == "Az CLI login")
     assert login["with"]["subscription-id"] == "${{ env.TEST_SUBSCRIPTION_ID }}"
 
 
 @POSIX_WORKFLOW
 @pytest.mark.parametrize("services,pythons,regions", [
     ("auto", "3.13", "centraluseuap"),
-    ("auto", "3.10,3.13", "centraluseuap"),  # Release caller: owned then ADU for EACH Python.
+    ("auto", "3.10,3.13", "centraluseuap"),  # Release caller: all services for EACH Python.
     ("ADR,DPS,ADU", "3.10,3.13", "centraluseuap,westus"),
-    ("ADU,ADR", "3.13", "centraluseuap"),  # Input order cannot fold ADU into the parallel cohort.
+    ("ADU,ADR", "3.13", "centraluseuap"),  # ADU has the same eligibility as the other services.
     ("HubControl,HubData,DPS,ADR", "3.13", "centraluseuap"),
     ("ADR", "3.13", "centraluseuap"),
     ("ADU", "3.13", "centraluseuap"),
     ("ADU", "3.10,3.13", "centraluseuap,westus"),
 ])
-def test_matrix_cohorts_preserve_every_selected_combination_once(tmp_path, services, pythons, regions):
+def test_flat_matrix_preserves_exact_cartesian_membership_budgets_names_and_artifacts(tmp_path, services, pythons, regions):
     result, outputs = _matrix(
         tmp_path, INPUT_SERVICES=services, INPUT_PYTHON_VERSIONS=pythons, INPUT_REGIONS=regions,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    flat, cohorts = json.loads(outputs["matrix"]), json.loads(outputs["cohorts"])
+    assert set(outputs) == {"matrix"}
+    flat = json.loads(outputs["matrix"])
     selected = SERVICES if services == "auto" else services.split(",")
     expected = set(itertools.product(selected, pythons.split(","), regions.split(",")))
 
     def identity(config):
         return config["service"], config["python"], config["region"]
 
-    assert len(flat) == len(expected)
-    assert {identity(config) for config in flat} == expected
-    owned = set(selected) & OWNED_SERVICES
-    group_services = ([owned] if owned else []) + ([{"ADU"}] if "ADU" in selected else [])
-    pairs = sorted(itertools.product(pythons.split(","), regions.split(",")))
-    assert len(cohorts) == len(pairs) * len(group_services)
-    assert [
-        (cohort["python"], cohort["region"], {config["service"] for config in cohort["configs"]})
-        for cohort in cohorts
-    ] == [(python, region, services) for python, region in pairs for services in group_services]
-    assert Counter(identity(config) for cohort in cohorts for config in cohort["configs"]) == Counter(
-        identity(config) for config in flat
-    )
+    assert Counter(identity(config) for config in flat) == Counter(expected)
     ceilings = {"DPS": 150, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 360}
-    for cohort in cohorts:
-        configs = cohort["configs"]
-        actual_services = {config["service"] for config in configs}
-        assert actual_services in group_services
-        assert len(configs) == len(actual_services) <= 4
-        assert actual_services <= OWNED_SERVICES or actual_services == {"ADU"}
-        assert {(config["python"], config["region"]) for config in configs} == {
-            (cohort["python"], cohort["region"]),
-        }
-        for config in configs:
-            assert config["timeout"] == ceilings[config["service"]]
-            assert config["tox_env"] == config["service"] + "-int"
-    assert outputs["live-scope"] == hashlib.sha256(f"{SUBSCRIPTION}/cli-int-test-rg".encode()).hexdigest()
+    job = _workflows()[0]["jobs"]["int-test"]
+    uploads = [step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
+    names, artifacts = [], []
+    for config in flat:
+        assert config["timeout"] == ceilings[config["service"]]
+        assert config["tox_env"] == config["service"] + "-int"
+
+        def render(template):
+            for key, value in config.items():
+                template = template.replace("${{ matrix.config." + key + " }}", str(value))
+            assert "${{" not in template
+            return template
+
+        names.append(render(job["name"]))
+        assert names[-1] == f"{config['service']} py{config['python']} ({config['region']})"
+        for step in uploads:
+            artifacts.append(render(step["with"]["name"]))
+        assert artifacts[-2:] == [
+            f"{prefix}-{config['service']}-py{config['python']}-{config['region']}"
+            for prefix in ("test-result", "coverage")
+        ]
+    assert len(set(names)) == len(expected)
+    assert len(set(artifacts)) == 2 * len(expected)
 
 
 @POSIX_WORKFLOW
@@ -291,27 +262,6 @@ def test_matrix_inputs_are_not_evaluated_as_shell_or_injected_into_json(tmp_path
 
 
 @POSIX_WORKFLOW
-def test_scope_lock_identity_is_case_insensitive_and_independent_of_selected_cohorts(tmp_path):
-    scopes = []
-    for index, overrides in enumerate((
-        {},
-        {"INPUT_SERVICES": "ADR,DPS,ADU", "INPUT_PYTHON_VERSIONS": "3.10,3.13",
-         "INPUT_REGIONS": "centraluseuap,westus"},
-        {"INPUT_SERVICES": "ADR", "RESOURCE_GROUP": "CLI-INT-TEST-RG",
-         "TEST_SUBSCRIPTION_ID": SUBSCRIPTION.upper()},
-        {"INPUT_SERVICES": "ADR", "RESOURCE_GROUP": "different-offline-rg"},
-        {"INPUT_SERVICES": "ADR", "TEST_SUBSCRIPTION_ID": "different-offline-subscription"},
-    )):
-        directory = tmp_path / str(index)
-        directory.mkdir()
-        result, outputs = _matrix(directory, **overrides)
-        assert result.returncode == 0, result.stdout + result.stderr
-        scopes.append(outputs["live-scope"])
-    assert scopes[0] == scopes[1] == scopes[2]
-    assert len({scopes[0], scopes[3], scopes[4]}) == 3
-
-
-@POSIX_WORKFLOW
 @pytest.mark.parametrize("selected", [(), ("ADR",), ("DPS", "HubControl", "HubData", "ADR"), SERVICES])
 def test_dispatch_toggles_keep_adu_and_adr_selection_independent(tmp_path, selected):
     names = {"HubControl": "HUB_CONTROL", "HubData": "HUB_DATA"}
@@ -332,7 +282,7 @@ def test_execution_and_result_shells_never_interpolate_raw_github_inputs():
             for step in job.get("steps", []):
                 if "run" in step:
                     assert "${{" not in step["run"], step["name"]
-    job = _workflows()[2]["jobs"]["service"]
+    job = _workflows()[0]["jobs"]["int-test"]
     assert job["timeout-minutes"] == "${{ matrix.config.timeout }}"
     assert job["env"] == {
         "TEST_SERVICE": "${{ matrix.config.service }}", "TEST_TOX_ENV": "${{ matrix.config.tox_env }}",
@@ -344,10 +294,10 @@ def test_execution_and_result_shells_never_interpolate_raw_github_inputs():
 
 @POSIX_WORKFLOW
 @pytest.mark.parametrize("status", ["success", "failure", "cancelled"])
-@pytest.mark.parametrize("service", ["ADR", "ADU"])
-def test_result_artifact_contract_survives_extraction_and_keeps_phase_evidence(tmp_path, status, service):
-    public, _, cohort = _workflows()
-    steps = {step["name"]: step for step in cohort["jobs"]["service"]["steps"]}
+@pytest.mark.parametrize("service", SERVICES)
+def test_result_artifact_contract_keeps_phase_evidence_in_direct_jobs(tmp_path, status, service):
+    public = _workflows()[0]
+    steps = {step["name"]: step for step in public["jobs"]["int-test"]["steps"]}
     for name in ("Record test result", "Upload test result", "Upload coverage artifact"):
         assert steps[name]["if"] == "${{ always() }}"
     record = steps["Record test result"]

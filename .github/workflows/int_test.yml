@@ -127,8 +127,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
-      cohorts: ${{ steps.matrix.outputs.cohorts }}
-      live-scope: ${{ steps.matrix.outputs.live-scope }}
     steps:
       - name: "Checkout source"
         uses: actions/checkout@v5
@@ -272,14 +270,6 @@ jobs:
             echo "::error::Select at most 256 unique service/Python/region combinations; duplicates are not allowed."
             exit 1
           fi
-          # Keep the original flat matrix for result/coverage qualification.
-          # Parallelize only DPS/HubControl/HubData/ADR. ADU's legacy Hub consumers
-          # run in a separate serial cohort after the owned services for each
-          # Python/region pair; omit empty cohorts, never selected matrix entries.
-          cohorts=$(echo "$matrix" | jq -c 'group_by(.python, .region) |
-            map([map(select(.service != "ADU")), map(select(.service == "ADU"))] |
-              .[] | select(length > 0) |
-              {python: .[0].python, region: .[0].region, configs: .})')
           echo ""
           echo "┌──────────────────────────────────────────────────────────┐"
           title="Test Matrix: $job_count job(s)"
@@ -291,10 +281,6 @@ jobs:
           echo "└───────────┴─────────┴──────────────┴─────────────────────┘"
           echo ""
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          echo "cohorts=$cohorts" >> "$GITHUB_OUTPUT"
-          # Hash normalized scope so Actions does not suppress an output containing a subscription secret.
-          scope=$(printf '%s/%s' "${TEST_SUBSCRIPTION_ID,,}" "${RESOURCE_GROUP,,}" | sha256sum | cut -d ' ' -f 1)
-          echo "live-scope=$scope" >> $GITHUB_OUTPUT
 
           # --- Write summary table ---
           echo "## Test Matrix ($(echo "$matrix" | jq length) jobs)" >> $GITHUB_STEP_SUMMARY
@@ -335,32 +321,169 @@ jobs:
           retention-days: 30
 
   int-test:
-    name: "Integration service bundle"
+    name: "${{ matrix.config.service }} py${{ matrix.config.python }} (${{ matrix.config.region }})"
     needs: [setup, unit-test]
     if: ${{ needs.setup.result == 'success' && needs.unit-test.result == 'success' && (needs.setup.outputs.matrix || '[]') != '[]' }}
-    # One lock holder per RUN, not per service or cohort. Keep the existing scope
-    # key so other same-scope callers remain mutually exclusive with this bundle.
-    # Internal workflows must not reacquire it: pending siblings could be cancelled.
-    # Serial cohorts bound the conservative reservation for the four selected
-    # DPS/HubControl/HubData/ADR services (18 extra Hubs / 5 extra DPS at the canary).
-    # That reservation does not qualify the all-five UI default: ADU is a separate
-    # serial Hub-consuming cohort under this same lock and needs its own headroom.
-    # This is scheduling, NOT admission: fresh headroom/foreign-consumer checks
-    # remain required. Neither the lock nor reservation counts authorize a run.
-    concurrency:
-      group: integration-live-${{ needs.setup.outputs.live-scope }}
-      cancel-in-progress: false
-    uses: ./.github/workflows/int_test_bundle.yml
-    with:
-      cohorts: ${{ needs.setup.outputs.cohorts }}
-      # Neither `env` nor `secrets` is supported in reusable-job inputs.
-      # Preserve an empty subscription input; the cohort resolves the secret fallback.
-      resource-group: ${{ inputs['resource-group'] || 'cli-int-test-rg' }}
-      subscription-id: ${{ inputs['subscription-id'] }}
-      dps-capacity-limit: ${{ inputs['dps-capacity-limit'] }}
-      adr-test-filter: ${{ inputs['adr-test-filter'] }}
-      adr-revoke-certificates: ${{ inputs['adr-revoke-certificates'] == true }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.config.timeout }}
+    # All selected service/Python/region combinations are independently eligible,
+    # including ADU. Owned controllers still sequence their internal auth phases.
+    # Scheduling is not admission: live scope/headroom checks remain required.
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJson(needs.setup.outputs.matrix || '[]') }}
+    env:
+      TEST_SERVICE: ${{ matrix.config.service }}
+      TEST_TOX_ENV: ${{ matrix.config.tox_env }}
+      TEST_PYTHON: ${{ matrix.config.python }}
+      TEST_REGION: ${{ matrix.config.region }}
+    steps:
+      - name: "Checkout source"
+        uses: actions/checkout@v5
+
+      - name: "Setup Python ${{ matrix.config.python }}"
+        uses: actions/setup-python@v6
+        with:
+          python-version: "${{ matrix.config.python }}"
+          cache: "pip" # Saves ~30-60s per matrix job by caching pip downloads
+
+      - name: "Build and install extension"
+        run: |
+          pip install -r dev_requirements
+          python -m build
+          az extension add --source ./dist/*.whl -y
+          # az CLI uses its own Python (e.g. 3.13) to install deps into the extension dir.
+          # Binary packages like rpds-py and cryptography have version-specific .so files
+          # that won't load under a different Python. Reinstall them for the test Python version.
+          ext_dir=$(az extension show -n azure-iot --query path -o tsv 2>/dev/null || echo "")
+          if [ -n "$ext_dir" ] && [ -d "$ext_dir" ]; then
+            pip install --target "$ext_dir" --upgrade --force-reinstall --no-deps rpds-py cryptography
+          fi
+
+      - name: "Setup tox test environment"
+        run: |
+          pip install tox
+          if [ "$TEST_SERVICE" = "DPS" ]; then
+            tox r -vv -e DPS-phases,DPS-int --notest
+          else
+            tox r -vv -e "$TEST_TOX_ENV" --notest
+          fi
+
+      - name: "Az CLI login"
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.TEST_SUBSCRIPTION_ID }}
+
+      - name: "Verify Azure access"
+        run: |
+          az account set --subscription "$TEST_SUBSCRIPTION_ID"
+          az account show -o table
+          az group show \
+            --subscription "$TEST_SUBSCRIPTION_ID" \
+            --name "$RESOURCE_GROUP" \
+            --output table
+
+      - name: "OIDC Token refresh service"
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          while true; do
+            token_request=$ACTIONS_ID_TOKEN_REQUEST_TOKEN
+            token_uri=$ACTIONS_ID_TOKEN_REQUEST_URL
+            token=$(curl -sH "Authorization: bearer $token_request" "${token_uri}&audience=api://AzureADTokenExchange" | jq .value -r)
+            az login --service-principal -u "$AZURE_CLIENT_ID" -t "$AZURE_TENANT_ID" --federated-token "$token" --output none
+            az account set --subscription "$TEST_SUBSCRIPTION_ID"
+            sleep 240
+          done &
+
+      - name: "Run ${{ matrix.config.service }} integration tests"
+        id: run_tests
+        env:
+          AZURE_TEST_RUN_LIVE: "True"
+          PYTHONUNBUFFERED: "1"
+          azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
+          azext_iot_testhub_location: ${{ matrix.config.region }}
+          azext_iot_hub_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
+          AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
+          AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
+          azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
+          azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
+          azext_iot_adr_location: ${{ matrix.config.region }}
+          azext_iot_adr_revoke_certificates: ${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}
+          ADR_TEST_FILTER: ${{ inputs['adr-test-filter'] }}
+          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
+        run: |
+          set -o pipefail
+          run_service() {
+            if [ "$TEST_SERVICE" = "DPS" ]; then
+              echo "DPS coverage: regular (including owned CSR issuance), service-SAS and serial local-auth-toggle."
+              .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
+                --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
+                --region "$TEST_REGION" --dps-capacity-limit "$DPS_CAPACITY_LIMIT"
+            elif [ "$TEST_SERVICE" = "ADR" ] && [ -n "$ADR_TEST_FILTER" ]; then
+              # Reject malformed expressions before wrapping, so parentheses cannot escape the integration-only guard.
+              .tox/ADR-int/bin/python -c \
+                'import os; from _pytest.mark.expression import Expression; Expression.compile(os.environ["ADR_TEST_FILTER"])' \
+                || return $?
+              tox r -e "$TEST_TOX_ENV" --skip-pkg-install -- \
+                -k "(_int.py) and (${ADR_TEST_FILTER})"
+            else
+              tox r -e "$TEST_TOX_ENV" --skip-pkg-install
+            fi
+          }
+          run_service 2>&1 | \
+            sed -u 's/SharedAccessKey=[^;& "'"'"']*//g; s/AccountKey=[^;& "'"'"']*//g; s/sig=[^&"]*//g' | \
+            sed -u 's/\("primaryKey"\s*:\s*\)"[^"]*"/\1"***"/g; s/\("secondaryKey"\s*:\s*\)"[^"]*"/\1"***"/g' | \
+            sed -u 's/--pk [^ ]*/--pk ***/g; s/--sk [^ ]*/--sk ***/g; s/--key [^ ]*/--key ***/g' | \
+            sed -u 's/--login [^ ]*/--login ***/g; s/-l [^ ]*/--login ***/g; s/--connection-string [^ ]*/--connection-string ***/g' | \
+            tee test-output.log
+
+      - name: "Record test result"
+        if: ${{ always() }}
+        env:
+          TEST_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p test-result
+          printf '%s\n' "$TEST_STATUS" > test-result/status.txt
+          printf '%s\n' "$TEST_SERVICE" > test-result/service.txt
+          printf '%s\n' "$TEST_PYTHON" > test-result/python.txt
+          printf '%s\n' "$TEST_REGION" > test-result/region.txt
+          # ADR persists metadata-only outcomes before every phase hook returns.
+          # Never overwrite them with an empty final-summary scrape after cancellation.
+          if [ "$TEST_SERVICE" = "ADR" ]; then
+            if [ ! -f test-result/integration-outcomes.json ] || [ ! -f test-result/failures.txt ]; then
+              printf '%s\n' 'ADR incremental test evidence is missing; execution/coverage is unproven.' >> test-result/failures.txt
+            elif [ "$TEST_STATUS" != "success" ] && [ ! -s test-result/failures.txt ]; then
+              printf '%s\n' 'ADR job did not succeed; inspect status.txt and integration-outcomes.json.' >> test-result/failures.txt
+            fi
+          elif [ -f test-output.log ]; then
+            grep -E '^(FAILED|ERROR) azext_iot/tests/[^ ]+::' test-output.log | \
+              sed 's/^FAILED //;s/^ERROR //;s/ - .*$//' > test-result/failures.txt || true
+          fi
+          touch test-result/failures.txt
+
+      - name: "Upload test result"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-result-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
+          overwrite: true
+          path: test-result/
+          retention-days: 1
+
+      - name: "Upload coverage artifact"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
+          overwrite: true
+          path: ./.coverage
+          include-hidden-files: true
+          retention-days: 30
 
   int-test-gate:
     name: "Integration test gate"

@@ -7,6 +7,7 @@
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import textwrap
@@ -195,24 +196,26 @@ def test_incremental_option_rejects_parallel_writers_before_starting_pytest(mock
 
 
 def _record_step():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test_cohort.yml").read_text())
-    return next(step for step in workflow["jobs"]["service"]["steps"] if step["name"] == "Record test result")
+    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text())
+    return next(step for step in workflow["jobs"]["int-test"]["steps"] if step["name"] == "Record test result")
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow record step.")
-@pytest.mark.parametrize("receipt", ["failed", "cancelled", "missing", "passed"])
+@pytest.mark.parametrize("receipt", ["failed", "cancelled", "missing", "passed", "not-started", "no-selection"])
 def test_actual_workflow_record_step_preserves_incremental_adr_evidence(tmp_path, receipt):
     directory = tmp_path / "test-result"
     if receipt != "missing":
         writer = IntegrationResults(directory)
-        writer.select([NODE])
-        writer.start(NODE)
-        for phase in ("setup", "call", "teardown"):
-            _report(writer, when=phase, outcome="failed" if receipt == "failed" and phase == "call" else "passed")
+        if receipt != "no-selection":
+            writer.select([NODE])
+        if receipt not in ("not-started", "no-selection"):
+            writer.start(NODE)
+            for phase in ("setup", "call", "teardown"):
+                _report(writer, when=phase, outcome="failed" if receipt == "failed" and phase == "call" else "passed")
         if receipt != "cancelled":
             writer.finish(1 if receipt == "failed" else 0)
     (tmp_path / "test-output.log").write_text("No final pytest summary was emitted.\n")
-    status = {"failed": "failure", "cancelled": "cancelled", "missing": "cancelled", "passed": "success"}[receipt]
+    status = {"failed": "failure", "cancelled": "cancelled"}.get(receipt, "success")
     result = subprocess.run(
         ["bash", "-c", _record_step()["run"]], cwd=tmp_path,
         env=dict(os.environ, TEST_SERVICE="ADR", TEST_STATUS=status, TEST_PYTHON="3.13", TEST_REGION="centraluseuap"),
@@ -228,6 +231,13 @@ def test_actual_workflow_record_step_preserves_incremental_adr_evidence(tmp_path
     elif receipt == "missing":
         assert "missing" in failures
     assert (directory / "status.txt").read_text().strip() == status
+    evaluate = runpy.run_path(str(ROOT / "azext_iot/tests/_evaluate_test_results.py"))["evaluate_results"]
+    summary, errors = evaluate(
+        directory, [{"service": "ADR", "python": "3.13", "region": "centraluseuap"}],
+        {"setup": "success", "unit-test": "success", "int-test": "success", "gate preparation": "success"},
+    )
+    assert bool(errors) == (receipt != "passed")
+    assert ("### Passed" in summary) == (receipt == "passed")
 
 
 def test_only_adr_tox_enables_incremental_serial_receipts():

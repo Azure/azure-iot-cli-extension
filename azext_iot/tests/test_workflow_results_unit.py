@@ -234,8 +234,6 @@ def test_workflow_failure_propagation_is_wired():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     assert not jobs["int-test"].get("continue-on-error", False)
-    bundle = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_bundle.yml").read_text(encoding="utf-8"))
-    assert bundle["jobs"]["cohort"]["strategy"]["fail-fast"] is False
     assert _integration_service_job()["strategy"]["fail-fast"] is False
     assert not _integration_service_job().get("continue-on-error", False)
     gate = jobs["int-test-gate"]
@@ -249,6 +247,26 @@ def test_workflow_failure_propagation_is_wired():
     summaries = [step for step in jobs["combine-coverage"]["steps"] if step["name"] == "Write job summary"]
     assert summaries[0] is jobs["combine-coverage"]["steps"][-1]
     assert "job.status" in summaries[0]["env"]["COVERAGE_RESULT"]
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow summary shell.")
+@pytest.mark.parametrize("field", ["SETUP_RESULT", "UNIT_TEST_RESULT", "INTEGRATION_RESULT", "GATE_RESULT", "COVERAGE_RESULT"])
+@pytest.mark.parametrize("status", ["success", "failure", "cancelled", "skipped", ""])
+def test_coverage_summary_cannot_mask_missing_cancelled_or_failed_independent_gates(tmp_path, field, status):
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    coverage = workflow["jobs"]["combine-coverage"]
+    assert coverage["needs"] == ["setup", "unit-test", "int-test", "int-test-gate"]
+    summary = coverage["steps"][-1]
+    assert summary["name"] == "Write job summary" and summary["if"] == "${{ always() }}"
+    environment = {name: "success" for name in summary["env"]}
+    environment[field] = status
+    path = tmp_path / "summary"
+    result = subprocess.run(
+        ["bash", "-c", summary["run"]], cwd=tmp_path, capture_output=True, text=True, timeout=10, check=False,
+        env=dict(os.environ, **environment, GITHUB_STEP_SUMMARY=str(path)),
+    )
+    assert (result.returncode == 0) is (status == "success"), result.stderr
+    assert ("All workflow checks passed" in path.read_text()) is (status == "success")
 
 
 def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
@@ -266,7 +284,7 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
-def test_adr_budget_reaches_service_job_without_a_shorter_reusable_caller_ceiling():
+def test_adr_budget_applies_directly_to_service_job():
     from azext_iot.tests.adr._helpers import SU_LIFECYCLE_TIMEOUT
     from azext_iot.tests.adr.test_adr_link_int import _SU_LINK_LIFECYCLE_TIMEOUT
 
@@ -278,12 +296,7 @@ def test_adr_budget_reaches_service_job_without_a_shorter_reusable_caller_ceilin
     assert _SU_LINK_LIFECYCLE_TIMEOUT == 175 * 60
     # Observed non-SU prefix ~52m, two remaining 15m cases and 10m reporting margin.
     assert budget * 60 >= _SU_LINK_LIFECYCLE_TIMEOUT + SU_LIFECYCLE_TIMEOUT + (53 + 30 + 10) * 60
-    outer = workflow["jobs"]["int-test"]
-    bundle = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_bundle.yml").read_text(encoding="utf-8"))
-    cohort = bundle["jobs"]["cohort"]
-    assert outer["uses"] == "./.github/workflows/int_test_bundle.yml"
-    assert cohort["uses"] == "./.github/workflows/int_test_cohort.yml"
-    assert "timeout-minutes" not in outer and "timeout-minutes" not in cohort
+    assert "uses" not in workflow["jobs"]["int-test"]
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
@@ -309,12 +322,44 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
 
 
 def _integration_service_job():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test_cohort.yml").read_text(encoding="utf-8"))
-    return workflow["jobs"]["service"]
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    return workflow["jobs"]["int-test"]
 
 
 def _integration_run_step():
     return next(step for step in _integration_service_job()["steps"] if step.get("id") == "run_tests")
+
+
+def test_direct_job_preserves_installed_extension_and_service_environment():
+    job = _integration_service_job()
+    steps = {step["name"]: step for step in job["steps"]}
+    install = steps["Build and install extension"]["run"]
+    assert "python -m build" in install
+    assert "az extension add --source ./dist/*.whl -y" in install
+    assert "az extension show -n azure-iot --query path -o tsv" in install
+    assert 'pip install --target "$ext_dir" --upgrade --force-reinstall --no-deps rpds-py cryptography' in install
+    run = _integration_run_step()
+    assert run["env"] == {
+        "AZURE_TEST_RUN_LIVE": "True", "PYTHONUNBUFFERED": "1",
+        "azext_iot_testrg": "${{ env.RESOURCE_GROUP }}",
+        "azext_iot_testhub_location": "${{ matrix.config.region }}",
+        "azext_iot_hub_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
+        "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE": "login",
+        "AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE": "login",
+        "azext_iot_adr_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
+        "azext_iot_adr_resource_group": "${{ env.RESOURCE_GROUP }}",
+        "azext_iot_adr_location": "${{ matrix.config.region }}",
+        "azext_iot_adr_revoke_certificates": (
+            "${{ matrix.config.service == 'ADR' && inputs['adr-revoke-certificates'] == true && 'true' || 'false' }}"
+        ),
+        "ADR_TEST_FILTER": "${{ inputs['adr-test-filter'] }}",
+        "DPS_CAPACITY_LIMIT": "${{ inputs['dps-capacity-limit'] }}",
+    }
+    assert steps["Az CLI login"]["with"] == {
+        "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
+        "subscription-id": "${{ env.TEST_SUBSCRIPTION_ID }}",
+    }
+    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["OIDC Token refresh service"]["run"]
 
 
 def test_adr_revocation_workflow_opt_in_is_typed_default_off_and_adr_only():
@@ -398,15 +443,14 @@ def test_adr_workflow_filter_changes_only_nonempty_adr_posargs(tmp_path, service
 
 def test_capacity_input_defaults_and_trusted_evaluator_forwarding():
     workflows = [yaml.safe_load((REPOSITORY_ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
-                 for name in ("int_test.yml", "int_test_bundle.yml", "int_test_cohort.yml", "release_workflow.yml")]
+                 for name in ("int_test.yml", "release_workflow.yml")]
     for workflow in workflows:
         triggers = workflow.get("on", workflow.get(True))
         for trigger in triggers.values():
             setting = trigger["inputs"]["dps-capacity-limit"]
             assert setting["type"] == "string" and setting["default"] == "10" and setting["required"] is False
-    public, bundle, _cohort, release = workflows
-    for job in (public["jobs"]["int-test"], bundle["jobs"]["cohort"], release["jobs"]["int_test"]):
-        assert job["with"]["dps-capacity-limit"] == "${{ inputs['dps-capacity-limit'] }}"
+    public, release = workflows
+    assert release["jobs"]["int_test"]["with"]["dps-capacity-limit"] == "${{ inputs['dps-capacity-limit'] }}"
     run = _integration_run_step()
     assert run["env"]["DPS_CAPACITY_LIMIT"] == "${{ inputs['dps-capacity-limit'] }}"
     assert '--dps-capacity-limit "$DPS_CAPACITY_LIMIT"' in run["run"]
@@ -448,9 +492,10 @@ def test_adr_workflow_rejects_invalid_or_shell_input_without_running_tox(tmp_pat
 
 
 @pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
+@pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData", "ADU"])
 @pytest.mark.parametrize("exit_code", [1, 4, 5])
-def test_adr_workflow_preserves_failure_usage_and_no_selection_exit_codes(tmp_path, exit_code):
-    result = _run_integration_shell(tmp_path, "ADR", "test_job", exit_code)
+def test_workflow_preserves_failure_usage_and_no_selection_exit_codes(tmp_path, service, exit_code):
+    result = _run_integration_shell(tmp_path, service, "test_job", exit_code)
     assert result.returncode == exit_code
 
 
@@ -549,7 +594,7 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 
-def test_hub_workflow_uses_two_public_suites_and_one_scoped_bundle():
+def test_hub_workflow_uses_two_public_suites_in_the_direct_matrix():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
     inputs = triggers["workflow_dispatch"]["inputs"]
@@ -559,14 +604,9 @@ def test_hub_workflow_uses_two_public_suites_and_one_scoped_bundle():
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
     assert step["env"]["INPUT_TEST_HUB_CONTROL"] == "${{ inputs.testHubControl }}"
     job = workflow["jobs"]["int-test"]
-    assert "strategy" not in job
-    assert job["uses"] == "./.github/workflows/int_test_bundle.yml"
-    assert job["concurrency"]["cancel-in-progress"] is False
-    assert job["concurrency"]["group"] == "integration-live-${{ needs.setup.outputs.live-scope }}"
-    service = _integration_service_job()
-    assert "concurrency" not in service
-    assert "max-parallel" not in service["strategy"]
-    assert '"${TEST_SUBSCRIPTION_ID,,}" "${RESOURCE_GROUP,,}" | sha256sum' in step["run"]
+    assert job["strategy"]["matrix"] == {"config": "${{ fromJson(needs.setup.outputs.matrix || '[]') }}"}
+    assert "concurrency" not in workflow and "concurrency" not in job
+    assert "max-parallel" not in job["strategy"]
     env = _integration_run_step()["env"]
     assert env["azext_iot_testhub_location"] == "${{ matrix.config.region }}"
     assert env["azext_iot_hub_subscription"] == "${{ env.TEST_SUBSCRIPTION_ID }}"

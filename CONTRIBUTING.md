@@ -181,7 +181,7 @@ use the existing DPS/Hub fixtures; native linking creates only its required
 service-to-service roles. No first-party Graph/Device Update grant is added.
 
 Regular runtime/cleanup budgets are 45/10 minutes; the full controller is bounded
-at 140 minutes within the 150-minute CI cohort. Cleanup is never skipped or
+at 140 minutes within the 150-minute CI service job. Cleanup is never skipped or
 converted into a pass: policy, issuing CA, root CA, namespace, DPS, then Hub are
 removed in dependency order with exact ownership receipts and final ARM absence
 evidence. Before registration submission, persist the unique enrollment/device

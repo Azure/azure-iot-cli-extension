@@ -4,8 +4,8 @@ run-name: "Dispatch integration tests → ${{ github.event_name == 'schedule' &&
 on:
     schedule:
         # Same schedule every day (weekday or weekend): two runs per day.
-        # Full serial qualification can span both slots. Same-scope live jobs use
-        # the integration workflow's non-cancelling resource concurrency group.
+        # Integration runs can span both slots; the flat matrix does not serialize
+        # services or same-scope runs. Live scope/headroom checks still apply.
         - cron: "17 8 * * *" # ~00:17 AM PT nightly (08:17 UTC) → preview
         - cron: "17 12 * * *" # ~04:17 AM PT early morning (12:17 UTC) → dev
     workflow_dispatch:
