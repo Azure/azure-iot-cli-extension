@@ -731,7 +731,10 @@ def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker, unlink_on_r
 @pytest.mark.timeout(15)
 @pytest.mark.parametrize("outcome", ["success", "uncertain-visible", "uncertain", "cancelled", "terminated"])
 @pytest.mark.parametrize("release_delay", [0.05, 0.75], ids=["normal", "delayed-release"])
-def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocker, outcome, release_delay):
+@pytest.mark.parametrize("preflight_delay", [0, 0.75], ids=["fast-preflight", "slow-preflight"])
+def test_role_grant_real_workers_serialize_and_never_replay_attempt(
+    scope, mocker, outcome, release_delay, preflight_delay,
+):
     from azext_iot.tests import helpers
 
     owned = _owned("hub").removeprefix(ARM)
@@ -746,6 +749,9 @@ def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocke
         assert kwargs.get("assignee") == "caller-alias" or kwargs.get("assignee_object_id") == SUB_A
         with reads.get_lock():
             reads.value += 1
+            first_read = reads.value == 1
+        if first_read:
+            time.sleep(preflight_delay)
         return [{"principalId": SUB_A}] if visible.value else []
 
     def create(*_args, **_kwargs):
@@ -768,9 +774,9 @@ def test_role_grant_real_workers_serialize_and_never_replay_attempt(scope, mocke
         if label == "waiter":
             waiter_started.set()
         try:
-            # Successful contention must tolerate process scheduling and receipt fsync.
-            # Deadline behavior is covered independently; negative visibility cases stay short.
-            max_tries = 100 if outcome in ("success", "uncertain-visible") else 10
+            # Every owner must survive preflight long enough to exercise its create outcome.
+            # Successful waiters tolerate scheduling; negative visibility deadlines stay short.
+            max_tries = 100 if label == "owner" or outcome in ("success", "uncertain-visible") else 10
             runtime.assign_role_assignment_once("role", owned, "caller-alias", max_tries=max_tries, wait=0.05)
         except BaseException as error:  # pylint: disable=broad-except
             results.put((label, type(error).__name__))
