@@ -41,6 +41,11 @@ on:
         type: string
         required: false
         default: ""
+      dps-capacity-limit:
+        description: "Confirmed DPS instance limit for the selected subscription/run; otherwise keep 10."
+        type: string
+        required: false
+        default: "10"
     secrets:
       AZURE_CLIENT_ID:
         required: true
@@ -101,6 +106,11 @@ on:
         type: string
         required: false
         default: "a386d5ea-ea90-441a-8263-d816368c84a1"
+      dps-capacity-limit:
+        description: "Confirmed DPS instance limit for the selected subscription/run; otherwise keep 10."
+        type: string
+        required: false
+        default: "10"
 
 permissions:
   contents: "read"
@@ -125,6 +135,13 @@ jobs:
         with:
           sparse-checkout: |
             azext_iot/tests
+
+      - name: "Validate DPS capacity limit"
+        env:
+          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
+        run: >-
+          python3 -c 'import os, runpy;
+          runpy.run_path("azext_iot/tests/dps/_phase_manifest.py")["parse_capacity_limit"](os.environ["DPS_CAPACITY_LIMIT"])'
 
       - name: "Build test matrix"
         id: matrix
@@ -340,6 +357,7 @@ jobs:
       # Preserve an empty subscription input; the cohort resolves the secret fallback.
       resource-group: ${{ inputs['resource-group'] || 'cli-int-test-rg' }}
       subscription-id: ${{ inputs['subscription-id'] }}
+      dps-capacity-limit: ${{ inputs['dps-capacity-limit'] }}
       adr-test-filter: ${{ inputs['adr-test-filter'] }}
       adr-revoke-certificates: ${{ inputs['adr-revoke-certificates'] == true }}
     secrets: inherit
@@ -368,7 +386,10 @@ jobs:
           UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
           INTEGRATION_RESULT: ${{ needs.int-test.result }}
           GATE_JOB_RESULT: ${{ job.status }}
-        run: python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results
+          DPS_CAPACITY_LIMIT: ${{ inputs['dps-capacity-limit'] }}
+        run: >-
+          python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results
+          --expected-dps-capacity-limit "$DPS_CAPACITY_LIMIT"
 
   combine-coverage:
     name: "Combine coverage reports"

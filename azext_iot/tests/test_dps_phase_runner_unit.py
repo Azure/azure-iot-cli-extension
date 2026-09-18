@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import subprocess
 import sys
 import time
 from types import SimpleNamespace
@@ -255,6 +256,137 @@ def test_insufficient_initial_capacity_blocks_both_phases(tmp_path, mocker):
     execute = mocker.Mock()
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(9), execute=execute) == 1
     execute.assert_not_called()
+
+
+@pytest.mark.parametrize("count,limit,ready", [
+    (9, 10, False), (7, 100, True), (9, 100, True), (98, 100, True), (99, 100, False), (100, 100, False),
+])
+def test_explicit_subscription_limit_preserves_preview_two_slot_admission(tmp_path, mocker, count, limit, ready):
+    execute = mocker.Mock(side_effect=_execution)
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(count), execute=execute, capacity_limit=limit) == (
+        0 if ready else 1
+    )
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    assert summary["baseline"]["capacity"]["limit"] == limit
+    assert summary["baseline"]["capacity"]["required"] == 2
+    assert summary["baseline"]["capacity"]["ready"] is ready
+    if not ready:
+        execute.assert_not_called()
+        return
+    assert "operator-confirmed" in summary["baseline"]["capacity"]["limit_source"]
+    assert [phase["gate"]["capacity"]["required"] for phase in summary["phases"][1:]] == [2, 1]
+    assert all(phase["gate"]["capacity"]["limit"] == limit for phase in summary["phases"][1:])
+    assert all(phase["cleanup"]["capacity"]["limit"] == limit for phase in summary["phases"])
+    assert all(phase["cleanup"]["capacity"]["required"] == 2 for phase in summary["phases"])
+    assert not GATE(tmp_path, expected_capacity_limit=limit)
+    assert GATE(tmp_path)
+
+
+@pytest.mark.parametrize("phase,count,ready", [
+    ("regular", 98, True), ("regular", 99, False), ("service-sas", 99, True), ("service-sas", 100, False),
+])
+def test_override_fresh_gates_recheck_inventory_under_same_limit(tmp_path, phase, count, ready):
+    reader = Reader(7)
+
+    def execute(*args):
+        result = _execution(*args)
+        if args[1]["azext_iot_dps_test_phase"] == phase:
+            reader.resources = Reader(count).resources
+        return result
+
+    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute, capacity_limit=100)
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    next_phase = summary["phases"][1 if phase == "regular" else 2]
+    assert next_phase["gate"]["capacity"]["limit"] == 100
+    assert next_phase["gate"]["capacity"]["ready"] is ready
+    assert status == (0 if ready else 1)
+    assert bool(GATE(tmp_path, expected_capacity_limit=100)) is not ready
+
+
+@pytest.mark.parametrize("invalid", [
+    None, True, False, 0, -1, 10.0, "", "0", "-1", "010", "1.0", "1e2", " 100", "100 ",
+    "NaN", "\uff11\uff10\uff10", "True", [], {}, b"100",
+])
+def test_invalid_capacity_limit_fails_before_artifacts_inventory_or_execution(tmp_path, mocker, invalid):
+    reader, execute = mocker.Mock(), mocker.Mock()
+    with pytest.raises(ValueError, match="capacity limit"):
+        RUN(SUB, GROUP, tmp_path / "must-not-exist", reader, execute=execute, capacity_limit=invalid)
+    with pytest.raises(ValueError, match="capacity limit"):
+        RUNNER["capacity"]([], limit=invalid)
+    with pytest.raises(ValueError, match="capacity limit"):
+        RUNNER["verify_cleanup"](reader, [], "uid", 0, limit=invalid)
+    with pytest.raises(ValueError, match="capacity limit"):
+        GATE(tmp_path, expected_capacity_limit=invalid)
+    reader.inventory.assert_not_called()
+    reader.get.assert_not_called()
+    execute.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
+def test_ambient_limit_cannot_override_explicit_run_default(tmp_path, mocker, monkeypatch):
+    monkeypatch.setenv("DPS_CAPACITY_LIMIT", "100")
+    execute = mocker.Mock()
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(9), execute=execute) == 1
+    execute.assert_not_called()
+    assert json.loads((tmp_path / "dps-phases.json").read_text())["baseline"]["capacity"]["limit"] == 10
+
+
+@pytest.mark.parametrize("value", [None, "100", "1", "0", "-1", "10.0", "", "True"])
+def test_runner_cli_limit_is_validated_before_authentication(mocker, value):
+    arguments = ["runner", "--subscription", SUB, "--resource-group", GROUP]
+    if value is not None:
+        arguments += ["--dps-capacity-limit", value]
+    reader, execute, platform_check = mocker.Mock(), mocker.Mock(return_value=0), mocker.Mock()
+    mocker.patch.object(sys, "argv", arguments)
+    mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute,
+                      bounded_read=nullcontext, require_linux=platform_check)
+    if value in (None, "100", "1"):
+        assert RUNNER["main"]() == 0
+        platform_check.assert_called_once_with()
+        assert execute.call_args.kwargs["capacity_limit"] == (10 if value is None else int(value))
+    else:
+        with pytest.raises(SystemExit) as error:
+            RUNNER["main"]()
+        assert error.value.code == 2
+        platform_check.assert_not_called()
+        reader.assert_not_called()
+        execute.assert_not_called()
+
+
+@pytest.mark.parametrize("section", ["baseline", "regular-cleanup", "sas-gate", "sas-cleanup", "toggle-gate", "toggle-cleanup"])
+@pytest.mark.parametrize("untrusted", [10, 101, "100", 100.0, True, None])
+def test_independent_expected_limit_rejects_tampering_in_every_capacity_receipt(tmp_path, section, untrusted):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(7), execute=_execution, capacity_limit=100) == 0
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    if section == "baseline":
+        summary["baseline"]["capacity"]["limit"] = untrusted
+    else:
+        name, field = section.split("-")
+        phase = summary["phases"][{"regular": 0, "sas": 1, "toggle": 2}[name]]
+        phase[field]["capacity"]["limit"] = untrusted
+        _json(tmp_path / "dps-phases" / phase["name"] / "result.json", phase)
+    _json(tmp_path / "dps-phases.json", summary)
+    assert GATE(tmp_path, expected_capacity_limit=100)
+
+
+@pytest.mark.parametrize("expected", [None, "100", "10", "101", "0", "", "100.0"])
+def test_independent_evaluator_cli_binds_trusted_expected_limit(tmp_path, expected):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(7), execute=_execution, capacity_limit=100) == 0
+    for field, value in (("service", "DPS"), ("python", "3.13"), ("region", "centraluseuap"),
+                         ("status", "success"), ("failures", "")):
+        (tmp_path / f"{field}.txt").write_text(value, encoding="utf-8")
+    command = [sys.executable, "-I", "-S", str(ROOT / "azext_iot/tests/_evaluate_test_results.py"),
+               "--results-dir", str(tmp_path)]
+    if expected is not None:
+        command += ["--expected-dps-capacity-limit", expected]
+    result = subprocess.run(
+        command, cwd=tmp_path, capture_output=True, text=True, timeout=20, check=False,
+        env=dict(os.environ, INTEGRATION_MATRIX=json.dumps([{
+            "service": "DPS", "python": "3.13", "region": "centraluseuap",
+        }]), SETUP_RESULT="success", UNIT_TEST_RESULT="success", INTEGRATION_RESULT="success",
+            GATE_JOB_RESULT="success", GITHUB_STEP_SUMMARY=str(tmp_path / "gate-summary")),
+    )
+    assert result.returncode == (0 if expected == "100" else 2 if expected in ("0", "", "100.0") else 1)
 
 
 @pytest.mark.parametrize("state", ["Deleting", "Succeeded"])

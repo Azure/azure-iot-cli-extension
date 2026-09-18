@@ -232,7 +232,7 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, capacity_limit=10):
     chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
 
@@ -275,7 +275,7 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=phase, debug_nodes=chosen, capacity_limit=capacity_limit)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
 
 
@@ -295,12 +295,30 @@ def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, m
     assert "UNSAFE_CAPTURED_CREDENTIAL" not in (tmp_path / "dps-phases" / phase / "junit.xml").read_text()
 
 
+@pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
+@pytest.mark.parametrize("count", [98, 99])
+def test_explicit_limit_keeps_preview_debug_two_slot_policy_and_nonqualification(tmp_path, monkeypatch, phase, count):
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, phase, reader=DpsReader(count), capacity_limit=100,
+    )
+    assert result == (0 if count == 98 else 1)
+    assert summary["qualifiesFullSuite"] is False
+    assert summary["baseline"]["capacity"]["required"] == 2
+    assert summary["baseline"]["capacity"]["limit"] == 100
+    assert len(captured) == (1 if count == 98 else 0)
+    assert GATE["evaluate_dps_phases"](tmp_path, expected_capacity_limit=100)
+    if captured:
+        assert summary["phases"][0]["cleanup"]["capacity"]["required"] == 2
+        assert summary["phases"][0]["cleanup"]["capacity"]["limit"] == 100
+
+
+@pytest.mark.parametrize("limit", [10, 100])
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
 ])
-def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect):
-    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect)
+def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect, limit):
+    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect, capacity_limit=limit)
     assert result == 1 and summary["status"] == "debug-failed"
     if defect == "uncertain":
         assert summary["phases"][0]["cleanup"]["complete"] is False

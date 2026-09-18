@@ -112,6 +112,7 @@ def test_internal_calls_use_supported_keywords_and_forward_typed_inputs_and_oidc
         assert declared["adr-revoke-certificates"]["default"] is False
         assert declared["resource-group"] == {"type": "string", "required": True}
         assert declared["subscription-id"] == {"type": "string", "required": False, "default": ""}
+        assert declared["dps-capacity-limit"] == {"type": "string", "required": False, "default": "10"}
         assert "inputs['adr-test-filter']" in caller["with"]["adr-test-filter"]
         assert "inputs['adr-revoke-certificates']" in caller["with"]["adr-revoke-certificates"]
         assert triggers["workflow_call"]["secrets"] == {
@@ -124,7 +125,7 @@ def test_internal_calls_use_supported_keywords_and_forward_typed_inputs_and_oidc
     # only in workflow env, identically for root setup's scope hash and the cohort.
     assert callers[0]["with"]["resource-group"] == public["env"]["RESOURCE_GROUP"]
     assert callers[0]["with"]["subscription-id"] == "${{ inputs['subscription-id'] }}"
-    for name in ("resource-group", "subscription-id"):
+    for name in ("resource-group", "subscription-id", "dps-capacity-limit"):
         assert callers[1]["with"][name] == "${{ inputs['" + name + "'] }}"
     assert cohort["env"] == {
         "RESOURCE_GROUP": "${{ inputs['resource-group'] }}",
@@ -135,6 +136,7 @@ def test_internal_calls_use_supported_keywords_and_forward_typed_inputs_and_oidc
     assert set(_triggers(public)["workflow_dispatch"]["inputs"]) == {
         *(f"test{service}" for service in SERVICES),
         "adr-test-filter", "adr-revoke-certificates", "python-versions", "regions", "resource-group", "subscription-id",
+        "dps-capacity-limit",
     }
 
 

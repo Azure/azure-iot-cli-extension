@@ -17,6 +17,10 @@ on:
         type: string
         required: false
         default: ""
+      dps-capacity-limit:
+        type: string
+        required: false
+        default: "10"
       adr-test-filter:
         type: string
         default: ""
@@ -53,6 +57,7 @@ jobs:
       configs: ${{ toJson(matrix.cohort.configs) }}
       resource-group: ${{ inputs['resource-group'] }}
       subscription-id: ${{ inputs['subscription-id'] }}
+      dps-capacity-limit: ${{ inputs['dps-capacity-limit'] }}
       adr-test-filter: ${{ inputs['adr-test-filter'] }}
       adr-revoke-certificates: ${{ inputs['adr-revoke-certificates'] }}
     secrets: inherit

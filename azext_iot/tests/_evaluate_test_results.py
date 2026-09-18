@@ -19,8 +19,9 @@ MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[2] / "azext_iot/t
 FOCUSED = runpy.run_path(str(Path(__file__).resolve().with_name("_focused_live.py")))
 
 
-def evaluate_dps_phases(result_dir):
+def evaluate_dps_phases(result_dir, *, expected_capacity_limit=MANIFEST["DPS_LIMIT"]):
     """Do not trust a green job/last tox exit without every phase and cleanup evidence."""
+    expected_capacity_limit = MANIFEST["parse_capacity_limit"](expected_capacity_limit)
     errors = []
     try:
         receipt = json.loads((result_dir / "dps-phases.json").read_text(encoding="utf-8"))
@@ -32,6 +33,12 @@ def evaluate_dps_phases(result_dir):
                 or not receipt["baseline"]["capacity"]["ready"]):
             raise ValueError("incomplete/failed DPS phase summary")
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
+        admission = receipt["baseline"]["capacity"]
+        if (admission["required"] != MANIFEST["REQUIRED_DPS_SLOTS"]
+                or type(admission["limit"]) is not int or admission["limit"] != expected_capacity_limit
+                or admission["count"] != len(baseline) or set(admission["ids"]) != baseline
+                or admission["count"] + admission["required"] > expected_capacity_limit):
+            raise ValueError("full DPS qualification requires two-slot admission under the trusted expected limit")
         for phase in phases:
             if not FOCUSED["matches"](phase, None):
                 raise ValueError("focused/debug phase cannot qualify the full DPS suite")
@@ -45,6 +52,10 @@ def evaluate_dps_phases(result_dir):
             if stages.exists() and not FOCUSED["matches"](json.loads(stages.read_text(encoding="utf-8")), None):
                 raise ValueError("focused/debug stage evidence cannot qualify the full DPS suite")
             cleanup = phase["cleanup"]
+            if (cleanup["capacity"]["required"] != MANIFEST["REQUIRED_DPS_SLOTS"]
+                    or type(cleanup["capacity"]["limit"]) is not int
+                    or cleanup["capacity"]["limit"] != expected_capacity_limit):
+                raise ValueError(f"{name}: cleanup capacity policy does not match full qualification")
             owned = cleanup["owned_ids"]
             if (phase["status"] != "passed" or phase["exit_code"] != 0
                     or phase["timed_out"] is not False or phase["interrupted"] is not False
@@ -84,7 +95,8 @@ def evaluate_dps_phases(result_dir):
                         or any(case.find("skipped") is not None for case in cases)
                         or gate["previous_owned_absent"] is not True or capacity["ready"] is not True
                         or capacity["count"] != len(set(capacity["ids"]))
-                        or capacity["required"] != required or capacity["count"] + required > capacity["limit"]):
+                        or type(capacity["limit"]) is not int or capacity["limit"] != expected_capacity_limit
+                        or capacity["required"] != required or capacity["count"] + required > expected_capacity_limit):
                     raise ValueError(f"{name}: missing coverage or failed pre-phase cleanup/capacity gate")
     except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as error:
         errors.append(f"DPS phase evidence is incomplete or unsuccessful: {error}.")
@@ -114,7 +126,8 @@ def evaluate_hub_result(result_dir, service):
     return []
 
 
-def evaluate_results(results_dir, matrix, job_results):
+def evaluate_results(results_dir, matrix, job_results, *, expected_dps_capacity_limit=MANIFEST["DPS_LIMIT"]):
+    expected_dps_capacity_limit = MANIFEST["parse_capacity_limit"](expected_dps_capacity_limit)
     errors = []
     summary = [
         "## Integration Test Results",
@@ -153,7 +166,7 @@ def evaluate_results(results_dir, matrix, job_results):
             errors.append(f"Duplicate result for {service} / {python} / {region}.")
         seen.add(combination)
         if service == "DPS":
-            errors.extend(evaluate_dps_phases(result_dir))
+            errors.extend(evaluate_dps_phases(result_dir, expected_capacity_limit=expected_dps_capacity_limit))
         if service in ("HubControl", "HubData"):
             errors.extend(evaluate_hub_result(result_dir, service))
         if status != "success":
@@ -180,6 +193,9 @@ def evaluate_results(results_dir, matrix, job_results):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", required=True)
+    parser.add_argument("--expected-dps-capacity-limit", type=MANIFEST["parse_capacity_limit"],
+                        default=MANIFEST["DPS_LIMIT"],
+                        help="Trusted operator/workflow DPS limit; never infer it from result artifacts (default: 10).")
     args = parser.parse_args()
     matrix = json.loads(os.environ["INTEGRATION_MATRIX"])
     if not isinstance(matrix, list) or not all(isinstance(config, dict) for config in matrix):
@@ -193,6 +209,7 @@ def main():
             "int-test": os.environ.get("INTEGRATION_RESULT"),
             "gate preparation": os.environ.get("GATE_JOB_RESULT"),
         },
+        expected_dps_capacity_limit=args.expected_dps_capacity_limit,
     )
     print(summary, end="")
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
