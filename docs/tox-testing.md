@@ -87,14 +87,25 @@ The GitHub ADR service job reserves **360 minutes**, including setup and reporti
 The root integration workflow passes this budget through the reusable bundle and
 cohort to the service job; reusable callers do not impose a shorter runner timeout.
 The existing same-scope concurrency lock remains held until the bundle completes.
-This is a job-budget change, not an increase to provisioning or recovery waits.
+The job ceiling does not extend per-operation provisioning waits.
 
 ADR runs serially. Its SU-link case already allows 175 minutes for provisioning,
 native link recovery and cleanup, followed later by a separate 75-minute SU-instance
-lifecycle. Ordinary cases retain their 15-minute cap. Two completed-job logs showed
+lifecycle. Other ordinary cases retain their 15-minute cap. Two completed-job logs showed
 the latter lifecycle starting about 109 minutes into a former 120-minute job:
 SU-link alone consumed 56–63 minutes. Preserving its full existing envelope plus
-the observed other work and reporting margin requires about 342 minutes.
+the observed other work and reporting margin required about 342 minutes before
+the owned Hub/DPS fixture alignment below.
+
+Owned no-wait Hub/DPS link fixtures use the native CLI's **600-second** readiness
+default. A local run exhausted the former 240-second bound while an accepted
+recovery was still in progress, not after a terminal service rejection. The same
+monotonic deadline covers the initial snapshot, calls, backoff and polling;
+accepted work is not replayed and invalid-request failures remain non-retryable.
+The three-add lifecycle reserves **45 minutes** (15 minutes plus three 10-minute
+windows), without increasing native CLI or SU provisioning defaults. This adds
+18 minutes to its former allowance and puts that observed-prefix extrapolation
+at about 360 minutes.
 
 360 minutes is practical headroom, **not a guarantee of full coverage or success**.
 All case maxima combined exceed one hosted job. A cancellation must be reported

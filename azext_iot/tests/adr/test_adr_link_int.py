@@ -31,8 +31,8 @@ What is intentionally NOT covered here (covered by unit tests):
 - MI mutually-exclusive rejection
 - Invalid DPS resource id rejection
 
-Owned Hub and DPS adds allow up to 240 seconds each for actual namespace/endpoint
-readiness, including read-authorization propagation recovery via link update.
+Owned Hub and DPS adds use the native 600-second default for actual
+namespace/endpoint readiness, including authorization propagation recovery via link update.
 The dedicated combined and SU scenarios instead use native command recovery with
 fresh service roles, explicit 1200-second mutation budgets, and no fixture repair.
 """
