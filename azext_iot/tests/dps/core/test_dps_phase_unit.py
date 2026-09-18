@@ -19,6 +19,7 @@ from azext_iot.tests.dps import conftest as fixtures
 def _item(nodeid, service_sas=False):
     return SimpleNamespace(
         nodeid="azext_iot/tests/dps/" + nodeid,
+        path=Path("azext_iot/tests/dps") / nodeid.partition("::")[0],
         get_closest_marker=lambda name: pytest.mark.dps_service_sas if (
             service_sas and name == _phase.SERVICE_SAS_MARKER
         ) else None,
@@ -85,6 +86,32 @@ def test_phase_selects_exact_marked_capability_not_device_credentials(monkeypatc
     config.hook.pytest_deselected.assert_called_once_with(
         items=sas if phase == _phase.REGULAR else regular
     )
+
+
+@pytest.mark.parametrize("phase", [_phase.REGULAR, _phase.SERVICE_SAS])
+def test_explicit_phase_ignores_unit_parameter_ids_naming_integration_files(monkeypatch, mocker, phase):
+    monkeypatch.setenv(_phase.PHASE_ENV, phase)
+    expected = _regular_items() if phase == _phase.REGULAR else _sas_items()
+    unit = _item(
+        "device_registration/test_csr_issuance_fixture_unit.py::test_contract["
+        "device_registration/test_iot_device_registration_int.py::test_registration[default]]",
+        service_sas=phase == _phase.SERVICE_SAS,
+    )
+    items = expected + [unit]
+    config = mocker.Mock()
+    _phase.select_items(config, items)
+    assert items == expected
+    config.hook.pytest_deselected.assert_called_once_with(items=[unit])
+
+
+def test_default_invocation_preserves_unit_cases_naming_integration_files(monkeypatch, mocker):
+    monkeypatch.delenv(_phase.PHASE_ENV, raising=False)
+    unit = _item("test_fixture_unit.py::test_contract[test_registration_int.py]")
+    items = [unit]
+    config = mocker.Mock()
+    _phase.select_items(config, items)
+    assert items == [unit]
+    config.hook.pytest_deselected.assert_not_called()
 
 
 @pytest.mark.parametrize("invalid_selection", ["empty", "filtered", "unexpected", "duplicate"])

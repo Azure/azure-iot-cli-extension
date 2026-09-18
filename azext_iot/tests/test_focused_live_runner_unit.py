@@ -390,7 +390,10 @@ def test_dps_selection_and_receipts_use_same_exact_debug_subset(tmp_path, monkey
     debug = focused.select("DPS", phase, chosen)
     monkeypatch.setenv(focused.ENV, json.dumps(debug))
     monkeypatch.setenv(_phase.PHASE_ENV, phase)
-    items = [SimpleNamespace(nodeid=node, get_closest_marker=lambda _: None) for node in chosen]
+    items = [
+        SimpleNamespace(nodeid=node, path=Path(node.partition("::")[0]), get_closest_marker=lambda _: None)
+        for node in chosen
+    ]
     _phase.select_items(Mock(), items)
     with pytest.raises(pytest.UsageError, match="exactly"):
         _phase.select_items(Mock(), items * 2)
