@@ -387,6 +387,19 @@ def _assert_owned_ids(observed_ids, expected_ids, description):
     )
 
 
+def _read_device_for_comparison(device_id, hub_auth):
+    # Query rows establish the owned ID set, never current twin contents.
+    device = _invoke_state(f"iot hub device-twin show {hub_auth} -d {device_id}").as_json()
+    identity = _invoke_state(f"iot hub device-identity show {hub_auth} -d {device_id}").as_json()
+    authentication = identity["authentication"]
+    device["authenticationType"] = authentication["type"]
+    if authentication["type"] == DeviceAuthApiType.sas.value:
+        device["symmetricKey"] = authentication["symmetricKey"]
+    elif authentication["type"] == DeviceAuthApiType.selfSigned.value:
+        device["x509Thumbprint"] = authentication["x509Thumbprint"]
+    return device
+
+
 def _query_time_remaining(deadline):
     remaining = deadline - time.monotonic()
     assert remaining > 0, "Dataplane query visibility deadline exhausted."
@@ -482,14 +495,9 @@ def compare_hubs_dataplane(origin_auth: str, dest_auth: str, owned: _OwnedDatapl
 
     for device in orig_hub_identities:
         assert device["deviceId"] in dest_hub_identities_dict
-        target = dest_hub_identities_dict[device["deviceId"]]
-
-        if device["authenticationType"] == DeviceAuthApiType.sas.value:
-            id1 = origin_topology[device["deviceId"]]
-            id2 = dest_topology[device["deviceId"]]
-
-            device["symmetricKey"] = id1["authentication"]["symmetricKey"]
-            target["symmetricKey"] = id2["authentication"]["symmetricKey"]
+        device_id = device["deviceId"]
+        device = _read_device_for_comparison(device_id, origin_auth)
+        target = _read_device_for_comparison(device_id, dest_auth)
 
         compare_devices(device, target)
 
@@ -571,8 +579,7 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
     topology = _read_topology(hub_auth, owned)
 
     for device in hub_devices:
-        id = topology[device["deviceId"]]
-        device["symmetricKey"] = id["authentication"]["symmetricKey"]
+        device = _read_device_for_comparison(device["deviceId"], hub_auth)
 
         file_device = file_devices[device["deviceId"]]
         file_device_identity = {**file_device["identity"], **file_device["twin"]}
@@ -584,9 +591,6 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
             file_device_identity["x509Thumbprint"] = file_device_identity["authentication"]["x509Thumbprint"]
 
         assert file_device_identity
-
-        for key in ["$metadata", "$version"]:
-            device["properties"]["desired"].pop(key)
 
         compare_devices(device, file_device_identity)
 
@@ -608,9 +612,6 @@ def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDat
 
             assert target_module
             assert module["authentication"] == target_module["authentication"]
-            for key in ["$metadata", "$version"]:
-                module_twin["properties"]["desired"].pop(key)
-
             compare_module_twins(module_twin, target_module_twin)
 
     _wait_for_children_queries(((hub_auth, topology),), owned)
@@ -825,6 +826,16 @@ def compare_configs(configlist1, configlist2):
         assert config["targetCondition"] == target["targetCondition"]
 
 
+def _compare_twin_content(twin1, twin2):
+    # Presence is symmetric: missing or extra tags must not conceal lost state.
+    assert ("tags" in twin1) == ("tags" in twin2)
+    if "tags" in twin1:
+        assert twin1["tags"] == twin2["tags"]
+    desired1 = {key: value for key, value in twin1["properties"]["desired"].items() if key not in ("$metadata", "$version")}
+    desired2 = {key: value for key, value in twin2["properties"]["desired"].items() if key not in ("$metadata", "$version")}
+    assert desired1 == desired2
+
+
 def compare_devices(device1, device2):
     # Shared and identity only props
     assert device1["authenticationType"] == device2["authenticationType"]
@@ -840,16 +851,7 @@ def compare_devices(device1, device2):
         assert device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"]
         assert device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"]
 
-    # Twin only props
-    if "tags" in device1:
-        assert device1["tags"] == device2["tags"]
-
-    assert len(device1["properties"]["desired"]) == len(device2["properties"]["desired"])
-
-    for prop in device1["properties"]["desired"]:
-        if prop not in ["$metadata", "$version"]:
-            assert prop in device2["properties"]["desired"]
-            assert device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop]
+    _compare_twin_content(device1, device2)
 
 
 def compare_module_identities(module1, module2):
@@ -875,14 +877,7 @@ def compare_module_identities(module1, module2):
 def compare_module_twins(twin1, twin2):
     """Focus only on twin only props"""
     assert twin1["modelId"] == twin2["modelId"]
-    assert len(twin1["properties"]["desired"]) == len(twin2["properties"]["desired"])
-    for prop in twin1["properties"]["desired"]:
-        if prop not in ["$metadata", "$version"]:
-            assert prop in twin2["properties"]["desired"]
-            assert twin1["properties"]["desired"][prop] == twin2["properties"]["desired"][prop]
-
-    if "tags" in twin1:
-        assert twin1["tags"] == twin2["tags"]
+    _compare_twin_content(twin1, twin2)
 
 
 def compare_certs(cert1, cert2):

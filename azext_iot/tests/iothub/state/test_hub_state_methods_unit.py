@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import logging
+from copy import deepcopy
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -381,6 +382,13 @@ class TestProcessHubToDict:
 
 
 class TestDownloadDevices:
+    def _mock_twins(self, mocker, twins):
+        mocker.patch(f"{sp}._iot_device_twin_list", return_value=deepcopy(twins))
+        return mocker.patch(
+            f"{sp}._iot_device_twin_show",
+            side_effect=lambda target, device_id: deepcopy(next(twin for twin in twins if twin["deviceId"] == device_id)),
+        )
+
     def test_list_fails(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{sp}._iot_device_twin_list", side_effect=AzCLIError("boom"))
@@ -388,10 +396,12 @@ class TestDownloadDevices:
 
     def test_basic_tier_no_properties(self, mocker):
         p = _provider(mocker)
+        p.target["sku_tier"] = "Basic"
         twin = {"deviceId": "d1"}
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
+        show = self._mock_twins(mocker, [twin])
         result = p.download_devices(p.target)
         assert result == {}
+        show.assert_not_called()
 
     def test_full_device_with_module(self, mocker):
         p = _provider(mocker)
@@ -406,7 +416,7 @@ class TestDownloadDevices:
             "authenticationType": DeviceAuthApiType.sas.value,
             "x509Thumbprint": None,
         }
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
+        self._mock_twins(mocker, [twin])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
@@ -456,10 +466,10 @@ class TestDownloadDevices:
             "authenticationType": DeviceAuthApiType.sas.value,
             "x509Thumbprint": None,
         }
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[twin])
+        self._mock_twins(mocker, [twin])
         mocker.patch(f"{sp}._iot_device_show", side_effect=AzCLIError("boom"))
-        result = p.download_devices(p.target)
-        assert result == {}
+        with pytest.raises(AzCLIError, match="boom"):
+            p.download_devices(p.target)
 
     def _sas_device_twin(self):
         return {
@@ -484,7 +494,7 @@ class TestDownloadDevices:
 
     def test_module_list_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
@@ -495,7 +505,7 @@ class TestDownloadDevices:
 
     def test_module_identity_show_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
@@ -507,7 +517,7 @@ class TestDownloadDevices:
 
     def test_module_twin_show_fails(self, mocker):
         p = _provider(mocker)
-        mocker.patch(f"{sp}._iot_device_twin_list", return_value=[self._sas_device_twin()])
+        self._mock_twins(mocker, [self._sas_device_twin()])
         mocker.patch(
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},

@@ -826,6 +826,7 @@ def _comparison_read_key(args):
         ("edge", "deployment", "list"): "deployments",
         ("hub", "device-identity", "list"): "devices",
         ("hub", "device-identity", "show"): "identity",
+        ("hub", "device-twin", "show"): "twin",
         ("hub", "module-identity", "list"): "modules",
         ("hub", "module-twin", "show"): "module_twin",
         ("hub", "device-identity", "children"): "children",
@@ -864,6 +865,7 @@ def comparison_data(mocker, fake_cli, tmp_path):
     }
     origin = {
         "configs": configs[:1], "deployments": configs[1:], "devices": devices,
+        "twin": {device["deviceId"]: deepcopy(device) for device in devices},
         "identity": identity, "modules": [module], "module_twin": module_twin, "children": [],
     }
     views = {"origin": deepcopy(origin), "destination": deepcopy(origin)}
@@ -899,7 +901,7 @@ def comparison_data(mocker, fake_cli, tmp_path):
         name, kind = key = _comparison_read_key(args)
         counts[key] += 1
         response = overrides[key](counts[key]) if key in overrides else views[name][kind]
-        if kind in ("identity", "children") and isinstance(response, dict):
+        if kind in ("identity", "children", "twin") and isinstance(response, dict):
             response = response[args[args.index("-d") + 1]]
         out_file.write(json.dumps(response))
         return 0
@@ -998,11 +1000,95 @@ def test_complete_comparison_retains_detailed_device_and_module_checks(mocker, c
 
 
 @pytest.mark.parametrize("mode", ["migration", "file"])
+@pytest.mark.parametrize("lag", ["missing-tags", "wrong-values", "ids-only"])
+def test_comparison_uses_authoritative_twins_despite_query_lag(comparison_data, mode, lag):
+    for view in comparison_data.views.values():
+        for device in view["devices"]:
+            if lag == "ids-only":
+                device_id = device["deviceId"]
+                device.clear()
+                device["deviceId"] = device_id
+            else:
+                device.pop("tags")
+                device["properties"]["desired"] = {"stale": "query"}
+                if lag == "wrong-values":
+                    device["tags"] = {"stale": "query"}
+    comparison_data.compare(mode)
+    count = len(comparison_data.owned.device_ids)
+    assert comparison_data.counts[("origin", "twin")] == count
+    assert comparison_data.counts[("destination", "twin")] == (count if mode == "migration" else 0)
+    subject.time.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
+@pytest.mark.parametrize("side", ["source", "target"])
+@pytest.mark.parametrize("kind", ["device", "module"])
+@pytest.mark.parametrize("field", ["tags", "desired"])
+@pytest.mark.parametrize("change", ["missing", "wrong", "extra"])
+def test_comparison_rejects_missing_wrong_and_extra_twin_content(
+    comparison_data, mode, side, kind, field, change,
+):
+    device_id = comparison_data.owned.device_ids[0]
+    if mode == "file" and side == "target":
+        device = comparison_data.exported["devices"][device_id]
+        twin = device["twin"] if kind == "device" else device["modules"]["unit-module"]["twin"]
+    else:
+        name = "destination" if mode == "migration" and side == "target" else "origin"
+        view = comparison_data.views[name]
+        twin = view["twin"][device_id] if kind == "device" else view["module_twin"]
+    if field == "tags":
+        if change == "missing":
+            del twin["tags"]
+        elif change == "wrong":
+            twin["tags"]["tag"] = "wrong"
+        else:
+            twin["tags"]["extra"] = "not in the other twin"
+    else:
+        desired = twin["properties"]["desired"]
+        if change == "missing":
+            del desired["setting"]
+        elif change == "wrong":
+            desired["setting"] = "wrong"
+        else:
+            desired["extra"] = "not in the other twin"
+    with pytest.raises(AssertionError):
+        comparison_data.compare(mode)
+    subject.time.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
+@pytest.mark.parametrize("auth_type", ["sas", "selfSigned", "certificateAuthority"])
+def test_authoritative_comparison_preserves_authentication_types(comparison_data, mode, auth_type):
+    authentication = {"type": auth_type}
+    if auth_type == "sas":
+        authentication["symmetricKey"] = {"primaryKey": "unit-primary", "secondaryKey": "unit-secondary"}
+    elif auth_type == "selfSigned":
+        authentication["x509Thumbprint"] = {"primaryThumbprint": "unit-primary", "secondaryThumbprint": "unit-secondary"}
+    for view in comparison_data.views.values():
+        for identity in view["identity"].values():
+            identity["authentication"] = deepcopy(authentication)
+        for twin in view["twin"].values():
+            twin.pop("authenticationType")
+    for device in comparison_data.exported["devices"].values():
+        device["identity"]["authentication"] = deepcopy(authentication)
+    comparison_data.compare(mode)
+
+
+def test_twin_comparison_preserves_absence_without_empty_fallback():
+    twin = {"properties": {"desired": {"setting": "value"}}}
+    subject._compare_twin_content(twin, deepcopy(twin))
+    with pytest.raises(AssertionError):
+        subject._compare_twin_content(twin, dict(twin, tags={}))
+    with pytest.raises(AssertionError):
+        subject._compare_twin_content(dict(twin, tags={}), twin)
+
+
+@pytest.mark.parametrize("mode", ["migration", "file"])
 @pytest.mark.parametrize("kind", ["device_tags", "module_auth", "module_twin"])
 def test_owned_ids_do_not_bypass_detailed_value_mismatches(comparison_data, mode, kind):
     view = comparison_data.views["destination" if mode == "migration" else "origin"]
     if kind == "device_tags":
-        view["devices"][0]["tags"] = {"unexpected": "value"}
+        view["twin"][comparison_data.owned.device_ids[0]]["tags"] = {"unexpected": "value"}
     elif kind == "module_auth":
         view["modules"][0]["authentication"]["symmetricKey"]["primaryKey"] = "different-unit-key"
     else:
@@ -1015,7 +1101,7 @@ def test_owned_ids_do_not_bypass_detailed_value_mismatches(comparison_data, mode
     (mode, hub, kind)
     for mode in ("migration", "file")
     for hub in ("origin", "destination")
-    for kind in ("configs", "deployments", "devices", "identity", "modules", "module_twin", "children")
+    for kind in ("configs", "deployments", "devices", "identity", "twin", "modules", "module_twin", "children")
     if mode == "migration" or hub == "origin"
 ])
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
