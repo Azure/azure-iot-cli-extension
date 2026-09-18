@@ -71,6 +71,9 @@ def execute_factory(damage=None, handlers=None):
             receipt.data["reports"][expected[0]]["call"] = [damage]
         if phase != "sas" and damage == "duplicate":
             receipt.data["collected"].append(expected[0])
+        if phase == "sas" and damage == "sas-failure":
+            receipt.data["reports"][expected[-1]]["call"] = ["failed"]
+            receipt.data["exitstatus"] = 1
         receipt.write()
         path = Path(env["AZEXT_IOT_HUB_OWNERSHIP"])
         if phase == "sas":
@@ -86,6 +89,8 @@ def execute_factory(damage=None, handlers=None):
                         (hub + "/eventHubEndpoints/events/ConsumerGroups/" + name).casefold()
                         for name in ("test1", "test2", "test3", "test4")
                     ], "deviceIds": []}
+            if damage in ("sas-failure", "sas-missing-pass"):
+                data["passed"] = expected[:-1]
         else:
             resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + phase).casefold()
             data = {"schemaVersion": 1, "installed": True, "phase": phase, "runId": env["AZEXT_IOT_HUB_RUN_ID"],
@@ -97,7 +102,8 @@ def execute_factory(damage=None, handlers=None):
         ownership.write(path, data)
         if phase != "sas" and damage == "missing":
             Path(env["AZEXT_IOT_HUB_RECEIPT"]).unlink()
-        return {"exit_code": 1 if damage == "exit" and phase != "sas" else 0,
+        failed = (damage == "exit" and phase != "sas") or (damage == "sas-failure" and phase == "sas")
+        return {"exit_code": 1 if failed else 0,
                 "timed_out": damage == "timeout", "interrupted": damage == "cancel",
                 "cleanup_deadline": time.monotonic() + 30}
 
@@ -142,6 +148,34 @@ def test_controller_fail_closed(tmp_path, damage):
     assert result == 1
     assert not runner.evaluate_hub_phases(tmp_path / "phases")["passed"]
     assert calls == (["entra"] if damage in ("cancel", "cleanup", "timeout") else ["entra", "sas"])
+
+
+@pytest.mark.parametrize("damage", ["sas-failure", "sas-missing-pass"])
+def test_sas_case_failure_does_not_erase_verified_cleanup(tmp_path, damage):
+    result, calls = run(tmp_path, damage=damage)
+    assert result == 1 and calls == ["entra", "sas"]
+    output = tmp_path / "phases"
+    cleanup = runner.read_json(output / "sas/cleanup.json")
+    assert cleanup["complete"] and cleanup["errors"] == []
+    assert len(cleanup["ownedIds"]) == 4 and cleanup["absentIds"] == cleanup["ownedIds"]
+    phase = runner.read_json(output / "hub-phases.json")["phases"][-1]
+    assert phase["status"] == "failed" and phase["receiptErrors"]
+    assert not runner.evaluate_hub_phases(output)["passed"]
+
+
+@pytest.mark.parametrize("damage", ["absent", "cleanup-failure", "foreign-id", "mutation"])
+def test_sas_cleanup_still_requires_exact_owned_absence(tmp_path, damage):
+    assert run(tmp_path)[0] == 0
+    data = runner.read_json(tmp_path / "phases/sas/ownership.json")
+    if damage == "absent":
+        data["absent"].remove("hub")
+    elif damage == "cleanup-failure":
+        data["cleanupFailures"] = {"hub": "rejected"}
+    elif damage == "foreign-id":
+        data["ids"]["hub"] += "-foreign"
+    else:
+        data["statuses"][data["mutations"][0]] = None
+    assert runner.sas_cleanup_errors(data)
 
 
 @pytest.mark.parametrize("damage", ["phase", "duplicate", "ownership", "absent", "status", "sas-pass", "sas-uncertain"])

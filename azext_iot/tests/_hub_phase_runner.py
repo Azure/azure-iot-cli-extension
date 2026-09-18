@@ -87,6 +87,14 @@ def write_junit(receipt, expected, path):
 
 def sas_errors(data, expected, *, debug=None):
     """Validate existing SAS evidence without changing its membership/receipt format."""
+    errors = sas_cleanup_errors(data, debug=debug)
+    if sorted(data.get("passed", [])) != sorted(expected):
+        errors.append("SAS required cases did not pass")
+    return errors
+
+
+def sas_cleanup_errors(data, *, debug=None):
+    """Validate owned resource absence independently of test outcomes."""
     owned = helper()
     errors = []
     ids = data.get("ids", {})
@@ -95,10 +103,9 @@ def sas_errors(data, expected, *, debug=None):
             or set(ids) != {"hub", "storage", "container", "role"}
             or not all(owned["scope_id"](value) for value in ids.values())
             or len(set(value.casefold() for value in ids.values())) != 4
-            or sorted(data.get("passed", [])) != sorted(expected)
             or sorted(data.get("absent", [])) != sorted(ids)
             or data.get("cleanupFailures") != {} or not FOCUSED["matches"](data, debug)):
-        errors.append("invalid SAS ownership, passes or cleanup")
+        errors.append("invalid SAS ownership or cleanup")
     if ids:
         prefix = f"/subscriptions/{owned['SUBSCRIPTION']}/resourceGroups/{owned['GROUP']}/providers/"
         hub = prefix + "Microsoft.Devices/IotHubs/test-hubsas-" + uid
@@ -359,8 +366,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 evidence = read_json(folder / "ownership.json")
                 if phase == "sas":
                     result["sasRunUid"] = evidence["runUid"]
-                    errors = sas_errors(evidence, debug["requestedNodes"] if debug else
-                                        list(selection()["nodes"](suite, phase)), debug=debug)
+                    errors = sas_cleanup_errors(evidence, debug=debug)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
@@ -372,6 +378,8 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 expected = debug["requestedNodes"] if debug else list(selection()["nodes"](suite, phase))
                 write_junit(receipt, expected, folder / "junit.xml")
                 receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
+                if phase == "sas":
+                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug))
                 result["receiptErrors"] = receipt_errors
                 result["status"] = "passed" if (
                     not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
