@@ -121,27 +121,15 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
 
-The Linux DPS phase controller (`azext_iot/tests/_dps_phase_runner.py`) uses a
-conservative subscription-wide instance limit of ten across all regions.
-For a selected subscription/run with an operator-confirmed higher limit, pass
-`--dps-capacity-limit 100`, or set `dps-capacity-limit` to `"100"` on the manual
-Integration Tests or Build and Publish Release workflow. The confirmed limit
-for subscription `a386d5ea-ea90-441a-8263-d816368c84a1` is not a default for
-other subscriptions or unconfigured runs; all defaults remain ten. Inputs must
-be positive base-10 integers, not booleans, fractions, empty strings or expressions.
-This option does not modify Azure quota or authorize foreign-resource deletion.
-
-Admission, fresh pre-phase gates and cleanup capacity receipts use the same
-selected limit. This branch retains two-slot initial/cleanup admission,
-two/one-slot service-SAS/local-auth gates, its existing case manifest and
-runtime budgets. Focused/debug runs remain nonqualifying. Ownership, cleanup
-and uncertain-mutation guards are unchanged.
-
-The independent workflow evaluator receives the expected limit from the trusted
-workflow input, never from receipt metadata. To evaluate local artifacts from
-a run admitted with 100, pass `--expected-dps-capacity-limit 100` to
-`azext_iot/tests/_evaluate_test_results.py`; its default-ten policy rejects those
-receipts unless the expected limit is explicitly supplied.
+Hub and DPS controllers do not perform subscription quota admission or reserve
+slots. Inventory and exact-resource reads remain mandatory for collision,
+ownership, known-resource reconciliation and verified cleanup, not quota counting.
+Azure provisioning rejections, including quota errors, fail the run; they are not
+suppressed. No resource ownership, scoped RBAC, quarantine or full-result checks
+are bypassed. This branch retains its existing DPS case manifest and runtime
+budgets, with regular, service-SAS and local-auth phases ordered internally.
+Local focused-debug runs remain nonqualifying.
+See [workflow selection and safety](docs/tox-testing.md#integration-workflow-topology).
 
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`

@@ -29,11 +29,6 @@ ROOT = Path(__file__).resolve().parents[2]
 BUDGETS = {"HubControl": (("regular", 190 * 60),), "HubData": (("entra", 210 * 60), ("sas", 100 * 60))}
 CLEANUP = 15 * 60
 RESERVE = 5 * 60
-HUB_LIMIT = 50  # Conservative documented subscription limit; includes every foreign Hub.
-# Module-scoped fixtures coexist across state functions, including two migration
-# destinations and a separate only-Hubs fixture. Reserve conservatively; the
-# observer also rechecks all-subscription Hub capacity at each actual Hub create.
-SLOTS = {"regular": 8, "entra": 4, "sas": 1}
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 
 
@@ -341,10 +336,8 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
             if cancel.is_set():
                 break
             arm.deadline = min(deadline, time.monotonic() + RESERVE)
-            inventory = arm.inventory()  # All subscription Hubs, never DPS inventory.
-            result["capacity"] = {"ids": inventory, "prospective": SLOTS[phase], "limit": HUB_LIMIT}
-            if len(inventory) + SLOTS[phase] > HUB_LIMIT:
-                break
+            # Retain subscription inventory for ownership/collision evidence, not quota admission.
+            result["inventoryIds"] = arm.inventory()
             if time.monotonic() + runtime + CLEANUP > deadline:
                 break
             folder = output / phase

@@ -583,8 +583,6 @@ class Observer:
                 self.reject("Resource location outside authorized region")
             if parts[-2] == "iothubs" and body.get("properties", {}).get("disableLocalAuth") is not True:
                 self.reject("Ordinary Hub must disable local authentication")
-            if parts[-2] == "iothubs" and len(self._verify(self.arm.inventory)) >= 50:
-                self.reject("No subscription Hub capacity remains at creation")
             status, _ = self._read(resource_id, api)
             if status != 404:
                 self.reject("Cannot own a pre-existing resource")
@@ -614,8 +612,6 @@ class Observer:
                     if (body.get("location", REGION).casefold() != REGION
                             or ("/iothubs/" in root and body.get("properties", {}).get("disableLocalAuth") is not True)):
                         self.reject("Invalid recreation location/auth")
-                    if "/iothubs/" in root and len(self._verify(self.arm.inventory)) >= 50:
-                        self.reject("No subscription Hub capacity remains at creation")
                     previous = roots[root]
                     roots[root] = dict(previous, mutations=[], resolved=False, uncertain=False,
                                        generation=previous.get("generation", 1) + 1,

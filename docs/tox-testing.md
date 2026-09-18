@@ -90,10 +90,23 @@ lock. Job names and result/coverage artifacts identify the service, Python and r
 The result gate checks the complete selected matrix independently of coverage reporting.
 
 Owned Hub/DPS controllers still sequence their internal phases; ADR still uses
-serial pytest. This scheduling does not grant admission or reserve capacity:
-the existing canary scope, owned-resource and live headroom checks still apply.
+serial pytest. Controllers do not reserve slots or enforce subscription quota
+admission. Inventory and exact-ID reads still establish ownership, detect
+collisions, reconcile known resources and verify cleanup; they are not quota
+count gates. Azure provisioning errors, including quota rejections, fail the run.
+The existing canary scope, identities/RBAC, quarantine and ownership checks still apply.
 Overlapping runs and additional Python/region combinations can consume resources
 concurrently; the former bounded-cohort reservation does not apply.
+
+Every selected service runs its full branch-specific suite. GitHub dispatch and
+reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
+capacity-limit input; the release caller does not supply a quota override either.
+Both ADR Microsoft CA revocation cases run using newly created, test-owned CAs.
+Pre-existing resources are rejected before creation, and the certificate action
+tracker independently enforces exact ownership before any mutation.
+Unrelated optional external/preprovisioned fixtures retain their safety controls:
+selecting the full suite never authorizes mutation of external credentials.
+Local focused-debug controls remain available and cannot qualify a full suite.
 
 ## ADR live-test budgets
 

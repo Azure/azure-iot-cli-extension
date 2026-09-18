@@ -9,17 +9,6 @@
 from pathlib import Path
 
 PHASE_NAMES = ("regular", "service-sas", "local-auth-toggle")
-DPS_LIMIT = 10  # Conservative subscription default; no SDK quota-read operation is available.
-REQUIRED_DPS_SLOTS = 2
-
-
-def parse_capacity_limit(value):
-    """Accept only an explicit positive integer, never booleans or numeric coercions."""
-    if isinstance(value, str) and value.isascii() and value.isdecimal() and not value.startswith("0"):
-        value = int(value)
-    if type(value) is not int or value <= 0:
-        raise ValueError("DPS capacity limit must be a positive base-10 integer (default: 10).")
-    return value
 
 
 LIFECYCLES = {

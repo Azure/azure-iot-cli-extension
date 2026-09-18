@@ -232,8 +232,9 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, capacity_limit=10):
-    chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
+    if chosen is None:
+        chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
 
     def execute(command, env, log, runtime, cleanup, cancelled):
@@ -275,17 +276,17 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen, capacity_limit=capacity_limit)
+                         debug_phase=phase, debug_nodes=chosen)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
 @pytest.mark.parametrize("whole", [False, True])
-def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, monkeypatch, phase, whole):
+def test_dps_debug_phase_keeps_ownership_cleanup_and_never_qualifies(tmp_path, monkeypatch, phase, whole):
     result, summary, captured = run_dps(tmp_path, monkeypatch, phase, whole=whole)
     assert result == 0 and summary["status"] == "debug-passed"
     assert [value["name"] for value in summary["phases"]] == [phase]
-    assert summary["baseline"]["capacity"]["required"] == dps.REQUIRED_SLOTS
+    assert summary["baseline"]["resources"] == DpsReader().resources
     assert summary["runner_seconds"] <= dps.RUNNER_SECONDS
     assert summary["phases"][0]["cleanup"]["complete"] is True
     assert summary["phases"][0]["results"]["stage_errors"] == []
@@ -296,29 +297,25 @@ def test_dps_debug_phase_keeps_admission_cleanup_and_never_qualifies(tmp_path, m
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
-@pytest.mark.parametrize("count", [98, 99])
-def test_explicit_limit_keeps_preview_debug_two_slot_policy_and_nonqualification(tmp_path, monkeypatch, phase, count):
+@pytest.mark.parametrize("count", [10, 1000])
+def test_preview_debug_keeps_cleanup_and_nonqualification_without_quota(tmp_path, monkeypatch, phase, count):
     result, summary, captured = run_dps(
-        tmp_path, monkeypatch, phase, reader=DpsReader(count), capacity_limit=100,
+        tmp_path, monkeypatch, phase, reader=DpsReader(count),
     )
-    assert result == (0 if count == 98 else 1)
+    assert result == 0
     assert summary["qualifiesFullSuite"] is False
-    assert summary["baseline"]["capacity"]["required"] == 2
-    assert summary["baseline"]["capacity"]["limit"] == 100
-    assert len(captured) == (1 if count == 98 else 0)
-    assert GATE["evaluate_dps_phases"](tmp_path, expected_capacity_limit=100)
-    if captured:
-        assert summary["phases"][0]["cleanup"]["capacity"]["required"] == 2
-        assert summary["phases"][0]["cleanup"]["capacity"]["limit"] == 100
+    assert len(captured) == 1
+    assert GATE["evaluate_dps_phases"](tmp_path)
+    assert summary["phases"][0]["cleanup"]["complete"]
+    assert len(summary["phases"][0]["cleanup"]["inventory_ids"]) == count
 
 
-@pytest.mark.parametrize("limit", [10, 100])
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
 ])
-def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect, limit):
-    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect, capacity_limit=limit)
+def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, monkeypatch, defect):
+    result, summary, _ = run_dps(tmp_path, monkeypatch, "regular", defect=defect)
     assert result == 1 and summary["status"] == "debug-failed"
     if defect == "uncertain":
         assert summary["phases"][0]["cleanup"]["complete"] is False
@@ -327,13 +324,74 @@ def test_dps_debug_cannot_hide_incomplete_stages_or_uncertain_creates(tmp_path, 
 
 
 @pytest.mark.parametrize("suite,phase", [("HubData", "entra"), ("DPS", "regular")])
-def test_debug_does_not_reduce_conservative_capacity(tmp_path, monkeypatch, suite, phase):
+def test_debug_ignores_foreign_resource_count_but_never_qualifies(tmp_path, monkeypatch, suite, phase):
     if suite == "DPS":
-        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, reader=DpsReader(9))
+        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, reader=DpsReader(1000))
+        assert GATE["evaluate_dps_phases"](tmp_path)
     else:
-        result, summary, _, _, captured = run_hub(tmp_path, monkeypatch, suite, phase, reader=HubReader(49))
-    assert result == 1 and summary["status"] == "debug-failed"
-    assert not captured
+        result, summary, output, _, captured = run_hub(tmp_path, monkeypatch, suite, phase, reader=HubReader(1000))
+        assert not hub.evaluate_hub_phases(output)["passed"]
+    assert result == 0 and summary["status"] == "debug-passed"
+    assert len(captured) == 1
+
+
+@pytest.mark.parametrize("selection", ["full", "empty-full", "regular", "service-sas", "local-auth-toggle"])
+def test_all_dps_selections_run_without_quota_but_only_full_evidence_qualifies(tmp_path, monkeypatch, selection):
+    if selection in ("full", "empty-full"):
+        execute = Mock(side_effect=_execution)
+        result = FULL_DPS_RUN(
+            SUB, GROUP, tmp_path / "dps-phases", DpsReader(1000), execute=execute,
+            debug_nodes=[] if selection == "empty-full" else None,
+        )
+        summary = hub.read_json(tmp_path / "dps-phases.json")
+        assert execute.call_count == 3
+        assert not GATE["evaluate_dps_phases"](tmp_path)
+    else:
+        phase = selection if selection in ("service-sas", "local-auth-toggle") else "regular"
+        chosen = nodes("DPS", phase)[:1]
+        result, summary, captured = run_dps(tmp_path, monkeypatch, phase, chosen=chosen, reader=DpsReader(1000))
+        assert len(captured) == 1
+        assert GATE["evaluate_dps_phases"](tmp_path)
+    assert result == 0
+    assert len(summary["baseline"]["resources"]) == 1000
+
+
+@pytest.mark.parametrize("defect", ["empty", "duplicate", "unknown", "no-phase", "wrong-phase"])
+def test_invalid_debug_is_rejected_before_inventory_or_launch(tmp_path, defect):
+    phase, chosen = "regular", nodes("DPS", "regular")[:1]
+    if defect == "empty":
+        chosen = []
+    elif defect == "duplicate":
+        chosen.append(chosen[0])
+    elif defect == "unknown":
+        chosen.append(chosen[0] + "-unknown")
+    elif defect == "no-phase":
+        phase = None
+    else:
+        phase = "service-sas"
+    reader, execute = Mock(), Mock()
+    with pytest.raises(ValueError):
+        dps.run(SUB, GROUP, tmp_path / "must-not-exist", reader, execute=execute,
+                debug_phase=phase, debug_nodes=chosen)
+    reader.inventory.assert_not_called()
+    execute.assert_not_called()
+    assert not (tmp_path / "must-not-exist").exists()
+
+
+@pytest.mark.parametrize("defect", ["empty", "suite", "phase", "manifest", "nodes", "duplicate"])
+def test_debug_selection_cannot_trust_a_forged_or_stale_envelope(defect):
+    debug = focused.select("DPS", "regular", nodes("DPS", "regular")[:1])
+    if defect == "empty":
+        debug = {}
+    elif defect == "nodes":
+        debug["requestedNodes"] = []
+    elif defect == "duplicate":
+        debug["requestedNodes"].append(debug["requestedNodes"][0])
+    else:
+        field = "manifestSha256" if defect == "manifest" else defect
+        debug[field] = "foreign"
+    with pytest.raises(ValueError):
+        focused.from_environment({focused.ENV: json.dumps(debug)}, "DPS", "regular")
 
 
 @pytest.mark.parametrize("platform", ["win32", "darwin"])

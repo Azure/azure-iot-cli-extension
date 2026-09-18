@@ -94,9 +94,12 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     reader = Reader()
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
-    assert summary["baseline"]["capacity"]["count"] == 3  # Neither hardcoded eight nor assumed empty.
+    assert summary["baseline"]["resources"] == reader.resources
     assert reader.inventories == 6  # Baseline, each cleanup, and both pre-phase gates.
     assert len(reader.gets) == 13  # Three IDs per old phase, rechecked before the next; one toggle DPS.
+    ids = RUNNER["inventory_ids"](reader.resources)
+    assert all(phase["gate"]["inventory_ids"] == ids for phase in summary["phases"][1:])
+    assert all(phase["cleanup"]["inventory_ids"] == ids for phase in summary["phases"])
     assert not GATE(tmp_path)
     for phase in RUNNER["MANIFEST"]["PHASE_NAMES"]:
         folder = tmp_path / "dps-phases" / phase
@@ -106,8 +109,8 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
 
 
-@pytest.mark.parametrize("defect", ["cleanup", "reappeared", "unrelated-capacity"])
-def test_toggle_waits_for_immediately_previous_sas_cleanup_and_uses_one_slot(tmp_path, defect):
+@pytest.mark.parametrize("defect", ["cleanup", "reappeared", "many-foreign-resources"])
+def test_toggle_waits_for_immediately_previous_sas_cleanup_not_quota(tmp_path, defect):
     reader = Reader()
 
     def execute(*args):
@@ -127,16 +130,15 @@ def test_toggle_waits_for_immediately_previous_sas_cleanup_and_uses_one_slot(tmp
                     return {"id": record["id"], "state": "Deleting"} if len(reads) > 3 else None
                 reader.get = get
             else:
-                reader.resources = Reader(9).resources
+                reader.resources = Reader(1000).resources
         return result
 
     status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     toggle = summary["phases"][2]
-    if defect == "unrelated-capacity":
+    if defect == "many-foreign-resources":
         assert status == 0 and not GATE(tmp_path)
-        assert toggle["gate"]["capacity"]["required"] == 1
-        assert toggle["gate"]["capacity"]["count"] == 9
+        assert len(toggle["gate"]["inventory_ids"]) == 1000
     else:
         assert status == 1 and GATE(tmp_path)
         assert toggle["status"] == "blocked"
@@ -160,15 +162,16 @@ def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
     elif defect == "failed":
         toggle["exit_code"] = 1
     else:
-        toggle["gate"]["capacity"]["ready"] = False
+        toggle["gate"]["previous_owned_absent"] = False
     _json(summary_path, summary)
     _json(folder / "result.json", toggle)
     assert GATE(tmp_path)
 
 
 @pytest.mark.parametrize("defect", [
-    "exit", "timeout", "interrupt", "missing-junit", "missing-selection", "missing-ownership",
-    "uncertain-create", "capacity", "baseline-overlap", "reappeared", "five-regular", "regular-skips", "wrong-identity",
+    "exit", "quota-rejection", "timeout", "interrupt", "missing-junit", "missing-selection", "missing-ownership",
+    "uncertain-create", "duplicate-inventory", "baseline-overlap", "reappeared",
+    "five-regular", "regular-skips", "wrong-identity",
 ])
 def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     reader = Reader()
@@ -185,8 +188,10 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
         environment = args[1]
         if environment["azext_iot_dps_test_phase"] == "regular":
             directory = Path(environment["azext_iot_dps_phase_receipts"])
-            if defect == "exit":
+            if defect in ("exit", "quota-rejection"):
                 result["exit_code"] = 1
+                if defect == "quota-rejection":
+                    Path(args[2]).write_text("Azure provisioning failed: QuotaExceeded\n", encoding="utf-8")
             elif defect in ("timeout", "interrupt"):
                 result["timed_out" if defect == "timeout" else "interrupted"] = True
             elif defect == "missing-junit":
@@ -198,11 +203,8 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
                     path.unlink()
             elif defect == "uncertain-create":
                 (directory / "created-h.json").unlink()
-            elif defect == "capacity":
+            elif defect == "duplicate-inventory":
                 reader.resources.extend(Reader(6).resources)
-                # Fresh, distinct unrelated resources, not duplicate/partial inventory.
-                for index, resource in enumerate(reader.resources):
-                    resource["id"] = PREFIX + f"provisioningServices/unrelated-{index}"
             elif defect == "baseline-overlap":
                 record = json.loads((directory / "owned-h.json").read_text())
                 record.update(name="baseline-0", id=reader.resources[0]["id"])
@@ -229,7 +231,9 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert GATE(tmp_path)
     phases = summary["phases"]
-    if defect in ("exit", "timeout", "interrupt", "missing-junit", "missing-selection",
+    if defect == "quota-rejection":
+        assert "QuotaExceeded" in (tmp_path / "dps-phases/regular/output.log").read_text(encoding="utf-8")
+    if defect in ("exit", "quota-rejection", "timeout", "interrupt", "missing-junit", "missing-selection",
                   "five-regular", "regular-skips", "wrong-identity"):
         assert [phase["status"] for phase in phases] == ["failed", "passed", "passed"]
     else:
@@ -252,87 +256,44 @@ def test_incompatible_pins_fail_before_inventory_or_execution(tmp_path, monkeypa
     assert os.environ[pin] == "supplied-do-not-clear"
 
 
-def test_insufficient_initial_capacity_blocks_both_phases(tmp_path, mocker):
-    execute = mocker.Mock()
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(9), execute=execute) == 1
-    execute.assert_not_called()
-
-
-@pytest.mark.parametrize("count,limit,ready", [
-    (9, 10, False), (7, 100, True), (9, 100, True), (98, 100, True), (99, 100, False), (100, 100, False),
-])
-def test_explicit_subscription_limit_preserves_preview_two_slot_admission(tmp_path, mocker, count, limit, ready):
+@pytest.mark.parametrize("count", [7, 9, 10, 100, 1000])
+def test_subscription_inventory_never_imposes_quota_admission(tmp_path, mocker, count):
     execute = mocker.Mock(side_effect=_execution)
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(count), execute=execute, capacity_limit=limit) == (
-        0 if ready else 1
-    )
+    reader = Reader(count)
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
-    assert summary["baseline"]["capacity"]["limit"] == limit
-    assert summary["baseline"]["capacity"]["required"] == 2
-    assert summary["baseline"]["capacity"]["ready"] is ready
-    if not ready:
-        execute.assert_not_called()
-        return
-    assert "operator-confirmed" in summary["baseline"]["capacity"]["limit_source"]
-    assert [phase["gate"]["capacity"]["required"] for phase in summary["phases"][1:]] == [2, 1]
-    assert all(phase["gate"]["capacity"]["limit"] == limit for phase in summary["phases"][1:])
-    assert all(phase["cleanup"]["capacity"]["limit"] == limit for phase in summary["phases"])
-    assert all(phase["cleanup"]["capacity"]["required"] == 2 for phase in summary["phases"])
-    assert not GATE(tmp_path, expected_capacity_limit=limit)
-    assert GATE(tmp_path)
+    assert summary["baseline"]["resources"] == reader.resources
+    assert execute.call_count == 3 and reader.inventories == 6
+    assert all(len(phase["cleanup"]["inventory_ids"]) == count for phase in summary["phases"])
+    assert not GATE(tmp_path)
 
 
-@pytest.mark.parametrize("phase,count,ready", [
-    ("regular", 98, True), ("regular", 99, False), ("service-sas", 99, True), ("service-sas", 100, False),
-])
-def test_override_fresh_gates_recheck_inventory_under_same_limit(tmp_path, phase, count, ready):
+@pytest.mark.parametrize("phase", ["regular", "service-sas"])
+def test_fresh_gates_recheck_owned_absence_despite_foreign_inventory_growth(tmp_path, phase):
     reader = Reader(7)
 
     def execute(*args):
         result = _execution(*args)
         if args[1]["azext_iot_dps_test_phase"] == phase:
-            reader.resources = Reader(count).resources
+            reader.resources = Reader(1000).resources
         return result
 
-    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute, capacity_limit=100)
+    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     next_phase = summary["phases"][1 if phase == "regular" else 2]
-    assert next_phase["gate"]["capacity"]["limit"] == 100
-    assert next_phase["gate"]["capacity"]["ready"] is ready
-    assert status == (0 if ready else 1)
-    assert bool(GATE(tmp_path, expected_capacity_limit=100)) is not ready
+    assert len(next_phase["gate"]["inventory_ids"]) == 1000
+    assert next_phase["gate"]["previous_owned_absent"]
+    assert status == 0 and not GATE(tmp_path)
 
 
-@pytest.mark.parametrize("invalid", [
-    None, True, False, 0, -1, 10.0, "", "0", "-1", "010", "1.0", "1e2", " 100", "100 ",
-    "NaN", "\uff11\uff10\uff10", "True", [], {}, b"100",
-])
-def test_invalid_capacity_limit_fails_before_artifacts_inventory_or_execution(tmp_path, mocker, invalid):
-    reader, execute = mocker.Mock(), mocker.Mock()
-    with pytest.raises(ValueError, match="capacity limit"):
-        RUN(SUB, GROUP, tmp_path / "must-not-exist", reader, execute=execute, capacity_limit=invalid)
-    with pytest.raises(ValueError, match="capacity limit"):
-        RUNNER["capacity"]([], limit=invalid)
-    with pytest.raises(ValueError, match="capacity limit"):
-        RUNNER["verify_cleanup"](reader, [], "uid", 0, limit=invalid)
-    with pytest.raises(ValueError, match="capacity limit"):
-        GATE(tmp_path, expected_capacity_limit=invalid)
-    reader.inventory.assert_not_called()
-    reader.get.assert_not_called()
-    execute.assert_not_called()
-    assert not list(tmp_path.iterdir())
-
-
-def test_ambient_limit_cannot_override_explicit_run_default(tmp_path, mocker, monkeypatch):
-    monkeypatch.setenv("DPS_CAPACITY_LIMIT", "100")
-    execute = mocker.Mock()
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(9), execute=execute) == 1
-    execute.assert_not_called()
-    assert json.loads((tmp_path / "dps-phases.json").read_text())["baseline"]["capacity"]["limit"] == 10
+def test_obsolete_ambient_limit_cannot_block_full_run(tmp_path, monkeypatch):
+    monkeypatch.setenv("DPS_CAPACITY_LIMIT", "1")
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(1000), execute=_execution) == 0
+    assert not GATE(tmp_path)
 
 
 @pytest.mark.parametrize("value", [None, "100", "1", "0", "-1", "10.0", "", "True"])
-def test_runner_cli_limit_is_validated_before_authentication(mocker, value):
+def test_runner_cli_rejects_removed_limit_before_authentication(mocker, value):
     arguments = ["runner", "--subscription", SUB, "--resource-group", GROUP]
     if value is not None:
         arguments += ["--dps-capacity-limit", value]
@@ -340,10 +301,10 @@ def test_runner_cli_limit_is_validated_before_authentication(mocker, value):
     mocker.patch.object(sys, "argv", arguments)
     mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute,
                       bounded_read=nullcontext, require_linux=platform_check)
-    if value in (None, "100", "1"):
+    if value is None:
         assert RUNNER["main"]() == 0
         platform_check.assert_called_once_with()
-        assert execute.call_args.kwargs["capacity_limit"] == (10 if value is None else int(value))
+        assert "capacity_limit" not in execute.call_args.kwargs
     else:
         with pytest.raises(SystemExit) as error:
             RUNNER["main"]()
@@ -354,24 +315,23 @@ def test_runner_cli_limit_is_validated_before_authentication(mocker, value):
 
 
 @pytest.mark.parametrize("section", ["baseline", "regular-cleanup", "sas-gate", "sas-cleanup", "toggle-gate", "toggle-cleanup"])
-@pytest.mark.parametrize("untrusted", [10, 101, "100", 100.0, True, None])
-def test_independent_expected_limit_rejects_tampering_in_every_capacity_receipt(tmp_path, section, untrusted):
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(7), execute=_execution, capacity_limit=100) == 0
+def test_independent_gate_rejects_ambiguous_inventory_in_every_receipt(tmp_path, section):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(1000), execute=_execution) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     if section == "baseline":
-        summary["baseline"]["capacity"]["limit"] = untrusted
+        summary["baseline"]["resources"].append(summary["baseline"]["resources"][0])
     else:
         name, field = section.split("-")
         phase = summary["phases"][{"regular": 0, "sas": 1, "toggle": 2}[name]]
-        phase[field]["capacity"]["limit"] = untrusted
+        phase[field]["inventory_ids"].append(phase[field]["inventory_ids"][0])
         _json(tmp_path / "dps-phases" / phase["name"] / "result.json", phase)
     _json(tmp_path / "dps-phases.json", summary)
-    assert GATE(tmp_path, expected_capacity_limit=100)
+    assert GATE(tmp_path)
 
 
 @pytest.mark.parametrize("expected", [None, "100", "10", "101", "0", "", "100.0"])
-def test_independent_evaluator_cli_binds_trusted_expected_limit(tmp_path, expected):
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(7), execute=_execution, capacity_limit=100) == 0
+def test_independent_evaluator_cli_requires_no_quota_policy(tmp_path, expected):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(1000), execute=_execution) == 0
     for field, value in (("service", "DPS"), ("python", "3.13"), ("region", "centraluseuap"),
                          ("status", "success"), ("failures", "")):
         (tmp_path / f"{field}.txt").write_text(value, encoding="utf-8")
@@ -386,7 +346,7 @@ def test_independent_evaluator_cli_binds_trusted_expected_limit(tmp_path, expect
         }]), SETUP_RESULT="success", UNIT_TEST_RESULT="success", INTEGRATION_RESULT="success",
             GATE_JOB_RESULT="success", GITHUB_STEP_SUMMARY=str(tmp_path / "gate-summary")),
     )
-    assert result.returncode == (0 if expected == "100" else 2 if expected in ("0", "", "100.0") else 1)
+    assert result.returncode == (0 if expected is None else 2)
 
 
 @pytest.mark.parametrize("state", ["Deleting", "Succeeded"])
@@ -687,7 +647,7 @@ def test_final_gate_independently_rejects_missing_or_false_green_evidence(tmp_pa
         elif defect == "cleanup":
             sas["cleanup"]["complete"] = False
         elif defect == "gate":
-            sas["gate"]["capacity"]["ready"] = False
+            sas["gate"]["previous_owned_absent"] = False
         elif defect == "skip":
             tree = ET.parse(folder / "junit.xml")
             ET.SubElement(next(tree.getroot().iter("testcase")), "skipped")
@@ -794,6 +754,18 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker):
     assert reader.hub._config.api_version == "2026-10-01-preview"  # pylint: disable=protected-access
 
 
+@pytest.mark.parametrize("section", ["cleanup", "gate"])
+def test_full_qualification_rejects_owned_resources_still_listed(tmp_path, section):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    summary_path = tmp_path / "dps-phases.json"
+    summary = json.loads(summary_path.read_text())
+    phase = summary["phases"][0 if section == "cleanup" else 1]
+    phase[section]["inventory_ids"].append(summary["phases"][0]["cleanup"]["owned_ids"][0].lower())
+    _json(summary_path, summary)
+    _json(tmp_path / "dps-phases" / phase["name"] / "result.json", phase)
+    assert GATE(tmp_path)
+
+
 @responses.activate
 @pytest.mark.parametrize("body", [{}, None, {"value": None}, {"value": []}])
 def test_inventory_wire_contract_does_not_confuse_missing_results_with_empty_inventory(mocker, body):
@@ -814,7 +786,7 @@ def test_inventory_wire_contract_does_not_confuse_missing_results_with_empty_inv
 
 
 @responses.activate
-def test_inventory_pagination_failure_is_not_partial_capacity_or_retried(mocker):
+def test_inventory_pagination_failure_is_not_partial_ownership_evidence_or_retried(mocker):
     mocker.patch.dict(RUNNER["ArmReader"].inventory.__globals__, bounded_read=nullcontext)
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))

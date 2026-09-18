@@ -255,10 +255,11 @@ def test_unsupported_platform_rejects_before_output_credentials_or_mutation(tmp_
     assert not reader.mock_calls and not (tmp_path / "no").exists()
 
 
-def test_capacity_includes_foreign_hubs_and_prospective_separate_fixtures(tmp_path):
-    result, calls = run(tmp_path, reader=Reader(count=48))
-    assert result == 1 and not calls
-    assert runner.SLOTS["entra"] >= 3
+@pytest.mark.parametrize("count", [48, 50, 1000])
+def test_foreign_hub_count_does_not_block_owned_phases(tmp_path, count):
+    result, calls = run(tmp_path, reader=Reader(count=count))
+    assert result == 0 and len(calls) == 2
+    assert runner.evaluate_hub_phases(tmp_path / "phases")["passed"]
 
 
 def test_observer_precreate_evidence_and_no_uncertain_replay(tmp_path):
@@ -818,14 +819,19 @@ def test_transport_never_replays_accepted_or_ambiguous_update_even_after_get(wir
 
 
 @pytest.mark.parametrize("initial", [False, True])
-def test_unexpected_400_is_not_success_or_initial_ownership(wire, monkeypatch, initial):
-    observer, _, _, _, submit = wire
+@pytest.mark.parametrize("status", [400, 403, 409])
+def test_service_rejection_including_quota_is_not_success_or_initial_ownership(wire, monkeypatch, initial, status):
+    observer, reader, _, _, submit = wire
+    reader.count = 1000
     hub_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
     body = {"properties": {"disableLocalAuth": True}}
     if not initial:
         submit("PUT", hub_id, body)
-    monkeypatch.setattr(observer, "original_send", Mock(return_value=Mock(status_code=400)))
-    submit("PUT", hub_id, body)
+    response = Mock(status_code=status, json=lambda: {"error": {"code": "QuotaExceeded"}})
+    sender = Mock(return_value=response)
+    monkeypatch.setattr(observer, "original_send", sender)
+    assert submit("PUT", hub_id, body) is response
+    sender.assert_called_once()
     record_ = observer.data["resources"][hub_id]
     assert record_["resolved"] is not initial
     assert not record_["uncertain"]
@@ -965,7 +971,7 @@ def test_confirmed_async_a_then_b_then_a_is_a_new_update(wire, monkeypatch):
     assert not ownership.ownership_errors(observer.data, "uid", "regular")
 
 
-@pytest.mark.parametrize("damage", [None, "unknown", "disappeared", "capacity", "history"])
+@pytest.mark.parametrize("damage", [None, "unknown", "disappeared", "many-foreign-hubs", "history"])
 def test_same_name_generation_recreation_and_parent_cleanup(wire, tmp_path, damage):
     observer, reader, resources, requests_sent, submit = wire
     hub_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
@@ -978,9 +984,9 @@ def test_same_name_generation_recreation_and_parent_cleanup(wire, tmp_path, dama
     if damage == "unknown":
         observer.data["resources"][hub_id]["mutations"][-1]["status"] = None
         observer.data["resources"][hub_id]["uncertain"] = True
-    if damage == "capacity":
-        reader.count = 50
-    if damage in ("unknown", "disappeared", "capacity"):
+    if damage == "many-foreign-hubs":
+        reader.count = 1000
+    if damage in ("unknown", "disappeared"):
         with pytest.raises(ownership.OwnershipError):
             submit("PUT", hub_id, body)
         assert len(requests_sent) == (1 if damage == "disappeared" else 2)
@@ -994,8 +1000,8 @@ def test_same_name_generation_recreation_and_parent_cleanup(wire, tmp_path, dama
         current["generations"][0]["mutations"][-1]["status"] = None
     result = runner.cleanup_regular(reader, observer.data, "uid", "regular", time.monotonic() + 1,
                                     tmp_path / "owner.json")
-    assert result["complete"] is (damage is None)
-    assert bool([call for call in reader.calls if call[0] == "DELETE"]) is (damage is None)
+    assert result["complete"] is (damage != "history")
+    assert bool([call for call in reader.calls if call[0] == "DELETE"]) is (damage != "history")
 
 
 @pytest.mark.parametrize("raw", [

@@ -5,7 +5,7 @@ on:
     schedule:
         # Same schedule every day (weekday or weekend): two runs per day.
         # Integration runs can span both slots; the flat matrix does not serialize
-        # services or same-scope runs. Live scope/headroom checks still apply.
+        # services or same-scope runs. Resource ownership/scope checks still apply.
         - cron: "17 8 * * *" # ~00:17 AM PT nightly (08:17 UTC) → preview
         - cron: "17 12 * * *" # ~04:17 AM PT early morning (12:17 UTC) → dev
     workflow_dispatch:
