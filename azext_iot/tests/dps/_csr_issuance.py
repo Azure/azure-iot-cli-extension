@@ -9,25 +9,30 @@
 from contextlib import contextmanager, ExitStack
 import json
 from shlex import quote
-from time import time
+from time import monotonic, sleep, time
+from uuid import UUID, uuid4
 
 import pytest
+from azure.cli.command_modules.role._client_factory import _auth_client_factory
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import adr_service_factory
+from azext_iot.adr.rbac import CONTRIBUTOR_ROLE, LINK_ROLE_IDS
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_condition
 from azext_iot.tests.dps import conftest as fixtures, _phase, _phase_receipts as receipts, _phase_runtime as runtime
-from azext_iot.tests.helpers import invoke_checked
+from azext_iot.tests.helpers import invoke_checked, role_assignment_create_command, role_assignment_create_scope
 
 ROOT_CA = "rootca"
 ISSUING_CA = "issuingca"
 POLICY = "leafpolicy"
 LINK_OPTIONS = "--timeout 1200 --interval 10"
 WAIT_OPTIONS = "--timeout 600 --interval 10"
+NAMESPACE_ROLE_RECEIPT = "csr-namespace-self-role.json"
+NAMESPACE_ROLE_PROPAGATION_SECONDS = 60
 
 
 def invoke(command):
@@ -126,11 +131,128 @@ def _assert_linked(namespace, dps, hub):
         assert endpoint["inboundCallerIdentity"]["type"] == "SystemAssigned"
 
 
+def _namespace_sami(namespace):
+    identity = namespace["identity"]
+    assert "systemassigned" in {kind.strip().casefold() for kind in identity["type"].split(",")}
+    return str(UUID(identity["principalId"]))
+
+
+def _namespace_role_binding(record, principal):
+    return {
+        "scope": record["id"], "principalId": principal, "principalType": "ServicePrincipal",
+        "roleDefinitionId": (
+            f"/subscriptions/{record['subscription']}/providers/Microsoft.Authorization/"
+            f"roleDefinitions/{LINK_ROLE_IDS[CONTRIBUTOR_ROLE]}"
+        ),
+    }
+
+
+def _assignment_matches(assignment, expected):
+    return isinstance(assignment, dict) and all(
+        isinstance(assignment.get(key), str) and assignment[key].casefold() == expected[key].casefold()
+        for key in ("id", "name", "scope", "principalId", "principalType", "roleDefinitionId")
+    )
+
+
+def _get_namespace_role(client, expected):
+    try:
+        role = client.role_assignments.get_by_id(expected["id"])
+    except HttpResponseError as error:
+        if error.status_code == 404:
+            return None
+        raise
+    assignment = {
+        "id": role.id, "name": role.name, "scope": role.scope, "principalId": role.principal_id,
+        "principalType": role.principal_type, "roleDefinitionId": role.role_definition_id,
+    }
+    assert _assignment_matches(assignment, expected), "Namespace role assignment binding changed."
+    return assignment
+
+
+def _grant_namespace_self_role(name):
+    """Test-only Contributor workaround from work item 39640174, comment 55823874."""
+    namespace = find_namespace(name)
+    record = _require_owned(name, namespace)
+    assert record["kind"] == "csrns" and namespace["properties"]["provisioningState"] == "Succeeded"
+    principal = _namespace_sami(namespace)
+    assignment_name = str(uuid4())
+    claim = {
+        **_namespace_role_binding(record, principal),
+        "id": f"{record['id']}/providers/Microsoft.Authorization/roleAssignments/{assignment_name}",
+        "name": assignment_name, "verified": False, "delete_attempted": False, "deleted": False, "conflicted": False,
+    }
+    with _auth_client_factory(fixtures.cli.az_cli, scope=record["id"]) as client:
+        assert _get_namespace_role(client, claim) is None, "Refusing an existing namespace role assignment ID."
+        receipts.write(NAMESPACE_ROLE_RECEIPT, claim, exclusive=True)
+        command = role_assignment_create_command(
+            claim["roleDefinitionId"], claim["scope"],
+            assignee_object_id=principal, assignee_principal_type="ServicePrincipal",
+        )
+        with role_assignment_create_scope(principal):
+            created = invoke(
+                f"{command} --name {assignment_name} --subscription {record['subscription']}"
+            ).as_json()
+        if not _assignment_matches(created, claim):
+            receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "conflicted": True})
+            raise AssertionError("Native role assignment did not preserve its exact journaled binding.")
+        wait_for_condition(
+            lambda: _get_namespace_role(client, claim), lambda value: value is not None,
+            description="owned namespace SAMI Contributor visibility", timeout=300, interval=5,
+            is_retryable_error=lambda _error: False,
+        )
+    receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "verified": True})
+    return monotonic() + NAMESPACE_ROLE_PROPAGATION_SECONDS
+
+
+def _remove_namespace_self_role(name):
+    path = receipts.settings()[0] / NAMESPACE_ROLE_RECEIPT
+    if not path.exists():
+        return
+    namespace = find_namespace(name)
+    record = _require_owned(name, namespace) if namespace is not None else receipts._owned(name)
+    claim = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        **_namespace_role_binding(
+            record, _namespace_sami(namespace) if namespace is not None else str(UUID(claim["principalId"])),
+        ), "name": str(UUID(claim["name"])),
+    }
+    expected["id"] = f"{record['id']}/providers/Microsoft.Authorization/roleAssignments/{expected['name']}"
+    assert _assignment_matches(claim, expected), "Namespace role receipt scope/principal/role changed."
+    assert all(claim.get(key) == record[key] for key in ("run_uid", "subscription", "phase"))
+    assert all(isinstance(claim.get(key), bool) for key in ("verified", "delete_attempted", "deleted", "conflicted"))
+    assert not claim["conflicted"], "Conflicting namespace role ownership requires reconciliation."
+    with _auth_client_factory(fixtures.cli.az_cli, scope=record["id"]) as client:
+        if namespace is None:
+            assert claim["deleted"] and _get_namespace_role(client, claim) is None, (
+                "Namespace disappeared before exact role cleanup; orphan reconciliation is required."
+            )
+            return
+        if not claim["verified"]:
+            # An uncertain create followed by an early 404 cannot release the
+            # namespace: a delayed assignment could otherwise become orphaned.
+            wait_for_condition(
+                lambda: _get_namespace_role(client, claim), lambda value: value is not None,
+                description="uncertain namespace role creation reconciliation", timeout=300, interval=5,
+                is_retryable_error=lambda _error: False,
+            )
+            claim["verified"] = True
+            receipts.write(NAMESPACE_ROLE_RECEIPT, claim)
+        if _get_namespace_role(client, claim) is not None:
+            assert not claim["deleted"], "Completed namespace role assignment reappeared."
+            if not claim["delete_attempted"]:
+                claim["delete_attempted"] = True
+                receipts.write(NAMESPACE_ROLE_RECEIPT, claim)
+                invoke(f"role assignment delete --ids {quote(claim['id'])} --subscription {record['subscription']}")
+            _wait_arm_absent(lambda: _get_namespace_role(client, claim), "owned namespace SAMI role absence")
+    receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "deleted": True})
+
+
 def delete_namespace(name):
     from azext_iot.tests.dps._csr_registry import cleanup_registry_devices
 
     current = find_namespace(name)
     if current is None:
+        _remove_namespace_self_role(name)
         return
     record = _require_owned(name, current)
     cleanup_registry_devices(record)
@@ -156,6 +278,7 @@ def delete_namespace(name):
         if child["properties"].get("provisioningState") != "Deleting":
             invoke(f"{command} delete {arguments} -y")
         _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
+    _remove_namespace_self_role(name)
     if receipts.before_delete(name, find_namespace(name)):
         with runtime.owned_write(name, "DELETE"):
             invoke(f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
@@ -192,6 +315,7 @@ def _create_namespace(run_uid, kind, dps, hub):
             f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
         ).as_json()
         _assert_linked(linked, dps, hub)
+        role_ready_at = _grant_namespace_self_role(name)
 
         record = receipts._owned(name)  # pylint: disable=protected-access
         for label, command, arguments, child_path, options in _children(name):
@@ -208,6 +332,9 @@ def _create_namespace(run_uid, kind, dps, hub):
             assert child["properties"]["provisioningState"] == "Succeeded"
             if label != "policy":
                 assert child["properties"]["certificateAuthorityType"] == ("Root" if label == "root" else "ICA")
+        remaining = max(0, role_ready_at - monotonic())
+        if remaining:
+            sleep(remaining)
         cleanup.pop_all()
         return name, linked
 

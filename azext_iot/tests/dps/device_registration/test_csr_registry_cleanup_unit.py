@@ -277,7 +277,7 @@ def test_damaged_conflict_receipt_cannot_authorize_a_survivor(wire, contents):
     assert "foreign" in wire.devices
 
 
-@pytest.mark.parametrize("failure", [None, "namespace-409", "ca"])
+@pytest.mark.parametrize("failure", [None, "namespace-409", "ca", "namespace-role"])
 def test_registry_completion_does_not_release_controller_targets_until_namespace_absence(wire, mocker, failure):
     session = controller(wire, mocker)
     owner = start(wire)
@@ -287,6 +287,11 @@ def test_registry_completion_does_not_release_controller_targets_until_namespace
     registry.require_registry_cleanup_resolved()
     if failure == "namespace-409":
         wire.namespace_delete_status = 409
+    elif failure == "namespace-role":
+        mocker.patch.object(csr, "_remove_namespace_self_role", side_effect=HttpResponseError(
+            message="Exact owned namespace role cleanup denied",
+            response=SimpleNamespace(status_code=403, reason="Forbidden", headers={}),
+        ))
     elif failure == "ca":
         namespace = receipts._owned("ns")
         child = {
@@ -308,7 +313,7 @@ def test_registry_completion_does_not_release_controller_targets_until_namespace
     if failure:
         with pytest.raises(HttpResponseError) as raised:
             csr.fixtures.pytest_sessionfinish(session)
-        assert raised.value.status_code == 409
+        assert raised.value.status_code == (403 if failure == "namespace-role" else 409)
         assert not wire.events
         assert_retained(wire)
         assert not (wire.directory / "deleted-csrns.json").exists()

@@ -136,8 +136,27 @@ selection still includes these four cases. The full phase counts remain
 35 regular, 29 service-SAS and 3 local-auth-toggle.
 
 The caller still needs the existing owned fixture's management, linking and
-data-plane permissions. Namespace-SAMI ``registryDevices/write`` failures
-(including service ``403000``) must be reported and resolved as an explicitly
-approved test-owned prerequisite, not concealed or addressed by broad product
-RBAC grants. These assertions do not themselves establish successful live
-issuance evidence; retain the actual local run results separately.
+data-plane permissions, plus role-assignment read/write/delete at its newly
+owned namespace. As explicitly approved for these tests, the fixture applies
+the workaround verified in work item 39640174, comment 55823874: Contributor
+(``b24988ac-6180-42a0-ab88-20f7382dd24c``) for the namespace's **own**
+system-assigned principal at **that namespace's exact resource scope**.
+The principal comes from a fresh, ownership-checked ARM read after linking.
+This is separate from the DPS principal's namespace grant; it is not a
+resource-group/subscription grant, custom role, or production CLI auto-grant.
+Contributor is proven but broader than the still-unconfirmed minimum
+``Microsoft.DeviceRegistry/namespaces/registryDevices/write`` contract.
+
+The exact assignment GUID is journaled before its single native create, then
+its ID/principal/role/scope are verified through ARM. Existing authority/policy
+setup consumes the propagation floor; only the remainder of at least 60 seconds
+after verified grant visibility is waited before exposing the fixture.
+Cleanup removes only that exact verified assignment after owned registry/CA
+cleanup and before namespace deletion. Unresolved creates, conflicting bindings,
+unresolved registration/profile actions or missing namespaces with uncompleted
+role cleanup retain the namespace/target quarantine; accepted or uncertain
+assignment deletes are never replayed. Visibility/reconciliation has a
+300-second bound and exact deletion absence a 600-second bound, with no service
+error retry. Service ``403000`` and other failures must still surface rather
+than triggering broader grants or registration retries. Retain actual local
+results separately; offline contracts do not establish successful live issuance.

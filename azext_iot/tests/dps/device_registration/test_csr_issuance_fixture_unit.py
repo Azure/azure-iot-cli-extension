@@ -38,6 +38,7 @@ from azext_iot.tests.dps.device_registration import test_iot_device_registration
 
 UID = "a" * 32
 SUB = "11111111-2222-3333-4444-555555555555"
+NAMESPACE_PRINCIPAL = "77777777-8888-9999-aaaa-bbbbbbbbbbbb"
 
 
 @pytest.fixture
@@ -70,6 +71,7 @@ class NamespaceCommands:
         self.resource = resource
         self.commands = []
         self.resources = {}
+        self.roles = {}
         self.fail = None
         self.namespace_id = (
             f"/subscriptions/{SUB}/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/"
@@ -81,7 +83,20 @@ class NamespaceCommands:
         args = shlex.split(command)
         if self.fail and self.fail in command:
             raise ForbiddenError("Injected service rejection")
-        if "identity assign" in command:
+        if command.startswith("role assignment create "):
+            assignment = args[args.index("--name") + 1]
+            body = {
+                "id": self.namespace_id + "/providers/Microsoft.Authorization/roleAssignments/" + assignment,
+                "name": assignment, "scope": args[args.index("--scope") + 1],
+                "principalId": args[args.index("--assignee-object-id") + 1],
+                "principalType": args[args.index("--assignee-principal-type") + 1],
+                "roleDefinitionId": args[args.index("--role") + 1],
+            }
+            self.roles[body["id"]] = body
+        elif command.startswith("role assignment delete "):
+            del self.roles[args[args.index("--ids") + 1]]
+            body = None
+        elif "identity assign" in command:
             identity = {"principalId": args[1] + "-principal", "type": "SystemAssigned"}
             body = {"identity": identity} if args[1] == "dps" else identity
         elif "link add" in command:
@@ -110,6 +125,8 @@ class NamespaceCommands:
                     "name": self.resource["namespace"] if label == "namespace" else args[args.index("-n") + 1],
                     "properties": properties, "tags": record["tags"],
                 }
+                if label == "namespace":
+                    body["identity"] = {"type": "SystemAssigned", "principalId": NAMESPACE_PRINCIPAL}
                 self.resources[label] = body
             elif " delete " in command:
                 del self.resources[label]
@@ -121,9 +138,29 @@ class NamespaceCommands:
         return SimpleNamespace(as_json=lambda: deepcopy(body))
 
 
+def role_backend(mocker, backend):
+    def get(assignment_id):
+        if assignment_id not in backend.roles:
+            error = HttpResponseError("RoleAssignmentNotFound")
+            error.status_code = 404
+            raise error
+        value = backend.roles[assignment_id]
+        return SimpleNamespace(
+            id=value["id"], name=value["name"], scope=value["scope"], principal_id=value["principalId"],
+            principal_type=value["principalType"], role_definition_id=value["roleDefinitionId"],
+        )
+
+    client = mocker.MagicMock()
+    client.role_assignments.get_by_id.side_effect = get
+    mocker.patch.object(csr, "_auth_client_factory").return_value.__enter__.return_value = client
+    mocker.patch.object(csr, "sleep")
+    backend.role_client = client
+
+
 @pytest.fixture
 def namespace_commands(scope, resource, mocker):
     backend = NamespaceCommands(resource)
+    role_backend(mocker, backend)
     mocker.patch.object(csr, "invoke", side_effect=backend)
     mocker.patch.object(csr, "find_namespace", side_effect=lambda _name: backend.resources.get("namespace"))
     mocker.patch.object(csr, "find_child", side_effect=lambda _name, label: backend.resources.get(label))
@@ -133,6 +170,7 @@ def namespace_commands(scope, resource, mocker):
 @pytest.fixture
 def arm_commands(scope, resource, mocker):
     backend = NamespaceCommands(resource)
+    role_backend(mocker, backend)
     backend.get_responses, backend.get_calls, backend.transport_error = {}, [], None
     endpoint = "https://centraluseuap.management.azure.com"
     credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
@@ -173,7 +211,7 @@ def test_real_sdk_absence_probes_complete_setup_and_dependency_ordered_cleanup(a
     assert not arm_commands.resources
     assert sum(" show " in command for command in arm_commands.commands) == 3  # Present-child readback only.
     assert not any("iot adr ns show " in command for command in arm_commands.commands)
-    deletes = [command for command in arm_commands.commands if " delete " in command]
+    deletes = [command for command in arm_commands.commands if " delete " in command and command.startswith("iot ")]
     assert [command.split(" -n ")[1].split()[0] for command in deletes] == [
         csr.POLICY, csr.ISSUING_CA, csr.ROOT_CA, name,
     ]
@@ -269,26 +307,29 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     mutations = [command for command in namespace_commands.commands if any(
         action in command for action in (" create ", " assign ", " add ")
     )]
-    assert len(mutations) == 7
+    assert len(mutations) == 8
     assert "iot dps identity assign" in mutations[1]
     assert "iot hub identity assign" in mutations[2]
     assert mutations[3].startswith("iot adr ns link add ")
     assert "--timeout 1200 --interval 10" in mutations[3]
     assert "--dps-system-assigned-mi" in mutations[3] and "--hub-system-assigned-mi" in mutations[3]
-    assert "--type Root" in mutations[4]
-    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[5]
-    assert "--validity-days 30" in mutations[6]
+    assert mutations[4].startswith("role assignment create ")
+    assert f'--assignee-object-id "{NAMESPACE_PRINCIPAL}"' in mutations[4]
+    assert "--type Root" in mutations[5]
+    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[6]
+    assert "--validity-days 30" in mutations[7]
     assert sum(" wait " in command for command in namespace_commands.commands) == 3
-    assert not any("role assignment" in command or "linked-hub" in command for command in mutations)
+    assert not any("linked-hub" in command for command in mutations)
     assert json.loads((scope / "created-csrns.json").read_text())["create_completed"]
     csr.delete_namespace(name)
     deletes = [command for command in namespace_commands.commands if " delete " in command]
-    assert ["policy" if " policy " in command else "ica" if "issuingca" in command
+    assert ["role" if command.startswith("role ") else "policy" if " policy " in command else "ica" if "issuingca" in command
             else "root" if "rootca" in command else "namespace" for command in deletes] == [
-        "policy", "ica", "root", "namespace",
+        "policy", "ica", "root", "role", "namespace",
     ]
     assert json.loads((scope / "deleted-csrns.json").read_text())["delete_completed"]
     assert not namespace_commands.resources
+    assert not namespace_commands.roles
 
 
 def test_fixture_commands_parse_through_real_root_loader(namespace_commands, resource):
@@ -300,7 +341,7 @@ def test_fixture_commands_parse_through_real_root_loader(namespace_commands, res
 
     name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
     csr.delete_namespace(name)
-    commands = [shlex.split(command) for command in namespace_commands.commands]
+    commands = [shlex.split(command) for command in namespace_commands.commands if command.startswith("iot ")]
     names = {
         " ".join(command[:next(i for i, arg in enumerate(command) if arg in {
             "create", "show", "wait", "delete", "assign", "add",
