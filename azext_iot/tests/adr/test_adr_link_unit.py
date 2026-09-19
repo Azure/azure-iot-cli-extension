@@ -16,6 +16,7 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
+from azure.cli.core.cloud import AZURE_CHINA_CLOUD, AZURE_PUBLIC_CLOUD, AZURE_US_GOV_CLOUD
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.util import CLIError
 
@@ -719,6 +720,37 @@ def test_dps_profile_lookup_failure_keeps_namespace_inspection(fixture_link_prov
     )
     assert fixture_link_provider.dps_show("dps", "namespace", "rg")["brownfieldHubsAvailable"] is False
     assert "Could not initialize DPS inspection" in caplog.text
+
+
+@pytest.mark.parametrize("cloud,arm_audience", [
+    (AZURE_US_GOV_CLOUD, None),
+    (AZURE_CHINA_CLOUD, None),
+    (AZURE_PUBLIC_CLOUD, "https://management.usgovcloudapi.net"),
+])
+def test_dps_optional_inspection_preserves_real_factory_cloud_guard(
+    fixture_link_provider, mocker, monkeypatch, caplog, cloud, arm_audience,
+):
+    from azext_iot.adr.providers import link
+
+    cli_ctx = fixture_link_provider.cmd.cli_ctx
+    cloud = deepcopy(cloud)
+    if arm_audience:
+        cloud.endpoints.active_directory_resource_id = arm_audience
+    monkeypatch.setattr(cli_ctx, "cloud", cloud)
+    credential = mocker.patch(
+        "azext_iot._factory.get_cli_credential", side_effect=AssertionError("Unexpected credential lookup"),
+    )
+    factory = mocker.spy(link, "adr_iot_service_provisioning_factory")
+    with pytest.raises(CLIError, match="Azure public cloud only"):
+        factory(cli_ctx, subscription_id="sub")
+    factory.reset_mock()
+
+    with pytest.raises(CLIError, match="Azure public cloud only"):
+        fixture_link_provider._side_get_dps_resource(DPS_ID)
+
+    credential.assert_not_called()
+    factory.assert_not_called()
+    assert "Could not initialize DPS inspection" not in caplog.text
 
 
 @pytest.mark.parametrize("stage", ["factory", "get"])
