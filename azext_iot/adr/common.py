@@ -38,6 +38,32 @@ class GroupType(Enum):
     registry_device = "RegistryDevice"
 
 
+class RegistryDeviceEnablementState(Enum):
+    enabled = "Enabled"
+    disabled = "Disabled"
+
+
+class RegistryDeviceAuthenticationType(Enum):
+    certificate_authority_signed_x509_certificate = "CertificateAuthoritySignedX509Certificate"
+    self_signed_x509_certificate = "SelfSignedX509Certificate"
+    symmetric_key = "SymmetricKey"
+
+
+class DeviceAttributeReportedType(Enum):
+    """Customers author User attributes; Device Update provenance is service-owned."""
+
+    adu = "Microsoft.DeviceUpdate"
+    user = "User"
+
+
+ADU_ATTRIBUTE_NAME = "update"
+
+
+def is_adu_attribute_alias(attribute_name: str) -> bool:
+    """Accept software-update spellings for reads, after trying the literal name."""
+    return attribute_name.replace("-", "").replace("_", "").lower() == "softwareupdate"
+
+
 class JobType(Enum):
     software_update = "SoftwareUpdate"
     onboarding_update = "OnboardingUpdate"

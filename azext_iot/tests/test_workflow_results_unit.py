@@ -533,7 +533,10 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 30
+        assert len(nodes) == 31
+        assert {
+            "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
+        } <= nodes
         assert expected <= nodes
         assert {
             "test_adr_certificate_authority_int.py::TestADRCAActions::" + name

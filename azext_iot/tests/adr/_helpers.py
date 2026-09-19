@@ -138,7 +138,14 @@ def is_retryable_resource_error(error: Exception) -> bool:
     )
 
 
-def is_resource_not_found_error(error: Exception) -> bool:
+def is_resource_not_found_error(error: Exception, *, ambient_context=None) -> bool:
+    """Classify lookup evidence without borrowing an in-flight caller failure.
+
+    Callers may snapshot sys.exc_info()[1:] immediately before their operation.
+    Only that exact, unchanged exception is an implicit-context boundary.
+    Explicit causes and exceptions re-raised by the operation remain evidence.
+    """
+    ambient_error, ambient_traceback = ambient_context or (None, None)
     statuses = []
     codes = []
     seen = set()
@@ -177,8 +184,18 @@ def is_resource_not_found_error(error: Exception) -> bool:
         cause = current.__cause__
         # A fresh HTTP response during cleanup can have an unrelated primary
         # failure as its implicit context. Only unwrap status-less wrappers.
-        if cause is None and not response_statuses and not current.__suppress_context__:
-            cause = current.__context__
+        if (
+            cause is None and not response_statuses
+            and (ambient_context is not None or not current.__suppress_context__)
+        ):
+            # With a known operation boundary, `raise ... from None` only
+            # suppresses traceback display, not genuine lookup-error evidence.
+            context = current.__context__
+            if not (
+                context is not None and context is ambient_error
+                and context.__traceback__ is ambient_traceback
+            ):
+                cause = context
         if (
             isinstance(current, CliExecutionError)
             and current.__cause__ is None
@@ -215,14 +232,15 @@ def is_resource_not_found_error(error: Exception) -> bool:
 
 
 def resource_is_absent(test, show_command: str, *, description: str = "resource") -> bool:
+    ambient_context = sys.exc_info()[1:]
     try:
         test.cmd(show_command)
     except SystemExit as error:
-        if error.code == 3 and is_resource_not_found_error(error):
+        if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
             return True
         raise AssertionError(f"{description} lookup exited with code {error.code}") from error
     except (HttpResponseError, CloudError, CLIError) as error:
-        if not is_resource_not_found_error(error):
+        if not is_resource_not_found_error(error, ambient_context=ambient_context):
             raise
         return True
     return False
@@ -519,14 +537,15 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
         confirmation = " --yes" if kind in {"namespace", "su"} else ""
         wait_option = " --no-wait" if no_wait else ""
+        ambient_context = sys.exc_info()[1:]
         try:
             self.cmd(f"{command} delete {arguments}{confirmation}{wait_option}")
         except SystemExit as error:
-            if error.code == 3 and is_resource_not_found_error(error):
+            if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
                 return
             raise AssertionError(f"{kind} delete exited with code {error.code}") from error
         except (HttpResponseError, CloudError, CLIError) as error:
-            if not is_resource_not_found_error(error):
+            if not is_resource_not_found_error(error, ambient_context=ambient_context):
                 raise
 
     def cleanup_full_infra(self):

@@ -20,9 +20,11 @@ from azext_iot.adr.common import (
     CertificateAuthorityKeyType,
     CertificateAuthorityIssuerType,
     CertificateAuthorityType,
+    DeviceAttributeReportedType,
     GroupType,
     JobType,
     MessagingEndpointAvailability,
+    RegistryDeviceEnablementState,
     ReportType,
 )
 
@@ -34,6 +36,8 @@ def load_adr_arguments(self, _):
         "iot adr ns wait",
         "iot adr ns ca wait",
         "iot adr ns ca policy wait",
+        "iot adr ns registry-device wait",
+        "iot adr ns registry-device auth wait",
         "iot adr ns identity wait",
         "iot adr ns link wait",
         "iot adr ns link hub wait",
@@ -224,6 +228,84 @@ def load_adr_arguments(self, _):
             type=int,
             help="Updated leaf certificate validity period in days. Must be between "
                  "7 and 90 days, inclusive.",
+        )
+
+    with self.argument_context("iot adr ns registry-device") as context:
+        context.argument(
+            "namespace_name", options_list=["--namespace", "--ns"],
+            help="Name of the Device Registry namespace.",
+        )
+        context.argument(
+            "registry_device_name", options_list=["--device-name", "--dn", "--name", "-n"],
+            help="Name of the Registry Device.",
+        )
+
+    for verb in ("create", "update"):
+        with self.argument_context(f"iot adr ns registry-device {verb}") as context:
+            context.argument("tags", arg_type=tags_type)
+            context.argument(
+                "enablement_state", options_list=["--enablement-state"],
+                arg_type=get_enum_type(RegistryDeviceEnablementState),
+                help="Whether the Registry Device is enabled or disabled.",
+            )
+            for field, description in (
+                ("manufacturer", "Manufacturer"), ("model", "Model"),
+                ("hardware_revision", "Hardware revision"), ("software_revision", "Software revision"),
+            ):
+                context.argument(
+                    field, options_list=[f"--{field.replace('_', '-')}"],
+                    help=f"{description} of the Registry Device.",
+                )
+
+    with self.argument_context("iot adr ns registry-device create") as context:
+        context.argument("location", arg_type=get_location_type(self.cli_ctx))
+        context.argument(
+            "external_device_id", options_list=["--external-device-id", "--ext-id"],
+            help="Customer-provided device ID. This property is create-only.",
+        )
+
+    for verb in ("show", "wait"):
+        with self.argument_context(f"iot adr ns registry-device {verb}") as context:
+            context.argument(
+                "external_device_id", options_list=["--external-device-id", "--ext-id"],
+                help="Customer-provided external ID. Specify exactly one of this option or --name. "
+                "Lookup follows all namespace result pages; duplicate matches are an error.",
+            )
+
+    for child, field, aliases in (
+        ("auth", "authentication_profile_name", ["--auth-profile-name", "--apn", "--name", "-n"]),
+        ("attribute", "attribute_name", ["--attribute-name", "--an", "--name", "-n"]),
+        ("capability", "capability_name", ["--capability-name", "--cn", "--name", "-n"]),
+    ):
+        with self.argument_context(f"iot adr ns registry-device {child}") as context:
+            context.argument(
+                "registry_device_name", options_list=["--registry-device-name", "--rdn", "--device-name", "--dn"],
+                help="Name of the parent Registry Device.",
+            )
+            context.argument(field, options_list=aliases, help=f"Name of the Registry Device {child}.")
+
+    with self.argument_context("iot adr ns registry-device attribute show") as context:
+        context.argument(
+            "attribute_name", options_list=["--attribute-name", "--an", "--name", "-n"],
+            help="Attribute name. If no literal match exists, software-update is an alias for "
+            "the service-owned Device Update attribute named update.",
+        )
+
+    with self.argument_context("iot adr ns registry-device attribute create") as context:
+        context.argument(
+            "reported_by", options_list=["--reported-by", "--rb"],
+            arg_type=get_enum_type([DeviceAttributeReportedType.user.value]),
+            deprecate_info=context.deprecate(hide=True),
+            help="Deprecated compatibility option. Customer-authored attributes use User provenance.",
+        )
+        context.argument(
+            "schema", options_list=["--schema"],
+            help="Schema identifier for the attribute. Use a schema supported by your service.",
+        )
+        context.argument(
+            "properties", options_list=["--properties", "--props"],
+            help="Attribute properties as a JSON object or JSON file path (optionally prefixed by @). "
+            "Service-owned Microsoft.DeviceUpdate provenance cannot be authored.",
         )
 
     # Namespace managed identity

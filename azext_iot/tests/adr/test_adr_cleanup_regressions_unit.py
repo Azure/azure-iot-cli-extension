@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import shlex
+import sys
+import traceback
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -12,14 +14,16 @@ import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.cli.testsdk.base import ExecutionResult
 from azure.cli.testsdk.exceptions import CliExecutionError
-from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.util import CLIError
 
 from azext_iot.tests.adr import test_adr_certificate_authority_int as ca_scenario
+from azext_iot.tests.adr import test_adr_registry_device_int as registry_scenario
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     CleanupLedger,
     is_resource_not_found_error,
+    resource_is_absent,
     wait_for_resource_absent,
 )
 
@@ -103,6 +107,173 @@ def test_sdk_wrapper_structured_denial_and_nontransparent_cycles_are_rejected():
     error.__context__.error = None
     error.__context__.exception = CLIError("different exception")
     assert not is_resource_not_found_error(error)
+
+
+def _real_scenario(invoke):
+    scenario = registry_scenario.TestADRRegistryDeviceLifecycle("test_registry_device_lifecycle")
+    scenario.kwargs = {}
+    invocation = Mock(side_effect=invoke)
+    scenario.cli_ctx = Mock(data={}, invoke=invocation)
+    return scenario, invocation
+
+
+@pytest.mark.parametrize("primary_type", [AssertionError, ClientAuthenticationError, ServiceRequestError])
+def test_real_testsdk_missing_exit_during_primary_failure_uses_only_lookup_evidence(primary_type):
+    primary = primary_type("original scenario failure")
+    missing = SystemExit(3)
+
+    def invoke(*_args, **_kwargs):
+        raise missing
+
+    scenario, invocation = _real_scenario(invoke)
+    with pytest.raises(primary_type) as raised:
+        try:
+            raise primary
+        finally:
+            original_traceback = primary.__traceback__
+            assert resource_is_absent(scenario, "iot adr ns show -n owned -g rg")
+            assert missing.__context__ is primary
+            assert primary.__traceback__ is original_traceback
+            # No blanket exception-type or exit-code relaxation: without the
+            # observed boundary the classifier still inspects the whole chain.
+            assert not is_resource_not_found_error(missing)
+    assert raised.value is primary
+    frames = [frame.name for frame in traceback.extract_tb(missing.__traceback__)]
+    assert "_in_process_execute" in frames and "cmd" in frames
+    invocation.assert_called_once()
+
+
+@pytest.mark.parametrize("lookup_error", [
+    ClientAuthenticationError("ResourceNotFound 404"),
+    ServiceRequestError("ResourceNotFound 404"),
+    ServiceResponseError("ResourceNotFound 404"),
+    CLIError("AuthorizationFailed: ResourceNotFound 404"),
+])
+@pytest.mark.parametrize("chain", ["implicit", "explicit", "suppressed"])
+def test_real_testsdk_missing_exit_preserves_lookup_auth_and_transport_failures(lookup_error, chain):
+    primary = AssertionError("original assertion")
+    missing = SystemExit(3)
+
+    def invoke(*_args, **_kwargs):
+        try:
+            raise lookup_error
+        except type(lookup_error) as error:
+            if chain == "explicit":
+                raise missing from error
+            if chain == "suppressed":
+                raise missing from None
+            raise missing  # pylint: disable=raise-missing-from
+
+    scenario, invocation = _real_scenario(invoke)
+    with pytest.raises(AssertionError, match="original assertion") as raised:
+        try:
+            raise primary
+        finally:
+            with pytest.raises(AssertionError, match="lookup exited with code 3") as failure:
+                resource_is_absent(scenario, "iot adr ns show -n owned -g rg")
+            assert failure.value.__cause__ is missing
+            assert missing.__context__ is lookup_error
+    assert raised.value is primary
+    invocation.assert_called_once()
+
+
+@pytest.mark.parametrize("cause", ["explicit", "reraised", "reraised-suppressed"])
+def test_real_testsdk_does_not_discard_ambient_exception_when_lookup_reuses_it(cause):
+    primary = ClientAuthenticationError("original authorization failure")
+    missing = SystemExit(3)
+
+    def invoke(*_args, **_kwargs):
+        if cause == "explicit":
+            raise missing from primary
+        try:
+            raise primary
+        except ClientAuthenticationError:
+            if cause == "reraised-suppressed":
+                raise missing from None
+            raise missing  # pylint: disable=raise-missing-from
+
+    scenario, _ = _real_scenario(invoke)
+    with pytest.raises(ClientAuthenticationError) as raised:
+        try:
+            raise primary
+        finally:
+            with pytest.raises(AssertionError, match="lookup exited with code 3"):
+                resource_is_absent(scenario, "iot adr ns show -n owned -g rg")
+    assert raised.value is primary
+
+
+@pytest.mark.parametrize("status", [403, 502])
+def test_lookup_status_conflict_survives_ambient_context_boundary(status):
+    primary = AssertionError("unrelated failure")
+    lookup = HttpResponseError("ResourceNotFound 404")
+    lookup.status_code = status
+    missing = SystemExit(3)
+
+    def invoke(*_args, **_kwargs):
+        try:
+            raise lookup
+        except HttpResponseError:
+            raise missing  # pylint: disable=raise-missing-from
+
+    scenario, _ = _real_scenario(invoke)
+    with pytest.raises(AssertionError, match="unrelated failure"):
+        try:
+            raise primary
+        finally:
+            with pytest.raises(AssertionError, match="lookup exited with code 3"):
+                resource_is_absent(scenario, "iot adr ns show -n owned -g rg")
+
+
+@pytest.mark.parametrize("exit_code", [2, 3, 4])
+def test_real_testsdk_delete_race_uses_same_narrow_ambient_boundary(exit_code):
+    primary = AssertionError("original assertion")
+    calls = []
+
+    def invoke(command, **_kwargs):
+        calls.append(command)
+        if "delete" in command:
+            raise SystemExit(exit_code)
+        return 0
+
+    scenario, _ = _real_scenario(invoke)
+    helper = ADRFullInfraHelper()
+    helper.cmd = scenario.cmd
+    owned = ("namespace", "owned", "rg")
+    helper._owned_resources = {owned: None}
+    with pytest.raises(AssertionError, match="original assertion") as raised:
+        try:
+            raise primary
+        finally:
+            helper.cleanup_full_infra()
+    assert raised.value is primary
+    assert helper._owned_resources == ({} if exit_code == 3 else {owned: None})
+    assert len(calls) == 2
+
+
+def test_ambient_snapshot_is_required_and_exception_chain_is_not_mutated():
+    primary = AssertionError("unrelated assertion")
+    missing = SystemExit(3)
+    try:
+        raise primary
+    except AssertionError:
+        boundary = sys.exc_info()[1:]
+        try:
+            raise missing
+        except SystemExit:
+            assert is_resource_not_found_error(missing, ambient_context=boundary)
+            assert not is_resource_not_found_error(missing)
+            assert missing.__context__ is primary
+
+
+def test_real_testsdk_suppressed_not_found_chain_still_proves_absence():
+    def invoke(*_args, **_kwargs):
+        try:
+            raise ResourceNotFoundError("owned resource missing")
+        except ResourceNotFoundError:
+            raise SystemExit(3) from None
+
+    scenario, _ = _real_scenario(invoke)
+    assert resource_is_absent(scenario, "iot adr ns show -n owned -g rg")
 
 
 def test_cleanup_dependency_failure_retains_exact_callbacks_for_explicit_retry():
