@@ -29,6 +29,8 @@ from azure.cli.core.parser import AzCliCommandParser
 from azure.core.credentials import AccessToken
 
 
+_IDENTITY_UPDATE_COMMAND = "iot hub device-identity update"
+_IDENTITY_LOGIN = "HostName=hub.unit.invalid;SharedAccessKeyName=owner;SharedAccessKey=b2ZmbGluZQ=="
 _NAMESPACE_ARGUMENTS = [
     "--namespace",
     "namespace",
@@ -133,7 +135,10 @@ def management_command_parser():
     loader = cli_ctx.commands_loader
     loader.skip_applicability = True
     loader.load_command_table(None)
-    names = [*_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_REGISTRY_DEVICE_PARSER_CASES, "iot hub create", "iot dps create"]
+    names = [
+        *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_REGISTRY_DEVICE_PARSER_CASES,
+        "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
+    ]
     loader.command_table = {
         name: loader.command_table[name]
         for name in names
@@ -152,6 +157,289 @@ def management_command_parser():
     parser = AzCliCommandParser(cli_ctx=cli_ctx)
     parser.load_command_table(loader)
     return parser
+
+
+class _HubIdentityCommandsLoader(MainCommandsLoader):
+    def load_command_table(self, args):
+        from azext_iot import IoTExtCommandsLoader
+
+        loader = IoTExtCommandsLoader(self.cli_ctx)
+        table = loader.load_command_table(args)
+        self.command_table = {_IDENTITY_UPDATE_COMMAND: table[_IDENTITY_UPDATE_COMMAND]}
+        self.cmd_to_loader_map = {_IDENTITY_UPDATE_COMMAND: [loader]}
+        return self.command_table
+
+
+@pytest.fixture
+def identity_update_cli(mocker):
+    """Run the native invoker, discovery, generic update and SDK against offline HTTP only."""
+    from azure.core.credentials import AzureKeyCredential
+    from azext_iot import _factory
+    from azext_iot.iothub.providers.discovery import IotHubDiscovery
+    from azext_iot.operations import hub
+
+    subscription = "00000000-0000-0000-0000-000000000001"
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
+    mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
+    oauth = mocker.patch.object(_factory, "IoTOAuth", return_value=AzureKeyCredential("Bearer offline-token"))
+    mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value=subscription)
+    mocker.patch("azext_iot.iothub.providers.discovery.get_subscription_id", return_value=subscription)
+    profile_guard = mocker.patch("azure.cli.core._profile.Profile.__init__", side_effect=AssertionError("Live Profile"))
+    discovery = mocker.spy(IotHubDiscovery, "get_target")
+    custom_update = mocker.spy(hub, "update_iot_device_custom")
+    cli = DummyCli(commands_loader_cls=_HubIdentityCommandsLoader)
+    cli.data["subscription_id"] = subscription
+    resource_id = f"/subscriptions/{subscription}/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub"
+    state = SimpleNamespace(
+        cli=cli, discovery=discovery, custom_update=custom_update, oauth=oauth, requests=[],
+        resource={
+            "deviceId": "device", "etag": "original", "status": "enabled", "statusReason": "original",
+            "capabilities": {"iotEdge": False},
+            "authentication": {
+                "type": "sas", "symmetricKey": {"primaryKey": "cHJpbWFyeQ==", "secondaryKey": "c2Vjb25kYXJ5"},
+                "x509Thumbprint": {"primaryThumbprint": "primary", "secondaryThumbprint": "secondary"},
+                "policyResourceId": "policy", "x509CaValidation": True, "unknownAuthField": "drop",
+            },
+            "attributes": {"keep": "value", "items": []},
+            "adrDeviceProperties": {"uuid": "owned"}, "deviceResourceId": "owned",
+            "armSyncStatus": {"status": "owned"}, "unknownField": "drop",
+        },
+    )
+
+    def respond(request):
+        state.requests.append(request)
+        path = urlsplit(request.url).path
+        if path == resource_id:
+            assert request.method == "GET"
+            return 200, {}, json.dumps({
+                "id": resource_id, "name": "hub", "location": "centraluseuap", "sku": {"tier": "Standard"},
+                "properties": {"hostName": "hub.unit.invalid"},
+            })
+        if path == resource_id + "/listkeys":
+            assert request.method == "POST"
+            return 200, {}, json.dumps({"value": [{
+                "keyName": "owner", "primaryKey": "b2ZmbGluZQ==", "secondaryKey": "b2ZmbGluZQ==",
+                "rights": "RegistryWrite, ServiceConnect, DeviceConnect",
+            }]})
+        assert urlsplit(request.url).netloc == "hub.unit.invalid"
+        assert path == "/devices/device"
+        assert "api-version=2026-11-01-preview" in request.url
+        if request.method == "PUT":
+            state.resource = json.loads(request.body)
+        else:
+            assert request.method == "GET"
+        return 200, {}, json.dumps(state.resource)
+
+    def invoke(arguments):
+        output = StringIO()
+        try:
+            code = cli.invoke([*_IDENTITY_UPDATE_COMMAND.split(), *arguments], out_file=output)
+        except SystemExit as error:
+            code = error.code
+        return code, cli.result, output.getvalue()
+
+    state.invoke = invoke
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
+        for method in ("GET", "POST", "PUT"):
+            network.add_callback(
+                method, re.compile(r"https://(?:hub\.unit\.invalid|centraluseuap\.management\.azure\.com)/.*"),
+                callback=respond, content_type="application/json",
+            )
+        yield state
+    profile_guard.assert_not_called()
+
+
+@pytest.mark.parametrize("arguments", [[], ["--auth-type", "login"], ["-g", "rg"], ["--login", ""], ["-n", ""]])
+def test_identity_update_invocation_requires_target_before_getter(identity_update_cli, arguments):
+    from azure.cli.core.azclierror import RequiredArgumentMissingError
+
+    runtime = identity_update_cli
+    code, result, _ = runtime.invoke(["-d", "device", "--set", "status=disabled", *arguments])
+    assert code != 0
+    assert isinstance(result.error, RequiredArgumentMissingError)
+    assert "hub" in str(result.error).lower() and "login" in str(result.error).lower()
+    runtime.discovery.assert_not_called()
+    runtime.custom_update.assert_not_called()
+    assert runtime.requests == []
+
+
+@pytest.mark.parametrize("target,authorization,management_methods", [
+    (["-n", "hub", "-g", "rg"], "SharedAccessSignature ", ["GET", "POST", "GET", "POST"]),
+    (["-n", "hub", "-g", "rg", "--auth-type", "login"], "Bearer ", ["GET", "GET"]),
+    (["-n", "hub.unit.invalid", "--auth-type", "login"], "Bearer ", []),
+    (["--login", _IDENTITY_LOGIN], "SharedAccessSignature ", []),
+    (["-n", "ignored", "--auth-type", "login", "--login", _IDENTITY_LOGIN], "SharedAccessSignature ", []),
+])
+def test_identity_update_invocation_preserves_target_auth_and_write_projection(
+    identity_update_cli, target, authorization, management_methods,
+):
+    runtime = identity_update_cli
+    code, result, _ = runtime.invoke([
+        "-d", "device", *target, "--set", "status=DISABLED", "--status-reason", "maintenance", "--etag", "explicit",
+    ])
+    assert code == 0, result.error
+    requests = [request for request in runtime.requests if urlsplit(request.url).netloc == "hub.unit.invalid"]
+    assert [request.method for request in requests] == ["GET", "PUT"]
+    assert [request.method for request in runtime.requests if request not in requests] == management_methods
+    assert all(request.headers["Authorization"].startswith(authorization) for request in requests)
+    assert requests[-1].headers["If-Match"] == '"explicit"'
+    assert runtime.resource["status"] == "disabled"
+    assert runtime.resource["statusReason"] == "maintenance"
+    assert runtime.resource["authentication"] == {
+        "type": "sas", "symmetricKey": {"primaryKey": "cHJpbWFyeQ==", "secondaryKey": "c2Vjb25kYXJ5"},
+        "x509Thumbprint": {"primaryThumbprint": "primary", "secondaryThumbprint": "secondary"},
+        "policyResourceId": "policy", "x509CaValidation": True,
+    }
+    assert not {"adrDeviceProperties", "deviceResourceId", "armSyncStatus", "unknownField", "hub"} & runtime.resource.keys()
+    assert runtime.discovery.call_count == 2
+    runtime.custom_update.assert_called_once()
+    assert runtime.oauth.call_count == (2 if authorization == "Bearer " else 0)
+
+
+@pytest.mark.parametrize("arguments,path,expected", [
+    (["--status-reason", "maintenance"], ("statusReason",), "maintenance"),
+    (["--edge-enabled", "true"], ("capabilities", "iotEdge"), True),
+    (["--primary-key", "bmV3"], ("authentication", "symmetricKey", "primaryKey"), "bmV3"),
+    (["--set", ".status=DISABLED"], ("status",), "disabled"),
+    (["--set", "attributes.adrDeviceProperties=user"], ("attributes", "adrDeviceProperties"), "user"),
+    (["--set", "attributes.deviceResourceId=null"], ("attributes", "deviceResourceId"), None),
+    (["--add", "attributes.items", "adrDeviceProperties=user"], ("attributes", "items"), [{"adrDeviceProperties": "user"}]),
+    (["--remove", "attributes.keep"], ("attributes",), {"items": []}),
+    (["--status", "enabled", "--set", "status=disabled"], ("status",), "disabled"),
+    (["--set", "status=disabled", "--set", "status=enabled"], ("status",), "enabled"),
+])
+def test_identity_update_invocation_keeps_allowed_partial_updates(identity_update_cli, arguments, path, expected):
+    runtime = identity_update_cli
+    code, result, _ = runtime.invoke(["-d", "device", "--login", _IDENTITY_LOGIN, *arguments])
+    assert code == 0, result.error
+    assert [request.method for request in runtime.requests] == ["GET", "PUT"]
+    assert runtime.requests[-1].headers["If-Match"] == '"*"'
+    value = runtime.resource
+    for key in path:
+        value = value[key]
+    assert value == expected
+
+
+@pytest.mark.parametrize("auth_type", ["sas", "selfSigned", "certificateAuthority"])
+def test_identity_update_invocation_preserves_partial_policy_auth(identity_update_cli, auth_type):
+    runtime = identity_update_cli
+    authentication = {"type": auth_type, "policyResourceId": "policy", "x509CaValidation": True}
+    if auth_type == "selfSigned":
+        authentication["x509Thumbprint"] = {"primaryThumbprint": "primary", "secondaryThumbprint": "secondary"}
+    runtime.resource["authentication"] = deepcopy(authentication)
+    code, result, _ = runtime.invoke([
+        "-d", "device", "--login", _IDENTITY_LOGIN, "--status-reason", "maintenance",
+    ])
+    assert code == 0, result.error
+    assert [request.method for request in runtime.requests] == ["GET", "PUT"]
+    assert runtime.resource["authentication"] == authentication
+
+
+@pytest.mark.parametrize("path", [
+    "adrDeviceProperties", "deviceResourceId", "armSyncStatus",
+    "adr_device_properties.uuid", "ADRDEVICEPROPERTIES.uuid", "armSyncStatus[0]",
+    ".adrDeviceProperties.uuid", "..device_resource_id", ".armSyncStatus.[0]",
+])
+@pytest.mark.parametrize("operation", ["--set", "--add", "--remove"])
+def test_identity_update_invocation_rejects_owned_intent_before_getter(identity_update_cli, path, operation):
+    runtime = identity_update_cli
+    values = [f"{path}=forged"] if operation == "--set" else [path, "uuid=forged"] if operation == "--add" else [path]
+    code, result, _ = runtime.invoke([
+        "-d", "device", "--login", _IDENTITY_LOGIN, "--set", "status=disabled", operation, *values,
+    ])
+    assert code != 0
+    assert "owned by ADR/ARM" in str(result.error)
+    runtime.discovery.assert_not_called()
+    runtime.custom_update.assert_not_called()
+    assert runtime.requests == []
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--set", "deviceResourceId=owned"],
+    ["--set", "adrDeviceProperties.uuid=forged", "--set", "adrDeviceProperties.uuid=owned"],
+    ["--remove", "adrDeviceProperties", "--set", 'adrDeviceProperties={"uuid":"owned"}'],
+])
+def test_identity_update_invocation_rejects_owned_intent_even_without_net_change(identity_update_cli, arguments):
+    runtime = identity_update_cli
+    code, result, _ = runtime.invoke(["-d", "device", "--login", _IDENTITY_LOGIN, *arguments])
+    assert code != 0
+    assert "owned by ADR/ARM" in str(result.error)
+    runtime.discovery.assert_not_called()
+    runtime.custom_update.assert_not_called()
+    assert runtime.requests == []
+
+
+def test_identity_update_invocation_requires_device(identity_update_cli):
+    code, _, _ = identity_update_cli.invoke(["--login", _IDENTITY_LOGIN, "--set", "status=disabled"])
+    assert code != 0
+    identity_update_cli.discovery.assert_not_called()
+    assert identity_update_cli.requests == []
+
+
+def test_identity_update_invocation_rejects_malformed_login_before_http(identity_update_cli):
+    code, result, _ = identity_update_cli.invoke([
+        "-d", "device", "--login", "malformed", "--set", "status=disabled",
+    ])
+    assert code != 0
+    assert "connection string" in str(result.error).lower()
+    identity_update_cli.custom_update.assert_not_called()
+    assert identity_update_cli.requests == []
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--auth-type", "invalid"], ["--auth-method", "invalid"], ["--status", "invalid"],
+    ["--edge-enabled", "invalid"], ["--set"], ["--unknown-option"],
+])
+def test_identity_update_invocation_rejects_invalid_arguments_before_getter(identity_update_cli, arguments):
+    runtime = identity_update_cli
+    code, _, _ = runtime.invoke(["-d", "device", "--login", _IDENTITY_LOGIN, *arguments])
+    assert code != 0
+    runtime.discovery.assert_not_called()
+    runtime.custom_update.assert_not_called()
+    assert runtime.requests == []
+
+
+@pytest.mark.parametrize("arguments,message", [
+    (["--primary-thumbprint", "new"], "does not support primary or secondary thumbprints"),
+    (["--auth-method", "shared_private_key", "--primary-key", "bmV3"], "primary + secondary Key required"),
+    (["--auth-method", "x509_thumbprint"], "primary or secondary Thumbprint required"),
+    (["--set", "authentication.type=invalid"], "authentication.type must be one of"),
+    (["--remove", "notPresent"], "notPresent"),
+    (["--set", "=empty"], "Empty key"),
+])
+def test_identity_update_invocation_rejects_invalid_update_before_setter(identity_update_cli, arguments, message):
+    runtime = identity_update_cli
+    code, result, _ = runtime.invoke(["-d", "device", "--login", _IDENTITY_LOGIN, *arguments])
+    assert code != 0
+    assert message in str(result.error)
+    assert [request.method for request in runtime.requests] == ["GET"]
+
+
+def test_identity_update_hook_is_hidden_and_cannot_be_supplied(identity_update_cli, capsys):
+    runtime = identity_update_cli
+    code, _, output = runtime.invoke(["--help"])
+    assert code == 0
+    help_output = (output + capsys.readouterr().out).lower()
+    assert "--login" in help_output and "--set" in help_output
+    assert "identity_update" not in help_output and "identity-update" not in help_output
+    for option in ("--identity-update", "--identity_update", "--__IDENTITY_UPDATE", "--__IDENTITY_UPDATE=false"):
+        code, _, _ = runtime.invoke([
+            "-d", "device", "--login", _IDENTITY_LOGIN, "--set", "adrDeviceProperties.uuid=forged", option,
+        ])
+        assert code != 0
+    runtime.discovery.assert_not_called()
+    assert runtime.requests == []
+
+
+def test_identity_update_composes_native_argument_validators(management_command_parser):
+    from azext_iot._validators import mode2_iot_login_handler
+    from azext_iot.iothub._payload import validate_identity_update
+
+    parsed = management_command_parser.parse_args([
+        *_IDENTITY_UPDATE_COMMAND.split(), "-d", "device", "--set", "status=disabled",
+    ])
+    assert not getattr(parsed, "_command_validator", None)
+    assert {mode2_iot_login_handler, validate_identity_update} <= set(parsed._argument_validators)
 
 
 @pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)

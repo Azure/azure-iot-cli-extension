@@ -8,7 +8,7 @@
 CLI parameter definitions.
 """
 
-from knack.arguments import CLIArgumentType, CaseInsensitiveList
+from knack.arguments import CLIArgumentType, CaseInsensitiveList, ignore_type
 from azure.cli.core.commands.parameters import (
     resource_group_name_type,
     get_enum_type,
@@ -37,6 +37,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot._validators import mode2_iot_login_handler, process_top, process_dps_top
 from azext_iot.assets.user_messages import info_param_properties_device
+from azext_iot.iothub._payload import validate_identity_update
 from azext_iot.monitor.models.enum import Transport
 
 
@@ -519,6 +520,14 @@ def load_arguments(self, _):
             "For edge devices, this is auto-generated and immutable. "
             "For leaf devices, set this to create child/parent relationship.",
             arg_group="Device Scope"
+        )
+
+    with self.argument_context("iot hub device-identity update") as context:
+        # Inspect generic-update intent before the getter without bypassing target/auth validators.
+        # This validation-only hook is not reflected from an operation's parameters.
+        context.extra(
+            "identity_update", arg_type=ignore_type, options_list=["--__IDENTITY_UPDATE"],
+            validator=validate_identity_update,
         )
 
     with self.argument_context("iot hub device-identity renew-key") as context:

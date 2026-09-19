@@ -13,6 +13,7 @@ JSON deletion marker. Never recursively scrub user tags, content or payloads.
 from copy import deepcopy
 
 from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.core.commands.arm import _get_internal_path, _split_key_value_pair
 from knack.util import to_snake_case
 from msrest.exceptions import SerializationError
 from msrest.serialization import Deserializer, Serializer
@@ -127,6 +128,8 @@ def validate_identity_update(namespace):
     for operation, values in getattr(namespace, "ordered_arguments", None) or []:
         paths = values if operation == "--set" else values[:1]
         for value in paths:
-            path = value.split("=", 1)[0].split(".", 1)[0].split("[", 1)[0]
-            if path.replace("_", "").lower() in {name.lower() for name in OWNED_IDENTITY_FIELDS}:
-                raise InvalidArgumentValueError(f"{path} is owned by ADR/ARM and cannot be modified.")
+            key = _split_key_value_pair(value)[0] if operation == "--set" else value
+            # Use GenericUpdate's path rules, including leading dots and list indices.
+            path = _get_internal_path(key)
+            if path and path[0].replace("_", "").lower() in {name.lower() for name in OWNED_IDENTITY_FIELDS}:
+                raise InvalidArgumentValueError(f"{path[0]} is owned by ADR/ARM and cannot be modified.")

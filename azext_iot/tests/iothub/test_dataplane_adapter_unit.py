@@ -81,15 +81,22 @@ def test_bad_modeled_input_fails(value):
 
 
 @pytest.mark.parametrize("operation", ["--set", "--add", "--remove"])
-@pytest.mark.parametrize("path", [*OWNED_IDENTITY_FIELDS, "adrDeviceProperties.name", "adr_device_properties.uuid"])
+@pytest.mark.parametrize("path", [
+    *OWNED_IDENTITY_FIELDS, "adrDeviceProperties.name", "adr_device_properties.uuid",
+    ".adrDeviceProperties.uuid", "..device_resource_id", ".armSyncStatus.[0]", "ADRDEVICEPROPERTIES[0]",
+])
 def test_explicit_owned_metadata_mutation_rejected(operation, path):
+    values = [path + "=value"] if operation == "--set" else [path]
     with pytest.raises(InvalidArgumentValueError, match="owned by ADR"):
-        validate_identity_update(SimpleNamespace(ordered_arguments=[(operation, [path + "=value"])]))
+        validate_identity_update(SimpleNamespace(ordered_arguments=[(operation, values)]))
 
 
 @pytest.mark.parametrize("arguments", [
     None, [], [("--set", ["status=disabled", 'attributes={"adrDeviceProperties":"user"}'])],
     [("--add", ["attributes", "adrDeviceProperties=user"])],
+    [("--set", ["attributes.items[0].armSyncStatus=user", "attributes.deviceResourceId=null"])],
+    [("--remove", ["attributes.adrDeviceProperties"])],
+    [("--set", ["=empty"])], [("--set", [".=empty"])],
 ])
 def test_unrelated_user_content_is_not_readonly(arguments):
     validate_identity_update(SimpleNamespace(ordered_arguments=arguments))
