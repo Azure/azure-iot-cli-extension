@@ -125,6 +125,16 @@ Read/auth errors, ambiguous external IDs and changed identity still fail closed.
 Use the existing DPS phase controller's ``--debug-phase regular`` and repeated
 ``--debug-node`` options with these exact repository-relative node IDs. Debug
 results remain non-qualifying subsets; the full phase manifest is unchanged.
+The legacy Azure DevOps DPS invocation is explicitly a partial regular subset,
+not full qualification, and rejects controller settings. It excludes both
+``test_register_without_csr_deadline_contract`` and
+``test_register_and_issue_certificate_contract``: all four default/deadline cases
+require the owned controller fixture. This leaves 31 of the 35 full regular
+manifest cases eligible for that legacy selector; pre-existing manual cases
+outside that manifest are not reclassified as full coverage. Full regular/debug
+selection still includes these four cases. The full phase counts remain
+35 regular, 29 service-SAS and 3 local-auth-toggle.
+
 The caller still needs the existing owned fixture's management, linking and
 data-plane permissions. Namespace-SAMI ``registryDevices/write`` failures
 (including service ``403000``) must be reported and resolved as an explicitly
