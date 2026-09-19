@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, InvalidArgumentValueError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
 from azext_iot.adr.providers.link import LinkProvider
@@ -121,8 +121,9 @@ def test_recovery_commands_follow_dps_first_topology():
 
 @pytest.mark.parametrize("kind,section,endpoint_type", LINK_TYPES)
 @pytest.mark.parametrize("user_assigned", [False, True])
+@pytest.mark.parametrize("repeat_identity", [False, True])
 def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
-    kind, section, endpoint_type, user_assigned,
+    kind, section, endpoint_type, user_assigned, repeat_identity,
 ):
     identity = (
         {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
@@ -161,7 +162,8 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     provider.client.namespaces.begin_update.assert_not_called()
 
     # Prove public update preflight/submission independently of service readiness.
-    getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **identity_args)
+    update_args = identity_args if repeat_identity else {}
+    getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **update_args)
     provider._rbac.ensure.assert_called_once_with(
         link_type=kind, namespace_scope=NS_ID, target_scope=target_id,
         namespace_principal_id="namespace-principal",
@@ -178,7 +180,47 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     provider.client.namespaces.begin_update.reset_mock()
     provider._rbac.ensure.side_effect = AzureResponseError("RBAC preflight failed")
     with pytest.raises(AzureResponseError, match="RBAC preflight failed"):
-        getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", **identity_args)
+        getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", **update_args)
+    provider.client.namespaces.begin_update.assert_not_called()
+    provider._rbac.ensure.side_effect = None
+    provider._get_target.return_value["identity"] = {}
+    with pytest.raises(InvalidArgumentValueError, match="not enabled|not attached"):
+        getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", **update_args)
+    provider.client.namespaces.begin_update.assert_not_called()
+
+
+@pytest.mark.parametrize("state_field", ["linkingState", "provisioningStatus", "status"])
+def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state_field):
+    namespace = _namespace("messaging", IOT_HUB_ENDPOINT_TYPE, None)
+    endpoint = namespace["properties"]["messaging"]["endpoints"]["primary"]
+    endpoint.pop("inboundCallerIdentity")
+    endpoint.pop("linkingState")
+    endpoint[state_field] = "fAiLeD" if state_field == "linkingState" else {"status": "Failed"}
+    endpoint["provisioning"] = {"availability": "Unavailable", "allocationWeight": 0}
+    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}}}
+    original = deepcopy(namespace)
+    command = split(failed_link_recovery_commands(namespace)[0])
+    assert command[-2:] == ["--subscription", "ns-sub"]
+    provider = LinkProvider(Mock(), client=Mock())
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = Mock(return_value={
+        "location": "centraluseuap", "sku": {"name": "S1"}, "properties": {"provisioningState": "Succeeded"},
+    })
+    provider._rbac = Mock()
+    provider._warn_if_hub_classically_linked = Mock()
+    provider._wait = Mock()
+    provider.hub_update("primary", "ns", "ns-rg", no_wait=True)
+    assert provider._rbac.ensure.call_args.kwargs["linked_principal_id"] is None
+    patch = provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]["messaging"]["endpoints"]
+    assert patch["primary"] == {
+        "endpointType": IOT_HUB_ENDPOINT_TYPE, "resourceId": endpoint["resourceId"],
+        "provisioning": endpoint["provisioning"],
+    }
+    assert namespace == original
+    namespace["properties"]["provisioning"]["endpoints"].clear()
+    provider.client.namespaces.begin_update.reset_mock()
+    with pytest.raises(ArgumentUsageError, match="DPS link is required"):
+        provider.hub_update("primary", "ns", "ns-rg", no_wait=True)
     provider.client.namespaces.begin_update.assert_not_called()
 
 

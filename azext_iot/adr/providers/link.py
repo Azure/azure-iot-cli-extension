@@ -11,11 +11,9 @@ from typing import Optional
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     AzureResponseError,
-    InvalidArgumentValueError,
-    RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.log import get_logger
 from knack.util import CLIError
 
@@ -43,7 +41,7 @@ from azext_iot.adr.providers.link_helpers import (
     parse_dps_resource_id as _parse_dps_resource_id,
     parse_hub_resource_id as _parse_hub_resource_id,
     parse_su_resource_id as _parse_su_resource_id,
-    resolve_inbound_identity as _resolve_inbound_identity,
+    resolve_update_identity,
 )
 from azext_iot.adr.providers.link_persistence import (
     get_typed_endpoint,
@@ -283,7 +281,8 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Messaging endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be repointed by link hub add. "
-                "Use link hub update or delete the existing endpoint first."
+                "Use 'az iot adr ns link hub update' for an existing Hub link, "
+                "or choose an unused endpoint name. Link commands do not unlink endpoints."
             )
 
         endpoint_body = _build_hub_endpoint_body(
@@ -341,12 +340,7 @@ class LinkProvider(ADRProvider):
         if is_failed_hub_endpoint(endpoint) and not has_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_REQUIRED_MSG)
 
-        inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
-        if inbound_identity is None:
-            raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --system-assigned-mi or "
-                "--user-assigned-mi <uami-resource-id>."
-            )
+        inbound_identity = resolve_update_identity(endpoint, mi_system_assigned, mi_user_assigned)
 
         # The backend requires the full endpoint identity (endpointType + resourceId) on update,
         # so re-send the existing endpoint with the requested changes overlaid rather than a
@@ -402,34 +396,37 @@ class LinkProvider(ADRProvider):
 
     # DPS commands
 
-    def _side_get_dps_resource(self, dps_resource_id: str) -> dict:
-        """Side-GET the DPS RP to surface existing ``properties.iotHubs[]`` registrations.
-
-        Errors here are non-fatal: we surface a warning and return an empty dict so the
-        primary projection still succeeds. RBAC on DPS is independent of the namespace.
-        """
-        try:
-            parsed = _parse_dps_resource_id(dps_resource_id)
-        except InvalidArgumentValueError:  # pragma: no cover - validated upstream
-            return {}
+    def _side_get_dps_resource(self, dps_resource_id: str) -> Optional[dict]:
+        """Return None, with a warning, when optional DPS inspection is unavailable."""
+        parsed = _parse_dps_resource_id(dps_resource_id)
         dps_name = parsed["name"]
         try:
-            client = adr_iot_service_provisioning_factory(
-                self.cmd.cli_ctx,
-                subscription_id=parsed["subscription_id"],
-            ).iot_dps_resource
-            return dict(
-                client.get(
-                    resource_group_name=parsed["resource_group_name"],
-                    provisioning_service_name=dps_name,
-                )
-                or {}
+            try:
+                client = adr_iot_service_provisioning_factory(
+                    self.cmd.cli_ctx,
+                    subscription_id=parsed["subscription_id"],
+                ).iot_dps_resource
+            except CLIError as error:
+                # Profile/credential lookup can fail for a different subscription
+                # even when the caller can inspect the namespace.
+                logger.warning("Could not initialize DPS inspection for '%s': %s", dps_resource_id, error)
+                return None
+            dps = client.get(
+                resource_group_name=parsed["resource_group_name"],
+                provisioning_service_name=dps_name,
             )
-        except Exception as exc:  # pragma: no cover - defensive logging path
+        except (HttpResponseError, ServiceRequestError, ServiceResponseError) as exc:
             logger.warning(
                 "Could not list existing IoT Hubs registered on DPS '%s': %s", dps_name, exc
             )
-            return {}
+            return None
+        properties = dps.get("properties") if isinstance(dps, dict) else None
+        if not isinstance(properties, dict):
+            raise AzureResponseError("DPS inspection did not return a resource with valid properties.")
+        hubs = properties.get("iotHubs")
+        if hubs is not None and not isinstance(hubs, list):
+            raise AzureResponseError("DPS inspection returned an invalid properties.iotHubs list.")
+        return dps
 
     def _warn_if_hub_classically_linked(
         self, namespace: dict, parsed_hub: dict, hub: dict
@@ -443,13 +440,15 @@ class LinkProvider(ADRProvider):
             if not endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE):
                 continue
             dps = self._side_get_dps_resource(endpoint.get("resourceId"))
+            if dps is None:
+                continue
             for classic_hub in ((dps.get("properties") or {}).get("iotHubs") or []):
                 classic_name = str(
                     classic_hub.get("hostName")
                     or classic_hub.get("name")
                     or ""
                 ).casefold()
-                if (
+                if classic_name and (
                     classic_name in hub_names
                     or classic_name.split(".", 1)[0]
                     == parsed_hub["name"].casefold()
@@ -487,7 +486,8 @@ class LinkProvider(ADRProvider):
         if endpoint_name in _get_provisioning_endpoints(existing):
             raise ArgumentUsageError(
                 f"Provisioning endpoint '{endpoint_name}' already exists on "
-                f"namespace '{namespace_name}'. Update or remove it first."
+                f"namespace '{namespace_name}'. Choose an unused endpoint name. "
+                "Link commands do not unlink endpoints."
             )
 
         endpoint_body = _build_dps_endpoint_body(
@@ -537,12 +537,7 @@ class LinkProvider(ADRProvider):
             "DPS",
         )
 
-        inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
-        if inbound_identity is None:
-            raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --system-assigned-mi or "
-                "--user-assigned-mi <uami-resource-id> to change the inbound caller identity."
-            )
+        inbound_identity = resolve_update_identity(endpoint, mi_system_assigned, mi_user_assigned, required=True)
 
         # The backend requires the full endpoint body (endpointType + resourceId) on update, so
         # re-send the existing endpoint with the new inbound identity overlaid rather than a sparse
@@ -583,12 +578,15 @@ class LinkProvider(ADRProvider):
         endpoint = dict(endpoints[endpoint_name] or {})
         endpoint["name"] = endpoint_name
         dps_resource_id = endpoint.get("resourceId")
+        endpoint["brownfieldHubs"] = None
+        endpoint["brownfieldHubsAvailable"] = False
         if dps_resource_id:
             dps = self._side_get_dps_resource(dps_resource_id)
-            brownfield_hubs = (dps.get("properties") or {}).get("iotHubs") or []
-            # NOTE: 'brownfieldHubs' is a public response key documented in _help.py and
-            # asserted by tests; do not rename without coordinating those.
-            endpoint["brownfieldHubs"] = brownfield_hubs
+            if dps is not None:
+                endpoint["brownfieldHubs"] = (dps.get("properties") or {}).get("iotHubs") or []
+                endpoint["brownfieldHubsAvailable"] = True
+        else:
+            logger.warning("DPS endpoint '%s' has no resource ID; registered Hub information is unavailable.", endpoint_name)
         return endpoint
 
     def dps_list(self, namespace_name: str, resource_group_name: str):
@@ -625,7 +623,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Updating endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be overwritten by link su add. "
-                "Update or remove the existing endpoint first."
+                "Choose an unused endpoint name. Link commands do not unlink endpoints."
             )
 
         endpoint_body = _build_su_endpoint_body(
@@ -676,12 +674,7 @@ class LinkProvider(ADRProvider):
             "Software update",
         )
 
-        inbound_identity = _resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
-        if inbound_identity is None:
-            raise RequiredArgumentMissingError(
-                "Nothing to update. Pass --system-assigned-mi or "
-                "--user-assigned-mi <uami-resource-id> to change the inbound caller identity."
-            )
+        inbound_identity = resolve_update_identity(endpoint, mi_system_assigned, mi_user_assigned, required=True)
 
         # The backend requires the full endpoint body (endpointType + resourceId) on update, so
         # re-send the existing endpoint with the new inbound identity overlaid rather than a sparse

@@ -7,7 +7,7 @@
 """Command-specific wait conditions for Azure Device Registry resources."""
 
 from dataclasses import dataclass
-from time import sleep
+from time import monotonic, sleep
 from typing import Callable, Optional
 
 from azure.cli.core.azclierror import (
@@ -277,40 +277,41 @@ def wait_for_resource(
     exists: bool = False,
     custom: Optional[str] = None,
     sleeper: Callable[[float], None] = sleep,
+    clock: Callable[[], float] = monotonic,
 ):
-    """Poll a getter using Azure CLI wait flags or a command-specific default."""
+    """Bound polling and sleeps; an in-flight GET remains subject to transport timeouts."""
     if timeout <= 0:
         raise InvalidArgumentValueError("--timeout must be greater than zero.")
     if interval <= 0:
         raise InvalidArgumentValueError("--interval must be greater than zero.")
 
     explicit = any((created, updated, deleted, exists, custom))
+    deadline = clock() + timeout
     progress = IndeterminateProgressBar(cli_ctx, message="Waiting")
     progress.begin()
     last_observation = None
     try:
-        for _ in range(0, timeout, interval):
+        while clock() < deadline:
+            complete = False
             try:
                 progress.update_progress()
+                if clock() >= deadline:
+                    break
                 resource = getter()
                 if explicit:
-                    if _explicit_condition(
+                    complete = _explicit_condition(
                         resource,
                         created=created,
                         updated=updated,
                         exists=exists,
                         custom=custom,
-                    ):
-                        progress.end()
-                        return None
+                    )
                 else:
                     evaluation = default_condition(resource)
                     last_observation = evaluation.observation
                     if evaluation.failure:
                         raise AzureResponseError(evaluation.failure)
-                    if evaluation.complete:
-                        progress.end()
-                        return None
+                    complete = evaluation.complete
             except (
                 ClientException,
                 HttpResponseError,
@@ -319,12 +320,17 @@ def wait_for_resource(
                 if not _is_not_found(error):
                     raise
                 if deleted:
-                    progress.end()
-                    return None
-                if explicit and updated and not any((created, exists, custom)):
+                    complete = True
+                elif explicit and updated and not any((created, exists, custom)):
                     raise
                 last_observation = "resource not found"
-            sleeper(interval)
+            remaining = deadline - clock()
+            if complete and remaining >= 0:
+                progress.end()
+                return None
+            if remaining <= 0:
+                break
+            sleeper(min(interval, remaining))
     except Exception:
         progress.stop()
         raise
