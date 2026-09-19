@@ -70,7 +70,7 @@ def test_hash_remains_local_through_native_cli(offline_cli, tmp_path):
     }]
 
 
-def test_hub_documented_defaults_do_not_set_unspecified_auth_or_identity():
+def test_hub_documented_defaults_preserve_all_unspecified_upsert_values():
     name = "iot hub create"
     cli = DummyCli(commands_loader_cls=IoTExtCommandsLoader)
     loader = cli.commands_loader
@@ -83,7 +83,7 @@ def test_hub_documented_defaults_do_not_set_unspecified_auth_or_identity():
     parser = AzCliCommandParser(cli_ctx=cli)
     parser.load_command_table(loader)
     args = parser.parse_args(["iot", "hub", "create", "-n", "hub", "-g", "rg"])
-    assert (args.sku, args.unit, args.partition_count, args.retention_day) == ("S1", 1, 4, 1)
+    assert (args.sku, args.unit, args.partition_count, args.retention_day) == (None, None, None, None)
     assert args.disable_local_auth is None
     assert args.system_identity is None and args.user_identities is None
 
