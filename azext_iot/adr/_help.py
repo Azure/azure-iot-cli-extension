@@ -539,9 +539,10 @@ def load_adr_help():
   type: group
   short-summary: Manage links between a Device Registry namespace and downstream resources.
   long-summary: |
-    Links live on the namespace, not on the linked IoT Hub, DPS, or Update Instance.
-    Add and update use namespace PATCH. Show and list expose each endpoint's
-    top-level linkingState. This group does not provide unlink or composite
+    Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
+    identity or retry a Failed endpoint with its saved identity and settings.
+    Use show, list and wait to inspect linkingState. Links belong to the namespace.
+    This group does not provide unlink or composite
     resource-delete commands; namespace and target lifecycles are managed separately.
     Waited add/update commands require the actual endpoint to reach Succeeded. They recover only
     confirmed AdrMiNotAuthorized, using an unchanged endpoint update and verified existing service-role
@@ -567,7 +568,7 @@ def load_adr_help():
   type: command
   short-summary: Link an IoT Hub to a Device Registry namespace.
   long-summary: |
-    Adds a Hub messaging endpoint entry under the namespace's properties.messaging.endpoints.
+    Link a Standard S-tier Hub, such as S1, as a namespace messaging endpoint.
     Requires the namespace to already have at least one linked DPS (DPS-first ordering).
     --system-assigned-mi and --user-assigned-mi are optional. When supplied, exactly one may be
     used to set the inbound caller identity that the Hub will use to call back into the namespace.
@@ -576,9 +577,8 @@ def load_adr_help():
     when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
     stops before namespace mutation and prints exact remediation commands. A newly created
     assignment must become visible within the 180-second preflight deadline before PATCH.
-    IoT Hub Data
-    Contributor is canonical for this implementation; final service-owner confirmation remains
-    an external product decision.
+    The current role set includes IoT Hub Data Contributor; final service-owner confirmation
+    of the minimum required roles is pending.
   examples:
     - name: Link a Hub using the Hub's system-assigned identity for inbound calls
       text: |
@@ -603,10 +603,12 @@ def load_adr_help():
   type: command
   short-summary: Update an existing IoT Hub messaging endpoint on a Device Registry namespace.
   long-summary: |
-    Only the inbound caller identity can be updated. The linked Hub resource and provisioning
-    settings cannot be changed in place. Retrying an endpoint whose linkingState is Failed
-    requires a linked DPS. An endpoint whose linkingState is Succeeded remains updateable
-    after DPS deletion. Before PATCH, update repeats add's target existence, region,
+    Retry a Failed Hub endpoint without identity options to preserve its saved identity
+    (including no inbound identity) and provisioning settings. A linked DPS is required.
+    To change the inbound identity, pass --system-assigned-mi or --user-assigned-mi.
+    Healthy endpoints require an explicit identity change; target and provisioning settings
+    cannot be changed in place. A Succeeded endpoint remains updateable after DPS deletion.
+    Update checks target existence, region,
     provisioning-state, Standard SKU, selected identity attachment, namespace outbound
     principal, and automatic RBAC preflight. Newly created assignments must become visible
     before namespace mutation.
@@ -616,10 +618,10 @@ def load_adr_help():
     mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
     --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
     --no-wait returns submission only; later asynchronous failures are not observed or recovered.
-    After verifying access and allowing recent assignments to propagate, retry a persisted
-    failed endpoint with update, not add, preserving its existing identity and endpoint
-    settings. There is no need to delete the linked Hub to retry the link.
+    Use update, not add, for a persisted failure. Do not delete the linked Hub to retry it.
   examples:
+    - name: Retry a failed Hub link with its saved identity and settings
+      text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup
     - name: Switch a Hub link to a system-assigned identity
       text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
   """
@@ -706,8 +708,10 @@ def load_adr_help():
   type: command
   short-summary: Update an existing DPS provisioning endpoint on a Device Registry namespace.
   long-summary: |
-    Only the inbound caller identity may be updated. The linked DPS resource cannot be changed
-    in place. Before PATCH, update repeats add's target existence, region,
+    Retry a Failed DPS endpoint without identity options to reuse its saved inbound identity.
+    Pass --system-assigned-mi or --user-assigned-mi to change that identity. A healthy endpoint
+    requires an explicit change; the target DPS cannot be changed in place.
+    Update checks target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
     ARM assignment visibility does not guarantee that the linked service already honors access.
@@ -716,9 +720,7 @@ def load_adr_help():
     mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
     --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
     --no-wait returns submission only; later asynchronous failures are not observed or recovered.
-    After verifying access and allowing recent assignments to propagate, retry a persisted
-    failed endpoint with update, not add, passing its existing inbound identity. There is no
-    need to delete the linked DPS to retry the link.
+    Use update, not add, for a persisted failure. Do not delete the linked DPS to retry it.
   examples:
     - name: Rotate to a system-assigned identity on an existing DPS link
       text: az iot adr ns link dps update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
@@ -730,10 +732,12 @@ def load_adr_help():
   type: command
   short-summary: Show a single DPS provisioning endpoint on a Device Registry namespace.
   long-summary: |
-    Projects the named endpoint and, when the linked DPS is accessible, includes a
-    read-only 'brownfieldHubs' list (the DPS resource's existing properties.iotHubs[]).
-    The brownfield list is informational so you can decide which Hubs to subsequently link
-    to the namespace.
+    Inspect the named endpoint and decide which existing DPS Hubs to link to the namespace.
+    When the DPS read succeeds, brownfieldHubs contains its properties.iotHubs[] list and
+    brownfieldHubsAvailable is true. An empty list then means no Hubs are registered.
+    If access or a service failure prevents that read, brownfieldHubs is null,
+    brownfieldHubsAvailable is false, and a warning explains why. Namespace inspection
+    still succeeds; unavailable data must not be treated as an empty DPS registration list.
   examples:
     - name: Show a DPS link by endpoint name (with brownfield Hubs when accessible)
       text: az iot adr ns link dps show -n primary --ns myNamespace -g myResourceGroup
@@ -818,7 +822,9 @@ def load_adr_help():
   type: command
   short-summary: Update an existing Software Updates updating endpoint on a Device Registry namespace.
   long-summary: |
-    Only the inbound caller identity may be updated. The linked update instance cannot be changed
+    Retry a Failed endpoint without identity options to reuse its saved inbound identity.
+    Pass --system-assigned-mi or --user-assigned-mi to change that identity.
+    Healthy endpoints require an explicit change. The linked Update Instance cannot be changed
     in place. Before PATCH, update repeats add's target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
@@ -1252,7 +1258,7 @@ def load_adr_help():
     and repair persisted failures with the corresponding link update, preserving the existing identity.
     After DPS succeeds, use link hub add only if the Hub endpoint is absent; use link hub wait if pending.
     Do not rerun combined link add when the DPS endpoint already exists.
-    Required roles are taken from the same authoritative matrices used by atomic adds:
+    Required service-to-service roles:
     {format_role_requirements("dps")}; {format_role_requirements("hub")}.
   examples:
     - name: Link both a Hub and a DPS using system-assigned identity for both inbound callers
@@ -1271,6 +1277,12 @@ def load_adr_help():
           --hub-endpoint-name primary-hub --hub-id <hub-id> --hub-system-assigned-mi \\
           --hub-availability Available --hub-allocation-weight 1 \\
           --dps-endpoint-name primary-dps --dps-id <dps-id> --dps-system-assigned-mi
+    - name: Wait for DPS, submit the Hub without waiting, then observe the Hub link
+      text: |
+        az iot adr ns link add --ns myNamespace -g myResourceGroup \\
+          --hub-endpoint-name primary-hub --hub-id <hub-id> \\
+          --dps-endpoint-name primary-dps --dps-id <dps-id> --dps-system-assigned-mi --no-wait
+        az iot adr ns link hub wait -n primary-hub --ns myNamespace -g myResourceGroup
   """
 
     helps[

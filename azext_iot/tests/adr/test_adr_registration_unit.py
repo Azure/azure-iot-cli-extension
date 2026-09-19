@@ -128,6 +128,9 @@ def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
 
 def test_2026_command_surface_is_registered():
     commands = _registered_commands()
+    assert commands["iot adr ns su software-update calculate-hash"] == (
+        "command", "adr_su_software_update_calculate_hash", {},
+    )
 
     assert commands["iot adr ns group list-members"][1] == "adr_group_list_members"
     assert commands["iot adr ns job run cancel"] == (
@@ -374,12 +377,19 @@ def test_load_adr_arguments():
         "--hub-endpoint-name",
         "--hen",
     ]
-    assert "--hub-name" in bundled["hub_endpoint_name"]["options_list"]
+    assert bundled["hub_endpoint_name"]["options_list"][2:] == [
+        {"target": alias, "redirect": "--hub-endpoint-name", "hide": True}
+        for alias in ("--hub-name", "--hn")
+    ]
     assert bundled["dps_endpoint_name"]["options_list"][:2] == [
         "--dps-endpoint-name",
         "--den",
     ]
-    assert "--dps-name" in bundled["dps_endpoint_name"]["options_list"]
+    assert bundled["dps_endpoint_name"]["options_list"][2:] == [
+        {"target": alias, "redirect": "--dps-endpoint-name", "hide": True}
+        for alias in ("--dps-name", "--dn")
+    ]
+    assert "has no effect" in arguments["iot adr ns group delete"]["no_wait"]["help"]
     assert "Wait for DPS linking to succeed" in bundled["no_wait"]["help"]
     for scope, registered in arguments.items():
         if not scope.startswith("iot adr ns link"):
