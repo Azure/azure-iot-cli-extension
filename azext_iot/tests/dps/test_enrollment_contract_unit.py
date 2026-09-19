@@ -15,11 +15,33 @@ from msrest.serialization import Model
 
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.dps.services._enrollment_errors import handle_enrollment_error
+from azext_iot.dps.services._enrollment_output import enrollment_group_output
 from azext_iot.operations import dps
 
 
 def _wire(value):
     return value.serialize(keep_readonly=True) if isinstance(value, Model) else value
+
+
+@pytest.mark.parametrize("has_attestation,has_keys", [(False, False), (True, False), (True, True)])
+def test_legacy_model_output_redaction_preserves_original_credentials(has_attestation, has_keys):
+    enrollment = Model()
+    if has_attestation:
+        enrollment.attestation = SimpleNamespace()
+        if has_keys:
+            enrollment.attestation.symmetric_key = SimpleNamespace(primary_key="primary-secret", secondary_key="secondary-secret")
+    result = enrollment_group_output(enrollment)
+    assert isinstance(result, Model) and result is not enrollment
+    if has_keys:
+        assert result.attestation.symmetric_key.primary_key is None
+        assert result.attestation.symmetric_key.secondary_key is None
+        assert enrollment.attestation.symmetric_key.primary_key == "primary-secret"
+        assert enrollment.attestation.symmetric_key.secondary_key == "secondary-secret"
+
+
+def test_enrollment_group_output_rejects_unknown_representation():
+    with pytest.raises(TypeError, match="Unsupported enrollment-group response representation"):
+        enrollment_group_output([])
 
 
 @pytest.mark.parametrize("operation", ["create", "update", "show"])
@@ -78,6 +100,7 @@ def test_enrollment_guidance_uses_effective_service_auth_and_preserves_cause(sta
     with pytest.raises(kind) as raised:
         handle_enrollment_error(original, {"policy": policy}, operation, translate)
     message = str(raised.value)
+    assert message.startswith("Check ")
     assert "(403000) Unauthorized" in message and operation in message
     assert raised.value.__cause__ is original
     assert "DPS managed-identity" in message and "does not identify" in message
@@ -109,6 +132,7 @@ def test_actual_discovery_handler_preserves_authorization_cause(mocker, status):
         discovery.find_resource("dps", "rg")
     assert raised.value.__cause__ is original
     assert "AuthorizationFailed" in str(raised.value)
+    assert str(raised.value).startswith("Check the selected subscription/resource group")
 
 
 @pytest.mark.parametrize("status", [404, 502])

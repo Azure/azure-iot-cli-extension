@@ -22,9 +22,10 @@ def arm_authorization_context():
         if isinstance(original, HttpResponseError) and status in (401, 403):
             kind = UnauthorizedError if status == 401 else ForbiddenError
             raise kind(
-                f"{original}\nDPS ARM discovery or shared-access-policy lookup failed. "
                 "Check the selected subscription/resource group and the caller's ARM read/list-keys permissions. "
-                "DPS data-plane roles do not grant ARM permissions. This is not a DPS managed-identity request to ADR."
+                "DPS ARM discovery or shared-access-policy lookup failed. "
+                "DPS data-plane roles do not grant ARM permissions. This is not a DPS managed-identity request to ADR. "
+                f"\nService response: {original}"
             ) from original
         raise
 
@@ -36,22 +37,25 @@ def handle_enrollment_error(error, target, operation, translate):
     except (UnauthorizedError, ForbiddenError) as translated:
         if target.get("policy") == "login":
             guidance = (
-                "The resolved DPS service authentication is Microsoft Entra. "
                 "Check the caller's DPS data-plane permission for this enrollment operation"
             )
             if operation.startswith(("create", "update", "delete")):
                 guidance += " (for example, Device Provisioning Service Data Contributor for enrollment writes)"
-            guidance += ". ARM management permissions alone do not grant this data-plane access."
+            guidance += (
+                ". The resolved DPS service authentication is Microsoft Entra. "
+                "ARM management permissions alone do not grant this data-plane access."
+            )
         else:
             guidance = (
+                "Check the shared-access policy's enrollment permissions and the DPS local-auth configuration; "
+                "use --auth-type login without a connection string when service local authentication is disabled. "
                 "The resolved DPS service authentication is SAS/shared-access policy, including when a "
-                "connection string overrides --auth-type. Check that policy's enrollment permissions and "
-                "the DPS local-auth configuration. Caller Entra role assignments do not authorize a SAS request; "
-                "use --auth-type login without a connection string when service local authentication is disabled."
+                "connection string overrides --auth-type. Caller Entra role assignments do not authorize a SAS request."
             )
         raise type(translated)(
-            f"{translated}\nDPS service operation: {operation}. {guidance} "
+            f"{guidance} DPS service operation: {operation}. "
             "If this enrollment uses an ADR policy, DPS managed-identity access to the referenced ADR namespace "
             "is a separate authorization boundary. This response alone does not identify that identity or "
-            "namespace, or prove that either boundary lacks a particular role."
+            "namespace, or prove that either boundary lacks a particular role. "
+            f"\nService response: {translated}"
         ) from error
