@@ -402,7 +402,8 @@ def fake_worker(mocker):
     child = mocker.MagicMock()
     child.returncode = 0
     child.poll.return_value = 0
-    child.communicate.return_value = (b'{"version":1,"ok":true,"result":{"status":"assigned"}}', b"private stderr")
+    child.stdout.readline.side_effect = [b'{"version":1,"ok":true,"result":{"status":"assigned"}}\n', b""]
+    child.stderr.read.side_effect = [b"private stderr", b""]
     popen = mocker.patch.object(registration.subprocess, "Popen", return_value=child)
     return child, popen
 
@@ -419,7 +420,7 @@ def bootstrap_provider():
 
 def assert_worker_closed(child):
     for stream in (child.stdin, child.stdout, child.stderr):
-        stream.close.assert_called_once()
+        stream.close.assert_called()
 
 
 def test_worker_secrets_only_on_pipe_and_exact_endpoint(fake_worker):
@@ -428,7 +429,7 @@ def test_worker_secrets_only_on_pipe_and_exact_endpoint(fake_worker):
     assert result == {"status": "assigned"}
     assert len(popen.call_args.args[0]) == 3
     assert popen.call_args.args[0][1] == "-I"
-    request = json.loads(child.communicate.call_args.args[0])
+    request = json.loads(child.stdin.write.call_args.args[0])
     assert request["provider"]["device_symmetric_key"] == "key"
     assert request["provider"]["provisioning_host"] == "device.custom.test"
     assert request["body"] == {"registrationId": "reg"}
@@ -439,7 +440,7 @@ def test_worker_secrets_only_on_pipe_and_exact_endpoint(fake_worker):
 def test_worker_communication_failure_is_reaped(fake_worker, failure):
     child, _ = fake_worker
     child.poll.return_value = None
-    child.communicate.side_effect = failure
+    child.stdin.write.side_effect = failure
     with pytest.raises(type(failure)):
         registration.register_with_deadline(bootstrap_provider(), {}, 10)
     child.terminate.assert_called_once()
@@ -469,7 +470,7 @@ def test_worker_failure_paths_are_explicit_and_clean(fake_worker, mocker, failur
     elif failure == "exit":
         child.returncode = 7
     elif failure == "protocol":
-        child.communicate.return_value = (b"invalid JSON", b"SECRET")
+        child.stdout.readline.side_effect = [b"invalid JSON\n", b""]
     elif failure == "thread":
         mocker.patch.object(registration.Thread, "start", side_effect=RuntimeError("cannot start thread"))
     else:
@@ -593,6 +594,10 @@ def test_isolated_worker_loads_extension_dependencies_without_shadowing_source(
     (untrusted / "msrestazure.py").write_text("raise AssertionError('PYTHONPATH was imported')\n")
     monkeypatch.setenv("AZURE_EXTENSION_DIR", str(extension.parent))
     monkeypatch.setenv("PYTHONPATH", str(untrusted))
+    config = tmp_path / "private-cli"
+    config.mkdir(mode=0o700)
+    monkeypatch.setenv("AZURE_CONFIG_DIR", str(config))
+    monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "False")
 
     # Supply this interpreter's CLI runtime, but make msrestazure extension-only as in tox.
     runtime = str(Path(azure.cli.core.__file__).parents[3])
@@ -876,7 +881,11 @@ def test_actual_process_deadline_and_pipe_cleanup_without_network(mocker, tmp_pa
         + "json.load(sys.stdin)\n"
         + ("time.sleep(60)\n" if mode == "blocked-request" else "")
         + "json.dump({'version': 1, 'ok': True, 'result': {'status': 'assigned'}}, sys.stdout)\n"
+        + "sys.stdout.write('\\n')\n"
     )
+    config = tmp_path / "private-cli"
+    config.mkdir(mode=0o700)
+    mocker.patch.dict("os.environ", {"AZURE_CONFIG_DIR": str(config), "AZURE_TEST_RUN_LIVE": "False"})
     original_popen = subprocess.Popen
     children = []
 

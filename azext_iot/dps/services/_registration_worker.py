@@ -35,6 +35,8 @@ from azure.core.exceptions import (
 )
 from knack.log import get_logger
 
+from azext_iot.dps.services._registration_protocol import RegistrationTimeoutError, is_operation_id, write_frame
+
 
 logger = get_logger(__name__)
 _STAGES = frozenset(("load-extension", "read-request", "register"))
@@ -42,7 +44,7 @@ _FRAME_FILES = {
     str(Path(__file__).resolve().parents[2] / relative): relative
     for relative in (
         "_factory.py", "dps/providers/device_registration.py",
-        "dps/services/_registration.py", "dps/services/_registration_worker.py",
+        "dps/services/_registration.py", "dps/services/_registration_worker.py", "dps/services/_registration_protocol.py",
         "dps/services/_csr.py", "dps/services/_authentication.py",
         "sdk/dps/device/_client.py", "sdk/dps/device/operations/_operations.py",
     )
@@ -57,6 +59,7 @@ _ERROR_TYPES = {kind.__name__: kind for kind in (
 )}
 _ERROR_TYPES["HttpResourceNotFoundError"] = HttpResourceNotFoundError
 _ERROR_NAMES = {kind: name for name, kind in _ERROR_TYPES.items()}
+_ERROR_NAMES[RegistrationTimeoutError] = "AzureConnectionError"
 _TRANSPORT_OPTION_ERRORS = {
     f"Session.request() got an unexpected keyword argument '{option}'":
         f"DPS registration transport rejected request option '{option}'. "
@@ -162,14 +165,19 @@ def main():
             request = json.load(sys.stdin)
             values = request.pop("provider")
             secrets = [values["device_symmetric_key"], values["passphrase"], request["body"].get("csr")]
+
+            def accepted(operation_id):
+                if not is_operation_id(operation_id) or any(secret and secret in operation_id for secret in secrets):
+                    raise AzureResponseError("DPS returned unsafe registration operation metadata.")
+                write_frame(output, {"version": 1, "accepted": {"operationId": operation_id}})
+
             stage = "register"
-            result = _registration.register_in_worker(values, **request)
+            result = _registration.register_in_worker(values, **request, accepted=accepted)
         response = {"version": 1, "ok": True, "result": result}
     except Exception as error:  # Exceptions must cross the process boundary, never become a successful empty result.
         response = {"version": 1, "ok": False, "error": _error_to_json(error, secrets)}
         response["error"]["diagnostics"] = _diagnostics(error, stage)
-    json.dump(response, output)
-    output.flush()
+    write_frame(output, response)
 
 
 if __name__ == "__main__":

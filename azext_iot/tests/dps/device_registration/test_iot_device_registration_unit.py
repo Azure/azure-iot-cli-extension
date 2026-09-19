@@ -576,7 +576,7 @@ def test_create_uses_register_and_issue_certificate_contract(mocker, valid_csr):
                 "storageRootKey": "storage",
             },
         },
-        cls=subject._capture_device_response,
+        cls=provider._capture_registration_response,
     )
     state = result["registrationState"]
     assert state["connectionProfile"] == "MqttV5"

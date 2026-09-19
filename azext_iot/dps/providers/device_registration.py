@@ -13,6 +13,7 @@ import re
 from time import monotonic, sleep
 
 from azure.cli.core.azclierror import (
+    AzureConnectionError,
     AzureResponseError,
     FileOperationError,
     InvalidArgumentValueError,
@@ -41,6 +42,7 @@ from azext_iot.dps.common import (
 )
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.dps.services._csr import normalize_csr
+from azext_iot.dps.services._registration_protocol import RegistrationTimeoutError, is_operation_id, timeout_message
 from azext_iot.operations.dps import (
     iot_dps_compute_device_key,
     iot_dps_device_enrollment_get,
@@ -226,6 +228,8 @@ class DeviceRegistrationProvider:
         self._clock = clock or monotonic
         self._sleep = sleeper or sleep
         self._registration_timeout = registration_timeout
+        self._operation_id = None
+        self._accepted_callback = None
         self._has_explicit_supported_auth = bool(device_symmetric_key) or bool(
             certificate_file and key_file
         )
@@ -483,6 +487,7 @@ class DeviceRegistrationProvider:
         }
 
     def _perform_registration(self, body, deadline=None):
+        self._operation_id = None
         try:
             response = _as_device_response(
                 self._invoke_operation(
@@ -491,19 +496,53 @@ class DeviceRegistrationProvider:
                     registration_id=self.registration_id,
                     id_scope=self.id_scope,
                     device_registration=body,
-                    cls=_capture_device_response,
+                    cls=self._capture_registration_response,
                 )
             )
+            self._observe_acceptance(response)
             if response.status_code == 202:
                 result = self._wait_for_registration(response, deadline=deadline)
             else:
                 result = response.body
+            self._request_options(deadline)
+        except RegistrationTimeoutError as error:
+            raise AzureConnectionError(self._timeout_message()) from error
         except HttpResponseError as error:
             return handle_service_exception(error)
 
-        self._request_options(deadline)
         _raise_for_terminal_registration(result)
         return self._correlate_registration(result)
+
+    def _capture_registration_response(self, pipeline_response, body, headers):
+        response = _capture_device_response(pipeline_response, body, headers)
+        # SDK cls runs before call_with_deadline's post-response budget check.
+        self._observe_acceptance(response)
+        return response
+
+    def _observe_acceptance(self, response):
+        if response.status_code != 202:
+            return
+        operation_id = response.body.get("operationId") if isinstance(response.body, dict) else None
+        if not operation_id:
+            if self._operation_id is not None:
+                return
+            raise AzureResponseError(
+                "DPS accepted the registration but did not return the operation ID required to poll it."
+            )
+        if not is_operation_id(operation_id):
+            raise AzureResponseError("DPS returned invalid registration operation metadata.")
+        if self._operation_id is not None and operation_id != self._operation_id:
+            raise AzureResponseError(
+                "DPS returned a different registration operation ID. "
+                f"Check the original operation with --operation-id {self._operation_id}; do not resubmit registration."
+            )
+        if self._operation_id is None:
+            if self._accepted_callback is not None:
+                self._accepted_callback(operation_id)
+            self._operation_id = operation_id
+
+    def _timeout_message(self):
+        return timeout_message(self._operation_id, self.registration_id, self.id_scope, self.device_endpoint)
 
     @staticmethod
     def _invoke_operation(operation, deadline, **kwargs):
@@ -515,12 +554,8 @@ class DeviceRegistrationProvider:
 
     def _wait_for_registration(self, response: _DeviceResponse, deadline=None):
         request_deadline = deadline
-        operation_id = (response.body or {}).get("operationId")
-        if not operation_id:
-            raise AzureResponseError(
-                "DPS accepted the registration but did not return the "
-                "operation ID required to poll it."
-            )
+        self._observe_acceptance(response)
+        operation_id = self._operation_id
 
         deadline = deadline if deadline is not None else self._clock() + self._registration_timeout
         current = response
@@ -549,9 +584,10 @@ class DeviceRegistrationProvider:
                         registration_id=self.registration_id,
                         operation_id=operation_id,
                         id_scope=self.id_scope,
-                        cls=_capture_device_response,
+                        cls=self._capture_registration_response,
                     )
                 )
+                self._observe_acceptance(current)
             except HttpResponseError as error:
                 status_code = getattr(error, "status_code", None)
                 if status_code not in (408, 429) and not (
@@ -568,12 +604,7 @@ class DeviceRegistrationProvider:
                 )
         if current.status_code == 200:
             return current.body
-        raise AzureResponseError(
-            "Timed out waiting for DPS registration operation "
-            f"'{operation_id}'. The operation may still complete; check it "
-            "with 'az iot device registration operation-status' and retry "
-            "that read safely."
-        )
+        raise AzureResponseError(self._timeout_message())
 
     def _correlate_registration(self, result):
         registration_state = (result or {}).get("registrationState")
