@@ -675,6 +675,54 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
         registry_assertions.assert_called_with(resource, owner, certificate=certificate)
 
 
+@pytest.mark.parametrize("profile,valid", [
+    pytest.param({"connectionProfile": "classic"}, True, id="classic-lowercase"),
+    pytest.param({"connectionProfile": "Classic"}, True, id="classic-canonical"),
+    pytest.param({"connectionProfile": "CLASSIC"}, True, id="classic-uppercase"),
+    pytest.param({"connectionProfile": "MqttV5"}, True, id="mqtt-canonical"),
+    pytest.param({"connectionProfile": "mqttv5"}, True, id="mqtt-lowercase"),
+    pytest.param({"connectionProfile": "MQTTV5"}, True, id="mqtt-uppercase"),
+    pytest.param({"connectionProfile": "mQtTv5"}, True, id="mqtt-mixed-case"),
+    pytest.param({}, False, id="missing"),
+    pytest.param({"connectionProfile": None}, False, id="null"),
+    pytest.param({"connectionProfile": ""}, False, id="empty"),
+    pytest.param({"connectionProfile": "Unknown"}, False, id="unknown"),
+    pytest.param({"connectionProfile": "MqttV6"}, False, id="unknown-version"),
+    pytest.param({"connectionProfile": " Classic"}, False, id="leading-whitespace"),
+    pytest.param({"connectionProfile": "classic "}, False, id="trailing-whitespace"),
+    pytest.param({"connectionProfile": False}, False, id="boolean"),
+    pytest.param({"connectionProfile": 1}, False, id="number"),
+    pytest.param({"connectionProfile": []}, False, id="list"),
+    pytest.param({"connectionProfile": {}}, False, id="object"),
+    pytest.param({"connectionProfile": b"classic"}, False, id="bytes"),
+])
+def test_csr_connection_profile_contract_preserves_wire_value(resource, tmp_path, mocker, profile, valid):
+    from azext_iot.tests.dps.device_registration.test_csr_registry_cleanup_unit import result as registration_result
+
+    registration_id = "owned-registration"
+    result = registration_result(registration_id)
+    del result["registrationState"]["connectionProfile"]
+    result["registrationState"].update(profile)
+    expected = deepcopy(result)
+    owner = mocker.Mock()
+    mocker.patch.object(scenario, "generate_names", return_value=registration_id)
+    mocker.patch.object(scenario, "enrollment", return_value=nullcontext(owner))
+    invoke = mocker.patch.object(scenario, "invoke", return_value=SimpleNamespace(as_json=lambda: result))
+    registry_assertions = mocker.patch.object(scenario, "assert_registry_registration")
+
+    with nullcontext() if valid else pytest.raises(AssertionError):
+        scenario.test_register_and_issue_certificate_contract(resource, tmp_path, None)
+
+    assert result == expected
+    owner.before_submit.assert_called_once_with()
+    assert owner.record_result.call_count == invoke.call_count == (2 if valid else 1)
+    if valid:
+        registry_assertions.assert_called_once_with(resource, owner, certificate=True)
+    else:
+        registry_assertions.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
 def test_csr_cases_are_required_not_pending_and_resources_are_typed():
     assert manifest.CSR_NODEIDS <= manifest.expected_nodeids("regular")
     assert "test_register_and_issue_certificate_contract" not in _phase.PENDING_CERTIFICATE_TESTS
