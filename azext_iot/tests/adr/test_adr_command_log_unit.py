@@ -198,10 +198,27 @@ def test_other_services_keep_their_existing_command_behavior(scenario, mocker, c
     assert not caplog.records
 
 
-def test_all_adr_scenarios_use_the_command_wrapper():
+@pytest.mark.parametrize("expect_failure", [False, True])
+def test_all_adr_scenarios_use_the_command_wrapper(mocker, expect_failure):
+    execution = mocker.patch.object(CaptureOutputLiveScenarioTest, "cmd")
+    logged = mocker.patch("azext_iot.tests.adr.log_command")
     for path in Path(__file__).parent.glob("test_*_int.py"):
         module = importlib.import_module(f"azext_iot.tests.adr.{path.stem}")
         for _, cls in inspect.getmembers(module, inspect.isclass):
             if cls.__module__ == module.__name__ and issubclass(cls, CaptureOutputLiveScenarioTest):
                 assert issubclass(cls, ADRLiveScenarioTest), cls.__name__
-                assert cls.cmd is ADRLiveScenarioTest.cmd, cls.__name__
+                # Scoped adapters may extend the command, but every scenario
+                # must still pass through the ADR log wrapper and preserve the
+                # testsdk checks/failure contract. Do not exempt any scenario.
+                scenario = object.__new__(cls)
+                scenario.kwargs = {"resource_group": "test-rg"}
+                checks = [object()]
+                execution.reset_mock()
+                logged.reset_mock()
+                result = scenario.cmd("iot adr ns list -g {resource_group}", checks=checks, expect_failure=expect_failure)
+                assert result is execution.return_value
+                execution.assert_called_once()
+                command = execution.call_args.args[0]
+                assert command.startswith("iot adr ns list -g {resource_group}")
+                assert execution.call_args.kwargs == {"checks": checks, "expect_failure": expect_failure}
+                logged.assert_called_once_with(scenario._apply_kwargs(command), expect_failure=expect_failure)

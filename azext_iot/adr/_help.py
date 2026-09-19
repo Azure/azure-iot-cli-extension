@@ -12,7 +12,178 @@ from knack.help_files import helps
 from azext_iot.adr.rbac import format_role_requirements
 
 
+def _load_registry_device_help():
+    helps["iot adr ns registry-device"] = """
+  type: group
+  short-summary: Manage Registry Devices in a Device Registry namespace.
+  long-summary: |
+    Registry Devices use the 2026-11-02-preview management API. Device creation does
+    not itself issue credentials or create service capabilities. Authentication
+    profiles and capabilities are materialized by the provisioning services.
+  """
+    helps["iot adr ns registry-device create"] = """
+  type: command
+  short-summary: Create or replace a Registry Device.
+  long-summary: Location defaults to the namespace location. External device ID is create-only.
+  examples:
+    - name: Create an enabled device.
+      text: az iot adr ns registry-device create -n my-device --ns my-ns -g MyRG --external-device-id factory-device-1 --manufacturer Contoso
+  """
+    helps["iot adr ns registry-device show"] = """
+  type: command
+  short-summary: Get a Registry Device by name or external device ID.
+  long-summary: External ID lookup scans every namespace page and fails on ambiguous matches.
+  examples:
+    - name: Resolve a provisioned device without guessing its Registry Device name.
+      text: az iot adr ns registry-device show --external-device-id factory-device-1 --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device list"] = """
+  type: command
+  short-summary: List all Registry Devices in a namespace.
+  examples:
+    - name: List devices.
+      text: az iot adr ns registry-device list --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device update"] = """
+  type: command
+  short-summary: Update writable Registry Device properties.
+  long-summary: Only supplied fields are patched. Unspecified properties are preserved.
+  examples:
+    - name: Disable a device without replacing its metadata.
+      text: az iot adr ns registry-device update -n my-device --ns my-ns -g MyRG --enablement-state Disabled
+  """
+    helps["iot adr ns registry-device delete"] = """
+  type: command
+  short-summary: Delete a Registry Device.
+  examples:
+    - name: Delete a device and wait for its absence.
+      text: |
+        az iot adr ns registry-device delete -n my-device --ns my-ns -g MyRG --yes --no-wait
+        az iot adr ns registry-device wait -n my-device --ns my-ns -g MyRG --deleted
+  """
+    helps["iot adr ns registry-device wait"] = """
+  type: command
+  short-summary: Wait for Registry Device provisioning or a specified condition.
+  long-summary: |
+    By default waits for provisioningState Succeeded and fails on Failed or Canceled.
+    Use --exists for materialization alone or --deleted for absence. Specify exactly
+    one of --name and --external-device-id.
+  examples:
+    - name: Wait for a device materialized by registration.
+      text: az iot adr ns registry-device wait --external-device-id factory-device-1 --ns my-ns -g MyRG --exists --timeout 600 --interval 10
+  """
+    helps["iot adr ns registry-device auth"] = """
+  type: group
+  short-summary: Inspect service-materialized authentication profiles.
+  long-summary: Profiles are read-only metadata; use the provisioning service to issue credentials.
+  """
+    helps["iot adr ns registry-device auth list"] = """
+  type: command
+  short-summary: List authentication profile metadata, not plaintext keys.
+  examples:
+    - name: Discover profile names.
+      text: az iot adr ns registry-device auth list --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device auth show"] = """
+  type: command
+  short-summary: Get authentication profile metadata.
+  examples:
+    - name: Inspect a discovered profile.
+      text: az iot adr ns registry-device auth show -n my-profile --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device auth show-keys"] = """
+  type: command
+  short-summary: Retrieve plaintext keys for a SymmetricKey profile.
+  long-summary: |
+    Output contains secrets. Store it securely; avoid shared logs. Other
+    authentication types are rejected. List and show do not call the key action.
+  examples:
+    - name: Retrieve keys for a discovered symmetric-key profile.
+      text: az iot adr ns registry-device auth show-keys -n my-profile --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device auth revoke-certs"] = """
+  type: command
+  short-summary: Revoke certificates for a CA-signed X.509 profile.
+  long-summary: |
+    Requires CertificateAuthoritySignedX509Certificate authentication. Self-signed
+    X.509 and symmetric-key profiles are rejected. This action is destructive.
+  examples:
+    - name: Revoke certificates for an owned CA-issued profile.
+      text: az iot adr ns registry-device auth revoke-certs -n my-profile --rdn my-device --ns my-ns -g MyRG --yes
+  """
+    helps["iot adr ns registry-device auth wait"] = """
+  type: command
+  short-summary: Wait for authentication profile materialization or a specified condition.
+  long-summary: |
+    By default waits for GET to succeed. Profiles have no provisioningState;
+    --created and --updated are not profile materialization predicates.
+  examples:
+    - name: Wait for a discovered authentication profile.
+      text: az iot adr ns registry-device auth wait -n my-profile --rdn my-device --ns my-ns -g MyRG --timeout 600 --interval 10
+  """
+    helps["iot adr ns registry-device attribute"] = """
+  type: group
+  short-summary: Manage Registry Device attributes.
+  long-summary: User attributes are customer-authored. Microsoft.DeviceUpdate attributes are service-owned.
+  """
+    helps["iot adr ns registry-device attribute create"] = """
+  type: command
+  short-summary: Create or replace a User-reported attribute.
+  long-summary: |
+    Properties must be a JSON object. User provenance is added automatically.
+    Use schema identifiers and property values supported by your service;
+    the CLI does not infer a schema or validate application-specific fields.
+  examples:
+    - name: Create an attribute from a JSON file.
+      text: az iot adr ns registry-device attribute create -n my-attribute --rdn my-device --ns my-ns -g MyRG --properties @attribute.json
+  """
+    helps["iot adr ns registry-device attribute list"] = """
+  type: command
+  short-summary: List attributes, including service-reported metadata.
+  examples:
+    - name: List attributes.
+      text: az iot adr ns registry-device attribute list --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device attribute show"] = """
+  type: command
+  short-summary: Get an attribute.
+  long-summary: |
+    The software-update alias falls back to the canonical update attribute only
+    after the literal name returns HTTP 404. Create and delete use literal names.
+  examples:
+    - name: Read an attribute.
+      text: az iot adr ns registry-device attribute show -n my-attribute --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device attribute delete"] = """
+  type: command
+  short-summary: Delete an attribute by its literal resource name.
+  examples:
+    - name: Delete a customer-owned attribute.
+      text: az iot adr ns registry-device attribute delete -n my-attribute --rdn my-device --ns my-ns -g MyRG --yes
+  """
+    helps["iot adr ns registry-device capability"] = """
+  type: group
+  short-summary: Inspect service-materialized Registry Device capabilities.
+  long-summary: Capabilities are read-only. Provisioning services create them; the CLI does not synthesize them.
+  """
+    helps["iot adr ns registry-device capability list"] = """
+  type: command
+  short-summary: List Registry Device capabilities.
+  examples:
+    - name: Discover capabilities.
+      text: az iot adr ns registry-device capability list --rdn my-device --ns my-ns -g MyRG
+  """
+    helps["iot adr ns registry-device capability show"] = """
+  type: command
+  short-summary: Get a discovered capability.
+  examples:
+    - name: Inspect an IoT Hub capability whose name is the namespace messaging endpoint.
+      text: az iot adr ns registry-device capability show -n my-hub-endpoint --rdn my-device --ns my-ns -g MyRG
+  """
+
+
 def load_adr_help():
+    _load_registry_device_help()
     helps[
         "iot adr"
     ] = """

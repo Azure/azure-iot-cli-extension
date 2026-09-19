@@ -84,10 +84,10 @@ def _http_error(error):
     return None, None
 
 
-def _get_resource(scenario, command):
+def _get_resource(scenario, command, getter=None):
     """None means an actual GET 404, never empty CLI output or an exit code."""
     try:
-        result = scenario.cmd(command).get_output_in_json()
+        result = getter() if getter is not None else scenario.cmd(command).get_output_in_json()
     except (HttpResponseError, CloudError, CLIError, SystemExit) as error:
         original, status = _http_error(error)
         response = getattr(original, "response", None)
@@ -147,13 +147,16 @@ def _child_rejection(error):
 
 def delete_test_namespace(
     scenario, namespace_name, resource_group, *, jobs=(), groups=(),
-    timeout=120, interval=10, clock=None, sleeper=None,
+    timeout=120, interval=10, clock=None, sleeper=None, namespace_getter=None,
 ):
     """Require owned job/group GET 404 before sending the parent's DELETE.
 
     Names include children explicitly deleted earlier in the lifecycle. Empty
     lists alone cannot prove their absence. Lists are an additional guard after
     an explicit child-index rejection, never an instruction to delete strangers.
+    A bound namespace SDK GET can preserve the original HTTP response when the
+    CLI's exit-code wrapper loses it during exception unwinding. The same exact
+    GET/URI/404 checks apply; an exit code alone never establishes absence.
     """
     scope = shlex.join(["--namespace", namespace_name, "-g", resource_group])
     budget = _Deadline(timeout, clock, sleeper, "owned namespace cleanup")
@@ -170,7 +173,7 @@ def delete_test_namespace(
                         _get_resource, scenario, f"iot adr ns {kind} show {scope} -n {shlex.quote(name)}",
                     )
                 _log(LogKind.RESULT, "Owned %s GET returned HTTP 404", kind)
-        namespace = budget.call(_get_resource, scenario, f"iot adr ns show {scope}")
+        namespace = budget.call(_get_resource, scenario, f"iot adr ns show {scope}", namespace_getter)
         if namespace is None:
             return
         state = (namespace.get("properties") or {}).get("provisioningState")

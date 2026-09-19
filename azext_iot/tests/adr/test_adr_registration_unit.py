@@ -204,7 +204,7 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 92
+    assert len(commands) == 109
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} delete" not in commands
         assert not hasattr(commands_link, f"adr_link_{endpoint}_delete")
@@ -217,6 +217,8 @@ def test_2026_command_surface_is_registered():
         "iot adr ns wait": "adr_namespace_wait",
         "iot adr ns ca wait": "adr_ca_wait",
         "iot adr ns ca policy wait": "adr_ca_policy_wait",
+        "iot adr ns registry-device wait": "adr_registry_device_wait",
+        "iot adr ns registry-device auth wait": "adr_registry_device_auth_wait",
         "iot adr ns identity wait": "adr_namespace_wait",
         "iot adr ns link wait": "adr_link_wait",
         "iot adr ns link hub wait": "adr_link_hub_wait",
