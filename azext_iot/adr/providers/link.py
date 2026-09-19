@@ -18,6 +18,7 @@ from knack.log import get_logger
 from knack.util import CLIError
 
 from azext_iot._factory import (
+    _get_canary_credential_scopes,
     adr_iot_hub_service_factory,
     adr_iot_service_provisioning_factory,
     adr_update_instance_service_factory,
@@ -400,6 +401,8 @@ class LinkProvider(ADRProvider):
         """Return None, with a warning, when optional DPS inspection is unavailable."""
         parsed = _parse_dps_resource_id(dps_resource_id)
         dps_name = parsed["name"]
+        # Routing validation is mandatory even when profile lookup is optional.
+        _get_canary_credential_scopes(self.cmd.cli_ctx)
         try:
             try:
                 client = adr_iot_service_provisioning_factory(
