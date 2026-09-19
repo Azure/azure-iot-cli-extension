@@ -349,6 +349,24 @@ def test_create_resolves_location_and_supports_no_wait(
     poller.result.assert_not_called()
 
 
+def test_create_continues_when_unavailable_name_is_absent_from_requested_group(update_instance_provider):
+    error = HttpResponseError(message="not found")
+    error.status_code = 404
+    operations = update_instance_provider.client.update_instances
+    operations.check_name_availability.return_value = {"nameAvailable": False}
+    operations.get.side_effect = error
+
+    assert update_instance_provider.create(
+        INSTANCE, RG, location="westus2", no_wait=True
+    ) is operations.begin_create.return_value
+    operations.get.assert_called_once_with(resource_group_name=RG, update_instance_name=INSTANCE)
+    operations.begin_create.assert_called_once_with(
+        resource_group_name=RG,
+        update_instance_name=INSTANCE,
+        resource={"location": "westus2", "properties": {}},
+    )
+
+
 def test_create_propagates_existing_instance_lookup_error(
     update_instance_provider,
 ):
@@ -723,11 +741,12 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
 
 
 @pytest.mark.parametrize(
-    "selected, desired",
+    "selected, desired, blocked",
     [
         (
             {"type": "SystemAssigned"},
             {"type": "None"},
+            True,
         ),
         (
             {
@@ -735,11 +754,20 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
                 "userAssignedIdentity": UAMI_ID,
             },
             {"type": "SystemAssigned"},
+            True,
+        ),
+        (
+            {
+                "type": "UserAssigned",
+                "userAssignedIdentity": UAMI_ID,
+            },
+            {"type": "UserAssigned", "userAssignedIdentities": {UAMI_ID.upper(): {}}},
+            False,
         ),
     ],
 )
 def test_update_protects_identity_selected_by_active_link(
-    update_instance_provider, selected, desired
+    update_instance_provider, selected, desired, blocked
 ):
     namespace_id = (
         "/subscriptions/sub/resourceGroups/rg/providers/"
@@ -769,8 +797,13 @@ def test_update_protects_identity_selected_by_active_link(
     with patch(
         "azext_iot.adr.providers.update_instance.adr_service_factory",
         return_value=registry,
-    ), pytest.raises(ArgumentUsageError, match="link su update"):
-        update_instance_provider._protect_link_identity(instance, desired)
+    ):
+        if blocked:
+            with pytest.raises(ArgumentUsageError, match="link su update"):
+                update_instance_provider._protect_link_identity(instance, desired)
+        else:
+            update_instance_provider._protect_link_identity(instance, desired)
+    registry.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="ns")
 
 
 def test_update_identity_guard_ignores_unlinked_instance(

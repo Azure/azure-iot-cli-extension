@@ -21,6 +21,7 @@ from msrestazure.azure_operation import AzureOperationPoller
 
 from azext_iot.common.arm import (
     adapt_modeless_lro_poller,
+    get_resource_group,
     hub_description_for_write,
     hub_etag_arguments,
     sanitize_arm_identity,
@@ -55,6 +56,13 @@ def test_hub_resource_group_reports_missing_resource_context(resource):
 
     with pytest.raises(CLIInternalError, match="IoT Hub response did not include a usable resource ID"):
         _get_resource_group_from_hub(resource)
+
+
+@pytest.mark.parametrize("resource", [None, {"id": RESOURCE_ID}, {"resourcegroup": "legacy-rg"}])
+def test_explicit_resource_group_takes_precedence_without_mutating_resource(resource):
+    original = deepcopy(resource)
+    assert get_resource_group(resource, fallback="explicit-rg") == "explicit-rg"
+    assert resource == original
 
 
 @pytest.mark.parametrize(
@@ -180,6 +188,7 @@ def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():
             "iotHubDetails": {"gatewayVersion": "V2"},
             "privateEndpointConnections": [{"id": "/private/one"}],
             "eventHubEndpoints": {
+                "disabled": None,
                 "events": {
                     "retentionTimeInDays": 1,
                     "partitionCount": 4,
@@ -206,6 +215,7 @@ def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():
         "retentionTimeInDays": 1,
         "partitionCount": 4,
     }
+    assert body["properties"]["eventHubEndpoints"]["disabled"] is None
     assert body["properties"]["routing"] == {"routes": [{"name": "route"}]}
     assert {
         "deviceRegistry",
