@@ -248,15 +248,17 @@ def test_load_arguments_for_all_commands(loader, command_table):
     assert "--hub-endpoint-name" in bundled["hub_endpoint_name"].settings[
         "options_list"
     ]
-    assert "--hub-name" in bundled["hub_endpoint_name"].settings[
-        "options_list"
-    ]
+    assert any(
+        getattr(option, "target", None) == "--hub-name" and option.hide
+        for option in bundled["hub_endpoint_name"].settings["options_list"]
+    )
     assert "--dps-endpoint-name" in bundled["dps_endpoint_name"].settings[
         "options_list"
     ]
-    assert "--dps-name" in bundled["dps_endpoint_name"].settings[
-        "options_list"
-    ]
+    assert any(
+        getattr(option, "target", None) == "--dps-name" and option.hide
+        for option in bundled["dps_endpoint_name"].settings["options_list"]
+    )
 
     for command_name in (
         "iot device registration request-software-updates",
