@@ -352,13 +352,14 @@ def test_active_dps_link_blocks_selected_identity_removal():
 
     with patch(
         "azext_iot._factory.adr_service_factory", return_value=registry
-    ), pytest.raises(ArgumentUsageError, match="link dps update"):
+    ), pytest.raises(ArgumentUsageError, match="link dps update") as raised:
         _protect_dps_link_identity(
             cmd,
             _dps(),
             remove_system=True,
             remove_user_identities=None,
         )
+    assert "delete" not in str(raised.value)
 
 
 def test_active_dps_link_blocks_uami_and_unreadable_projection():
@@ -382,13 +383,15 @@ def test_active_dps_link_blocks_uami_and_unreadable_projection():
     registry = MagicMock()
     registry.namespaces.get.return_value = namespace
     with patch("azext_iot._factory.adr_service_factory", return_value=registry):
-        with pytest.raises(ArgumentUsageError, match="selected DPS"):
+        with pytest.raises(ArgumentUsageError, match="selected DPS") as raised:
             _protect_dps_link_identity(
                 cmd,
                 dps,
                 remove_system=False,
                 remove_user_identities=[UAMI_1.upper()],
             )
+    assert "az iot adr ns link dps update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
     with patch(
         "azext_iot._factory.adr_service_factory",
@@ -405,10 +408,13 @@ def test_active_dps_link_blocks_uami_and_unreadable_projection():
 def test_dps_identity_guard_blocks_unverifiable_link_shapes():
     dps = _dps()
     dps.pop("id")
-    with pytest.raises(ArgumentUsageError, match="resource ID is missing"):
+    with pytest.raises(ArgumentUsageError, match="resource ID is missing") as raised:
         _protect_dps_link_identity(
             MagicMock(), dps, remove_system=True, remove_user_identities=None
         )
+    assert "az iot adr ns link dps show" in str(raised.value)
+    assert "az iot adr ns link dps update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
     dps = _dps()
     with pytest.raises(ArgumentUsageError, match="through Azure CLI"):
@@ -419,10 +425,13 @@ def test_dps_identity_guard_blocks_unverifiable_link_shapes():
     dps["properties"]["deviceRegistryNamespaces"] = [
         {"resourceId": "not-an-arm-id"}
     ]
-    with pytest.raises(ArgumentUsageError, match="could not be validated"):
+    with pytest.raises(ArgumentUsageError, match="could not be validated") as raised:
         _protect_dps_link_identity(
             MagicMock(), dps, remove_system=True, remove_user_identities=None
         )
+    assert "az iot adr ns link dps show" in str(raised.value)
+    assert "az iot adr ns link dps update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
 
 def test_dps_identity_guard_ignores_unrelated_namespace_endpoint():

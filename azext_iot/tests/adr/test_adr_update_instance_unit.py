@@ -791,10 +791,13 @@ def test_update_identity_guard_rejects_invalid_or_unreadable_namespace(
             "linking": {"namespaceResourceId": "not-an-arm-id"}
         }
     }
-    with pytest.raises(ArgumentUsageError, match="could not be validated"):
+    with pytest.raises(ArgumentUsageError, match="could not be validated") as raised:
         update_instance_provider._protect_link_identity(
             invalid, {"type": "None"}
         )
+    assert "az iot adr ns link su show" in str(raised.value)
+    assert "az iot adr ns link su update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
     linked = {
         "id": "/updateInstances/instance",

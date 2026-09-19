@@ -137,8 +137,10 @@ def test_identity_target_reads_selected_subscription_without_mutating_general_re
 def test_identity_target_rejects_unverifiable_response(mocker, guard_target, response):
     kind, _, _, resource, _, get = guard_target
     get.return_value = response
-    with pytest.raises(ArgumentUsageError, match="could not be validated"):
+    with pytest.raises(ArgumentUsageError, match="could not be validated") as raised:
         custom._adr_identity_target(mocker.Mock(), resource, kind)
+    assert f"az iot adr ns link {kind} update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
 
 @pytest.mark.parametrize("resource", [None, {}, {"id": 123}, {"id": "/invalid"}])

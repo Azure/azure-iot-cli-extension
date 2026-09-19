@@ -1545,7 +1545,8 @@ def _adr_identity_target(cmd, resource, kind):
     except Exception as error:
         raise ArgumentUsageError(
             "The ADR link identity could not be validated. Do not remove identities "
-            "until you can read the target and rotate or delete its namespace link."
+            "until you can read the target and rotate the selected identity with "
+            f"'az iot adr ns link {kind} update'."
         ) from error
 
 
@@ -1572,7 +1573,7 @@ def _protect_hub_link_identity(
         raise ArgumentUsageError(
             "The Hub system-assigned identity is used by an active ADR link. "
             "Rotate it first with 'az iot adr ns link hub update --user-assigned-mi ...' "
-            "or permanently delete the link."
+            "before removing this identity."
         )
     selected_uami = selected.get("userAssignedIdentity")
     removals = {
@@ -1589,8 +1590,8 @@ def _protect_hub_link_identity(
     ):
         raise ArgumentUsageError(
             "The selected Hub user-assigned identity is used by an active ADR "
-            "link. Rotate it first with 'az iot adr ns link hub update' or "
-            "permanently delete the link."
+            "link. Rotate it first with 'az iot adr ns link hub update' "
+            "before removing this identity."
         )
 
 
@@ -2428,7 +2429,9 @@ def _protect_dps_link_identity(
     if not dps_id:
         raise ArgumentUsageError(
             "DPS has an active ADR namespace projection but its resource ID is "
-            "missing. Rotate or delete the link before removing identities."
+            "missing. Verify the link with 'az iot adr ns link dps show' and "
+            "rotate its identity with 'az iot adr ns link dps update' before "
+            "removing identities."
         )
     requested_uamis = {
         value.rstrip("/").casefold() for value in (remove_user_identities or [])
@@ -2448,7 +2451,9 @@ def _protect_dps_link_identity(
         ):
             raise ArgumentUsageError(
                 "DPS has an active ADR namespace projection that could not be "
-                "validated. Rotate or delete the namespace link before removing identities."
+                "validated. Verify the link with 'az iot adr ns link dps show' "
+                "and rotate its identity with 'az iot adr ns link dps update' "
+                "before removing identities."
             )
         try:
             namespace = adr_service_factory(
@@ -2483,7 +2488,7 @@ def _protect_dps_link_identity(
                 raise ArgumentUsageError(
                     "The DPS system-assigned identity is used by an active ADR "
                     "link. Rotate it first with 'az iot adr ns link dps update' "
-                    "or permanently delete the link."
+                    "before removing this identity."
                 )
             selected_uami = inbound.get("userAssignedIdentity")
             if (
@@ -2497,5 +2502,5 @@ def _protect_dps_link_identity(
                 raise ArgumentUsageError(
                     "The selected DPS user-assigned identity is used by an active "
                     "ADR link. Rotate it first with "
-                    "'az iot adr ns link dps update' or permanently delete the link."
+                    "'az iot adr ns link dps update' before removing this identity."
                 )
