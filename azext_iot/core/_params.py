@@ -45,14 +45,6 @@ dps_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/ProvisioningServices'),
     help='IoT Hub Device Provisioning Service name')
 
-mi_system_assigned_type = CLIArgumentType(
-    options_list=['--system-assigned-mi'],
-    help='Provide this flag to use system assigned identity.')
-
-system_assigned_type = CLIArgumentType(
-    options_list=['--system-assigned'],
-    help='Provide this flag to refer to the system-assigned identity.')
-
 
 def load_arguments(self, _):  # pylint: disable=too-many-statements
     # Arguments for IoT DPS
@@ -455,6 +447,10 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
 
     with self.argument_context('iot hub create') as c:
         c.argument('hub_name', completer=None)
+        c.argument('sku', help='Pricing tier. New Hubs default to S1. Only one free F1 Hub is allowed per subscription.')
+        c.argument('unit', help='Number of units. New Hubs default to 1.')
+        c.argument('partition_count', help='Device-to-cloud Event Hub partitions. New Hubs default to 4.')
+        c.argument('retention_day', help='Device-to-cloud event retention in days (1-7). New Hubs default to 1.')
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub. Default is the location of target resource group.')
         c.argument('enable_data_residency', arg_type=get_three_state_flag(),

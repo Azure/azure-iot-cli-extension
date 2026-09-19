@@ -209,7 +209,7 @@ def test_group_delete_calls_groups_delete_directly(
     wait.assert_not_called()
 
 
-def test_group_delete_no_wait(fixture_group_provider, mocker):
+def test_group_delete_no_wait(fixture_group_provider, mocker, caplog):
     fixture_group_provider.client.groups.delete.return_value = None
     wait = mocker.patch.object(fixture_group_provider, "_wait")
 
@@ -218,6 +218,7 @@ def test_group_delete_no_wait(fixture_group_provider, mocker):
     )
 
     assert result is None
+    assert "--no-wait has no effect" in caplog.text
     fixture_group_provider.client.groups.delete.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",

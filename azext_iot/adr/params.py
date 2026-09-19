@@ -57,7 +57,8 @@ def load_adr_arguments(self, _):
                 type=int,
                 default=3600,
                 arg_group="Wait Condition",
-                help="Maximum wait in seconds.",
+                help="Polling budget in seconds, including GET time. An in-flight GET is bounded by "
+                     "transport timeouts and cannot be interrupted by this polling deadline.",
             )
             context.argument(
                 "interval",
@@ -905,8 +906,8 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--hub-endpoint-name",
                 "--hen",
-                "--hub-name",
-                "--hn",
+                context.deprecate(target="--hub-name", redirect="--hub-endpoint-name", hide=True),
+                context.deprecate(target="--hn", redirect="--hub-endpoint-name", hide=True),
             ],
             help="Logical name of the Hub messaging endpoint entry on the namespace. "
             "--hub-name and --hn are deprecated aliases.",
@@ -966,8 +967,8 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--dps-endpoint-name",
                 "--den",
-                "--dps-name",
-                "--dn",
+                context.deprecate(target="--dps-name", redirect="--dps-endpoint-name", hide=True),
+                context.deprecate(target="--dn", redirect="--dps-endpoint-name", hide=True),
             ],
             help="Logical name of the DPS provisioning endpoint entry on the namespace. "
             "--dps-name and --dn are deprecated aliases.",
@@ -1019,6 +1020,12 @@ def load_adr_arguments(self, _):
             "group_name",
             options_list=["--group-name", "--gn", "--name", "-n"],
             help="Name of the group.",
+        )
+
+    with self.argument_context("iot adr ns group delete") as context:
+        context.argument(
+            "no_wait",
+            help="Accepted for compatibility only; has no effect because group deletion is synchronous.",
         )
 
     with self.argument_context("iot adr ns group create") as context:

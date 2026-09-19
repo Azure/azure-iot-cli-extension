@@ -12,6 +12,7 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
 )
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
 
 from azext_iot.adr.common import GroupType
 from azext_iot.adr.providers.base import ADRProvider
@@ -22,6 +23,7 @@ from azext_iot.adr.providers.wait import (
 
 
 _GROUP_REFRESH_ALREADY_IN_PROGRESS = "GroupRefreshAlreadyInProgress"
+logger = get_logger(__name__)
 
 
 class GroupProvider(ADRProvider):
@@ -109,9 +111,11 @@ class GroupProvider(ADRProvider):
         group_name: str,
         namespace_name: str,
         resource_group_name: str,
+        no_wait: bool = False,
         **kwargs,  # pylint: disable=unused-argument
     ):
-        # --no-wait remains accepted, but this API completes synchronously.
+        if no_wait:
+            logger.warning("--no-wait has no effect for group delete; this API completes synchronously.")
         return self.client.groups.delete(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,

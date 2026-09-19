@@ -212,7 +212,9 @@ class UpdateInstanceProvider(ADRProvider):
         ):
             raise ArgumentUsageError(
                 "The Update Instance has an active ADR link that could not be "
-                "validated. Rotate or delete the link before changing identities."
+                "validated. Verify the link with 'az iot adr ns link su show' "
+                "and rotate its identity with 'az iot adr ns link su update' "
+                "before changing identities."
             )
         try:
             namespace = adr_service_factory(

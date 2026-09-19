@@ -29,6 +29,7 @@ from azext_iot.adr.topology import endpoint_update_body  # noqa: F401
 from azext_iot.adr.topology import (
     endpoint_is_type,
     get_endpoints,
+    is_failed_link_endpoint,
 )
 
 MI_MUTEX_MSG = (
@@ -148,6 +149,21 @@ def build_inbound_identity(
     return body
 
 
+def resolve_update_identity(endpoint: dict, mi_system_assigned: bool, mi_user_assigned: Optional[str], *, required=False):
+    identity = resolve_inbound_identity(mi_system_assigned, mi_user_assigned)
+    if identity is not None:
+        return identity
+    if not is_failed_link_endpoint(endpoint):
+        raise RequiredArgumentMissingError(
+            "Nothing to update. Pass --system-assigned-mi or --user-assigned-mi <uami-resource-id>. "
+            "Omit identity options only to retry a Failed endpoint with its saved settings."
+        )
+    identity = endpoint.get("inboundCallerIdentity")
+    if required and not identity:
+        raise RequiredArgumentMissingError(MI_REQUIRED_MSG)
+    return identity
+
+
 def get_messaging_endpoints(namespace: dict) -> dict:
     return get_endpoints(namespace, "messaging")
 
@@ -161,7 +177,7 @@ def get_updating_endpoints(namespace: dict) -> dict:
 
 
 def failed_link_recovery_commands(namespace: dict) -> list:
-    """Render scoped updates only when the persisted link identity is known."""
+    """Render scoped updates without inventing an inbound identity."""
     resource_id = namespace.get("id")
     if not isinstance(resource_id, str) or not is_valid_resource_id(resource_id):
         return []
@@ -186,16 +202,14 @@ def failed_link_recovery_commands(namespace: dict) -> list:
         for name, endpoint in endpoints.items():
             if not endpoint_is_type(endpoint, endpoint_type):
                 continue
-            status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
-            state = endpoint.get("linkingState") or (
-                status.get("status") if isinstance(status, dict) else None
-            )
-            if str(state).casefold() != "failed":
+            if not is_failed_link_endpoint(endpoint):
                 continue
             identity = endpoint.get("inboundCallerIdentity") or {}
             if not isinstance(identity, dict):
                 continue
-            if identity.get("type") == IdentityType.system_assigned.value:
+            if kind == "hub" and endpoint.get("inboundCallerIdentity") is None:
+                identity_args = []
+            elif identity.get("type") == IdentityType.system_assigned.value:
                 identity_args = ["--system-assigned-mi"]
             elif identity.get("type") == IdentityType.user_assigned.value:
                 uami = identity.get("userAssignedIdentity")

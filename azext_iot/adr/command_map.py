@@ -270,7 +270,7 @@ def load_adr_commands(self, _):
             confirmation=True,
             supports_no_wait=True,
         )
-        cmd_group.show_command(
+        cmd_group.command(
             "calculate-hash", "adr_su_software_update_calculate_hash"
         )
         cmd_group.command(

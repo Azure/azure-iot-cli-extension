@@ -235,22 +235,25 @@ def test_active_link_blocks_selected_system_identity_removal():
     with pytest.raises(
         ArgumentUsageError,
         match="link hub update --user-assigned-mi",
-    ):
+    ) as raised:
         _protect_hub_link_identity(
             _hub(), remove_system=True, remove_user_identities=None
         )
+    assert "delete" not in str(raised.value)
 
 
 def test_active_link_blocks_selected_uami_removal_case_insensitively():
     uami = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/selected"
     hub = _hub(identity_type="UserAssigned", uami=uami)
 
-    with pytest.raises(ArgumentUsageError, match="selected Hub"):
+    with pytest.raises(ArgumentUsageError, match="selected Hub") as raised:
         _protect_hub_link_identity(
             hub,
             remove_system=False,
             remove_user_identities=[uami.upper()],
         )
+    assert "az iot adr ns link hub update" in str(raised.value)
+    assert "delete" not in str(raised.value)
 
 
 def test_failed_or_unlinked_projection_does_not_block_identity_removal():

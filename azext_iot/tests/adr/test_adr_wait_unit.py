@@ -406,7 +406,90 @@ def test_wait_times_out_with_last_observation():
             timeout=1,
             interval=1,
             sleeper=lambda _: None,
+            clock=MagicMock(side_effect=[0, 0, 0, 1]),
         )
+
+
+@pytest.mark.parametrize("rpc_time,interval,complete,sleeps,success", [
+    (0, 10, False, [5], False),
+    (2, 10, False, [3], False),
+    (4, 1, False, [1], False),
+    (6, 1, False, [], False),
+    (6, 1, True, [], False),
+    (5, 1, True, [], True),
+    (4, 1, True, [], True),
+])
+def test_wait_deadline_counts_rpc_time_and_caps_sleep(
+    mock_progress, rpc_time, interval, complete, sleeps, success,
+):
+    now = 0
+    delays = []
+
+    def getter():
+        nonlocal now
+        now += rpc_time
+        return {}
+
+    def sleep_for(delay):
+        nonlocal now
+        delays.append(delay)
+        now += delay
+
+    get = MagicMock(side_effect=getter)
+    options = {"timeout": 5, "interval": interval, "sleeper": sleep_for, "clock": lambda: now}
+    if success:
+        assert wait_for_resource(MagicMock(), get, lambda _: WaitEvaluation(complete), **options) is None
+    else:
+        with pytest.raises(CLIError, match="timed out after 5 seconds"):
+            wait_for_resource(MagicMock(), get, lambda _: WaitEvaluation(complete), **options)
+    get.assert_called_once()
+    assert delays == sleeps
+    mock_progress.end.assert_called_once()
+    mock_progress.stop.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["exists", "custom", "deleted", "predicate"])
+@pytest.mark.parametrize("elapsed", [5, 6])
+def test_wait_boundary_applies_to_explicit_predicates_and_not_found(mock_progress, mode, elapsed):
+    now = 0
+
+    def getter():
+        nonlocal now
+        if mode != "predicate":
+            now = elapsed
+        if mode == "deleted":
+            raise ResourceNotFoundError("gone")
+        return {"ready": True}
+
+    def condition(_resource):
+        nonlocal now
+        now = elapsed
+        return WaitEvaluation(True)
+
+    flags = {"custom": "ready"} if mode == "custom" else {mode: True} if mode != "predicate" else {}
+    sleeper = MagicMock()
+    if elapsed == 5:
+        assert wait_for_resource(
+            MagicMock(), getter, condition, timeout=5, clock=lambda: now, sleeper=sleeper, **flags,
+        ) is None
+    else:
+        with pytest.raises(CLIError, match="timed out"):
+            wait_for_resource(
+                MagicMock(), getter, condition, timeout=5, clock=lambda: now, sleeper=sleeper, **flags,
+            )
+    sleeper.assert_not_called()
+    mock_progress.end.assert_called_once()
+
+
+def test_wait_does_not_start_get_after_progress_consumes_budget(mock_progress):
+    getter = MagicMock()
+    with pytest.raises(CLIError, match="timed out"):
+        wait_for_resource(
+            MagicMock(), getter, resource_exists, timeout=1,
+            clock=MagicMock(side_effect=[0, 0, 1]),
+        )
+    getter.assert_not_called()
+    mock_progress.end.assert_called_once()
 
 
 def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):

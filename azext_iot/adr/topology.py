@@ -23,18 +23,22 @@ DPS_REQUIRED_MSG = (
 )
 
 DPS_CAP_EXCEEDED_MSG = (
-    "Namespace already has a linked DPS; update the existing DPS endpoint "
-    "instead. Only one DPS may be linked per namespace."
+    "Namespace already has a linked DPS. Only one DPS may be linked per namespace. "
+    "Use 'az iot adr ns link dps update' to change its identity or retry a Failed link, "
+    "not to change the target DPS. Link commands do not unlink endpoints."
 )
 
 SU_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked Software Updates instance; only one may be "
     "linked per namespace. Use 'az iot adr ns link su update' to modify the "
-    "existing link."
+    "existing link's identity or retry a Failed link, not to change its target. "
+    "Link commands do not unlink endpoints."
 )
 
 HUB_CAP_EXCEEDED_MSG = (
-    "Namespace already has the maximum of 10 linked IoT Hubs."
+    "Namespace already has the maximum of 10 linked IoT Hubs. "
+    "Use 'az iot adr ns link hub update' to retry an existing Failed link. "
+    "Link commands do not unlink endpoints."
 )
 
 
@@ -81,9 +85,13 @@ def hub_endpoint_count(namespace: dict) -> int:
 
 def is_failed_hub_endpoint(endpoint) -> bool:
     """Return whether an endpoint is a Hub whose linking state is Failed."""
-    return endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and (
-        endpoint.get("linkingState") or ""
-    ).casefold() == "failed"
+    return endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and is_failed_link_endpoint(endpoint)
+
+
+def is_failed_link_endpoint(endpoint: dict) -> bool:
+    status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
+    state = endpoint.get("linkingState") or (status.get("status") if isinstance(status, dict) else None)
+    return str(state or "").casefold() == "failed"
 
 
 def endpoint_update_body(

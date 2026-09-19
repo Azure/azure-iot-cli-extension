@@ -302,23 +302,6 @@ iot adr ns report:
   rule_exclusions:
     - require_wait_command_if_no_wait
 
-# An extended location is a required custom-location scope, not an Azure region.
-iot adr ns asset create:
-  parameters:
-    extended_location:
-      rule_exclusions:
-        - no_required_location_param
-iot adr ns discovered-asset create:
-  parameters:
-    extended_location:
-      rule_exclusions:
-        - no_required_location_param
-iot adr ns discovered-device create:
-  parameters:
-    extended_location:
-      rule_exclusions:
-        - no_required_location_param
-
 # Additional list commands that legitimately use --ids parameter
 iot dps enrollment list:
   rule_exclusions:

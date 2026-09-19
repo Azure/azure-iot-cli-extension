@@ -157,7 +157,16 @@ def test_resolve_endpoint_ignores_failed_link_when_one_is_ready(provider):
     assert provider._resolve_endpoint(NAMESPACE, RG) == ENDPOINT
 
 
-def test_resolve_endpoint_surfaces_link_failure(provider):
+@pytest.mark.parametrize(
+    "linking_error",
+    [
+        {"code": "LinkFailed", "message": "The service rejected the link."},
+        {"code": "LinkFailed"},
+        None,
+        "Unexpected error representation",
+    ],
+)
+def test_resolve_endpoint_surfaces_link_failure(provider, linking_error):
     provider.registry_client.namespaces.get.return_value = {
         "properties": {
             "updating": {
@@ -165,20 +174,19 @@ def test_resolve_endpoint_surfaces_link_failure(provider):
                     "software-updates": {
                         "endpointType": "Microsoft.DeviceUpdate/updateInstances",
                         "linkingState": "Failed",
-                        "linkingError": {
-                            "code": "LinkFailed",
-                            "message": "The service rejected the link.",
-                        },
+                        "linkingError": linking_error,
                     }
                 }
             }
         }
     }
 
-    with pytest.raises(
-        AzureResponseError, match="Failed state.*service rejected"
-    ):
+    with pytest.raises(AzureResponseError, match="Failed state") as raised:
         provider._resolve_endpoint(NAMESPACE, RG)
+    assert "software-updates" in str(raised.value)
+    assert ("service rejected" in str(raised.value)) is (
+        isinstance(linking_error, dict) and bool(linking_error.get("message"))
+    )
 
 
 @pytest.mark.parametrize(

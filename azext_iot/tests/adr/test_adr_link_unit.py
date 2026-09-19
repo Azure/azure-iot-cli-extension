@@ -16,7 +16,8 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from knack.util import CLIError
 
 from azext_iot.adr.common import (
     SU_ENDPOINT_TYPE,
@@ -619,6 +620,8 @@ def test_dps_show_without_resource_id_still_returns_named_object(
     assert fixture_link_provider.dps_show("primary", "namespace", "rg") == {
         "name": "primary",
         "endpointType": DPS_ENDPOINT_TYPE,
+        "brownfieldHubs": None,
+        "brownfieldHubsAvailable": False,
     }
 
 
@@ -683,22 +686,122 @@ def test_dps_and_su_add_reject_mutually_exclusive_identity(
     fixture_link_provider.client.namespaces.begin_update.assert_not_called()
 
 
-@pytest.mark.parametrize("resource_id", ["not-an-arm-id", DPS_ID])
-def test_dps_show_enrichment_failure_is_non_fatal(
-    fixture_link_provider, mocker, resource_id
-):
+@pytest.mark.parametrize("error", [
+    _http_error(401), _http_error(403), _http_error(404), _http_error(429), _http_error(503),
+    ServiceRequestError("connection unavailable"), ServiceResponseError("response unavailable"),
+])
+def test_dps_show_enrichment_failure_is_explicit(fixture_link_provider, mocker, caplog, error):
+    resource_id = DPS_ID.replace("/sub/", "/other-sub/")
     fixture_link_provider.client.namespaces.get.return_value = _namespace(
         dps={"primary": _endpoint(DPS_ENDPOINT_TYPE, resource_id)}
     )
+    factory = mocker.patch(
+        "azext_iot.adr.providers.link.adr_iot_service_provisioning_factory",
+    )
+    factory.return_value.iot_dps_resource.get.side_effect = error
+    result = fixture_link_provider.dps_show("primary", "namespace", "rg")
+    assert result["name"] == "primary"
+    assert result["brownfieldHubs"] is None
+    assert result["brownfieldHubsAvailable"] is False
+    factory.assert_called_once_with(fixture_link_provider.cmd.cli_ctx, subscription_id="other-sub")
+    assert "Could not list existing IoT Hubs" in caplog.text
+    LinkProvider._warn_if_hub_classically_linked(
+        fixture_link_provider, fixture_link_provider.client.namespaces.get.return_value, {"name": "hub"}, {},
+    )
+    assert "also configured" not in caplog.text
+
+
+def test_dps_profile_lookup_failure_keeps_namespace_inspection(fixture_link_provider, mocker, caplog):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)})
     mocker.patch(
         "azext_iot.adr.providers.link.adr_iot_service_provisioning_factory",
-        side_effect=RuntimeError("unavailable"),
+        side_effect=CLIError("Subscription not found in the local profile"),
     )
+    assert fixture_link_provider.dps_show("dps", "namespace", "rg")["brownfieldHubsAvailable"] is False
+    assert "Could not initialize DPS inspection" in caplog.text
 
-    result = fixture_link_provider.dps_show("primary", "namespace", "rg")
 
-    assert result["name"] == "primary"
-    assert result["brownfieldHubs"] == []
+@pytest.mark.parametrize("stage", ["factory", "get"])
+@pytest.mark.parametrize("error", [RuntimeError("defect"), TypeError("defect"), ValueError("defect")])
+def test_dps_optional_inspection_does_not_hide_programming_errors(fixture_link_provider, mocker, stage, error):
+    factory = mocker.patch("azext_iot.adr.providers.link.adr_iot_service_provisioning_factory")
+    if stage == "factory":
+        factory.side_effect = error
+    else:
+        factory.return_value.iot_dps_resource.get.side_effect = error
+    with pytest.raises(type(error), match="defect"):
+        fixture_link_provider._side_get_dps_resource(DPS_ID)
+
+
+def test_dps_optional_inspection_rejects_invalid_id(fixture_link_provider):
+    with pytest.raises(InvalidArgumentValueError):
+        fixture_link_provider._side_get_dps_resource("not-an-arm-id")
+
+
+@pytest.mark.parametrize("body", [
+    None, [], {}, {"properties": None}, {"properties": []},
+    {"properties": {"iotHubs": ""}}, {"properties": {"iotHubs": {}}}, {"properties": {"iotHubs": False}},
+])
+def test_dps_malformed_success_cannot_become_authoritative_empty(fixture_link_provider, mocker, body):
+    factory = mocker.patch("azext_iot.adr.providers.link.adr_iot_service_provisioning_factory")
+    factory.return_value.iot_dps_resource.get.return_value = body
+    with pytest.raises(AzureResponseError, match="DPS inspection"):
+        fixture_link_provider._side_get_dps_resource(DPS_ID)
+
+
+def test_dps_unexpected_cli_error_from_get_is_not_a_profile_failure(fixture_link_provider, mocker):
+    factory = mocker.patch("azext_iot.adr.providers.link.adr_iot_service_provisioning_factory")
+    factory.return_value.iot_dps_resource.get.side_effect = CLIError("unexpected SDK adapter defect")
+    with pytest.raises(CLIError, match="adapter defect"):
+        fixture_link_provider._side_get_dps_resource(DPS_ID)
+
+
+@pytest.mark.parametrize("kind,section,endpoint_type,resource_id", [
+    ("dps", "provisioning", DPS_ENDPOINT_TYPE, DPS_ID),
+    ("su", "updating", SU_ENDPOINT_TYPE, SU_ID),
+])
+def test_failed_dps_and_su_retry_still_requires_persisted_identity(
+    fixture_link_provider, kind, section, endpoint_type, resource_id,
+):
+    fixture_link_provider.client.namespaces.get.return_value = {
+        "properties": {section: {"endpoints": {
+            "primary": _endpoint(endpoint_type, resource_id, linkingState="Failed"),
+        }}},
+    }
+    with pytest.raises(RequiredArgumentMissingError, match="inbound caller identity is required"):
+        getattr(fixture_link_provider, f"{kind}_update")("primary", "namespace", "rg")
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+@pytest.mark.parametrize("hubs", [None, [], [{"name": "classic"}]])
+def test_dps_successful_read_is_authoritative_even_when_empty(fixture_link_provider, mocker, hubs):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)})
+    factory = mocker.patch("azext_iot.adr.providers.link.adr_iot_service_provisioning_factory")
+    factory.return_value.iot_dps_resource.get.return_value = {"properties": {"iotHubs": hubs}}
+    result = fixture_link_provider.dps_show("dps", "namespace", "rg")
+    assert result["brownfieldHubsAvailable"] is True
+    assert result["brownfieldHubs"] == (hubs or [])
+
+
+def test_dps_missing_target_id_is_explicitly_unavailable(fixture_link_provider, caplog):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(dps={"dps": {}})
+    result = fixture_link_provider.dps_show("dps", "namespace", "rg")
+    assert result["brownfieldHubs"] is None and result["brownfieldHubsAvailable"] is False
+    assert "has no resource ID" in caplog.text
+
+
+@pytest.mark.parametrize("entry,matched", [
+    ({}, False), ({"name": "other.azure-devices.net"}, False), ({"name": "hub.azure-devices.net"}, True),
+])
+def test_classic_hub_warning_does_not_match_missing_names(fixture_link_provider, mocker, caplog, entry, matched):
+    mocker.patch.object(
+        fixture_link_provider, "_side_get_dps_resource", return_value={"properties": {"iotHubs": [entry]}},
+    )
+    LinkProvider._warn_if_hub_classically_linked(
+        fixture_link_provider, _namespace(dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)}),
+        {"name": "hub"}, {"properties": {"hostName": "hub.azure-devices.net"}},
+    )
+    assert ("also configured" in caplog.text) is matched
 
 
 def test_su_add_uses_update_instance_endpoint(
