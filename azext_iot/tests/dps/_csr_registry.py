@@ -6,6 +6,7 @@
 
 """Receipt-owned issuance descendants; external device IDs are never ARM names."""
 
+from contextlib import contextmanager
 from hashlib import sha256
 import json
 from shlex import quote
@@ -288,10 +289,32 @@ class RegistryDeviceOwnership:
                     "reason": "RegistryDevice cleanup unresolved; preserve the original error and intent.",
                 })
 
-    def _cleanup(self):
+    def read_device(self):
+        """Resolve current identity without freezing a cleanup ETag before profile actions."""
+        if not self.started:
+            raise AssertionError("RegistryDevice reads require a pre-submission ownership intent.")
         csr._require_owned(self.namespace["name"], csr.find_namespace(self.namespace["name"]))  # pylint: disable=protected-access
-        external_id = self._external_id()
+        device = self._resolve_candidate(self._external_id())
+        current = wait_for_condition(
+            lambda: self._get(device), lambda value: value is not None, description="owned RegistryDevice GET",
+            timeout=RESOLVE_TIMEOUT, interval=5, is_retryable_error=lambda _error: False,
+        )
+        if _read(self._name("observed")) is None:
+            self._write("observed", {
+                "device": {key: value for key, value in device.items() if key != "etag"},
+            }, exclusive=True)
+        return current
 
+    @contextmanager
+    def certificate_revocation(self, profile_id):
+        if not self.started or _read(self._name("resolved")):
+            raise AssertionError("Profile mutation requires active ownership before cleanup resolution.")
+        action = {"profile_id": profile_id, "completed": False}
+        self._write("profile-action", action, exclusive=True)
+        yield
+        self._write("profile-action", {**action, "completed": True})
+
+    def _resolve_candidate(self, external_id):
         def match():
             matches = [device for device in self._list() if device["external_id"] == external_id]
             if len(matches) > 1:
@@ -302,15 +325,36 @@ class RegistryDeviceOwnership:
                 raise AssertionError("Ambiguous RegistryDevice external ID; no device will be deleted.")
             return matches
 
+        device = wait_for_condition(
+            match, bool, description="owned RegistryDevice materialization",
+            timeout=RESOLVE_TIMEOUT, interval=5, is_retryable_error=lambda _error: False,
+        )[0]
+        if any(old["id"].casefold() == device["id"].casefold() or old["external_id"] == external_id
+               for old in self.intent["baseline"]):
+            raise AssertionError("RegistryDevice predates this registration; refusing unowned deletion.")
+        observed = _read(self._name("observed"))
+        if (receipts.settings()[0] / self._name("observed")).exists():
+            assert isinstance(observed, dict) and observed.get("namespace_id") == self.namespace["id"], (
+                "Malformed RegistryDevice observation cannot establish ownership."
+            )
+            identity = observed["device"]
+            if (any(identity[key].casefold() != device[key].casefold() for key in ("id", "name"))
+                    or any(identity[key] != device[key] for key in ("external_id", "uuid"))):
+                self._write("conflict", {"reason": "Previously observed RegistryDevice identity changed"})
+                raise AssertionError("RegistryDevice identity changed; cleanup is quarantined.")
+        return device
+
+    def _cleanup(self):
+        action = _read(self._name("profile-action"))
+        if (receipts.settings()[0] / self._name("profile-action")).exists():
+            if (not isinstance(action, dict) or action.get("completed") is not True
+                    or action.get("namespace_id") != self.namespace["id"]):
+                raise AssertionError("Uncertain certificate revocation; RegistryDevice cleanup is quarantined.")
+        csr._require_owned(self.namespace["name"], csr.find_namespace(self.namespace["name"]))  # pylint: disable=protected-access
+        external_id = self._external_id()
         resolved = _read(self._name("resolved"))
         if not resolved:
-            device = wait_for_condition(
-                match, bool, description="owned RegistryDevice materialization",
-                timeout=RESOLVE_TIMEOUT, interval=5, is_retryable_error=lambda _error: False,
-            )[0]
-            if any(old["id"].casefold() == device["id"].casefold() or old["external_id"] == external_id
-                   for old in self.intent["baseline"]):
-                raise AssertionError("RegistryDevice predates this registration; refusing unowned deletion.")
+            device = self._resolve_candidate(external_id)
             self._write("resolved", {"device": device}, exclusive=True)
         else:
             device = resolved["device"]

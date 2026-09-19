@@ -471,6 +471,7 @@ def test_actual_scenario_cleans_after_assertion_or_partial_result_and_quarantine
     enrollment_exists = False
     issued = result()
     mocker.patch.object(scenario, "generate_names", return_value="unique-enrollment")
+    registry_assertions = mocker.patch.object(scenario, "assert_registry_registration")
 
     def invoke(command):
         nonlocal enrollment_exists
@@ -530,3 +531,65 @@ def test_actual_scenario_cleans_after_assertion_or_partial_result_and_quarantine
     else:
         assert not wire.devices and not enrollment_exists
         assert sum(method == "DELETE" for method, _ in wire.calls) == 1
+    assert registry_assertions.call_count == (0 if failure else 1)
+
+
+def test_read_resolution_does_not_persist_etag_before_later_profile_mutation(wire):
+    owner = start(wire)
+    wire.devices["arm-generated-name"] = device(wire)
+    owner.record_result(result())
+    assert owner.read_device()["etag"] == '"etag1"'
+    assert not (wire.directory / owner._name("resolved")).exists()
+    assert "etag" not in json.loads((wire.directory / owner._name("observed")).read_text())["device"]
+    wire.devices["arm-generated-name"]["etag"] = '"after-profile-action"'
+    owner.cleanup()
+    assert not wire.devices
+    assert json.loads((wire.directory / owner._name("resolved")).read_text())["device"]["etag"] == '"after-profile-action"'
+
+
+def test_read_resolution_requires_prior_registration_intent(wire):
+    owner = registry.RegistryDeviceOwnership(wire.resource, "unique-enrollment")
+    with pytest.raises(AssertionError, match="pre-submission"):
+        owner.read_device()
+    assert not wire.calls
+
+
+@pytest.mark.parametrize("started,resolved", [(False, False), (True, True)])
+def test_profile_mutation_cannot_start_without_active_unfrozen_ownership(wire, started, resolved):
+    owner = start(wire) if started else registry.RegistryDeviceOwnership(wire.resource, "unique-enrollment")
+    if resolved:
+        owner._write("resolved", {"device": device(wire)})
+    with pytest.raises(AssertionError, match="active ownership"):
+        with owner.certificate_revocation("profile"):
+            pytest.fail("Mutation must not start.")
+    assert not (wire.directory / owner._name("profile-action")).exists()
+
+
+@pytest.mark.parametrize("replacement", ["name", "uuid"])
+def test_read_resolution_identity_cannot_change_while_etag_is_unfrozen(wire, replacement):
+    owner = start(wire)
+    wire.devices["arm-generated-name"] = device(wire)
+    owner.record_result(result())
+    owner.read_device()
+    if replacement == "name":
+        wire.devices.clear()
+        wire.devices["replacement"] = device(wire, name="replacement")
+    else:
+        wire.devices["arm-generated-name"]["properties"]["uuid"] = "replacement-uuid"
+    with pytest.raises(AssertionError, match="identity changed"):
+        owner.read_device()
+    with pytest.raises(AssertionError, match="Conflicting"):
+        owner.cleanup()
+    assert not any(method == "DELETE" for method, _ in wire.calls)
+
+
+@pytest.mark.parametrize("kind", ["observed", "profile-action"])
+@pytest.mark.parametrize("contents", ["null", "{}", '{"completed":true,"namespace_id":"foreign"}'])
+def test_damaged_new_receipts_cannot_authorize_cleanup(wire, kind, contents):
+    owner = start(wire)
+    wire.devices["arm-generated-name"] = device(wire)
+    owner.record_result(result())
+    (wire.directory / owner._name(kind)).write_text(contents)
+    with pytest.raises(AssertionError):
+        owner.cleanup()
+    assert not any(method == "DELETE" for method, _ in wire.calls)

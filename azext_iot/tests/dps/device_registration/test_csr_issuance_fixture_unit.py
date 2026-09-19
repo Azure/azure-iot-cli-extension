@@ -546,14 +546,17 @@ def test_expected_404_query_cannot_filter_the_next_enrollment_result(resource, t
 
 
 @pytest.mark.parametrize("timeout", [None, 180])
+@pytest.mark.parametrize("certificate", [False, True])
 @pytest.mark.parametrize("failure", [None, "create", "registration", "operation-status"])
 def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
-    resource, tmp_path, mocker, timeout, failure,
+    resource, tmp_path, mocker, timeout, certificate, failure,
 ):
     commands = []
     ids = []
     existing = False
     owner = mocker.patch("azext_iot.tests.dps._csr_registry.RegistryDeviceOwnership").return_value
+    owner.intent = {"assigned_hubs": ["classic", "modern"]}
+    registry_assertions = mocker.patch.object(scenario, "assert_registry_registration")
 
     def invoke(command):
         nonlocal existing
@@ -569,10 +572,14 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
             if failure == "create":
                 raise ForbiddenError("create rejected")
             assert "--query" in args and "primaryKey" not in args[args.index("--query") + 1]
-            body = {
-                "registrationId": enrollment_id, "namespaceName": resource["namespace"],
-                "certificateAuthorityName": resource["ca"], "certificatePolicyName": resource["policy"],
-            }
+            body = {"registrationId": enrollment_id}
+            assert ("--adr-namespace" in args) == certificate
+            if certificate:
+                body.update(namespaceName=resource["namespace"], certificateAuthorityName=resource["ca"],
+                            certificatePolicyName=resource["policy"])
+            else:
+                assert not any(flag in args for flag in ("--adr-ca-name", "--adr-cert-policy-name"))
+                assert args[args.index("--query") + 1] == "{registrationId:registrationId}"
         elif "enrollment delete" in command:
             existing = False
             body = None
@@ -580,12 +587,15 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
             body = None
         elif "device registration" in command:
             assert "--key" not in args and "--symmetric-key" not in args
-            assert "--auth-type login" in command and "--id-scope scope" in command
+            assert "--auth-type login" in command
             if args[3] == "create":
                 assert ("--timeout" in args) == (timeout is not None)
-                path = Path(args[args.index("--csr") + 1])
-                request = x509.load_pem_x509_csr(path.read_bytes())
-                assert request.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == ids[-1]
+                assert ("--csr" in args) == certificate
+                if certificate:
+                    assert "--id-scope scope" in command
+                    path = Path(args[args.index("--csr") + 1])
+                    request = x509.load_pem_x509_csr(path.read_bytes())
+                    assert request.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == ids[-1]
                 if failure == "registration":
                     raise ForbiddenError("registration rejected")
             elif failure == "operation-status":
@@ -596,6 +606,7 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
                     "registrationId": ids[-1], "deviceId": ids[-1], "assignedHub": "modern",
                     "connectionProfile": "MqttV5", "issuedCertificateChain": ["opaque-contract-value"],
                     "registryDeviceExternalId": "external-id",
+                    "substatus": "initialAssignment",
                 },
             }
         else:
@@ -605,8 +616,12 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
     mocker.patch.object(csr, "invoke", side_effect=invoke)
     mocker.patch.object(scenario, "invoke", side_effect=invoke)
     for _ in range(2):
-        with pytest.raises(ForbiddenError, match="rejected") if failure else nullcontext():
-            scenario.test_register_and_issue_certificate_contract(resource, tmp_path, timeout)
+        fails = failure and (certificate or failure != "operation-status")
+        with pytest.raises(ForbiddenError, match="rejected") if fails else nullcontext():
+            if certificate:
+                scenario.test_register_and_issue_certificate_contract(resource, tmp_path, timeout)
+            else:
+                scenario.test_register_without_csr_deadline_contract(resource, timeout)
         assert not existing
         assert not list(tmp_path.iterdir())
     assert len(set(ids)) == 2
@@ -614,6 +629,9 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
     assert not any("link update" in command or "--key " in command for command in commands)
     assert owner.before_submit.call_count == (0 if failure == "create" else 2)
     assert owner.cleanup.call_count == (0 if failure == "create" else 2)
+    assert registry_assertions.call_count == (0 if fails else 2)
+    if not fails:
+        registry_assertions.assert_called_with(resource, owner, certificate=certificate)
 
 
 def test_csr_cases_are_required_not_pending_and_resources_are_typed():

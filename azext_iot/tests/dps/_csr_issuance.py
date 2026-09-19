@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""One receipt-owned ADR-bound DPS/Hub/issuer, shared by the two CSR variants."""
+"""One receipt-owned ADR-bound DPS/Hub/issuer, shared by registration and CSR variants."""
 
 from contextlib import contextmanager, ExitStack
 import json
@@ -238,7 +238,7 @@ def provisioned_issuance(request):
 
 
 @contextmanager
-def enrollment(resource, enrollment_id):
+def enrollment(resource, enrollment_id, *, certificate=True):
     from azext_iot.tests.dps._csr_registry import RegistryDeviceOwnership
 
     dps = resource["dps"]
@@ -248,19 +248,19 @@ def enrollment(resource, enrollment_id):
         raise AssertionError("Refusing to overwrite an existing CSR enrollment.")
     ownership = None
     try:
-        projection = "{registrationId:registrationId,namespaceName:namespaceName," \
-                     "certificateAuthorityName:certificateAuthorityName,certificatePolicyName:certificatePolicyName}"
-        created = invoke(
-            f"iot dps enrollment create {arguments} --attestation-type symmetricKey "
-            f"--adr-namespace {resource['namespace']} --adr-ca-name {resource['ca']} "
-            f"--adr-cert-policy-name {resource['policy']} --query {quote(projection)}"
-        ).as_json()
-        expected = {
-            "registrationId": enrollment_id, "namespaceName": resource["namespace"],
-            "certificateAuthorityName": resource["ca"], "certificatePolicyName": resource["policy"],
-        }
+        command = f"iot dps enrollment create {arguments} --attestation-type symmetricKey"
+        expected = {"registrationId": enrollment_id}
+        if certificate:
+            command += (
+                f" --adr-namespace {resource['namespace']} --adr-ca-name {resource['ca']}"
+                f" --adr-cert-policy-name {resource['policy']}"
+            )
+            expected.update(namespaceName=resource["namespace"], certificateAuthorityName=resource["ca"],
+                            certificatePolicyName=resource["policy"])
+        projection = "{" + ",".join(f"{key}:{key}" for key in expected) + "}"
+        created = invoke(f"{command} --query {quote(projection)}").as_json()
         observed = {key: created.get(key) for key in expected} if isinstance(created, dict) else type(created).__name__
-        assert created == expected, f"CSR enrollment references differ: expected {expected}, observed {observed}"
+        assert created == expected, f"Enrollment references differ: expected {expected}, observed {observed}"
         ownership = RegistryDeviceOwnership(resource, enrollment_id)
         yield ownership
     finally:

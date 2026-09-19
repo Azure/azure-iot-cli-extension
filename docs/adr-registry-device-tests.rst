@@ -82,3 +82,52 @@ existing modules. Run offline commands with a fresh empty private
 Measure the complete restored runtime modules and added executable lines in
 shared runtime files with branch coverage. Do not present that scoped percentage
 as coverage of the entire repository or generated SDK.
+
+Combined preview registration assertions
+---------------------------------------
+
+The combined Hub/DPS branch additionally exercises registry commands inside the
+four existing default/deadline registration cases in
+``azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py``:
+``test_register_without_csr_deadline_contract[default]``,
+``test_register_without_csr_deadline_contract[deadline]``,
+``test_register_and_issue_certificate_contract[default]`` and
+``test_register_and_issue_certificate_contract[deadline]``.
+
+All four reuse ``provisioned_csr_issuance`` and its same owned namespace, DPS, Hub,
+authorities and policy. No second provisioning stack is introduced. Ordinary
+symmetric enrollments send no namespace/CA/policy references; certificate
+enrollments retain the complete reference tuple and strict echo validation.
+Both registration paths discover their bootstrap credential internally, rather
+than outputting it or placing it in CLI arguments. The former argv-based
+wrong-key probe is not repeated here; existing DPS authentication tests remain.
+
+Assertions resolve the actual Registry Device through the existing pre-submit
+baseline and registration external ID, then check show by name/external ID,
+list, auth list/show/wait and capability list/show. They correlate Hub
+``adrDeviceProperties.uuid`` with the registry UUID, require the issued profile's
+exact owned policy, and wait only on read-only metadata visibility. Each metadata
+wait is bounded by 600 seconds, with 5-second observations and no error retry.
+The existing 2700-second CSR case ceiling also bounds the normal variants.
+
+The symmetric case calls ``auth show-keys`` with a native CLI query that returns
+only the two key lengths. The certificate case submits exactly one confirmed,
+waited ``auth revoke-certs`` action, then reads the same profile. No-wait/LRO
+variants remain covered by the restored runtime's offline SDK contracts; a
+profile existence wait is not misrepresented as revocation completion.
+
+Existing ownership receipts pin identity without freezing a cleanup ETag before
+intentional profile mutation. Cleanup resolves the current version afterwards.
+An uncertain revocation leaves a pending action receipt and quarantines the
+device and dependent parents; neither the scenario nor controller replays it.
+Read/auth errors, ambiguous external IDs and changed identity still fail closed.
+
+Use the existing DPS phase controller's ``--debug-phase regular`` and repeated
+``--debug-node`` options with these exact repository-relative node IDs. Debug
+results remain non-qualifying subsets; the full phase manifest is unchanged.
+The caller still needs the existing owned fixture's management, linking and
+data-plane permissions. Namespace-SAMI ``registryDevices/write`` failures
+(including service ``403000``) must be reported and resolved as an explicitly
+approved test-owned prerequisite, not concealed or addressed by broad product
+RBAC grants. These assertions do not themselves establish successful live
+issuance evidence; retain the actual local run results separately.
