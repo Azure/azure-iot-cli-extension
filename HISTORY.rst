@@ -66,6 +66,7 @@ Release History
 * Reused in-process Azure CLI credentials scoped to the CLI context and target subscription for service and staging clients. Unsupported canary/cloud configurations fail before credential acquisition.
 * DPS enrollment-group create/update/show redact symmetric keys by default; ``--show-keys`` / ``--keys`` explicitly reveal them. Enrollment errors distinguish caller access from the DPS managed identity's ADR access.
 * Hub fallback updates return completed server state. MQTT failures produce clean CLI errors; cleanup preserves the primary error and surfaces cleanup-only failures.
+* Hub feedback monitoring reports AMQP transport failures when a requested message has not been received, while preserving normal cancellation and completed waits. Device filtering no longer discards later matching records in a mixed-device feedback batch.
 
 **Integration and delivery**
 
