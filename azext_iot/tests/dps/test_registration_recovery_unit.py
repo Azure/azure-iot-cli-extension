@@ -15,6 +15,7 @@ from pathlib import Path
 import runpy
 import secrets
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -333,7 +334,16 @@ def start_peer(mocker, tmp_path):
                 config = tmp_path / f"private-cli-{len(children)}"
                 config.mkdir(mode=0o700)
                 env = dict(os.environ, AZURE_CONFIG_DIR=str(config), AZURE_TEST_RUN_LIVE="False")
-                child = processes.enter_context(original([sys.executable, "-I", "-c", driver], env=env, **kwargs))
+                # Test drivers import SDK dependencies before the production
+                # worker bootstrap. ADO can supply those only through the
+                # parent's runtime sys.path; the empty child CLI profile cannot
+                # discover that extension. Keep checkout source first.
+                runtime_paths = list(dict.fromkeys([
+                    str(Path(worker.__file__).resolve().parents[3]),
+                    *(os.path.abspath(path) for path in sys.path),
+                ]))
+                child_driver = f"import sys\nsys.path[:0] = {runtime_paths!r}\n{driver}"
+                child = processes.enter_context(original([sys.executable, "-I", "-c", child_driver], env=env, **kwargs))
                 children.append(child)
                 return child
 
@@ -407,14 +417,35 @@ def test_real_protocol_pipes_reap_all_threads_and_keep_only_complete_progress(st
 
 @pytest.mark.parametrize("with_csr", [False, True])
 @pytest.mark.parametrize("mode", ["success", "retry-after", "blocked-poll", "post-response"])
-def test_real_worker_sdk_acceptance_and_deadline_with_in_memory_http(start_peer, with_csr, mode):
+@pytest.mark.parametrize("dependency_layout", ["default", "parent-only"])
+def test_real_worker_sdk_acceptance_and_deadline_with_in_memory_http(
+    start_peer, monkeypatch, tmp_path, with_csr, mode, dependency_layout,
+):
     # Import and source guards, SDK serialization/signing, worker frames and
     # process termination are real. Only the HTTP boundary is in memory.
+    dependency_path = None
+    if dependency_layout == "parent-only":
+        import msrestazure
+
+        dependency_path = str(tmp_path / "parent-only-runtime")
+        shutil.copytree(Path(msrestazure.__file__).parent, Path(dependency_path) / "msrestazure")
+        monkeypatch.syspath_prepend(dependency_path)
+
     driver = f"""
-import os, sys, socket, io, json, time, runpy
+import os, sys, socket, io, json, time, runpy, importlib.machinery
 assert os.environ["AZURE_TEST_RUN_LIVE"] == "False"
 assert not os.listdir(os.environ["AZURE_CONFIG_DIR"])
-sys.path.insert(0, {str(Path(worker.__file__).resolve().parents[3])!r})
+assert sys.path[0] == {str(Path(worker.__file__).resolve().parents[3])!r}
+parent_dependency = {dependency_path!r}
+if parent_dependency:
+    class ParentOnlyDependency:
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname == "msrestazure":
+                if parent_dependency not in sys.path:
+                    raise ModuleNotFoundError("No module named 'msrestazure'", name=fullname)
+                return importlib.machinery.PathFinder.find_spec(fullname, [parent_dependency])
+            return None
+    sys.meta_path.insert(0, ParentOnlyDependency())
 def blocked(*args, **kwargs):
     raise AssertionError("Network access is forbidden")
 socket.socket.connect = socket.socket.connect_ex = blocked
@@ -424,6 +455,8 @@ requests.adapters.HTTPAdapter.send = blocked
 from azext_iot.dps.services import _registration
 calls = []
 def send(session, prepared, **kwargs):
+    if parent_dependency:
+        assert os.path.dirname(sys.modules["msrestazure"].__file__) == os.path.join(parent_dependency, "msrestazure")
     calls.append(prepared.method)
     assert prepared.url.startswith("https://dps.invalid/")
     assert "api-version=2026-11-02-preview" in prepared.url
