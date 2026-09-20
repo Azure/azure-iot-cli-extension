@@ -230,6 +230,21 @@ def test_workflow_gate_command_exit_status_and_summary(tmp_path, monkeypatch, st
     assert ("### Passed" in summary.read_text(encoding="utf-8")) == (exit_code == 0)
 
 
+def test_ado_style_check_installs_cli_in_selected_python():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/merge.yml").read_text(encoding="utf-8"))
+    steps = next(job for job in workflow["jobs"] if job["job"] == "run_style_check")["steps"]
+    templates = [step.get("template") for step in steps]
+    setup = templates.index("templates/setup-python.yml")
+    cli = templates.index("templates/install-azure-cli-released.yml")
+    extension = templates.index("templates/download-install-local-azure-iot-cli-extension-with-pip.yml")
+    pylint = next(index for index, step in enumerate(steps) if step.get("script", "").startswith("pylint "))
+    assert setup < cli < extension < pylint
+    install = yaml.safe_load(
+        (REPOSITORY_ROOT / ".azure-devops/templates/install-azure-cli-released.yml").read_text(encoding="utf-8")
+    )
+    assert install["steps"][0]["script"] == "python -m pip install azure-cli"
+
+
 def test_workflow_failure_propagation_is_wired():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
