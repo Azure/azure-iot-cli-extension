@@ -103,9 +103,14 @@ def cli_scenario(mocker, monkeypatch, tmp_path):
     mocker.patch.object(commands_wait, "JobRunProvider", return_value=provider)
     mocker.patch.object(commands_job, "JobRunProvider", return_value=provider)
     mocker.patch("azext_iot.adr.providers.wait.IndeterminateProgressBar")
-    # Keep the real wait evaluator/timeout budget without sleeping offline.
+    elapsed = [0]
+
+    def advance_time(delay):
+        elapsed[0] += delay
+
+    # Advance the same clock that defines the real wait evaluator's deadline.
     mocker.patch.object(commands_wait, "wait_for_resource", side_effect=lambda *args, **kwargs: (
-        wait_for_resource(*args, **kwargs, sleeper=lambda _: None)
+        wait_for_resource(*args, **kwargs, clock=lambda: elapsed[0], sleeper=advance_time)
     ))
     scenario = _CliScenario()
     yield scenario, provider
