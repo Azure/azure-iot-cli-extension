@@ -144,14 +144,16 @@ def test_provider_never_replaces_accepted_id_or_reemits_progress():
     assert provider._operation_id == "4.operation-01"
 
 
-@pytest.mark.parametrize("operation_id", ["4.operation-01", "key-secret", "passphrase", "bad\nid"])
+@pytest.mark.parametrize("operation_id", ["4.operation-01", "device_symmetric_key", "passphrase", "bad\nid"])
 def test_worker_progress_does_not_forward_response_payload_or_secrets(mocker, operation_id):
-    passphrase = secrets.token_urlsafe(32)
-    if operation_id == "passphrase":
-        operation_id = passphrase
+    sensitive_values = {
+        name: secrets.token_urlsafe(32) for name in ("device_symmetric_key", "passphrase", "csr", "payload")
+    }
+    if operation_id in ("device_symmetric_key", "passphrase"):
+        operation_id = sensitive_values[operation_id]
     request = {
-        "provider": {"device_symmetric_key": "key-secret", "passphrase": passphrase},
-        "body": {"csr": "csr-secret", "payload": {"value": "payload-secret"}}, "deadline": 100,
+        "provider": {name: sensitive_values[name] for name in ("device_symmetric_key", "passphrase")},
+        "body": {"csr": sensitive_values["csr"], "payload": {"value": sensitive_values["payload"]}}, "deadline": 100,
     }
     output = io.StringIO()
     mocker.patch.object(sys, "stdin", io.StringIO(json.dumps(request)))
@@ -172,8 +174,9 @@ def test_worker_progress_does_not_forward_response_payload_or_secrets(mocker, op
     else:
         assert len(frames) == 1
         assert "unsafe registration operation metadata" in frames[0]
-    for secret in ("key-secret", passphrase, "csr-secret", "payload-secret", "bad\\nid"):
-        assert secret not in output.getvalue()
+    for value in sensitive_values.values():
+        assert value not in output.getvalue()
+    assert "bad\\nid" not in output.getvalue()
 
 
 @pytest.mark.parametrize("origin", ["parent", "provider"])
