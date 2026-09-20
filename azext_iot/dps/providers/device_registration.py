@@ -505,9 +505,7 @@ class DeviceRegistrationProvider:
             else:
                 result = response.body
             self._request_options(deadline)
-        except AzureConnectionError as error:
-            if not isinstance(error, RegistrationTimeoutError):
-                raise
+        except RegistrationTimeoutError as error:
             raise AzureConnectionError(self._timeout_message()) from error
         except HttpResponseError as error:
             return handle_service_exception(error)
