@@ -11,6 +11,7 @@ import yaml
 from typing import Optional, Tuple, Union
 from uuid import uuid4
 from knack.log import get_logger
+from azure.cli.core.azclierror import AzureConnectionError
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import shell_safe_json_parse
@@ -149,7 +150,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
                 and p.get("deviceId")
                 and p["deviceId"].lower() != device_id.lower()
             ):
-                return None
+                continue
             print(yaml.safe_dump({"feedback": p}, default_flow_style=False), flush=True)
             if wait_on_id:
                 msg_id = p["originalMessageId"]
@@ -169,6 +170,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         f"Starting C2D feedback monitor,{device_filter_txt if device_filter_txt else ''} use ctrl-c to stop..."
     )
 
+    match = None
     try:
         client = PyAMQPReceiveClient(
             hostname=_service_hostname(target),
@@ -200,6 +202,11 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     except KeyboardInterrupt:
         logger.info("Stopping C2D feedback monitor...")
     except AMQPLinkError as e:
+        if wait_on_id and not match:
+            raise AzureConnectionError(
+                f"Feedback monitoring failed before receiving feedback for message '{wait_on_id}': {e}",
+                recommendation="Check the connection and retry monitoring without resending the message.",
+            ) from e
         # Link detachment is expected when device disconnects or service closes the connection
         error_condition = getattr(e, 'condition', None)
         if error_condition and 'detach' in str(error_condition).lower():
@@ -207,6 +214,11 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         else:
             logger.warning(f"AMQP link error during feedback monitoring: {e}")
     except AMQPConnectionError as e:
+        if wait_on_id and not match:
+            raise AzureConnectionError(
+                f"Feedback monitoring failed before receiving feedback for message '{wait_on_id}': {e}",
+                recommendation="Check the connection and retry monitoring without resending the message.",
+            ) from e
         # Connection errors can occur due to transient network issues or server-side disconnects
         logger.warning(f"AMQP connection error during feedback monitoring: {e}")
         # Don't re-raise - this is often a transient issue that shouldn't fail the operation
