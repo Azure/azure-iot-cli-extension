@@ -432,14 +432,15 @@ def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
 def test_hub_create_callback_does_not_assign_roles_without_a_principal(mocker, preview_mgmt, identity):
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
-    assignment = mocker.patch.object(custom, "assign_identity")
+    assignment = mocker.patch.object(custom, "create_role_assignment")
     client.iot_hub_resource.begin_create_or_update.return_value = mocker.Mock(spec=LROPoller)
     poller = custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/scope"]
     )
     polling_method = mocker.Mock(spec=PollingMethod)
     polling_method.resource.return_value = {"identity": identity}
-    poller.add_done_callback.call_args.args[0](polling_method)
+    with pytest.raises(CLIInternalError, match="did not return a principalId"):
+        poller.add_done_callback.call_args.args[0](polling_method)
     polling_method.resource.assert_called_once_with()
     assignment.assert_not_called()
     assert "principalId" not in client.iot_hub_resource.begin_create_or_update.call_args.kwargs["iot_hub_description"]["identity"]
