@@ -85,10 +85,6 @@ def load_deviceprovisioningservice_help():
         az iot device registration create --id-scope 0ne00000000 \\
           --registration-id device-01 --certificate-file-path ./device.pem \\
           --key-file-path ./device-key.pem
-    - name: Follow an accepted operation after a timeout without resubmitting registration
-      text: |
-        az iot device registration operation-status --id-scope 0ne00000000 \\
-          --registration-id device-01 --operation-id OPERATION_ID --symmetric-key DEVICE_KEY
   """
 
     helps["iot device registration operation-status"] = """
@@ -108,4 +104,8 @@ def load_deviceprovisioningservice_help():
         az iot device registration operation-status --id-scope 0ne00000000 \\
           --registration-id device-01 --operation-id OPERATION_ID \\
           --symmetric-key GROUP_KEY --compute-key --host MyProvisioningHost
+    - name: Follow an accepted operation after a timeout without resubmitting registration
+      text: |
+        az iot device registration operation-status --id-scope 0ne00000000 \\
+          --registration-id device-01 --operation-id OPERATION_ID --symmetric-key DEVICE_KEY
   """

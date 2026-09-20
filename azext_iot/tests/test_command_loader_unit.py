@@ -28,6 +28,8 @@ from azure.cli.core.mock import DummyCli
 from azure.cli.core.parser import AzCliCommandParser
 from azure.core.credentials import AccessToken
 
+from azext_iot.common.utility import generate_key
+
 
 _IDENTITY_UPDATE_COMMAND = "iot hub device-identity update"
 _IDENTITY_LOGIN = "HostName=hub.unit.invalid;SharedAccessKeyName=owner;SharedAccessKey=b2ZmbGluZQ=="
@@ -190,13 +192,16 @@ def identity_update_cli(mocker):
     cli = DummyCli(commands_loader_cls=_HubIdentityCommandsLoader)
     cli.data["subscription_id"] = subscription
     resource_id = f"/subscriptions/{subscription}/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub"
+    symmetric_keys = {"primaryKey": generate_key(), "secondaryKey": generate_key()}
+    policy_key = generate_key()
     state = SimpleNamespace(
         cli=cli, discovery=discovery, custom_update=custom_update, oauth=oauth, requests=[],
+        symmetric_keys=symmetric_keys,
         resource={
             "deviceId": "device", "etag": "original", "status": "enabled", "statusReason": "original",
             "capabilities": {"iotEdge": False},
             "authentication": {
-                "type": "sas", "symmetricKey": {"primaryKey": "cHJpbWFyeQ==", "secondaryKey": "c2Vjb25kYXJ5"},
+                "type": "sas", "symmetricKey": dict(symmetric_keys),
                 "x509Thumbprint": {"primaryThumbprint": "primary", "secondaryThumbprint": "secondary"},
                 "policyResourceId": "policy", "x509CaValidation": True, "unknownAuthField": "drop",
             },
@@ -218,7 +223,7 @@ def identity_update_cli(mocker):
         if path == resource_id + "/listkeys":
             assert request.method == "POST"
             return 200, {}, json.dumps({"value": [{
-                "keyName": "owner", "primaryKey": "b2ZmbGluZQ==", "secondaryKey": "b2ZmbGluZQ==",
+                "keyName": "owner", "primaryKey": policy_key, "secondaryKey": policy_key,
                 "rights": "RegistryWrite, ServiceConnect, DeviceConnect",
             }]})
         assert urlsplit(request.url).netloc == "hub.unit.invalid"
@@ -286,7 +291,7 @@ def test_identity_update_invocation_preserves_target_auth_and_write_projection(
     assert runtime.resource["status"] == "disabled"
     assert runtime.resource["statusReason"] == "maintenance"
     assert runtime.resource["authentication"] == {
-        "type": "sas", "symmetricKey": {"primaryKey": "cHJpbWFyeQ==", "secondaryKey": "c2Vjb25kYXJ5"},
+        "type": "sas", "symmetricKey": runtime.symmetric_keys,
         "x509Thumbprint": {"primaryThumbprint": "primary", "secondaryThumbprint": "secondary"},
         "policyResourceId": "policy", "x509CaValidation": True,
     }

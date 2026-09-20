@@ -37,7 +37,13 @@ def test_help_examples_are_workflow_first_and_keep_contract_warnings():
     assert "--compute-key" in examples[3]["text"]
     assert "--csr" in examples[4]["text"]
     assert "--certificate-file-path" in examples[5]["text"]
-    assert "operation-status" in examples[6]["text"]
+    status_help = yaml.safe_load(helps["iot device registration operation-status"])
+    assert "--symmetric-key DEVICE_KEY" in status_help["examples"][2]["text"]
+    for command, entry in (
+        ("iot device registration create", help_data),
+        ("iot device registration operation-status", status_help),
+    ):
+        assert all(example["text"].startswith(f"az {command} ") for example in entry["examples"])
     summary = help_data["long-summary"]
     for warning in (
         "after preliminary ID scope", "bootstrap credential discovery", "five-minute",
