@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import secrets
 import shlex
 import socket
 import subprocess
@@ -142,10 +143,13 @@ def test_provider_never_replaces_accepted_id_or_reemits_progress():
     assert provider._operation_id == "4.operation-01"
 
 
-@pytest.mark.parametrize("operation_id", ["4.operation-01", "key-secret", "bad\nid"])
+@pytest.mark.parametrize("operation_id", ["4.operation-01", "key-secret", "passphrase", "bad\nid"])
 def test_worker_progress_does_not_forward_response_payload_or_secrets(mocker, operation_id):
+    passphrase = secrets.token_urlsafe(32)
+    if operation_id == "passphrase":
+        operation_id = passphrase
     request = {
-        "provider": {"device_symmetric_key": "key-secret", "passphrase": "passphrase-secret"},
+        "provider": {"device_symmetric_key": "key-secret", "passphrase": passphrase},
         "body": {"csr": "csr-secret", "payload": {"value": "payload-secret"}}, "deadline": 100,
     }
     output = io.StringIO()
@@ -167,8 +171,47 @@ def test_worker_progress_does_not_forward_response_payload_or_secrets(mocker, op
     else:
         assert len(frames) == 1
         assert "unsafe registration operation metadata" in frames[0]
-    for secret in ("key-secret", "passphrase-secret", "csr-secret", "payload-secret", "bad\\nid"):
+    for secret in ("key-secret", passphrase, "csr-secret", "payload-secret", "bad\\nid"):
         assert secret not in output.getvalue()
+
+
+@pytest.mark.parametrize("origin", ["parent", "provider"])
+@pytest.mark.parametrize("deadline_timeout", [False, True])
+def test_only_deadline_errors_are_enriched_and_exception_chains_are_preserved(mocker, origin, deadline_timeout):
+    provider = _provider()
+    kind = protocol.RegistrationTimeoutError if deadline_timeout else AzureConnectionError
+    error = kind("Offline connection failure")
+    cause = OSError("Original offline transport failure")
+    error.__cause__ = cause
+    if origin == "parent":
+        # Isolate the translation boundary; real worker reaping is tested below.
+        mocker.patch.object(registration.subprocess, "Popen")
+
+        def fail_worker(_worker, _request, communication, _deadline, _decode_response):
+            communication["operation_id"] = "4.operation-01"
+            raise error
+
+        mocker.patch.object(registration, "_await_worker", side_effect=fail_worker)
+        with pytest.raises(AzureConnectionError) as raised:
+            registration.register_with_deadline(provider, {}, 5)
+    else:
+        client = mocker.patch.object(provider, "_get_client").return_value
+        client.runtime_registration.register_device_and_issue_certificate.side_effect = error
+        with pytest.raises(AzureConnectionError) as raised:
+            provider._perform_registration({})
+        client.runtime_registration.register_device_and_issue_certificate.assert_called_once()
+
+    if deadline_timeout:
+        assert type(raised.value) is AzureConnectionError
+        assert raised.value.__cause__ is error
+        if origin == "parent":
+            _assert_followup(raised.value)
+        else:
+            assert "Operation ID is unknown" in str(raised.value)
+    else:
+        assert raised.value is error
+        assert str(raised.value) == "Offline connection failure"
+    assert error.__cause__ is cause
 
 
 def test_parent_refuses_a_worker_from_another_extension(mocker):

@@ -141,7 +141,9 @@ def register_with_deadline(provider, body, timeout):
     communication = {}
     try:
         return _await_worker(worker, request, communication, deadline, _registration_worker.decode_response)
-    except RegistrationTimeoutError as error:
+    except AzureConnectionError as error:
+        if not isinstance(error, RegistrationTimeoutError):
+            raise
         # _await_worker has joined the readers: include progress racing with the
         # deadline, but never infer acceptance from a partial frame or an exit.
         raise AzureConnectionError(timeout_message(
