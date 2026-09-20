@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Owned registry-only lifecycle; live scope is documented in docs/adr-registry-device-tests.rst."""
+"""Owned registry-only lifecycle."""
 
 import shlex
 from functools import partial
