@@ -15,6 +15,8 @@ argument declarations without requiring a live Azure CLI command table.
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from azext_iot.iothub._help import load_iothub_help
 from azext_iot.iothub.command_map import load_iothub_commands
 from azext_iot.iothub.params import load_iothub_arguments
@@ -54,3 +56,42 @@ def test_route_update_result_transform(mocker):
         return_value=result,
     )
     assert transform("poller") == ["r"]
+
+
+def test_topic_group_update_result_transform(mocker):
+    from azext_iot.iothub.command_map import TopicGroupUpdateResultTransform
+
+    transform = TopicGroupUpdateResultTransform(MagicMock())
+    result = {
+        "properties": {
+            "mqttV5Settings": {
+                "topicGroups": ["g"],
+            }
+        }
+    }
+    mocker.patch(
+        "azext_iot.iothub.command_map.LongRunningOperation.__call__",
+        return_value=result,
+    )
+    assert transform("poller") == ["g"]
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"properties": {}},
+        {"properties": {"mqttV5Settings": None}},
+        {"properties": {"mqttV5Settings": {"topicGroups": None}}},
+    ],
+)
+def test_topic_group_update_result_transform_treats_missing_settings_as_empty(
+    mocker, result
+):
+    from azext_iot.iothub.command_map import TopicGroupUpdateResultTransform
+
+    transform = TopicGroupUpdateResultTransform(MagicMock())
+    mocker.patch(
+        "azext_iot.iothub.command_map.LongRunningOperation.__call__",
+        return_value=result,
+    )
+    assert transform("poller") == []

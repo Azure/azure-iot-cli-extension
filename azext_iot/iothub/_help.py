@@ -881,6 +881,82 @@ def load_iothub_help():
     """
 
     helps[
+        "iot hub topic-group"
+    ] = """
+        type: group
+        short-summary: Manage MQTT 5 topic groups for an IoT Hub.
+        long-summary: Topic groups are supported only for IoT Hubs using the MqttV5 connection profile.
+    """
+
+    helps[
+        "iot hub topic-group create"
+    ] = """
+        type: command
+        short-summary: Create an MQTT 5 topic group.
+        examples:
+          - name: Create a topic group with multiple topic templates.
+            text: >
+              az iot hub topic-group create -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates {topic_template_1} {topic_template_2}
+          - name: Create a topic group with an empty topic-template list.
+            text: >
+              az iot hub topic-group create -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates
+    """
+
+    helps[
+        "iot hub topic-group show"
+    ] = """
+        type: command
+        short-summary: Show an MQTT 5 topic group.
+        examples:
+          - name: Show a topic group.
+            text: >
+              az iot hub topic-group show -n {iothub_name} --topic-group-id {topic_group_id}
+    """
+
+    helps[
+        "iot hub topic-group list"
+    ] = """
+        type: command
+        short-summary: List MQTT 5 topic groups.
+        examples:
+          - name: List all topic groups.
+            text: >
+              az iot hub topic-group list -n {iothub_name}
+    """
+
+    helps[
+        "iot hub topic-group update"
+    ] = """
+        type: command
+        short-summary: Replace the topic templates of an MQTT 5 topic group.
+        examples:
+          - name: Replace the templates of a topic group.
+            text: >
+              az iot hub topic-group update -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates {topic_template_1} {topic_template_2}
+          - name: Clear all templates from a topic group.
+            text: >
+              az iot hub topic-group update -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates
+    """
+
+    helps[
+        "iot hub topic-group delete"
+    ] = """
+        type: command
+        short-summary: Delete one or all MQTT 5 topic groups.
+        examples:
+          - name: Delete a topic group.
+            text: >
+              az iot hub topic-group delete -n {iothub_name} --topic-group-id {topic_group_id}
+          - name: Delete all topic groups without prompting.
+            text: >
+              az iot hub topic-group delete -n {iothub_name} --all --yes
+    """
+
+    helps[
         "iot hub message-route create"
     ] = """
         type: command

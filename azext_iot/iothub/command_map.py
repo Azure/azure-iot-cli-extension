@@ -16,6 +16,7 @@ pnp_runtime_ops = CliCommandType(
 iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
 iothub_message_endpoint_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_message_endpoint#{}")
 iothub_message_route_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_message_route#{}")
+iothub_topic_group_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_topic_group#{}")
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
@@ -38,6 +39,16 @@ class RouteUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-f
     def __call__(self, poller):
         result = super(RouteUpdateResultTransform, self).__call__(poller)
         return result["properties"]["routing"]["routes"]
+
+
+class TopicGroupUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
+    def __call__(self, poller):
+        result = super(TopicGroupUpdateResultTransform, self).__call__(poller)
+        mqtt_v5_settings = result["properties"].get("mqttV5Settings")
+        if mqtt_v5_settings is None:
+            return []
+        topic_groups = mqtt_v5_settings.get("topicGroups")
+        return [] if topic_groups is None else topic_groups
 
 
 def load_iothub_commands(self, _):
@@ -161,6 +172,27 @@ def load_iothub_commands(self, _):
             'update', 'message_route_update', transform=RouteUpdateResultTransform(self.cli_ctx)
         )
         cmd_group.command('test', 'message_route_test')
+
+    with self.command_group(
+        "iot hub topic-group", command_type=iothub_topic_group_ops, is_preview=True
+    ) as cmd_group:
+        cmd_group.command(
+            "create",
+            "topic_group_create",
+            transform=TopicGroupUpdateResultTransform(self.cli_ctx),
+        )
+        cmd_group.show_command("show", "topic_group_show")
+        cmd_group.command("list", "topic_group_list")
+        cmd_group.command(
+            "update",
+            "topic_group_update",
+            transform=TopicGroupUpdateResultTransform(self.cli_ctx),
+        )
+        cmd_group.command(
+            "delete",
+            "topic_group_delete",
+            transform=TopicGroupUpdateResultTransform(self.cli_ctx),
+        )
 
     with self.command_group("iot hub message-route fallback", command_type=iothub_message_route_ops) as cmd_group:
         cmd_group.show_command("show", "message_fallback_route_show")
