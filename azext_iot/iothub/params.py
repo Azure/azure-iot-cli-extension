@@ -646,6 +646,48 @@ def load_iothub_arguments(self, _):
             help="Force delete the endpoint(s) and any routes and message enrichments associated.",
         )
 
+    with self.argument_context("iot hub topic-group") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--hub-name", "-n"],
+            help="IoT Hub name.",
+            arg_group=None,
+        )
+        context.argument(
+            "topic_group_id",
+            options_list=["--topic-group-id"],
+            help="Customer-defined identifier of the topic group.",
+        )
+
+    for command_name in ("create", "update"):
+        with self.argument_context(f"iot hub topic-group {command_name}") as context:
+            context.argument("topic_group_id", required=True)
+            context.argument(
+                "topic_templates",
+                options_list=["--topic-templates"],
+                nargs="*",
+                required=True,
+                help=(
+                    "Space-separated topic templates. Specify the option without values "
+                    "to use an empty list."
+                ),
+            )
+
+    with self.argument_context("iot hub topic-group show") as context:
+        context.argument("topic_group_id", required=True)
+
+    with self.argument_context("iot hub topic-group delete") as context:
+        context.argument(
+            "delete_all",
+            options_list=["--all"],
+            help="Delete all topic groups.",
+        )
+        context.argument(
+            "yes",
+            options_list=["--yes", "-y"],
+            help="Do not prompt for confirmation when deleting all topic groups.",
+        )
+
     with self.argument_context("iot hub message-route") as context:
         context.argument(
             "hub_name",
