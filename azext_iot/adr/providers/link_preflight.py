@@ -19,6 +19,7 @@ from azure.core.exceptions import HttpResponseError
 from azext_iot.adr.rbac import (
     resolve_linked_resource_principal,
     resolve_namespace_outbound_principal,
+    resolve_namespace_system_principal,
 )
 
 
@@ -134,6 +135,10 @@ def preflight_target(
             target, inbound_identity, strategy.display_name
         ),
     }
+    if link_type == "dps":
+        request["namespace_system_principal_id"] = (
+            resolve_namespace_system_principal(namespace)
+        )
     if rbac_requests is not None:
         rbac_requests.append(request)
     else:

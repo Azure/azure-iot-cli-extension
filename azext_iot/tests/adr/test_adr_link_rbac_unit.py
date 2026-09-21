@@ -35,6 +35,7 @@ from azext_iot.adr.rbac import (
     format_role_requirements,
     resolve_linked_resource_principal,
     resolve_namespace_outbound_principal,
+    resolve_namespace_system_principal,
 )
 
 NS_SCOPE = (
@@ -116,7 +117,11 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
             ("namespace", "IoT Hub Data Contributor", "target"),
             ("linked", "Contributor", "namespace"),
         ],
-        "dps": [("namespace", "Contributor", "target"), ("linked", "Contributor", "namespace")],
+        "dps": [
+            ("namespace", "Contributor", "target"),
+            ("namespace_system", "Contributor", "namespace"),
+            ("linked", "Contributor", "namespace"),
+        ],
         "su": [
             ("namespace", "Contributor", "target"),
             ("linked", "Azure Device Registry Contributor", "namespace"),
@@ -254,6 +259,12 @@ def test_strict_management_group_roles_use_actual_cli_arm_at_scope_query(mocker,
 
 def test_namespace_outbound_principal_defaults_to_system_identity():
     assert resolve_namespace_outbound_principal(_namespace()) == "ns-system"
+
+
+def test_namespace_system_principal_uses_system_identity_when_outbound_uses_uami():
+    assert resolve_namespace_system_principal(
+        _namespace({"type": "UserAssigned", "userAssignedIdentity": UAMI})
+    ) == "ns-system"
 
 
 def test_namespace_outbound_principal_uses_selected_uami_case_insensitively():
@@ -543,6 +554,40 @@ def test_rbac_unauthorized_fails_with_exact_remediation_before_create():
     assert not any(
         "role assignment create" in call.args[0]
         for call in cli.invoke.call_args_list
+    )
+
+
+def test_dps_link_assigns_namespace_system_identity_to_its_own_namespace(mocker):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    mocker.patch.object(
+        manager,
+        "_assignment_exists",
+        side_effect=lambda principal, _role, scope: not (
+            principal == "namespace-system" and scope == NS_SCOPE
+        ),
+    )
+    mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    invoke = mocker.patch.object(manager, "_invoke_json")
+    wait = mocker.patch.object(manager, "_wait_for_assignments")
+
+    manager.ensure(
+        "dps",
+        NS_SCOPE,
+        TARGET_SCOPE,
+        "namespace-outbound",
+        "dps-principal",
+        namespace_system_principal_id="namespace-system",
+    )
+
+    invoke.assert_called_once_with(
+        "role assignment create --assignee-object-id 'namespace-system' "
+        "--assignee-principal-type ServicePrincipal --role 'Contributor' "
+        f"--scope '{NS_SCOPE}'",
+        subscription="sub",
+    )
+    wait.assert_called_once_with(
+        [("namespace-system", "Contributor", NS_SCOPE)]
     )
 
 
