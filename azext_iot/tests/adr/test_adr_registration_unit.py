@@ -220,8 +220,8 @@ def test_2026_command_surface_is_registered():
         "iot adr ns wait": "adr_namespace_wait",
         "iot adr ns ca wait": "adr_ca_wait",
         "iot adr ns ca policy wait": "adr_ca_policy_wait",
-        "iot adr ns registry-device wait": "adr_registry_device_wait",
-        "iot adr ns registry-device auth wait": "adr_registry_device_auth_wait",
+        "iot adr ns device wait": "adr_registry_device_wait",
+        "iot adr ns device auth wait": "adr_registry_device_auth_wait",
         "iot adr ns identity wait": "adr_namespace_wait",
         "iot adr ns link wait": "adr_link_wait",
         "iot adr ns link hub wait": "adr_link_hub_wait",
@@ -299,7 +299,7 @@ def test_unsupported_command_surfaces_are_not_registered():
                 "iot adr ns asset",
                 "iot adr ns discovered-",
                 "iot adr ns management-endpoint",
-                "iot adr ns device",
+                "iot adr ns registry-device",
             )
         )
         for command in commands
@@ -497,7 +497,7 @@ def test_load_adr_arguments():
                 "iot adr ns asset",
                 "iot adr ns discovered-",
                 "iot adr ns management-endpoint",
-                "iot adr ns device",
+                "iot adr ns registry-device",
             )
         )
         for command in arguments
@@ -743,7 +743,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
                 "iot adr ns asset",
                 "iot adr ns discovered-",
                 "iot adr ns management-endpoint",
-                "iot adr ns device",
+                "iot adr ns registry-device",
             )
         )
         for command in helps

@@ -43,7 +43,7 @@ DEVICE = {
     "properties": {"externalDeviceId": "external", "enablementState": "Enabled", "provisioningState": "Succeeded"},
 }
 PROFILE = {"name": "profile", "properties": {"authenticationType": "SymmetricKey"}}
-PREFIX = "iot adr ns registry-device"
+PREFIX = "iot adr ns device"
 
 
 @pytest.mark.parametrize("command,group,method,result,kwargs", [

@@ -223,6 +223,6 @@ def test_parser_rejections_require_exit_code_and_message(
     mocker.patch.object(scenario, "cmd", side_effect=fail)
     with pytest.raises(AssertionError):
         scenario._assert_parser_error(
-            "iot adr ns device show",
-            "'device' is misspelled or not recognized by the system.",
+            "iot adr ns registry-device show",
+            "'registry-device' is misspelled or not recognized by the system.",
         )

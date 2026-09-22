@@ -36,8 +36,8 @@ def load_adr_arguments(self, _):
         "iot adr ns wait",
         "iot adr ns ca wait",
         "iot adr ns ca policy wait",
-        "iot adr ns registry-device wait",
-        "iot adr ns registry-device auth wait",
+        "iot adr ns device wait",
+        "iot adr ns device auth wait",
         "iot adr ns identity wait",
         "iot adr ns link wait",
         "iot adr ns link hub wait",
@@ -231,7 +231,7 @@ def load_adr_arguments(self, _):
                  "7 and 90 days, inclusive.",
         )
 
-    with self.argument_context("iot adr ns registry-device") as context:
+    with self.argument_context("iot adr ns device") as context:
         context.argument(
             "namespace_name", options_list=["--namespace", "--ns"],
             help="Name of the Device Registry namespace.",
@@ -242,7 +242,7 @@ def load_adr_arguments(self, _):
         )
 
     for verb in ("create", "update"):
-        with self.argument_context(f"iot adr ns registry-device {verb}") as context:
+        with self.argument_context(f"iot adr ns device {verb}") as context:
             context.argument("tags", arg_type=tags_type)
             context.argument(
                 "enablement_state", options_list=["--enablement-state"],
@@ -258,7 +258,7 @@ def load_adr_arguments(self, _):
                     help=f"{description} of the Registry Device.",
                 )
 
-    with self.argument_context("iot adr ns registry-device create") as context:
+    with self.argument_context("iot adr ns device create") as context:
         context.argument("location", arg_type=get_location_type(self.cli_ctx))
         context.argument(
             "external_device_id", options_list=["--external-device-id", "--ext-id"],
@@ -266,7 +266,7 @@ def load_adr_arguments(self, _):
         )
 
     for verb in ("show", "wait"):
-        with self.argument_context(f"iot adr ns registry-device {verb}") as context:
+        with self.argument_context(f"iot adr ns device {verb}") as context:
             context.argument(
                 "external_device_id", options_list=["--external-device-id", "--ext-id"],
                 help="Customer-provided external ID. Specify exactly one of this option or --name. "
@@ -278,21 +278,21 @@ def load_adr_arguments(self, _):
         ("attribute", "attribute_name", ["--attribute-name", "--an", "--name", "-n"]),
         ("capability", "capability_name", ["--capability-name", "--cn", "--name", "-n"]),
     ):
-        with self.argument_context(f"iot adr ns registry-device {child}") as context:
+        with self.argument_context(f"iot adr ns device {child}") as context:
             context.argument(
                 "registry_device_name", options_list=["--registry-device-name", "--rdn", "--device-name", "--dn"],
                 help="Name of the parent Registry Device.",
             )
             context.argument(field, options_list=aliases, help=f"Name of the Registry Device {child}.")
 
-    with self.argument_context("iot adr ns registry-device attribute show") as context:
+    with self.argument_context("iot adr ns device attribute show") as context:
         context.argument(
             "attribute_name", options_list=["--attribute-name", "--an", "--name", "-n"],
             help="Attribute name. If no literal match exists, software-update is an alias for "
             "the service-owned Device Update attribute named update.",
         )
 
-    with self.argument_context("iot adr ns registry-device attribute create") as context:
+    with self.argument_context("iot adr ns device attribute create") as context:
         context.argument(
             "reported_by", options_list=["--reported-by", "--rb"],
             arg_type=get_enum_type([DeviceAttributeReportedType.user.value]),
