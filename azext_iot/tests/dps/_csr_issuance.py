@@ -49,7 +49,8 @@ def _optional(command, *, dataplane=False):
         return invoke(command).as_json()
     except (HttpResponseError, CloudError, CLIError) as error:
         if (dataplane and isinstance(error, ResourceNotFoundError)
-                and isinstance(error.__cause__, HttpResponseError) and error.__cause__.status_code == 404):
+                and isinstance(error.__cause__, HttpResponseError)
+                and getattr(error.__cause__, "status_code") == 404):
             return None
         if is_resource_not_found_error(error):
             return None
