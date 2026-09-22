@@ -39,6 +39,27 @@ _NAMESPACE_ARGUMENTS = [
     "--resource-group",
     "resource-group",
 ]
+_DEVICE_PARSER_CASES = {
+    "iot adr ns device create": ["--name", "device", "--location", "centraluseuap"],
+    "iot adr ns device show": ["--name", "device"],
+    "iot adr ns device list": [],
+    "iot adr ns device update": ["--name", "device", "--manufacturer", "Contoso"],
+    "iot adr ns device delete": ["--name", "device"],
+    "iot adr ns device wait": ["--name", "device", "--exists"],
+    "iot adr ns device auth list": ["--device-name", "device"],
+    "iot adr ns device auth show": ["--device-name", "device", "--name", "profile"],
+    "iot adr ns device auth show-keys": ["--device-name", "device", "--name", "profile"],
+    "iot adr ns device auth revoke-certs": ["--device-name", "device", "--name", "profile"],
+    "iot adr ns device auth wait": ["--device-name", "device", "--name", "profile"],
+    "iot adr ns device attribute create": [
+        "--device-name", "device", "--name", "attribute", "--properties", "{}",
+    ],
+    "iot adr ns device attribute list": ["--device-name", "device"],
+    "iot adr ns device attribute show": ["--device-name", "device", "--name", "attribute"],
+    "iot adr ns device attribute delete": ["--device-name", "device", "--name", "attribute"],
+    "iot adr ns device capability list": ["--device-name", "device"],
+    "iot adr ns device capability show": ["--device-name", "device", "--name", "capability"],
+}
 _ENDPOINT_ARGUMENTS = [
     "--endpoint-name",
     "endpoint",
@@ -74,26 +95,6 @@ _PNP_PARSER_CASES = {
     "iot hub digital-twin show": [],
     "iot hub digital-twin update": ["--patch", "[]"],
     "iot hub digital-twin invoke-command": ["--cn", "noop"],
-}
-_REGISTRY_DEVICE_PARSER_CASES = {
-    f"iot adr ns registry-device{group} {verb}": [*arguments, *extra]
-    for group, arguments, verbs in (
-        ("", [], {
-            "create": ["-n", "device", "--ext-id", "external"], "show": ["-n", "device"], "list": [],
-            "update": ["-n", "device", "--manufacturer", "Contoso"], "delete": ["-n", "device", "--yes"],
-            "wait": ["-n", "device"],
-        }),
-        (" auth", ["--rdn", "device"], {
-            "list": [], "show": ["-n", "profile"], "show-keys": ["-n", "profile"],
-            "revoke-certs": ["-n", "profile", "--yes"], "wait": ["-n", "profile"],
-        }),
-        (" attribute", ["--rdn", "device"], {
-            "create": ["-n", "attribute"], "list": [], "show": ["-n", "attribute"],
-            "delete": ["-n", "attribute", "--yes"],
-        }),
-        (" capability", ["--rdn", "device"], {"list": [], "show": ["-n", "capability"]}),
-    )
-    for verb, extra in verbs.items()
 }
 for _kind, _resource_option, _resource_id in (
     ("hub", "--hub-resource-id", _HUB_ID),
@@ -138,7 +139,7 @@ def management_command_parser():
     loader.skip_applicability = True
     loader.load_command_table(None)
     names = [
-        *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_REGISTRY_DEVICE_PARSER_CASES,
+        *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
     ]
     loader.command_table = {
@@ -477,20 +478,24 @@ def test_retired_link_delete_is_not_registered(command_table, kind):
     assert f"iot adr ns link {kind} delete" not in command_table
 
 
-@pytest.mark.parametrize("command_name", _REGISTRY_DEVICE_PARSER_CASES)
-def test_restored_registry_device_commands_parse(command_table, management_command_parser, command_name):
+@pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)
+def test_namespace_device_command_parser(command_table, management_command_parser, command_name):
     assert command_table[command_name].command_kwargs["is_preview"]
     parsed = management_command_parser.parse_args([
-        *command_name.split(), *_NAMESPACE_ARGUMENTS, *_REGISTRY_DEVICE_PARSER_CASES[command_name],
+        *command_name.split(), *_NAMESPACE_ARGUMENTS, *_DEVICE_PARSER_CASES[command_name],
     ])
     assert parsed.namespace_name == "namespace"
     assert parsed.resource_group_name == "resource-group"
+    if command_name != "iot adr ns device list":
+        assert parsed.registry_device_name == "device"
 
 
-def test_adr_command_count_includes_all_restored_registry_devices(command_table):
-    commands = [name for name in command_table if name.startswith("iot adr ")]
-    assert len(commands) == 109
-    assert {name for name in commands if name.startswith("iot adr ns registry-device")} == set(_REGISTRY_DEVICE_PARSER_CASES)
+def test_namespace_device_command_names(command_table):
+    assert sum(name.startswith("iot adr ") for name in command_table) == 109
+    assert {
+        name for name in command_table if name.startswith("iot adr ns device ")
+    } == set(_DEVICE_PARSER_CASES)
+    assert not any(name.startswith("iot adr ns registry-device") for name in command_table)
 
 
 def test_command_table_loads(command_table):

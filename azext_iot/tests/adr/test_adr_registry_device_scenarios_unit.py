@@ -94,7 +94,7 @@ class _LifecycleBackend:
         self.commands.append(tokens)
         group = "namespace"
         offset = 3
-        if tokens[:4] == ["iot", "adr", "ns", "registry-device"]:
+        if tokens[:4] == ["iot", "adr", "ns", "device"]:
             group = "device"
             offset = 4
             if tokens[offset] in ("auth", "attribute", "capability"):
@@ -208,8 +208,8 @@ def test_lifecycle_cleanup_keeps_collision_quarantine_and_testsdk_json(mocker, c
         scenario.test_registry_device_lifecycle()
         assert not backend.resources
         commands = [" ".join(tokens) for tokens in backend.commands]
-        assert sum("registry-device attribute delete" in command for command in commands) == 1
-        assert sum("registry-device delete" in command for command in commands) == 1
+        assert sum("ns device attribute delete" in command for command in commands) == 1
+        assert sum("ns device delete" in command for command in commands) == 1
         assert sum("iot adr ns delete" in command for command in commands) == 1
         assert backend.update_states == ["Succeeded", "Succeeded"]
         assert len(backend.wait_observations) == 3
@@ -223,7 +223,7 @@ def test_lifecycle_cleanup_keeps_collision_quarantine_and_testsdk_json(mocker, c
         assert len(backend.attribute_list_reads) == 3 and len(backend.attribute_list_reads[-1]) == 1
         # One initial PUT, one intentional replace, one rejected negative PUT;
         # delayed LIST visibility must never introduce an additional mutation.
-        assert sum("registry-device attribute create" in command for command in commands) == 3
+        assert sum("ns device attribute create" in command for command in commands) == 3
     scenario.doCleanups()
     assert all(tokens[-2:] == ["--subscription", scenarios.TEST_SUBSCRIPTION] for tokens in backend.commands)
     client.close.assert_called_once()
@@ -373,9 +373,9 @@ def test_cleanup_uses_sdk_404_while_unwinding_primary_error(mocker):
     factory.assert_called_once_with(scenario.cli_ctx, subscription_id=scenarios.TEST_SUBSCRIPTION)
     assert not backend.resources
     commands = [" ".join(tokens) for tokens in backend.commands]
-    assert sum("registry-device delete" in command for command in commands) == 1
+    assert sum("ns device delete" in command for command in commands) == 1
     assert sum("iot adr ns delete" in command for command in commands) == 1
-    assert "show" not in " ".join(commands[commands.index(next(c for c in commands if "registry-device delete" in c)):])
+    assert "show" not in " ".join(commands[commands.index(next(c for c in commands if "ns device delete" in c)):])
     scenario.doCleanups()
     client.close.assert_called_once()
 

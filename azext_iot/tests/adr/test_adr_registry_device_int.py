@@ -27,7 +27,7 @@ from azext_iot.tests.adr.conftest import (
 from azext_iot.tests.generators import generate_generic_id
 
 
-PREFIX = "iot adr ns registry-device"
+PREFIX = "iot adr ns device"
 WAIT = "--timeout 600 --interval 10"
 
 

@@ -84,10 +84,10 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 InvalidArgumentValueError,
                 f"'{_UAMI_ID}' is not a Microsoft.DeviceRegistry/assets resource ID.",
             )
-        with timed_step("ns device ❯ removed alias is not registered"):
+        with timed_step("ns registry-device ❯ previous spelling is not registered"):
             self._assert_parser_error(
-                f"iot adr ns device show -n mydev --ns {ns} -g {rg}",
-                "'device' is misspelled or not recognized by the system.",
+                f"iot adr ns registry-device show -n mydev --ns {ns} -g {rg}",
+                "'registry-device' is misspelled or not recognized by the system.",
             )
 
         # --- Certificate authority: update requires --tags ---

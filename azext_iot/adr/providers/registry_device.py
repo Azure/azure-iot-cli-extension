@@ -160,7 +160,7 @@ class RegistryDeviceProvider(ADRProvider):
                 f"No Registry Device with external device ID "
                 f"'{external_device_id}' was found in namespace "
                 f"'{namespace_name}'. If registration just completed, use "
-                "'az iot adr ns registry-device wait --external-device-id ...' "
+                "'az iot adr ns device wait --external-device-id ...' "
                 "to allow for materialization."
             )
         if len(matches) > 1:

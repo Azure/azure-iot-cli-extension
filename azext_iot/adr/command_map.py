@@ -128,7 +128,7 @@ def load_adr_commands(self, _):
         )
 
     with self.command_group(
-        "iot adr ns registry-device", command_type=adr_registry_device_ops, is_preview=True
+        "iot adr ns device", command_type=adr_registry_device_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("create", "adr_registry_device_create", supports_no_wait=True)
         cmd_group.show_command("show", "adr_registry_device_show", table_transformer=_REGISTRY_DEVICE_TABLE)
@@ -138,7 +138,7 @@ def load_adr_commands(self, _):
         cmd_group.command("wait", "adr_registry_device_wait", command_type=adr_wait_ops)
 
     with self.command_group(
-        "iot adr ns registry-device auth", command_type=adr_registry_device_ops, is_preview=True
+        "iot adr ns device auth", command_type=adr_registry_device_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("list", "adr_registry_device_auth_list", table_transformer="[]." + _REGISTRY_AUTH_TABLE)
         cmd_group.show_command("show", "adr_registry_device_auth_show", table_transformer=_REGISTRY_AUTH_TABLE)
@@ -149,7 +149,7 @@ def load_adr_commands(self, _):
         cmd_group.command("wait", "adr_registry_device_auth_wait", command_type=adr_wait_ops)
 
     with self.command_group(
-        "iot adr ns registry-device attribute", command_type=adr_registry_device_ops, is_preview=True
+        "iot adr ns device attribute", command_type=adr_registry_device_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("create", "adr_registry_device_attribute_create")
         cmd_group.command("list", "adr_registry_device_attribute_list", table_transformer="[]." + _REGISTRY_ATTRIBUTE_TABLE)
@@ -157,7 +157,7 @@ def load_adr_commands(self, _):
         cmd_group.command("delete", "adr_registry_device_attribute_delete", confirmation=True)
 
     with self.command_group(
-        "iot adr ns registry-device capability", command_type=adr_registry_device_ops, is_preview=True
+        "iot adr ns device capability", command_type=adr_registry_device_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("list", "adr_registry_device_capability_list", table_transformer="[]." + _REGISTRY_CAPABILITY_TABLE)
         cmd_group.show_command("show", "adr_registry_device_capability_show", table_transformer=_REGISTRY_CAPABILITY_TABLE)
