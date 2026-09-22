@@ -20,7 +20,6 @@ from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import adr_service_factory
-from azext_iot.adr.rbac import CONTRIBUTOR_ROLE, LINK_ROLE_IDS
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_condition
 from azext_iot.tests.dps import conftest as fixtures, _phase, _phase_receipts as receipts, _phase_runtime as runtime
@@ -33,6 +32,9 @@ LINK_OPTIONS = "--timeout 1200 --interval 10"
 WAIT_OPTIONS = "--timeout 600 --interval 10"
 NAMESPACE_ROLE_RECEIPT = "csr-namespace-self-role.json"
 NAMESPACE_ROLE_PROPAGATION_SECONDS = 60
+# Built-in Azure Device Registry Administrator: Microsoft.DeviceRegistry/*
+# includes Microsoft.DeviceRegistry/namespaces/registryDevices/write (39640174).
+NAMESPACE_ROLE_DEFINITION_ID = "12675fd7-7f59-493f-9201-f7944860a2f1"
 
 
 def invoke(command):
@@ -142,7 +144,7 @@ def _namespace_role_binding(record, principal):
         "scope": record["id"], "principalId": principal, "principalType": "ServicePrincipal",
         "roleDefinitionId": (
             f"/subscriptions/{record['subscription']}/providers/Microsoft.Authorization/"
-            f"roleDefinitions/{LINK_ROLE_IDS[CONTRIBUTOR_ROLE]}"
+            f"roleDefinitions/{NAMESPACE_ROLE_DEFINITION_ID}"
         ),
     }
 
@@ -170,7 +172,7 @@ def _get_namespace_role(client, expected):
 
 
 def _grant_namespace_self_role(name):
-    """Test-only Contributor workaround from work item 39640174, comment 55823874."""
+    """Test-only Azure Device Registry Administrator prerequisite for the namespace's own SAMI (39640174)."""
     namespace = find_namespace(name)
     record = _require_owned(name, namespace)
     assert record["kind"] == "csrns" and namespace["properties"]["provisioningState"] == "Succeeded"
@@ -197,7 +199,7 @@ def _grant_namespace_self_role(name):
             raise AssertionError("Native role assignment did not preserve its exact journaled binding.")
         wait_for_condition(
             lambda: _get_namespace_role(client, claim), lambda value: value is not None,
-            description="owned namespace SAMI Contributor visibility", timeout=300, interval=5,
+            description="owned namespace SAMI Azure Device Registry Administrator visibility", timeout=300, interval=5,
             is_retryable_error=lambda _error: False,
         )
     receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "verified": True})

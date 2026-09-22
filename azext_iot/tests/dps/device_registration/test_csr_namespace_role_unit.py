@@ -4,10 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Exact, test-owned namespace SAMI grant, native wire contract and quarantine."""
+"""Exact, test-owned namespace SAMI Administrator grant, native wire contract and quarantine."""
 
 from copy import deepcopy
 import json
+from shlex import split
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
 from urllib.parse import parse_qs, urlsplit
@@ -20,6 +21,7 @@ from azure.core.exceptions import HttpResponseError
 from azure.core.pipeline.transport import HttpTransport
 from azure.mgmt.authorization import AuthorizationManagementClient
 
+from azext_iot.adr.rbac import CONTRIBUTOR_ROLE, LINK_ROLE_IDS
 from azext_iot.tests.adr import test_adr_validation_scenarios_unit as cli_tests
 from azext_iot.tests.dps import _csr_issuance as csr, _csr_registry as registry
 from azext_iot.tests.dps.device_registration import test_csr_issuance_fixture_unit as fixture_tests
@@ -87,7 +89,7 @@ def test_native_cli_preserves_prejournaled_guid_scope_principal_and_exact_delete
                 "principalId": fixture_tests.NAMESPACE_PRINCIPAL, "principalType": "ServicePrincipal",
                 "roleDefinitionId": (
                     f"/subscriptions/{fixture_tests.SUB}/providers/Microsoft.Authorization/roleDefinitions/"
-                    "b24988ac-6180-42a0-ab88-20f7382dd24c"
+                    "12675fd7-7f59-493f-9201-f7944860a2f1"
                 ),
             }
             payload = {
@@ -137,18 +139,67 @@ def test_existing_setup_consumes_propagation_floor(namespace_commands, resource,
 
 def test_grant_reads_fresh_owned_namespace_identity_and_cannot_replay(owned, mocker):
     principal = "12345678-1234-1234-1234-123456789abc"
-    owned.backend.resources["namespace"]["identity"]["principalId"] = principal
+    namespace = owned.backend.resources["namespace"]
+    namespace["identity"].update({
+        "principalId": principal, "type": "SystemAssigned, UserAssigned",
+        "userAssignedIdentities": {"/foreign/identity": {"principalId": fixture_tests.NAMESPACE_PRINCIPAL}},
+    })
+    namespace["properties"]["outboundIdentity"] = {
+        "type": "UserAssigned", "userAssignedIdentity": "/foreign/identity",
+    }
     read = mocker.patch.object(
         csr, "find_namespace", side_effect=lambda _name: owned.backend.resources.get("namespace"),
     )
     csr._grant_namespace_self_role(owned.name)
     assert claim(owned)["principalId"] == principal
+    assert claim(owned)["scope"] == owned.record["id"]
+    assert claim(owned)["roleDefinitionId"] == (
+        f"/subscriptions/{fixture_tests.SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+        "12675fd7-7f59-493f-9201-f7944860a2f1"
+    )
     read.assert_called_once_with(owned.name)
     with pytest.raises(RuntimeError, match="repeat recorded mutation"):
         csr._grant_namespace_self_role(owned.name)
     assert len(owned.backend.commands) == 1
     csr._remove_namespace_self_role(owned.name)
     assert not owned.backend.roles
+
+
+def test_native_role_rejection_propagates_without_contributor_fallback(owned, mocker):
+    error = HttpResponseError("Administrator assignment rejected")
+    error.status_code = 403
+    invoke = mocker.patch.object(csr, "invoke", side_effect=error)
+    with pytest.raises(HttpResponseError) as raised:
+        csr._grant_namespace_self_role(owned.name)
+    assert raised.value is error
+    invoke.assert_called_once()
+    args = split(invoke.call_args.args[0])
+    assert args[args.index("--role") + 1] == (
+        f"/subscriptions/{fixture_tests.SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+        "12675fd7-7f59-493f-9201-f7944860a2f1"
+    )
+    assert args[args.index("--assignee-object-id") + 1] == fixture_tests.NAMESPACE_PRINCIPAL
+    assert args[args.index("--scope") + 1] == owned.record["id"]
+    assert not claim(owned)["verified"]
+
+
+def test_contributor_reply_is_quarantined_without_fallback_or_deletion(owned, mocker):
+    def create(command):
+        reply = owned.backend(command).as_json()
+        reply["roleDefinitionId"] = (
+            f"/subscriptions/{fixture_tests.SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+            f"{LINK_ROLE_IDS[CONTRIBUTOR_ROLE]}"
+        )
+        return SimpleNamespace(as_json=lambda: reply)
+
+    invoke = mocker.patch.object(csr, "invoke", side_effect=create)
+    with pytest.raises(AssertionError, match="journaled binding"):
+        csr._grant_namespace_self_role(owned.name)
+    assert claim(owned)["conflicted"] and not claim(owned)["verified"]
+    with pytest.raises(AssertionError, match="Conflicting namespace role"):
+        csr.delete_namespace(owned.name)
+    invoke.assert_called_once()
+    assert owned.backend.roles and "namespace" in owned.backend.resources
 
 
 @pytest.mark.parametrize("change", ["type", "principal", "tags", "state"])
@@ -195,6 +246,10 @@ def test_native_conflicting_reply_quarantines_without_foreign_deletion(owned, mo
     ("id", "/foreign"), ("name", "12345678-1234-1234-1234-123456789abc"), ("scope", "/subscriptions/foreign"),
     ("principalId", "12345678-1234-1234-1234-123456789abc"), ("principalType", "User"),
     ("roleDefinitionId", "/providers/Microsoft.Authorization/roleDefinitions/foreign"),
+    ("roleDefinitionId", (
+        f"/subscriptions/{fixture_tests.SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+        f"{LINK_ROLE_IDS[CONTRIBUTOR_ROLE]}"
+    )),
     ("run_uid", "b" * 32), ("subscription", "other"), ("phase", "service-sas"),
     ("verified", "true"), ("delete_attempted", None), ("deleted", None), ("conflicted", True),
 ])
@@ -279,7 +334,7 @@ def test_grant_visibility_timeout_is_not_registration_permission(owned, mocker):
     missing = HttpResponseError("RoleAssignmentNotFound")
     missing.status_code = 404
     owned.backend.role_client.role_assignments.get_by_id.side_effect = missing
-    with pytest.raises(AssertionError, match="Contributor visibility"):
+    with pytest.raises(AssertionError, match="Azure Device Registry Administrator visibility"):
         csr._grant_namespace_self_role(owned.name)
     assert owned.backend.roles and not claim(owned)["verified"]
     assert len(owned.backend.commands) == 1
