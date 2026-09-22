@@ -11,7 +11,7 @@ from shlex import join, quote
 from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.dps._csr_issuance import invoke
 
-PREFIX = "iot adr ns registry-device"
+PREFIX = "iot adr ns device"
 METADATA_TIMEOUT = 600
 KEY_LENGTH_QUERY = "{primary:length(symmetricKey.primaryKey),secondary:length(symmetricKey.secondaryKey)}"
 

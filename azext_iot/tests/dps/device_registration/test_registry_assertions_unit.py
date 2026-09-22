@@ -279,7 +279,7 @@ def test_native_cli_key_projection_never_reaches_embedded_output_or_logs(offline
     try:
         with caplog.at_level("DEBUG"):
             result = csr.invoke(
-                "iot adr ns registry-device auth show-keys --ns ns -g rg --rdn device -n profile "
+                "iot adr ns device auth show-keys --ns ns -g rg --rdn device -n profile "
                 f"--query {shlex.quote(assertions.KEY_LENGTH_QUERY)}"
             )
         assert result.as_json() == {"primary": len(secret), "secondary": len(secret + "-secondary")}
