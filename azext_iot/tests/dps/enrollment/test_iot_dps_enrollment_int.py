@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from shlex import quote
 
 import pytest
 
@@ -21,6 +22,74 @@ from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_
 from azext_iot.tests.generators import generate_generic_id, generate_names
 
 cli = EmbeddedCLI()
+
+
+def test_dps_enrollment_device_type_reference_round_trip():
+    resource_group = os.getenv("azext_iot_testrg", "").strip()
+    dps_name = os.getenv("azext_iot_dps_semantic_model_name", "").strip()
+    subscription = os.getenv(
+        "azext_iot_dps_semantic_model_subscription", ""
+    ).strip()
+    if not all((resource_group, dps_name, subscription)):
+        pytest.skip(
+            "Set azext_iot_testrg, azext_iot_dps_semantic_model_name, and "
+            "azext_iot_dps_semantic_model_subscription to an ADR-linked canary DPS."
+        )
+
+    enrollment_id = generate_names()
+    first_reference = f"urn:example:thing-model:{enrollment_id}:1"
+    second_reference = f"urn:example:thing-model:{enrollment_id}:2"
+    resource_scope = (
+        f"--dps-name {quote(dps_name)} "
+        f"-g {quote(resource_group)} "
+        f"--subscription {quote(subscription)} "
+        "--auth-type login"
+    )
+    enrollment_scope = f"{resource_scope} --enrollment-id {enrollment_id}"
+
+    try:
+        created = cli.invoke(
+            f"iot dps enrollment create {enrollment_scope} --attestation-type symmetricKey "
+            f"--device-type-ref {quote(first_reference)}"
+        ).as_json()
+        assert created["deviceTypeRefs"] == [first_reference]
+
+        shown = cli.invoke(f"iot dps enrollment show {enrollment_scope}").as_json()
+        assert shown["deviceTypeRefs"] == [first_reference]
+
+        listed = cli.invoke(
+            f"iot dps enrollment list {resource_scope}"
+        ).as_json()
+        listed_enrollment = next(
+            (
+                enrollment
+                for enrollment in listed
+                if enrollment["registrationId"] == enrollment_id
+            ),
+            None,
+        )
+        assert listed_enrollment
+        assert listed_enrollment["deviceTypeRefs"] == [first_reference]
+
+        preserved = cli.invoke(
+            f"iot dps enrollment update {enrollment_scope} --device-id {enrollment_id}"
+        ).as_json()
+        assert preserved["deviceTypeRefs"] == [first_reference]
+
+        replaced = cli.invoke(
+            f"iot dps enrollment update {enrollment_scope} "
+            f"--device-type-ref {quote(second_reference)}"
+        ).as_json()
+        assert replaced["deviceTypeRefs"] == [second_reference]
+
+        cli.invoke(
+            f"iot dps enrollment update {enrollment_scope} --remove-device-type-ref"
+        )
+
+        shown = cli.invoke(f"iot dps enrollment show {enrollment_scope}").as_json()
+        assert shown.get("deviceTypeRefs") in (None, [])
+    finally:
+        cli.invoke(f"iot dps enrollment delete {enrollment_scope}")
 
 
 def test_dps_enrollment_adr_certificate_reference_round_trip(
