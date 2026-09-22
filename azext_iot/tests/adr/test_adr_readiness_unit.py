@@ -50,6 +50,11 @@ LINKS = {
 NAMESPACE_IDENTITY = {"type": "SystemAssigned", "principalId": "11111111-1111-4111-8111-111111111111"}
 
 
+@pytest.fixture(autouse=True)
+def scoped_subscription(mocker):
+    mocker.patch.object(readiness, "get_subscription_id", return_value="sub")
+
+
 @pytest.fixture(params=["hub", "dps"])
 def link_kind(request):
     return request.param
@@ -278,7 +283,7 @@ def test_real_sdk_get_404_and_testsdk_rethrow_gate_bounded_namespace_delete(mock
                 proofs.append(shaped)
                 raise shaped
 
-        _cleanup(SimpleNamespace(cmd=command), clock)
+        _cleanup(SimpleNamespace(cmd=command, cli_ctx=Mock(data={"subscription_id": "sub"})), clock)
     assert clock.sleeps == [10, 10]
     assert len(proofs) == 5
     assert all(error.response.status_code == 404 and error.response.request.method == "GET" for error in proofs)

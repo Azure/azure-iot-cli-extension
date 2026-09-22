@@ -598,3 +598,100 @@ def test_damaged_new_receipts_cannot_authorize_cleanup(wire, kind, contents):
     with pytest.raises(AssertionError):
         owner.cleanup()
     assert not any(method == "DELETE" for method, _ in wire.calls)
+
+
+@pytest.mark.parametrize("change", [
+    lambda value: value["properties"].update(externalDeviceId=""),
+    lambda value: value["properties"].update(uuid=[]),
+    lambda value: value.update(etag=42),
+])
+def test_malformed_identity_never_establishes_registry_ownership(wire, change):
+    owner = start(wire)
+    current = device(wire)
+    change(current)
+    wire.devices[current["name"]] = current
+    owner.record_result(result())
+    with pytest.raises(AssertionError, match="externalDeviceId|malformed"):
+        owner.read_device()
+    assert not any(method == "DELETE" for method, _ in wire.calls)
+
+
+@pytest.mark.parametrize("value", [None, [], {"registrationState": []}, {"operationId": 123}])
+def test_invalid_registration_result_never_authorizes_cleanup(wire, value):
+    owner = start(wire)
+    with pytest.raises(AssertionError, match="correlation|operation changed|Malformed registration state"):
+        owner.record_result(value)
+    assert not (wire.directory / owner._name("completed")).exists()
+
+
+def test_changed_operation_or_external_identity_is_not_reconciled_by_metadata(wire):
+    owner = start(wire)
+    owner.record_result(result())
+    changed = result()
+    changed["operationId"] = "replacement"
+    with pytest.raises(AssertionError, match="operation changed"):
+        owner.record_result(changed)
+    with pytest.raises(AssertionError, match="external ID changed"):
+        owner.record_result(result(external_id="foreign"))
+    with pytest.raises(AssertionError, match="Conflicting"):
+        owner._external_id()
+    assert not any(method == "DELETE" for method, _ in wire.calls)
+
+
+def test_baseline_duplicate_devices_cannot_claim_ownership(wire):
+    wire.list_body = {"value": [device(wire), device(wire)]}
+    with pytest.raises(AssertionError, match="Duplicate"):
+        start(wire)
+    assert not list(wire.directory.glob("csr-registry-intent-*.json"))
+
+
+def test_current_owned_target_id_must_still_match_intent(wire):
+    owner = registry.RegistryDeviceOwnership(wire.resource, "unique-enrollment")
+    owner.intent["hub_id"] += "-foreign"
+    with pytest.raises(AssertionError, match="target changed"):
+        owner.before_submit()
+    assert not owner.started
+
+
+def test_idle_cleanup_and_no_namespace_receipt_do_not_mutate(wire):
+    owner = registry.RegistryDeviceOwnership(wire.resource, "unique-enrollment")
+    owner.cleanup()
+    (wire.directory / "owned-csrns.json").unlink()
+    registry.require_namespace_cleanup_resolved()
+    assert not wire.calls
+
+
+@pytest.mark.parametrize("change", [
+    lambda value: value.update(kind="foreign"),
+    lambda value: value.update(phase="foreign"),
+    lambda value: value.update(subscription="foreign"),
+])
+def test_namespace_receipt_mismatch_cannot_release_targets(wire, change):
+    path = wire.directory / "owned-csrns.json"
+    record = json.loads(path.read_text())
+    change(record)
+    path.write_text(json.dumps(record))
+    with pytest.raises(AssertionError, match="inconsistent"):
+        registry.require_namespace_cleanup_resolved()
+    assert not wire.calls
+
+
+def test_resolved_receipt_external_id_cannot_change_before_delete(wire):
+    owner = start(wire)
+    wire.devices["arm-generated-name"] = device(wire)
+    owner.record_result(result())
+    snapshot = owner._snapshot(device(wire))
+    snapshot["external_id"] = "foreign"
+    owner._write("resolved", {"device": snapshot})
+    with pytest.raises(AssertionError, match="external ID disagree"):
+        owner.cleanup()
+    assert not any(method == "DELETE" for method, _ in wire.calls)
+
+
+def test_completion_receipt_without_resolved_identity_cannot_release_quarantine(wire):
+    owner = start(wire)
+    owner._write("completed", {"device_id": wire.collection + "/foreign", "absent": True})
+    for cleanup in (owner.cleanup, registry.require_registry_cleanup_resolved):
+        with pytest.raises(AssertionError, match="Malformed RegistryDevice completion"):
+            cleanup()
+    assert not any(method == "DELETE" for method, _ in wire.calls)

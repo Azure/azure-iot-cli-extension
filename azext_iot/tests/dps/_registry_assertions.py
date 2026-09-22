@@ -117,6 +117,10 @@ def assert_registry_registration(resource, ownership, *, certificate):
     ownership.read_device()
     show_profile()
     if certificate:
+        # The profile GET contract has no revocation generation/operation marker.
+        # Keeping the profile, changing its ETag, or receiving 202 is NOT CRL
+        # invalidation evidence. Keep the waited action and quarantine on *any*
+        # error (including denied subscription-regional status reads).
         with ownership.certificate_revocation(profile["id"]):
             invoke(f"{PREFIX} auth revoke-certs {profile_args} --yes --output none")
         show_profile()

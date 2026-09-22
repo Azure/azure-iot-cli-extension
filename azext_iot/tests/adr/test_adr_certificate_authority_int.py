@@ -50,6 +50,7 @@ from azext_iot.tests.adr.conftest import (
     generate_adr_namespace_name,
 )
 from azext_iot.adr.providers.certificate_helpers import validate_external_certificate_chain
+from azext_iot.adr.providers.certificate_activation import ExternalActivationEvidence
 from azext_iot.common.certops import make_cert_chain
 
 
@@ -165,10 +166,12 @@ class TestADRCAActions(ADRLiveScenarioTest):
                 del self._ca_actions[resource_id]
             tracker.assert_no_submission()
 
-    def _tracked_ca_action(self, before, command, action):
+    def _tracked_ca_action(self, before, command, action, *, certificate_chain=None):
         # Reject local formatting errors before registering a mutation receipt.
         self._apply_kwargs(command)
         tracker = self._new_ca_tracker(before["id"], action)
+        if certificate_chain is not None:
+            tracker.use_activation_resource(before, certificate_chain, TEST_API_VERSION)
         with tracker.observe():
             result = self.cmd(command)
         tracker.wait()
@@ -224,6 +227,8 @@ class TestADRCAActions(ADRLiveScenarioTest):
                         f"iot adr ns ca activate -n nonexistent-owned-ca {scope} --ccf {shlex.quote(str(chain))}"
                     )
                 assert is_resource_not_found_error(missing.value)
+            chain_text = chain.read_text(encoding="utf-8")
+            evidence = ExternalActivationEvidence(pending, chain_text, resource_id=pending["id"])
             result = self._tracked_ca_action(
                 pending,
                 f"iot adr ns ca activate -n ica {scope} --ccf {shlex.quote(str(chain))}"
@@ -232,10 +237,11 @@ class TestADRCAActions(ADRLiveScenarioTest):
                     "prov:properties.provisioningState,status:properties.issuer.status}}'"
                 )),
                 "activate",
+                certificate_chain=chain_text,
             )
             shown = self._bounded_read(
                 lambda: self.cmd(f"iot adr ns ca show -n ica {scope}").get_output_in_json(),
-                lambda value: value["properties"]["issuer"].get("status") == "Active",
+                evidence.completed,
                 description=f"External ICA activation {pending['id']}",
             )
             assert shown["properties"]["issuer"]["thumbprint"]

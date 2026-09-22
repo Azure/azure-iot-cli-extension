@@ -329,7 +329,7 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     assert "including owned CSR issuance" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
-    assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
+    assert "set -euo pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
     assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
     assert 'tox r -e "$TEST_TOX_ENV" --skip-pkg-install' in step["run"]
     upload = next(step for step in steps if step["name"] == "Upload test result")
@@ -355,6 +355,7 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
     assert 'pip install --target "$ext_dir" --upgrade --force-reinstall --no-deps rpds-py cryptography' in install
     run = _integration_run_step()
     assert run["env"] == {
+        "AZURE_CLIENT_ID": "${{ secrets.AZURE_CLIENT_ID }}", "AZURE_TENANT_ID": "${{ secrets.AZURE_TENANT_ID }}",
         "AZURE_TEST_RUN_LIVE": "True", "PYTHONUNBUFFERED": "1",
         "azext_iot_testrg": "${{ env.RESOURCE_GROUP }}",
         "azext_iot_testhub_location": "${{ matrix.config.region }}",
@@ -369,7 +370,9 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
         "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
         "subscription-id": "${{ env.TEST_SUBSCRIPTION_ID }}",
     }
-    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["OIDC Token refresh service"]["run"]
+    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["Verify Azure access"]["run"]
+    assert "az account set" not in run["run"] and "az login" not in run["run"]
+    assert "_refresh_ci_auth.py --loop" in run["run"]
 
 
 def test_workflow_runs_full_selected_services_without_removed_controls():
@@ -396,9 +399,26 @@ def _run_integration_shell(tmp_path, service, expression, exit_code=0):
     script = _integration_run_step()["run"]
     # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
     script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
+    script = script.replace('"$auth_python" azext_iot/tests/_refresh_ci_auth.py', "auth_refresh")
     stubs = """
-tox() { printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
-dps_controller() { printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
+auth_refresh() {
+  if [ "${1:-}" = "--loop" ]; then
+    exec "$OFFLINE_PYTHON" -c '
+from pathlib import Path
+import signal
+import sys
+from threading import Event
+stopped = Event()
+signal.signal(signal.SIGTERM, lambda *_: stopped.set())
+Path("auth-ready").touch()
+Path(sys.argv[1]).write_text("ready\\n")
+stopped.wait()
+' "$3"
+  fi
+}
+auth_ready() { while [ ! -f auth-ready ]; do sleep 0.01; done; }
+tox() { auth_ready; printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
+dps_controller() { auth_ready; printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
 tee() { cat; }
 """
     return subprocess.run(
@@ -406,7 +426,8 @@ tee() { cat; }
         env=dict(os.environ, ADR_TEST_FILTER=expression,
                  TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
                  TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
-                 OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
+                 OFFLINE_EXIT_CODE=str(exit_code), OFFLINE_PYTHON=sys.executable,
+                 DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
         capture_output=True, text=True, timeout=20, check=False,
     )
 

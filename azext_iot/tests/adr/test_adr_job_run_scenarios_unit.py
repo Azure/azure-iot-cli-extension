@@ -66,6 +66,7 @@ class _CliScenario:
 
     def __init__(self):
         self.cli = DummyCli(commands_loader_cls=_OfflineJobLoader)
+        self.cli_ctx = self.cli
         self.commands = []
 
     def cmd(self, command, expect_failure=False):

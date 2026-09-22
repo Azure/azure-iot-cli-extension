@@ -143,6 +143,10 @@ class GroupProvider(ADRProvider):
                 or error_code != _GROUP_REFRESH_ALREADY_IN_PROGRESS
             ):
                 raise
+            logger.warning(
+                "GroupRefreshAlreadyInProgress: reusing the existing membership refresh.",
+                extra={"adr_group_refresh": ("reused", 409)},
+            )
             if no_wait:
                 return self.show(group_name, namespace_name, resource_group_name)
             wait_for_resource(
@@ -155,6 +159,12 @@ class GroupProvider(ADRProvider):
             return self.show(
                 group_name, namespace_name, resource_group_name
             )
+        response = self._poller_initial_http_response(poller)
+        status = response.status_code if response is not None else None
+        logger.warning(
+            "Group membership refresh accepted by the service (HTTP %s).", status,
+            extra={"adr_group_refresh": ("accepted", status)},
+        )
         return self._wait(
             poller,
             f"Refreshing members of group '{group_name}' in namespace {namespace_name}...",

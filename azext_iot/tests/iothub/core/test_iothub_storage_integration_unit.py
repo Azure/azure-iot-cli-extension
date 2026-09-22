@@ -12,10 +12,33 @@ from types import SimpleNamespace
 from unittest import TestCase
 
 import pytest
-from azure.cli.core.azclierror import BadRequestError, CLIInternalError, ForbiddenError
-from azure.core.exceptions import ServiceRequestError
+from azure.cli.core.azclierror import BadRequestError, CLIInternalError, ForbiddenError, UnauthorizedError
+from azure.core.exceptions import ServiceRequestError, ServiceResponseError
 
 from azext_iot.tests.iothub.core import test_iothub_storage_int as subject
+
+
+REJECTED_MESSAGE = (
+    "ErrorCode:BlobContainerValidationError;Error: 400 ErrorCode: BlobContainerValidationError\r\n"
+    "Message: Unauthorized to write to output blob container.\r\n"
+    "Timestamp: offline\r\nPublic Message: Unauthorized to write to output blob container."
+)
+
+
+def rejected_submission():
+    return BadRequestError({"Message": REJECTED_MESSAGE, "ExceptionMessage": "https://storage.test/?sig=unit-secret"})
+
+
+@pytest.fixture
+def clock(mocker):
+    state = SimpleNamespace(now=0)
+
+    def sleep(seconds):
+        state.now += seconds
+
+    mocker.patch.object(subject, "monotonic", side_effect=lambda: state.now)
+    mocker.patch.object(subject, "sleep", side_effect=sleep)
+    return state
 
 
 @pytest.fixture(autouse=True)
@@ -182,7 +205,7 @@ def test_managed_storage_preserves_borrowed_state_and_cleans_owned_state_without
             assert ("inputBlobContainerUri", scenario.live_storage_uri) in checks
 
 
-@pytest.mark.parametrize("error_type", [ForbiddenError, ServiceRequestError])
+@pytest.mark.parametrize("error_type", [ForbiddenError, UnauthorizedError, ServiceRequestError, ServiceResponseError])
 def test_service_or_transport_failure_is_not_retried(storage_scenario, error_type):
     scenario, state = storage_scenario
     error = error_type("Original service failure")
@@ -205,7 +228,7 @@ def test_role_cleanup_failure_still_removes_owned_attachment(storage_scenario, k
 
 @pytest.mark.parametrize("user_type,assignee_flag", [("user", "--assignee"), ("servicePrincipal", "--assignee-object-id")])
 @pytest.mark.parametrize("visible", [False, True])
-def test_role_visibility_is_bounded_and_preserves_the_existing_settle(
+def test_role_visibility_is_bounded_without_a_blind_settle(
     mocker, storage_scenario, user_type, assignee_flag, visible
 ):
     scenario, state = storage_scenario
@@ -216,12 +239,12 @@ def test_role_visibility_is_bounded_and_preserves_the_existing_settle(
         with ExitStack() as cleanup:
             scenario.assign_storage_role_if_needed("principal", cleanup)
             assert len(state.roles) == 1
-        assert subject.sleep.call_args_list == [mocker.call(10)] * 3 + [mocker.call(60)]
+        assert subject.sleep.call_args_list == [mocker.call(10)] * 2
     else:
         with pytest.raises(CLIInternalError, match="not visible after 3 reads"):
             with ExitStack() as cleanup:
                 scenario.assign_storage_role_if_needed("principal", cleanup)
-        assert subject.sleep.call_args_list == [mocker.call(10)] * 3
+        assert subject.sleep.call_args_list == [mocker.call(10)] * 2
     assert state.role_reads == 4
     assert state.events == ["role.create", "role.delete"]
     assert not state.roles
@@ -316,3 +339,119 @@ def test_failed_job_diagnostics_do_not_dump_storage_credentials(storage_scenario
     assert event["jobId"] == "job-id" and event["jobStatus"] == "failed"
     assert event["hub"] == "owned-hub" and event["storageScope"] == scenario.live_storage_id
     assert event["time"].endswith("+00:00")
+
+
+@pytest.mark.parametrize("payload", [
+    "BlobContainerValidationError: Unauthorized to write to output blob container.",
+    {}, {"Message": None}, {"Message": 400},
+    {"Message": REJECTED_MESSAGE, "jobId": "possibly-accepted"},
+    {"Message": REJECTED_MESSAGE.replace("400", "503")},
+    {"Message": REJECTED_MESSAGE.replace("BlobContainerValidationError", "OtherError")},
+    {"Message": REJECTED_MESSAGE.replace("write to output", "read from input")},
+    {"Message": REJECTED_MESSAGE.replace("Unauthorized", "Forbidden")},
+])
+def test_readiness_requires_exact_structured_rejected_submission(storage_scenario, payload):
+    scenario, state = storage_scenario
+    error = BadRequestError(payload)
+    state.failure = ("export", error)
+    with pytest.raises(BadRequestError) as raised:
+        scenario.test_system_identity_storage()
+    assert raised.value is error
+    assert state.events == ["identity.assign", "role.create", "export", "role.delete", "identity.remove"]
+
+
+@pytest.mark.parametrize("kind", ["system", "user"])
+@pytest.mark.parametrize("operation", ["export", "import"])
+def test_rejected_storage_submission_probes_readiness_then_runs_each_job_once(
+    storage_scenario, clock, kind, operation, capsys
+):
+    scenario, state = storage_scenario
+    invoke = scenario.cmd.side_effect
+    rejected = []
+
+    def submit(command, **kwargs):
+        if command.startswith(f"iot hub device-identity {operation}") and not kwargs.get("expect_failure"):
+            clock.now += 2  # time spent in the RPC is part of the readiness budget
+            if len(rejected) < 2:
+                rejected.append(command)
+                raise rejected_submission()
+        return invoke(command, **kwargs)
+
+    scenario.cmd.side_effect = submit
+    getattr(scenario, f"test_{kind}_identity_storage")()
+    assert len(rejected) == 2
+    assert clock.now == 26
+    assert state.events.count("export") == state.events.count("import") == state.events.count("negative") == 1
+    assert [call.args[0] for call in scenario.wait_till_job_completion.call_args_list] == ["export-job", "import-job"]
+    assert state.events[-2:] == ["role.delete", "identity.remove"] and not state.roles
+    output = capsys.readouterr().out
+    assert "unit-secret" not in output and scenario.live_storage_uri not in output
+    events = [json.loads(line) for line in output.splitlines()]
+    pending = [event for event in events if event["storageEvent"].endswith(".storage.pending")]
+    assert [event["attempt"] for event in pending] == [1, 2]
+    assert all(event["principalId"] == kind + "-principal" for event in pending)
+
+
+@pytest.mark.parametrize("rpc_seconds,attempts,sleeps", [(8, 1, []), (6, 1, [1]), (1, 3, [2, 2])])
+def test_readiness_timeout_includes_rpc_time_and_surfaces_permanent_rejection(
+    mocker, storage_scenario, clock, rpc_seconds, attempts, sleeps, capsys
+):
+    scenario, state = storage_scenario
+    invoke = scenario.cmd.side_effect
+    rejected = []
+    mocker.patch.object(subject, "IDENTITY_READINESS_TIMEOUT", 7)
+    mocker.patch.object(subject, "SETUP_SLEEP_INTERVAL", 2)
+
+    def submit(command, **kwargs):
+        if command.startswith("iot hub device-identity export"):
+            rejected.append(command)
+            clock.now += rpc_seconds
+            raise rejected_submission()
+        return invoke(command, **kwargs)
+
+    scenario.cmd.side_effect = submit
+    with pytest.raises(CLIInternalError, match="submission deadline") as raised:
+        scenario.test_system_identity_storage()
+    assert raised.value.__suppress_context__
+    assert "unit-secret" not in str(raised.value) and "unit-secret" not in capsys.readouterr().out
+    assert len(rejected) == attempts
+    assert [call.args[0] for call in subject.sleep.call_args_list] == sleeps
+    assert not state.roles and state.events[-2:] == ["role.delete", "identity.remove"]
+    scenario.wait_till_job_completion.assert_not_called()
+    assert "import" not in state.events and "negative" not in state.events
+
+
+@pytest.mark.parametrize("failure", ["parse", "missing-id", "check", "job"])
+def test_accepted_or_uncertain_job_is_never_resubmitted(mocker, storage_scenario, clock, failure):
+    scenario, state = storage_scenario
+    result = SimpleNamespace(get_output_in_json=mocker.Mock(return_value={}))
+    if failure == "parse":
+        result.get_output_in_json.side_effect = rejected_submission()
+    if failure == "check":
+        scenario.cmd.side_effect = AssertionError("Job checks failed after acceptance")
+    else:
+        scenario.cmd.side_effect = None
+        scenario.cmd.return_value = result
+    if failure == "job":
+        result.get_output_in_json.return_value = {"jobId": "accepted-job"}
+        scenario.wait_till_job_completion.side_effect = rejected_submission()
+    error = {"parse": BadRequestError, "missing-id": KeyError, "check": AssertionError, "job": BadRequestError}[failure]
+    with pytest.raises(error):
+        job_id = scenario._submit_identity_job("job submission", [], "principal", "export")
+        scenario.wait_till_job_completion(job_id)
+    scenario.cmd.assert_called_once()
+    subject.sleep.assert_not_called()
+    assert not state.events
+
+
+def test_slow_accepted_submission_is_not_replayed_at_deadline(storage_scenario, clock):
+    scenario, _ = storage_scenario
+
+    def submit(*_args, **_kwargs):
+        clock.now += subject.IDENTITY_READINESS_TIMEOUT + 1
+        return SimpleNamespace(get_output_in_json=lambda: {"jobId": "accepted-job"})
+
+    scenario.cmd.side_effect = submit
+    assert scenario._submit_identity_job("submission", [], "principal", "export") == "accepted-job"
+    scenario.cmd.assert_called_once()
+    subject.sleep.assert_not_called()

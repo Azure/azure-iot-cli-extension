@@ -10,8 +10,8 @@ import pytest
 from contextlib import ExitStack
 from datetime import datetime, timezone
 from uuid import uuid4
-from azure.cli.core.azclierror import CLIInternalError
-from time import sleep
+from azure.cli.core.azclierror import BadRequestError, CLIInternalError
+from time import monotonic, sleep
 from knack.util import CLIError
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -36,7 +36,24 @@ user_managed_identity_name = generate_generic_id()
 SETUP_MAX_ATTEMPTS = 3
 JOB_POLL_MAX_ATTEMPTS = 3
 SETUP_SLEEP_INTERVAL = 10
-IDENTITY_SLEEP_INTERVAL = 60
+IDENTITY_READINESS_TIMEOUT = 180
+
+
+def _storage_submission_rejected(error):
+    """The backend's explicit 400 validation rejection, not an accepted job.
+
+    Match the structured service envelope retained by handle_service_exception,
+    rather than arbitrary exception text (which can contain URLs/credentials).
+    Other authorization errors and uncertain transport failures are not readiness.
+    """
+    payload = error.error_msg
+    if not isinstance(payload, dict) or set(payload) - {"Message", "ExceptionMessage"}:
+        return False
+    message = payload.get("Message")
+    return isinstance(message, str) and message.splitlines()[:2] == [
+        "ErrorCode:BlobContainerValidationError;Error: 400 ErrorCode: BlobContainerValidationError",
+        "Message: Unauthorized to write to output blob container.",
+    ]
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -140,11 +157,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 "role.visible" if visible else "role.pending",
                 principal_id=assignee, assignment_id=assignment_id, attempt=attempt,
             )
-            sleep(SETUP_SLEEP_INTERVAL)
             if visible:
-                sleep(IDENTITY_SLEEP_INTERVAL)
-                self._storage_event("role.settle.complete", principal_id=assignee, assignment_id=assignment_id)
                 return
+            if attempt < MAX_RBAC_ASSIGNMENT_TRIES:
+                sleep(SETUP_SLEEP_INTERVAL)
         raise CLIInternalError(
             f"Storage role for principal '{assignee}' was not visible after {MAX_RBAC_ASSIGNMENT_TRIES} reads."
         )
@@ -313,7 +329,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.check_for_running_import_export()
         kind = "sami" if identity == "[system]" else "uami"
         self._storage_event(f"{kind}.export.start", principal_id=principal_id)
-        job_id = self.cmd(
+        job_id = self._submit_identity_job(
             'iot hub device-identity export -n {} --bcu "{}" --identity {} --ik true'.format(
                 self.entity_name, self.live_storage_uri, identity
             ),
@@ -325,11 +341,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                 self.exists("jobId"),
             ],
-        ).get_output_in_json()["jobId"]
+            principal_id=principal_id, operation=f"{kind}.export",
+        )
         self._storage_event(f"{kind}.export.submitted", principal_id=principal_id, job_id=job_id)
         self.wait_till_job_completion(job_id)
         self._storage_event(f"{kind}.import.start", principal_id=principal_id)
-        job_id = self.cmd(
+        job_id = self._submit_identity_job(
             'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --identity {}'.format(
                 self.entity_name, self.live_storage_uri, self.live_storage_uri, identity
             ),
@@ -341,7 +358,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                 self.exists("jobId"),
             ],
-        ).get_output_in_json()["jobId"]
+            principal_id=principal_id, operation=f"{kind}.import",
+        )
         self._storage_event(f"{kind}.import.submitted", principal_id=principal_id, job_id=job_id)
         self.wait_till_job_completion(job_id)
         self.cmd(
@@ -350,6 +368,30 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ),
             expect_failure=True
         )
+
+    def _submit_identity_job(self, command, checks, principal_id, operation):
+        # A visible role assignment does not prove Hub's storage access. The
+        # actual submission is the readiness probe; stop immediately on acceptance.
+        deadline = monotonic() + IDENTITY_READINESS_TIMEOUT
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                result = self.cmd(command, checks=checks)
+            except BadRequestError as error:
+                if not _storage_submission_rejected(error):
+                    raise
+                remaining = deadline - monotonic()  # includes the failed RPC
+                if remaining <= 0:
+                    raise CLIInternalError("Hub storage access was not ready before the submission deadline.") from None
+                self._storage_event(f"{operation}.storage.pending", principal_id=principal_id, attempt=attempt)
+                sleep(min(SETUP_SLEEP_INTERVAL, remaining))
+                if monotonic() >= deadline:
+                    raise CLIInternalError("Hub storage access was not ready before the submission deadline.") from None
+            else:
+                # Parsing/check failures or subsequent job failure must never
+                # enter the rejection retry loop: a job may already be running.
+                return result.get_output_in_json()["jobId"]
 
     def wait_till_job_completion(self, job_id):
         tries = 0

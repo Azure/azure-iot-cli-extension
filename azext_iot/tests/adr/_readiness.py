@@ -15,15 +15,19 @@ visibility as effective authorization.
 
 import re
 import shlex
+import sys
 import time
 from copy import deepcopy
 from urllib.parse import unquote, urlsplit
 
 from azure.cli.core.azclierror import AzureResponseError
+from azure.cli.core.commands.arm import show_exception_handler
+from azure.cli.core.commands.client_factory import get_subscription_id
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
+from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
@@ -86,10 +90,29 @@ def _http_error(error):
 
 def _get_resource(scenario, command, getter=None):
     """None means an actual GET 404, never empty CLI output or an exit code."""
+    ambient_context = sys.exc_info()[1:]
     try:
         result = getter() if getter is not None else scenario.cmd(command).get_output_in_json()
     except (HttpResponseError, CloudError, CLIError, SystemExit) as error:
-        original, status = _http_error(error)
+        evidence = error
+        # ARM's show handler can be called *outside* the HTTP except block.
+        # Its SystemExit then inherits an unrelated cleanup assertion, not the
+        # HTTP error. The real handler's traceback still owns the response.
+        # Never infer absence from exit 3, text, or a similarly named wrapper.
+        if (
+            isinstance(error, SystemExit) and error.code == 3 and error.__cause__ is None
+            and getattr(error, "status_code", None) is None and getattr(error, "response", None) is None
+            and is_resource_not_found_error(error, ambient_context=ambient_context)
+        ):
+            trace = error.__traceback__
+            while trace is not None:
+                if trace.tb_frame.f_code is show_exception_handler.__code__:
+                    candidate = trace.tb_frame.f_locals.get("ex")
+                    if isinstance(candidate, (HttpResponseError, CloudError)):
+                        evidence = candidate
+                    break
+                trace = trace.tb_next
+        original, status = _http_error(evidence)
         response = getattr(original, "response", None)
         request = getattr(response, "request", None)
         url = getattr(request, "url", None)
@@ -101,11 +124,15 @@ def _get_resource(scenario, command, getter=None):
             path += f"/{parts[3]}s/{parts[parts.index('-n') + 1]}"
         if (
             (not isinstance(error, SystemExit) or error.code == 3)
-            and is_resource_not_found_error(error) and status == 404
+            and is_resource_not_found_error(evidence) and status == 404
             and getattr(response, "status_code", None) == 404
             and getattr(request, "method", None) == "GET"
             and isinstance(url, str)
-            and unquote(urlsplit(url).path).casefold().endswith(path.casefold())
+            and urlsplit(url).scheme == "https"
+            and urlsplit(url).netloc in {"management.azure.com", urlsplit(_ADR_CANARY_ARM_ENDPOINT).netloc}
+            and unquote(urlsplit(url).path).casefold() == (
+                f"/subscriptions/{get_subscription_id(scenario.cli_ctx)}{path}"
+            ).casefold()
         ):
             return None
         raise

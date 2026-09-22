@@ -386,6 +386,12 @@ def load_adr_help():
     policy constraints; backend validation remains authoritative.
     Successful waited activation returns a fresh CA resource. --no-wait returns submission only,
     without an added completion wait or output read.
+    For an external ICA observed as PendingActivation before submission, completion is verified using
+    resource GET: the same CA must become Active with a thumbprint matching the submitted leaf
+    certificate and provisioningState Succeeded. This path does not read subscription-regional
+    async operation status, including in the background. An absent or non-PendingActivation baseline
+    retains action-status polling, with a diagnostic; a read error never selects another path.
+    An unrelated Active certificate, ETag change, or provisioningState alone is not completion.
   examples:
     - name: Activate an externally issued ICA
       text: az iot adr ns ca activate -n myExternalICA --ns myNamespace -g myResourceGroup --certificate-chain-file ./signed-chain.pem

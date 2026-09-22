@@ -304,7 +304,7 @@ def _iothub_provisioner(request) -> Optional[dict]:
                 target_name = generate_linked_hub_id()
                 create_result = cli.invoke(
                     f"iot hub create -g {ACCOUNT_RG} -n {target_name} "
-                    f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
+                    f"--location {HUB_TEST_LOCATION} --disable-local-auth false"
                 )
                 if not create_result.success():
                     raise RuntimeError(f"Failed to provision iot hub resource {target_name}.")

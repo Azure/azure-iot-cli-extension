@@ -18,7 +18,7 @@ from azext_iot.tests.helpers import invoke_checked
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 pytestmark = pytest.mark.hub_infrastructure(
     sys_identity=True,
     user_identity=True,

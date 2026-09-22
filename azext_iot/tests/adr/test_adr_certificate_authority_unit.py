@@ -769,6 +769,7 @@ def test_live_private_key_directory_removed_after_failure(signer_fails, ca_pki, 
     from azext_iot.tests.adr import test_adr_certificate_authority_int as live
 
     scenario = live.TestADRCAActions("test_external_activation_no_wait")
+    ca_pki["resource"]["properties"]["issuer"]["status"] = "PendingActivation"
 
     @contextmanager
     def owned():

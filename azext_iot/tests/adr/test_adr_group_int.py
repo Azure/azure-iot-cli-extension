@@ -6,8 +6,12 @@
 
 """ADR group lifecycle integration tests."""
 
-import pytest
+import logging
 
+import pytest
+from azure.core.exceptions import HttpResponseError
+
+from azext_iot.adr.providers import group as group_provider
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
@@ -22,6 +26,42 @@ from azext_iot.tests.generators import generate_generic_id
 
 def _generate_group_name() -> str:
     return f"testgrp{generate_generic_id()[:8]}"
+
+
+class _RefreshEvidence(logging.Handler):
+    """Capture only the provider's service acknowledgement, not CLI exit codes."""
+
+    def __init__(self):
+        super().__init__()
+        self.acknowledgements = []
+
+    def emit(self, record):
+        evidence = getattr(record, "adr_group_refresh", None)
+        if evidence is not None:
+            self.acknowledgements.append(evidence)
+
+
+def _observe_group_refresh(scenario, command):
+    evidence = _RefreshEvidence()
+    group_provider.logger.addHandler(evidence)
+    try:
+        try:
+            scenario.cmd(command)
+        except HttpResponseError as error:
+            if error.status_code != 409 or getattr(error.error, "code", None) != "GroupRefreshRateLimited":
+                raise
+            assert not evidence.acknowledgements, "Refresh failed after a conflicting service acknowledgement"
+            _log(LogKind.RESULT, "Refresh explicitly throttled: HTTP 409 GroupRefreshRateLimited")
+            return "throttled"
+        assert len(evidence.acknowledgements) == 1, "Refresh completed without a unique service acknowledgement"
+        outcome, status = evidence.acknowledgements[0]
+        assert (outcome, status) in {
+            ("reused", 409), ("accepted", 202), ("accepted", 204),
+        }, "Refresh returned an unrecognized service acknowledgement"
+        _log(LogKind.RESULT, "Refresh service acknowledgement: %s, HTTP %s", outcome, status)
+        return outcome
+    finally:
+        group_provider.logger.removeHandler(evidence)
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -129,13 +169,17 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert int(count or 0) == len(members)
 
-            with timed_step("Step 3 ❯ Immediate manual refresh is rate-limited"):
-                refresh_failure = self.cmd(
+            with timed_step("Step 3 ❯ Observe immediate refresh throttling or operation reuse"):
+                refresh_outcome = _observe_group_refresh(
+                    self,
                     f"iot adr ns group refresh -n {group_name} "
                     f"--ns {namespace_name} -g {rg}",
-                    expect_failure=True,
                 )
-                assert refresh_failure.exit_code == 1
+                assert refresh_outcome in {"throttled", "reused"}, (
+                    "Service accepted a new immediate refresh after initial creation. "
+                    "This contradicts the documented once-per-hour limit including initial calculation; "
+                    "confirm the backend contract before changing this expectation."
+                )
 
             with timed_step("Step 4 ❯ Update group"):
                 updated = self.cmd(

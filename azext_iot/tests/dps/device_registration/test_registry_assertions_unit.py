@@ -238,6 +238,38 @@ def test_uncertain_revocation_is_not_replayed_and_controller_retains_quarantine(
     assert not any(method == "DELETE" for method, _ in case.wire.calls)
 
 
+@pytest.mark.parametrize("permission", [
+    "Microsoft.DeviceRegistry/locations/asyncOperationStatuses/read",
+    "Microsoft.DeviceRegistry/namespaces/registryDevices/authenticationProfiles/read",
+    "Microsoft.Other/unrelated/read",
+])
+def test_revocation_403_and_changed_metadata_cannot_complete_or_release_cleanup(case, permission):
+    certificate(case)
+    case.action_error = HttpResponseError(f"AuthorizationFailed: {permission}")
+    case.action_error.status_code = 403
+    original = case.invoke.side_effect
+
+    def mutate_then_fail(command):
+        if " auth revoke-certs " in command:
+            case.device["etag"] = '"changed-after-submission"'
+            case.profile["properties"]["provisioningState"] = "Succeeded"
+            case.profile["systemData"] = {"lastModifiedAt": "2026-09-22T00:00:00Z"}
+        return original(command)
+
+    case.invoke.side_effect = mutate_then_fail
+    with pytest.raises(HttpResponseError) as raised:
+        assertions.assert_registry_registration(case.wire.resource, case.owner, certificate=True)
+    assert raised.value is case.action_error
+    receipt = json.loads((case.wire.directory / case.owner._name("profile-action")).read_text())
+    assert receipt["completed"] is False
+    for cleanup in (case.owner.cleanup, registry.require_registry_cleanup_resolved):
+        with pytest.raises(AssertionError, match="quarantined"):
+            cleanup()
+    assert sum("revoke-certs" in command for command in case.commands) == 1
+    assert not any("show-keys" in command or "--no-wait" in command for command in case.commands)
+    assert not any(method == "DELETE" for method, _ in case.wire.calls)
+
+
 @pytest.mark.parametrize("name", [None, "", ".", "..", "nested/child", "escaped%2fchild"])
 def test_child_names_cannot_redirect_commands(name):
     with pytest.raises(AssertionError):

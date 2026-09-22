@@ -17,7 +17,12 @@ from azext_iot.adr.common import (
     CertificateAuthorityType,
     compose_namespace_child_arm_id,
 )
-from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.base import ADRProvider, console
+from azext_iot.adr.providers.certificate_activation import (
+    ExternalActivationEvidence,
+    has_pending_activation,
+    wait_for_activation,
+)
 from azext_iot.adr.providers.certificate_helpers import (
     log_activation_error_hint,
     validate_external_certificate_chain,
@@ -182,6 +187,23 @@ class CertificateAuthorityProvider(ADRProvider):
             action="activate",
         )
         validate_external_certificate_chain(certificate_chain, certificate_authority)
+        evidence = None
+        if has_pending_activation(certificate_authority):
+            resource_id = compose_namespace_child_arm_id(
+                subscription_id=get_subscription_id(self.cmd.cli_ctx),
+                resource_group_name=resource_group_name, namespace_name=namespace_name,
+                child_type=_CA_CHILD_TYPE, child_name=certificate_authority_name,
+            )
+            evidence = ExternalActivationEvidence(certificate_authority, certificate_chain, resource_id=resource_id)
+            logger.info(
+                "Using the CA resource's PendingActivation-to-Active transition "
+                "and submitted certificate thumbprint for completion."
+            )
+        else:
+            logger.warning(
+                "No PendingActivation external ICA baseline is available; activation requires action-status polling. "
+                "Resource provisioningState alone is not activation evidence."
+            )
         body = {"certificateChain": certificate_chain}
         try:
             poller = self.client.certificate_authorities.begin_activate(
@@ -189,10 +211,25 @@ class CertificateAuthorityProvider(ADRProvider):
                 namespace_name=namespace_name,
                 certificate_authority_name=certificate_authority_name,
                 body=body,
+                # NoPolling is submission-only, never completion evidence. Disable
+                # background Location/async-status GETs as well as foreground ones.
+                **({"polling": False} if evidence else {}),
             )
         except HttpResponseError as error:
             log_activation_error_hint(error)
             raise
+        if evidence:
+            if kwargs.pop("no_wait", False):
+                return poller
+            with console.status(f"Verifying certificate authority '{certificate_authority_name}' activation..."):
+                return wait_for_activation(
+                    lambda remaining: self.client.certificate_authorities.get(
+                        resource_group_name=resource_group_name, namespace_name=namespace_name,
+                        certificate_authority_name=certificate_authority_name,
+                        connection_timeout=remaining, read_timeout=remaining, retry_total=0, permit_redirects=False,
+                    ),
+                    evidence, initial_response=self._poller_initial_http_response(poller), **kwargs,
+                )
         return self._action_result(
             poller,
             f"Activating certificate authority '{certificate_authority_name}' on namespace {namespace_name}...",
