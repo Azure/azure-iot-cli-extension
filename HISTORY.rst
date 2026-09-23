@@ -3,8 +3,8 @@
 Release History
 ===============
 
-0.33.0b12 (Preview)
-++++++++++++++++++
+1.0.0b1 (Preview)
++++++++++++++++++
 
 **ADR SDK and API compatibility**
 
