@@ -117,19 +117,23 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotHubClient): operational resource for
             working with IoT Hub Service.
     """
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        get_adr_arm_endpoint(),
     )
 
 
 def adr_iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     """Use preview's modeless transport with the ADR target API contract."""
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        get_adr_arm_endpoint(),
         api_version=_ADR_IOT_HUB_API_VERSION,
     )
 
@@ -167,10 +171,12 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        get_adr_arm_endpoint(),
     )
 
 
@@ -178,10 +184,12 @@ def adr_iot_service_provisioning_factory(
     cli_ctx, *_, subscription_id=None
 ):
     """Use preview's modeless transport with the ADR target API contract."""
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        get_adr_arm_endpoint(),
         api_version=_ADR_DPS_API_VERSION,
     )
 
@@ -201,7 +209,9 @@ def adr_service_factory(cli_ctx, *_, subscription_id=None):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
     from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
 
+    endpoint = get_adr_arm_endpoint()
     credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
@@ -210,7 +220,7 @@ def adr_service_factory(cli_ctx, *_, subscription_id=None):
             cli_ctx, subscription_id=subscription_id
         ),
         subscription_id=subscription_id,
-        base_url=_ADR_CANARY_ARM_ENDPOINT,
+        base_url=endpoint,
         credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
@@ -222,7 +232,9 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
     from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
 
+    endpoint = get_adr_arm_endpoint()
     credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
@@ -231,7 +243,7 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
             cli_ctx, subscription_id=subscription_id
         ),
         subscription_id=subscription_id,
-        base_url=_ADR_CANARY_ARM_ENDPOINT,
+        base_url=endpoint,
         credential_scopes=credential_scopes,
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),

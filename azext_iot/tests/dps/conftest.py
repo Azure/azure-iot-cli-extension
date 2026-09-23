@@ -79,8 +79,9 @@ def pytest_configure(config):
     if receipts:
         if settings.env.azext_iot_testdps or settings.env.azext_iot_testdps_hub or settings.env.azext_iot_testhub:
             raise pytest.UsageError("Isolated DPS phases reject supplied resource pins, including pytest configuration pins.")
-        if ENTITY_RG != receipts[3] or ENTITY_LOCATION != "centraluseuap" or HUB_TEST_LOCATION != "centraluseuap":
-            raise pytest.UsageError("Isolated DPS phases require the explicit test resource group and centraluseuap fixtures.")
+        target = _phase_receipts.target()
+        if ENTITY_RG != receipts[3] or ENTITY_LOCATION != target["region"] or HUB_TEST_LOCATION != target["region"]:
+            raise pytest.UsageError("Isolated DPS phases require the explicit test resource group and authorized region.")
         _phase_runtime.require_linux()
         from azext_iot.tests import helpers
         runtime = _phase_runtime.activate(receipts[2], existing=(cli, helpers.cli))

@@ -27,6 +27,7 @@ from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests._dps_phase_runner import Redactor
 from azext_iot.tests import _focused_live as focused
+from azext_iot.tests._integration_target import public_scope, target
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
 
@@ -190,8 +191,13 @@ class HubSasPhase:
         self.config = config
         self.hub, self.storage, self.group, self.location = hub, storage, group, location
         self.subscription = os.getenv("azext_iot_hubsas_subscription", "").strip()
-        if not self.subscription or location != "centraluseuap":
-            raise pytest.UsageError("HubSAS requires an explicit subscription and centraluseuap.")
+        if not self.subscription:
+            raise pytest.UsageError("HubSAS requires an explicit subscription.")
+        try:
+            self.target_scope = target(location, os.getenv("azext_iot_test_arm_endpoint"))
+            public_scope(self.subscription, group, **self.target_scope)
+        except ValueError as error:
+            raise pytest.UsageError(str(error)) from error
         prefix = f"/subscriptions/{self.subscription}/resourceGroups/{group}/providers/"
         self.ids = {
             "hub": prefix + "Microsoft.Devices/IotHubs/" + hub,
@@ -230,6 +236,7 @@ class HubSasPhase:
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({
             "phase": "local-auth", "runUid": UID, "ids": self.ids,
+            "target": self.target_scope,
             "mutations": sorted(self.sent), "statuses": self.statuses,
             "absent": sorted(self.absent), "passed": sorted(self.passed),
             "consumerGroupIds": sorted(self.allowed - {value.casefold() for value in self.ids.values()}),

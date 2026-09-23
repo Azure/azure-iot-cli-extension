@@ -80,6 +80,29 @@ def test_default_is_regular(monkeypatch):
     assert not subject.enabled()
 
 
+@pytest.mark.parametrize("location,endpoint,allowed", [
+    ("australiaeast", "https://management.azure.com", True),
+    ("australiaeast", "https://centraluseuap.management.azure.com", False),
+    ("westeurope", "https://management.azure.com", True),
+    ("centraluseuap", "https://management.azure.com", True),
+    ("west us", "https://management.azure.com", False),
+])
+def test_sas_authorized_target_is_attested_without_reducing_manifest(tmp_path, monkeypatch, location, endpoint, allowed):
+    from azext_iot.tests._integration_target import SUBSCRIPTION, RESOURCE_GROUP
+    monkeypatch.setenv("azext_iot_hubsas_subscription", SUBSCRIPTION)
+    monkeypatch.setenv("azext_iot_hubsas_receipt", str(tmp_path / "receipt.json"))
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", endpoint)
+    if allowed:
+        runtime = subject.HubSasPhase(configuration(), "hub", "storage", RESOURCE_GROUP, location)
+        assert json.loads(runtime.path.read_text(encoding="utf-8"))["target"] == {"region": location, "endpoint": endpoint}
+        assert runtime.expected == subject.NODES
+        runtime.restore()
+    else:
+        with pytest.raises(pytest.UsageError, match="not authorized|requires region|region identifier"):
+            subject.HubSasPhase(configuration(), "hub", "storage", RESOURCE_GROUP, location)
+        assert not list(tmp_path.iterdir())
+
+
 @pytest.mark.parametrize("args", [
     [], ["azext_iot/tests/iothub"], list(reversed(subject.NODES)),
     subject.NODES[1:], subject.NODES + (subject.NODES[0],),

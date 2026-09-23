@@ -30,14 +30,17 @@ BUDGETS = {"HubControl": (("regular", 190 * 60),), "HubData": (("entra", 210 * 6
 CLEANUP = 15 * 60
 RESERVE = 5 * 60
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
+TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 
 
 def selection():
     return runpy.run_path(str(ROOT / "azext_iot/tests/_hub_suite_manifest.py"))
 
 
-def helper():
-    return runpy.run_path(str(ROOT / "azext_iot/tests/_hub_ownership.py"))
+def helper(region="centraluseuap", endpoint=None):
+    owned = runpy.run_path(str(ROOT / "azext_iot/tests/_hub_ownership.py"))
+    owned.update(owned["configure_target"](region, endpoint))
+    return owned
 
 
 def read_json(path):
@@ -80,21 +83,22 @@ def write_junit(receipt, expected, path):
     os.chmod(path, 0o600)
 
 
-def sas_errors(data, expected, *, debug=None):
+def sas_errors(data, expected, *, debug=None, region="centraluseuap", endpoint=None):
     """Validate existing SAS evidence without changing its membership/receipt format."""
-    errors = sas_cleanup_errors(data, debug=debug)
+    errors = sas_cleanup_errors(data, debug=debug, region=region, endpoint=endpoint)
     if sorted(data.get("passed", [])) != sorted(expected):
         errors.append("SAS required cases did not pass")
     return errors
 
 
-def sas_cleanup_errors(data, *, debug=None):
+def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=None):
     """Validate owned resource absence independently of test outcomes."""
-    owned = helper()
+    owned = helper(region, endpoint)
     errors = []
     ids = data.get("ids", {})
     uid = data.get("runUid", "")
-    if (data.get("phase") != "local-auth" or not data.get("runUid")
+    if (not TARGETS["matches"](data, TARGETS["target"](region, endpoint))
+            or data.get("phase") != "local-auth" or not data.get("runUid")
             or set(ids) != {"hub", "storage", "container", "role"}
             or not all(owned["scope_id"](value) for value in ids.values())
             or len(set(value.casefold() for value in ids.values())) != 4
@@ -128,7 +132,7 @@ def sas_cleanup_errors(data, *, debug=None):
     return errors
 
 
-def evaluate_hub_phases(result_dir, *, debug=False):
+def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
     """Pure JSON gate, no pytest/Azure imports. Return {passed: bool, errors: list}.
 
     Load with runpy.run_path(path) to bypass Azure-dependent package __init__ files.
@@ -145,7 +149,10 @@ def evaluate_hub_phases(result_dir, *, debug=False):
             raise ValueError("Invalid debug provenance")
         names = (request["phase"],) if request else selection()["phases"](suite)
         results = summary["phases"]
-        owned = helper()
+        target = TARGETS["target"](summary["region"], summary["endpoint"])
+        if region is not None and target != TARGETS["target"](region, endpoint):
+            raise ValueError("Hub receipt does not match the scheduled target")
+        owned = helper(**target)
         if (summary.get("schemaVersion") != 1
                 or (summary.get("subscription"), summary.get("resourceGroup"), summary.get("region"),
                     summary.get("endpoint")) != (owned["SUBSCRIPTION"], owned["GROUP"], owned["REGION"], owned["ARM"])
@@ -176,14 +183,14 @@ def evaluate_hub_phases(result_dir, *, debug=False):
             cleanup = read_json(output / name / "cleanup.json")
             evidence = read_json(output / name / "ownership.json")
             if name == "sas":
-                errors.extend(sas_errors(evidence, expected, debug=request))
+                errors.extend(sas_errors(evidence, expected, debug=request, **target))
                 ids = sorted(value.casefold() for value in evidence["ids"].values())
                 if result.get("sasRunUid") != evidence.get("runUid"):
                     errors.append("SAS receipt identity mismatch")
             else:
-                errors.extend(helper()["ownership_errors"](evidence, run_id, name))
+                errors.extend(owned["ownership_errors"](evidence, run_id, name))
                 ids = sorted(evidence["resources"])
-                children = sorted(helper()["descendants"](evidence))
+                children = sorted(owned["descendants"](evidence))
                 if (cleanup.get("descendantIds") != children or cleanup.get("absentDescendantIds") != children):
                     errors.append("owned descendant resource absence not proven")
             if (cleanup.get("runId") != run_id or cleanup.get("complete") is not True
@@ -198,7 +205,9 @@ def evaluate_hub_phases(result_dir, *, debug=False):
     return {"passed": not errors, "errors": errors}
 
 
-def environment(base, suite, phase, folder, run_id, subscription, group, *, debug=None):
+def environment(base, suite, phase, folder, run_id, subscription, group, *, debug=None,
+                region="centraluseuap", endpoint=None):
+    target = TARGETS["target"](region, endpoint)
     forbidden = {
         "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_XDIST_WORKER_COUNT", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
         "PYTEST_XDIST_AUTO_NUM_WORKERS", "PYTEST_CURRENT_TEST",
@@ -208,15 +217,22 @@ def environment(base, suite, phase, folder, run_id, subscription, group, *, debu
         FOCUSED["ENV"], FOCUSED["DPS_ARGS_ENV"],
     }
     for key, value in base.items():
-        managed = key.startswith(("AZEXT_IOT_HUB_", "azext_iot_hubsas_", "azext_iot_dps_", "AZURE_IOT_"))
+        managed = (key.startswith(("AZEXT_IOT_HUB_", "azext_iot_hubsas_", "azext_iot_dps_", "AZURE_IOT_"))
+                   and key != "AZURE_IOT_ADR_ARM_ENDPOINT")
         if value and (key in forbidden or managed or key == "azext_iot_hub_auth_phase"):
             raise ValueError("Ambient resource/auth/selection override rejected: " + key)
-    for key, expected in (("azext_iot_testrg", group), ("azext_iot_testhub_location", "centraluseuap")):
+    for key, expected in (
+        ("azext_iot_testrg", group), ("azext_iot_testhub_location", region),
+        (TARGETS["ENDPOINT_ENV"], target["endpoint"]),
+        ("AZURE_IOT_ADR_ARM_ENDPOINT", target["endpoint"]),
+    ):
         if base.get(key) and base[key] != expected:
             raise ValueError("Conflicting ambient resource scope: " + key)
     result = dict(
         base, AZURE_TEST_RUN_LIVE="True", AZURE_IOT_AUTH_TYPE="login",
-        azext_iot_testrg=group, azext_iot_testhub_location="centraluseuap",
+        azext_iot_testrg=group, azext_iot_testhub_location=region,
+        azext_iot_test_arm_endpoint=target["endpoint"],
+        AZURE_IOT_ADR_ARM_ENDPOINT=target["endpoint"],
         AZEXT_IOT_HUB_SUITE=suite, AZEXT_IOT_HUB_PHASE=phase, AZEXT_IOT_HUB_RUN_ID=run_id,
         AZEXT_IOT_HUB_RECEIPT=str(folder / "pytest.json"),
         AZEXT_IOT_HUB_OWNERSHIP=str(folder / "ownership.json"),
@@ -246,8 +262,8 @@ def command(suite, phase, *, debug=None, folder=None):
     ]
 
 
-def cleanup_regular(arm, evidence, run_id, phase, deadline, path):
-    owned = helper()
+def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="centraluseuap", endpoint=None):
+    owned = helper(region, endpoint)
     arm.deadline = deadline
     # Only structurally valid receipts may authorize even reconciliation reads.
     errors = owned["ownership_errors"](evidence, run_id, phase)
@@ -304,18 +320,19 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path):
 
 
 def run(suite, subscription, group, region, output, arm=None, execute=None, base=None, *,
-        debug_phase=None, debug_nodes=None):
+        debug_phase=None, debug_nodes=None, endpoint=None):
     debug = FOCUSED["select"](suite, debug_phase, debug_nodes)
     sys.path.insert(0, str(ROOT))
     from azext_iot.tests._dps_phase_runner import child, require_linux, write_json
     require_linux()
-    owned = helper()
+    target = TARGETS["target"](region, endpoint)
+    owned = helper(**target)
     if (subscription, group, region) != (owned["SUBSCRIPTION"], owned["GROUP"], owned["REGION"]):
-        raise ValueError("Controller is restricted to the authorized canary scope")
+        raise ValueError("Controller is restricted to the authorized integration scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
     budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
-    environment(base, suite, budgets[0][0], output, "preflight", subscription, group, debug=debug)
+    environment(base, suite, budgets[0][0], output, "preflight", subscription, group, debug=debug, **target)
     output.mkdir(parents=True, exist_ok=False)
     cancel = threading.Event()
     previous = {sig: signal.signal(sig, lambda *_: cancel.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
@@ -342,7 +359,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 break
             folder = output / phase
             folder.mkdir()
-            env = environment(base, suite, phase, folder, result["runId"], subscription, group, debug=debug)
+            env = environment(base, suite, phase, folder, result["runId"], subscription, group, debug=debug, **target)
             result.update(status="running", runtimeSeconds=runtime, cleanupSeconds=CLEANUP)
             write_json(summary_path, summary)
             # pytest node args are repository-relative; retain every inherited dependency path.
@@ -359,20 +376,20 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 evidence = read_json(folder / "ownership.json")
                 if phase == "sas":
                     result["sasRunUid"] = evidence["runUid"]
-                    errors = sas_cleanup_errors(evidence, debug=debug)
+                    errors = sas_cleanup_errors(evidence, debug=debug, **target)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
                 else:
                     cleanup = cleanup_regular(arm, evidence, result["runId"], phase,
-                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json")
+                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json", **target)
                     write_json(folder / "ownership.json", evidence)
                 receipt = read_json(folder / "pytest.json")
                 expected = debug["requestedNodes"] if debug else list(selection()["nodes"](suite, phase))
                 write_junit(receipt, expected, folder / "junit.xml")
                 receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
                 if phase == "sas":
-                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug))
+                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug, **target))
                 result["receiptErrors"] = receipt_errors
                 result["status"] = "passed" if (
                     not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
@@ -396,7 +413,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         write_json(summary_path, summary)
         for sig, handler in previous.items():
             signal.signal(sig, handler)
-    return 0 if evaluate_hub_phases(output, debug=bool(debug))["passed"] else 1
+    return 0 if evaluate_hub_phases(output, debug=bool(debug), **target)["passed"] else 1
 
 
 def main():
@@ -405,12 +422,13 @@ def main():
     parser.add_argument("--subscription", required=True)
     parser.add_argument("--resource-group", required=True)
     parser.add_argument("--region", required=True)
+    parser.add_argument("--arm-endpoint")
     parser.add_argument("--output", default="test-result/hub-phases")
     FOCUSED["add_arguments"](parser)
     args = parser.parse_args()
     try:
         return run(args.suite, args.subscription, args.resource_group, args.region, args.output,
-                   debug_phase=args.debug_phase, debug_nodes=args.debug_node)
+                   debug_phase=args.debug_phase, debug_nodes=args.debug_node, endpoint=args.arm_endpoint)
     except ValueError as error:
         print("Hub controller rejected launch: " + str(error), flush=True)
         return 1

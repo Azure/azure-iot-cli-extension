@@ -21,6 +21,11 @@ on:
         type: string
         required: false
         default: "centraluseuap"
+      arm-endpoint:
+        description: "ARM routing: auto (canary for centraluseuap, public otherwise), public, or canary"
+        type: string
+        required: false
+        default: "auto"
       resource-group:
         description: "Resource group for test resources"
         type: string
@@ -71,6 +76,15 @@ on:
         type: string
         required: false
         default: "centraluseuap"
+      arm-endpoint:
+        description: "ARM routing (canary requires centraluseuap)"
+        type: choice
+        required: false
+        default: "auto"
+        options:
+          - auto
+          - public
+          - canary
       resource-group:
         description: "Resource group for test resources"
         type: string
@@ -110,6 +124,7 @@ jobs:
           INPUT_SERVICES: ${{ inputs['test-services'] }}
           INPUT_PYTHON_VERSIONS: ${{ inputs['python-versions'] || '3.13' }}
           INPUT_REGIONS: ${{ inputs.regions || 'centraluseuap' }}
+          INPUT_ARM_ENDPOINT: ${{ inputs['arm-endpoint'] || 'auto' }}
           INPUT_TEST_DPS: ${{ inputs.testDPS }}
           INPUT_TEST_HUB_CONTROL: ${{ inputs.testHubControl }}
           INPUT_TEST_HUB_DATA: ${{ inputs.testHubData }}
@@ -165,6 +180,13 @@ jobs:
 
           python_versions="$INPUT_PYTHON_VERSIONS"
           regions="$INPUT_REGIONS"
+          case "$INPUT_ARM_ENDPOINT" in
+            auto|public|canary) ;;
+            *)
+              echo "::error::arm-endpoint must be auto, public, or canary."
+              exit 1
+              ;;
+          esac
 
           for value in "$services" "$python_versions" "$regions"; do
             if [[ "$value" == *$'\n'* || "$value" == *$'\r'* || "$value" =~ (^|,)[[:space:]]*(,|$) ]]; then
@@ -210,17 +232,23 @@ jobs:
                   echo "::error::Regions must be Azure region identifiers."
                   exit 1
                 fi
-                if [[ "$svc" = HubControl || "$svc" = HubData ]]; then
-                  if [ "$region" != centraluseuap ] || \
-                     [ "$TEST_SUBSCRIPTION_ID" != a386d5ea-ea90-441a-8263-d816368c84a1 ] || \
-                     [ "$RESOURCE_GROUP" != cli-int-test-rg ]; then
-                    echo "::error::Hub live phases require the authorized subscription, cli-int-test-rg and centraluseuap."
+                arm_endpoint="https://management.azure.com"
+                if [[ "$INPUT_ARM_ENDPOINT" = canary || ( "$INPUT_ARM_ENDPOINT" = auto && "$region" = centraluseuap ) ]]; then
+                  if [ "$region" != centraluseuap ]; then
+                    echo "::error::Canary ARM requires region centraluseuap."
                     exit 1
                   fi
+                  arm_endpoint="https://centraluseuap.management.azure.com"
+                fi
+                if [[ "$svc" = HubControl || "$svc" = HubData || \
+                      ( "$arm_endpoint" = https://management.azure.com && ( "$svc" = DPS || "$svc" = ADR ) ) ]] && \
+                   [[ "$TEST_SUBSCRIPTION_ID" != a386d5ea-ea90-441a-8263-d816368c84a1 || "$RESOURCE_GROUP" != cli-int-test-rg ]]; then
+                  echo "::error::Hub/public ARM live phases require the authorized subscription and cli-int-test-rg."
+                  exit 1
                 fi
 
                 if [ "$first" = true ]; then first=false; else matrix="$matrix,"; fi
-                matrix="$matrix{\"service\":\"$svc\",\"tox_env\":\"$tox_env\",\"timeout\":$timeout,\"python\":\"$py\",\"region\":\"$region\"}"
+                matrix="$matrix{\"service\":\"$svc\",\"tox_env\":\"$tox_env\",\"timeout\":$timeout,\"python\":\"$py\",\"region\":\"$region\",\"arm_endpoint\":\"$arm_endpoint\"}"
               done
             done
           done
@@ -248,9 +276,9 @@ jobs:
 
           # --- Write summary table ---
           echo "## Test Matrix ($(echo "$matrix" | jq length) jobs)" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Python | Region | Timeout |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "$matrix" | jq -r '.[] | "| \(.service) | \(.python) | \(.region) | \(.timeout) min |"' >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Python | Region | ARM endpoint | Timeout |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|--------|--------------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "$matrix" | jq -r '.[] | "| \(.service) | \(.python) | \(.region) | \(.arm_endpoint) | \(.timeout) min |"' >> $GITHUB_STEP_SUMMARY
 
   unit-test:
     name: "Linter and unit tests"
@@ -302,6 +330,7 @@ jobs:
       TEST_TOX_ENV: ${{ matrix.config.tox_env }}
       TEST_PYTHON: ${{ matrix.config.python }}
       TEST_REGION: ${{ matrix.config.region }}
+      TEST_ARM_ENDPOINT: ${{ matrix.config.arm_endpoint }}
     steps:
       - name: "Checkout source"
         uses: actions/checkout@v5
@@ -371,12 +400,16 @@ jobs:
           PYTHONUNBUFFERED: "1"
           azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
           azext_iot_testhub_location: ${{ matrix.config.region }}
+          azext_iot_test_arm_endpoint: ${{ matrix.config.arm_endpoint }}
+          AZURE_IOT_ADR_ARM_ENDPOINT: ${{ matrix.config.arm_endpoint }}
           azext_iot_hub_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
           AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
           azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}
+          azext_iot_adr_arm_endpoint: ${{ matrix.config.arm_endpoint }}
+          azext_iot_adr_arm_resource: https://management.azure.com
         run: |
           set -o pipefail
           run_service() {
@@ -384,7 +417,7 @@ jobs:
               echo "DPS coverage: regular, service-SAS and serial local-auth-toggle; certificate coverage is not configured in this workflow."
               .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
-                --region "$TEST_REGION"
+                --region "$TEST_REGION" --arm-endpoint "$TEST_ARM_ENDPOINT"
             else
               tox r -e "$TEST_TOX_ENV" --skip-pkg-install
             fi
@@ -406,6 +439,7 @@ jobs:
           printf '%s\n' "$TEST_SERVICE" > test-result/service.txt
           printf '%s\n' "$TEST_PYTHON" > test-result/python.txt
           printf '%s\n' "$TEST_REGION" > test-result/region.txt
+          printf '%s\n' "$TEST_ARM_ENDPOINT" > test-result/arm-endpoint.txt
           # ADR persists metadata-only outcomes before every phase hook returns.
           # Never overwrite them with an empty final-summary scrape after cancellation.
           if [ "$TEST_SERVICE" = "ADR" ]; then

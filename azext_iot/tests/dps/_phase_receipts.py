@@ -17,12 +17,25 @@ import pytest
 
 from azext_iot.tests.dps import _phase
 from azext_iot.tests import _focused_live as focused
+from azext_iot.tests._integration_target import public_scope, target as arm_target
 from azext_iot.tests.dps._phase_manifest import normalize_nodeid
 
 DIRECTORY_ENV = "azext_iot_dps_phase_receipts"
 RUN_UID_ENV = "azext_iot_dps_run_uid"
 SUBSCRIPTION_ENV = "azext_iot_dps_test_subscription"
 RESOURCE_GROUP_ENV = "azext_iot_dps_test_resource_group"
+
+
+def target():
+    return arm_target(
+        os.getenv("azext_iot_dps_test_location", "centraluseuap"), os.getenv("azext_iot_test_arm_endpoint"),
+    )
+
+
+def location_matches(resource):
+    expected = target()
+    return (resource.get("location", "").replace(" ", "").casefold() == expected["region"]
+            or (expected == arm_target() and "location" not in resource))
 
 
 def settings():
@@ -36,6 +49,10 @@ def settings():
         raise pytest.UsageError("DPS phase receipts require a subscription UUID.")
     if not Path(directory).is_absolute() or not Path(directory).is_dir():
         raise pytest.UsageError("DPS phase receipt directory must be an existing absolute directory.")
+    try:
+        public_scope(subscription, group, **target())
+    except ValueError as error:
+        raise pytest.UsageError(str(error)) from error
     return Path(directory), uid, subscription, group
 
 
@@ -46,6 +63,7 @@ def write(name, payload, exclusive=False):
     directory, uid, subscription, _ = config
     payload = {
         "phase": _phase.get_phase(), "run_uid": uid, "subscription": subscription,
+        "target": target(),
         "recorded_at": datetime.now(timezone.utc).isoformat(), **payload,
         **focused.provenance(focused.from_environment(os.environ, "DPS", _phase.get_phase())),
     }
@@ -89,6 +107,7 @@ def before_create(name, resource_group, run_uid, kind):
         "name": name, "kind": kind, "resource_group": resource_group,
         "id": f"/subscriptions/{subscription}/resourceGroups/{resource_group}/providers/Microsoft.Devices/{resource_type}/{name}",
         "tags": {"intTest": "true", "runUid": run_uid, "kind": kind},
+        "location": target()["region"],
         "create_attempted": True,
     }, exclusive=True)
 
@@ -115,6 +134,7 @@ def after_create(name, resource):
         state = (resource.get("properties") or {}).get("provisioningState")
         ready = (
             resource.get("id", "").lower() == record["id"].lower()
+            and location_matches(resource)
             and str(state).lower() == "succeeded"
             and all((resource.get("tags") or {}).get(key) == value for key, value in record["tags"].items())
         )
@@ -130,6 +150,7 @@ def before_delete(name, resource=None):
     if resource is None:
         return False
     if (resource.get("id", "").lower() != record["id"].lower()
+            or not location_matches(resource)
             or any((resource.get("tags") or {}).get(key) != value for key, value in record["tags"].items())):
         raise RuntimeError("DPS phase refuses deletion: current resource ownership does not match its receipt.")
     if str((resource.get("properties") or {}).get("provisioningState", "")).lower() == "deleting":

@@ -6,12 +6,33 @@
 
 from configparser import ConfigParser
 from pathlib import Path
+import os
+import subprocess
 import sys
 
 import pytest
 
 
 INTEGRATION_ENVIRONMENT = "testenv:{Central,ADT,DPS,HubControl,HubData,ADU,ADR}-int"
+
+
+@pytest.mark.parametrize("override", [None, "https://management.azure.com"])
+def test_real_adr_tox_binds_product_factory_endpoint_to_fixture_endpoint(tmp_path, override):
+    root = Path(__file__).resolve().parents[2]
+    environment = dict(os.environ)
+    for key in ("AZURE_IOT_ADR_ARM_ENDPOINT", "azext_iot_adr_arm_endpoint"):
+        environment.pop(key, None)
+    if override:
+        environment["azext_iot_adr_arm_endpoint"] = override
+    result = subprocess.run(
+        [sys.executable, "-m", "tox", "c", "-c", str(root / "tox.ini"),
+         "--workdir", str(tmp_path / "tox"), "-e", "ADR-int", "-k", "set_env"],
+        cwd=root, env=environment, capture_output=True, text=True, check=False, timeout=30,
+    )
+    assert result.returncode == 0
+    expected = override or "https://centraluseuap.management.azure.com"
+    assert f"AZURE_IOT_ADR_ARM_ENDPOINT={expected}" in result.stdout
+    assert f"azext_iot_adr_arm_endpoint={expected}" in result.stdout
 
 
 def test_integration_environments_discover_the_candidate_extension():
@@ -101,8 +122,8 @@ def test_public_hub_tox_uses_managed_controller_with_explicit_scope_and_no_filte
         f"{suite}: python {{toxinidir}}/azext_iot/tests/_hub_phase_runner.py --suite {suite} \\",
         "HubControl,HubData:    --subscription {env:azext_iot_hub_subscription} \\",
         "HubControl,HubData:    --resource-group {env:azext_iot_testrg:cli-int-test-rg} \\",
-        "HubControl,HubData:    --region {env:azext_iot_testhub_location:centraluseuap}"
-        " --output test-result/hub-phases {posargs}",
+        "HubControl,HubData:    --region {env:azext_iot_testhub_location:centraluseuap} \\",
+        "HubControl,HubData:    --arm-endpoint={env:azext_iot_test_arm_endpoint:} --output test-result/hub-phases {posargs}",
     ]
     assert "HubSAS" not in commands and "HubMgmt" not in commands
     assert "hubsas_subscription" not in section["setenv"]

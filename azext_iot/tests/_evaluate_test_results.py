@@ -17,13 +17,18 @@ import xml.etree.ElementTree as ET
 COMBINATION_FIELDS = ("service", "python", "region")
 MANIFEST = runpy.run_path(str(Path(__file__).resolve().parents[2] / "azext_iot/tests/dps/_phase_manifest.py"))
 FOCUSED = runpy.run_path(str(Path(__file__).resolve().with_name("_focused_live.py")))
+TARGETS = runpy.run_path(str(Path(__file__).resolve().with_name("_integration_target.py")))
 
 
-def evaluate_dps_phases(result_dir):
+def evaluate_dps_phases(result_dir, region=None, endpoint=None):
     """Do not trust a green job/last tox exit without every phase and cleanup evidence."""
     errors = []
     try:
         receipt = json.loads((result_dir / "dps-phases.json").read_text(encoding="utf-8"))
+        target = TARGETS["target"](receipt["region"], receipt["endpoint"])
+        if region is not None and target != TARGETS["target"](region, endpoint):
+            raise ValueError("DPS receipt does not match the scheduled target")
+        TARGETS["public_scope"](receipt["subscription"], receipt["resource_group"], **target)
         phases = receipt["phases"]
         if not FOCUSED["matches"](receipt, None):
             raise ValueError("focused/debug evidence cannot qualify the full DPS suite")
@@ -57,6 +62,10 @@ def evaluate_dps_phases(result_dir):
                     or len(inventory) != len(set(inventory))
                     or set(inventory).intersection(resource.lower() for resource in owned)):
                 raise ValueError(f"{name}: unsuccessful execution or unproven owned-resource cleanup")
+            ownership = [json.loads(path.read_text(encoding="utf-8"))
+                         for path in (folder / "receipts").glob("owned-*.json")]
+            if any(not TARGETS["matches"](record, target) for record in ownership):
+                raise ValueError(f"{name}: ownership target mismatch")
             for resource in owned:
                 if not any(
                     json.loads(path.read_text(encoding="utf-8")).get("id") == resource
@@ -103,7 +112,7 @@ def _combination(values):
     return result
 
 
-def evaluate_hub_result(result_dir, service):
+def evaluate_hub_result(result_dir, service, region=None, endpoint=None):
     """Bind authoritative phase evidence to the scheduled suite, not just a green job."""
     try:
         folder = result_dir / "hub-phases"
@@ -111,7 +120,7 @@ def evaluate_hub_result(result_dir, service):
         if receipt["suite"] != service:
             return [f"{service}: Hub phase summary suite does not match the scheduled service."]
         controller = runpy.run_path(str(Path(__file__).resolve().with_name("_hub_phase_runner.py")))
-        result = controller["evaluate_hub_phases"](folder)
+        result = controller["evaluate_hub_phases"](folder, region=region, endpoint=endpoint)
         if result["passed"] is not True or result["errors"]:
             return [f"{service}: Hub phase evidence is incomplete or unsuccessful."] + result["errors"]
     except (OSError, ValueError, KeyError, TypeError):
@@ -157,10 +166,17 @@ def evaluate_results(results_dir, matrix, job_results):
         if combination in seen:
             errors.append(f"Duplicate result for {service} / {python} / {region}.")
         seen.add(combination)
+        endpoint_path = result_dir / "arm-endpoint.txt"
+        scheduled = next((config for config in matrix if _combination(config) == combination), {})
+        if "arm_endpoint" in scheduled and (
+            not endpoint_path.is_file()
+            or endpoint_path.read_text(encoding="utf-8").strip() != scheduled["arm_endpoint"]
+        ):
+            errors.append(f"{service} / {python} / {region}: missing or mismatched ARM endpoint receipt.")
         if service == "DPS":
-            errors.extend(evaluate_dps_phases(result_dir))
+            errors.extend(evaluate_dps_phases(result_dir, region, scheduled.get("arm_endpoint")))
         if service in ("HubControl", "HubData"):
-            errors.extend(evaluate_hub_result(result_dir, service))
+            errors.extend(evaluate_hub_result(result_dir, service, region, scheduled.get("arm_endpoint")))
         if status != "success":
             errors.append(f"{service} / {python} / {region} did not succeed: {status or 'missing result'}.")
 

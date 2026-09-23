@@ -87,9 +87,15 @@ def pytest_load_initial_conftests(early_config, parser, args):
     ownership_path = os.getenv("AZEXT_IOT_HUB_OWNERSHIP")
     if ownership_path:
         from azext_iot.tests._dps_phase_runner import require_linux
-        from azext_iot.tests._hub_ownership import ProcessScope
+        from azext_iot.tests import _hub_ownership as owned
         require_linux()
-        runtime.scope = ProcessScope()
+        previous_target = (owned.REGION, owned.ARM)
+        owned.configure_target(
+            os.getenv("azext_iot_testhub_location", "centraluseuap"),
+            os.getenv("azext_iot_test_arm_endpoint"),
+        )
+        early_config.add_cleanup(lambda: owned.configure_target(*previous_target))
+        runtime.scope = owned.ProcessScope()
         runtime.scope.install()
         early_config.add_cleanup(runtime.scope.restore)
     if ownership_path and phase != "sas":

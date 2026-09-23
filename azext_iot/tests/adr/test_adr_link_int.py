@@ -46,7 +46,7 @@ import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
 from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
-from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT, _ADR_DPS_API_VERSION
+from azext_iot._factory import _ADR_DPS_API_VERSION
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
@@ -62,6 +62,7 @@ from azext_iot.tests.adr._readiness import (
 )
 from azext_iot.tests.adr._su_reader_probe import SUReaderProbe
 from azext_iot.tests.adr.conftest import (
+    TEST_ARM_ENDPOINT,
     TEST_ARM_RESOURCE,
     TEST_LOCATION,
     TEST_RG,
@@ -447,7 +448,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 shown = self.cmd(
                     f"iot adr ns link dps show --ns {namespace_name} -g {rg} -n {dps_endpoint}"
                 ).get_output_in_json()
-                dps_url = f"{_ADR_CANARY_ARM_ENDPOINT}{dps_id}?api-version={_ADR_DPS_API_VERSION}"
+                dps_url = f"{TEST_ARM_ENDPOINT}{dps_id}?api-version={_ADR_DPS_API_VERSION}"
                 dps = self.cmd(
                     f"rest --method get --url {shlex.quote(dps_url)} --resource {shlex.quote(TEST_ARM_RESOURCE)}"
                 ).get_output_in_json()

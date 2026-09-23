@@ -152,6 +152,39 @@ def test_workflow_gate_handles_single_and_multiple_artifact_layouts(tmp_path, la
     assert ("### Passed" in summary) == (status == "success")
 
 
+@pytest.mark.parametrize("endpoint", [None, "https://centraluseuap.management.azure.com", "https://management.azure.com"])
+def test_matrix_endpoint_receipt_must_match_scheduled_target(tmp_path, endpoint):
+    combination = dict(MATRIX[0], region="australiaeast", arm_endpoint="https://management.azure.com")
+    _result(tmp_path, combination)
+    if endpoint:
+        (tmp_path / "arm-endpoint.txt").write_text(endpoint, encoding="utf-8")
+    _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
+    assert bool(errors) == (endpoint != combination["arm_endpoint"])
+
+
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast"])
+def test_workflow_environment_passes_real_hub_controller_preflight(tmp_path, region):
+    from azext_iot.tests import _hub_phase_runner as controller
+    target = controller.TARGETS["target"](region)
+    bindings = {
+        "matrix.config.region": region, "matrix.config.arm_endpoint": target["endpoint"],
+        "env.RESOURCE_GROUP": controller.TARGETS["RESOURCE_GROUP"],
+        "env.TEST_SUBSCRIPTION_ID": controller.TARGETS["SUBSCRIPTION"],
+        "secrets.AZURE_CLIENT_ID": "offline-client", "secrets.AZURE_TENANT_ID": "offline-tenant",
+    }
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    step = next(step for step in workflow["jobs"]["int-test"]["steps"] if step.get("id") == "run_tests")
+    env = {name: bindings[value[3:-3].strip()] if value.startswith("${{") else value
+           for name, value in step["env"].items()}
+    result = controller.environment(
+        env, "HubData", "entra", tmp_path, "uid", bindings["env.TEST_SUBSCRIPTION_ID"],
+        bindings["env.RESOURCE_GROUP"], **target,
+    )
+    assert result["azext_iot_test_arm_endpoint"] == target["endpoint"]
+    assert result["AZURE_IOT_ADR_ARM_ENDPOINT"] == target["endpoint"]
+    assert result["azext_iot_testhub_location"] == result["azext_iot_adr_location"] == region
+
+
 def test_workflow_gate_requires_every_combination_to_pass(tmp_path):
     other = dict(MATRIX[0], python="3.12")
     _result(tmp_path / "passing")
@@ -364,6 +397,10 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
         "azext_iot_adr_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
         "azext_iot_adr_resource_group": "${{ env.RESOURCE_GROUP }}",
         "azext_iot_adr_location": "${{ matrix.config.region }}",
+        "azext_iot_adr_arm_endpoint": "${{ matrix.config.arm_endpoint }}",
+        "azext_iot_adr_arm_resource": "https://management.azure.com",
+        "azext_iot_test_arm_endpoint": "${{ matrix.config.arm_endpoint }}",
+        "AZURE_IOT_ADR_ARM_ENDPOINT": "${{ matrix.config.arm_endpoint }}",
     }
     assert steps["Az CLI login"]["with"] == {
         "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
@@ -405,6 +442,7 @@ tee() { cat; }
         ["bash", "-c", stubs + script], cwd=tmp_path,
         env=dict(os.environ, ADR_TEST_FILTER=expression,
                  TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
+                 TEST_ARM_ENDPOINT="https://centraluseuap.management.azure.com",
                  TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
                  OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
         capture_output=True, text=True, timeout=20, check=False,
@@ -423,6 +461,7 @@ def test_workflow_always_runs_full_service_despite_obsolete_environment(tmp_path
             "dps_controller", "azext_iot/tests/_dps_phase_runner.py",
             "--subscription", "offline-subscription", "--resource-group", "offline-rg",
             "--region", "centraluseuap",
+            "--arm-endpoint", "https://centraluseuap.management.azure.com",
         ]
     else:
         expected = ["tox", "r", "-e", f"{service}-int", "--skip-pkg-install"]
@@ -595,7 +634,8 @@ def test_hub_public_matrix_auto_includes_complete_data_suite(services, toggle, e
                INPUT_TEST_DPS="false", INPUT_TEST_HUB_CONTROL="false",
                INPUT_TEST_ADU="false", INPUT_TEST_ADR="false", INPUT_PYTHON_VERSIONS="3.13",
                TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1", RESOURCE_GROUP="cli-int-test-rg",
-               INPUT_REGIONS="centraluseuap", GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
+               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="auto",
+               GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
     result = subprocess.run(
         ["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
         capture_output=True, text=True, timeout=15, check=False,
@@ -631,8 +671,12 @@ def test_hub_data_manifest_preserves_exact_six_sas_nodes_and_normal_auth_default
 
 @pytest.mark.parametrize("service", ["HubControl", "HubData"])
 @pytest.mark.parametrize("passed", [False, True])
-def test_hub_gate_delegates_to_checkout_controller(tmp_path, mocker, service, passed):
+@pytest.mark.parametrize("endpoint", [None, "https://management.azure.com"])
+def test_hub_gate_delegates_to_checkout_controller(tmp_path, mocker, service, passed, endpoint):
     combination = dict(MATRIX[0], service=service)
+    if endpoint:
+        combination["arm_endpoint"] = endpoint
+        (tmp_path / "arm-endpoint.txt").write_text(endpoint, encoding="utf-8")
     _result(tmp_path, combination)
     folder = tmp_path / "hub-phases"
     folder.mkdir()
@@ -641,7 +685,7 @@ def test_hub_gate_delegates_to_checkout_controller(tmp_path, mocker, service, pa
     load = mocker.patch("runpy.run_path", return_value={"evaluate_hub_phases": evaluate})
     _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
     load.assert_called_once_with(str(REPOSITORY_ROOT / "azext_iot/tests/_hub_phase_runner.py"))
-    evaluate.assert_called_once_with(folder)
+    evaluate.assert_called_once_with(folder, region=combination["region"], endpoint=endpoint)
     assert bool(errors) is not passed
 
 
@@ -658,7 +702,8 @@ def test_hub_control_evidence_cannot_qualify_hub_data(tmp_path):
 @pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
 @pytest.mark.parametrize("override", [
     {"INPUT_SERVICES": "HubSAS"}, {"INPUT_SERVICES": "HubMgmt"},
-    {"INPUT_REGIONS": "westus"}, {"INPUT_REGIONS": "centraluseuap,westus"},
+    {"INPUT_REGIONS": "westus", "INPUT_ARM_ENDPOINT": "canary"},
+    {"INPUT_REGIONS": "centraluseuap,westus", "INPUT_ARM_ENDPOINT": "canary"},
     {"TEST_SUBSCRIPTION_ID": "foreign"}, {"RESOURCE_GROUP": "foreign"},
 ])
 def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_path, override):
@@ -666,7 +711,7 @@ def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_p
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
     output = tmp_path / "output"
     env = dict(os.environ, INPUT_SERVICES="HubData", INPUT_PYTHON_VERSIONS="3.13",
-               INPUT_REGIONS="centraluseuap", RESOURCE_GROUP="cli-int-test-rg",
+               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="auto", RESOURCE_GROUP="cli-int-test-rg",
                TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1",
                GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
     env.update(override)
