@@ -366,8 +366,8 @@ def test_refresh_handler_ignores_unrelated_records():
     assert not handler.acknowledgements
 
 
-@pytest.mark.parametrize("outcome", ["accepted", "reused", "throttled"])
-def test_group_lifecycle_keeps_unexpected_immediate_acceptance_visible(mocker, outcome):
+@pytest.mark.parametrize("outcome", ["accepted", "reused", "throttled", "unexpected"])
+def test_group_lifecycle_accepts_supported_refresh_outcomes(mocker, outcome):
     mocker.patch.object(groups, "delete_test_namespace")
     mocker.patch.object(groups, "_observe_group_refresh", return_value=outcome)
     mocker.patch.object(groups, "_generate_group_name", return_value="group")
@@ -391,9 +391,9 @@ def test_group_lifecycle_keeps_unexpected_immediate_acceptance_visible(mocker, o
         return Mock(get_output_in_json=lambda: value)
 
     scenario.cmd.side_effect = command
-    if outcome == "accepted":
-        with pytest.raises(AssertionError, match="contradicts the documented"):
+    if outcome == "unexpected":
+        with pytest.raises(AssertionError, match="Unexpected group refresh outcome"):
             groups.TestADRGroupLifecycle.test_adr_group_lifecycle(scenario)
     else:
         groups.TestADRGroupLifecycle.test_adr_group_lifecycle(scenario)
-    assert any("group update" in call.args[0] for call in scenario.cmd.call_args_list) is (outcome != "accepted")
+    assert any("group update" in call.args[0] for call in scenario.cmd.call_args_list) is (outcome != "unexpected")

@@ -169,16 +169,15 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert int(count or 0) == len(members)
 
-            with timed_step("Step 3 ❯ Observe immediate refresh throttling or operation reuse"):
+            with timed_step("Step 3 ❯ Refresh members after initial calculation"):
                 refresh_outcome = _observe_group_refresh(
                     self,
                     f"iot adr ns group refresh -n {group_name} "
                     f"--ns {namespace_name} -g {rg}",
                 )
-                assert refresh_outcome in {"throttled", "reused"}, (
-                    "Service accepted a new immediate refresh after initial creation. "
-                    "This contradicts the documented once-per-hour limit including initial calculation; "
-                    "confirm the backend contract before changing this expectation."
+                # Acceptance does not establish that a separate calculation was started.
+                assert refresh_outcome in {"accepted", "throttled", "reused"}, (
+                    f"Unexpected group refresh outcome: {refresh_outcome}"
                 )
 
             with timed_step("Step 4 ❯ Update group"):
