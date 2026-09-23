@@ -44,11 +44,23 @@ def test_dps_device_type_reference_round_trip(provisioned_csr_issuance, command,
         created = create_result.as_json()
         assert created["deviceTypeRefs"] == [reference]
 
-        shown = cli.invoke(f"{target} show {enrollment_scope}").as_json()
+        shown = invoke_checked(
+            cli,
+            f"{target} show {enrollment_scope}",
+            description=f"Show semantic-reference DPS {command}",
+        ).as_json()
         assert shown["deviceTypeRefs"] == [reference]
 
-        cli.invoke(f"{target} update {enrollment_scope} --remove-device-type-ref")
-        shown = cli.invoke(f"{target} show {enrollment_scope}").as_json()
+        invoke_checked(
+            cli,
+            f"{target} update {enrollment_scope} --remove-device-type-ref",
+            description=f"Remove semantic-reference from DPS {command}",
+        )
+        shown = invoke_checked(
+            cli,
+            f"{target} show {enrollment_scope}",
+            description=f"Show cleared semantic-reference DPS {command}",
+        ).as_json()
         assert shown.get("deviceTypeRefs") in (None, [])
     finally:
         if enrollment_created:
