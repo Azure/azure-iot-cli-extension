@@ -48,10 +48,10 @@ def _observe_group_refresh(scenario, command):
         try:
             scenario.cmd(command)
         except HttpResponseError as error:
-            if error.status_code != 409 or getattr(error.error, "code", None) != "GroupRefreshRateLimited":
+            if error.status_code not in (409, 429) or getattr(error.error, "code", None) != "GroupRefreshRateLimited":
                 raise
             assert not evidence.acknowledgements, "Refresh failed after a conflicting service acknowledgement"
-            _log(LogKind.RESULT, "Refresh explicitly throttled: HTTP 409 GroupRefreshRateLimited")
+            _log(LogKind.RESULT, "Refresh explicitly throttled: HTTP %s GroupRefreshRateLimited", error.status_code)
             return "throttled"
         assert len(evidence.acknowledgements) == 1, "Refresh completed without a unique service acknowledgement"
         outcome, status = evidence.acknowledgements[0]

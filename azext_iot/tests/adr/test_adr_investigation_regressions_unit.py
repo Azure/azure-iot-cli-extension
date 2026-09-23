@@ -293,22 +293,32 @@ def test_group_refresh_acknowledgement_is_based_on_actual_initial_response(fixtu
     fixture_group_provider.client.groups.begin_refresh_members.assert_called_once()
 
 
-@pytest.mark.parametrize("code,outcome", [
-    ("GroupRefreshAlreadyInProgress", "reused"), ("GroupRefreshRateLimited", "throttled"),
+@pytest.mark.parametrize("status,code,outcome", [
+    (409, "GroupRefreshAlreadyInProgress", "reused"),
+    (409, "GroupRefreshRateLimited", "throttled"),
+    (429, "GroupRefreshRateLimited", "throttled"),
 ])
-def test_group_refresh_reuse_and_throttle_are_distinct_observable_cases(fixture_group_provider, code, outcome):
-    fixture_group_provider.client.groups.begin_refresh_members.side_effect = _refresh_error(409, code)
+def test_group_refresh_reuse_and_throttle_are_distinct_observable_cases(
+    fixture_group_provider, mocker, status, code, outcome,
+):
+    log = mocker.patch.object(groups, "_log")
+    fixture_group_provider.client.groups.begin_refresh_members.side_effect = _refresh_error(status, code)
     scenario = Mock()
     scenario.cmd.side_effect = lambda _text: fixture_group_provider.refresh("group", "ns", "rg", no_wait=True)
     assert groups._observe_group_refresh(scenario, "refresh") == outcome
     fixture_group_provider.client.groups.begin_refresh_members.assert_called_once()
     assert fixture_group_provider.client.groups.get.call_count == (1 if outcome == "reused" else 0)
+    if outcome == "throttled":
+        log.assert_called_once_with(
+            groups.LogKind.RESULT, "Refresh explicitly throttled: HTTP %s GroupRefreshRateLimited", status,
+        )
 
 
 @pytest.mark.parametrize("status,code,outcome", [
     (202, None, "accepted"), (204, None, "accepted"),
     (409, "GroupRefreshAlreadyInProgress", "reused"),
     (409, "GroupRefreshRateLimited", "throttled"),
+    (429, "GroupRefreshRateLimited", "throttled"),
 ])
 def test_generated_sdk_refresh_retains_service_acknowledgement(mocked_response, status, code, outcome):
     # Headerless 202 deliberately avoids launching a background async-status
@@ -331,6 +341,8 @@ def test_generated_sdk_refresh_retains_service_acknowledgement(mocked_response, 
 
 @pytest.mark.parametrize("error", [
     _refresh_error(400, "GroupRefreshRateLimited"), _refresh_error(409, "UnrelatedConflict"),
+    _refresh_error(429, "TooManyRequests"), _refresh_error(429, "AuthorizationFailed"),
+    _refresh_error(500, "GroupRefreshRateLimited"),
     _refresh_error(403, "AuthorizationFailed"), ServiceRequestError("transport"),
 ])
 def test_group_refresh_observation_propagates_real_failures_and_removes_handler(error):
@@ -352,10 +364,11 @@ def test_group_refresh_does_not_accept_exit_zero_without_unique_valid_evidence(e
         groups._observe_group_refresh(SimpleNamespace(cmd=command), "refresh")
 
 
-def test_group_refresh_conflicting_throttle_is_not_success():
+@pytest.mark.parametrize("status", [409, 429])
+def test_group_refresh_conflicting_throttle_is_not_success(status):
     def command(_text):
         groups.group_provider.logger.warning("ack", extra={"adr_group_refresh": ("reused", 409)})
-        raise _refresh_error(409, "GroupRefreshRateLimited")
+        raise _refresh_error(status, "GroupRefreshRateLimited")
     with pytest.raises(AssertionError, match="conflicting"):
         groups._observe_group_refresh(SimpleNamespace(cmd=command), "refresh")
 
