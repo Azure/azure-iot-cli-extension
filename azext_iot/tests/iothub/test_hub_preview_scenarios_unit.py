@@ -14,7 +14,7 @@ from shlex import split
 from types import SimpleNamespace
 
 import pytest
-from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.core.azclierror import ForbiddenError, InvalidArgumentValueError, UnauthorizedError
 from azure.cli.testsdk.base import CheckerMixin
 from azure.iot.device.common.transport_exceptions import NoConnectionError
 
@@ -127,7 +127,8 @@ def test_identity_scenario_executes_each_required_authentication(preview, mocker
         assert swap_index < enabled_index < module_index
 
 
-def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
+@pytest.fixture
+def pnp_scenario(preview, mocker):
     module, expected = preview
     scenario, calls = _scenario(mocker)
     scenario.generate_device_names.return_value = ["device"]
@@ -140,9 +141,16 @@ def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
     constructor = mocker.patch(
         "azure.iot.device.IoTHubDeviceClient.create_from_connection_string", return_value=client,
     )
+    runtime = SimpleNamespace(
+        module=module, expected=expected, scenario=scenario, calls=calls, client=client, constructor=constructor,
+        gateway="V2", failure=None, failure_phase="login", failure_component=False,
+    )
 
     def command(text):
         args = _arguments(text)
+        if args[2] == "show":
+            details = {"gatewayVersion": runtime.gateway} if runtime.gateway else {}
+            return _result({"properties": {"iotHubDetails": details}})
         if args[2] == "device-identity":
             return _result()
         action = args[3]
@@ -152,6 +160,12 @@ def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
             client.on_twin_desired_properties_patch_received({"thermostat1": {"targetTemperature": 22}})
             return _result()
         assert action == "invoke-command"
+        auth_phase = calls[-1][0]
+        targeted = auth_phase == runtime.failure_phase and ("--component-path" in args) == runtime.failure_component
+        if targeted and isinstance(runtime.failure, Exception):
+            raise runtime.failure
+        if runtime.gateway == "V2" and auth_phase == "login" and not (targeted and runtime.failure == "unexpected-success"):
+            raise UnauthorizedError({"Message": '{"errorCode":401002,"message":"Unauthorized access"}'})
         name = args[args.index("--cn") + 1]
         if "--component-path" in args:
             name = args[args.index("--component-path") + 1] + "*" + name
@@ -161,26 +175,78 @@ def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
         return _result({"status": response.status, "payload": response.payload})
 
     scenario.cmd.side_effect = command
+    return runtime
+
+
+@pytest.mark.parametrize("gateway", ["V2", "V1", None])
+def test_pnp_scenario_executes_each_required_authentication(pnp_scenario, gateway):
+    runtime = pnp_scenario
+    runtime.gateway = gateway
+    module, scenario, expected = runtime.module, runtime.scenario, runtime.expected
     method = module.TestHubPreview.test_responding_digital_twin
     method(scenario)
 
-    assert tuple(dict.fromkeys(phase for phase, _ in calls)) == expected
+    assert tuple(dict.fromkeys(phase for phase, _ in runtime.calls)) == expected
     for phase in expected:
-        commands = [text for auth, text in calls if auth == phase]
+        commands = [text for auth, text in runtime.calls if auth == phase]
         assert sum("digital-twin show" in text for text in commands) == 1
         assert sum("digital-twin update" in text for text in commands) == 1
         assert sum("digital-twin invoke-command" in text for text in commands) == 2
     timeout = next(mark for mark in method.pytestmark if mark.name == "timeout")
     assert timeout.args == (300 * len(expected),)
-    constructor.assert_called_once()
-    client.connect.assert_called_once()
-    client.shutdown.assert_called_once()
+    runtime.constructor.assert_called_once()
+    runtime.client.connect.assert_called_once()
+    runtime.client.shutdown.assert_called_once()
+    expected_responses = 2 * (len(expected) - (1 if gateway == "V2" else 0))
+    assert runtime.client.send_method_response.call_count == expected_responses
+
+
+@pytest.mark.parametrize("component", [False, True])
+@pytest.mark.parametrize("failure", [
+    UnauthorizedError({"Message": '{"errorCode":401003}'}),
+    UnauthorizedError({"Message": '{"errorCode":4010020}'}),
+    UnauthorizedError("401002 is only incidental text"),
+    ForbiddenError('{"errorCode":401002}'),
+    RuntimeError("transport failed"),
+    "unexpected-success",
+])
+def test_gwv2_login_only_accepts_documented_command_rejection(pnp_scenario, component, failure):
+    runtime = pnp_scenario
+    runtime.failure, runtime.failure_component = failure, component
+    expected = pytest.fail.Exception if failure == "unexpected-success" else (
+        AssertionError if isinstance(failure, UnauthorizedError) else type(failure)
+    )
+    with pytest.raises(expected):
+        runtime.module.TestHubPreview.test_responding_digital_twin(runtime.scenario)
+    runtime.client.shutdown.assert_called_once()
+
+
+@pytest.mark.parametrize("gateway,phase", [("V1", "login"), (None, "login"), ("V2", "key"), ("V2", "cstring")])
+def test_pnp_supported_command_authentication_still_requires_success(pnp_scenario, gateway, phase):
+    runtime = pnp_scenario
+    runtime.gateway = gateway
+    runtime.module.AUTH_TYPES = (phase,)
+    runtime.failure_phase = phase
+    runtime.failure = UnauthorizedError({"Message": '{"errorCode":401002}'})
+    with pytest.raises(UnauthorizedError):
+        runtime.module.TestHubPreview.test_responding_digital_twin(runtime.scenario)
+    runtime.client.shutdown.assert_called_once()
+
+
+def test_pnp_command_callback_failure_still_fails(pnp_scenario):
+    runtime = pnp_scenario
+    runtime.module.AUTH_TYPES = ("key",)
+    runtime.client.send_method_response.side_effect = RuntimeError("device response failed")
+    with pytest.raises(RuntimeError, match="device response failed"):
+        runtime.module.TestHubPreview.test_responding_digital_twin(runtime.scenario)
+    runtime.client.shutdown.assert_called_once()
 
 
 @pytest.mark.parametrize("failure", ["connect", "subscribe"])
 def test_pnp_initialization_failure_still_shuts_down(preview, mocker, failure):
     module, _ = preview
     scenario, _ = _scenario(mocker)
+    scenario.cmd.return_value = _result({"properties": {}})
     scenario.generate_device_names.return_value = ["device"]
     client = _ConnectedPnpClient(connected=False, connect=mocker.Mock(), shutdown=mocker.Mock())
     if failure == "connect":

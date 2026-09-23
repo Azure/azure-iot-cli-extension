@@ -13,8 +13,9 @@ from shlex import quote
 from threading import Event
 
 import pytest
-from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.core.azclierror import InvalidArgumentValueError, UnauthorizedError
 
+from azext_iot.common.shared import GatewayVersion
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
 from azext_iot.tests.iothub._sas_phase import AUTH_TYPES as SAS_AUTH_TYPES, enabled as sas_phase_enabled
 
@@ -94,6 +95,8 @@ class TestHubPreview(IoTLiveScenarioTest):
     def test_responding_digital_twin(self):
         from azure.iot.device import IoTHubDeviceClient, MethodResponse
 
+        hub = self.cmd(f"iot hub show -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        gateway = hub["properties"].get("iotHubDetails", {}).get("gatewayVersion")
         device = self.generate_device_names(1)[0]
         self.cmd(f"iot hub device-identity create -d {device} -n {self.entity_name} -g {self.entity_rg}")
         client = IoTHubDeviceClient.create_from_connection_string(
@@ -136,13 +139,20 @@ class TestHubPreview(IoTLiveScenarioTest):
                     (None, "reboot", 0), ("thermostat1", "getMaxMinReport", "2026-01-01T00:00:00Z"),
                 ):
                     component_flag = f"--component-path {component}" if component else ""
-                    result = command(
+                    invocation = (
                         f"iot hub digital-twin invoke-command --cn {name} {component_flag} "
                         f"--payload {quote(json.dumps(payload))} --cto 15 --rto 30"
-                    ).get_output_in_json()
+                    )
+                    # GatewayV2 rejects JWT before RBAC on both command routes (ADO 39719599).
+                    # Remove this expectation when supported; SAS and GatewayV1 must still succeed.
+                    if gateway == GatewayVersion.V2.value and auth_phase == "login":
+                        with pytest.raises(UnauthorizedError, match=r'"errorCode"\s*:\s*401002\b'):
+                            command(invocation)
+                    else:
+                        result = command(invocation).get_output_in_json()
+                        assert str(result["status"]) == "200"
+                        assert result["payload"] == {"method": f"{component}*{name}" if component else name, "received": payload}
                     if not failures.empty():
                         raise failures.get_nowait()
-                    assert str(result["status"]) == "200"
-                    assert result["payload"] == {"method": f"{component}*{name}" if component else name, "received": payload}
         finally:
             client.shutdown()
