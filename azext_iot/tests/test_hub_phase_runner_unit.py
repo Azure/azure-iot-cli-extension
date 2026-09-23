@@ -397,7 +397,8 @@ def test_hub_environment_refuses_conflicting_endpoint_before_child(tmp_path, key
 @pytest.mark.parametrize("subscription,group", [
     ("foreign", ownership.GROUP), (ownership.SUBSCRIPTION, "foreign"),
 ])
-def test_public_hub_scope_is_rejected_before_any_arm_or_output(tmp_path, subscription, group):
+def test_public_hub_scope_is_rejected_before_any_arm_or_output(monkeypatch, tmp_path, subscription, group):
+    monkeypatch.setattr(dps_runner, "require_linux", lambda: None)
     with pytest.raises(ValueError, match="authorized integration scope"):
         runner.run("HubData", subscription, group, "australiaeast", tmp_path / "phases", arm=Mock())
     assert not list(tmp_path.iterdir())
