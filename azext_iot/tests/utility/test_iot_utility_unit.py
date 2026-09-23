@@ -289,13 +289,12 @@ class TestEmbeddedCli(object):
         expected_count = 0 if (capture_stderr is None and init_capture_stderr) or capture_stderr else 1
         cli = EmbeddedCLI(cli_ctx, capture_stderr=init_capture_stderr)
 
-        if mocked_azclient.test_meta.error_code == 0 or expected_count == 1:
+        if mocked_azclient.test_meta.error_code != 1 or expected_count == 1:
             cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
         else:
             with pytest.raises(CLIError) as e:
                 cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
-            expected_message = "Generic Error" if mocked_azclient.test_meta.error_code == 1 else "exit code 2"
-            assert expected_message in str(e.value)
+            assert "Generic Error" in str(e.value)
 
         assert cli.az_cli.exception_handler.call_count == expected_count
 

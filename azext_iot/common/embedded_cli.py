@@ -24,8 +24,8 @@ class EmbeddedCLI(object):
     Attributes
     ----------
     output : str
-        The output of the last invoked cli command. If the last command failed or there were no runs,
-        will return ""
+        Captured output of the last invoked command, or "" before the first invocation.
+        Nonempty output does not imply that the command succeeded.
     error_code : int
         Error code of the last invoked cli command. If no runs, will be 0.
     az_cli : AzCli
@@ -50,7 +50,8 @@ class EmbeddedCLI(object):
         """
         Run a given command.
 
-        Note that if capture_stderr is True, any error during invocation will be raised.
+        With capture_stderr=True, recorded exceptions are raised. Nonzero exits without
+        an exception remain available through success() and raise_for_error().
 
         Parameters
         ----------
@@ -78,8 +79,7 @@ class EmbeddedCLI(object):
         capture = self.capture_stderr if capture_stderr is None else capture_stderr
         old_exception_handler = self.az_cli.exception_handler
         self.output = ""
-        self.error_code = 0
-        self.az_cli.result = None
+        self.error_code = 1
         if capture:
             self.az_cli.exception_handler = lambda _: 1
 
@@ -98,8 +98,9 @@ class EmbeddedCLI(object):
             self.output,
         )
 
-        if capture:
-            self.raise_for_error()
+        error = self.get_error()
+        if capture and isinstance(error, BaseException):
+            raise error
 
         return self
 

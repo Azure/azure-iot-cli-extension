@@ -7,6 +7,7 @@
 """Offline proofs for the account-profile race mitigation and its workflow lifetime."""
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
@@ -537,24 +538,25 @@ def _write_lifetime_refresh(mode):
         os.utime(cache, (time.time(), time.time()))
 
 
-@pytest.mark.parametrize("writer_mode", ["helper", "old-profile-login"])
-def test_long_lived_cli_store_reload_and_sdk_assertion_lifetime_match_old_login(configured, mocker, writer_mode):
+def _assert_lifetime_refresh(writer_mode):
     # pylint: disable=protected-access
+    configured = Path(os.environ["AZURE_CONFIG_DIR"]) / "azureProfile.json"
     before, stat = configured.read_bytes(), configured.stat()
     clock = [LIFETIME_START]
-    mocker.patch("time.time", side_effect=lambda: clock[0])
-    mocker.patch.object(Session, "save", side_effect=AssertionError("Lifetime proof must not write ACCOUNT"))
     data_scope = "https://iothubs.azure.net/.default"
     storage_scope = "https://storage.azure.com/.default"
-    with responses.RequestsMock() as remote:
+    with ExitStack() as patches, responses.RequestsMock() as remote:
+        patches.enter_context(patch("time.time", side_effect=lambda: clock[0]))
+        patches.enter_context(patch.object(Session, "save", side_effect=AssertionError("Lifetime proof must not write ACCOUNT")))
         posts = _lifetime_http(remote)
         auth.refresh()
         profile = _lifetime_profile()
+        assert profile.get_subscription() == json.loads(before.decode("utf-8-sig"))["subscriptions"][0]
         retained_sdk, _, _ = profile.get_login_credentials()
         assert retained_sdk.get_token(data_scope).token == f"offline-access-{data_scope}-1"
         store = identity.Identity._service_principal_store_instance
         token_cache = identity.Identity._msal_token_cache
-        load = mocker.spy(store._secret_store, "load")
+        load = patches.enter_context(patch.object(store._secret_store, "load", wraps=store._secret_store.load))
         assert store._entries[0]["client_assertion"] == "offline-assertion-1"
 
         # Expire both the assertion (10 min) and the consumer's tokens (60 min).
@@ -594,6 +596,28 @@ def test_long_lived_cli_store_reload_and_sdk_assertion_lifetime_match_old_login(
         ]
         assert identity.Identity._service_principal_store_instance is store
         assert identity.Identity._msal_token_cache is token_cache
+    assert configured.read_bytes() == before
+    assert configured.stat().st_mtime_ns == stat.st_mtime_ns
+
+
+@pytest.mark.parametrize("writer_mode", ["helper", "old-profile-login"])
+def test_long_lived_cli_store_reload_and_sdk_assertion_lifetime_match_old_login(configured, mocker, writer_mode):
+    # Other in-process CLI tests can wrap Profile.get_subscription. Prove that an
+    # unrelated user's account cannot replace the lifetime consumer's real SP.
+    foreign_account = mocker.patch.object(_profile.Profile, "get_subscription", return_value={
+        "id": "foreign", "tenantId": "offline", "user": {"name": "offline", "type": "user"},
+    })
+    before, stat = configured.read_bytes(), configured.stat()
+    code = (
+        "from azext_iot.tests.test_refresh_ci_auth_unit import _assert_lifetime_refresh\n"
+        f"_assert_lifetime_refresh({writer_mode!r})"
+    )
+    consumer = subprocess.run(
+        [sys.executable, "-c", code], cwd=ROOT, env=os.environ.copy(),
+        capture_output=True, text=True, timeout=45, check=False,
+    )
+    assert consumer.returncode == 0, consumer.stdout + consumer.stderr
+    foreign_account.assert_not_called()
     assert configured.read_bytes() == before
     assert configured.stat().st_mtime_ns == stat.st_mtime_ns
 

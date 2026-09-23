@@ -59,11 +59,12 @@ def test_capture_preserves_failure_exit_code_and_restores_handler(embedded):
     handler.assert_not_called()
 
 
-def test_capture_rejects_exit_failure_without_exception(embedded):
+def test_capture_preserves_nonzero_status_for_contextual_callers(embedded):
     cli, client = embedded
     client.invoke.return_value = 2
+    assert not cli.invoke("group show", capture_stderr=True).success()
     with pytest.raises(CLIInternalError, match="exit code 2"):
-        cli.invoke("group show", capture_stderr=True)
+        cli.raise_for_error()
 
 
 @pytest.mark.parametrize("capture", [False, True])
@@ -85,6 +86,7 @@ def test_unexpected_exception_restores_handler_and_closes_capture(embedded, capt
     assert client.exception_handler is handler
     assert streams[0].closed
     assert cli.output == "partial"
+    assert not cli.success()
 
 
 @pytest.mark.parametrize("code", [None, 0, 3])
@@ -110,7 +112,12 @@ def test_system_exit_preserves_result_and_restores_handler(embedded, code):
 def test_previous_error_is_not_reused_for_later_invocation(embedded):
     cli, client = embedded
     client.result = SimpleNamespace(error=CLIError("previous"))
-    client.invoke.return_value = 2
+
+    def invoke(_args, out_file):
+        client.result = SimpleNamespace(error=None)
+        return 2
+
+    client.invoke.side_effect = invoke
     cli.invoke("group show")
     assert cli.get_error() is None
     with pytest.raises(CLIInternalError, match="exit code 2"):
@@ -167,3 +174,22 @@ def test_endpoint_scenario_stops_at_first_failed_command(embedded):
         scenario["test_iot_eventhub_endpoint_lifecycle"](([hub], endpoint))
     assert raised.value is error
     client.invoke.assert_called_once()
+
+
+def test_real_cli_replaces_results_without_wrapper_mutation():
+    cli = EmbeddedCLI()
+    assert cli.invoke("version").success()
+    successful_result = cli.az_cli.result
+
+    assert not cli.invoke("version --invalid-embedded-regression-option").success()
+    assert cli.az_cli.result is not successful_result
+    error = cli.get_error()
+    assert isinstance(error, BaseException)
+    with pytest.raises(type(error)) as raised:
+        cli.as_json()
+    assert raised.value is error
+
+    failed_result = cli.az_cli.result
+    assert cli.invoke("version", capture_stderr=True).success()
+    assert cli.az_cli.result is not failed_result
+    assert cli.get_error() is None
