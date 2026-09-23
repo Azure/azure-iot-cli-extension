@@ -994,7 +994,16 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
         return {"id": "created"}
 
     invoke = mocker.patch.object(manager, "_invoke_json", side_effect=create)
-    manager.ensure(link_type, namespace, target, "ns-principal", "linked-principal")
+    manager.ensure(
+        link_type,
+        namespace,
+        target,
+        "ns-principal",
+        "linked-principal",
+        namespace_system_principal_id=(
+            "ns-system-principal" if link_type == "dps" else None
+        ),
+    )
 
     assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type])
     assert caplog.text.count("before updating the namespace") == 1
@@ -1005,6 +1014,9 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     assert f"{link_type.upper()} selected inbound MI -> {role} on namespace" in caplog.text
     assert "principalId=ns-principal" in caplog.text
     assert "principalId=linked-principal" in caplog.text
+    if link_type == "dps":
+        assert "namespace system-assigned MI -> Contributor on namespace" in caplog.text
+        assert "principalId=ns-system-principal" in caplog.text
     if link_type == "su":
         assert invoke.call_count == 2
         assert "ADU first-party" not in caplog.text
