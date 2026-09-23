@@ -160,9 +160,10 @@ def test_malformed_unrelated_endpoint_collections_prevent_retry_patch(mocker, co
     assert len(harness.patches) == 1 and not harness.clock.delays
     assert harness.created == [
         ("namespace-principal", "Contributor", KINDS["dps"][2]),
+        ("namespace-principal", "Contributor", NS_ID),
         ("target-principal", "Contributor", NS_ID),
     ]
-    assert len(harness.assignments) == 2
+    assert len(harness.assignments) == 3
 
 
 def test_json_object_allowlist_accepts_supported_properties_without_mutation():

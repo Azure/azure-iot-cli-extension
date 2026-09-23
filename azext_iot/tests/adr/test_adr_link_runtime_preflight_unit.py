@@ -222,6 +222,60 @@ def test_preflight_resolves_both_principals_and_runs_authoritative_rbac():
     ]
 
 
+def test_dps_preflight_assigns_namespace_system_identity_to_namespace():
+    provider = _provider()
+    dps_id = HUB_ID.replace(
+        "Microsoft.Devices/IotHubs/hub",
+        "Microsoft.Devices/provisioningServices/dps",
+    )
+    namespace = _namespace()
+    namespace["identity"]["type"] = "SystemAssigned,UserAssigned"
+    namespace["identity"]["userAssignedIdentities"] = {
+        UAMI: {"principalId": "namespace-outbound"}
+    }
+    namespace["properties"]["outboundIdentity"] = {
+        "type": "UserAssigned",
+        "userAssignedIdentity": UAMI,
+    }
+    provider._get_target = MagicMock(
+        return_value={
+            "id": dps_id,
+            "location": "centraluseuap",
+            "identity": {"type": "SystemAssigned", "principalId": "dps-principal"},
+            "properties": {"provisioningState": "Succeeded"},
+        }
+    )
+    provider._rbac = MagicMock()
+    strategy = TargetLookup(
+        factory=MagicMock(),
+        operation_group_name="iot_dps_resource",
+        name_parameter="resource_name",
+        display_name="DPS",
+    )
+
+    provider._preflight_link(
+        "dps",
+        namespace,
+        dps_id,
+        {"type": "SystemAssigned"},
+        {
+            "subscription_id": "target-sub",
+            "resource_group_name": "target-rg",
+            "name": "dps",
+        },
+        strategy,
+    )
+
+    provider._rbac.ensure.assert_called_once_with(
+        link_type="dps",
+        namespace_scope=NS_ID,
+        target_scope=dps_id,
+        namespace_principal_id="namespace-outbound",
+        namespace_system_principal_id="namespace-principal",
+        linked_principal_id="dps-principal",
+    )
+
+
 def test_rbac_manager_is_created_lazily():
     provider = _provider()
     with patch(

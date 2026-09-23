@@ -56,6 +56,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     ),
     "dps": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
+        RoleRule("namespace_system", CONTRIBUTOR_ROLE, "namespace"),
         RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
     ),
     "su": (
@@ -154,6 +155,23 @@ def resolve_namespace_outbound_principal(namespace: dict) -> str:
     return principal_id
 
 
+def resolve_namespace_system_principal(namespace: dict) -> str:
+    """Resolve the namespace system-assigned identity required by DPS registration."""
+    identity = (namespace or {}).get("identity") or {}
+    if not _identity_type_contains(identity, "SystemAssigned"):
+        raise InvalidArgumentValueError(
+            "The namespace requires a system-assigned identity for DPS "
+            "registry-device provisioning. Assign one and retry."
+        )
+    principal_id = identity.get("principalId")
+    if not principal_id:
+        raise AzureResponseError(
+            "The namespace system-assigned identity has no principalId yet. "
+            "Wait for identity provisioning and retry."
+        )
+    return principal_id
+
+
 def resolve_linked_resource_principal(
     resource: dict, inbound_identity: Optional[dict], display_name: str
 ) -> Optional[str]:
@@ -198,6 +216,7 @@ def resolve_linked_resource_principal(
 def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
+        "namespace_system": "namespace system-assigned MI",
         "linked": f"{link_type.upper()} selected inbound MI",
     }
     scopes = {"namespace": "namespace", "target": link_type.upper()}
@@ -311,6 +330,9 @@ class LinkRbacManager:
         """
         for request in requests:
             principals = {"namespace": request["namespace_principal_id"], "linked": request.get("linked_principal_id")}
+            principals["namespace_system"] = request.get(
+                "namespace_system_principal_id"
+            )
             scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
             for rule in LINK_ROLE_MATRIX[request["link_type"]]:
                 principal = principals[rule.principal]
@@ -454,6 +476,7 @@ class LinkRbacManager:
         target_scope: str,
         namespace_principal_id: str,
         linked_principal_id: Optional[str],
+        namespace_system_principal_id: Optional[str] = None,
     ) -> None:
         self.ensure_many(
             [
@@ -462,6 +485,7 @@ class LinkRbacManager:
                     "namespace_scope": namespace_scope,
                     "target_scope": target_scope,
                     "namespace_principal_id": namespace_principal_id,
+                    "namespace_system_principal_id": namespace_system_principal_id,
                     "linked_principal_id": linked_principal_id,
                 }
             ]
@@ -479,6 +503,9 @@ class LinkRbacManager:
                 )
             principals = {
                 "namespace": request["namespace_principal_id"],
+                "namespace_system": request.get(
+                    "namespace_system_principal_id"
+                ),
                 "linked": request.get("linked_principal_id"),
             }
             scopes = {
