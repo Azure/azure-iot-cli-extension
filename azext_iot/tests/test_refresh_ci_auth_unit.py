@@ -768,6 +768,8 @@ def test_workflow_supervision_never_masks_auth_or_test_failures(tmp_path, servic
         "mode = os.environ['OFFLINE_FAILURE']\n"
         "if '_refresh_ci_auth.py' not in sys.argv[1]:\n"
         "    assert Path('ready').exists(), 'Tests started before the refresher was ready'\n"
+        "    if os.environ['TEST_SERVICE'] == 'DPS':\n"
+        "        assert sys.argv[sys.argv.index('--arm-endpoint') + 1] == os.environ['TEST_ARM_ENDPOINT']\n"
         "    if mode == 'shutdown-timeout':\n"
         "        while not Path('test-cache.json').exists(): time.sleep(.01)\n"
         "    Path('tests-started').touch()\n"
@@ -808,7 +810,7 @@ def test_workflow_supervision_never_masks_auth_or_test_failures(tmp_path, servic
     env = dict(
         os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"], OFFLINE_FAILURE=failure,
         TEST_SERVICE=service, TEST_TOX_ENV=service + "-int", TEST_SUBSCRIPTION_ID=SUBSCRIPTION,
-        RESOURCE_GROUP="offline-rg", TEST_REGION="offline",
+        RESOURCE_GROUP="offline-rg", TEST_REGION="offline", TEST_ARM_ENDPOINT="https://management.azure.com",
     )
     try:
         result = subprocess.run(
