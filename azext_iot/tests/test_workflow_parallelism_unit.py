@@ -43,6 +43,7 @@ def _matrix(tmp_path, **overrides):
     step = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
     env = dict(
         os.environ, INPUT_SERVICES="auto", INPUT_PYTHON_VERSIONS="3.13", INPUT_REGIONS="centraluseuap",
+        INPUT_ARM_ENDPOINT="auto",
         RESOURCE_GROUP="cli-int-test-rg", TEST_SUBSCRIPTION_ID=SUBSCRIPTION,
         GITHUB_OUTPUT=str(tmp_path / "outputs"), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"),
         **{"INPUT_TEST_" + name: "false" for name in ("DPS", "HUB_CONTROL", "HUB_DATA", "ADU", "ADR")},
@@ -54,6 +55,43 @@ def _matrix(tmp_path, **overrides):
     path = Path(env["GITHUB_OUTPUT"])
     outputs = dict(line.split("=", 1) for line in path.read_text(encoding="utf-8").splitlines()) if path.exists() else {}
     return result, outputs
+
+
+@POSIX_WORKFLOW
+@pytest.mark.parametrize("region,mode", [
+    ("centraluseuap", "auto"), ("australiaeast", "auto"), ("westeurope", "auto"),
+    ("futurepublicregion", "auto"), ("westus3", "public"),
+    ("centraluseuap", "public"), ("centraluseuap", "canary"),
+])
+def test_full_requested_services_use_explicit_region_endpoint_pair_without_adu(tmp_path, region, mode):
+    result, outputs = _matrix(
+        tmp_path, INPUT_SERVICES="ADR,DPS,HubControl,HubData", INPUT_REGIONS=region, INPUT_ARM_ENDPOINT=mode,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = json.loads(outputs["matrix"])
+    assert {row["service"] for row in rows} == {"ADR", "DPS", "HubControl", "HubData"}
+    endpoint = ("https://centraluseuap.management.azure.com"
+                if mode == "canary" or (mode == "auto" and region == "centraluseuap") else "https://management.azure.com")
+    assert all(row["arm_endpoint"] == endpoint and row["region"] == region for row in rows)
+
+
+@POSIX_WORKFLOW
+@pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData"])
+@pytest.mark.parametrize("scope", [{"TEST_SUBSCRIPTION_ID": "foreign"}, {"RESOURCE_GROUP": "foreign"}])
+def test_public_matrix_rejects_unauthorized_scope(tmp_path, service, scope):
+    result, outputs = _matrix(tmp_path, INPUT_SERVICES=service, INPUT_REGIONS="australiaeast", **scope)
+    assert result.returncode != 0 and not outputs
+
+
+@POSIX_WORKFLOW
+@pytest.mark.parametrize("mode,regions", [
+    ("canary", "westeurope"), ("canary", "centraluseuap,australiaeast"),
+    ("https://management.azure.com.invalid", "westeurope"), ("unknown", "centraluseuap"),
+])
+def test_matrix_rejects_untrusted_selector_or_canary_region_mismatch(tmp_path, mode, regions):
+    result, outputs = _matrix(tmp_path, INPUT_SERVICES="DPS", INPUT_ARM_ENDPOINT=mode, INPUT_REGIONS=regions)
+    assert result.returncode != 0 and not outputs
+    assert "::error::" in result.stdout
 
 
 def test_flat_matrix_makes_all_combinations_concurrently_eligible_without_wrappers_or_locks():
@@ -92,6 +130,7 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
         assert declared["resource-group"]["default"] == "cli-int-test-rg"
         assert declared["regions"]["default"] == "centraluseuap"
         assert declared["python-versions"]["default"] == "3.13"
+        assert declared["arm-endpoint"]["default"] == "auto"
     assert public["permissions"] == {"contents": "read", "id-token": "write"}
     assert public["env"] == {
         "RESOURCE_GROUP": "${{ inputs['resource-group'] || 'cli-int-test-rg' }}",
@@ -102,14 +141,17 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
     }
     assert triggers["workflow_call"]["inputs"]["subscription-id"]["default"] == ""
     assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
+    assert triggers["workflow_call"]["inputs"]["arm-endpoint"]["type"] == "string"
     dispatch = triggers["workflow_dispatch"]["inputs"]
     assert dispatch["subscription-id"]["default"] == SUBSCRIPTION
+    assert dispatch["arm-endpoint"]["type"] == "choice"
+    assert dispatch["arm-endpoint"]["options"] == ["auto", "public", "canary"]
     for service in SERVICES:
         assert dispatch[f"test{service}"]["type"] == "boolean"
         assert dispatch[f"test{service}"]["default"] is True
     assert set(dispatch) == {
         *(f"test{service}" for service in SERVICES),
-        "python-versions", "regions", "resource-group", "subscription-id",
+        "python-versions", "regions", "resource-group", "subscription-id", "arm-endpoint",
     }
 
 
@@ -185,6 +227,7 @@ def test_subscription_resolution_is_shared_by_setup_and_direct_service_login(tmp
     ("ADR,DPS,ADU", "3.10,3.13", "centraluseuap,westus"),
     ("ADU,ADR", "3.13", "centraluseuap"),  # ADU has the same eligibility as the other services.
     ("HubControl,HubData,DPS,ADR", "3.13", "centraluseuap"),
+    ("HubControl,HubData,DPS,ADR", "3.13", "centraluseuap,westeurope,australiaeast"),
     ("ADR", "3.13", "centraluseuap"),
     ("ADU", "3.13", "centraluseuap"),
     ("ADU", "3.10,3.13", "centraluseuap,westus"),
@@ -282,6 +325,7 @@ def test_execution_and_result_shells_never_interpolate_raw_github_inputs():
     assert job["env"] == {
         "TEST_SERVICE": "${{ matrix.config.service }}", "TEST_TOX_ENV": "${{ matrix.config.tox_env }}",
         "TEST_PYTHON": "${{ matrix.config.python }}", "TEST_REGION": "${{ matrix.config.region }}",
+        "TEST_ARM_ENDPOINT": "${{ matrix.config.arm_endpoint }}",
     }
     login = next(step for step in job["steps"] if step["name"] == "Az CLI login")
     assert login["with"]["subscription-id"] == "${{ env.TEST_SUBSCRIPTION_ID }}"
@@ -313,7 +357,8 @@ def test_result_artifact_contract_keeps_phase_evidence_in_direct_jobs(tmp_path, 
         (result_dir / "failures.txt").write_text(failure + "\n")
     result = subprocess.run(
         ["bash", "-c", record["run"]], cwd=tmp_path, capture_output=True, text=True, timeout=15, check=False,
-        env=dict(os.environ, TEST_STATUS=status, TEST_SERVICE=service, TEST_PYTHON="3.13", TEST_REGION="centraluseuap"),
+        env=dict(os.environ, TEST_STATUS=status, TEST_SERVICE=service, TEST_PYTHON="3.13", TEST_REGION="centraluseuap",
+                 TEST_ARM_ENDPOINT="https://centraluseuap.management.azure.com"),
     )
     assert result.returncode == 0, result.stdout + result.stderr
     for field, value in {

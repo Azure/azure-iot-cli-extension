@@ -19,6 +19,7 @@ from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError
 
 from azext_iot import _factory
+from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.dps import _csr_registry as registry, _csr_issuance as csr
 from azext_iot.tests.dps import _phase_receipts as receipts, _phase_runtime as runtime
 from azext_iot.tests.dps.device_registration import test_iot_device_registration_int as scenario
@@ -378,6 +379,53 @@ def test_malformed_or_cross_scope_paging_fails_before_registration_intent(wire, 
         start(wire)
     assert wire.calls == [("GET", wire.namespace_id), ("GET", wire.collection)]
     assert not list(wire.directory.glob("csr-registry-intent-*.json"))
+
+
+@pytest.mark.parametrize("region,endpoint", [
+    ("centraluseuap", ARM),
+    ("australiaeast", "https://management.azure.com"),
+    ("centraluseuap", "https://management.azure.com"),
+])
+@pytest.mark.parametrize("continuation", ["same", "other", "foreign", "http", "fragment"])
+def test_registry_pagination_stays_on_selected_target(monkeypatch, region, endpoint, continuation):
+    monkeypatch.setenv("azext_iot_dps_test_location", region)
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", endpoint)
+    namespace_id = f"/subscriptions/{SUB}/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
+    collection = namespace_id + "/registryDevices"
+    next_endpoint = endpoint
+    if continuation == "other":
+        next_endpoint = "https://management.azure.com" if endpoint == ARM else ARM
+    elif continuation == "http":
+        next_endpoint = endpoint.replace("https:", "http:")
+    next_path = collection + ("/foreign" if continuation == "foreign" else "")
+    query = {"api-version": "2026-11-02-preview", "$skiptoken": "next"}
+    next_link = f"{next_endpoint}{next_path}?api-version={query['api-version']}&$skiptoken=next"
+    if continuation == "fragment":
+        next_link += "#foreign"
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
+        network.add(
+            responses.GET, endpoint + collection,
+            match=[responses.matchers.query_param_matcher({"api-version": query["api-version"]})],
+            json={"value": [], "nextLink": next_link},
+        )
+        network.add(
+            responses.GET, endpoint + collection,
+            match=[responses.matchers.query_param_matcher(query)],
+            json={"value": []},
+        )
+        with DeviceRegistryMgmtClient(credential, SUB, base_url=endpoint, retry_total=0) as client:
+            owner = registry.RegistryDeviceOwnership.__new__(registry.RegistryDeviceOwnership)
+            owner.namespace = {"id": namespace_id, "name": "ns", "resource_group": "rg"}
+            owner._client = client
+            if continuation == "same":
+                assert owner._list() == []
+                assert len(network.calls) == 2
+                assert all(call.request.url.startswith(endpoint + collection) for call in network.calls)
+            else:
+                with pytest.raises(AssertionError, match="pagination escaped"):
+                    owner._list()
+                assert len(network.calls) == 1
 
 
 @pytest.mark.parametrize("status", [400, 403, 500])

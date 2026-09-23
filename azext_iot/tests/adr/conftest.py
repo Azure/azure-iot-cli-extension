@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, Mock, create_autospec, patch
 
 import pytest
 
+from azext_iot.adr.endpoints import get_adr_arm_endpoint
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.adr.providers.certificate_authority import CertificateAuthorityProvider
 from azext_iot.adr.providers.certificate_policy import CertificatePolicyProvider
@@ -44,8 +45,8 @@ TEST_ARM_RESOURCE = os.getenv(
 )
 TEST_ARM_ENDPOINT = os.getenv(
     "azext_iot_adr_arm_endpoint",
-    f"https://{TEST_LOCATION}.management.azure.com",
-)
+    get_adr_arm_endpoint(),
+).rstrip("/").lower()
 PREFLIGHT_TIMEOUT_SECONDS = 60
 OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_update_instance_id",
@@ -100,6 +101,12 @@ def run_adr_integration_preflight(config):
     }:
         raise pytest.UsageError(
             "ADR integration tests require AZURE_TEST_RUN_LIVE=True."
+        )
+
+    if TEST_ARM_ENDPOINT.rstrip("/").lower() != get_adr_arm_endpoint():
+        raise pytest.UsageError(
+            "azext_iot_adr_arm_endpoint must match AZURE_IOT_ADR_ARM_ENDPOINT. "
+            "ADR test REST requests and production clients must use the same ARM endpoint."
         )
 
     _run_preflight_command(

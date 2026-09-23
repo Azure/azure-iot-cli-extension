@@ -57,14 +57,22 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
     nodeids = sorted(RUNNER["MANIFEST"]["expected_nodeids"](phase))
     count = len(nodeids)
     directory = Path(env["azext_iot_dps_phase_receipts"])
-    metadata = {"phase": phase, "run_uid": uid, "subscription": SUB}
+    subscription = env["azext_iot_dps_test_subscription"]
+    group = env["azext_iot_dps_test_resource_group"]
+    metadata = {"phase": phase, "run_uid": uid, "subscription": subscription,
+                "target": {"region": env["azext_iot_dps_test_location"],
+                           "endpoint": env["azext_iot_test_arm_endpoint"]}}
+    assert env["azext_iot_testhub_location"] == env["azext_iot_adr_location"] == metadata["target"]["region"]
+    assert env["azext_iot_adr_arm_endpoint"] == metadata["target"]["endpoint"]
+    assert env["AZURE_IOT_ADR_ARM_ENDPOINT"] == metadata["target"]["endpoint"]
     _json(directory / "started.json", dict(metadata, started=True))
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
     for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
         name = f"owned-{uid[:8]}-{kind}"
-        resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/" + name
+        resource_id = (f"/subscriptions/{subscription}/resourceGroups/{group}/providers/"
+                       + RUNNER["MANIFEST"]["resource_type"](kind) + "/" + name)
         _json(directory / f"owned-{kind}.json", dict(
-            metadata, kind=kind, name=name, resource_group=GROUP, id=resource_id, create_attempted=True,
+            metadata, kind=kind, name=name, resource_group=group, id=resource_id, create_attempted=True,
             tags={"intTest": "true", "runUid": uid if phase == "regular" else uid + "-" + phase, "kind": kind},
         ))
         _json(directory / f"created-{kind}.json", {"id": resource_id, "create_completed": True})
@@ -106,6 +114,86 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
         assert "UNSAFE_CAPTURED_CREDENTIAL" not in (folder / "junit.xml").read_text()
     with pytest.raises(FileExistsError):
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
+
+
+@pytest.mark.parametrize("damage", [None, "wrong-matrix", "wrong-target", "missing-target"])
+@pytest.mark.parametrize("region,endpoint", [
+    ("australiaeast", None), ("westeurope", None), ("centraluseuap", "https://management.azure.com"),
+])
+def test_public_dps_runs_all_phases_and_requires_matching_target_evidence(tmp_path, damage, region, endpoint):
+    from azext_iot.tests.test_workflow_results_unit import _result, EVALUATE, SUCCESSFUL_JOBS
+    target = RUNNER["TARGETS"]
+    assert RUN(target["SUBSCRIPTION"], target["RESOURCE_GROUP"], tmp_path / "dps-phases", Reader(0),
+               execute=_execution, region=region, endpoint=endpoint) == 0
+    assert not GATE(tmp_path, region, endpoint)
+    if damage is None:
+        combination = {
+            "service": "DPS", "python": "3.13", "region": region,
+            "arm_endpoint": target["target"](region, endpoint)["endpoint"],
+        }
+        _result(tmp_path, combination)
+        (tmp_path / "arm-endpoint.txt").write_text(combination["arm_endpoint"], encoding="utf-8")
+        assert not EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)[1]
+    if damage in ("wrong-target", "missing-target"):
+        path = tmp_path / "dps-phases/regular/receipts/owned-h.json"
+        data = json.loads(path.read_text())
+        data.pop("target")
+        if damage == "wrong-target":
+            data["target"] = target["target"]()
+        _json(path, data)
+    scheduled = target["target"]() if damage == "wrong-matrix" else target["target"](region, endpoint)
+    assert bool(GATE(tmp_path, **scheduled)) == bool(damage)
+
+
+@pytest.mark.parametrize("name,value", [
+    ("azext_iot_testhub_location", "centraluseuap"),
+    ("azext_iot_dps_test_location", "centraluseuap"),
+    ("azext_iot_test_arm_endpoint", RUNNER["ARM"]),
+    ("AZURE_IOT_ADR_ARM_ENDPOINT", RUNNER["ARM"]),
+    ("reader", RUNNER["TARGETS"]["target"]()),
+])
+def test_dps_public_preflight_rejects_ambient_or_reader_target_conflict(tmp_path, monkeypatch, name, value):
+    reader = Reader(0)
+    if name == "reader":
+        reader.target = value
+    else:
+        monkeypatch.setenv(name, value)
+    target = RUNNER["TARGETS"]
+    with pytest.raises(RUNNER["PhaseError"], match="target"):
+        RUN(target["SUBSCRIPTION"], target["RESOURCE_GROUP"], tmp_path / "phases", reader, region="australiaeast")
+    assert reader.inventories == 0 and not list(tmp_path.iterdir())
+
+
+def test_dps_cli_binds_reader_and_full_execution_to_the_same_public_target(monkeypatch, mocker):
+    targets = RUNNER["TARGETS"]
+    target = targets["target"]("australiaeast")
+    execute, reader = mocker.Mock(return_value=0), mocker.Mock()
+    mocker.patch.dict(RUNNER["main"].__globals__, run=execute, ArmReader=reader,
+                      require_linux=lambda: None, bounded_read=nullcontext)
+    monkeypatch.setattr(sys, "argv", [
+        "dps-controller", "--subscription", targets["SUBSCRIPTION"], "--resource-group", targets["RESOURCE_GROUP"],
+        "--region", "australiaeast", "--arm-endpoint", target["endpoint"],
+    ])
+    assert RUNNER["main"]() == 0
+    reader.assert_called_once_with(targets["SUBSCRIPTION"], **target)
+    execute.assert_called_once_with(
+        targets["SUBSCRIPTION"], targets["RESOURCE_GROUP"], "test-result/dps-phases", reader.return_value,
+        debug_phase=None, debug_nodes=None, **target,
+    )
+
+
+def test_dps_cli_rejects_noncentral_canary_clearly_before_reader(monkeypatch, mocker, capsys):
+    reader = mocker.Mock()
+    mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader)
+    monkeypatch.setattr(sys, "argv", [
+        "dps-controller", "--subscription", SUB, "--resource-group", GROUP, "--region", "westeurope",
+        "--arm-endpoint", RUNNER["ARM"],
+    ])
+    with pytest.raises(SystemExit) as error:
+        RUNNER["main"]()
+    assert error.value.code == 2
+    assert "Canary ARM requires region centraluseuap" in capsys.readouterr().err
+    reader.assert_not_called()
 
 
 @pytest.mark.parametrize("defect", ["cleanup", "reappeared", "many-foreign-resources"])
@@ -777,26 +865,29 @@ def test_reader_transport_refuses_mutations_wrong_subscription_and_non_canary(mo
     send.assert_not_called()
 
 
-def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker):
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast"])
+def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker, region):
     token = mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                          return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
-    reader = RUNNER["ArmReader"](SUB)
+    reader = RUNNER["ArmReader"](SUB, region=region)
     reader.dps._config.credential.get_token("ignored")  # pylint: disable=protected-access
     token.assert_called_once_with(subscription=SUB, resource="https://management.azure.com/")
     assert reader.dps._config.api_version == "2026-06-01-preview"  # pylint: disable=protected-access
     assert reader.hub._config.api_version == "2026-10-01-preview"  # pylint: disable=protected-access
     assert reader.adr._config.api_version == "2026-11-02-preview"  # pylint: disable=protected-access
+    assert reader.dps._config.base_url == RUNNER["TARGETS"]["target"](region)["endpoint"]
 
 
 @responses.activate
 @pytest.mark.parametrize("kind", ["csrdps", "csrhub", "csrns"])
 @pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
-def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind, platform):
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast", "westeurope"])
+def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind, platform, region):
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
     resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/owned"
-    responses.add(responses.GET, RUNNER["ARM"] + resource_id, status=404)
-    reader = RUNNER["ArmReader"](SUB)
+    responses.add(responses.GET, RUNNER["TARGETS"]["target"](region)["endpoint"] + resource_id, status=404)
+    reader = RUNNER["ArmReader"](SUB, region=region)
     # Exercise SDK routing on every OS; timer/platform enforcement has separate tests.
     bounded = mocker.Mock(side_effect=nullcontext)
     mocker.patch.dict(
@@ -852,3 +943,26 @@ def test_inventory_pagination_failure_is_not_partial_ownership_evidence_or_retri
         reader.inventory()
     assert len(responses.calls) == 2
     assert [read["status"] for read in reader.reads] == [200, 500]
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_public_start_receipt_mismatch_quarantines_before_cleanup_and_next_phase(tmp_path, missing):
+    targets = RUNNER["TARGETS"]
+    reader = Reader(0)
+
+    def execute(*args):
+        result = _execution(*args)
+        path = Path(args[1]["azext_iot_dps_phase_receipts"]) / "started.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.pop("target")
+        if not missing:
+            data["target"] = targets["target"]()
+        _json(path, data)
+        return result
+
+    assert RUN(targets["SUBSCRIPTION"], targets["RESOURCE_GROUP"], tmp_path / "dps-phases",
+               reader, execute=execute, region="australiaeast") == 1
+    summary = json.loads((tmp_path / "dps-phases.json").read_text(encoding="utf-8"))
+    assert [phase["status"] for phase in summary["phases"]] == ["failed", "blocked", "blocked"]
+    assert summary["phases"][0]["cleanup"]["remaining"]
+    assert not reader.gets

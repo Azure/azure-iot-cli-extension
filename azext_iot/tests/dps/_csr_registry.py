@@ -156,6 +156,7 @@ class RegistryDeviceOwnership:
 
     def _list(self):
         collection = self.namespace["id"] + "/registryDevices"
+        authority = urlsplit(receipts.target()["endpoint"]).netloc
 
         def validate_page(response):
             http = response.http_response
@@ -167,7 +168,7 @@ class RegistryDeviceOwnership:
             next_link = body.get("nextLink")
             if next_link:
                 url = urlsplit(next_link)
-                if (url.scheme != "https" or url.netloc != "centraluseuap.management.azure.com"
+                if (url.scheme != "https" or url.netloc != authority
                         or url.path.casefold() != collection.casefold() or url.fragment):
                     raise AssertionError("RegistryDevice pagination escaped the owned namespace.")
 

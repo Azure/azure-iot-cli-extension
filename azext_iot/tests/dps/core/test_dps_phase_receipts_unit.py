@@ -49,6 +49,41 @@ def test_receipts_are_optional_without_orchestration(monkeypatch):
     assert receipts.before_delete("name")
 
 
+@pytest.mark.parametrize("region", ["australiaeast", "westeurope", "centraluseuap"])
+@pytest.mark.parametrize("location", [None, "westus2", "requested"])
+def test_public_creation_and_cleanup_require_exact_resource_location(receipt_directory, monkeypatch, location, region):
+    from azext_iot.tests._integration_target import SUBSCRIPTION, RESOURCE_GROUP
+    monkeypatch.setenv(receipts.SUBSCRIPTION_ENV, SUBSCRIPTION)
+    monkeypatch.setenv(receipts.RESOURCE_GROUP_ENV, RESOURCE_GROUP)
+    monkeypatch.setenv("azext_iot_dps_test_location", region)
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", "https://management.azure.com")
+    if location == "requested":
+        location = "Australia East" if region == "australiaeast" else region
+    receipts.before_create("owned", RESOURCE_GROUP, UID, "h")
+    record = json.loads((receipt_directory / "owned-h.json").read_text())
+    resource = dict(record, properties={"provisioningState": "Succeeded"})
+    resource.pop("location")
+    if location:
+        resource["location"] = location
+    receipts.after_create("owned", resource)
+    created = json.loads((receipt_directory / "created-h.json").read_text())
+    valid = location not in (None, "westus2")
+    assert created["create_completed"] == valid
+    assert created["target"] == record["target"] == receipts.target()
+    if valid:
+        assert receipts.before_delete("owned", resource)
+    else:
+        with pytest.raises(RuntimeError, match="ownership"):
+            receipts.before_delete("owned", resource)
+
+
+def test_public_receipts_refuse_foreign_scope_before_any_write(receipt_directory, monkeypatch):
+    monkeypatch.setenv("azext_iot_dps_test_location", "australiaeast")
+    with pytest.raises(pytest.UsageError, match="authorized subscription"):
+        receipts.before_create("owned", "group", UID, "h")
+    assert not list(receipt_directory.iterdir())
+
+
 @pytest.mark.parametrize("phase,kind", [
     (phase, kind)
     for phase in (_phase.REGULAR, _phase.SERVICE_SAS, _phase.LOCAL_AUTH_TOGGLE)

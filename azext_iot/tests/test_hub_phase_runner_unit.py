@@ -99,6 +99,9 @@ def execute_factory(damage=None, handlers=None):
                 data["resources"][resource_id]["uncertain"] = True
             if damage == "cancel":
                 handlers[runner.signal.SIGTERM](None, None)
+        data["target"] = {
+            "region": env["azext_iot_testhub_location"], "endpoint": env["azext_iot_test_arm_endpoint"],
+        }
         ownership.write(path, data)
         if phase != "sas" and damage == "missing":
             Path(env["AZEXT_IOT_HUB_RECEIPT"]).unlink()
@@ -110,23 +113,29 @@ def execute_factory(damage=None, handlers=None):
     return execute, calls
 
 
-def run(tmp_path, suite="HubData", damage=None, reader=None):
+def run(tmp_path, suite="HubData", damage=None, reader=None, region="centraluseuap", endpoint=None):
     handlers = {}
     execute, calls = execute_factory(damage, handlers)
     # This helper uses only fake execution/ARM; never install real OS handlers.
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(dps_runner, "require_linux", lambda: None)
         patch.setattr(runner.signal, "signal", lambda sig, handler: handlers.setdefault(sig, handler))
-        result = runner.run(suite, ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, tmp_path / "phases",
-                            arm=reader or Reader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"})
+        result = runner.run(suite, ownership.SUBSCRIPTION, ownership.GROUP, region, tmp_path / "phases",
+                            arm=reader or Reader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
+                            endpoint=endpoint)
     return result, calls
 
 
 @pytest.mark.parametrize("suite", ["HubControl", "HubData"])
-def test_controller_success_and_stdlib_only_gate(tmp_path, suite):
-    result, calls = run(tmp_path, suite=suite)
+@pytest.mark.parametrize("region,endpoint", [
+    ("centraluseuap", None), ("australiaeast", None), ("westeurope", None),
+    ("centraluseuap", "https://management.azure.com"),
+])
+def test_controller_success_and_stdlib_only_gate(tmp_path, suite, region, endpoint):
+    result, calls = run(tmp_path, suite=suite, region=region, endpoint=endpoint)
     assert result == 0
     assert calls == [phase for phase, _ in runner.BUDGETS[suite]]
+    assert runner.evaluate_hub_phases(tmp_path / "phases", region=region, endpoint=endpoint)["passed"]
     script = (
         "import runpy,sys\n"
         "def guard(name, *args):\n"
@@ -320,7 +329,8 @@ def test_parent_cleanup_durable_intent_multiple_roots_and_no_sweep(tmp_path):
     assert not runner.cleanup_regular(reader, evidence, "uid", "entra", time.monotonic() + 30, path)["complete"]
 
 
-def test_process_scope_explicit_tokens_endpoint_and_restore(monkeypatch):
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast"])
+def test_process_scope_explicit_tokens_endpoint_and_restore(monkeypatch, region):
     import requests
     from azure.cli.core._profile import Profile
     token = Mock(return_value=("never-persist", None, None))
@@ -329,6 +339,9 @@ def test_process_scope_explicit_tokens_endpoint_and_restore(monkeypatch):
     monkeypatch.setattr(Profile, "get_raw_token", token)
     monkeypatch.setattr(Profile, "get_subscription", subscription)
     monkeypatch.setattr(requests.Session, "send", send)
+    target = runner.TARGETS["target"](region)
+    monkeypatch.setattr(ownership, "REGION", region)
+    monkeypatch.setattr(ownership, "ARM", target["endpoint"])
     scope = ownership.ProcessScope()
     scope.install()
     try:
@@ -343,12 +356,51 @@ def test_process_scope_explicit_tokens_endpoint_and_restore(monkeypatch):
         assert requests.Session().send(request) == "response"
         assert request.url.startswith(ownership.ARM)
         assert send.call_args.kwargs["allow_redirects"] is False
+        request = requests.Request("GET", "https://centraluseuap.management.azure.com" + PREFIX).prepare()
+        assert requests.Session().send(request) == "response"
+        assert request.url.startswith(target["endpoint"])
         with pytest.raises(ownership.OwnershipError):
             Profile.get_raw_token(object(), subscription="foreign")
     finally:
         scope.restore()
     assert Profile.get_raw_token is token and Profile.get_subscription is subscription
     assert requests.Session.send is send
+
+
+@pytest.mark.parametrize("phase", ["entra", "sas"])
+@pytest.mark.parametrize("damage", ["missing-target", "wrong-target", "wrong-matrix"])
+def test_public_hub_evidence_cannot_be_relabelled_or_qualify_another_target(tmp_path, phase, damage):
+    assert run(tmp_path, region="australiaeast")[0] == 0
+    folder = tmp_path / "phases"
+    if damage != "wrong-matrix":
+        path = folder / phase / "ownership.json"
+        data = runner.read_json(path)
+        data.pop("target")
+        if damage == "wrong-target":
+            data["target"] = runner.TARGETS["target"]()
+        ownership.write(path, data)
+    result = runner.evaluate_hub_phases(
+        folder, region="centraluseuap" if damage == "wrong-matrix" else "australiaeast",
+    )
+    assert not result["passed"]
+
+
+@pytest.mark.parametrize("key", ["azext_iot_test_arm_endpoint", "AZURE_IOT_ADR_ARM_ENDPOINT"])
+def test_hub_environment_refuses_conflicting_endpoint_before_child(tmp_path, key):
+    with pytest.raises(ValueError, match="scope"):
+        runner.environment(
+            {key: ownership.ARM}, "HubData", "entra", tmp_path, "uid",
+            ownership.SUBSCRIPTION, ownership.GROUP, region="australiaeast",
+        )
+
+
+@pytest.mark.parametrize("subscription,group", [
+    ("foreign", ownership.GROUP), (ownership.SUBSCRIPTION, "foreign"),
+])
+def test_public_hub_scope_is_rejected_before_any_arm_or_output(tmp_path, subscription, group):
+    with pytest.raises(ValueError, match="authorized integration scope"):
+        runner.run("HubData", subscription, group, "australiaeast", tmp_path / "phases", arm=Mock())
+    assert not list(tmp_path.iterdir())
 
 
 def test_parent_refuses_replaced_foreign_resource(tmp_path):
@@ -362,7 +414,8 @@ def test_parent_refuses_replaced_foreign_resource(tmp_path):
     assert reader.request.call_count == 1 and reader.request.call_args.args[0] == "GET"
 
 
-def test_ownership_plugin_installs_before_integration_imports(monkeypatch, tmp_path):
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast"])
+def test_ownership_plugin_installs_before_integration_imports(monkeypatch, tmp_path, region):
     monkeypatch.setattr(dps_runner, "require_linux", lambda: None)
     monkeypatch.setenv("AZEXT_IOT_HUB_SUITE", "HubData")
     monkeypatch.setenv("AZEXT_IOT_HUB_PHASE", "entra")
@@ -370,6 +423,8 @@ def test_ownership_plugin_installs_before_integration_imports(monkeypatch, tmp_p
     monkeypatch.setenv("AZEXT_IOT_HUB_RECEIPT", str(tmp_path / "pytest.json"))
     monkeypatch.setenv("AZEXT_IOT_HUB_OWNERSHIP", str(tmp_path / "owner.json"))
     monkeypatch.setenv("azext_iot_hub_auth_phase", "regular")
+    monkeypatch.setenv("azext_iot_testhub_location", region)
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", runner.TARGETS["target"](region)["endpoint"])
     monkeypatch.setattr(plugin, "validate_args", Mock())
     observer, scope = Mock(), Mock()
     monkeypatch.setattr(ownership, "Observer", Mock(return_value=observer))
@@ -379,7 +434,26 @@ def test_ownership_plugin_installs_before_integration_imports(monkeypatch, tmp_p
     plugin.pytest_load_initial_conftests(config, None, [])
     scope.install.assert_called_once()
     observer.install.assert_called_once()
-    assert config.add_cleanup.call_count == 2
+    assert ownership.REGION == region
+    assert config.add_cleanup.call_count == 3
+    for call in reversed(config.add_cleanup.call_args_list):
+        call.args[0]()
+    assert ownership.REGION == "centraluseuap"
+
+
+def test_hub_cli_endpoint_option_is_forwarded_without_changing_selection(monkeypatch):
+    execute = Mock(return_value=0)
+    monkeypatch.setattr(runner, "run", execute)
+    monkeypatch.setattr(sys, "argv", [
+        "hub-controller", "--suite", "HubData", "--subscription", ownership.SUBSCRIPTION,
+        "--resource-group", ownership.GROUP, "--region", "australiaeast",
+        "--arm-endpoint", "https://management.azure.com",
+    ])
+    assert runner.main() == 0
+    execute.assert_called_once_with(
+        "HubData", ownership.SUBSCRIPTION, ownership.GROUP, "australiaeast", "test-result/hub-phases",
+        debug_phase=None, debug_nodes=None, endpoint="https://management.azure.com",
+    )
 
 
 def test_observer_transport_tags_conditional_create_and_uncertain_no_replay(tmp_path, monkeypatch):
@@ -1079,3 +1153,21 @@ def test_same_name_generation_recreation_and_parent_cleanup(wire, tmp_path, dama
 def test_cli_envelope_parser_rejects_non_policy_or_non_json_templates(raw):
     with pytest.raises((ownership.OwnershipError, json.JSONDecodeError)):
         ownership.request_body(raw)
+
+
+def test_public_arm_routing_never_rewrites_hub_data_plane_endpoint(monkeypatch):
+    import requests
+    send = Mock(return_value="offline-response")
+    monkeypatch.setattr(requests.Session, "send", send)
+    monkeypatch.setattr(ownership, "ARM", "https://management.azure.com")
+    monkeypatch.setattr(ownership, "REGION", "australiaeast")
+    scope = ownership.ProcessScope()
+    scope.install()
+    try:
+        url = "https://unit.azure-devices.net/devices/unit?api-version=offline"
+        request = requests.Request("GET", url).prepare()
+        assert requests.Session().send(request) == "offline-response"
+        assert request.url == url
+        assert "allow_redirects" not in send.call_args.kwargs
+    finally:
+        scope.restore()

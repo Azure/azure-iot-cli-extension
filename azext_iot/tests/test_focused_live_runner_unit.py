@@ -990,7 +990,7 @@ def test_hub_debug_overrides_ambient_coverage_without_changing_full_mode(tmp_pat
 @pytest.mark.parametrize("ambient", ["", "ambient-coverage"])
 def test_dps_rejects_ambient_managed_coverage_before_inventory_or_execution(tmp_path, monkeypatch, debug, ambient):
     monkeypatch.setenv("azext_iot_dps_coverage_file", ambient)
-    reader, execute = Mock(reads=[]), Mock()
+    reader, execute = Mock(reads=[], target=dps.TARGETS["target"]()), Mock()
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(

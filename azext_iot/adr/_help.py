@@ -189,6 +189,12 @@ def load_adr_help():
     ] = """
   type: group
   short-summary: Manage Azure Device Registry (ADR) resources.
+  long-summary: |
+    ADR management clients default to https://centraluseuap.management.azure.com.
+    Set AZURE_IOT_ADR_ARM_ENDPOINT=https://management.azure.com to use public ARM
+    for ADR namespaces, Update Instances, and link-target management requests.
+    Resource location is configured separately with --location. Selecting public
+    ARM does not change API versions or retry unsupported operations against canary.
   """
 
     helps[

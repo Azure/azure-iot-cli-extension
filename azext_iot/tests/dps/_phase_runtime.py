@@ -30,7 +30,6 @@ from filelock import FileLock, Timeout as LockTimeout
 from azext_iot.tests.dps import _phase_receipts as receipts
 from azext_iot.tests.dps import _phase
 
-ARM_HOST = "centraluseuap.management.azure.com"
 _WRITE = ContextVar("owned_dps_fixture_write", default=None)
 _COMMAND = ContextVar("dps_cli_command_writes", default=None)
 _LINK_COMMAND = ContextVar("dps_native_adr_link_command", default=False)
@@ -99,6 +98,7 @@ class ScopedTransport(HttpTransport):
         self.inner = inner
         self.subscription = subscription
         self.authorization = authorization
+        self.target = receipts.target()
 
     def open(self):
         self.inner.open()
@@ -119,13 +119,17 @@ class ScopedTransport(HttpTransport):
     def send(self, request, **kwargs):
         fence = kwargs.pop(_FENCE, None)
         url = urlsplit(request.url)
-        if (url.scheme != "https" or url.netloc != ARM_HOST
+        if (url.scheme != "https" or url.netloc != urlsplit(self.target["endpoint"]).netloc
                 or not url.path.lower().startswith(f"/subscriptions/{self.subscription}/".lower())):
-            raise ScopeError("Orchestrated DPS management requests require the explicit subscription and canary ARM.")
+            raise ScopeError("Orchestrated DPS management requests require the explicit subscription and authorized ARM.")
         if request.method == "POST" and url.path.lower().endswith("/register"):
             raise ScopeError("Orchestrated DPS fixtures must not register resource providers.")
         if _is_write(request):
             _require_owned_path(url.path)
+            if request.method in ("PUT", "PATCH"):
+                body = json.loads(request.body) if request.body else {}
+                if "location" in body and not receipts.location_matches(body):
+                    raise ScopeError("ARM mutation location differs from the authorized DPS target.")
             if self.authorization and "/providers/microsoft.authorization/roleassignments/" not in url.path.lower():
                 raise ScopeError("Orchestrated RBAC writes are limited to owned-scope role assignments.")
             if not fence or fence["sent"]:
@@ -384,16 +388,15 @@ def activate(subscription, existing=()):
 
     resource_client = get_client_class(ResourceType.MGMT_RESOURCE_RESOURCES)
 
-    def sdk_init(original, authorization=False, canary=False):
+    def sdk_init(original, authorization=False):
         @wraps(original)
         def initialize(self, *args, **kwargs):
             check(kwargs.get("subscription_id", args[1] if len(args) > 1 else None))
-            if canary:
-                # Route this test client, not the shared CLI cloud/profile.
-                if len(args) > 2:
-                    args = (*args[:2], f"https://{ARM_HOST}", *args[3:])
-                else:
-                    kwargs["base_url"] = f"https://{ARM_HOST}"
+            # Route this test client, not the shared CLI cloud/profile.
+            if len(args) > 2:
+                args = (*args[:2], receipts.target()["endpoint"], *args[3:])
+            else:
+                kwargs["base_url"] = receipts.target()["endpoint"]
             kwargs["transport"] = ScopedTransport(
                 kwargs.get("transport") or RequestsTransport(), subscription, authorization=authorization,
             )
@@ -421,7 +424,6 @@ def activate(subscription, existing=()):
             stack.enter_context(patch.object(
                 client, "__init__", sdk_init(
                     client.__init__, authorization=client is AuthorizationManagementClient,
-                    canary=client in (AuthorizationManagementClient, resource_client),
                 ),
             ))
         yield

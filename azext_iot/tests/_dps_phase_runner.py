@@ -37,6 +37,7 @@ PHASES = (
 RUNNER_SECONDS = 140 * 60
 READ_SECONDS = 60
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
+TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 
 
@@ -191,9 +192,10 @@ def bounded_read_call(operation, deadline=None):
 
 
 class ArmReader:
-    """Current branch SDKs, explicit subscription/audience, GET-only canary transport."""
+    """Current branch SDKs, explicit subscription/audience, GET-only authorized ARM transport."""
 
-    def __init__(self, subscription):
+    def __init__(self, subscription, region="centraluseuap", endpoint=None):
+        self.target = TARGETS["target"](region, endpoint)
         sys.path.insert(0, str(ROOT))
         from azure.cli.core import get_default_cli
         from azure.cli.core._profile import Profile
@@ -220,9 +222,9 @@ class ArmReader:
             def send(self, request, **kwargs):
                 url = urlsplit(request.url)
                 if (request.method != "GET" or url.scheme != "https"
-                        or url.netloc != urlsplit(ARM).netloc
+                        or url.netloc != urlsplit(reader.target["endpoint"]).netloc
                         or not url.path.lower().startswith(f"/subscriptions/{subscription}/".lower())):
-                    raise PhaseError("Read-only canary ARM boundary rejected a request.")
+                    raise PhaseError("Read-only ARM boundary rejected a request.")
                 response = super().send(request, **kwargs)
                 reader.reads.append({
                     "at": utc(), "method": "GET", "host": url.netloc, "path": url.path,
@@ -239,7 +241,7 @@ class ArmReader:
 
         def client(kind, api):
             return kind(
-                Credential(), subscription, base_url=ARM, api_version=api,
+                Credential(), subscription, base_url=self.target["endpoint"], api_version=api,
                 credential_scopes=["https://management.azure.com/.default"],
                 transport=GetOnly(connection_timeout=5, read_timeout=20),
                 retry_total=0, retry_connect=0, retry_read=0, retry_status=0, logging_enable=False,
@@ -254,6 +256,7 @@ class ArmReader:
             raise PhaseError("ARM returned an incomplete resource; inventory/cleanup is not proven.")
         return {
             "id": resource["id"], "name": resource.get("name"),
+            "location": resource.get("location"),
             "state": (resource.get("properties") or {}).get("provisioningState"),
             "tags": {key: (resource.get("tags") or {}).get(key) for key in ("intTest", "runUid", "kind")},
         }
@@ -294,9 +297,11 @@ def inventory_ids(inventory):
     return sorted(ids)
 
 
-def ownership(receipts, phase, uid, subscription, group, baseline):
+def ownership(receipts, phase, uid, subscription, group, baseline, *, region="centraluseuap", endpoint=None):
+    target = TARGETS["target"](region, endpoint)
     started = json.loads((receipts / "started.json").read_text(encoding="utf-8"))
-    if not started.get("started") or started.get("run_uid") != uid or started.get("phase") != phase:
+    if (not TARGETS["matches"](started, target) or not started.get("started")
+            or started.get("run_uid") != uid or started.get("phase") != phase):
         raise PhaseError("Missing/mismatched phase-start receipt; cleanup cannot be proven.")
     records = []
     for path in sorted(receipts.glob("owned-*.json")):
@@ -307,7 +312,8 @@ def ownership(receipts, phase, uid, subscription, group, baseline):
             f"{MANIFEST['resource_type'](kind)}/{record.get('name')}"
         )
         expected_uid = uid if phase == "regular" else f"{uid}-{phase}"
-        if (kind not in MANIFEST["resource_kinds"](phase) or record.get("run_uid") != uid
+        if (not TARGETS["matches"](record, target)
+                or kind not in MANIFEST["resource_kinds"](phase) or record.get("run_uid") != uid
                 or record.get("phase") != phase or record.get("subscription") != subscription
                 or record.get("resource_group") != group or record.get("id") != expected_id
                 or record.get("tags") != {"intTest": "true", "runUid": expected_uid, "kind": kind}
@@ -530,8 +536,19 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
 
 
 def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *,
-        debug_phase=None, debug_nodes=None):
+        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None):
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
+    target = TARGETS["target"](region, endpoint)
+    TARGETS["public_scope"](subscription, group, **target)
+    if getattr(reader, "target", target) != target:
+        raise PhaseError("DPS reader does not match the requested target.")
+    for name, expected in (
+        ("azext_iot_testhub_location", region), ("azext_iot_dps_test_location", region),
+        (TARGETS["ENDPOINT_ENV"], target["endpoint"]),
+        ("AZURE_IOT_ADR_ARM_ENDPOINT", target["endpoint"]),
+    ):
+        if os.environ.get(name) and os.environ[name] != expected:
+            raise PhaseError("Conflicting ambient DPS target: " + name)
     phases = tuple(value for value in PHASES if not debug or value[0] == debug["phase"])
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)  # A rerun must not overwrite phase evidence.
@@ -544,7 +561,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
     reader.deadline = deadline
     summary = {
         "schema": 1, "status": "failed", "subscription": subscription, "resource_group": group,
-        "endpoint": ARM, "region": "centraluseuap", "started_at": utc(), "runner_seconds": runner_seconds,
+        **target, "started_at": utc(), "runner_seconds": runner_seconds,
         "phases": [{"name": name, "status": "blocked", "reason": "Not started",
                     **FOCUSED["provenance"](debug)} for name, _, _ in phases],
         **FOCUSED["provenance"](debug),
@@ -620,7 +637,11 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_dps_phase_receipts=str(receipts.resolve()),
                                    azext_iot_dps_test_subscription=subscription,
                                    azext_iot_dps_test_resource_group=group, azext_iot_testrg=group,
-                                   azext_iot_dps_test_location="centraluseuap", azext_iot_testhub_location="centraluseuap",
+                                   azext_iot_dps_test_location=region, azext_iot_testhub_location=region,
+                                   azext_iot_test_arm_endpoint=target["endpoint"],
+                                   AZURE_IOT_ADR_ARM_ENDPOINT=target["endpoint"],
+                                   azext_iot_adr_location=region, azext_iot_adr_arm_endpoint=target["endpoint"],
+                                   azext_iot_adr_arm_resource="https://management.azure.com",
                                    azext_iot_dps_workers="0" if debug or name == "local-auth-toggle" else "7",
                                    azext_iot_dps_junit=str(raw_junit))
                 if debug:
@@ -667,7 +688,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 except (OSError, ValueError, KeyError, TypeError, AttributeError, PhaseError):
                     result["results"] = {"valid": False, "reason": "Missing/invalid collection or JUnit results"}
                 try:
-                    records = ownership(receipts, name, uid, subscription, group, baseline_ids)
+                    records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
                     reader.deadline = min(execution["cleanup_deadline"], deadline)
                     result["cleanup"] = verify_cleanup(
                         reader, records, uid, reader.deadline, clock=clock,
@@ -720,7 +741,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--subscription", required=True)
     parser.add_argument("--resource-group", required=True)
-    parser.add_argument("--region", choices=["centraluseuap"], default="centraluseuap")
+    parser.add_argument("--region", default="centraluseuap")
+    parser.add_argument("--arm-endpoint")
     parser.add_argument("--output", default="test-result/dps-phases")
     FOCUSED["add_arguments"](parser)
     args = parser.parse_args()
@@ -730,14 +752,16 @@ def main():
     logging.getLogger("azure").setLevel(logging.ERROR)
     try:
         FOCUSED["select"]("DPS", args.debug_phase, args.debug_node)
+        target = TARGETS["target"](args.region, args.arm_endpoint)
+        TARGETS["public_scope"](args.subscription, args.resource_group, **target)
     except ValueError as error:
         parser.error(str(error))
     try:
         require_linux()  # Public entry: no profiles, credentials, ARM reads, output writes, or children before this.
         with bounded_read():
-            reader = ArmReader(args.subscription)
+            reader = ArmReader(args.subscription, **target)
         return run(args.subscription, args.resource_group, args.output, reader,
-                   debug_phase=args.debug_phase, debug_nodes=args.debug_node)
+                   debug_phase=args.debug_phase, debug_nodes=args.debug_node, **target)
     except Exception as error:
         diagnostic = str(error) if isinstance(error, PhaseError) else type(error).__name__
         print(f"[DPS phases] failed before launch: {diagnostic}", flush=True)

@@ -165,7 +165,10 @@ class Wire:
 
 
 @pytest.fixture
-def transport(tmp_path, monkeypatch):
+def transport(tmp_path, monkeypatch, request):
+    target = ownership.TARGETS["target"](getattr(request, "param", "centraluseuap"))
+    monkeypatch.setattr(ownership, "REGION", target["region"])
+    monkeypatch.setattr(ownership, "ARM", target["endpoint"])
     wire = Wire()
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send",
                         lambda _adapter, request, **kwargs: wire.send(request, **kwargs))
@@ -184,7 +187,24 @@ def create_hub(wire):
     wire.submit("PUT", HUB, {"location": ownership.REGION, "properties": {"disableLocalAuth": True}})
 
 
+@pytest.mark.parametrize("transport", ["australiaeast", "westeurope"], indirect=True)
+@pytest.mark.parametrize("location", ["requested", "centraluseuap"])
+def test_public_hub_create_requires_authorized_location_before_any_arm_request(transport, location):
+    observer, _, wire = transport
+    location = ownership.REGION if location == "requested" else location
+    body = {"location": location, "properties": {"disableLocalAuth": True}}
+    if location == ownership.REGION:
+        assert wire.submit("PUT", HUB, body).status_code == 200
+        assert observer.data["resources"][HUB]["resolved"]
+        assert wire.resources[HUB]["location"] == location
+    else:
+        with pytest.raises(ownership.OwnershipError, match="authorized region"):
+            wire.submit("PUT", HUB, body)
+        assert not wire.calls and not observer.data["resources"]
+
+
 @pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE", "POST"])
+@pytest.mark.parametrize("transport", ["centraluseuap", "australiaeast"], indirect=True)
 @pytest.mark.parametrize("failure", [503, 429, "connect", "read"])
 def test_azure_core_and_requests_do_not_retry_uncertain_arm_mutations(transport, monkeypatch, method, failure):
     observer, _, wire = transport
@@ -251,6 +271,7 @@ def test_retry_suppression_does_not_affect_reads_or_non_arm_clients(transport, m
 
 
 @pytest.mark.parametrize("status", [None, 408, 429, 503])
+@pytest.mark.parametrize("transport", ["centraluseuap", "australiaeast"], indirect=True)
 def test_uncertain_delete_absence_reconciles_cleanup_without_replay(transport, monkeypatch, status):
     observer, arm, wire = transport
     create_hub(wire)
@@ -272,7 +293,10 @@ def test_uncertain_delete_absence_reconciles_cleanup_without_replay(transport, m
         assert wire.submit("DELETE", HUB).status_code == status
     item = observer.data["resources"][HUB]
     assert item["uncertain"]
-    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 10, observer.path)
+    result = runner.cleanup_regular(
+        arm, observer.data, "uid", "regular", time.monotonic() + 10, observer.path,
+        region=ownership.REGION, endpoint=ownership.ARM,
+    )
     assert result["complete"] and result["absentIds"] == [HUB]
     assert [call[0] for call in wire.calls].count("DELETE") == 1
     assert item["mutations"][-1]["status"] == status
@@ -640,11 +664,14 @@ def test_worker_read_preserves_real_main_thread_interval_timer(transport, monkey
 
 
 @pytest.mark.parametrize("operation", ["test_all_routes", "test_route"])
+@pytest.mark.parametrize("transport", ["centraluseuap", "australiaeast", "westeurope"], indirect=True)
 def test_real_route_sdk_path_requires_current_exact_owned_hub(transport, operation):
     from azext_iot.sdk.iothub.mgmt import IotHubClient
     observer, _, wire = transport
     create_hub(wire)
-    client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM)
+    # Ordinary product factories still default to canary; the owned transport
+    # must route those generated requests to the explicitly selected endpoint.
+    client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url="https://centraluseuap.management.azure.com")
     test_route = getattr(client.iot_hub_resource, operation)
     assert test_route(HUB.rsplit("/", 1)[1], ownership.GROUP, input={"message": {"body": "{}"}}) == {"routes": []}
     assert len(observer.data["resources"][HUB]["mutations"]) == 1

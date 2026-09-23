@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import threading
 import time
 from urllib.parse import parse_qs, parse_qsl, urlsplit
@@ -20,6 +21,17 @@ AUDIENCE = "https://management.azure.com/"
 SUBSCRIPTION = "a386d5ea-ea90-441a-8263-d816368c84a1"
 GROUP = "cli-int-test-rg"
 REGION = "centraluseuap"
+TARGETS = runpy.run_path(str(Path(__file__).with_name("_integration_target.py")))
+ARM_HOSTS = {"management.azure.com", "centraluseuap.management.azure.com"}
+
+
+def configure_target(region="centraluseuap", endpoint=None):
+    global ARM, REGION
+    target = TARGETS["target"](region, endpoint)
+    ARM, REGION = target["endpoint"], target["region"]
+    return {"ARM": ARM, "REGION": REGION}
+
+
 OWNER_TAG = "azextHubRunId"
 ROOT_TYPES = {
     ("microsoft.devices", "iothubs"), ("microsoft.storage", "storageaccounts"),
@@ -387,6 +399,8 @@ def write(path, data):
 
 def ownership_errors(data, run_id, phase):
     errors = []
+    if not TARGETS["matches"](data, {"region": REGION, "endpoint": ARM}):
+        errors.append("ownership target mismatch")
     if (data.get("schemaVersion") != 1 or data.get("runId") != run_id
             or data.get("phase") != phase or not data.get("installed")):
         errors.append("missing/mismatched observer receipt")
@@ -551,6 +565,7 @@ class Observer:
         self.lock = threading.RLock()
         self.data = {
             "schemaVersion": 1, "runId": run_id, "phase": phase,
+            "target": {"region": REGION, "endpoint": ARM},
             "installed": False, "resources": {}, "violations": [],
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -914,7 +929,7 @@ class Observer:
             mutation = method in ("PUT", "PATCH", "DELETE") or (
                 method == "POST" and parsed.path.casefold().rstrip("/").endswith(("/generateverificationcode", "/verify"))
             )
-            if parsed.hostname in ("management.azure.com", urlsplit(ARM).hostname) and mutation:
+            if parsed.hostname in ARM_HOSTS and mutation:
                 # urllib3's adapter is below Azure Core's retry loop. Disable
                 # both layers before dispatch, including retries of transport
                 # errors. GET/read-only POST and non-ARM clients retain their
@@ -929,7 +944,7 @@ class Observer:
 
         def send(session, request, **kwargs):
             parsed = urlsplit(request.url)
-            is_arm = parsed.hostname in ("management.azure.com", urlsplit(ARM).hostname)
+            is_arm = parsed.hostname in ARM_HOSTS
             if not is_arm:
                 return owner.original_send(session, request, **kwargs)
             # Change only this process's ARM request destination, not Azure cloud defaults.
@@ -1042,7 +1057,7 @@ class Observer:
 
 
 class ProcessScope:
-    """Subscription/token scope and canary endpoint, in memory only, also for SAS."""
+    """Subscription/token scope and authorized endpoint, in memory only, also for SAS."""
 
     def install(self):
         import requests
@@ -1060,7 +1075,7 @@ class ProcessScope:
         def token(profile, resource=None, scopes=None, subscription=None, *args, **kwargs):
             if subscription and subscription.casefold() != SUBSCRIPTION:
                 raise OwnershipError("Foreign token subscription override")
-            arm_hosts = {"management.azure.com", "management.core.windows.net", urlsplit(ARM).hostname}
+            arm_hosts = ARM_HOSTS | {"management.core.windows.net"}
             if scopes and all(urlsplit(value).hostname in arm_hosts for value in scopes):
                 resource, scopes = None, [AUDIENCE + ".default"]
             elif not scopes and (resource is None or urlsplit(resource).hostname in arm_hosts):
@@ -1069,11 +1084,9 @@ class ProcessScope:
 
         def send(session, request, **kwargs):
             parsed = urlsplit(request.url)
-            if parsed.path.casefold().startswith("/subscriptions/") and parsed.hostname not in (
-                "management.azure.com", urlsplit(ARM).hostname,
-            ):
+            if parsed.path.casefold().startswith("/subscriptions/") and parsed.hostname not in ARM_HOSTS:
                 raise OwnershipError("Unapproved ARM endpoint")
-            if parsed.hostname in ("management.azure.com", urlsplit(ARM).hostname):
+            if parsed.hostname in ARM_HOSTS:
                 request.url = ARM + parsed.path + ("?" + parsed.query if parsed.query else "")
                 kwargs["allow_redirects"] = False
             return scope.send(session, request, **kwargs)

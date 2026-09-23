@@ -43,11 +43,19 @@ ARM = "https://centraluseuap.management.azure.com"
 
 
 @pytest.fixture
-def scope(tmp_path, monkeypatch, mocker):
+def scope(tmp_path, monkeypatch, mocker, request):
+    region = getattr(request, "param", "centraluseuap")
+    target = receipts.arm_target(region)
+    group = "group"
+    if target["endpoint"] == "https://management.azure.com":
+        monkeypatch.setattr(sys.modules[__name__], "SUB_B", RUNNER["TARGETS"]["SUBSCRIPTION"])
+        group = RUNNER["TARGETS"]["RESOURCE_GROUP"]
+    monkeypatch.setenv("azext_iot_dps_test_location", region)
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", target["endpoint"])
     monkeypatch.setenv(receipts.DIRECTORY_ENV, str(tmp_path))
     monkeypatch.setenv(receipts.RUN_UID_ENV, UID)
     monkeypatch.setenv(receipts.SUBSCRIPTION_ENV, SUB_B)
-    monkeypatch.setenv(receipts.RESOURCE_GROUP_ENV, "group")
+    monkeypatch.setenv(receipts.RESOURCE_GROUP_ENV, group)
     monkeypatch.setenv("azext_iot_dps_test_phase", "regular")
     credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("fake-unit-token", 9999999999))
     mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
@@ -60,8 +68,9 @@ def _client(factory_name):
 
 
 def _owned(kind):
-    receipts.before_create("owned", "group", UID, kind)
-    return ARM + f"/subscriptions/{SUB_B}/resourceGroups/group/providers/{resource_type(kind)}/owned"
+    group = os.environ[receipts.RESOURCE_GROUP_ENV]
+    receipts.before_create("owned", group, UID, kind)
+    return receipts.target()["endpoint"] + f"/subscriptions/{SUB_B}/resourceGroups/{group}/providers/{resource_type(kind)}/owned"
 
 
 @pytest.mark.parametrize("determinant", [False, True])
@@ -110,6 +119,7 @@ def test_cleanup_progress_survives_closed_pytest_capture(scope, monkeypatch, det
 ])
 @pytest.mark.parametrize("method", ["PUT", "DELETE"])
 @pytest.mark.parametrize("failure", ["read-timeout", "504"])
+@pytest.mark.parametrize("scope", ["centraluseuap", "australiaeast"], indirect=True)
 def test_real_factory_pipeline_never_resends_uncertain_owned_mutation(scope, factory_name, kind, method, failure):
     url = _owned(kind)
     if failure == "read-timeout":
@@ -119,6 +129,7 @@ def test_real_factory_pipeline_never_resends_uncertain_owned_mutation(scope, fac
     responses.add(method, url, status=200, json={})  # A forbidden retry would consume this and appear successful.
     with runtime.activate(SUB_B):
         client = _client(factory_name)
+        assert client._config.base_url == receipts.target()["endpoint"]
         with runtime.owned_write("owned", method):
             if failure == "read-timeout":
                 with pytest.raises(ServiceResponseError):
@@ -126,6 +137,49 @@ def test_real_factory_pipeline_never_resends_uncertain_owned_mutation(scope, fac
             else:
                 assert client.send_request(HttpRequest(method, url)).status_code == 504
     assert len(responses.calls) == 1
+
+
+@responses.activate
+@pytest.mark.parametrize("scope", ["australiaeast", "westeurope"], indirect=True)
+@pytest.mark.parametrize("location", ["requested", "centraluseuap"])
+def test_public_factory_validates_actual_resource_region_before_transport(scope, location):
+    location = receipts.target()["region"] if location == "requested" else location
+    url = _owned("nh")
+    responses.add("PUT", url, status=200, json={})
+    with runtime.activate(SUB_B):
+        client = _client("iot_service_provisioning_factory")
+        request = HttpRequest("PUT", url.removeprefix(receipts.target()["endpoint"]))
+        request.set_json_body({"location": location})
+        with runtime.owned_write("owned", "PUT"):
+            if location == receipts.target()["region"]:
+                assert client.send_request(request).status_code == 200
+            else:
+                with pytest.raises(runtime.ScopeError, match="location"):
+                    client.send_request(request)
+    assert len(responses.calls) == (1 if location == receipts.target()["region"] else 0)
+
+
+@pytest.mark.parametrize("scope", ["australiaeast"], indirect=True)
+@pytest.mark.parametrize("url", [
+    "https://centraluseuap.management.azure.com/subscriptions/foreign/providers/Microsoft.Devices/provisioningServices",
+    "https://management.azure.com/subscriptions/foreign/providers/Microsoft.Devices/provisioningServices",
+])
+def test_public_transport_rejects_other_arm_host_or_subscription(scope, mocker, url):
+    inner = mocker.Mock()
+    transport = runtime.ScopedTransport(inner, SUB_B)
+    with pytest.raises(runtime.ScopeError, match="authorized ARM"):
+        transport.send(HttpRequest("GET", url))
+    inner.send.assert_not_called()
+
+
+@pytest.mark.parametrize("scope", ["australiaeast"], indirect=True)
+def test_positional_sdk_endpoint_is_pinned_to_selected_public_target(scope):
+    from azext_iot.sdk.dps.mgmt import IotDpsClient
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline", 9999999999))
+    with runtime.activate(SUB_B):
+        client = IotDpsClient(credential, SUB_B, ARM)
+        assert client._config.base_url == "https://management.azure.com"
+        client.close()
 
 
 @responses.activate

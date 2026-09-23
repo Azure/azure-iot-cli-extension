@@ -841,6 +841,9 @@ def test_sequential_scenario_exercises_combined_command_without_helper_recovery(
     scenario.cleanup_full_infra.assert_called_once()
 
 
+@pytest.mark.parametrize("arm_endpoint", [
+    "https://centraluseuap.management.azure.com", "https://management.azure.com",
+])
 @pytest.mark.parametrize("registered_hubs,projection,hub_overrides,expected_failure", [
     ([], [], {}, None),
     ([{"hostName": "classic.azure-devices.net"}], [{"hostName": "classic.azure-devices.net"}], {}, None),
@@ -867,7 +870,7 @@ def test_sequential_scenario_exercises_combined_command_without_helper_recovery(
     }, None),
 ])
 def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
-    monkeypatch, registered_hubs, projection, hub_overrides, expected_failure,
+    monkeypatch, arm_endpoint, registered_hubs, projection, hub_overrides, expected_failure,
 ):
     scenario = Mock()
     scenario.setup_full_infra.return_value = {"identity_resource_id": UAMI_ID}
@@ -877,6 +880,7 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
     monkeypatch.setattr(link_scenarios, "generate_adr_namespace_name", lambda: "ns")
     monkeypatch.setattr(link_scenarios, "generate_dps_name", lambda: "dps")
     monkeypatch.setattr(link_scenarios, "generate_hub_name", Mock(side_effect=["primary", "secondary", "tertiary"]))
+    monkeypatch.setattr(link_scenarios, "TEST_ARM_ENDPOINT", arm_endpoint)
     events = []
     monkeypatch.setattr(
         link_scenarios, "link_dps_with_readiness", lambda *_args: events.append("dps ready"),
@@ -895,7 +899,7 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         if text.startswith("rest "):
             assert shlex.split(text) == [
                 "rest", "--method", "get", "--url",
-                f"{link_scenarios._ADR_CANARY_ARM_ENDPOINT}{DPS_ID}?api-version={link_scenarios._ADR_DPS_API_VERSION}",
+                f"{arm_endpoint}{DPS_ID}?api-version={link_scenarios._ADR_DPS_API_VERSION}",
                 "--resource", link_scenarios.TEST_ARM_RESOURCE,
             ]
             return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
