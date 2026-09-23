@@ -26,7 +26,8 @@ CONTROLLER_ENV = (
     "azext_iot_dps_test_subscription", "azext_iot_dps_test_resource_group",
 )
 LEGACY_DPS_EXPRESSION = (
-    "_int.py and not test_register_and_issue_certificate_contract and not test_register_without_csr_deadline_contract"
+    "_int.py and not test_register_and_issue_certificate_contract and not test_register_without_csr_deadline_contract "
+    "and not test_dps_device_type_reference_round_trip"
 )
 
 
@@ -159,16 +160,21 @@ def test_ado_legacy_script_runs_once_preserves_pins_and_propagates_pytest_exit(t
     assert arguments[arguments.index("-k") + 1] == LEGACY_DPS_EXPRESSION
 
 
-@pytest.mark.parametrize("legacy", [False, True], ids=["all-four-controller-cases", "legacy-excludes-all-four"])
-def test_real_registration_collection_respects_legacy_controller_boundary(tmp_path, legacy):
+@pytest.mark.parametrize("legacy", [False, True], ids=["all-six-controller-cases", "legacy-excludes-all-six"])
+def test_controller_owned_collection_respects_legacy_boundary(tmp_path, legacy):
     command = next(line for line in _script().splitlines() if line.strip().startswith("pytest "))
     arguments = shlex.split(command)
     expression = arguments[arguments.index("-k") + 1]
-    prefix = "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py"
+    registration_prefix = "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py"
+    semantic_prefix = "azext_iot/tests/dps/test_iot_dps_semantic_model_int.py"
+    prefixes = (registration_prefix, semantic_prefix)
     expected = {
-        f"{prefix}::{name}[{option}]"
+        f"{registration_prefix}::{name}[{option}]"
         for name in ("test_register_without_csr_deadline_contract", "test_register_and_issue_certificate_contract")
         for option in ("default", "deadline")
+    } | {
+        f"{semantic_prefix}::test_dps_device_type_reference_round_trip[{kind}]"
+        for kind in ("individual", "group")
     }
     manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
     regular = manifest["expected_nodeids"]("regular")
@@ -176,7 +182,7 @@ def test_real_registration_collection_respects_legacy_controller_boundary(tmp_pa
     assert len(regular) == 37 and required <= regular
     matcher = Expression.compile(expression)
     retained = {node for node in regular if matcher.evaluate(lambda keyword, node=node: keyword.lower() in node.lower())}
-    assert retained == regular - required and len(retained) == 33
+    assert retained == regular - required and len(retained) == 31
     assert len(manifest["expected_nodeids"]("service-sas")) == 29
     assert len(manifest["expected_nodeids"]("local-auth-toggle")) == 3
 
@@ -209,11 +215,14 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[ControllerFixtureContract()]))
     )
     result = subprocess.run(
         [sys.executable, "-B", "-c", script, "-c", str(config), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
-         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", expression if legacy else "_int.py", prefix],
+         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", expression if legacy else "_int.py", *prefixes],
         cwd=ROOT, env=environment, capture_output=True, text=True, timeout=60, check=False,
     )
     assert result.returncode == (5 if legacy else 0), result.stdout + result.stderr
-    selected = {line for line in result.stdout.splitlines() if line.startswith(prefix + "::")}
+    selected = {
+        line for line in result.stdout.splitlines()
+        if line.startswith(tuple(prefix + "::" for prefix in prefixes))
+    }
     assert selected == (set() if legacy else expected)
 
 

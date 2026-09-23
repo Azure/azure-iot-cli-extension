@@ -155,7 +155,6 @@ def test_device_type_reference_update_wire(service, group, kwargs, expected):
     assert json.loads(service.calls[-1].request.body)["deviceTypeRefs"] == expected
 
 
-@pytest.mark.parametrize("group", [False, True])
 @pytest.mark.parametrize(("kwargs", "error"), [
     ({"device_type_ref": ""}, InvalidArgumentValueError),
     (
@@ -163,10 +162,9 @@ def test_device_type_reference_update_wire(service, group, kwargs, expected):
         MutuallyExclusiveArgumentError,
     ),
 ])
-def test_invalid_device_type_reference_update(group, kwargs, error):
-    prefix = "iot_dps_device_enrollment_group" if group else "iot_dps_device_enrollment"
+def test_invalid_device_type_reference(kwargs, error):
     with pytest.raises(error):
-        getattr(dps, prefix + "_update")(None, enrollment_id="test", **kwargs)
+        dps._get_device_type_refs(**kwargs)
 
 
 @pytest.mark.parametrize("supplied", [
