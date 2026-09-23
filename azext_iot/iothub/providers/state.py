@@ -194,6 +194,15 @@ def _endpoint_resource_name(endpoint_uri: str) -> str:
     return (urlparse(endpoint_uri).hostname or "").split(".")[0]
 
 
+def _has_endpoint_arm_scope(endpoint, endpoint_type, *, credentials, require_resource_group=True):
+    """Require the lookup's own ARM scope rather than falling back to the Hub's scope."""
+    if endpoint.get("subscriptionId") and (not require_resource_group or endpoint.get("resourceGroup")):
+        return True
+    message = usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG if credentials else usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG
+    logger.warning(message.format(endpoint_type, endpoint["name"]))
+    return False
+
+
 class StateProvider(IoTHubProvider):
     def __init__(
         self,
@@ -781,6 +790,9 @@ class StateProvider(IoTHubProvider):
         for ep in endpoints.get("cosmosDBSqlContainers", []):
             account_name = _endpoint_resource_name(ep["endpointUri"])
             if ep.get("primaryKey") or ep.get("secondaryKey"):
+                if not _has_endpoint_arm_scope(ep, "Cosmos DB Sql Collection", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 try:
                     cosmos_keys = cli.invoke(
                         "cosmosdb keys list --name {} --resource-group {} --type connection-strings --subscription {}".format(
@@ -809,6 +821,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Cosmos DB Sql Collection", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 success = cli.invoke(
                     "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
                     "--name {} --subscription {}".format(
@@ -833,6 +848,9 @@ class StateProvider(IoTHubProvider):
         eventhub_endpoints = []
         for ep in endpoints["eventHubs"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Event Hub", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -858,6 +876,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Event Hub", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "eventhubs eventhub show --namespace-name {} --resource-group {} "
@@ -879,6 +900,9 @@ class StateProvider(IoTHubProvider):
         servicebus_queue_endpoints = []
         for ep in endpoints["serviceBusQueues"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Service Bus Queue", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -904,6 +928,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Service Bus Queue", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus queue show --namespace-name {} --resource-group {} "
@@ -925,6 +952,9 @@ class StateProvider(IoTHubProvider):
         servicebus_topic_endpoints = []
         for ep in endpoints["serviceBusTopics"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Service Bus Topic", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -952,6 +982,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Service Bus Topic", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus topic show --namespace-name {} --resource-group {} "
@@ -975,6 +1008,9 @@ class StateProvider(IoTHubProvider):
         storage_endpoints = []
         for ep in endpoints["storageContainers"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Storage Container", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_storage_container_connection_string(ep["connectionString"])
                 try:
                     ep["connectionString"] = cli.invoke(
@@ -998,6 +1034,10 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                # Account show resolves the globally unique name within the explicit subscription.
+                if not _has_endpoint_arm_scope(ep, "Storage Container", credentials=False, require_resource_group=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 account_name = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "storage account show --name {} --subscription {}".format(
