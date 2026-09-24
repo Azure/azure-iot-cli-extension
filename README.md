@@ -115,6 +115,7 @@ Group
 
 Subgroups:
     ca                      : Manage certificate authorities for a Device Registry namespace.
+    device                  : Manage Registry Devices in a Device Registry namespace.
     group                   : Manage Device Registry namespace groups.
     identity                : Manage identities assigned to a Device Registry namespace.
     job                     : Manage Device Registry namespace jobs.
@@ -136,8 +137,10 @@ Commands:
 `az iot adr ns` is a cloud-only surface. Asset, discovered-asset, discovered-device,
 and management-endpoint resources require an Azure IoT Operations custom location
 and live in the `azure-iot-ops` extension under `az iot ops ns`. Namespace Device
-and Registry Device commands are not exposed in this preview. Groups and jobs
-retain the backend `RegistryDevice` group type.
+commands are not exposed in this preview. Cloud Registry Device commands are
+available under `az iot adr ns device` for create, show, list, update, delete, and
+wait operations, with `auth`, `attribute`, and `capability` subgroups. Groups and
+jobs retain the backend `RegistryDevice` group type.
 Use `az iot adr ns migrate --resource-ids ...` only to move existing legacy assets
 into a namespace.
 
