@@ -310,11 +310,11 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     assert len(mutations) == 8
     assert "iot dps identity assign" in mutations[1]
     assert "iot hub identity assign" in mutations[2]
-    assert mutations[3].startswith("iot adr ns link add ")
-    assert "--timeout 1200 --interval 10" in mutations[3]
-    assert "--dps-system-assigned-mi" in mutations[3] and "--hub-system-assigned-mi" in mutations[3]
-    assert mutations[4].startswith("role assignment create ")
-    assert f'--assignee-object-id "{NAMESPACE_PRINCIPAL}"' in mutations[4]
+    assert mutations[3].startswith("role assignment create ")
+    assert f'--assignee-object-id "{NAMESPACE_PRINCIPAL}"' in mutations[3]
+    assert mutations[4].startswith("iot adr ns link add ")
+    assert "--timeout 1200 --interval 10" in mutations[4]
+    assert "--dps-system-assigned-mi" in mutations[4] and "--hub-system-assigned-mi" in mutations[4]
     assert "--type Root" in mutations[5]
     assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[6]
     assert "--validity-days 30" in mutations[7]
@@ -384,6 +384,9 @@ def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namesp
         csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
     assert sum(failed in command for command in namespace_commands.commands) == 1
     assert not namespace_commands.resources
+    assert not namespace_commands.roles
+    if failed == "iot adr ns link add":
+        assert sum("role assignment delete" in command for command in namespace_commands.commands) == 1
     assert not any("link update" in command for command in namespace_commands.commands)
 
 

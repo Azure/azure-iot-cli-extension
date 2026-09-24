@@ -311,6 +311,8 @@ def _create_namespace(run_uid, kind, dps, hub):
             ).as_json()
             assert (identity["identity"] if kind_name == "dps" else identity)["principalId"]
 
+        # Journal the fixture-owned grant first so automatic link RBAC reuses it.
+        role_ready_at = _grant_namespace_self_role(name)
         linked = invoke(
             f"iot adr ns link add --ns {name} -g {fixtures.ENTITY_RG} "
             f"--dps-endpoint-name dps --dps-id {dps['dps']['id']} --dps-system-assigned-mi "
@@ -318,7 +320,6 @@ def _create_namespace(run_uid, kind, dps, hub):
             f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
         ).as_json()
         _assert_linked(linked, dps, hub)
-        role_ready_at = _grant_namespace_self_role(name)
 
         record = receipts._owned(name)  # pylint: disable=protected-access
         for label, command, arguments, child_path, options in _children(name):
