@@ -161,8 +161,9 @@ def test_malformed_unrelated_endpoint_collections_prevent_retry_patch(mocker, co
     assert harness.created == [
         ("namespace-principal", "Contributor", KINDS["dps"][2]),
         ("target-principal", "Contributor", NS_ID),
+        ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
     ]
-    assert len(harness.assignments) == 2
+    assert len(harness.assignments) == 3
 
 
 def test_json_object_allowlist_accepts_supported_properties_without_mutation():
@@ -365,11 +366,15 @@ def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_w
         return _result([{"id": "existing-assignment"}] if assignment in raced else [])
 
     cli.invoke.side_effect = invoke
-    manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "namespace-principal", "dps-principal")
+    manager.ensure(
+        "dps", NS_SCOPE, TARGET_SCOPE, "namespace-principal", "dps-principal",
+        namespace_system_principal_id="namespace-system",
+    )
 
     assert raced == [
         ("namespace-principal", "Contributor", TARGET_SCOPE),
         ("dps-principal", "Contributor", NS_SCOPE),
+        ("namespace-system", "Azure Device Registry Administrator", NS_SCOPE),
     ]
     assert reads == raced * 2  # Initial preflight then one race verification per role.
     assert not clock.delays

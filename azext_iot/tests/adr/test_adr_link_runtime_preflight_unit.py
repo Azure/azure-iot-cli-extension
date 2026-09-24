@@ -236,6 +236,88 @@ def test_rbac_manager_is_created_lazily():
 @pytest.mark.parametrize("outbound_uami", [False, True])
 @pytest.mark.parametrize("inbound_uami", [False, True])
 @pytest.mark.parametrize("authorized", [False, True])
+def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
+    mocker, operation, outbound_uami, inbound_uami, authorized,
+):
+    provider = _provider()
+    namespace = _namespace()
+    namespace["identity"]["type"] = "SystemAssigned,UserAssigned"
+    namespace["identity"]["userAssignedIdentities"] = {UAMI: {"principalId": "namespace-user"}}
+    if outbound_uami:
+        namespace["properties"]["outboundIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI}
+    dps_id = HUB_ID.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.Devices/provisioningServices/dps")
+    if operation == "update":
+        namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
+            "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": dps_id,
+            "inboundCallerIdentity": {"type": "SystemAssigned"},
+        }}}
+    provider.client.namespaces.get.return_value = namespace
+    target = _hub()
+    target["id"] = dps_id
+    provider._get_target = MagicMock(return_value=target)
+    manager = LinkRbacManager(provider.cmd.cli_ctx, cli=MagicMock())
+    provider._rbac = manager
+    mocker.patch.object(manager, "_assignment_exists", return_value=False)
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    visible = mocker.patch.object(manager, "_wait_for_assignments")
+    grants = mocker.patch.object(manager, "_invoke_json")
+    kwargs = {"mi_user_assigned": UAMI} if inbound_uami else {"mi_system_assigned": True}
+    if operation == "add":
+        kwargs["dps_resource_id"] = dps_id
+    invoke = getattr(provider, f"dps_{operation}")
+    if not authorized:
+        with pytest.raises(AzureResponseError, match="No link mutation"):
+            invoke("dps", "ns", "ns-rg", **kwargs)
+        grants.assert_not_called()
+        visible.assert_not_called()
+        provider.client.namespaces.begin_update.assert_not_called()
+        return
+    invoke("dps", "ns", "ns-rg", no_wait=True, **kwargs)
+    outbound = "namespace-user" if outbound_uami else "namespace-principal"
+    inbound = "hub-user" if inbound_uami else "hub-system"
+    assert [call.args[0] for call in grants.call_args_list] == [
+        f"role assignment create --assignee-object-id '{outbound}' "
+        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{dps_id}'",
+        f"role assignment create --assignee-object-id '{inbound}' "
+        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{NS_ID}'",
+        "role assignment create --assignee-object-id 'namespace-principal' "
+        f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' --scope '{NS_ID}'",
+    ]
+    assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "ns-sub", "ns-sub"]
+    visible.assert_called_once_with([
+        (outbound, "Contributor", dps_id), (inbound, "Contributor", NS_ID),
+        ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
+    ])
+    provider.client.namespaces.begin_update.assert_called_once()
+
+
+@pytest.mark.parametrize("missing", ["system-type", "system-principal"])
+def test_dps_outbound_uami_cannot_hide_missing_namespace_system_identity(missing):
+    provider = _provider()
+    namespace = _namespace()
+    namespace["identity"]["type"] = "SystemAssigned,UserAssigned"
+    namespace["identity"]["userAssignedIdentities"] = {UAMI: {"principalId": "namespace-user"}}
+    namespace["properties"]["outboundIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI}
+    if missing == "system-type":
+        namespace["identity"]["type"] = "UserAssigned"
+    else:
+        namespace["identity"].pop("principalId")
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = MagicMock(return_value=_hub())
+    provider._rbac = MagicMock()
+    dps_id = HUB_ID.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.Devices/provisioningServices/dps")
+    error_type = InvalidArgumentValueError if missing == "system-type" else AzureResponseError
+    with pytest.raises(error_type, match="system-assigned identity"):
+        provider.dps_add("dps", "ns", "ns-rg", dps_id, mi_system_assigned=True)
+    provider._rbac.ensure.assert_not_called()
+    provider.client.namespaces.begin_update.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["add", "update"])
+@pytest.mark.parametrize("outbound_uami", [False, True])
+@pytest.mark.parametrize("inbound_uami", [False, True])
+@pytest.mark.parametrize("authorized", [False, True])
 def test_su_runtime_uses_exact_two_roles_for_selected_identities(
     mocker, operation, outbound_uami, inbound_uami, authorized,
 ):

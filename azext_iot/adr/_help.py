@@ -691,6 +691,10 @@ def load_adr_help():
     Rejected if the namespace already has a linked DPS (one DPS per namespace).
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided.
     Required service-to-service roles: {format_role_requirements("dps")}.
+    The namespace must also have a system-assigned identity. It receives Azure Device Registry
+    Administrator on its own namespace for registry-device provisioning, even when the
+    namespace outbound identity is user-assigned. No role is granted to the signed-in caller;
+    DPS enrollment management with --auth-type login requires separate DPS data-plane access.
     The command reuses inherited assignments and automatically creates only missing assignments
     when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
     stops before namespace mutation and prints exact remediation commands. A newly created
@@ -720,6 +724,8 @@ def load_adr_help():
     Update checks target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
+    DPS preflight also ensures the namespace system-assigned identity has Azure Device Registry
+    Administrator on its own namespace, independently of the namespace outbound identity.
     ARM assignment visibility does not guarantee that the linked service already honors access.
     Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds

@@ -704,6 +704,13 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     monkeypatch.setattr(link_scenarios, "link_hub_with_readiness", hub_readiness)
 
     def command(text):
+        if text.startswith("iot adr ns show "):
+            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+        if text.startswith("role assignment list "):
+            assert "--assignee-object-id namespace-system" in text
+            assert "--role 'Azure Device Registry Administrator'" in text
+            assert f"--scope '{NS_ID}'" in text
+            return _output([{"id": "self-role"}] if dps_readiness.called else [])
         if text.startswith("iot dps show "):
             return _output({"id": DPS_ID})
         if text.startswith("iot adr ns link dps wait "):
@@ -889,6 +896,13 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         events.append(text)
         if "linked-hub" in text:
             raise AssertionError("The namespace-linked DPS Hub list is read-only")
+        if text.startswith("iot adr ns show "):
+            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+        if text.startswith("role assignment list "):
+            assert "--assignee-object-id namespace-system" in text
+            assert "--role 'Azure Device Registry Administrator'" in text
+            assert f"--scope '{NS_ID}'" in text
+            return _output([{"id": "self-role"}] if "dps ready" in events else [])
         if text.startswith("iot dps show "):
             return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
         if text.startswith("rest "):

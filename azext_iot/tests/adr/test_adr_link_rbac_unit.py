@@ -24,6 +24,7 @@ from azure.core.credentials import AccessToken
 from azure.mgmt.authorization import AuthorizationManagementClient
 
 from azext_iot.adr.rbac import (
+    ADR_ADMINISTRATOR_ROLE,
     ADR_CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
     LINK_ROLE_IDS,
@@ -116,13 +117,21 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
             ("namespace", "IoT Hub Data Contributor", "target"),
             ("linked", "Contributor", "namespace"),
         ],
-        "dps": [("namespace", "Contributor", "target"), ("linked", "Contributor", "namespace")],
+        "dps": [
+            ("namespace", "Contributor", "target"),
+            ("linked", "Contributor", "namespace"),
+            ("namespace_system", "Azure Device Registry Administrator", "namespace"),
+        ],
         "su": [
             ("namespace", "Contributor", "target"),
             ("linked", "Azure Device Registry Contributor", "namespace"),
         ],
     }
     assert ADR_CONTRIBUTOR_ROLE == "Azure Device Registry Contributor"
+    assert LINK_ROLE_IDS[ADR_ADMINISTRATOR_ROLE] == "12675fd7-7f59-493f-9201-f7944860a2f1"
+    assert "namespace system-assigned MI -> Azure Device Registry Administrator on namespace" in (
+        format_role_requirements("dps")
+    )
     assert format_role_requirements("su") == (
         "namespace outbound MI -> Contributor on SU; "
         "SU selected inbound MI -> Azure Device Registry Contributor on namespace"
@@ -528,18 +537,24 @@ def test_rbac_unauthorized_fails_with_exact_remediation_before_create():
         _result([]),
         _result([]),
         _result([]),
+        _result([]),
     ]
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
     with pytest.raises(AzureResponseError) as raised:
         manager.ensure(
-            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal",
+            namespace_system_principal_id="ns-system",
         )
 
     message = str(raised.value)
     assert "No link mutation was submitted" in message
     assert "--assignee-object-id 'ns-principal'" in message
     assert "--assignee-object-id 'dps-principal'" in message
+    assert (
+        "--assignee-object-id 'ns-system' --assignee-principal-type ServicePrincipal "
+        f"--role 'Azure Device Registry Administrator' --scope '{NS_SCOPE}'"
+    ) in message
     assert not any(
         "role assignment create" in call.args[0]
         for call in cli.invoke.call_args_list
@@ -553,7 +568,7 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment(token_profi
 
     def acquire_token(**_):
         # Both service plans must be read before checking caller privileges.
-        assert cli.invoke.call_count == 5
+        assert cli.invoke.call_count == 6
         return ("Bearer", _access_token("reader-object-id"), {}), "sub", "tenant"
 
     raw_token.side_effect = acquire_token
@@ -569,6 +584,7 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment(token_profi
             "target_scope": dps_scope,
             "namespace_principal_id": "ns-principal",
             "linked_principal_id": "dps-principal",
+            "namespace_system_principal_id": "ns-system",
         },
         {
             "link_type": "hub",
@@ -774,6 +790,7 @@ def test_missing_current_assignee_stops_before_privilege_checks(token_profile):
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
+        _result([]),
     ]
     token_profile.return_value.get_raw_token.return_value = (
         ("Bearer", "not-a-jwt", {}), "sub", "tenant"
@@ -782,7 +799,8 @@ def test_missing_current_assignee_stops_before_privilege_checks(token_profile):
 
     with pytest.raises(AzureResponseError, match="signed-in principal"):
         manager.ensure(
-            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal",
+            namespace_system_principal_id="ns-system",
         )
 
 
@@ -791,6 +809,7 @@ def test_rbac_creation_failure_lists_remaining_commands():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
+        _result([{"id": "existing-self-role"}]),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         RuntimeError("authorization changed"),
@@ -799,7 +818,8 @@ def test_rbac_creation_failure_lists_remaining_commands():
 
     with pytest.raises(AzureResponseError, match="before namespace mutation") as raised:
         manager.ensure(
-            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal",
+            namespace_system_principal_id="ns-system",
         )
     assert "--assignee-object-id 'ns-principal'" in str(raised.value)
 
@@ -810,6 +830,7 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(caplog):
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
+        _result([{"id": "existing-self-role"}]),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         RuntimeError("assignment already exists"),
@@ -820,7 +841,8 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(caplog):
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
     manager.ensure(
-        "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+        "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal",
+        namespace_system_principal_id="ns-system",
     )
 
     creates = [
@@ -949,7 +971,10 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
         return {"id": "created"}
 
     invoke = mocker.patch.object(manager, "_invoke_json", side_effect=create)
-    manager.ensure(link_type, namespace, target, "ns-principal", "linked-principal")
+    manager.ensure(
+        link_type, namespace, target, "ns-principal", "linked-principal",
+        namespace_system_principal_id="ns-system",
+    )
 
     assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type])
     assert caplog.text.count("before updating the namespace") == 1
@@ -960,6 +985,9 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     assert f"{link_type.upper()} selected inbound MI -> {role} on namespace" in caplog.text
     assert "principalId=ns-principal" in caplog.text
     assert "principalId=linked-principal" in caplog.text
+    if link_type == "dps":
+        assert "namespace system-assigned MI -> Azure Device Registry Administrator on namespace" in caplog.text
+        assert "principalId=ns-system" in caplog.text
     if link_type == "su":
         assert invoke.call_count == 2
         assert "ADU first-party" not in caplog.text
@@ -977,10 +1005,14 @@ def test_no_automatic_grant_notice_when_no_creation_can_occur(mocker, caplog, al
     caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
 
     if already_assigned:
-        manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+        manager.ensure(
+            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal", namespace_system_principal_id="ns-system",
+        )
     else:
         with pytest.raises(AzureResponseError, match="No link mutation was submitted"):
-            manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+            manager.ensure(
+                "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal", namespace_system_principal_id="ns-system",
+            )
 
     invoke.assert_not_called()
     assert "before updating the namespace" not in caplog.text
@@ -995,7 +1027,9 @@ def test_partial_assignment_failure_reports_completed_and_remaining_requests(moc
     wait = mocker.patch.object(manager, "_wait_for_assignments")
 
     with pytest.raises(AzureResponseError) as raised:
-        manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+        manager.ensure(
+            "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal", namespace_system_principal_id="ns-system",
+        )
 
     completed, remaining = str(raised.value).split("Complete these exact remediation commands")
     assert "Assignment requests completed before the failure" in completed
@@ -1015,3 +1049,78 @@ def test_rbac_rejects_unknown_link_type_and_failed_cli_command():
     manager.cli.invoke.return_value = _result({}, success=False)
     with pytest.raises(AzureResponseError, match="preflight"):
         manager._invoke_json("account show")
+
+
+@pytest.mark.parametrize("operation", ["ensure_many", "verify_many"])
+@pytest.mark.parametrize("principal", [None, ""])
+def test_dps_rbac_cannot_skip_missing_namespace_system_principal(operation, principal):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    request = {
+        "link_type": "dps", "namespace_scope": NS_SCOPE, "target_scope": TARGET_SCOPE,
+        "namespace_principal_id": "outbound-uami", "linked_principal_id": "dps-principal",
+        "namespace_system_principal_id": principal,
+    }
+    kwargs = {"guard": MagicMock()} if operation == "verify_many" else {}
+    with pytest.raises(AzureResponseError, match="namespace system-assigned principalId"):
+        getattr(manager, operation)([request], **kwargs)
+    manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("existing,authorized", [(True, False), (False, True), (False, False)])
+def test_dps_self_role_is_exact_reused_and_privilege_gated(mocker, existing, authorized):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    assignment = ("namespace-system", ADR_ADMINISTRATOR_ROLE, NS_SCOPE)
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    lookup = mocker.patch.object(
+        manager, "_assignment_exists", side_effect=lambda *args: existing or args != assignment,
+    )
+    privilege = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    invoke = mocker.patch.object(manager, "_invoke_json")
+    wait = mocker.patch.object(manager, "_wait_for_assignments")
+    args = ("dps", NS_SCOPE, TARGET_SCOPE, "namespace-outbound", "dps-principal")
+    kwargs = {"namespace_system_principal_id": "namespace-system"}
+    if existing or authorized:
+        manager.ensure(*args, **kwargs)
+    else:
+        with pytest.raises(AzureResponseError, match="Azure Device Registry Administrator") as error:
+            manager.ensure(*args, **kwargs)
+        assert "--assignee-object-id 'namespace-system'" in str(error.value)
+        assert "--assignee-object-id 'namespace-outbound'" not in str(error.value)
+    assert assignment in [call.args for call in lookup.call_args_list]
+    if existing:
+        privilege.assert_not_called()
+    else:
+        privilege.assert_called_once_with("caller", NS_SCOPE)
+    if authorized and not existing:
+        invoke.assert_called_once_with(
+            "role assignment create --assignee-object-id 'namespace-system' "
+            "--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' "
+            f"--scope '{NS_SCOPE}'", subscription="sub",
+        )
+        wait.assert_called_once_with([assignment])
+    else:
+        invoke.assert_not_called()
+        wait.assert_not_called()
+
+
+@pytest.mark.parametrize("present", [False, True])
+def test_recovery_verifies_namespace_self_role_without_granting(mocker, present):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    lookup = mocker.patch.object(
+        manager, "_assignment_exists",
+        side_effect=lambda _principal, role, _scope, **_kwargs: present or role != ADR_ADMINISTRATOR_ROLE,
+    )
+    guard = MagicMock()
+    request = {
+        "link_type": "dps", "namespace_scope": NS_SCOPE, "target_scope": TARGET_SCOPE,
+        "namespace_principal_id": "outbound-uami", "linked_principal_id": "dps-principal",
+        "namespace_system_principal_id": "namespace-system",
+    }
+    if present:
+        manager.verify_many([request], guard=guard)
+    else:
+        with pytest.raises(AzureResponseError, match="Azure Device Registry Administrator"):
+            manager.verify_many([request], guard=guard)
+    lookup.assert_any_call("namespace-system", ADR_ADMINISTRATOR_ROLE, NS_SCOPE, strict=True)
+    assert guard.call_count == 6
+    manager.cli.invoke.assert_not_called()
