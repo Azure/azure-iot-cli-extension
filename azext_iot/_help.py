@@ -1145,6 +1145,11 @@ helps[
         --enrollment-id {enrollment_id} --attestation-type symmetrickey
         --adr-namespace {namespace_name} --adr-ca-name {ca_name}
         --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment with a device type reference.
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1201,6 +1206,15 @@ helps[
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
         --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[
@@ -1316,6 +1330,11 @@ helps[
         --enrollment-id {enrollment_id} --allocation-policy hashed
         --adr-namespace {namespace_name} --adr-ca-name {ca_name}
         --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment group with a device type reference.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1360,6 +1379,15 @@ helps[
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
         --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[
