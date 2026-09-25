@@ -236,7 +236,7 @@ def test_rbac_manager_is_created_lazily():
 @pytest.mark.parametrize("outbound_uami", [False, True])
 @pytest.mark.parametrize("inbound_uami", [False, True])
 @pytest.mark.parametrize("authorized", [False, True])
-def test_su_runtime_uses_exact_two_roles_for_selected_identities(
+def test_su_runtime_uses_exact_three_roles_for_selected_identities(
     mocker, operation, outbound_uami, inbound_uami, authorized,
 ):
     provider = _provider()
@@ -286,12 +286,15 @@ def test_su_runtime_uses_exact_two_roles_for_selected_identities(
         assert [call.args[0] for call in grants.call_args_list] == [
             f"role assignment create --assignee-object-id '{ns_principal}' "
             f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{su_id}'",
+            f"role assignment create --assignee-object-id '{ns_principal}' "
+            f"--assignee-principal-type ServicePrincipal --role 'Device Update Administrator' --scope '{su_id}'",
             f"role assignment create --assignee-object-id '{su_principal}' "
             f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' --scope '{NS_ID}'",
         ]
-        assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "ns-sub"]
+        assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "target-sub", "ns-sub"]
         visible.assert_called_once_with([
             (ns_principal, "Contributor", su_id),
+            (ns_principal, "Device Update Administrator", su_id),
             (su_principal, "Azure Device Registry Contributor", NS_ID),
         ])
         provider.client.namespaces.begin_update.assert_called_once()

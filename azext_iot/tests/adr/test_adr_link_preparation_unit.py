@@ -408,6 +408,7 @@ def test_owned_identity_regression_rejects_unexpected_scenario_skip(preparation,
 
 @pytest.mark.parametrize("failure", [
     None, "add", "update", "pending-add", "pending-update", "preauthorized-sami", "role-read", "discovery",
+    "report-add", "report-update",
 ])
 def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_terminal_results(monkeypatch, failure):
     from copy import deepcopy
@@ -504,6 +505,11 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
                 if failure == "discovery":
                     raise HttpResponseError("discovery failed")
                 return output([])
+            if command.startswith("iot adr ns report "):
+                phase = "add" if len(native_commands) == 1 else "update"
+                if failure == "report-" + phase:
+                    raise HttpResponseError("ADU returned 403 for report generation")
+                return output({"reportType": "NamespaceUpdateComplianceReport", "generatedAt": "2026-09-25T00:00:00Z"})
             raise AssertionError(f"Unexpected command: {command}")
         native_commands.append(command)
         assert subject._NATIVE_LINK_OPTIONS in command and "--no-wait" not in command
@@ -527,25 +533,53 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
     else:
         subject.TestADRLinkSU.test_adr_link_su_lifecycle(scenario)
     expected_calls = 0 if failure == "role-read" else 1 if failure in {
-        "add", "pending-add", "preauthorized-sami", "discovery",
+        "add", "pending-add", "preauthorized-sami", "discovery", "report-add",
     } else 2
     assert len(native_commands) == expected_calls
     if failure is None:
         assert role_observations == [
             ("namespace-sami", "Contributor", su_id, False),
+            ("namespace-sami", "Device Update Administrator", su_id, False),
             ("su-uami", "Azure Device Registry Contributor", namespace_id, False),
             ("namespace-sami", "Contributor", su_id, True),
+            ("namespace-sami", "Device Update Administrator", su_id, True),
             ("su-uami", "Azure Device Registry Contributor", namespace_id, True),
             ("su-sami", "Azure Device Registry Contributor", namespace_id, False),
             ("namespace-sami", "Contributor", su_id, True),
+            ("namespace-sami", "Device Update Administrator", su_id, True),
             ("su-sami", "Azure Device Registry Contributor", namespace_id, True),
         ]
+        report_commands = [
+            item.args[0] for item in scenario.cmd.call_args_list
+            if item.args[0].startswith("iot adr ns report ")
+        ]
+        assert [command.split()[4] for command in report_commands] == ["generate", "latest", "generate", "latest"]
     scenario.assign_role.assert_called_once_with("caller", "Device Update Reader", su_id, assignee_type=None)
     manager.ensure.assert_not_called()
     manager.ensure_many.assert_not_called()
     waits.assert_not_called()
     sleep.assert_not_called()
     scenario.cleanup_full_infra.assert_called_once()
+
+
+@pytest.mark.parametrize("failure", ["forbidden", "wrong-type", "missing-time", "stale-latest"])
+def test_su_report_regression_rejects_failure_or_stale_result(failure):
+    generated = {"reportType": "NamespaceUpdateComplianceReport", "generatedAt": "2026-09-25T00:00:00Z"}
+    latest = dict(generated)
+    if failure == "wrong-type":
+        generated["reportType"] = "GroupInstallableUpdatesReport"
+    elif failure == "missing-time":
+        generated["generatedAt"] = ""
+    elif failure == "stale-latest":
+        latest["generatedAt"] = "2026-09-24T00:00:00Z"
+    test = Mock()
+    test.cmd.side_effect = (
+        HttpResponseError("ADU returned 403") if failure == "forbidden" else
+        [Mock(get_output_in_json=lambda: generated), Mock(get_output_in_json=lambda: latest)]
+    )
+    with pytest.raises(HttpResponseError if failure == "forbidden" else AssertionError):
+        subject._assert_namespace_update_report(test, "namespace")
+    assert test.cmd.call_count == (2 if failure == "stale-latest" else 1)
 
 
 @pytest.mark.parametrize("scenario", [

@@ -809,7 +809,9 @@ def load_adr_help():
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
-    These are exactly two service-to-service grants. The configured namespace outbound identity
+    These are exactly three service-to-service grants. Device Update Administrator enables
+    namespace-initiated ADU data-plane operations, including report generation; ARM Contributor
+    alone does not grant data-plane access. The configured namespace outbound identity
     and the selected Update Instance inbound identity each support SAMI or an attached UAMI.
     No ADU first-party service principal or Microsoft Graph lookup is required.
     Missing assignments are created only for an inherited Owner or User Access Administrator.
@@ -840,6 +842,8 @@ def load_adr_help():
     in place. Before PATCH, update repeats add's target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
+    This includes Device Update Administrator for the namespace outbound identity on the linked
+    Update Instance, adding the missing grant for links created with older CLI versions.
     ARM assignment visibility does not guarantee that the linked service already honors access.
     Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds

@@ -27,9 +27,10 @@ from azext_iot.tests.adr.test_adr_link_rbac_unit import NS_SCOPE, TARGET_SCOPE, 
 def _assert_initial_su_roles_only(harness):
     assert harness.created == [
         ("namespace-principal", "Contributor", KINDS["su"][2]),
+        ("namespace-principal", "Device Update Administrator", KINDS["su"][2]),
         ("target-principal", "Azure Device Registry Contributor", NS_ID),
     ]
-    assert len(harness.assignments) == 2
+    assert len(harness.assignments) == 3
 
 
 @pytest.mark.parametrize("invalid", ["outbound", "collection", "namespace-state", "success-with-error"])

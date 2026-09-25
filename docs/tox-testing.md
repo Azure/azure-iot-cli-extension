@@ -110,6 +110,15 @@ Local focused-debug controls remain available and cannot qualify a full suite.
 
 ## ADR live-test budgets
 
+The owned SU-link lifecycle verifies that `link su add` creates the namespace
+outbound identity's **Device Update Administrator** role on the Update Instance
+without fixture service-role grants. It generates and reads back a namespace
+update-compliance report after both add and inbound-identity rotation through
+update. The fixture caller's separate Device Update Reader grant covers CLI
+discovery only; it cannot substitute for the namespace's report permissions.
+The opt-in `test_adr_report_int.py` suite additionally covers all three report
+types on a supplied SU-linked namespace.
+
 The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
 The root integration matrix applies this budget directly to each ADR service job.
 The job ceiling does not extend per-operation provisioning waits.

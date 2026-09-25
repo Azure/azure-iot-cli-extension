@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
 ADR_CONTRIBUTOR_ROLE = "Azure Device Registry Contributor"
+ADU_ADMINISTRATOR_ROLE = "Device Update Administrator"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
@@ -35,6 +36,7 @@ LINK_ROLE_IDS = {
     CONTRIBUTOR_ROLE: "b24988ac-6180-42a0-ab88-20f7382dd24c",
     HUB_DATA_ROLE: "4fc6c259-987e-4a07-842e-c321cc9d413f",
     ADR_CONTRIBUTOR_ROLE: "a5c3590a-3a1a-4cd4-9648-ea0a32b15137",
+    ADU_ADMINISTRATOR_ROLE: "02ca0879-e8e4-47a5-a61e-5c618b76e64a",
 }
 
 
@@ -60,6 +62,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
+        RoleRule("namespace", ADU_ADMINISTRATOR_ROLE, "target"),
         RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
     ),
 }
