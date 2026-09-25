@@ -180,9 +180,11 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
     assert len(h.assignments) == len(h.created)  # recovery verifies, never grants again
     inbound_principal = "target-user" if identity == "user" else "target-principal"
     outbound_principal = "namespace-user" if identity == "user" else "namespace-principal"
+    principals = {
+        "namespace": outbound_principal, "namespace_system": "namespace-principal", "linked": inbound_principal,
+    }
     assert h.created == [
-        (outbound_principal if rule.principal == "namespace" else inbound_principal,
-         rule.role, KINDS[kind][2] if rule.scope == "target" else NS_ID)
+        (principals[rule.principal], rule.role, KINDS[kind][2] if rule.scope == "target" else NS_ID)
         for rule in LINK_ROLE_MATRIX[kind]
     ]
 

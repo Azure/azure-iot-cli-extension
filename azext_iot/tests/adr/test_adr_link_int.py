@@ -261,6 +261,13 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 dps_show = self.cmd(f"iot dps show --name {dps_name} -g {rg}").get_output_in_json()
                 dps_id = dps_show["id"]
                 _log(LogKind.RESULT, "dps_id=%s", dps_id)
+                namespace = self.cmd(
+                    f"iot adr ns show -n {namespace_name} -g {rg}"
+                ).get_output_in_json()
+                self_role = (
+                    namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"],
+                )
+                _assert_service_roles(self, [self_role], present=False)
 
                 add_cmd = (
                     f"iot adr ns link dps add --ns {namespace_name} -g {rg} "
@@ -281,6 +288,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"iot adr ns link dps wait -n {dps_endpoint} "
                     f"--ns {namespace_name} -g {rg}"
                 )
+                _assert_service_roles(self, [self_role], present=True)
                 _log(LogKind.OK, "DPS link '%s' created", dps_endpoint)
 
             with timed_step("Step 2 ❯ link dps show / list"):
@@ -758,6 +766,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 roles = (
                     (namespace_principal, "Contributor", dps_id),
                     (identity["principalId"], "Contributor", namespace["id"]),
+                    (namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"]),
                     (namespace_principal, "Contributor", hub_id),
                     (namespace_principal, "IoT Hub Data Contributor", hub_id),
                 )

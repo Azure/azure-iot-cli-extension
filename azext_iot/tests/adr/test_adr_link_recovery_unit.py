@@ -164,10 +164,12 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     # Prove public update preflight/submission independently of service readiness.
     update_args = identity_args if repeat_identity else {}
     getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **update_args)
+    extra = {"namespace_system_principal_id": "namespace-principal"} if kind == "dps" else {}
     provider._rbac.ensure.assert_called_once_with(
         link_type=kind, namespace_scope=NS_ID, target_scope=target_id,
         namespace_principal_id="namespace-principal",
         linked_principal_id="target-user" if user_assigned else "target-system",
+        **extra,
     )
     patch = provider.client.namespaces.begin_update.call_args.kwargs["properties"]
     expected_patch = {

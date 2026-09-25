@@ -28,6 +28,7 @@ CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
 ADR_CONTRIBUTOR_ROLE = "Azure Device Registry Contributor"
 ADU_ADMINISTRATOR_ROLE = "Device Update Administrator"
+ADR_ADMINISTRATOR_ROLE = "Azure Device Registry Administrator"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
@@ -37,6 +38,7 @@ LINK_ROLE_IDS = {
     HUB_DATA_ROLE: "4fc6c259-987e-4a07-842e-c321cc9d413f",
     ADR_CONTRIBUTOR_ROLE: "a5c3590a-3a1a-4cd4-9648-ea0a32b15137",
     ADU_ADMINISTRATOR_ROLE: "02ca0879-e8e4-47a5-a61e-5c618b76e64a",
+    ADR_ADMINISTRATOR_ROLE: "12675fd7-7f59-493f-9201-f7944860a2f1",
 }
 
 
@@ -59,6 +61,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     "dps": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
         RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("namespace_system", ADR_ADMINISTRATOR_ROLE, "namespace"),
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
@@ -201,6 +204,7 @@ def resolve_linked_resource_principal(
 def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
+        "namespace_system": "namespace system-assigned MI",
         "linked": f"{link_type.upper()} selected inbound MI",
     }
     scopes = {"namespace": "namespace", "target": link_type.upper()}
@@ -217,6 +221,20 @@ def format_role_requirements(link_type: str) -> str:
             )
         requirements.append(requirement)
     return "; ".join(requirements)
+
+
+def _request_principals(request: dict) -> Dict[str, Optional[str]]:
+    principals = {
+        "namespace": request["namespace_principal_id"],
+        "linked": request.get("linked_principal_id"),
+        "namespace_system": request.get("namespace_system_principal_id"),
+    }
+    if request["link_type"] == "dps" and not principals["namespace_system"]:
+        raise AzureResponseError(
+            "DPS link RBAC requires the namespace system-assigned principalId "
+            "for registry-device provisioning. Verify the namespace identity and retry."
+        )
+    return principals
 
 
 class LinkRbacManager:
@@ -313,7 +331,7 @@ class LinkRbacManager:
         conditional grants stop recovery; this method never creates assignments.
         """
         for request in requests:
-            principals = {"namespace": request["namespace_principal_id"], "linked": request.get("linked_principal_id")}
+            principals = _request_principals(request)
             scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
             for rule in LINK_ROLE_MATRIX[request["link_type"]]:
                 principal = principals[rule.principal]
@@ -457,6 +475,8 @@ class LinkRbacManager:
         target_scope: str,
         namespace_principal_id: str,
         linked_principal_id: Optional[str],
+        *,
+        namespace_system_principal_id: Optional[str] = None,
     ) -> None:
         self.ensure_many(
             [
@@ -466,6 +486,7 @@ class LinkRbacManager:
                     "target_scope": target_scope,
                     "namespace_principal_id": namespace_principal_id,
                     "linked_principal_id": linked_principal_id,
+                    "namespace_system_principal_id": namespace_system_principal_id,
                 }
             ]
         )
@@ -480,10 +501,7 @@ class LinkRbacManager:
                 raise InvalidArgumentValueError(
                     f"Unsupported link type '{link_type}' for RBAC preflight."
                 )
-            principals = {
-                "namespace": request["namespace_principal_id"],
-                "linked": request.get("linked_principal_id"),
-            }
+            principals = _request_principals(request)
             scopes = {
                 "namespace": request["namespace_scope"],
                 "target": request["target_scope"],

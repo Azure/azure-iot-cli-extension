@@ -134,6 +134,11 @@ def preflight_target(
             target, inbound_identity, strategy.display_name
         ),
     }
+    if link_type == "dps":
+        # ADR's registry-device ARM write uses the namespace SAMI, not its outbound UAMI.
+        request["namespace_system_principal_id"] = resolve_linked_resource_principal(
+            namespace, {"type": "SystemAssigned"}, "namespace"
+        )
     if rbac_requests is not None:
         rbac_requests.append(request)
     else:
