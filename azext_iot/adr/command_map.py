@@ -186,6 +186,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_hub_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_hub_update", supports_no_wait=True)
+        cmd_group.command("delete", "adr_link_hub_delete", confirmation=True)
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
         cmd_group.command(
@@ -197,6 +198,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_dps_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_dps_update", supports_no_wait=True)
+        cmd_group.command("delete", "adr_link_dps_delete", confirmation=True)
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
         cmd_group.command(
@@ -208,6 +210,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_su_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_su_update", supports_no_wait=True)
+        cmd_group.command("delete", "adr_link_su_delete", confirmation=True)
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")
         cmd_group.command(

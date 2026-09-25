@@ -1228,9 +1228,9 @@ def test_link_mutation_supports_no_wait(fixture_link_provider, mock_poller):
     poller.result.assert_not_called()
 
 
-def test_remove_provider_methods_are_absent(fixture_link_provider):
+def test_composite_remove_provider_methods_are_absent(fixture_link_provider):
     for method in (
-        "hub_remove", "dps_remove", "su_remove", "hub_delete", "dps_delete", "su_delete",
+        "hub_remove", "dps_remove", "su_remove",
         "_delete_link", "_wait_for_linked_resource_deleted",
     ):
         assert not hasattr(LinkProvider, method)

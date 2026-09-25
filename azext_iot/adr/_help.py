@@ -548,8 +548,12 @@ def load_adr_help():
     Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    This group does not provide unlink or composite
-    resource-delete commands; namespace and target lifecycles are managed separately.
+    To unlink, delete the linked resource separately, then use link hub/dps/su delete
+    to remove its endpoint from the namespace. Link delete only submits a namespace
+    GET and replacement PUT; it does not delete or check the linked resource, manage
+    RBAC, or wait for completion. Initial backend errors are returned directly.
+    An accepted response does not confirm removal; inspect the namespace afterward
+    for asynchronous failures. Avoid concurrent namespace updates during GET/PUT.
     Waited add/update commands require the actual endpoint to reach Succeeded. They recover only
     confirmed AdrMiNotAuthorized, using an unchanged endpoint update and verified existing service-role
     assignments. Positive --timeout/--interval values default to 600/30 seconds. The mutation/recovery
@@ -566,6 +570,25 @@ def load_adr_help():
     A namespace must have a linked DPS before a new Hub can be linked or a failed
     Hub link can be retried (DPS-first ordering). Hub updates preserve existing
     provisioning settings. Links live on the namespace, not on the IoT Hub resource.
+  """
+
+    for kind, resource in (("hub", "IoT Hub"), ("dps", "DPS"), ("su", "Software Updates instance")):
+        helps[f"iot adr ns link {kind} delete"] = f"""
+  type: command
+  short-summary: Remove a {resource} endpoint from a Device Registry namespace.
+  long-summary: |
+    Delete the linked {resource} separately before removing its endpoint.
+    This command gets the namespace, removes the named endpoint, and submits a
+    replacement PUT preserving other endpoints and writable namespace settings.
+    It does not check or delete the linked resource, change role assignments,
+    or wait for completion. Initial GET/PUT errors are returned directly;
+    later asynchronous failures are not observed by this command.
+    Inspect the namespace with 'az iot adr ns show' to confirm removal and
+    provisioningState. A successful submission is not proof of completed removal.
+    Avoid concurrent namespace updates between this command's GET and PUT.
+  examples:
+    - name: Remove an endpoint after its linked {resource} has been deleted
+      text: az iot adr ns link {kind} delete -n primary --ns myNamespace -g myResourceGroup --yes
   """
 
     helps[
@@ -678,7 +701,8 @@ def load_adr_help():
   short-summary: Manage DPS links (provisioning endpoints) on a Device Registry namespace.
   long-summary: |
     Only one DPS may be linked per namespace today. Links live on the namespace, not on the
-    DPS resource; there is no per-DPS unlink API.
+    DPS resource. After deleting the DPS resource separately, use link dps delete
+    to submit removal of its namespace endpoint.
   """
 
     helps[

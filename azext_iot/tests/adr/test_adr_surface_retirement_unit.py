@@ -59,7 +59,7 @@ def test_registry_device_command_spelling_is_not_registered(offline_cli):
 
 
 @pytest.mark.parametrize("module", [_helpers, test_adr_link_int])
-def test_cleanup_sources_do_not_construct_retired_commands(module):
+def test_resource_cleanup_does_not_use_endpoint_delete_commands(module):
     for node in ast.walk(ast.parse(inspect.getsource(module))):
         if isinstance(node, ast.JoinedStr):
             text = "".join(
@@ -74,17 +74,16 @@ def test_cleanup_sources_do_not_construct_retired_commands(module):
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_retired_link_delete_is_absent_from_real_cli_and_help(offline_cli, kind):
+def test_endpoint_delete_is_registered_without_restoring_composite_deletion(offline_cli, kind):
     table = MainCommandsLoader(offline_cli).load_command_table(["iot", "adr", "ns", "link", kind])
-    for verb in ("add", "update", "show", "list", "wait"):
+    for verb in ("add", "update", "show", "list", "wait", "delete"):
         assert f"iot adr ns link {kind} {verb}" in table
-    assert f"iot adr ns link {kind} delete" not in table
     for command in ("iot adr ns delete", "iot hub delete", "iot dps delete", "iot adr ns su instance delete"):
         assert command in table
     load_adr_help()
-    assert f"iot adr ns link {kind} delete" not in helps
+    assert f"iot adr ns link {kind} delete" in helps
     assert "Destructive delete" not in helps["iot adr ns link"]
-    assert "namespace replacement" not in helps["iot adr ns link"]
+    assert "does not delete or check the linked resource" in helps["iot adr ns link"]
     with pytest.raises(SystemExit) as error:
         offline_cli.invoke(["iot", "adr", "ns", "link", kind, "delete"])
     assert error.value.code == 2

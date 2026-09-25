@@ -16,6 +16,7 @@ from azure.cli.core.azclierror import (
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.log import get_logger
 from knack.util import CLIError
+from azext_iot.common.arm import sanitize_arm_identity
 
 from azext_iot._factory import (
     _get_canary_credential_scopes,
@@ -66,6 +67,7 @@ from azext_iot.adr.topology import (
     has_su_endpoint,
     hub_endpoint_count,
     is_failed_hub_endpoint,
+    writable_namespace_properties,
 )
 
 logger = get_logger(__name__)
@@ -193,6 +195,40 @@ class LinkProvider(ADRProvider):
             **kwargs,
         )
 
+    def _delete_endpoint(
+        self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
+    ):
+        namespace = self.client.namespaces.get(
+            resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
+        )
+        self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
+        properties = writable_namespace_properties(namespace["properties"])
+        del properties[section]["endpoints"][endpoint_name]
+        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
+        resource["properties"] = properties
+        if "identity" in namespace:
+            resource["identity"] = sanitize_arm_identity(namespace["identity"])
+        # NoPolling returns the initial PUT response, not asynchronous completion.
+        return self.client.namespaces.begin_create_or_replace(
+            resource_group_name=resource_group_name, namespace_name=namespace_name,
+            resource=resource, polling=False, retry_total=0,
+        ).result()
+
+    def hub_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._delete_endpoint(
+            endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
+        )
+
+    def dps_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._delete_endpoint(
+            endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
+        )
+
+    def su_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._delete_endpoint(
+            endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
+        )
+
     def _patch_link(
         self, namespace, namespace_name, resource_group_name, section,
         endpoints_patch, status_message, no_wait=False, budget=None, **kwargs,
@@ -283,7 +319,7 @@ class LinkProvider(ADRProvider):
                 f"Messaging endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be repointed by link hub add. "
                 "Use 'az iot adr ns link hub update' for an existing Hub link, "
-                "or choose an unused endpoint name. Link commands do not unlink endpoints."
+                "or choose an unused endpoint name. To unlink, delete the Hub resource first, then use link hub delete."
             )
 
         endpoint_body = _build_hub_endpoint_body(
@@ -490,7 +526,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Provisioning endpoint '{endpoint_name}' already exists on "
                 f"namespace '{namespace_name}'. Choose an unused endpoint name. "
-                "Link commands do not unlink endpoints."
+                "To unlink, delete the DPS resource first, then use link dps delete."
             )
 
         endpoint_body = _build_dps_endpoint_body(
@@ -626,7 +662,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Updating endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be overwritten by link su add. "
-                "Choose an unused endpoint name. Link commands do not unlink endpoints."
+                "Choose an unused endpoint name. To unlink, delete the Update Instance first, then use link su delete."
             )
 
         endpoint_body = _build_su_endpoint_body(

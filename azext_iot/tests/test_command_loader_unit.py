@@ -86,7 +86,7 @@ for _kind, _resource_option, _resource_id in (
         _resource_option,
         _resource_id,
     ]
-    for _action in ("update", "show", "wait"):
+    for _action in ("update", "show", "wait", "delete"):
         _LINK_PARSER_CASES[
             f"iot adr ns link {_kind} {_action}"
         ] = _ENDPOINT_ARGUMENTS
@@ -140,8 +140,8 @@ def management_command_parser():
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_retired_link_delete_is_not_registered(command_table, kind):
-    assert f"iot adr ns link {kind} delete" not in command_table
+def test_link_delete_is_registered(command_table, kind):
+    assert f"iot adr ns link {kind} delete" in command_table
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)
