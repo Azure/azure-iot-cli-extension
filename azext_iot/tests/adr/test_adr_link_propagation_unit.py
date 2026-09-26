@@ -189,6 +189,69 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
     ]
 
 
+@pytest.mark.parametrize("action", ["add", "update"])
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("outcome", ["created", "existing", "unauthorized", "create-failure", "visibility-timeout"])
+def test_su_admin_grant_uses_outbound_identity_before_mutation(mocker, action, identity, outcome):
+    h = Harness(mocker, "su", identity, action)
+    principal = "namespace-user" if identity == "user" else "namespace-principal"
+    admin = (principal, "Device Update Administrator", SU_ID)
+    inherited = [
+        (principal, "Contributor", SU_ID),
+        ("target-user" if identity == "user" else "target-principal", "Azure Device Registry Contributor", NS_ID),
+    ]
+    for assignee, role, scope in inherited + ([admin] if outcome == "existing" else []):
+        h.assignments.append({
+            "principalId": assignee, "scope": scope,
+            "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[role],
+        })
+    original_rbac = h.rbac
+
+    def invoke(command, **kwargs):
+        if command.startswith("role assignment create"):
+            assert not h.patches
+            if outcome == "create-failure":
+                raise AzureResponseError("admin assignment denied")
+        return original_rbac(command, **kwargs)
+
+    h.provider._rbac._invoke_json.side_effect = invoke
+    h.provider._rbac._caller_can_assign.return_value = outcome != "unauthorized"
+    if outcome == "visibility-timeout":
+        mocker.patch.object(
+            h.provider._rbac, "_wait_for_assignments",
+            side_effect=AzureResponseError("Timed out waiting for newly-created link role assignments"),
+        )
+    if outcome in {"unauthorized", "create-failure", "visibility-timeout"}:
+        with pytest.raises(AzureResponseError, match="(No link mutation|before namespace mutation|Timed out waiting)"):
+            h.run()
+        assert not h.patches
+        assert h.created == ([admin] if outcome == "visibility-timeout" else [])
+    else:
+        h.outcomes = ["success"]
+        result = h.run()
+        assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
+        assert h.created == ([] if outcome == "existing" else [admin])
+        assert len(h.patches) == 1
+    if outcome == "existing":
+        h.provider._rbac._caller_can_assign.assert_not_called()
+
+
+def test_su_recovery_requires_admin_role_without_regranting(mocker):
+    h = Harness(mocker)
+
+    def revoke_admin():
+        h.assignments[:] = [
+            assignment for assignment in h.assignments
+            if not assignment["roleDefinitionId"].endswith(LINK_ROLE_IDS["Device Update Administrator"])
+        ]
+
+    h.clock.on_sleep = revoke_admin
+    with pytest.raises(AzureResponseError, match="Cannot confirm unconditional Device Update Administrator"):
+        h.run()
+    assert len(h.patches) == 1
+    assert len(h.created) == 3
+
+
 def test_repeated_auth_failure_uses_shared_deadline_and_clamped_backoff(mocker):
     h = Harness(mocker)
     h.outcomes = ["auth"] * 10
@@ -334,7 +397,7 @@ def test_recovery_rbac_is_read_only_and_fail_closed(mocker, failure):
     with pytest.raises(AzureResponseError):
         h.run()
     assert len(h.patches) == 1
-    assert len(h.created) == 2
+    assert len(h.created) == 3
     assert not h.clock.delays
 
 
@@ -634,8 +697,8 @@ def test_registered_adr_contributor_role_id_and_no_graph_or_caller_grants(mocker
     commands = [call.args[0] for call in h.provider._rbac._invoke_json.call_args_list]
     assert all(command.startswith("role assignment ") for command in commands)
     assert all("--fill-principal-name false" in command for command in commands if " list " in command)
-    assert not any("Device Update Administrator" in command or "'caller'" in command or " ad " in command
-                   for command in commands)
+    assert not any("'caller'" in command or " ad " in command for command in commands)
+    assert ("namespace-user", "Device Update Administrator", SU_ID) in h.created
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -717,6 +780,7 @@ def test_su_recovery_supports_mixed_inbound_and_outbound_identity_types(mocker, 
     h.run()
     assert h.created == [
         ("namespace-user" if outbound_user else "namespace-principal", "Contributor", SU_ID),
+        ("namespace-user" if outbound_user else "namespace-principal", "Device Update Administrator", SU_ID),
         ("target-principal" if outbound_user else "target-user", "Azure Device Registry Contributor", NS_ID),
     ]
     assert len(h.patches) == 2
@@ -830,6 +894,6 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
                 assert h.clock.now == 120
     assert patch_times == expected_patches
     assert bodies == [{"properties": {"updating": {"endpoints": {"su": h.body}}}}] * len(patch_times)
-    assert len(h.created) == 2
+    assert len(h.created) == 3
     assert all(at < 120 for _, at in requests)
     assert len(mocked_response.calls) == len(requests)  # No async-status/Graph/extra requests.

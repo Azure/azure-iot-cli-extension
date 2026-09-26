@@ -123,6 +123,16 @@ def _assert_native_link_result(namespace, section, name, resource_id, inbound_id
         assert actual["userAssignedIdentity"].casefold() == inbound_identity["userAssignedIdentity"].casefold(), endpoint
 
 
+def _assert_namespace_update_report(test_case, namespace_name):
+    selector = f"--ns {namespace_name} -g {TEST_RG} --report-type NamespaceUpdateComplianceReport"
+    generated = test_case.cmd(f"iot adr ns report generate {selector}").get_output_in_json()
+    assert generated["reportType"] == "NamespaceUpdateComplianceReport", generated
+    assert generated["generatedAt"], generated
+    latest = test_case.cmd(f"iot adr ns report latest {selector}").get_output_in_json()
+    assert latest["reportType"] == generated["reportType"], latest
+    assert latest["generatedAt"] == generated["generatedAt"], latest
+
+
 def _assert_cli_failure(test_case, command: str, expected_message: str):
     with pytest.raises(
         ArgumentUsageError,
@@ -775,6 +785,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
     4. Step 2: ``link su show`` / ``list`` surface the single entry.
     5. Step 3: data-plane list commands verify the materialized service address.
     6. Step 4: ``link su update`` rotates the inbound caller identity UAMI → SAMI.
+    Namespace report generation and readback after add and update independently exercise
+    the namespace outbound MI's ADU Administrator grant, not the fixture caller's Reader role.
 
     Opt in to ``azext_iot_adr_su_probe_reader=true`` only with a fresh owned
     Update Instance to test discovery before adding the fixture caller's Reader
@@ -964,6 +976,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Step 1 > link su add (UAMI)"):
                 roles = (
                     (namespace_principal_id, "Contributor", su_id),
+                    (namespace_principal_id, "Device Update Administrator", su_id),
                     (identity_principal_id, "Azure Device Registry Contributor", ns["id"]),
                 )
                 if is_owned_su:
@@ -1092,6 +1105,9 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     len(classes),
                 )
 
+            with timed_step("Verify namespace report after link su add"):
+                _assert_namespace_update_report(self, namespace_name)
+
             with timed_step("Step 4 > link su update (rotate identity UAMI to SAMI)"):
                 if is_owned_su:
                     _assert_service_roles(
@@ -1111,6 +1127,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _assert_service_roles(
                     self,
                     [(namespace_principal_id, "Contributor", su_id),
+                     (namespace_principal_id, "Device Update Administrator", su_id),
                      (sami_principal_id, "Azure Device Registry Contributor", ns["id"])],
                     present=True,
                 )
@@ -1127,6 +1144,9 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                         f"--user-assigned-mi {identity_resource_id}"
                     )
                 _log(LogKind.OK, "Rotated UAMI to SAMI")
+
+            with timed_step("Verify namespace report after link su update"):
+                _assert_namespace_update_report(self, namespace_name)
 
             _log(LogKind.OK, "Software Updates link lifecycle passed")
 

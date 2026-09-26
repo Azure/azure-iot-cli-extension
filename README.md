@@ -9,7 +9,7 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
-- 🆕 **`1.0.0b1` ADR-only Preview** provides 112 `az iot adr` commands: Registry Device CRUD/auth/attributes/capabilities, canonical namespace links, command-specific success waits, managed-identity options, and Software Updates catalog/status discovery. Link add/update validate topology and target readiness and create only missing service-to-service RBAC when authorized. After deleting a linked resource separately, `link hub|dps|su delete` ensures the namespace outbound identity has Reader on the linked resource's resource group, then submits a namespace GET/PUT to remove its endpoint without target checks or completion polling. Authorized Owner/User Access Administrator callers create missing Reader grants automatically; other callers receive remediation commands. Reader grants remain after unlinking and may need service-side propagation; inspect the namespace afterward for asynchronous failures. These commands do not delete resources. Three ADR-owned TypeSpec SDKs are modeless and synchronous-only. ADR control-plane operations use Central US EUAP; Software Updates data uses service-derived endpoints. ADR target lookups and identity-safety reads explicitly use Hub `2026-10-01-preview` and DPS `2026-06-01-preview` through preview's management clients. General Hub/DPS SDK versions remain unchanged, and management also uses Central US EUAP; their SDK upgrades and certificate-issuing enrollment/registration are separate follow-up work. This remains a cloud-only surface; AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
+- 🆕 **`1.0.0b1` Preview** provides 112 `az iot adr` commands and adds the Hub/DPS SDK and command upgrades: modeless management, Fabric routing, certificate-reference enrollment, and REST device registration with certificate issuance and operation-status lookup. Hub management uses `2026-10-01-preview`, DPS management uses `2026-06-01-preview`, DPS service/device REST uses `2026-11-02-preview`, and Hub service/device REST uses `2026-11-01-preview`. General management and ADR target/identity-safety reads use the Central US EUAP ARM endpoint with target-subscription credentials. Registration accepts validated PEM or base64 DER CSRs (sent as base64 DER), retains certificate-chain JSON and Registry Device external-ID correlation, and supports an explicit hard `--timeout`. ADR provides Registry Device CRUD/auth/attributes/capabilities, canonical namespace links, command-specific success waits, managed-identity options, and Software Updates catalog/status discovery. Link add/update validate topology and target readiness and create only missing service-to-service RBAC when authorized. After deleting a linked resource separately, `link hub|dps|su delete` ensures the namespace outbound identity has Reader on the linked resource's resource group, then submits a namespace GET/PUT to remove its endpoint without target checks or completion polling. Authorized Owner/User Access Administrator callers create missing Reader grants automatically; other callers receive remediation commands. Reader grants remain after unlinking and may need service-side propagation; inspect the namespace afterward for asynchronous failures. These commands do not delete resources. Three ADR-owned TypeSpec SDKs remain modeless and synchronous-only; ADR control-plane operations use Central US EUAP and Software Updates data uses service-derived endpoints. This remains a cloud-only surface; AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
 
@@ -115,6 +115,7 @@ Group
 
 Subgroups:
     ca                      : Manage certificate authorities for a Device Registry namespace.
+    device                  : Manage Registry Devices in a Device Registry namespace.
     group                   : Manage Device Registry namespace groups.
     identity                : Manage identities assigned to a Device Registry namespace.
     job                     : Manage Device Registry namespace jobs.
@@ -136,8 +137,10 @@ Commands:
 `az iot adr ns` is a cloud-only surface. Asset, discovered-asset, discovered-device,
 and management-endpoint resources require an Azure IoT Operations custom location
 and live in the `azure-iot-ops` extension under `az iot ops ns`. Namespace Device
-and Registry Device commands are not exposed in this ADR-only preview. Groups
-and jobs retain the backend `RegistryDevice` group type.
+commands are not exposed in this preview. Cloud Registry Device commands are
+available under `az iot adr ns device` for create, show, list, update, delete, and
+wait operations, with `auth`, `attribute`, and `capability` subgroups. Groups and
+jobs retain the backend `RegistryDevice` group type.
 Use `az iot adr ns migrate --resource-ids ...` only to move existing legacy assets
 into a namespace.
 

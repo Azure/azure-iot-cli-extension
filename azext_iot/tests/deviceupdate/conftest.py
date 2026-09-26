@@ -7,15 +7,22 @@
 import json
 import re
 import sys
+from functools import partial
+from shlex import quote
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 import pytest
 import responses
+from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
+from azure.core.exceptions import HttpResponseError
+from azure.mgmt.core.tools import parse_resource_id
 from knack.log import get_logger
 
+from azext_iot._factory import iot_hub_service_factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import get_role_assignments, tags_to_dict
+from azext_iot.tests.helpers import get_role_assignments, invoke_checked, role_assignment_create_command, tags_to_dict
 from azext_iot.tests.settings import DynamoSettings, HUB_TEST_LOCATION
 
 logger = get_logger(__name__)
@@ -279,47 +286,121 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
 
 @pytest.fixture(scope="module")
 def provisioned_iothubs_module(request) -> Optional[dict]:
-    result = _iothub_provisioner(request)
-    yield result
-    if result:
-        _iothub_removal(result)
+    yield _iothub_provisioner(request)
 
 
 @pytest.fixture
 def provisioned_iothubs(request) -> Optional[dict]:
-    result = _iothub_provisioner(request)
-    yield result
-    if result:
-        _iothub_removal(result)
+    yield _iothub_provisioner(request)
 
 
 def _iothub_provisioner(request) -> Optional[dict]:
     acct_marker = request.node.get_closest_marker("adu_infrastructure")
-    if acct_marker:
-        desired_instance_count = acct_marker.kwargs.get("instance_count")
-        if desired_instance_count:
-            hub_id_map = {}
-            hub_names = []
-            for _ in range(desired_instance_count):
-                target_name = generate_linked_hub_id()
-                create_result = cli.invoke(
-                    f"iot hub create -g {ACCOUNT_RG} -n {target_name} "
-                    f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
-                )
-                if not create_result.success():
-                    raise RuntimeError(f"Failed to provision iot hub resource {target_name}.")
-                create_result = create_result.as_json()
-                hub_id_map[create_result["id"]] = create_result
-                hub_names.append(target_name)
-            return hub_id_map
+    if not acct_marker or not acct_marker.kwargs.get("instance_count"):
+        return None
+
+    account = invoke_checked(cli, "account show", description="Resolving the ADU fixture caller").as_json()
+    subscription = account["id"]
+    assignee = account["user"]["name"]
+    if not assignee:
+        raise RuntimeError("A current principal is required for the ADU Hub data role.")
+
+    hub_id_map = {}
+    with iot_hub_service_factory(cli.az_cli, subscription_id=subscription) as client:
+        for _ in range(acct_marker.kwargs["instance_count"]):
+            target_name = generate_linked_hub_id()
+            hub_id = (
+                f"/subscriptions/{subscription}/resourceGroups/{ACCOUNT_RG}"
+                f"/providers/Microsoft.Devices/IotHubs/{target_name}"
+            )
+            try:
+                client.iot_hub_resource.get(resource_group_name=ACCOUNT_RG, resource_name=target_name)
+            except HttpResponseError as error:
+                if error.status_code != 404:
+                    raise
+            else:
+                raise RuntimeError(f"Refusing to adopt existing ADU dependency Hub '{hub_id}'.")
+
+            # Register before mutation: setup may fail before either fixture reaches yield.
+            request.addfinalizer(partial(_iothub_removal, {hub_id: None}))
+            hub = invoke_checked(
+                cli,
+                f"iot hub create -g {quote(ACCOUNT_RG)} -n {quote(target_name)} "
+                f"--subscription {quote(subscription)} --location {HUB_TEST_LOCATION} --disable-local-auth false",
+                description=f"Provisioning ADU dependency Hub '{hub_id}'",
+            ).as_json()
+            assert hub["id"].casefold() == hub_id.casefold(), "Created Hub did not match the owned ADU scope."
+            hub_id_map[hub["id"]] = hub
+            _iothub_assign_data_role(request, hub_id, assignee)
+    return hub_id_map
+
+
+def _iothub_assign_data_role(request, hub_id, assignee):
+    role = "IoT Hub Data Contributor"
+    assignments = get_role_assignments(
+        scope=hub_id, assignee=assignee, role=role, fill_role_definition_name=False,
+    )
+    if not isinstance(assignments, list):
+        raise RuntimeError("Malformed ADU Hub role-assignment response.")
+    if not assignments:
+        assignment_name = str(uuid4())
+        assignment_id = f"{hub_id}/providers/Microsoft.Authorization/roleAssignments/{assignment_name}"
+        subscription = parse_resource_id(hub_id)["subscription"]
+        request.addfinalizer(partial(
+            invoke_checked, cli,
+            f"role assignment delete --ids {quote(assignment_id)} --subscription {quote(subscription)}",
+            description=f"Deleting ADU Hub data-role assignment '{assignment_id}'",
+        ))
+        command = role_assignment_create_command(role, hub_id, assignee=assignee)
+        assignment = invoke_checked(
+            cli, f"{command} --name {assignment_name} --subscription {quote(subscription)}",
+            description=f"Assigning ADU Hub data role on '{hub_id}'",
+        ).as_json()
+        assert assignment["id"].casefold() == assignment_id.casefold(), "ADU Hub role assignment ID changed."
+
+    # ADU's backend requires Hub keys; the CLI cohort still uses Entra, not those keys.
+    _iothub_wait_for_data_role(hub_id)
+
+
+def _iothub_role_propagating(error):
+    return (
+        isinstance(error, (UnauthorizedError, ForbiddenError))
+        and re.search(
+            r"\bErrorCode:IotHubUnauthorized;Principal \S+ is not authorized "
+            r"for POST on /devices/query due to no assigned permissions\b",
+            str(error), re.IGNORECASE,
+        ) is not None
+    )
+
+
+def _iothub_wait_for_data_role(hub_id):
+    from azext_iot.tests.adr._helpers import wait_for_condition
+
+    resource = parse_resource_id(hub_id)
+    command = (
+        f"iot hub query -n {quote(resource['name'])} -g {quote(resource['resource_group'])} "
+        f"--subscription {quote(resource['subscription'])} --auth-type login "
+        "--query-command 'SELECT deviceId FROM devices' --top 1"
+    )
+
+    def read_devices():
+        rows = invoke_checked(cli, command, description=f"Reading ADU Hub device registry '{hub_id}'").as_json()
+        if not isinstance(rows, list):
+            raise RuntimeError("Malformed ADU Hub device-query response.")
+        return rows
+
+    wait_for_condition(
+        read_devices, lambda _rows: True, description=f"ADU Hub Entra device-query permission on '{hub_id}'",
+        timeout=120, interval=10, max_attempts=13, is_retryable_error=_iothub_role_propagating,
+    )
 
 
 def _iothub_removal(hub_id_map: Dict[str, Any]):
     for target_id in hub_id_map:
-        target_name = target_id.split("/")[-1]
-        delete_result = cli.invoke(f"iot hub delete -g {ACCOUNT_RG} -n {target_name}")
-        if not delete_result.success():
-            logger.error(f"Failed to delete iot hub resource {target_name}.")
+        invoke_checked(
+            cli, f"iot hub delete --ids {quote(target_id)}",
+            description=f"Deleting ADU dependency Hub '{target_id}'",
+        )
 
 
 @pytest.fixture(scope="module")

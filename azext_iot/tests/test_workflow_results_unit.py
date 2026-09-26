@@ -323,10 +323,10 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubControl": "225", "HubData": "360", "ADR": "360"}
+    assert budgets == {"HubControl": "275", "HubData": "360", "ADR": "360"}
     ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
-    assert ado_budgets == {"HubControl": 225, "HubData": 360}
+    assert ado_budgets == {"HubControl": 275, "HubData": 360}
     for suite, phases in BUDGETS.items():
         assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
@@ -352,17 +352,17 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert '"DPS|azext_iot/tests/dps|DPS-int|120"' in matrix["run"]
+    assert '"DPS|azext_iot/tests/dps|DPS-int|150"' in matrix["run"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in steps if step.get("id") == "run_tests")
     assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
     assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
-    assert "certificate coverage is not configured in this workflow" in step["run"]
+    assert "including owned CSR issuance" in step["run"]
     assert "serial local-auth-toggle" in step["run"]
     assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
-    assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
+    assert "set -euo pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
     assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
     assert 'tox r -e "$TEST_TOX_ENV" --skip-pkg-install' in step["run"]
     upload = next(step for step in steps if step["name"] == "Upload test result")
@@ -388,6 +388,7 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
     assert 'pip install --target "$ext_dir" --upgrade --force-reinstall --no-deps rpds-py cryptography' in install
     run = _integration_run_step()
     assert run["env"] == {
+        "AZURE_CLIENT_ID": "${{ secrets.AZURE_CLIENT_ID }}", "AZURE_TENANT_ID": "${{ secrets.AZURE_TENANT_ID }}",
         "AZURE_TEST_RUN_LIVE": "True", "PYTHONUNBUFFERED": "1",
         "azext_iot_testrg": "${{ env.RESOURCE_GROUP }}",
         "azext_iot_testhub_location": "${{ matrix.config.region }}",
@@ -406,7 +407,9 @@ def test_direct_job_preserves_installed_extension_and_service_environment():
         "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
         "subscription-id": "${{ env.TEST_SUBSCRIPTION_ID }}",
     }
-    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["OIDC Token refresh service"]["run"]
+    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["Verify Azure access"]["run"]
+    assert "az account set" not in run["run"] and "az login" not in run["run"]
+    assert "_refresh_ci_auth.py --loop" in run["run"]
 
 
 def test_workflow_runs_full_selected_services_without_removed_controls():
@@ -433,9 +436,26 @@ def _run_integration_shell(tmp_path, service, expression, exit_code=0):
     script = _integration_run_step()["run"]
     # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
     script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
+    script = script.replace('"$auth_python" azext_iot/tests/_refresh_ci_auth.py', "auth_refresh")
     stubs = """
-tox() { printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
-dps_controller() { printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
+auth_refresh() {
+  if [ "${1:-}" = "--loop" ]; then
+    exec "$OFFLINE_PYTHON" -c '
+from pathlib import Path
+import signal
+import sys
+from threading import Event
+stopped = Event()
+signal.signal(signal.SIGTERM, lambda *_: stopped.set())
+Path("auth-ready").touch()
+Path(sys.argv[1]).write_text("ready\\n")
+stopped.wait()
+' "$3"
+  fi
+}
+auth_ready() { while [ ! -f auth-ready ]; do sleep 0.01; done; }
+tox() { auth_ready; printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
+dps_controller() { auth_ready; printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
 tee() { cat; }
 """
     return subprocess.run(
@@ -444,7 +464,8 @@ tee() { cat; }
                  TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
                  TEST_ARM_ENDPOINT="https://centraluseuap.management.azure.com",
                  TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
-                 OFFLINE_EXIT_CODE=str(exit_code), DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
+                 OFFLINE_EXIT_CODE=str(exit_code), OFFLINE_PYTHON=sys.executable,
+                 DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
         capture_output=True, text=True, timeout=20, check=False,
     )
 
@@ -660,13 +681,13 @@ def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, s
     assert any("Hub phase evidence" in error for error in errors)
 
 
-def test_hub_data_manifest_preserves_exact_six_sas_nodes_and_normal_auth_default():
+def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_default():
     from azext_iot.tests.iothub._sas_phase import NODES
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra", "sas")
-    assert len(nodes("HubData", "entra")) == 42
+    assert len(nodes("HubData", "entra")) == 44
     assert len(nodes("HubControl", "regular")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 

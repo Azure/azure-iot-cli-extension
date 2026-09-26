@@ -29,6 +29,8 @@ def patch_core_help():
         ] += """
   - name: Create DPS with a system-assigned identity for later namespace linking.
     text: az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi
+  - name: Create DPS with one unit (the default). Units must be an integer of at least 1.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --unit 1
   - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned identity
     text: >
         az iot dps create --name MyDps --resource-group MyResourceGroup --user-assigned-mi IdentityResourceId
@@ -45,6 +47,8 @@ def patch_core_help():
   - name: Disable SAS key (local) authentication on an existing Device Provisioning Service, requiring Azure RBAC
     text: >
         az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
+  - name: Explicit capacity edits must retain an integer of at least 1.
+    text: az iot dps update --name MyDps --resource-group MyResourceGroup --set sku.capacity=1
 """
 
     # add DPS identity help

@@ -7,6 +7,7 @@
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ import sys
 
 import pytest
 import yaml
+from _pytest.mark.expression import Expression
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = ROOT / ".azure-devops/templates/run-tests-parallel.yml"
@@ -22,6 +24,9 @@ OFFLINE_BASH_TIMEOUT = 30
 CONTROLLER_ENV = (
     "azext_iot_dps_test_phase", "azext_iot_dps_phase_receipts", "azext_iot_dps_run_uid",
     "azext_iot_dps_test_subscription", "azext_iot_dps_test_resource_group",
+)
+LEGACY_DPS_EXPRESSION = (
+    "_int.py and not test_register_and_issue_certificate_contract and not test_register_without_csr_deadline_contract"
 )
 
 
@@ -80,13 +85,18 @@ def test_ado_dps_template_has_one_honestly_scoped_legacy_invocation():
     commands = [line.strip() for line in script.splitlines() if line.strip().startswith("pytest ")]
     assert len(commands) == 1
     command = commands[0]
-    assert command.startswith('pytest -vv ${{ parameters.path }} -k "_int.py"')
+    assert command.startswith(
+        'pytest -vv ${{ parameters.path }} -k "' + LEGACY_DPS_EXPRESSION + '"'
+    )
     assert "--ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py" in command
     assert "-n ${{ parameters.num_threads }}" in command
     assert "--reruns ${{ parameters.num_reruns }}" in command
     assert "--junitxml=junit/test-iotext-int.xml" in command
-    assert "legacy regular only" in script
-    assert "Service-SAS and owned local-auth-toggle coverage run through the GitHub DPS controller" in script
+    assert "legacy partial regular only, not full qualification" in script
+    assert (
+        "Owned normal registration, CSR issuance, service-SAS and local-auth-toggle coverage "
+        "require the GitHub DPS controller" in script
+    )
     assert "_dps_phase_runner.py" not in script
     assert "unset " not in script
     assert not re.search(r"(?:export\s+)?azext_iot_dps_test_phase=", script)
@@ -127,7 +137,8 @@ def _execute(tmp_path, overrides=None, exit_code=0):
         **(overrides or {}),
     )
     result = subprocess.run(
-        [bash, "-c", 'pytest() { printf "%s\\n" "$*" "$azext_iot_testdps" >> "$PYTEST_RECORD"; '
+        [bash, "-c", 'pytest() { printf "%q " "$@" >> "$PYTEST_RECORD"; '
+         'printf "\\n%s\\n" "$azext_iot_testdps" >> "$PYTEST_RECORD"; '
          'return "$PYTEST_EXIT"; }\n' + script],
         env=environment, cwd=tmp_path, capture_output=True, text=True, timeout=OFFLINE_BASH_TIMEOUT, check=False,
     )
@@ -144,7 +155,66 @@ def test_ado_legacy_script_runs_once_preserves_pins_and_propagates_pytest_exit(t
     assert arguments[arguments.index("-n") + 1] == "6"
     assert "--ignore=azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py" in arguments
     assert calls[1] == "supplied-unit-pin"
-    assert "legacy regular only" in result.stdout
+    assert "legacy partial regular only, not full qualification" in result.stdout
+    assert arguments[arguments.index("-k") + 1] == LEGACY_DPS_EXPRESSION
+
+
+@pytest.mark.parametrize("legacy", [False, True], ids=["all-four-controller-cases", "legacy-excludes-all-four"])
+def test_real_registration_collection_respects_legacy_controller_boundary(tmp_path, legacy):
+    command = next(line for line in _script().splitlines() if line.strip().startswith("pytest "))
+    arguments = shlex.split(command)
+    expression = arguments[arguments.index("-k") + 1]
+    prefix = "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py"
+    expected = {
+        f"{prefix}::{name}[{option}]"
+        for name in ("test_register_without_csr_deadline_contract", "test_register_and_issue_certificate_contract")
+        for option in ("default", "deadline")
+    }
+    manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
+    regular = manifest["expected_nodeids"]("regular")
+    required = {manifest["normalize_nodeid"](node) for node in expected}
+    assert len(regular) == 35 and required <= regular
+    matcher = Expression.compile(expression)
+    retained = {node for node in regular if matcher.evaluate(lambda keyword, node=node: keyword.lower() in node.lower())}
+    assert retained == regular - required and len(retained) == 31
+    assert len(manifest["expected_nodeids"]("service-sas")) == 29
+    assert len(manifest["expected_nodeids"]("local-auth-toggle")) == 3
+
+    config = tmp_path / "pytest.ini"
+    config.write_text("[pytest]\n", encoding="utf-8")
+    azure_config = tmp_path / "cli"
+    azure_config.mkdir(mode=0o700)
+    script = """
+import socket
+import sys
+def deny_network(*args, **kwargs):
+    raise AssertionError("Legacy selection proof must not connect to any service")
+socket.socket.connect = deny_network
+import pytest
+class ControllerFixtureContract:
+    def pytest_collection_finish(self, session):
+        for item in session.items:
+            assert "provisioned_csr_issuance" in item.fixturenames
+sys.exit(pytest.main(sys.argv[1:], plugins=[ControllerFixtureContract()]))
+"""
+    environment = {key: value for key, value in os.environ.items() if key not in CONTROLLER_ENV}
+    environment.pop("azext_iot_debug_selection", None)
+    environment.pop("azext_iot_dps_node_args", None)
+    environment.update(
+        AZURE_CONFIG_DIR=str(azure_config), AZURE_TEST_RUN_LIVE="False",
+        AZURE_CORE_COLLECT_TELEMETRY="0", AZURE_CORE_CHECK_VERSION="no",
+        AZURE_EXTENSION_USE_DYNAMIC_INSTALL="no", azext_iot_testrg="offline-legacy-rg",
+        PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS="",
+        PYTHONPATH=os.pathsep.join(dict.fromkeys([str(ROOT), *(os.path.abspath(path) for path in sys.path)])),
+    )
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", script, "-c", str(config), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
+         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", expression if legacy else "_int.py", prefix],
+        cwd=ROOT, env=environment, capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == (5 if legacy else 0), result.stdout + result.stderr
+    selected = {line for line in result.stdout.splitlines() if line.startswith(prefix + "::")}
+    assert selected == (set() if legacy else expected)
 
 
 @pytest.mark.parametrize("override", [
@@ -211,7 +281,7 @@ def test_ado_hub_public_jobs_are_serial_with_full_budgets_and_no_folder_selectio
     trigger = yaml.safe_load((ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     hub_jobs = [job for job in trigger["jobs"] if job["job"].startswith("Hub")]
     assert [job["job"] for job in hub_jobs] == ["HubControl", "HubData"]
-    assert [job["timeoutInMinutes"] for job in hub_jobs] == [225, 360]
+    assert [job["timeoutInMinutes"] for job in hub_jobs] == [275, 360]
     assert hub_jobs[1]["dependsOn"] == "HubControl"
     assert {"testDPS", "testADU", "testADR"}.issubset(hub_jobs[0]["dependsOn"])
     for job in hub_jobs:

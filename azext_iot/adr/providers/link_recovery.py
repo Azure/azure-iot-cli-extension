@@ -121,6 +121,9 @@ class LinkRecovery:
         self.namespace_identity = _namespace_identity(namespace)
         self.authorization_request = deepcopy(authorization_request)
         self.snapshot = None
+        previous = ((namespace.get("properties") or {}).get(section) or {}).get("endpoints", {}).get(name)
+        self.previous = _normalized(endpoint_update_body(previous)) if isinstance(previous, dict) else None
+        self.pending = False
         self.budget, self.verify = budget, verify
         self.progressed = True
 
@@ -144,21 +147,6 @@ class LinkRecovery:
             return ns_state, None
         if not isinstance(endpoint, dict):
             raise AzureResponseError("Malformed link endpoint response.")
-        actual = _normalized(endpoint_update_body(endpoint))
-        # The RP can fill omitted Hub provisioning defaults on the first read.
-        # Requested values must match; then freeze every writable setting.
-        expected = deepcopy(self.expected)
-        actual_settings = actual.get("provisioning", {})
-        expected_settings = expected.pop("provisioning", {})
-        comparison = {key: value for key, value in actual.items() if key != "provisioning"}
-        if (
-            comparison != expected
-            or not isinstance(actual_settings, dict)
-            or any(actual_settings.get(key) != value for key, value in expected_settings.items())
-            or (self.snapshot is not None and actual != self.snapshot)
-        ):
-            raise AzureResponseError("Link target, type, inbound identity or settings changed; recovery stopped.")
-        self.snapshot = actual
         state = endpoint.get("linkingState")
         if not isinstance(state, str) or state not in ACTIVE_STATES | TERMINAL_FAILURES | {"Succeeded"}:
             raise AzureResponseError(f"Malformed endpoint linkingState: {state!r}.")
@@ -172,6 +160,44 @@ class LinkRecovery:
             raise AzureResponseError("Malformed endpoint linkingError message.")
         if state == "Succeeded" and endpoint.get("linkingError"):
             raise AzureResponseError("Endpoint reports Succeeded with a linkingError; recovery stopped.")
+        actual = _normalized(endpoint_update_body(endpoint))
+        # The RP can fill omitted Hub provisioning defaults on the first read.
+        # Requested values must match; then freeze every writable setting.
+        expected = deepcopy(self.expected)
+        actual_settings = actual.get("provisioning", {})
+        expected_settings = expected.pop("provisioning", {})
+        comparison = {key: value for key, value in actual.items() if key != "provisioning"}
+        if (
+            comparison != expected
+            or not isinstance(actual_settings, dict)
+            or any(actual_settings.get(key) != value for key, value in expected_settings.items())
+            or (self.snapshot is not None and actual != self.snapshot)
+        ):
+            changed = sorted(
+                key for key in set(actual) | set(self.expected)
+                if actual.get(key) != self.expected.get(key)
+            )
+            frozen_changed = sorted(
+                key for key in set(actual) | set(self.snapshot or {})
+                if self.snapshot is not None and actual.get(key) != self.snapshot.get(key)
+            )
+            # A pending UPDATE may still expose the exact pre-write projection.
+            # Never freeze it, accept it as success, or recover its stale failure.
+            # No mixed projection, target/type change, post-convergence regression,
+            # or old view after operation completion is eligible.
+            if (
+                self.pending and ns_state in ACTIVE_STATES and self.snapshot is None
+                and actual == self.previous
+                and all(actual.get(key) == self.expected.get(key) for key in ("resourceId", "endpointType"))
+            ):
+                logger.info("Pending link update still exposes the pre-update fields: %s.", ", ".join(changed))
+                return ns_state, None
+            raise AzureResponseError(
+                "Link target, type, inbound identity or settings changed; recovery stopped. "
+                f"Requested-field differences: {', '.join(changed) or 'none'}; "
+                f"frozen-field differences: {', '.join(frozen_changed) or 'none'}."
+            )
+        self.snapshot = actual
         if ns_state in ACTIVE_STATES or state in ACTIVE_STATES:
             self.progressed = True
         return ns_state, endpoint
@@ -242,12 +268,16 @@ class LinkRecovery:
                         poller = self.budget.call(submit, body)
                         if no_wait:
                             return poller
-                        self.budget.call(
-                            self.provider._wait, poller, status_message,
-                            **{**kwargs, "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
-                               "clock": self.budget.clock, "sleeper": self.budget.pause,
-                               "deadline_guard": self.budget.remaining, "resource_observer": self.observe_lro},
-                        )
+                        self.pending = True
+                        try:
+                            self.budget.call(
+                                self.provider._wait, poller, status_message,
+                                **{**kwargs, "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
+                                   "clock": self.budget.clock, "sleeper": self.budget.pause,
+                                   "deadline_guard": self.budget.remaining, "resource_observer": self.observe_lro},
+                            )
+                        finally:
+                            self.pending = False
                     except ADRResourceStateError as error:
                         logger.warning("Link '%s' service failure: %s", self.name, error)
                         if no_wait:

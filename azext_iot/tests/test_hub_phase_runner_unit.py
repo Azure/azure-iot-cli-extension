@@ -537,12 +537,12 @@ def test_cleanup_requires_exact_descendant_absence(tmp_path):
 
 def test_budgets_leave_external_setup_below_github_cap():
     assert runner.BUDGETS == {
-        "HubControl": (("regular", 190 * 60),),
+        "HubControl": (("regular", 240 * 60),),
         "HubData": (("entra", 210 * 60), ("sas", 100 * 60)),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60
-    for suite, job_minutes in (("HubControl", 225), ("HubData", 360)):
+    for suite, job_minutes in (("HubControl", 275), ("HubData", 360)):
         controller = sum(seconds + runner.CLEANUP for _, seconds in runner.BUDGETS[suite]) + runner.RESERVE
         assert controller + 15 * 60 == job_minutes * 60 <= 360 * 60
 
@@ -779,7 +779,7 @@ def test_readonly_actions_require_exact_owned_roots(wire, action):
 
 @pytest.mark.parametrize("status", [None, 202, 429, 500])
 @pytest.mark.parametrize("method", ["PUT", "DELETE"])
-def test_parent_reconciles_only_acknowledged_async_acceptance(tmp_path, status, method):
+def test_parent_reconciles_acceptance_or_final_root_delete_absence(tmp_path, status, method):
     resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
     item = record(resource_id)
     if method == "DELETE":
@@ -797,11 +797,78 @@ def test_parent_reconciles_only_acknowledged_async_acceptance(tmp_path, status, 
             (404, None), (404, None),
         ])
     result = runner.cleanup_regular(reader, evidence, "uid", "entra", time.monotonic() + 1, tmp_path / "owner.json")
-    assert result["complete"] is (status == 202)
-    if status != 202:
+    assert result["complete"] is (status == 202 or method == "DELETE")
+    if method == "DELETE":
+        assert all(call[0] == "GET" for call in reader.calls)
+        assert item["mutations"][-1]["status"] == status
+        assert item["mutations"][-1]["absenceConfirmed"]
+    elif status != 202:
         assert not reader.calls
         ownership.observe_get(evidence, resource_id, 404, None)
         assert item["uncertain"]
+
+
+@pytest.mark.parametrize("damage", [
+    "present", "foreign-tag", "wrong-id", "unresolved-create", "child", "later-mutation",
+    "prior-uncertain", "responseError", "pollingFailed", "violation", "missing-record-id",
+])
+def test_uncertain_delete_retains_boundary_and_never_authorizes_another_mutation(tmp_path, monkeypatch, damage):
+    resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
+    item = record(resource_id)
+    deletion = {"method": "DELETE", "id": resource_id, "apiVersion": "api", "status": 503}
+    item["mutations"].append(deletion)
+    item["uncertain"] = True
+    evidence = {"schemaVersion": 1, "installed": True, "runId": "uid", "phase": "entra",
+                "resources": {resource_id: item}, "violations": []}
+    resource = {"id": resource_id, "tags": {ownership.OWNER_TAG: "uid"}}
+    if damage == "foreign-tag":
+        resource["tags"][ownership.OWNER_TAG] = "foreign"
+    elif damage == "wrong-id":
+        resource["id"] += "-foreign"
+    elif damage == "unresolved-create":
+        item["resolved"] = False
+    elif damage == "missing-record-id":
+        del item["id"]
+    elif damage == "child":
+        deletion["id"] += "/certificates/child"
+    elif damage == "later-mutation":
+        item["mutations"].append({"method": "PATCH", "id": resource_id, "status": 200})
+    elif damage == "prior-uncertain":
+        item["mutations"][0]["status"] = None
+    elif damage in ("responseError", "pollingFailed"):
+        deletion[damage] = True
+    elif damage == "violation":
+        evidence["violations"].append("Unplanned mutation")
+    reader = Reader()
+    reader.request = Mock(return_value=(200, resource))
+    clock = [0]
+    monkeypatch.setattr(ownership.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(ownership.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    path = tmp_path / "owner.json"
+    if damage in ("foreign-tag", "wrong-id"):
+        with pytest.raises(RuntimeError, match="no longer belongs"):
+            runner.cleanup_regular(reader, evidence, "uid", "entra", 3, path)
+        assert json.loads(path.read_text())["violationDetails"]
+    else:
+        result = runner.cleanup_regular(reader, evidence, "uid", "entra", 3, path)
+        assert not result["complete"] and result["errors"]
+    if damage == "present":
+        assert reader.request.call_count == 3 and clock[0] == 3
+    elif damage not in ("foreign-tag", "wrong-id"):
+        reader.request.assert_not_called()
+    assert all(call.args == ("GET", resource_id, "api") for call in reader.request.call_args_list)
+    assert deletion["status"] == 503 and not deletion.get("absenceConfirmed") and item["uncertain"]
+
+
+def test_uncertain_delete_needs_absence_evidence_even_if_uncertain_flag_is_missing():
+    resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + "a" * 32).casefold()
+    item = record(resource_id)
+    item["mutations"].append({"method": "DELETE", "id": resource_id, "status": 503})
+    evidence = {"schemaVersion": 1, "installed": True, "runId": "uid", "phase": "entra",
+                "resources": {resource_id: item}, "violations": []}
+    assert ownership.ownership_errors(evidence, "uid", "entra") == ["unresolved mutation; no replay permitted"]
+    ownership.observe_get(evidence, resource_id, 404, None)
+    assert not ownership.ownership_errors(evidence, "uid", "entra")
 
 
 def test_route_definitive_rejection_is_evidence_not_a_pass_and_distinct_update_allowed(wire, monkeypatch):

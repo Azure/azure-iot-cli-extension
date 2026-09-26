@@ -32,6 +32,7 @@ from filelock import FileLock, Timeout as LockTimeout
 from azext_iot import _factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.dps import _phase_receipts as receipts, _phase_runtime as runtime
+from azext_iot.tests.dps._phase_manifest import resource_type
 
 ROOT = Path(__file__).resolve().parents[4]
 RUNNER = runpy.run_path(str(ROOT / "azext_iot/tests/_dps_phase_runner.py"))
@@ -69,11 +70,7 @@ def _client(factory_name):
 def _owned(kind):
     group = os.environ[receipts.RESOURCE_GROUP_ENV]
     receipts.before_create("owned", group, UID, kind)
-    resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
-    return (
-        receipts.target()["endpoint"]
-        + f"/subscriptions/{SUB_B}/resourceGroups/{group}/providers/Microsoft.Devices/{resource_type}/owned"
-    )
+    return receipts.target()["endpoint"] + f"/subscriptions/{SUB_B}/resourceGroups/{group}/providers/{resource_type(kind)}/owned"
 
 
 @pytest.mark.parametrize("determinant", [False, True])
@@ -118,6 +115,7 @@ def test_cleanup_progress_survives_closed_pytest_capture(scope, monkeypatch, det
 @pytest.mark.parametrize("factory_name,kind", [
     ("iot_hub_service_factory", "hub"), ("adr_iot_hub_service_factory", "hub"),
     ("iot_service_provisioning_factory", "nh"), ("adr_iot_service_provisioning_factory", "nh"),
+    ("adr_service_factory", "csrns"),
 ])
 @pytest.mark.parametrize("method", ["PUT", "DELETE"])
 @pytest.mark.parametrize("failure", ["read-timeout", "504"])
@@ -182,6 +180,35 @@ def test_positional_sdk_endpoint_is_pinned_to_selected_public_target(scope):
         client = IotDpsClient(credential, SUB_B, ARM)
         assert client._config.base_url == "https://management.azure.com"
         client.close()
+
+
+@responses.activate
+@pytest.mark.parametrize("command,method,child,allowed", [
+    ("iot adr ns link add", "PATCH", "", True),
+    ("iot adr ns link dps update", "PATCH", "", True),
+    ("iot adr ns link hub add", "PATCH", "", True),
+    ("iot adr ns update", "PATCH", "", False),
+    ("iot adr ns link add", "PUT", "", False),
+    ("iot adr ns link add", "PATCH", "/certificateAuthorities/ca", False),
+])
+def test_native_link_can_submit_distinct_namespace_updates_without_allowing_other_command_replay(
+    scope, mocker, command, method, child, allowed,
+):
+    url = _owned("csrns") + child
+    responses.add(method, url, json={})
+    responses.add(method, url, json={})
+
+    def native_invoke(self, _command, **_kwargs):
+        client = _factory.adr_service_factory(self.az_cli, subscription_id=SUB_B)
+        client.send_request(HttpRequest(method, url))
+        client.send_request(HttpRequest(method, url))
+
+    mocker.patch.object(EmbeddedCLI, "invoke", native_invoke)
+    with runtime.activate(SUB_B):
+        with nullcontext() if allowed else pytest.raises(runtime.ScopeError, match="replay"):
+            EmbeddedCLI().invoke(command)
+    assert len(responses.calls) == (2 if allowed else 1)
+    assert not runtime._LINK_COMMAND.get()
 
 
 @responses.activate

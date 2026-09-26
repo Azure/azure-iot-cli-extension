@@ -135,9 +135,9 @@ jobs:
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
             # Regular -> service-SAS -> serial local-auth-toggle; certificate is not wired.
-            "DPS|azext_iot/tests/dps|DPS-int|120"
-            # Controller ceilings 210/345 minutes plus 15 minutes external setup; GH cap is 360.
-            "HubControl|azext_iot/tests/iothub|HubControl-int|225"
+            "DPS|azext_iot/tests/dps|DPS-int|150"
+            # Controller ceilings 260/345 minutes plus 15 minutes external setup; GH cap is 360.
+            "HubControl|azext_iot/tests/iothub|HubControl-int|275"
             "HubData|azext_iot/tests/iothub|HubData-int|360"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
             # Serial ADR includes a 175-minute SU link envelope and a separate 75-minute SU lifecycle.
@@ -379,23 +379,11 @@ jobs:
             --name "$RESOURCE_GROUP" \
             --output table
 
-      - name: "OIDC Token refresh service"
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: |
-          while true; do
-            token_request=$ACTIONS_ID_TOKEN_REQUEST_TOKEN
-            token_uri=$ACTIONS_ID_TOKEN_REQUEST_URL
-            token=$(curl -sH "Authorization: bearer $token_request" "${token_uri}&audience=api://AzureADTokenExchange" | jq .value -r)
-            az login --service-principal -u "$AZURE_CLIENT_ID" -t "$AZURE_TENANT_ID" --federated-token "$token" --output none
-            az account set --subscription "$TEST_SUBSCRIPTION_ID"
-            sleep 240
-          done &
-
       - name: "Run ${{ matrix.config.service }} integration tests"
         id: run_tests
         env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_TEST_RUN_LIVE: "True"
           PYTHONUNBUFFERED: "1"
           azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
@@ -411,10 +399,62 @@ jobs:
           azext_iot_adr_arm_endpoint: ${{ matrix.config.arm_endpoint }}
           azext_iot_adr_arm_resource: https://management.azure.com
         run: |
-          set -o pipefail
+          set -euo pipefail
+          # The base build Python has no CLI. Use the same CLI/cache implementation
+          # as the tests (DPS's controller lives outside its managed environment).
+          auth_python=".tox/$TEST_TOX_ENV/bin/python"
+          if [ "$TEST_SERVICE" = "DPS" ]; then
+            auth_python=".tox/DPS-phases/bin/python"
+          fi
+          # Fail before test execution if the explicit current account or auth is wrong.
+          "$auth_python" azext_iot/tests/_refresh_ci_auth.py
+          auth_ready=$(mktemp)
+          mkdir -p test-result
+          # A stalled writer must not keep the step's output pipe open on failure.
+          auth_log=test-result/auth-refresh.log
+          "$auth_python" azext_iot/tests/_refresh_ci_auth.py --loop --ready-file "$auth_ready" >"$auth_log" 2>&1 &
+          auth_pid=$!
+          stop_auth() {
+            result=$?
+            trap - EXIT
+            # A dead refresher (even exit 0) invalidates the run. A graceful stop
+            # waits for any in-flight cache persistence rather than interrupting it.
+            if ! kill -TERM "$auth_pid" 2>/dev/null; then
+              result=1
+            fi
+            auth_stop_deadline=$((SECONDS + 180))
+            while kill -0 "$auth_pid" 2>/dev/null; do
+              if [ "$SECONDS" -ge "$auth_stop_deadline" ]; then
+                echo "::error::OIDC refresher did not stop within 180 seconds; cache persistence was not force-killed."
+                cat "$auth_log"
+                rm -f "$auth_ready"
+                exit 1
+              fi
+              sleep 0.1
+            done
+            if ! wait "$auth_pid"; then
+              result=1
+            fi
+            cat "$auth_log"
+            rm -f "$auth_ready"
+            if [ "$result" -ne 0 ]; then
+              echo "::error::Integration tests or OIDC credential refresh failed."
+            fi
+            exit "$result"
+          }
+          trap stop_auth EXIT
+          # Even very short tests must not stop Python before its handlers exist.
+          auth_deadline=$((SECONDS + 30))
+          while [ ! -s "$auth_ready" ]; do
+            if ! kill -0 "$auth_pid" 2>/dev/null || [ "$SECONDS" -ge "$auth_deadline" ]; then
+              echo "::error::OIDC credential refresher did not become ready."
+              exit 1
+            fi
+            sleep 0.1
+          done
           run_service() {
             if [ "$TEST_SERVICE" = "DPS" ]; then
-              echo "DPS coverage: regular, service-SAS and serial local-auth-toggle; certificate coverage is not configured in this workflow."
+              echo "DPS coverage: regular (including owned CSR issuance), service-SAS and serial local-auth-toggle."
               .tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py \
                 --subscription "$TEST_SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" \
                 --region "$TEST_REGION" --arm-endpoint "$TEST_ARM_ENDPOINT"

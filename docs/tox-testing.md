@@ -98,6 +98,18 @@ The existing canary scope, identities/RBAC, quarantine and ownership checks stil
 Overlapping runs and additional Python/region combinations can consume resources
 concurrently; the former bounded-cohort reservation does not apply.
 
+DPS phases continue with fresh resources after a prior phase's cleanup fails,
+with a warning and the failed cleanup retained in the report. Cleanup and
+ownership checks still apply to each phase, and full qualification still requires
+every test and cleanup to pass. Cancellation and insufficient remaining runtime
+still stop scheduling. Leftover resources can consume quota; subsequent Azure
+provisioning failures are reported normally.
+
+HubControl reserves 240 minutes for serial execution, including normal pytest
+fixture teardown, plus 15 minutes for controller cleanup and 5 minutes for
+admission. GitHub and Azure DevOps jobs allow 275 minutes, including 15 minutes
+for external setup/reporting. Individual test timeouts remain unchanged.
+
 Every selected service runs its full branch-specific suite. GitHub dispatch and
 reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
 capacity-limit input; the release caller does not supply a quota override either.
@@ -111,6 +123,15 @@ unit tests retain coverage of failed-link recovery and identity-preserving updat
 Local focused-debug controls remain available and cannot qualify a full suite.
 
 ## ADR live-test budgets
+
+The owned SU-link lifecycle verifies that `link su add` creates the namespace
+outbound identity's **Device Update Administrator** role on the Update Instance
+without fixture service-role grants. It generates and reads back a namespace
+update-compliance report after both add and inbound-identity rotation through
+update. The fixture caller's separate Device Update Reader grant covers CLI
+discovery only; it cannot substitute for the namespace's report permissions.
+The opt-in `test_adr_report_int.py` suite additionally covers all three report
+types on a supplied SU-linked namespace.
 
 The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
 The root integration matrix applies this budget directly to each ADR service job.

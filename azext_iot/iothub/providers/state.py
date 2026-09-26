@@ -6,6 +6,8 @@
 
 import json
 import os
+import shlex
+import tempfile
 from copy import deepcopy
 from typing import Dict, List, Optional
 
@@ -21,6 +23,7 @@ from tqdm import tqdm
 
 import azext_iot.iothub.providers.helpers.state_strings as usr_msgs
 from azext_iot._factory import iot_hub_service_factory
+from azext_iot.common.arm import get_resource_group
 from azext_iot.common._azure import (
     parse_cosmos_db_connection_string,
     parse_iot_hub_message_endpoint_connection_string,
@@ -53,11 +56,151 @@ logger = get_logger(__name__)
 cli = EmbeddedCLI()
 
 
+def _state_value(value, expected_type, path):
+    if type(value) is not expected_type:
+        raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(path, f"expected {expected_type.__name__}"))
+    return value
+
+
+def _state_field(value, name, expected_type, path):
+    if name not in value:
+        raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"{path}.{name}", "required field is missing"))
+    return _state_value(value[name], expected_type, f"{path}.{name}")
+
+
+def _validate_state_identity(identity, path, module=False):
+    authentication = _state_field(identity, "authentication", dict, path)
+    auth_path = f"{path}.authentication"
+    auth_type = _state_field(authentication, "type", str, auth_path)
+    allowed = {DeviceAuthApiType.sas.value, DeviceAuthApiType.selfSigned.value, DeviceAuthApiType.certificateAuthority.value}
+    if module:
+        allowed.add("none")
+    if auth_type not in allowed:
+        raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"{auth_path}.type", "unsupported authentication type"))
+    if auth_type == DeviceAuthApiType.sas.value:
+        keys = _state_field(authentication, "symmetricKey", dict, auth_path)
+        for name in ("primaryKey", "secondaryKey"):
+            if not _state_field(keys, name, str, f"{auth_path}.symmetricKey"):
+                raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"{auth_path}.symmetricKey.{name}", "key is empty"))
+    elif auth_type == DeviceAuthApiType.selfSigned.value:
+        thumbprints = _state_field(authentication, "x509Thumbprint", dict, auth_path)
+        for name in ("primaryThumbprint", "secondaryThumbprint"):
+            if name not in thumbprints or thumbprints[name] is not None and not isinstance(thumbprints[name], str):
+                raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(
+                    f"{auth_path}.x509Thumbprint.{name}", "expected a thumbprint or explicit null"
+                ))
+        if not thumbprints["primaryThumbprint"] and not thumbprints["secondaryThumbprint"]:
+            raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(
+                f"{auth_path}.x509Thumbprint", "at least one thumbprint is required"
+            ))
+    if not module:
+        capabilities = _state_field(identity, "capabilities", dict, path)
+        _state_field(capabilities, "iotEdge", bool, f"{path}.capabilities")
+        _state_field(identity, "status", str, path)
+
+
+def _validate_state_twin(twin, path):
+    properties = _state_field(twin, "properties", dict, path)
+    _state_field(properties, "desired", dict, f"{path}.properties")
+    if "tags" in twin:
+        _state_field(twin, "tags", dict, path)
+
+
+def _validate_hub_state(hub_state, hub_aspects):
+    """Validate the selected snapshot fields consumed by restore, without changing them."""
+    _state_value(hub_state, dict, "state")
+    for aspect in hub_aspects:
+        value = _state_field(hub_state, aspect, dict, "state")
+        if aspect == HubAspects.Devices.value:
+            for device_id, device in value.items():
+                path = f"state.devices.{device_id}"
+                _state_value(device, dict, path)
+                _validate_state_identity(_state_field(device, "identity", dict, path), f"{path}.identity")
+                _validate_state_twin(_state_field(device, "twin", dict, path), f"{path}.twin")
+                if device.get("parent") is not None:
+                    _state_field(device, "parent", str, path)
+                modules = _state_value(device.get("modules", {}), dict, f"{path}.modules")
+                for module_id, module in modules.items():
+                    module_path = f"{path}.modules.{module_id}"
+                    _state_value(module, dict, module_path)
+                    if not module_id.startswith("$"):
+                        _validate_state_identity(
+                            _state_field(module, "identity", dict, module_path), f"{module_path}.identity", module=True
+                        )
+                    _validate_state_twin(_state_field(module, "twin", dict, module_path), f"{module_path}.twin")
+        elif aspect == HubAspects.Configurations.value:
+            for kind in ("admConfigurations", "edgeDeployments"):
+                configurations = _state_field(value, kind, dict, "state.configurations")
+                for config_id, config in configurations.items():
+                    path = f"state.configurations.{kind}.{config_id}"
+                    _state_value(config, dict, path)
+                    content = _state_field(config, "content", dict, path)
+                    _state_field(config, "targetCondition", str, path)
+                    _state_field(config, "priority", int, path)
+                    _state_field(config, "labels", dict, path)
+                    _state_field(config, "metrics", dict, path)
+                    if kind == "edgeDeployments":
+                        modules = _state_field(content, "modulesContent", dict, f"{path}.content")
+                        _state_field(modules, "$edgeAgent", dict, f"{path}.content.modulesContent")
+        elif aspect == HubAspects.Arm.value:
+            resources = _state_field(value, "resources", list, "state.arm")
+            if not resources:
+                raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format("state.arm.resources", "a Hub resource is required"))
+            hub = _state_value(resources[0], dict, "state.arm.resources[0]")
+            path = "state.arm.resources[0]"
+            for field in ("name", "type", "apiVersion", "location"):
+                _state_field(hub, field, str, path)
+            if hub["type"].lower() != "microsoft.devices/iothubs":
+                raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"{path}.type", "the first resource must be an IoT Hub"))
+            _state_field(hub, "sku", dict, path)
+            properties = _state_field(hub, "properties", dict, path)
+            events = _state_field(properties, "eventHubEndpoints", dict, f"{path}.properties")
+            event = _state_field(events, "events", dict, f"{path}.properties.eventHubEndpoints")
+            _state_field(event, "partitionCount", int, f"{path}.properties.eventHubEndpoints.events")
+            routing = _state_field(properties, "routing", dict, f"{path}.properties")
+            endpoints = _state_field(routing, "endpoints", dict, f"{path}.properties.routing")
+            for kind, entries in endpoints.items():
+                endpoint_path = f"{path}.properties.routing.endpoints.{kind}"
+                for endpoint in _state_value(entries, list, endpoint_path):
+                    _state_value(endpoint, dict, endpoint_path)
+                    _state_field(endpoint, "name", str, endpoint_path)
+                    if "authenticationType" in endpoint:
+                        _state_field(endpoint, "authenticationType", str, endpoint_path)
+            for index, resource in enumerate(resources[1:], 1):
+                path = f"state.arm.resources[{index}]"
+                _state_value(resource, dict, path)
+                if _state_field(resource, "type", str, path).endswith("certificates"):
+                    name = _state_field(resource, "name", str, path)
+                    depends_on = _state_field(resource, "dependsOn", list, path)
+                    if "/" not in name or not name.split("/")[1]:
+                        raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"{path}.name", "expected hub/certificate"))
+                    if not depends_on or not isinstance(depends_on[0], str) or len(depends_on[0].split("'")) < 4:
+                        raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(
+                            f"{path}.dependsOn", "expected the exported Hub dependency"
+                        ))
+        else:
+            raise BadRequestError(usr_msgs.INVALID_STATE_MSG.format(f"state.{aspect}", "unsupported Hub aspect"))
+
+
+def _require_device_snapshot_support(target):
+    if target and target.get("sku_tier") == "Basic":
+        raise BadRequestError(usr_msgs.BASIC_DEVICES_UNSUPPORTED_MSG)
+
+
 def _endpoint_resource_name(endpoint_uri: str) -> str:
     """Return the backing resource name (Service Bus / Event Hub namespace, or Cosmos DB / Storage
     account) parsed from a routing endpoint URI -- i.e. the first label of the host."""
     from urllib.parse import urlparse
     return (urlparse(endpoint_uri).hostname or "").split(".")[0]
+
+
+def _has_endpoint_arm_scope(endpoint, endpoint_type, *, credentials, require_resource_group=True):
+    """Require the lookup's own ARM scope rather than falling back to the Hub's scope."""
+    if endpoint.get("subscriptionId") and (not require_resource_group or endpoint.get("resourceGroup")):
+        return True
+    message = usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG if credentials else usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG
+    logger.warning(message.format(endpoint_type, endpoint["name"]))
+    return False
 
 
 class StateProvider(IoTHubProvider):
@@ -88,8 +231,6 @@ class StateProvider(IoTHubProvider):
 
         if self.target:
             self.hub_name = self.target["name"]
-        if not self.rg and self.target:
-            self.rg = self.target.get("resourcegroup")
 
     def _get_client(self):
         return iot_hub_service_factory(self.cmd.cli_ctx)
@@ -109,7 +250,8 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Arm.value in hub_aspects and self.login:
             raise MutuallyExclusiveArgumentError(usr_msgs.LOGIN_WITH_ARM_ERROR)
 
-        hub_state = self.process_hub_to_dict(self.target, hub_aspects)
+        hub_state = self.process_hub_to_dict(self.target, hub_aspects[:])
+        _validate_hub_state(hub_state, hub_aspects)
 
         try:
             with open(state_file, 'w', encoding='utf-8') as f:
@@ -131,17 +273,20 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Arm.value not in hub_aspects and not self.target:
             raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
 
-        self.delete_aspects(replace, hub_aspects)
-
+        if HubAspects.Devices.value in hub_aspects:
+            _require_device_snapshot_support(self.target)
         try:
             with open(state_file, 'r', encoding='utf-8') as f:
                 hub_state = json.load(f)
+        except FileNotFoundError as error:
+            raise FileOperationError(usr_msgs.FILE_NOT_FOUND_ERROR.format(state_file)) from error
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise FileOperationError(usr_msgs.STATE_FILE_READ_ERROR.format(state_file, error)) from error
 
-            self.upload_hub_from_dict(hub_state, hub_aspects)
-            logger.info(usr_msgs.UPLOAD_STATE_MSG.format(state_file, self.hub_name))
-
-        except FileNotFoundError:
-            raise FileOperationError(usr_msgs.FILE_NOT_FOUND_ERROR.format(state_file))
+        _validate_hub_state(hub_state, hub_aspects)
+        self.delete_aspects(replace, hub_aspects)
+        self.upload_hub_from_dict(hub_state, hub_aspects)
+        logger.info(usr_msgs.UPLOAD_STATE_MSG.format(state_file, self.hub_name))
 
     def migrate_state(
         self,
@@ -165,11 +310,19 @@ class StateProvider(IoTHubProvider):
             raise MutuallyExclusiveArgumentError(usr_msgs.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
             raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
+        if HubAspects.Devices.value in hub_aspects:
+            _require_device_snapshot_support(self.target)
         if not self.rg and not self.target:
-            self.rg = orig_hub_target.get("resourcegroup")
+            original_resource = self.discovery.find_resource(orig_hub, orig_rg)
+            self.rg = get_resource_group(
+                original_resource,
+                fallback=orig_rg,
+                resource_label="IoT Hub",
+            )
 
         # Command modifies hub_aspect - make copy so we can reuse for upload
         hub_state = self.process_hub_to_dict(orig_hub_target, hub_aspects[:])
+        _validate_hub_state(hub_state, hub_aspects)
         self.delete_aspects(replace, hub_aspects)
         self.upload_hub_from_dict(hub_state, hub_aspects)
 
@@ -217,56 +370,53 @@ class StateProvider(IoTHubProvider):
             }
         }
         """
+        if HubAspects.Devices.value in hub_aspects:
+            _require_device_snapshot_support(target)
         hub_state = {}
 
         if HubAspects.Configurations.value in hub_aspects:
             hub_aspects.remove(HubAspects.Configurations.value)
-            # Basic tier does not support list config
-            try:
-                all_configs = _iot_hub_configuration_list(target=target)
-                hub_state["configurations"] = {}
-                adm_configs = {}
-                for c in tqdm(all_configs, desc=usr_msgs.SAVE_CONFIGURATIONS_DESC, ascii=" #"):
-                    if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
-                        for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
-                            c.pop(key, None)
-                        adm_configs[c["id"]] = c
+            all_configs = deepcopy(_iot_hub_configuration_list(target=target))
+            hub_state["configurations"] = {}
+            adm_configs = {}
+            for c in tqdm(all_configs, desc=usr_msgs.SAVE_CONFIGURATIONS_DESC, ascii=" #"):
+                if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
+                    for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
+                        c.pop(key, None)
+                    adm_configs[c["id"]] = c
 
-                hub_state["configurations"]["admConfigurations"] = adm_configs
+            hub_state["configurations"]["admConfigurations"] = adm_configs
 
-                hub_state["configurations"]["edgeDeployments"] = {
-                    c["id"]: c for c in all_configs if c["content"].get("modulesContent")
-                }
-            except AzCLIError:
-                logger.warning(usr_msgs.SAVE_CONFIGURATIONS_RETRIEVE_FAIL_MSG)
+            hub_state["configurations"]["edgeDeployments"] = {
+                c["id"]: c for c in all_configs if c["content"].get("modulesContent")
+            }
 
         if HubAspects.Devices.value in hub_aspects:
             hub_aspects.remove(HubAspects.Devices.value)
-            devices = self.download_devices(target=target)
-            if devices:
-                hub_state["devices"] = devices
+            hub_state["devices"] = self.download_devices(target=target)
 
         # Controlplane using ARM
         if HubAspects.Arm.value in hub_aspects:
-            try:
-                hub_name = target.get("entity").split(".")[0]
-                hub_rg = target.get("resourcegroup")
+            hub_name = target.get("entity").split(".")[0]
+            hub_rg = self.rg if target is self.target else None
 
-                control_plane_obj = self.discovery.find_resource(hub_name, hub_rg)
-
-                if not hub_rg:
-                    hub_rg = control_plane_obj["resourcegroup"]
-                hub_resource_id = control_plane_obj["id"]
-                hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
-                if hub_arm and hub_arm["resources"]:
-                    hub_state["arm"] = hub_arm
-                    hub_resource = hub_state["arm"]["resources"][0]
-                    self.check_controlplane(hub_resource=hub_resource)
-                    print(usr_msgs.SAVE_ARM_DESC)
-                else:
-                    logger.warning(usr_msgs.SAVE_ARM_DESC_RETRIEVE_FAIL_MSG)
-            except AzCLIError as e:
-                logger.warning(usr_msgs.SAVE_ARM_DESC_RETRIEVE_ERROR_MSG.format(e))
+            control_plane_obj = self.discovery.find_resource(hub_name, hub_rg)
+            hub_rg = get_resource_group(
+                control_plane_obj,
+                fallback=hub_rg,
+                resource_label="IoT Hub",
+            )
+            hub_resource_id = control_plane_obj["id"]
+            hub_arm = cli.invoke(
+                f"group export -n {shlex.quote(hub_rg)} --resource-ids {shlex.quote(hub_resource_id)} --skip-all-params",
+                capture_stderr=True,
+            ).as_json()
+            if not hub_arm or not hub_arm.get("resources"):
+                raise BadRequestError(usr_msgs.SAVE_ARM_DESC_RETRIEVE_FAIL_MSG)
+            hub_state["arm"] = deepcopy(hub_arm)
+            hub_resource = hub_state["arm"]["resources"][0]
+            self.check_controlplane(hub_resource=hub_resource)
+            print(usr_msgs.SAVE_ARM_DESC)
 
         return hub_state
 
@@ -281,7 +431,10 @@ class StateProvider(IoTHubProvider):
                 # remove/overwrite attributes that cannot be changed
                 current_hub_resource = self.discovery.find_resource(self.hub_name, self.rg)
                 if not self.rg:
-                    self.rg = current_hub_resource["resourcegroup"]
+                    self.rg = get_resource_group(
+                        current_hub_resource,
+                        resource_label="IoT Hub",
+                    )
                 # location
                 hub_resource["location"] = current_hub_resource["location"]
                 # sku
@@ -306,7 +459,7 @@ class StateProvider(IoTHubProvider):
                 for endpoint_list in hub_resource["properties"]["routing"]["endpoints"].values():
                     for endpoint in endpoint_list:
                         if (
-                            endpoint["authenticationType"] == AuthenticationType.IdentityBased.value
+                            endpoint.get("authenticationType") == AuthenticationType.IdentityBased.value
                             and not endpoint.get("identity")
                         ):
                             identity_endpoints.append(endpoint["name"])
@@ -329,15 +482,19 @@ class StateProvider(IoTHubProvider):
             hub_resources.extend(hub_certs)
             hub_state["arm"]["resources"] = hub_resources
 
-            state_file = f"arm_deployment-{self.hub_name}.json"
-            with open(state_file, "w", encoding='utf-8') as f:
-                json.dump(hub_state["arm"], f)
-
-            print(f"Starting Arm Deployment for IoT Hub {self.hub_name}.")
-            arm_result = cli.invoke(
-                f"deployment group create --template-file {state_file} -g {self.rg}"
+            template = tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", prefix="iot-hub-state-", suffix=".json", delete=False
             )
-            os.remove(state_file)
+            state_file = template.name
+            try:
+                with template:
+                    json.dump(hub_state["arm"], template)
+                print(f"Starting Arm Deployment for IoT Hub {self.hub_name}.")
+                arm_result = cli.invoke(
+                    f"deployment group create --template-file {shlex.quote(state_file)} -g {shlex.quote(self.rg)}"
+                )
+            finally:
+                os.remove(state_file)
 
             if not arm_result.success():
                 raise BadRequestError(usr_msgs.FAILED_ARM_MSG.format(self.hub_name))
@@ -424,7 +581,7 @@ class StateProvider(IoTHubProvider):
                 config_progress.update(1)
 
         # Devices
-        if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
+        if HubAspects.Devices.value in hub_aspects and "devices" in hub_state:
             hub_aspects.remove(HubAspects.Devices.value)
             child_to_parent = {}
             for device_id, device_obj in tqdm(hub_state["devices"].items(), desc=usr_msgs.UPLOAD_DEVICE_MSG, ascii=" #"):
@@ -513,21 +670,17 @@ class StateProvider(IoTHubProvider):
             }
         }
         """
-        # if incorrect permissions, will fail to retrieve any devices
         devices = {}
-        # Only an explicit SKU identifies Basic; missing query fields may be index lag.
-        if target.get("sku_tier") == "Basic":
-            return devices
-        try:
-            twins = _iot_device_twin_list(target=target, top=None)
-        except AzCLIError:
-            logger.warning(usr_msgs.SAVE_DEVICES_RETRIEVE_FAIL_MSG)
-            return
+        # Only an explicit SKU identifies Basic; missing query properties can
+        # instead be index lag and must never silently discard a Standard twin.
+        _require_device_snapshot_support(target)
+        twins = _iot_device_twin_list(target=target, top=None)
 
         for i in tqdm(range(len(twins)), desc=usr_msgs.SAVE_DEVICE_DESC, ascii=" #"):
             device_id = twins[i]["deviceId"]
-            # Query discovers IDs, not snapshot content. Read failures must abort
-            # before migration deletes/restores or export overwrites an existing file.
+            # Query is discovery, not a snapshot: its tags/desired properties
+            # can lag a successful write. A failed authoritative read must
+            # abort capture before migration deletes or restores anything.
             device_twin = deepcopy(_iot_device_twin_show(target=target, device_id=device_id))
             device_obj = {}
 
@@ -549,55 +702,41 @@ class StateProvider(IoTHubProvider):
 
             # create the device identity from the device twin
             # primary and secondary keys show up in the "show" output but not in the "list" output
-            # Twin GET need not include query-only authentication fields. The
-            # existing SDK's identity GET supplies all three authentication types.
-            identity = _iot_device_show(target=target, device_id=device_id)
+            # Identity GET is authoritative for authentication and ADR metadata;
+            # neither is promised on Twin/query. Preserve them in the snapshot,
+            # but the restore path projects only writable identity extensions.
+            from azext_iot.iothub._payload import OWNED_IDENTITY_FIELDS
+            identity = deepcopy(_iot_device_show(target=target, device_id=device_id))
             device_twin.pop("authenticationType", None)
             device_twin.pop("x509Thumbprint", None)
-            device_twin["authentication"] = deepcopy(identity["authentication"])
+            device_twin["authentication"] = identity["authentication"]
+            for name in ("attributes", *OWNED_IDENTITY_FIELDS):
+                if identity.get(name) is not None:
+                    device_twin[name] = identity[name]
 
             for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
                 device_twin.pop(key, None)
             device_obj["identity"] = device_twin
 
-            # if unable to retrieve modules, log and continue without modules
-            module_objs = {}
-            try:
-                module_objs = _iot_device_module_list(target=target, device_id=device_id)
-            except AzCLIError:
-                logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_MODULES_RETRIEVE_FAIL_MSG.format(device_id))
+            module_objs = _iot_device_module_list(target=target, device_id=device_id)
 
             if module_objs:
                 device_obj["modules"] = {}
 
             for module in module_objs:
-                module = module.serialize()
                 module_id = module["moduleId"]
-                # Fail to retrieve module identity - log and continue without module
-                try:
-                    module_identity_show = _iot_device_module_show(
-                        target=target, device_id=device_id, module_id=module_id
-                    )
-                except AzCLIError:
-                    logger.warning(
-                        usr_msgs.SAVE_SPECIFIC_DEVICE_SPECIFIC_MODULE_RETRIEVE_FAIL_MSG.format("identity", module_id, device_id)
-                    )
-                    continue
-                module["authentication"] = module_identity_show["authentication"]
+                module_identity_show = _iot_device_module_show(
+                    target=target, device_id=device_id, module_id=module_id
+                )
+                module = deepcopy(module)
+                module["authentication"] = deepcopy(module_identity_show["authentication"])
 
                 for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
                     module.pop(key)
 
-                # Fail to retrieve module twin - log and continue without module
-                try:
-                    module_twin = _iot_device_module_twin_show(
-                        target=target, device_id=device_id, module_id=module_id
-                    )
-                except AzCLIError:
-                    logger.warning(
-                        usr_msgs.SAVE_SPECIFIC_DEVICE_SPECIFIC_MODULE_RETRIEVE_FAIL_MSG.format("twin", module_id, device_id)
-                    )
-                    continue
+                module_twin = deepcopy(_iot_device_module_twin_show(
+                    target=target, device_id=device_id, module_id=module_id
+                ))
 
                 for key in IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS:
                     module_twin.pop(key)
@@ -651,6 +790,9 @@ class StateProvider(IoTHubProvider):
         for ep in endpoints.get("cosmosDBSqlContainers", []):
             account_name = _endpoint_resource_name(ep["endpointUri"])
             if ep.get("primaryKey") or ep.get("secondaryKey"):
+                if not _has_endpoint_arm_scope(ep, "Cosmos DB Sql Collection", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 try:
                     cosmos_keys = cli.invoke(
                         "cosmosdb keys list --name {} --resource-group {} --type connection-strings --subscription {}".format(
@@ -679,6 +821,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Cosmos DB Sql Collection", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 success = cli.invoke(
                     "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
                     "--name {} --subscription {}".format(
@@ -703,6 +848,9 @@ class StateProvider(IoTHubProvider):
         eventhub_endpoints = []
         for ep in endpoints["eventHubs"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Event Hub", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -728,6 +876,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Event Hub", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "eventhubs eventhub show --namespace-name {} --resource-group {} "
@@ -749,6 +900,9 @@ class StateProvider(IoTHubProvider):
         servicebus_queue_endpoints = []
         for ep in endpoints["serviceBusQueues"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Service Bus Queue", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -774,6 +928,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Service Bus Queue", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus queue show --namespace-name {} --resource-group {} "
@@ -795,6 +952,9 @@ class StateProvider(IoTHubProvider):
         servicebus_topic_endpoints = []
         for ep in endpoints["serviceBusTopics"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Service Bus Topic", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
                 namespace = _endpoint_resource_name(endpoint_props["Endpoint"])
                 try:
@@ -822,6 +982,9 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                if not _has_endpoint_arm_scope(ep, "Service Bus Topic", credentials=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 namespace = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus topic show --namespace-name {} --resource-group {} "
@@ -845,6 +1008,9 @@ class StateProvider(IoTHubProvider):
         storage_endpoints = []
         for ep in endpoints["storageContainers"]:
             if ep.get("connectionString"):
+                if not _has_endpoint_arm_scope(ep, "Storage Container", credentials=True):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 endpoint_props = parse_storage_container_connection_string(ep["connectionString"])
                 try:
                     ep["connectionString"] = cli.invoke(
@@ -868,6 +1034,10 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
+                # Account show resolves the globally unique name within the explicit subscription.
+                if not _has_endpoint_arm_scope(ep, "Storage Container", credentials=False, require_resource_group=False):
+                    removed_endpoints.append(ep["name"])
+                    continue
                 account_name = _endpoint_resource_name(ep["endpointUri"])
                 success = cli.invoke(
                     "storage account show --name {} --subscription {}".format(
@@ -928,17 +1098,16 @@ class StateProvider(IoTHubProvider):
         auth_type = identity["authentication"]["type"]
         edge = identity["capabilities"]["iotEdge"]
         status = identity["status"]
-        ptp = identity["authentication"]["x509Thumbprint"]["primaryThumbprint"]
-        stp = identity["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
+        thumbprints = identity["authentication"].get("x509Thumbprint") or {}
+        ptp = thumbprints.get("primaryThumbprint")
+        stp = thumbprints.get("secondaryThumbprint")
 
-        if "status_reason" in identity.keys():
-            status_reason = identity["statusReason"]
-        else:
-            status_reason = None
+        status_reason = identity.get("statusReason")
 
         if auth_type == DeviceAuthApiType.sas.value:
-            pk = identity["authentication"]["symmetricKey"]["primaryKey"]
-            sk = identity["authentication"]["symmetricKey"]["secondaryKey"]
+            keys = identity["authentication"].get("symmetricKey") or {}
+            pk = keys.get("primaryKey")
+            sk = keys.get("secondaryKey")
 
             _iot_device_create(
                 target=self.target,
@@ -947,7 +1116,8 @@ class StateProvider(IoTHubProvider):
                 primary_key=pk,
                 secondary_key=sk,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         elif auth_type == DeviceAuthApiType.selfSigned.value:
@@ -959,7 +1129,8 @@ class StateProvider(IoTHubProvider):
                 primary_thumbprint=ptp,
                 secondary_thumbprint=stp,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         elif auth_type == DeviceAuthApiType.certificateAuthority.value:
@@ -971,7 +1142,8 @@ class StateProvider(IoTHubProvider):
                 primary_thumbprint=ptp,
                 secondary_thumbprint=stp,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         else:
@@ -983,11 +1155,12 @@ class StateProvider(IoTHubProvider):
         auth_type = identity["authentication"]["type"]
 
         if auth_type == DeviceAuthApiType.sas.value:
-            pk = identity["authentication"]["symmetricKey"]["primaryKey"]
-            sk = identity["authentication"]["symmetricKey"]["secondaryKey"]
+            keys = identity["authentication"].get("symmetricKey") or {}
+            pk = keys.get("primaryKey")
+            sk = keys.get("secondaryKey")
 
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id, primary_key=pk,
-                                      secondary_key=sk)
+                                      secondary_key=sk, identity_properties=identity)
 
         elif auth_type == DeviceAuthApiType.selfSigned.value:
             ptp = identity["authentication"]["x509Thumbprint"]["primaryThumbprint"]
@@ -995,11 +1168,11 @@ class StateProvider(IoTHubProvider):
 
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id,
                                       auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp,
-                                      secondary_thumbprint=stp)
+                                      secondary_thumbprint=stp, identity_properties=identity)
 
         elif auth_type == DeviceAuthApiType.certificateAuthority.value:
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id,
-                                      auth_method=DeviceAuthType.x509_ca.value)
+                                      auth_method=DeviceAuthType.x509_ca.value, identity_properties=identity)
 
         else:
             logger.error(usr_msgs.BAD_DEVICE_MODULE_AUTHORIZATION_MSG.format(module_id, device_id))

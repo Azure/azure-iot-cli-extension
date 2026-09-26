@@ -388,7 +388,7 @@ def _assert_owned_ids(observed_ids, expected_ids, description):
 
 
 def _read_device_for_comparison(device_id, hub_auth):
-    # Query rows establish the owned ID set, never current twin contents.
+    # Query rows establish the owned ID set, never the current twin contents.
     device = _invoke_state(f"iot hub device-twin show {hub_auth} -d {device_id}").as_json()
     identity = _invoke_state(f"iot hub device-identity show {hub_auth} -d {device_id}").as_json()
     authentication = identity["authentication"]
@@ -827,7 +827,7 @@ def compare_configs(configlist1, configlist2):
 
 
 def _compare_twin_content(twin1, twin2):
-    # Presence is symmetric: missing or extra tags must not conceal lost state.
+    # Compare presence symmetrically: neither missing nor extra tags may hide loss.
     assert ("tags" in twin1) == ("tags" in twin2)
     if "tags" in twin1:
         assert twin1["tags"] == twin2["tags"]

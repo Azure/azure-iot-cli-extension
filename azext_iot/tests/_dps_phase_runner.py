@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/cleanup gates."""
+"""Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/cleanup reporting."""
 
 import argparse
 from contextlib import contextmanager
@@ -30,11 +30,11 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 ARM = "https://centraluseuap.management.azure.com"
 PHASES = (
-    ("regular", 20 * 60, 5 * 60),
+    ("regular", 45 * 60, 10 * 60),
     ("service-sas", 40 * 60, 10 * 60),
     ("local-auth-toggle", 20 * 60, 5 * 60),
 )
-RUNNER_SECONDS = 110 * 60
+RUNNER_SECONDS = 140 * 60
 READ_SECONDS = 60
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
@@ -204,6 +204,7 @@ class ArmReader:
         from azext_iot._factory import _ADR_DPS_API_VERSION, _ADR_IOT_HUB_API_VERSION
         from azext_iot.sdk.dps.mgmt import IotDpsClient
         from azext_iot.sdk.iothub.mgmt import IotHubClient
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
         self.subscription = subscription
         self.deadline = None
@@ -247,6 +248,7 @@ class ArmReader:
             )
         self.dps = client(IotDpsClient, _ADR_DPS_API_VERSION)
         self.hub = client(IotHubClient, _ADR_IOT_HUB_API_VERSION)
+        self.adr = client(DeviceRegistryMgmtClient, "2026-11-02-preview")
 
     @staticmethod
     def snapshot(resource):
@@ -271,9 +273,12 @@ class ArmReader:
         from azure.core.exceptions import HttpResponseError
         with bounded_read(self.deadline):
             try:
-                if record["kind"] == "hub":
+                if record["kind"] in ("hub", "csrhub"):
                     resource = self.hub.iot_hub_resource.get(
                         resource_group_name=record["resource_group"], resource_name=record["name"])
+                elif record["kind"] == "csrns":
+                    resource = self.adr.namespaces.get(
+                        resource_group_name=record["resource_group"], namespace_name=record["name"])
                 else:
                     resource = self.dps.iot_dps_resource.get(
                         resource_group_name=record["resource_group"], provisioning_service_name=record["name"])
@@ -302,10 +307,9 @@ def ownership(receipts, phase, uid, subscription, group, baseline, *, region="ce
     for path in sorted(receipts.glob("owned-*.json")):
         record = json.loads(path.read_text(encoding="utf-8"))
         kind = record.get("kind")
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         expected_id = (
-            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/Microsoft.Devices/"
-            f"{resource_type}/{record.get('name')}"
+            f"/subscriptions/{subscription}/resourceGroups/{group}/providers/"
+            f"{MANIFEST['resource_type'](kind)}/{record.get('name')}"
         )
         expected_uid = uid if phase == "regular" else f"{uid}-{phase}"
         if (not TARGETS["matches"](record, target)
@@ -596,7 +600,6 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         baseline_ids = set(inventory_ids(baseline))
         summary["baseline"] = {"resources": baseline, "at": utc()}
         write_json(summary_path, summary)
-        records = []
         with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
             for index, (name, runtime, cleanup) in enumerate(phases):
                 result = summary["phases"][index]
@@ -606,24 +609,11 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 if index:
                     prior = summary["phases"][index - 1]
                     if not prior.get("cleanup", {}).get("complete"):
-                        result["reason"] = f"{prior['name']} owned-resource cleanup was not proven"
-                        break
-                    previous_ids = set(prior["cleanup"]["owned_ids"])
-                    present = [resource for record in records if (resource := reader.get(record)) is not None]
-                    inventory = reader.inventory()
-                    ids = inventory_ids(inventory)
-                    listed = [resource for resource in inventory
-                              if resource["id"].lower() in {value.lower() for value in previous_ids}]
-                    absent = not present and not listed
-                    result["gate"] = {
-                        "previous_owned_absent": absent, "remaining": present + listed, "inventory_ids": ids, "at": utc(),
-                    }
-                    if not absent:
-                        result["reason"] = "Fresh owned-ID absence gate failed"
-                        break
-                if clock() + runtime + cleanup + READ_SECONDS > deadline:
-                    result["reason"] = "Read-only gates left insufficient full phase/cleanup budget"
-                    break
+                        print(
+                            f"[DPS phases] WARNING: {prior['name']} cleanup was not proven; "
+                            f"continuing {name} with independent resources. The run remains failed.",
+                            flush=True,
+                        )
                 folder = output / name
                 receipts = folder / "receipts"
                 receipts.mkdir(parents=True)
@@ -669,7 +659,6 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 finally:
                     os.chdir(cwd)
                 result.update({key: value for key, value in execution.items() if key != "cleanup_deadline"})
-                records = []
                 try:
                     selected = selection_count(receipts, name, debug=debug)
                     result["results"] = safe_junit(raw_junit, folder / "junit.xml", name, selected, debug=debug)

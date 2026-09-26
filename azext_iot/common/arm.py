@@ -69,6 +69,23 @@ def get_resource_group(
     return resource_group
 
 
+def get_subscription_id(
+    resource: Optional[dict],
+    fallback: Optional[str] = None,
+    resource_label: str = "resource",
+) -> str:
+    """Resolve a subscription from an ARM resource ID or caller context."""
+    subscription_id = _resource_id_parts(resource).get("subscription")
+    if subscription_id:
+        return subscription_id
+    if fallback:
+        return fallback
+    raise CLIInternalError(
+        f"The {resource_label} response did not include a usable resource ID "
+        "and no subscription was supplied."
+    )
+
+
 def sanitize_arm_identity(identity: Optional[dict]) -> Optional[dict]:
     """Copy only writable ARM managed-identity fields."""
     if not identity:
@@ -99,6 +116,8 @@ def hub_description_for_write(hub: dict) -> dict:
     properties = deepcopy(hub.get("properties") or {})
     for key in (
         "deviceRegistry",
+        "deviceRegistryNamespace",
+        "deviceRegistryNamespaces",
         "provisioningState",
         "state",
         "hostName",

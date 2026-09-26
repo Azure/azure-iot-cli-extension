@@ -66,10 +66,14 @@ def storage_scenario(mocker):
 
     client.invoke = mocker.Mock(side_effect=invoke)
     scenario.infrastructure = (
-        [{"hub": {
-            "name": "owned-hub", "resourcegroup": "owned-rg", "subscriptionid": "sub",
-            "identity": {"userAssignedIdentities": {"owned-identity": {}}},
-        }}],
+        [{
+            "name": "owned-hub", "rg": "owned-rg",
+            "hub": {
+                "name": "owned-hub",
+                "id": "/subscriptions/sub/resourceGroups/owned-rg/providers/Microsoft.Devices/IotHubs/owned-hub",
+                "identity": {"userAssignedIdentities": {"owned-identity": {}}},
+            },
+        }],
         {
             "connectionString": "DefaultEndpointsProtocol=https;AccountName=offline",
             "storage": {"primaryEndpoints": {"blob": "https://offline.blob.core.windows.net/"}},

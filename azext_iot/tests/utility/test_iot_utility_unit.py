@@ -254,7 +254,7 @@ class TestEmbeddedCli(object):
 
         def mock_invoke(args, out_file):
             azclient.return_value.exception_handler("Generic Issue")
-            azclient.return_value.result.error = None
+            azclient.return_value.result = mock.Mock(error=None)
             if request.param == 0:
                 out_file.write(json.dumps({"generickey": "genericvalue"}))
             else:
@@ -317,7 +317,7 @@ class TestEmbeddedCli(object):
             if mocked_azclient.test_meta.error_code == 2:
                 with pytest.raises(CLIInternalError) as e:
                     cli.as_json()
-                assert "Issue parsing received payload" in str(e.value)
+                assert "exit code 2" in str(e.value)
         elif mocked_azclient.test_meta.error_code == 0:
             assert success
             assert cli.as_json()

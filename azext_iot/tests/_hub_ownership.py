@@ -110,6 +110,29 @@ def pending_mutation(mutation):
             and not mutation.get("reconciled"))
 
 
+def uncertain_delete(record, mutation):
+    """Only a final root DELETE after proven creation can be resolved by absence.
+
+    Preserve the original failure/transport status. A GET cannot establish the
+    outcome of a PUT, child mutation, failed LRO, or invalid response metadata.
+    """
+    status = mutation.get("status")
+    return (
+        record.get("resolved") and mutation is record["mutations"][-1]
+        and mutation.get("method") == "DELETE" and mutation.get("id") == record.get("id")
+        and not mutation.get("responseError") and not mutation.get("pollingFailed")
+        and (status is None or status in (408, 429) or (isinstance(status, int) and status >= 500))
+    )
+
+
+def mutation_uncertain(record, mutation):
+    if uncertain_delete(record, mutation) and mutation.get("absenceConfirmed"):
+        return False
+    status = mutation.get("status")
+    return (status is None or mutation.get("responseError") or mutation.get("pollingFailed")
+            or pending_mutation(mutation) or status in (408, 429) or (isinstance(status, int) and status >= 500))
+
+
 def _arm_read_location(url):
     """Validate read origin/subscription without mistaking resource GETs for LRO URLs."""
     if not isinstance(url, str) or not url or re.search(r"[\s\\]", url):
@@ -244,11 +267,13 @@ def request_body(raw):
 
 
 def observe_get(data, resource_id, status, resource):
-    """A GET can resolve acknowledged acceptance, never an unknown transport outcome."""
+    """Resolve acceptance, or prove absence after a final owned root DELETE."""
     for root, record in data["resources"].items():
         if resource_id == root and status == 404 and record["mutations"]:
             latest = record["mutations"][-1]
-            if latest["id"] == root and latest["method"] == "DELETE" and latest["status"] in (200, 202, 204, 404):
+            if latest["id"] == root and latest["method"] == "DELETE" and (
+                latest["status"] in (200, 202, 204, 404) or uncertain_delete(record, latest)
+            ):
                 latest["absenceConfirmed"] = True
         if resource_id == root and status == 200:
             if (resource.get("id", "").casefold() != root
@@ -291,15 +316,11 @@ def observe_get(data, resource_id, status, resource):
                     record["deploymentSucceeded"] = True
             if confirmed:
                 mutation["reconciled"] = True
-        record["uncertain"] = any(
-            m["status"] is None or m.get("responseError") or m.get("pollingFailed") or pending_mutation(m)
-            or m["status"] in (408, 429) or (isinstance(m["status"], int) and m["status"] >= 500)
-            for m in record["mutations"]
-        )
+        record["uncertain"] = any(mutation_uncertain(record, m) for m in record["mutations"])
 
 
 def reconcile(arm, data, deadline, save):
-    """Bounded GET-only resolution of acknowledged provisioning, never ambiguity."""
+    """Bounded GET-only reconciliation; never repeat a mutation."""
     previous = arm.deadline
     arm.deadline = min(previous or float("inf"), deadline)
     try:
@@ -314,8 +335,9 @@ def _reconcile(arm, data, deadline, save):
             continue
         mutations = record.get("mutations", [])
         if not mutations or any(
-            m.get("status") is None or m.get("responseError") or m.get("pollingFailed") or m.get("status") in (408, 429)
-            or (isinstance(m.get("status"), int) and m["status"] >= 500) for m in mutations
+            m.get("responseError") or m.get("pollingFailed")
+            or (mutation_uncertain(record, m) and not pending_mutation(m) and not uncertain_delete(record, m))
+            for m in mutations
         ):
             return
 
@@ -323,7 +345,9 @@ def _reconcile(arm, data, deadline, save):
         pending = set()
         for record in data["resources"].values():
             for mutation in record["mutations"]:
-                if not pending_mutation(mutation):
+                if not (pending_mutation(mutation) or (
+                    uncertain_delete(record, mutation) and not mutation.get("absenceConfirmed")
+                )):
                     continue
                 pending.add((mutation["id"], mutation.get("apiVersion", record["apiVersion"])))
                 if mutation.get("deployment"):
@@ -394,6 +418,7 @@ def ownership_errors(data, run_id, phase):
             if (previous.get("generation", 1) != index + 1 or not mutations
                     or mutations[-1].get("method") != "DELETE"
                     or mutations[-1].get("id") != resource_id
+                    or mutations[-1].get("status") not in (200, 202, 204, 404)
                     or not mutations[-1].get("absenceConfirmed")):
                 errors.append("unconfirmed previous generation deletion")
         if (not scope_id(resource_id) or record.get("id") != resource_id
@@ -401,12 +426,13 @@ def ownership_errors(data, run_id, phase):
                 or not record.get("attempted") or record.get("ownerTag") != run_id):
             errors.append("invalid pre-create evidence")
         if (record.get("uncertain") or not record.get("resolved")
-                or any(m.get("responseError") or m.get("pollingFailed") for m in record.get("mutations", []))):
+                or any(mutation_uncertain(record, m) for m in record.get("mutations", []))):
             errors.append("unresolved mutation; no replay permitted")
         mutations = record.get("mutations", [])
         if not mutations or mutations[0].get("method") != "PUT":
             errors.append("missing initial mutation")
-        if any(m.get("status") not in (200, 201, 202, 204, 404) and not expected_rejection(m) for m in mutations):
+        if any(m.get("status") not in (200, 201, 202, 204, 404)
+               and not expected_rejection(m) and not uncertain_delete(record, m) for m in mutations):
             errors.append("missing/failed mutation response")
         if any(pending_mutation(m) for m in mutations):
             errors.append("unreconciled asynchronous acceptance")
@@ -479,7 +505,10 @@ class Arm:
             )
             if response.status_code not in (200, 201, 202, 204, 404):
                 raise OwnershipError("ARM request failed (response omitted)")
-            body = response.json() if response.status_code == 200 else None
+            # DELETE success may be bodyless (including HTTP 200). Its body is
+            # not ownership evidence: cleanup must still GET the exact ID to 404.
+            # GET 200, unlike DELETE, requires valid JSON and must fail closed.
+            body = response.json() if method == "GET" and response.status_code == 200 else None
             checkpoint()
             return response.status_code, body
 
@@ -527,8 +556,8 @@ class Observer:
     """Installed before conftest imports; only new fixture roots in the authorized RG.
 
     A durable record precedes every initial PUT. Subsequent operations are permitted
-    only below these roots. An ambiguous response permanently poisons the record:
-    neither a SDK retry nor controller cleanup may replay it.
+    only below these roots. Ambiguous mutations cannot be replayed. An exact GET
+    may prove absence after a final root DELETE; its original journal is retained.
     """
 
     def __init__(self, path, run_id, phase, arm):
@@ -542,7 +571,7 @@ class Observer:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("x", encoding="utf-8"):
             pass
-        self.original_send = self.original_subscription = None
+        self.original_send = self.original_subscription = self.original_retry_send = None
         self.current_node = None
         self.deployment_plans = set()
         self.save()
@@ -613,6 +642,8 @@ class Observer:
                 self._verify(reconcile, self.arm, self.data, deadline, self.save)
             if roots[root]["uncertain"]:
                 self.reject("Uncertain mutation cannot be replayed")
+            if uncertain_delete(roots[root], roots[root]["mutations"][-1]):
+                self.reject("Unacknowledged DELETE cannot be replayed")
             if not roots[root]["resolved"]:
                 self.reject("Failed initial creation cannot authorize an update")
             if roots[root]["resolved"]:
@@ -884,10 +915,27 @@ class Observer:
     def install(self):
         import requests
         from azure.cli.core._profile import Profile
+        from azure.core.pipeline.policies import RetryPolicy
         from urllib3.util.retry import Retry
         owner = self
         self.original_send = requests.Session.send
         self.original_subscription = Profile.get_subscription
+        self.original_retry_send = RetryPolicy.send
+
+        def retry_send(policy, request):
+            http = request.http_request
+            parsed = urlsplit(http.url)
+            method = http.method.upper()
+            mutation = method in ("PUT", "PATCH", "DELETE") or (
+                method == "POST" and parsed.path.casefold().rstrip("/").endswith(("/generateverificationcode", "/verify"))
+            )
+            if parsed.hostname in ARM_HOSTS and mutation:
+                # urllib3's adapter is below Azure Core's retry loop. Disable
+                # both layers before dispatch, including retries of transport
+                # errors. GET/read-only POST and non-ARM clients retain their
+                # normal policy; unplanned POSTs are blocked by the observer.
+                request.context.options.update(retry_total=0, retry_connect=0, retry_read=0, retry_status=0)
+            return owner.original_retry_send(policy, request)
 
         def subscription(profile, subscription=None):
             if subscription and subscription.casefold() != SUBSCRIPTION:
@@ -994,6 +1042,7 @@ class Observer:
 
         requests.Session.send = send
         Profile.get_subscription = subscription
+        RetryPolicy.send = retry_send
         self.data["installed"] = True
         self.save()
 
@@ -1001,8 +1050,10 @@ class Observer:
         if self.original_send is not None:
             import requests
             from azure.cli.core._profile import Profile
+            from azure.core.pipeline.policies import RetryPolicy
             requests.Session.send = self.original_send
             Profile.get_subscription = self.original_subscription
+            RetryPolicy.send = self.original_retry_send
 
 
 class ProcessScope:

@@ -6,18 +6,37 @@ Release History
 1.0.0b1 (Preview)
 +++++++++++++++++
 
+**Hub/DPS SDK and command updates**
+
+* Updated modeless Hub management to ``2026-10-01-preview`` and DPS management to ``2026-06-01-preview`` on Central US EUAP. General management and ADR target/identity-safety reads use target-subscription credentials, native API overrides, and validated resource IDs.
+* Updated synchronous modeless Hub service/device REST clients to ``2026-11-01-preview`` and DPS service/device REST clients to ``2026-11-02-preview``. Handwritten Hub compatibility remains in adapters outside generated SDK operations.
+* Preserved management CRUD/upsert, conditional Hub writes, partial identity merging, Fabric endpoints/routes, and exact discovered service/device hostnames. Hub upserts preserve unspecified settings and identities selected by active ADR links.
+* DPS create requires positive integer ``--unit`` values, retaining the default of 1. Explicit generic capacity updates are validated before writes without blocking unrelated updates of resources whose capacity is absent.
+* Adapted Hub query, messaging, C2D settlement, file upload, direct-method/digital-twin, configuration, and job commands to the new HTTP contract. JSON serialization is explicit before raw transport; service authentication remains separate from device credentials.
+* Hub device-identity updates retain inherited target/authentication validation and reject normalized read-only metadata edits before resource discovery, including leading-dot paths.
+* State export reads authoritative identities and twins rather than treating query rows as complete snapshots. Import validates state before destructive replacement, rejects incomplete Basic device snapshots, preserves routing/authentication fields, and uses private temporary ARM staging.
+* DPS enrollment retains unknown writable JSON fields and supports ``--adr-namespace``, ``--adr-ca-name``, and ``--adr-cert-policy-name``, with namespace/certificate-name aliases and deprecated credential-policy aliases. All three empty references explicitly clear the association; incomplete references fail validation.
+* DPS queries follow continuation headers, reject repeated tokens and malformed pages, preserve service error codes and conditional ETags, and honor zero-item limits. ``--top -1`` retains its unlimited compatibility meaning.
+* DPS service authentication renews per request through in-process CLI credentials or SAS, preserves exact sovereign/custom hostnames, and blocks authentication redirects.
+* DPS bulk target discovery warns and skips resources whose ARM key/policy access is denied, including translated authorization errors. Explicit target requests and subscription enumeration failures still surface their errors.
+* Both CSR and non-CSR device registration use REST. ``--csr`` / ``--csr-file-path`` accept validated PEM or base64 DER PKCS #10 requests; signatures and Common Names are checked and the wire value is base64 DER. Payload, TPM attestation, operation-status, issued certificate-chain JSON, connection profiles, and Registry Device external-ID correlation remain available.
+* Explicit registration ``--timeout`` bounds worker startup, HTTP, and polling after preliminary discovery/bootstrap authentication, with worker reaping and no mutation replay. Encrypted X.509 keys and requests 2.32 connection-pool SSL contexts are supported; worker diagnostics expose only bounded, allowlisted metadata.
+* Registration timeouts preserve accepted operation IDs through bounded worker progress and provide ``operation-status`` follow-up guidance. Pre-acceptance timeouts explicitly identify the operation ID as unknown; help and authorization errors lead with supported workflows and next actions.
+* Preserved certificate-chain JSON without inventing TLS-ready encoding/order guarantees. DPS device-update actions remain SDK methods rather than public operator commands.
+* Expanded wire/authentication, CSR/certificate, metadata, state-safety, and responding-device coverage. Dedicated service-SAS/local-auth phases remain isolated from regular Entra-authenticated fixtures.
+
 **ADR SDK and API compatibility**
 
 * Expanded the cloud-only ADR surface to 112 commands for namespaces, Registry Devices, certificate authorities and policies, groups, jobs and runs, namespace links, reports, and Software Updates.
 * Replaced the ADR/CMS and Software Updates control/data clients with pinned TypeSpec-generated, modeless, synchronous-only clients. ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint; Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
-* ADR target lookups and identity-safety reads use Hub ``2026-10-01-preview`` and DPS ``2026-06-01-preview`` contracts. General Hub/DPS management retain preview SDK defaults (``2026-05-01-preview`` / ``2026-08-31``) and use Central US EUAP; their SDK upgrades and certificate-issuing enrollment/registration remain separate child-branch work.
+* ADR target lookups and identity-safety reads use the same Hub ``2026-10-01-preview`` and DPS ``2026-06-01-preview`` contracts as general management.
 * Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. Shared deadline-based polling handles Retry-After, transient reads, terminal failures, and no-wait follow-up without extending the operation budget.
 
 **Namespace links and identity safety**
 
 * Made ``az iot adr ns link hub|dps|su`` the canonical relationship model. Hub/DPS create and update no longer accept resource-side namespace inputs; namespace create/update do not expose raw messaging, provisioning, or updating endpoint bags.
 * Added target existence, region, provisioning-state, Standard Hub SKU, ARM ID, selected identity, endpoint collision, cardinality, and DPS-first Hub ordering validation. Cross-subscription DPS projections and partial failures preserve existing endpoints.
-* Link add/update reuse inherited role assignments and create only missing service assignments for authorized Owner or User Access Administrator callers. Plans, completed requests, and partial failures are disclosed; visibility is confirmed before namespace mutation. SU setup includes the ADU first-party application assignment without granting caller content roles.
+* Link add/update reuse inherited role assignments and create only missing service assignments for authorized Owner or User Access Administrator callers. Plans, completed requests, and partial failures are disclosed; visibility is confirmed before namespace mutation. SU setup grants the namespace outbound managed identity Contributor and Device Update Administrator on the Update Instance, and the selected SU identity Azure Device Registry Contributor on the namespace, without granting caller content roles or requiring an ADU first-party application assignment.
 * DPS link add/update, including combined DPS/Hub setup, grant the namespace's system-assigned identity Azure Device Registry Administrator on its own namespace for registry-device provisioning. This identity is distinct from a configured outbound UAMI; caller DPS data-plane roles are not granted.
 * Standardized managed-identity options on ``--system-assigned-mi`` / ``--user-assigned-mi``, retaining hidden ``--mi-*`` aliases. Qualified options select namespace outbound and bundled-link identities.
 * Composite ``--hub-name`` / ``--hn`` and ``--dps-name`` / ``--dn`` label aliases remain accepted and now emit deprecation warnings directing callers to ``--hub-endpoint-name`` and ``--dps-endpoint-name``.
@@ -55,8 +74,9 @@ Release History
 
 * Added secret-redacted command logging, timed steps, and separate cohort reports. Workflow runs execute full selected-service suites without per-test workflow filters.
 * Integration cleanup confirms exact owned-child GET404 before bounded namespace deletion and preserves cleanup failures. Narrow link-readiness recovery handles the recognized namespace-identity condition without retrying unrelated failures or deleting borrowed targets.
-* Strengthened authentication-phase isolation, role-creation coordination, ownership receipts, and ownership/cleanup-only admission without quota or capacity gating. Expanded generated-client, parser-retirement, identity-safety, SDK/HTTP, and cross-platform regression coverage.
+* Strengthened authentication-phase isolation, role-creation coordination, ownership receipts, and cleanup verification without quota or capacity gating. Expanded generated-client, parser-retirement, identity-safety, SDK/HTTP, and cross-platform regression coverage.
 * Reclassified Hub integration into ``HubControl`` and ``HubData``, with mandatory isolated Entra and SAS Data phases and exact ownership and cleanup accounting.
+* DPS phases continue independently after cleanup failures while retaining failed cleanup results and ownership safeguards. HubControl allows 240 minutes for execution and fixture teardown, with 275-minute GitHub and Azure DevOps job ceilings.
 
 0.33.0b1 (Preview)
 ++++++++++++++++++

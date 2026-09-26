@@ -69,9 +69,8 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
     for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
         name = f"owned-{uid[:8]}-{kind}"
-        resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
         resource_id = (f"/subscriptions/{subscription}/resourceGroups/{group}/providers/"
-                       + "Microsoft.Devices/" + resource_type + "/" + name)
+                       + RUNNER["MANIFEST"]["resource_type"](kind) + "/" + name)
         _json(directory / f"owned-{kind}.json", dict(
             metadata, kind=kind, name=name, resource_group=group, id=resource_id, create_attempted=True,
             tags={"intTest": "true", "runUid": uid if phase == "regular" else uid + "-" + phase, "kind": kind},
@@ -103,10 +102,10 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["resources"] == reader.resources
-    assert reader.inventories == 6  # Baseline, each cleanup, and both pre-phase gates.
-    assert len(reader.gets) == 13  # Three IDs per old phase, rechecked before the next; one toggle DPS.
+    assert reader.inventories == 4  # Baseline and each phase's cleanup.
+    assert len(reader.gets) == 12  # Eight regular IDs, three SAS IDs, then one toggle DPS.
     ids = RUNNER["inventory_ids"](reader.resources)
-    assert all(phase["gate"]["inventory_ids"] == ids for phase in summary["phases"][1:])
+    assert len({phase["run_uid"] for phase in summary["phases"]}) == 3
     assert all(phase["cleanup"]["inventory_ids"] == ids for phase in summary["phases"])
     assert not GATE(tmp_path)
     for phase in RUNNER["MANIFEST"]["PHASE_NAMES"]:
@@ -197,42 +196,73 @@ def test_dps_cli_rejects_noncentral_canary_clearly_before_reader(monkeypatch, mo
     reader.assert_not_called()
 
 
-@pytest.mark.parametrize("defect", ["cleanup", "reappeared", "many-foreign-resources"])
-def test_toggle_waits_for_immediately_previous_sas_cleanup_not_quota(tmp_path, defect):
+@pytest.mark.parametrize("phase_name", ["regular", "service-sas"])
+@pytest.mark.parametrize("defect", ["uncertain-create", "remaining", "invalid-ownership"])
+def test_cleanup_failure_warns_and_continues_independent_phases(tmp_path, capsys, phase_name, defect):
     reader = Reader()
 
     def execute(*args):
         result = _execution(*args)
         env = args[1]
-        if env["azext_iot_dps_test_phase"] == "service-sas":
+        if env["azext_iot_dps_test_phase"] == phase_name:
             directory = Path(env["azext_iot_dps_phase_receipts"])
-            if defect == "cleanup":
+            if defect == "uncertain-create":
                 (directory / "created-h.json").unlink()
-            elif defect == "reappeared":
-                previous = reader.get
-                reads = []
-
-                def get(record):
-                    reads.append(record)
-                    previous(record)
-                    return {"id": record["id"], "state": "Deleting"} if len(reads) > 3 else None
-                reader.get = get
+            elif defect == "remaining":
+                record = json.loads((directory / "owned-h.json").read_text())
+                reader.resources.append({"id": record["id"], "tags": record["tags"]})
+                result["cleanup_deadline"] = time.monotonic()
             else:
-                reader.resources = Reader(1000).resources
+                path = directory / "owned-h.json"
+                record = json.loads(path.read_text())
+                record["run_uid"] = "wrong-phase-owner"
+                _json(path, record)
         return result
 
     status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
-    toggle = summary["phases"][2]
-    if defect == "many-foreign-resources":
-        assert status == 0 and not GATE(tmp_path)
-        assert len(toggle["gate"]["inventory_ids"]) == 1000
-    else:
-        assert status == 1 and GATE(tmp_path)
-        assert toggle["status"] == "blocked"
+    assert status == 1 and GATE(tmp_path)
+    assert [phase["status"] for phase in summary["phases"]] == [
+        "failed" if phase["name"] == phase_name else "passed" for phase in summary["phases"]
+    ]
+    assert len({phase["run_uid"] for phase in summary["phases"]}) == 3
+    assert f"WARNING: {phase_name} cleanup was not proven; continuing" in capsys.readouterr().out
+    failed = next(phase for phase in summary["phases"] if phase["name"] == phase_name)
+    assert failed["cleanup"]["remaining"]
+    # Even a self-consistent green summary cannot hide failed cleanup evidence.
+    summary["status"] = failed["status"] = "passed"
+    _json(tmp_path / "dps-phases.json", summary)
+    _json(tmp_path / "dps-phases" / phase_name / "result.json", failed)
+    assert GATE(tmp_path)
 
 
-@pytest.mark.parametrize("defect", ["missing", "skip", "failed", "ownership", "gate"])
+@pytest.mark.parametrize("stop", ["cancellation", "deadline"])
+def test_continuation_still_respects_cancellation_and_runner_budget(tmp_path, mocker, stop):
+    cancel = RUNNER["Event"]()
+    heartbeat_stop = RUNNER["Event"]()
+    mocker.patch.dict(RUN.__globals__, Event=mocker.Mock(side_effect=[cancel, heartbeat_stop]))
+    clock = mocker.Mock(return_value=0)
+    calls = []
+
+    def execute(*args):
+        result = _execution(*args)
+        calls.append(args[1]["azext_iot_dps_test_phase"])
+        (Path(args[1]["azext_iot_dps_phase_receipts"]) / "created-h.json").unlink()
+        if stop == "cancellation":
+            cancel.set()
+        else:
+            clock.return_value = RUNNER["RUNNER_SECONDS"]
+        return result
+
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=execute, clock=clock) == 1
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    assert calls == ["regular"]
+    assert [phase["status"] for phase in summary["phases"]] == ["failed", "blocked", "blocked"]
+    assert summary["phases"][1]["reason"] == "Cancelled or insufficient remaining runtime/cleanup budget"
+    assert GATE(tmp_path)
+
+
+@pytest.mark.parametrize("defect", ["missing", "skip", "failed", "ownership", "cleanup"])
 def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
     summary_path = tmp_path / "dps-phases.json"
@@ -250,7 +280,7 @@ def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
     elif defect == "failed":
         toggle["exit_code"] = 1
     else:
-        toggle["gate"]["previous_owned_absent"] = False
+        toggle["cleanup"]["complete"] = False
     _json(summary_path, summary)
     _json(folder / "result.json", toggle)
     assert GATE(tmp_path)
@@ -258,17 +288,17 @@ def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
 
 @pytest.mark.parametrize("defect", [
     "exit", "quota-rejection", "timeout", "interrupt", "missing-junit", "missing-selection", "missing-ownership",
-    "uncertain-create", "duplicate-inventory", "baseline-overlap", "reappeared",
+    "uncertain-create", "duplicate-inventory", "baseline-overlap", "remaining",
     "five-regular", "regular-skips", "wrong-identity",
 ])
 def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     reader = Reader()
-    if defect == "reappeared":
+    if defect == "remaining":
         original_get = reader.get
 
         def get(record):
             original_get(record)
-            return {"id": record["id"], "state": "Deleting"} if len(reader.gets) > 3 else None
+            return {"id": record["id"], "state": "Deleting"} if record["phase"] == "regular" else None
         reader.get = get
 
     def execute(*args):
@@ -282,6 +312,8 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
                     Path(args[2]).write_text("Azure provisioning failed: QuotaExceeded\n", encoding="utf-8")
             elif defect in ("timeout", "interrupt"):
                 result["timed_out" if defect == "timeout" else "interrupted"] = True
+            elif defect == "remaining":
+                result["cleanup_deadline"] = time.monotonic()
             elif defect == "missing-junit":
                 Path(environment["azext_iot_dps_junit"]).unlink()
             elif defect == "missing-selection":
@@ -321,13 +353,42 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     phases = summary["phases"]
     if defect == "quota-rejection":
         assert "QuotaExceeded" in (tmp_path / "dps-phases/regular/output.log").read_text(encoding="utf-8")
-    if defect in ("exit", "quota-rejection", "timeout", "interrupt", "missing-junit", "missing-selection",
-                  "five-regular", "regular-skips", "wrong-identity"):
-        assert [phase["status"] for phase in phases] == ["failed", "passed", "passed"]
+    if defect == "duplicate-inventory":
+        assert [phase["status"] for phase in phases] == ["failed", "failed", "failed"]
     else:
-        assert phases[1]["status"] == "blocked"
-        if defect == "reappeared":
-            assert len(phases[1]["gate"]["remaining"]) == 3
+        assert [phase["status"] for phase in phases] == ["failed", "passed", "passed"]
+
+
+@pytest.mark.parametrize("nodeid", sorted(RUNNER["MANIFEST"]["CSR_NODEIDS"]))
+@pytest.mark.parametrize("defect", ["missing", "skipped"])
+def test_final_gate_requires_each_csr_variant(tmp_path, nodeid, defect):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    path = tmp_path / "dps-phases/regular/junit.xml"
+    tree = ET.parse(path)
+    case = next(case for case in tree.getroot() if RUNNER["MANIFEST"]["junit_nodeid"](case) == nodeid)
+    if defect == "missing":
+        tree.getroot().remove(case)
+    else:
+        ET.SubElement(case, "skipped")
+    tree.write(path)
+    assert GATE(tmp_path)
+
+
+@pytest.mark.parametrize("kind", RUNNER["MANIFEST"]["CSR_RESOURCE_KINDS"])
+def test_csr_passes_cannot_mask_missing_dedicated_resource_evidence(tmp_path, kind):
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    folder = tmp_path / "dps-phases/regular"
+    receipt = folder / "receipts" / f"owned-{kind}.json"
+    resource_id = json.loads(receipt.read_text())["id"]
+    receipt.unlink()
+    summary_path = tmp_path / "dps-phases.json"
+    summary = json.loads(summary_path.read_text())
+    phase = summary["phases"][0]
+    for key in ("owned_ids", "absent_ids"):
+        phase["cleanup"][key].remove(resource_id)
+    _json(summary_path, summary)
+    _json(folder / "result.json", phase)
+    assert GATE(tmp_path)
 
 
 @pytest.mark.parametrize("pin", [
@@ -351,13 +412,13 @@ def test_subscription_inventory_never_imposes_quota_admission(tmp_path, mocker, 
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["resources"] == reader.resources
-    assert execute.call_count == 3 and reader.inventories == 6
+    assert execute.call_count == 3 and reader.inventories == 4
     assert all(len(phase["cleanup"]["inventory_ids"]) == count for phase in summary["phases"])
     assert not GATE(tmp_path)
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas"])
-def test_fresh_gates_recheck_owned_absence_despite_foreign_inventory_growth(tmp_path, phase):
+def test_phase_cleanup_retains_inventory_despite_foreign_resource_growth(tmp_path, phase):
     reader = Reader(7)
 
     def execute(*args):
@@ -369,8 +430,8 @@ def test_fresh_gates_recheck_owned_absence_despite_foreign_inventory_growth(tmp_
     status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     next_phase = summary["phases"][1 if phase == "regular" else 2]
-    assert len(next_phase["gate"]["inventory_ids"]) == 1000
-    assert next_phase["gate"]["previous_owned_absent"]
+    assert len(next_phase["cleanup"]["inventory_ids"]) == 1000
+    assert next_phase["cleanup"]["complete"]
     assert status == 0 and not GATE(tmp_path)
 
 
@@ -385,8 +446,9 @@ def test_runner_cli_rejects_removed_limit_before_authentication(mocker, value):
     arguments = ["runner", "--subscription", SUB, "--resource-group", GROUP]
     if value is not None:
         arguments += ["--dps-capacity-limit", value]
-    reader, execute, platform_check = mocker.Mock(), mocker.Mock(return_value=0), mocker.Mock()
+    reader, execute = mocker.Mock(), mocker.Mock(return_value=0)
     mocker.patch.object(sys, "argv", arguments)
+    platform_check = mocker.Mock()
     mocker.patch.dict(RUNNER["main"].__globals__, ArmReader=reader, run=execute,
                       bounded_read=nullcontext, require_linux=platform_check)
     if value is None:
@@ -402,7 +464,7 @@ def test_runner_cli_rejects_removed_limit_before_authentication(mocker, value):
         execute.assert_not_called()
 
 
-@pytest.mark.parametrize("section", ["baseline", "regular-cleanup", "sas-gate", "sas-cleanup", "toggle-gate", "toggle-cleanup"])
+@pytest.mark.parametrize("section", ["baseline", "regular-cleanup", "sas-cleanup", "toggle-cleanup"])
 def test_independent_gate_rejects_ambiguous_inventory_in_every_receipt(tmp_path, section):
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(1000), execute=_execution) == 0
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
@@ -716,7 +778,7 @@ def test_windows_missing_posix_members_are_not_accessed_directly():
 
 
 @pytest.mark.parametrize("defect", [
-    "summary", "junit", "log", "phase-result", "exit", "cleanup", "ownership", "gate", "skip", "count",
+    "summary", "junit", "log", "phase-result", "exit", "cleanup", "ownership", "skip", "count",
 ])
 def test_final_gate_independently_rejects_missing_or_false_green_evidence(tmp_path, defect):
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
@@ -734,8 +796,6 @@ def test_final_gate_independently_rejects_missing_or_false_green_evidence(tmp_pa
             sas["exit_code"] = 1
         elif defect == "cleanup":
             sas["cleanup"]["complete"] = False
-        elif defect == "gate":
-            sas["gate"]["previous_owned_absent"] = False
         elif defect == "skip":
             tree = ET.parse(folder / "junit.xml")
             ET.SubElement(next(tree.getroot().iter("testcase")), "skipped")
@@ -841,18 +901,18 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker, regio
     token.assert_called_once_with(subscription=SUB, resource="https://management.azure.com/")
     assert reader.dps._config.api_version == "2026-06-01-preview"  # pylint: disable=protected-access
     assert reader.hub._config.api_version == "2026-10-01-preview"  # pylint: disable=protected-access
+    assert reader.adr._config.api_version == "2026-11-02-preview"  # pylint: disable=protected-access
     assert reader.dps._config.base_url == RUNNER["TARGETS"]["target"](region)["endpoint"]
 
 
 @responses.activate
-@pytest.mark.parametrize("kind", ["nh", "hub"])
+@pytest.mark.parametrize("kind", ["csrdps", "csrhub", "csrns"])
 @pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
 @pytest.mark.parametrize("region", ["centraluseuap", "australiaeast", "westeurope"])
-def test_reader_verifies_each_resource_with_its_own_rp(mocker, kind, platform, region):
+def test_reader_verifies_each_csr_resource_with_its_own_rp(mocker, kind, platform, region):
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
-    resource_type = "IotHubs" if kind == "hub" else "provisioningServices"
-    resource_id = PREFIX + resource_type + "/owned"
+    resource_id = PREFIX.partition("/providers/")[0] + "/providers/" + RUNNER["MANIFEST"]["resource_type"](kind) + "/owned"
     responses.add(responses.GET, RUNNER["TARGETS"]["target"](region)["endpoint"] + resource_id, status=404)
     reader = RUNNER["ArmReader"](SUB, region=region)
     # Exercise SDK routing on every OS; timer/platform enforcement has separate tests.
@@ -865,13 +925,13 @@ def test_reader_verifies_each_resource_with_its_own_rp(mocker, kind, platform, r
     bounded.assert_called_once_with(reader.deadline)
 
 
-@pytest.mark.parametrize("section", ["cleanup", "gate"])
-def test_full_qualification_rejects_owned_resources_still_listed(tmp_path, section):
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_full_qualification_rejects_owned_resources_still_listed(tmp_path, index):
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
     summary_path = tmp_path / "dps-phases.json"
     summary = json.loads(summary_path.read_text())
-    phase = summary["phases"][0 if section == "cleanup" else 1]
-    phase[section]["inventory_ids"].append(summary["phases"][0]["cleanup"]["owned_ids"][0].lower())
+    phase = summary["phases"][index]
+    phase["cleanup"]["inventory_ids"].append(phase["cleanup"]["owned_ids"][0].lower())
     _json(summary_path, summary)
     _json(tmp_path / "dps-phases" / phase["name"] / "result.json", phase)
     assert GATE(tmp_path)
@@ -913,12 +973,14 @@ def test_inventory_pagination_failure_is_not_partial_ownership_evidence_or_retri
 
 
 @pytest.mark.parametrize("missing", [False, True])
-def test_public_start_receipt_mismatch_quarantines_before_cleanup_and_next_phase(tmp_path, missing):
+def test_public_start_receipt_mismatch_preserves_resources_but_continues_next_phase(tmp_path, missing):
     targets = RUNNER["TARGETS"]
     reader = Reader(0)
 
     def execute(*args):
         result = _execution(*args)
+        if args[1]["azext_iot_dps_test_phase"] != "regular":
+            return result
         path = Path(args[1]["azext_iot_dps_phase_receipts"]) / "started.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         data.pop("target")
@@ -930,6 +992,6 @@ def test_public_start_receipt_mismatch_quarantines_before_cleanup_and_next_phase
     assert RUN(targets["SUBSCRIPTION"], targets["RESOURCE_GROUP"], tmp_path / "dps-phases",
                reader, execute=execute, region="australiaeast") == 1
     summary = json.loads((tmp_path / "dps-phases.json").read_text(encoding="utf-8"))
-    assert [phase["status"] for phase in summary["phases"]] == ["failed", "blocked", "blocked"]
+    assert [phase["status"] for phase in summary["phases"]] == ["failed", "passed", "passed"]
     assert summary["phases"][0]["cleanup"]["remaining"]
-    assert not reader.gets
+    assert len(reader.gets) == 4  # Only the later phases have valid ownership evidence.

@@ -24,8 +24,8 @@ class EmbeddedCLI(object):
     Attributes
     ----------
     output : str
-        The output of the last invoked cli command. If the last command failed or there were no runs,
-        will return ""
+        Captured output of the last invoked command, or "" before the first invocation.
+        Nonempty output does not imply that the command succeeded.
     error_code : int
         Error code of the last invoked cli command. If no runs, will be 0.
     az_cli : AzCli
@@ -50,7 +50,8 @@ class EmbeddedCLI(object):
         """
         Run a given command.
 
-        Note that if capture_stderr is True, any error during invocation will be raised.
+        With capture_stderr=True, recorded exceptions are raised. Nonzero exits without
+        an exception remain available through success() and raise_for_error().
 
         Parameters
         ----------
@@ -63,15 +64,6 @@ class EmbeddedCLI(object):
             Flag to determine whether we capture (don't print) output from invoked commands, but raise errors
             when they occur. Takes precedence over self.capture_stderr.
         """
-        output_file = StringIO()
-        old_exception_handler = None
-
-        # if capture_stderr is defined, use that, otherwise default to self.capture_stderr
-        if (capture_stderr is None and self.capture_stderr) or capture_stderr:
-            # Stop exception from being logged
-            old_exception_handler = self.az_cli.exception_handler
-            self.az_cli.exception_handler = lambda _: None
-
         command = self._ensure_json_output(command=command)
         # prioritize subscription passed into invoke
         if subscription:
@@ -83,54 +75,65 @@ class EmbeddedCLI(object):
                 command=command, subscription=self.user_subscription
             )
 
-        try:
-            self.error_code = (
-                self.az_cli.invoke(shlex.split(command), out_file=output_file) or 0
-            )
-        except SystemExit as se:
-            # Support caller error handling
-            self.error_code = se.code
+        args = shlex.split(command)
+        capture = self.capture_stderr if capture_stderr is None else capture_stderr
+        old_exception_handler = self.az_cli.exception_handler
+        self.output = ""
+        self.error_code = 1
+        if capture:
+            self.az_cli.exception_handler = lambda _: 1
 
-        self.output = output_file.getvalue()
+        with StringIO() as output_file:
+            try:
+                self.error_code = self.az_cli.invoke(args, out_file=output_file) or 0
+            except SystemExit as error:
+                self.error_code = error.code or 0
+            finally:
+                self.output = output_file.getvalue()
+                self.az_cli.exception_handler = old_exception_handler
+
         logger.debug(
             "Embedded CLI received error code: %s, output: '%s'",
             self.error_code,
             self.output,
         )
 
-        if old_exception_handler:
-            self.az_cli.exception_handler = old_exception_handler
-            if self.get_error():
-                raise self.get_error()
+        error = self.get_error()
+        if capture and isinstance(error, BaseException):
+            raise error
 
-        output_file.close()
+        return self
 
+    def raise_for_error(self):
+        """Preserve the command failure before consuming its output."""
+        if not self.success():
+            error = self.get_error()
+            if isinstance(error, BaseException):
+                raise error
+            raise CLIInternalError(f"Embedded CLI command failed with exit code {self.error_code}.")
         return self
 
     def as_json(self):
         """
-        Try to parse the result of the last invoked cli command as a json.
-
-        If the json cannot be parsed, the last invoked cli command must have failed. This will raise a
-        CLIInternalError.
+        Parse successful command output, preserving command errors before decoding.
         """
+        self.raise_for_error()
         try:
             return json.loads(self.output)
-        except Exception:
+        except json.JSONDecodeError as error:
             raise CLIInternalError(
-                "Issue parsing received payload '{}' as json. Please try again or check resource status.".format(
-                    self.output
-                )
-            )
+                "Issue parsing received payload as json. Please try again or check resource status."
+            ) from error
 
     def success(self) -> bool:
         """Return if last invoked cli command was a success."""
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
-    def get_error(self) -> Optional[Exception]:
+    def get_error(self) -> Optional[BaseException]:
         """Return error from last invoked cli command."""
-        return self.az_cli.result.error
+        result = self.az_cli.result
+        return result.error if result is not None else None
 
     def _ensure_json_output(self, command: str) -> str:
         """Force invoked cli command to return a json."""

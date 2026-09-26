@@ -733,8 +733,9 @@ def test_help_surface_matches_2026_commands_and_su_type():
     su_help = " ".join(helps["iot adr ns link su add"].split())
     assert "namespace outbound MI -> Contributor on SU" in su_help
     assert "SU selected inbound MI -> Azure Device Registry Contributor on namespace" in su_help
-    assert "exactly two service-to-service grants" in su_help
-    assert "Device Update Administrator" not in su_help
+    assert "exactly three service-to-service grants" in su_help
+    assert "namespace outbound MI -> Device Update Administrator on SU" in su_help
+    assert "Device Update Administrator" in helps["iot adr ns link su update"]
     assert "No ADU first-party service principal or Microsoft Graph lookup is required" in su_help
 
     assert not any(
