@@ -106,7 +106,7 @@ for _kind, _resource_option, _resource_id in (
         _resource_option,
         _resource_id,
     ]
-    for _action in ("update", "show", "wait"):
+    for _action in ("update", "show", "wait", "delete"):
         _LINK_PARSER_CASES[
             f"iot adr ns link {_kind} {_action}"
         ] = _ENDPOINT_ARGUMENTS
@@ -474,8 +474,8 @@ def test_pnp_update_authentication_default_has_only_the_standard_linter_exceptio
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_retired_link_delete_is_not_registered(command_table, kind):
-    assert f"iot adr ns link {kind} delete" not in command_table
+def test_link_delete_is_registered(command_table, kind):
+    assert f"iot adr ns link {kind} delete" in command_table
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)
@@ -491,7 +491,7 @@ def test_namespace_device_command_parser(command_table, management_command_parse
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 109
+    assert sum(name.startswith("iot adr ") for name in command_table) == 112
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)
