@@ -12,7 +12,7 @@ from unittest.mock import Mock
 
 import pytest
 import responses
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError, ResourceNotFoundError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ServiceRequestError
 
@@ -31,6 +31,12 @@ KINDS = [
 ]
 URL = "https://management.azure.com/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
 UAMI = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi"
+TARGET_RG = "/subscriptions/target-sub/resourceGroups/target-rg"
+
+
+@pytest.fixture(autouse=True)
+def unlink_rbac(mocker):
+    return mocker.patch.object(LinkProvider, "_rbac_manager").return_value
 
 
 def namespace():
@@ -39,8 +45,8 @@ def namespace():
         "location": "centraluseuap", "tags": {"preserve": "value"},
         "systemData": {"createdBy": "read-only"},
         "identity": {
-            "type": "SystemAssigned, UserAssigned", "principalId": "read-only", "tenantId": "read-only",
-            "userAssignedIdentities": {UAMI: {"principalId": "read-only", "clientId": "read-only"}},
+            "type": "SystemAssigned, UserAssigned", "principalId": "ns-system", "tenantId": "read-only",
+            "userAssignedIdentities": {UAMI: {"principalId": "ns-user", "clientId": "read-only"}},
         },
         "properties": {
             "uuid": "read-only", "provisioningState": "Failed",
@@ -53,7 +59,7 @@ def namespace():
             **{
                 section: {"endpoints": {
                     name: {
-                        "endpointType": endpoint_type, "resourceId": f"/{kind}/{name}",
+                        "endpointType": endpoint_type, "resourceId": f"{TARGET_RG}/providers/{endpoint_type}/{name}",
                         "inboundCallerIdentity": {"type": "SystemAssigned"},
                         "provisioning": {"availability": "Available", "allocationWeight": 3},
                         "linkingState": "Succeeded", "linkingError": {"code": "read-only"},
@@ -68,28 +74,30 @@ def namespace():
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("identity", ["mixed", "system", "user", "none", "empty", "null", "absent"])
-def test_delete_preserves_namespace_without_target_reads_or_waits(mocker, fixture_cmd, kind, section, _endpoint_type, identity):
+@pytest.mark.parametrize("identity", ["mixed", "system", "user"])
+def test_delete_preserves_namespace_without_target_reads_or_waits(
+    mocker, fixture_cmd, unlink_rbac, kind, section, _endpoint_type, identity,
+):
     source = namespace()
-    if identity == "absent":
-        source.pop("identity")
+    if identity == "system":
+        source["identity"] = {"type": "SystemAssigned", "principalId": "ns-system"}
+        source["properties"].pop("outboundIdentity")
         source.pop("tags")
-    elif identity in ("empty", "null"):
-        source["identity"] = {} if identity == "empty" else None
-    elif identity != "mixed":
-        source["identity"] = {"type": {"system": "SystemAssigned", "user": "UserAssigned", "none": "None"}[identity]}
-        if identity == "user":
-            source["identity"]["userAssignedIdentities"] = {UAMI: {"principalId": "read-only"}}
+    elif identity == "user":
+        source["identity"].pop("principalId")
+        source["identity"]["type"] = "UserAssigned"
     original = deepcopy(source)
     client = Mock()
     client.namespaces.get.return_value = source
     initial = {"properties": {"provisioningState": "Accepted"}}
     client.namespaces.begin_create_or_replace.return_value.result.return_value = initial
     provider = LinkProvider(fixture_cmd, client=client)
-    for name in ("_get_target", "_preflight_link", "_rbac_manager", "_wait", "_await_terminal"):
+    for name in ("_get_target", "_preflight_link", "_wait", "_await_terminal"):
         mocker.patch.object(provider, name, side_effect=AssertionError(f"Unexpected {name}"))
+    unlink_rbac.ensure_unlink_reader.side_effect = lambda *_: client.namespaces.begin_create_or_replace.assert_not_called()
 
     assert getattr(provider, kind + "_delete")("primary", "ns", "rg") is initial
+    unlink_rbac.ensure_unlink_reader.assert_called_once_with("ns-system" if identity == "system" else "ns-user", TARGET_RG)
 
     client.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="ns", retry_total=0)
     arguments = client.namespaces.begin_create_or_replace.call_args.kwargs
@@ -101,16 +109,14 @@ def test_delete_preserves_namespace_without_target_reads_or_waits(mocker, fixtur
     del expected[section]["endpoints"]["primary"]
     assert body["properties"] == expected
     assert body["location"] == original["location"]
-    if identity == "absent":
-        assert set(body) == {"location", "properties"}
+    if identity == "system":
+        assert set(body) == {"location", "properties", "identity"}
     else:
         assert body["tags"] == original["tags"]
-        assert body["identity"] == (
-            original["identity"] if not original["identity"] else {
-                "type": original["identity"]["type"],
-                **({"userAssignedIdentities": {UAMI: {}}} if identity in ("mixed", "user") else {}),
-            }
-        )
+    assert body["identity"] == {
+        "type": original["identity"]["type"],
+        **({"userAssignedIdentities": {UAMI: {}}} if identity in ("mixed", "user") else {}),
+    }
     assert source == original
     assert [call[0] for call in client.mock_calls] == [
         "namespaces.get", "namespaces.begin_create_or_replace", "namespaces.begin_create_or_replace().result",
@@ -119,7 +125,7 @@ def test_delete_preserves_namespace_without_target_reads_or_waits(mocker, fixtur
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("defect", ["missing", "null", "wrong-type", "missing-section"])
-def test_delete_requires_the_named_endpoint_of_the_correct_kind(fixture_cmd, kind, section, _endpoint_type, defect):
+def test_delete_requires_the_named_endpoint_of_the_correct_kind(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, defect):
     source = namespace()
     if defect == "missing-section":
         source["properties"].pop(section)
@@ -134,6 +140,38 @@ def test_delete_requires_the_named_endpoint_of_the_correct_kind(fixture_cmd, kin
     with pytest.raises(ResourceNotFoundError, match="primary"):
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
     client.namespaces.begin_create_or_replace.assert_not_called()
+    unlink_rbac.ensure_unlink_reader.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("defect", ["missing-id", "invalid-id", "wrong-target-type", "identity", "principal", "rbac"])
+def test_delete_preflight_failure_prevents_put(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, defect):
+    source = namespace()
+    endpoint = source["properties"][section]["endpoints"]["primary"]
+    error_type = InvalidArgumentValueError
+    if defect == "missing-id":
+        endpoint.pop("resourceId")
+    elif defect == "invalid-id":
+        endpoint["resourceId"] = "/invalid"
+    elif defect == "wrong-target-type":
+        endpoint["resourceId"] = TARGET_RG + "/providers/Microsoft.Storage/storageAccounts/storage"
+    elif defect == "identity":
+        source.pop("identity")
+    elif defect == "principal":
+        source["identity"]["userAssignedIdentities"][UAMI].pop("principalId")
+        error_type = AzureResponseError
+    else:
+        unlink_rbac.ensure_unlink_reader.side_effect = AzureResponseError("Reader grant denied")
+        error_type = AzureResponseError
+    client = Mock()
+    client.namespaces.get.return_value = source
+    original = deepcopy(source)
+    with pytest.raises(error_type):
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
+    assert source == original
+    client.namespaces.begin_create_or_replace.assert_not_called()
+    if defect != "rbac":
+        unlink_rbac.ensure_unlink_reader.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -167,7 +205,9 @@ def test_delete_command_handler_forwards_only_endpoint_selectors(mocker, kind, s
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("status", [200, 201])
 @pytest.mark.parametrize("state", ["Accepted", "Failed"])
-def test_delete_real_sdk_sends_only_get_and_put(fixture_cmd, kind, section, _endpoint_type, status, state):
+def test_delete_real_sdk_sends_only_get_and_put_after_rbac(
+    fixture_cmd, unlink_rbac, kind, section, _endpoint_type, status, state,
+):
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-token", 9999999999)
     initial = {"location": "centraluseuap", "properties": {"provisioningState": state}}
@@ -183,6 +223,7 @@ def test_delete_real_sdk_sends_only_get_and_put(fixture_cmd, kind, section, _end
         body = json.loads(network.calls[1].request.body)
         assert "primary" not in body["properties"][section]["endpoints"]
         assert body["identity"] == {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {UAMI: {}}}
+        unlink_rbac.ensure_unlink_reader.assert_called_once_with("ns-user", TARGET_RG)
 
 
 @pytest.mark.parametrize("stage", ["get", "put"])

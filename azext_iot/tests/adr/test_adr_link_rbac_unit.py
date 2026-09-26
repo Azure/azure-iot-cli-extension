@@ -32,6 +32,7 @@ from azext_iot.adr.rbac import (
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
+    READER_ROLE,
     _assignment_scope_applies,
     _scope_subscription,
     format_role_requirements,
@@ -156,6 +157,80 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
     )
     assert _scope_subscription(TARGET_SCOPE) == "sub"
     assert _scope_subscription("/") is None
+
+
+@pytest.mark.parametrize("scope", [
+    "/subscriptions/target-sub/resourceGroups/target-rg",
+    "/subscriptions/target-sub",
+    "/providers/Microsoft.Management/managementGroups/ancestor",
+])
+def test_unlink_reader_reuses_inherited_grants_without_caller_privileges(mocker, token_profile, scope):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    manager.cli.invoke.return_value = _result([{
+        "principalId": "outbound-mi", "scope": scope,
+        "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[READER_ROLE],
+    }])
+    caller = mocker.patch.object(manager, "_caller_can_assign")
+    manager.ensure_unlink_reader("outbound-mi", target_rg)
+    command = manager.cli.invoke.call_args.args[0]
+    assert "--role 'Reader'" in command
+    assert f"--scope '{target_rg}'" in command
+    assert "--include-inherited" in command
+    assert manager.cli.invoke.call_args.kwargs == {"subscription": "target-sub"}
+    assert manager.cli.invoke.call_count == 1
+    token_profile.return_value.get_raw_token.assert_not_called()
+    caller.assert_not_called()
+
+
+@pytest.mark.parametrize("authorized", [True, False])
+@pytest.mark.parametrize("existing_scope", [None, TARGET_SCOPE, "/subscriptions/other"])
+def test_unlink_reader_creates_only_rg_reader_or_returns_exact_remediation(
+    mocker, caplog, authorized, existing_scope,
+):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    assignment = {
+        "principalId": "outbound-mi", "scope": existing_scope or target_rg,
+        "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[READER_ROLE],
+    }
+    manager.cli.invoke.side_effect = [
+        _result([assignment] if existing_scope else []), _result(assignment), _result([{
+            **assignment, "scope": target_rg,
+        }]),
+    ]
+    caller = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    if authorized:
+        manager.ensure_unlink_reader("outbound-mi", target_rg)
+        commands = [call.args[0] for call in manager.cli.invoke.call_args_list]
+        assert len(commands) == 3
+        assert commands[1] == (
+            "role assignment create --assignee-object-id 'outbound-mi' "
+            "--assignee-principal-type ServicePrincipal --role 'Reader' "
+            f"--scope '{target_rg}'"
+        )
+        assert "namespace outbound MI -> Reader" in caplog.text
+        assert "propagate" in caplog.text
+    else:
+        with pytest.raises(AzureResponseError, match="No link mutation") as error:
+            manager.ensure_unlink_reader("outbound-mi", target_rg)
+        assert "--role 'Reader'" in str(error.value)
+        assert f"--scope '{target_rg}' --subscription 'target-sub'" in str(error.value)
+        assert manager.cli.invoke.call_count == 1
+    caller.assert_called_once_with("caller-object-id", target_rg)
+    assert all(call.kwargs["subscription"] == "target-sub" for call in manager.cli.invoke.call_args_list)
+
+
+def test_unlink_reader_lookup_failure_does_not_attempt_grants(mocker):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    manager.cli.invoke.side_effect = AzureResponseError("cannot read role assignments")
+    create = mocker.patch.object(manager, "_ensure_assignments")
+    with pytest.raises(AzureResponseError, match="cannot read role assignments") as error:
+        manager.ensure_unlink_reader("outbound-mi", "/subscriptions/sub/resourceGroups/rg")
+    assert "'/subscriptions/sub/resourceGroups/rg' to exist" in str(error.value)
+    assert "recreate it before retrying" in str(error.value)
+    assert "No namespace PUT or broader subscription-level grant" in str(error.value)
+    create.assert_not_called()
 
 
 @pytest.mark.parametrize("assignment_scope,trusted,expected", [

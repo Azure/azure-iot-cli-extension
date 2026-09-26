@@ -555,9 +555,12 @@ def load_adr_help():
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
     To unlink, delete the linked resource separately, then use link hub/dps/su delete
-    to remove its endpoint from the namespace. Link delete only submits a namespace
-    GET and replacement PUT; it does not delete or check the linked resource, manage
-    RBAC, or wait for completion. Initial backend errors are returned directly.
+    to remove its endpoint from the namespace. Link delete ensures the namespace outbound
+    identity has Reader on the linked resource's resource group before submitting a
+    replacement PUT. Missing grants are created for authorized Owner/User Access
+    Administrator callers; other callers receive exact remediation commands.
+    It does not delete or check the linked resource or wait for unlink completion.
+    Initial backend errors are returned directly.
     An accepted response does not confirm removal; inspect the namespace afterward
     for asynchronous failures. Avoid concurrent namespace updates during GET/PUT.
     Waited add/update commands require the actual endpoint to reach Succeeded. They recover only
@@ -586,11 +589,23 @@ def load_adr_help():
     Delete the linked {resource} separately before removing its endpoint.
     This command gets the namespace, removes the named endpoint, and submits a
     replacement PUT preserving other endpoints and writable namespace settings.
-    It does not check or delete the linked resource, change role assignments,
-    or wait for completion. Initial GET/PUT errors are returned directly;
+    Before PUT, it ensures the namespace outbound managed identity has Reader on the
+    linked resource's resource group, using the resource ID saved in the endpoint.
+    An existing inherited Reader grant is reused. Otherwise, an Owner or User Access
+    Administrator at that scope can create the missing grant automatically; callers
+    without that authority receive exact remediation commands and no PUT is submitted.
+    Keep the linked resource's resource group until unlink completes. If the group was
+    deleted too, recreate it at the original subscription and name before retrying.
+    This command never substitutes a broader subscription-level Reader grant.
+    The Reader grant remains in place after unlinking. Newly created grants must become
+    visible to ARM, but service authorization may still take time to propagate.
+    It does not check or delete the linked resource, retry the namespace update,
+    or wait for unlink completion. Initial GET/PUT errors are returned directly;
     later asynchronous failures are not observed by this command.
     Inspect the namespace with 'az iot adr ns show' to confirm removal and
     provisioningState. A successful submission is not proof of completed removal.
+    If deletion confirmation fails after a new Reader grant, allow RBAC to propagate,
+    then retry removal of the retained endpoint.
     Avoid concurrent namespace updates between this command's GET and PUT.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted

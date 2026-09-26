@@ -25,6 +25,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 
 logger = get_logger(__name__)
 CONTRIBUTOR_ROLE = "Contributor"
+READER_ROLE = "Reader"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
 ADR_CONTRIBUTOR_ROLE = "Azure Device Registry Contributor"
 ADU_ADMINISTRATOR_ROLE = "Device Update Administrator"
@@ -34,6 +35,7 @@ USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
 LINK_ROLE_IDS = {
+    READER_ROLE: "acdd72a7-3385-48ef-bd42-f606fba81ae7",
     CONTRIBUTOR_ROLE: "b24988ac-6180-42a0-ab88-20f7382dd24c",
     HUB_DATA_ROLE: "4fc6c259-987e-4a07-842e-c321cc9d413f",
     ADR_CONTRIBUTOR_ROLE: "a5c3590a-3a1a-4cd4-9648-ea0a32b15137",
@@ -297,7 +299,7 @@ class LinkRbacManager:
         self, principal_id: str, role: str, scope: str, *, strict=False
     ) -> bool:
         if strict and (not isinstance(scope, str) or not scope.startswith("/")):
-            raise InvalidArgumentValueError("An explicit ARM scope is required for recovery role verification.")
+            raise InvalidArgumentValueError("An explicit ARM scope is required for role verification.")
         # Azure CLI uses ARM list_for_scope with atScope() for this explicit
         # --scope. --include-inherited retains its applicable ancestor results,
         # including management groups; no extra hierarchy/Graph lookup is needed.
@@ -311,7 +313,7 @@ class LinkRbacManager:
         if not strict:
             return bool(assignments)
         if not isinstance(assignments, list) or any(not isinstance(item, dict) for item in assignments):
-            raise AzureResponseError("Malformed role-assignment response during link recovery preflight.")
+            raise AzureResponseError("Malformed role-assignment response during link RBAC preflight.")
         for assignment in assignments:
             assignment_scope = _normalized_id(assignment.get("scope"))
             if (
@@ -523,6 +525,26 @@ class LinkRbacManager:
                     missing.append(assignment)
                     descriptions[assignment] = _format_role_requirement(link_type, rule)
 
+        self._ensure_assignments(missing, descriptions)
+
+    def ensure_unlink_reader(self, namespace_principal_id: str, resource_group_scope: str) -> None:
+        """Allow the outbound MI to confirm deletion at the surviving parent scope."""
+        try:
+            if self._assignment_exists(namespace_principal_id, READER_ROLE, resource_group_scope, strict=True):
+                return
+            assignment = (namespace_principal_id, READER_ROLE, resource_group_scope)
+            self._ensure_assignments(
+                [assignment],
+                {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
+            )
+        except AzureResponseError as error:
+            raise AzureResponseError(
+                f"{error}\nUnlink Reader setup requires resource group '{resource_group_scope}' to exist. "
+                "If that group was deleted, recreate it before retrying. "
+                "No namespace PUT or broader subscription-level grant was submitted."
+            ) from error
+
+    def _ensure_assignments(self, missing, descriptions) -> None:
         if not missing:
             return
 
