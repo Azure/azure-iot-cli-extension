@@ -9,8 +9,12 @@ import json
 import pytest
 
 from unittest import mock
+from azure.cli.core.azclierror import AzureConnectionError, ResourceNotFoundError
 from azure.eventhub import EventData
 from azure.eventhub import TransportType
+from azure.eventhub._pyamqp.error import ErrorCondition
+from azure.eventhub._pyamqp.message import Message
+from azure.eventhub._pyamqp.performatives import TransferFrame
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
@@ -71,6 +75,117 @@ class TestGwV2MonitorRouting:
         )
 
 
+class TestFeedbackMonitor:
+    @pytest.fixture
+    def receiver(self, mocker):
+        mocker.patch.object(
+            event, "_get_endpoint_and_token_auth_pyamqp",
+            return_value=("/messages/servicebound/feedback", object()),
+        )
+        factory = mocker.patch.object(event, "PyAMQPReceiveClient", autospec=True)
+        return factory.return_value
+
+    @staticmethod
+    def _delivery(records, framed=True, sections=True):
+        data = json.dumps(records).encode("utf-8")
+        message = Message(data=[data] if sections else data)
+        frame = TransferFrame(delivery_id=1, delivery_tag=b"feedback")
+        return (frame, message) if framed else message
+
+    @pytest.mark.parametrize("wait_on_id", [None, "requested-message"])
+    @pytest.mark.parametrize("error_type,condition", [
+        (event.AMQPLinkError, ErrorCondition.UnknownError),
+        (event.AMQPLinkError, b"amqp:link:detach-forced"),
+        (event.AMQPConnectionError, ErrorCondition.UnknownError),
+    ])
+    def test_transport_error_after_unrelated_feedback(self, receiver, wait_on_id, error_type, condition, capsys):
+        error = error_type(condition, description="Link detached unexpectedly.")
+
+        def deliveries():
+            yield self._delivery([{"deviceId": "device", "originalMessageId": "unrelated", "description": "Success"}])
+            raise error
+
+        receiver.receive_messages_iter.return_value = deliveries()
+        if wait_on_id:
+            with pytest.raises(AzureConnectionError, match="requested-message") as raised:
+                event.monitor_feedback({"entity": "hub.unit.invalid"}, None, wait_on_id)
+            assert raised.value.__cause__ is error
+            assert "Link detached unexpectedly." in str(raised.value)
+            assert any("retry monitoring" in recommendation for recommendation in raised.value.recommendations)
+        else:
+            assert event.monitor_feedback({"entity": "hub.unit.invalid"}, None) is None
+        assert "originalMessageId: unrelated" in capsys.readouterr().out
+        receiver.open.assert_called_once_with()
+        receiver.receive_messages_iter.assert_called_once_with()
+        receiver.settle_messages.assert_not_called()
+        receiver.close.assert_called_once_with()
+
+    @pytest.mark.parametrize("device_id", [None, "TARGET-DEVICE"])
+    @pytest.mark.parametrize("framed", [False, True])
+    @pytest.mark.parametrize("sections", [False, True])
+    def test_matching_message_later_in_mixed_device_batch(self, receiver, device_id, framed, sections, capsys):
+        records = [
+            {"deviceId": "other-device", "originalMessageId": "other-message"},
+            {"deviceId": "target-device", "originalMessageId": "earlier-message"},
+            {"deviceId": "target-device", "originalMessageId": "requested-message", "description": "Message rejected"},
+        ]
+
+        def deliveries():
+            yield self._delivery(records, framed=framed, sections=sections)
+            raise AssertionError("Monitoring must stop immediately after matching the requested ID.")
+
+        receiver.receive_messages_iter.return_value = deliveries()
+        assert event.monitor_feedback(
+            {"entity": "hub.unit.invalid"}, device_id, "requested-message",
+        ) == "requested-message"
+        output = capsys.readouterr().out
+        assert "description: Message rejected" in output
+        assert "originalMessageId: requested-message" in output
+        if device_id:
+            assert "originalMessageId: other-message" not in output
+        if framed:
+            receiver.settle_messages.assert_called_once_with(1, b"feedback", "accepted")
+        else:
+            receiver.settle_messages.assert_not_called()
+        receiver.close.assert_called_once_with()
+
+    @pytest.mark.parametrize("wait_on_id", [None, "requested-message"])
+    def test_keyboard_interrupt_preserves_normal_stop(self, receiver, wait_on_id):
+        receiver.receive_messages_iter.side_effect = KeyboardInterrupt
+        assert event.monitor_feedback({"entity": "hub.unit.invalid"}, None, wait_on_id) is None
+        receiver.close.assert_called_once_with()
+
+    def test_continuous_monitor_prints_entire_batch(self, receiver, capsys):
+        receiver.receive_messages_iter.return_value = iter([self._delivery([
+            {"deviceId": "device", "originalMessageId": "first"},
+            {"deviceId": "device", "originalMessageId": "second"},
+        ])])
+        assert event.monitor_feedback({"entity": "hub.unit.invalid"}, None) is None
+        output = capsys.readouterr().out
+        assert "originalMessageId: first" in output
+        assert "originalMessageId: second" in output
+        receiver.close.assert_called_once_with()
+
+    @pytest.mark.parametrize("error_type", [event.AMQPLinkError, event.AMQPConnectionError])
+    def test_settlement_error_after_match_preserves_existing_stop(self, receiver, error_type, capsys):
+        receiver.receive_messages_iter.return_value = iter([self._delivery([
+            {"deviceId": "device", "originalMessageId": "requested-message"},
+        ])])
+        receiver.settle_messages.side_effect = error_type(
+            ErrorCondition.UnknownError, description="Connection lost during settlement.",
+        )
+        assert event.monitor_feedback({"entity": "hub.unit.invalid"}, None, "requested-message") is None
+        assert "originalMessageId: requested-message" in capsys.readouterr().out
+        receiver.close.assert_called_once_with()
+
+    def test_malformed_feedback_error_is_not_masked_by_close_error(self, receiver):
+        receiver.receive_messages_iter.return_value = iter([Message(data="invalid JSON")])
+        receiver.close.side_effect = RuntimeError("Close failed.")
+        with pytest.raises(json.JSONDecodeError):
+            event.monitor_feedback({"entity": "hub.unit.invalid"}, None, "requested-message")
+        receiver.close.assert_called_once_with()
+
+
 def _encode_app_props(app_props: dict):
     return {key.encode(): value.encode() for key, value in app_props.items()}
 
@@ -120,6 +235,46 @@ def _create_event_data(
     mock_event.get_data = mock.Mock(return_value=get_data_generator())
 
     return mock_event
+
+
+@pytest.mark.parametrize("rows", [[], [{"deviceId": "included"}], None])
+def test_monitor_query_filters_actual_event_callbacks(rows, mocker, capsys):
+    from azext_iot.operations import hub
+    cmd = mock.Mock()
+    cmd.cli_ctx.invocation.data = {"output": "json"}
+    query = mocker.patch.object(hub, "iot_query", return_value=rows)
+    discovery = mocker.patch.object(hub, "IotHubDiscovery")
+    builder = mocker.patch.object(hub_target_builder, "EventTargetBuilder")
+
+    def receive(**kwargs):
+        for device_id in ("included", "excluded"):
+            kwargs["on_message_received"](_create_event_data(
+                "payload", annotations={common_parser.DEVICE_ID_IDENTIFIER: device_id.encode()},
+            ))
+
+    monitor = mocker.patch.object(telemetry, "start_single_monitor", side_effect=receive)
+    options = {"cmd": cmd, "hub_name_or_hostname": "hub", "resource_group_name": "rg", "timeout": 8}
+    if rows is not None:
+        options["device_query"] = "select * from devices where deviceId = 'included'"
+    if rows == []:
+        with pytest.raises(ResourceNotFoundError, match="No devices matched"):
+            hub.iot_hub_monitor_events(**options)
+        discovery.assert_not_called()
+        builder.assert_not_called()
+        monitor.assert_not_called()
+        assert capsys.readouterr().out == ""
+    else:
+        hub.iot_hub_monitor_events(**options)
+        output = capsys.readouterr().out
+        assert '"origin": "included"' in output
+        assert ('"origin": "excluded"' in output) == (rows is None)
+        monitor.assert_called_once()
+    if rows is None:
+        query.assert_not_called()
+    else:
+        query.assert_called_once_with(
+            cmd, options["device_query"], "hub", None, "rg", login=None,
+        )
 
 
 def _validate_issues(

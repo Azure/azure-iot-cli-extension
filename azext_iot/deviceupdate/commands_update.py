@@ -452,6 +452,8 @@ def calculate_hash(
     file_paths: List[str],
     hash_algo: str = ADUValidHashAlgorithmType.SHA256.value,
 ):
+    from pathlib import Path
+
     result = []
     for path in file_paths:
         file_metadata = DeviceUpdateDataManager.calculate_file_metadata(path)
@@ -460,7 +462,7 @@ def calculate_hash(
                 "bytes": file_metadata.bytes,
                 "hash": file_metadata.hash,
                 "hashAlgorithm": hash_algo,
-                "uri": file_metadata.path.as_uri(),
+                "uri": Path(file_metadata.path).resolve().as_uri(),
             }
         )
     return result

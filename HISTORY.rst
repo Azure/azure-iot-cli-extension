@@ -3,6 +3,61 @@
 Release History
 ===============
 
+1.0.0b1 (Preview)
++++++++++++++++++
+
+**ADR SDK and API compatibility**
+
+* Expanded the cloud-only ADR surface to 112 commands for namespaces, Registry Devices, certificate authorities and policies, groups, jobs and runs, namespace links, reports, and Software Updates.
+* Replaced the ADR/CMS and Software Updates control/data clients with pinned TypeSpec-generated, modeless, synchronous-only clients. ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint; Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
+* ADR target lookups and identity-safety reads use Hub ``2026-10-01-preview`` and DPS ``2026-06-01-preview`` contracts. General Hub/DPS management retain preview SDK defaults (``2026-05-01-preview`` / ``2026-08-31``) and use Central US EUAP; their SDK upgrades and certificate-issuing enrollment/registration remain separate child-branch work.
+* Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. Shared deadline-based polling handles Retry-After, transient reads, terminal failures, and no-wait follow-up without extending the operation budget.
+
+**Namespace links and identity safety**
+
+* Made ``az iot adr ns link hub|dps|su`` the canonical relationship model. Hub/DPS create and update no longer accept resource-side namespace inputs; namespace create/update do not expose raw messaging, provisioning, or updating endpoint bags.
+* Added target existence, region, provisioning-state, Standard Hub SKU, ARM ID, selected identity, endpoint collision, cardinality, and DPS-first Hub ordering validation. Cross-subscription DPS projections and partial failures preserve existing endpoints.
+* Link add/update reuse inherited role assignments and create only missing service assignments for authorized Owner or User Access Administrator callers. Plans, completed requests, and partial failures are disclosed; visibility is confirmed before namespace mutation. SU setup includes the ADU first-party application assignment without granting caller content roles.
+* DPS link add/update, including combined DPS/Hub setup, grant the namespace's system-assigned identity Azure Device Registry Administrator on its own namespace for registry-device provisioning. This identity is distinct from a configured outbound UAMI; caller DPS data-plane roles are not granted.
+* Standardized managed-identity options on ``--system-assigned-mi`` / ``--user-assigned-mi``, retaining hidden ``--mi-*`` aliases. Qualified options select namespace outbound and bundled-link identities.
+* Composite ``--hub-name`` / ``--hn`` and ``--dps-name`` / ``--dn`` label aliases remain accepted and now emit deprecation warnings directing callers to ``--hub-endpoint-name`` and ``--dps-endpoint-name``.
+* Identity-sensitive Hub/DPS updates omit read-only ADR projections, preserve unmentioned identities, and prevent removal of identities selected by active links. DPS generic update removals use the same guard. Update Instance partial UAMI removal preserves unrelated identities and uses explicit-null PATCH entries.
+* Added endpoint-only ``link hub|dps|su delete`` commands: GET the namespace, ensure its outbound managed identity has Reader on the linked resource's resource group, and submit a replacement PUT without the named endpoint, preserving other endpoints and writable settings. Authorized Owner/User Access Administrator callers automatically create a missing Reader grant; other callers receive exact remediation commands before any PUT. Reader assignments remain after unlinking. Delete the linked resource separately first. These commands do not check target existence or wait for unlink completion; initial backend errors propagate, while asynchronous failures require namespace inspection. Newly created Reader assignments may need service-side propagation before a retry succeeds. The former composite resource-deletion behavior remains retired.
+* Failed Hub, DPS, and SU links can be retried with their saved identity and settings without repeating identity options, including Hub links with no inbound identity. Healthy no-option updates remain rejected, and target, topology, selected-identity, and RBAC checks still apply. Collision guidance distinguishes endpoint removal from deletion of the linked resource.
+* DPS link show distinguishes an unavailable Hub-registration read from an authoritative empty list: ``brownfieldHubsAvailable`` is false and ``brownfieldHubs`` is null on expected access or service failures. Malformed responses and programming defects are not hidden.
+* Link show/list expose linking-state and failed-endpoint filters. Wait commands retain standard CLI predicates while defaulting to resource-specific success and surfacing terminal failures.
+* ADR wait commands use monotonic deadlines that include GET and predicate time and cap sleeps to the remaining budget. In-flight requests remain subject to SDK transport timeouts rather than being interrupted by the polling deadline.
+
+**Namespaces, certificates, groups, jobs, and reports**
+
+* Added namespace identity show/assign/remove, legacy-asset migration, and namespace/group update-compliance report generate/latest commands. Namespace upserts preserve existing observability settings.
+* Added certificate authority and policy management with parent-location inheritance, certificate-file validation, Microsoft issuer references, revoke-and-rotate, and policy validity updates from 7 through 90 days. Removed unsupported certificate-subject and issuer-UUID inputs.
+* Certificate operation failures preserve partial service errors and identify response-correlation sources. Detail-free failures suggest Activity Log investigation without guessing the backend cause.
+* External ICA activation checks deterministic certificate defects, warns about unconfirmed service constraints, and includes complete ECC CSR-signing guidance without rewriting the submitted chain.
+* Waited certificate authority activate/revoke actions return the freshly read resource. ``--no-wait`` retains submission-only behavior, and Microsoft issuer fields are not fabricated.
+* Added group member listing/count/refresh and ``RegistryDevice`` group queries. Groups use the service's tracked-resource model without unsupported identity configuration.
+* Synchronous group deletion continues accepting ``--no-wait`` for compatibility but now warns that it has no effect. Composite link ``--no-wait`` still waits for DPS before submitting the final Hub stage.
+* Added ``SoftwareUpdate`` and ``OnboardingUpdate`` jobs, job-run listing/results/summary/cancellation/deletion, and repeated scheduling through ``JobRuns_CreateOrReplace``. Autogenerated run names combine a UTC timestamp with a unique suffix; explicit names remain unchanged.
+* Exposed the 17 preview Registry Device commands under ``az iot adr ns device`` (replacing ``az iot adr ns registry-device``) for CRUD, wait, authentication, attributes, and capabilities against the current modeless SDK. External-ID lookup follows every page; updates patch only supplied fields. Auth metadata redacts symmetric keys and only ``auth show-keys`` retrieves secrets. Composite link deletion remains retired.
+* Kept AIO custom-location resources and legacy credential/policy groups out of the cloud-only ADR surface. Asset, discovered-resource, namespace-device, and management-endpoint workflows belong to ``az iot ops ns``.
+
+**Software Updates and command reliability**
+
+* Added Update Instance lifecycle and identity management, namespace SU links, software-update import/stage/list/show/delete/hash/wait, file and device-class discovery, and v5 manifest initialization.
+* Registered ADR software-update ``calculate-hash`` as a normal local command, preserving its output and no-Azure-call behavior. Clarified recovery, partial-wait, and new-Hub-default help without changing parser defaults or identity-option spellings; removed unused MI argument types and stale ADR linter exclusions.
+* Added catalog provider/name/version discovery and operation-status list/show for asynchronous imports. Staging validates manifest artifacts and supports idempotent Azure Storage upload and multi-manifest import.
+* Reused in-process Azure CLI credentials scoped to the CLI context and target subscription for service and staging clients. Unsupported canary/cloud configurations fail before credential acquisition.
+* DPS enrollment-group create/update/show redact symmetric keys by default; ``--show-keys`` / ``--keys`` explicitly reveal them. Enrollment errors distinguish caller access from the DPS managed identity's ADR access.
+* Hub fallback updates return completed server state. MQTT failures produce clean CLI errors; cleanup preserves the primary error and surfaces cleanup-only failures.
+* Hub feedback monitoring reports AMQP transport failures when a requested message has not been received, while preserving normal cancellation and completed waits. Device filtering no longer discards later matching records in a mixed-device feedback batch.
+
+**Integration and delivery**
+
+* Added secret-redacted command logging, timed steps, and separate cohort reports. Workflow runs execute full selected-service suites without per-test workflow filters.
+* Integration cleanup confirms exact owned-child GET404 before bounded namespace deletion and preserves cleanup failures. Narrow link-readiness recovery handles the recognized namespace-identity condition without retrying unrelated failures or deleting borrowed targets.
+* Strengthened authentication-phase isolation, role-creation coordination, ownership receipts, and ownership/cleanup-only admission without quota or capacity gating. Expanded generated-client, parser-retirement, identity-safety, SDK/HTTP, and cross-platform regression coverage.
+* Reclassified Hub integration into ``HubControl`` and ``HubData``, with mandatory isolated Entra and SAS Data phases and exact ownership and cleanup accounting.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 

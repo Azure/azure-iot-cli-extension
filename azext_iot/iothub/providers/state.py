@@ -6,6 +6,7 @@
 
 import json
 import os
+from copy import deepcopy
 from typing import Dict, List, Optional
 
 from azure.core import MatchConditions
@@ -41,6 +42,7 @@ from azext_iot.operations.hub import (_iot_device_create, _iot_device_delete,
                                       _iot_device_module_twin_update,
                                       _iot_device_set_parent, _iot_device_show,
                                       _iot_device_twin_list,
+                                      _iot_device_twin_show,
                                       _iot_device_twin_update,
                                       _iot_edge_set_modules,
                                       _iot_hub_configuration_create,
@@ -343,7 +345,8 @@ class StateProvider(IoTHubProvider):
             if not self.target:
                 self.target = self.discovery.get_target(
                     hub_resource["name"],
-                    resource_group_name=arm_result.as_json()["resourceGroup"]
+                    resource_group_name=arm_result.as_json()["resourceGroup"],
+                    auth_type=self.auth_type,
                 )
                 print(usr_msgs.CREATE_IOT_HUB_MSG.format(self.hub_name))
             else:
@@ -512,6 +515,9 @@ class StateProvider(IoTHubProvider):
         """
         # if incorrect permissions, will fail to retrieve any devices
         devices = {}
+        # Only an explicit SKU identifies Basic; missing query fields may be index lag.
+        if target.get("sku_tier") == "Basic":
+            return devices
         try:
             twins = _iot_device_twin_list(target=target, top=None)
         except AzCLIError:
@@ -519,17 +525,16 @@ class StateProvider(IoTHubProvider):
             return
 
         for i in tqdm(range(len(twins)), desc=usr_msgs.SAVE_DEVICE_DESC, ascii=" #"):
-            device_twin = twins[i]
-            device_id = device_twin["deviceId"]
+            device_id = twins[i]["deviceId"]
+            # Query discovers IDs, not snapshot content. Read failures must abort
+            # before migration deletes/restores or export overwrites an existing file.
+            device_twin = deepcopy(_iot_device_twin_show(target=target, device_id=device_id))
             device_obj = {}
 
             if device_twin.get("parentScopes"):
                 device_parent = device_twin["parentScopes"][0].split("://")[1]
                 device_obj["parent"] = device_parent[:device_parent.rfind("-")]
 
-            # Basic tier does not support device twins, modules
-            if not device_twin.get("properties"):
-                continue
             # put properties + tags into the saved twin
             device_twin["properties"].pop("reported")
             for key in ["$metadata", "$version"]:
@@ -539,24 +544,17 @@ class StateProvider(IoTHubProvider):
                 "properties": device_twin.pop("properties")
             }
 
-            if device_twin.get("tags"):
+            if "tags" in device_twin:
                 device_obj["twin"]["tags"] = device_twin.pop("tags")
 
             # create the device identity from the device twin
             # primary and secondary keys show up in the "show" output but not in the "list" output
-            authentication = {
-                "type": device_twin.pop("authenticationType"),
-                "x509Thumbprint": device_twin.pop("x509Thumbprint")
-            }
-            if authentication["type"] == DeviceAuthApiType.sas.value:
-                # Cannot retrieve the sas key for some reason - throw out the device
-                try:
-                    id2 = _iot_device_show(target=target, device_id=device_id)
-                    authentication["symmetricKey"] = id2["authentication"]["symmetricKey"]
-                except AzCLIError:
-                    logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_RETRIEVE_FAIL_MSG.format(device_id))
-                    continue
-            device_twin["authentication"] = authentication
+            # Twin GET need not include query-only authentication fields. The
+            # existing SDK's identity GET supplies all three authentication types.
+            identity = _iot_device_show(target=target, device_id=device_id)
+            device_twin.pop("authenticationType", None)
+            device_twin.pop("x509Thumbprint", None)
+            device_twin["authentication"] = deepcopy(identity["authentication"])
 
             for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
                 device_twin.pop(key, None)

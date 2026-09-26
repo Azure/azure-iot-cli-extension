@@ -6,6 +6,7 @@
 
 import importlib
 import inspect
+import io
 import shlex
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from azure.cli.testsdk.base import ExecutionResult
 
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr import ADRLiveScenarioTest
+from azext_iot.tests.adr import _log as log
 from azext_iot.tests.adr._log import _redact_command
 
 
@@ -97,8 +99,6 @@ def test_command_display_escapes_control_characters():
 def test_commands_are_logged_once_before_execution(
     scenario, mocker, monkeypatch, capsys, caplog, pretty, expect_failure
 ):
-    if pretty:
-        monkeypatch.setenv("PRETTY_LOG", "1")
     command = "iot adr ns show -n {namespace}"
     checks = [mocker.sentinel.check]
     result = mocker.create_autospec(ExecutionResult, instance=True)
@@ -119,12 +119,37 @@ def test_commands_are_logged_once_before_execution(
 
     execution = mocker.patch("azure.cli.testsdk.base.execute", side_effect=execute)
 
-    assert scenario.cmd(command, checks, expect_failure) is mocker.sentinel.result
+    with monkeypatch.context() as context:
+        if pretty:
+            context.setenv("PRETTY_LOG", "1")
+        assert scenario.cmd(command, checks, expect_failure) is mocker.sentinel.result
 
     execution.assert_called_once_with(
         scenario.cli_ctx, "iot adr ns show -n test-ns", expect_failure=expect_failure
     )
     result.assert_with_checks.assert_called_once_with(checks)
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "cp1252"])
+@pytest.mark.parametrize("arguments", [
+    "--password redactme",
+    "--url 'https://storage.example/blob?sig=redactme'",
+    "--body '{\"password\":\"redactme\"}'",
+    "--password 'redactme",
+])
+def test_pretty_command_redaction_precedes_encoded_output(encoding, arguments, monkeypatch):
+    buffer = io.BytesIO()
+    with io.TextIOWrapper(buffer, encoding=encoding, errors="strict", newline="\n") as stream:
+        with monkeypatch.context() as context:
+            context.setenv("PRETTY_LOG", "1")
+            context.setattr(log.sys, "stdout", stream)
+            log.log_command(f"iot adr ns show --name caf\u00e9 {arguments}")
+        output = buffer.getvalue()
+    assert b"redactme" not in output
+    assert b"***" in output or b"command omitted" in output
+    assert output.count(b"\n") == 1
+    assert output.count(log._ANSI["sky"].encode("ascii")) == 1
+    assert output.endswith(log._ANSI_RESET.encode("ascii") + b"\n")
 
 
 def test_original_template_and_secrets_are_delegated_unchanged(scenario, mocker, caplog):
@@ -173,10 +198,27 @@ def test_other_services_keep_their_existing_command_behavior(scenario, mocker, c
     assert not caplog.records
 
 
-def test_all_adr_scenarios_use_the_command_wrapper():
+@pytest.mark.parametrize("expect_failure", [False, True])
+def test_all_adr_scenarios_use_the_command_wrapper(mocker, expect_failure):
+    execution = mocker.patch.object(CaptureOutputLiveScenarioTest, "cmd")
+    logged = mocker.patch("azext_iot.tests.adr.log_command")
     for path in Path(__file__).parent.glob("test_*_int.py"):
         module = importlib.import_module(f"azext_iot.tests.adr.{path.stem}")
         for _, cls in inspect.getmembers(module, inspect.isclass):
             if cls.__module__ == module.__name__ and issubclass(cls, CaptureOutputLiveScenarioTest):
                 assert issubclass(cls, ADRLiveScenarioTest), cls.__name__
-                assert cls.cmd is ADRLiveScenarioTest.cmd, cls.__name__
+                # Scoped adapters may extend the command, but every scenario
+                # must still pass through the ADR log wrapper and preserve the
+                # testsdk checks/failure contract. Do not exempt any scenario.
+                scenario = object.__new__(cls)
+                scenario.kwargs = {"resource_group": "test-rg"}
+                checks = [object()]
+                execution.reset_mock()
+                logged.reset_mock()
+                result = scenario.cmd("iot adr ns list -g {resource_group}", checks=checks, expect_failure=expect_failure)
+                assert result is execution.return_value
+                execution.assert_called_once()
+                command = execution.call_args.args[0]
+                assert command.startswith("iot adr ns list -g {resource_group}")
+                assert execution.call_args.kwargs == {"checks": checks, "expect_failure": expect_failure}
+                logged.assert_called_once_with(scenario._apply_kwargs(command), expect_failure=expect_failure)

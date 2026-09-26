@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import inspect
+
 import pytest
 from unittest.mock import Mock, patch
 from azure.cli.core.azclierror import BadRequestError
@@ -19,6 +21,15 @@ location = "westus2"
 
 def _get_sent_description(mock_client):
     return mock_client.iot_dps_resource.begin_create_or_update.call_args.kwargs["iot_dps_description"]
+
+
+def test_local_auth_option_does_not_shift_existing_positional_parameters():
+    assert list(inspect.signature(iot_dps_create).parameters)[-3:] == [
+        "mi_system_assigned", "mi_user_assigned", "disable_local_auth",
+    ]
+    assert list(inspect.signature(iot_dps_update).parameters)[-4:] == [
+        "mi_system_assigned", "mi_user_assigned", "cmd", "disable_local_auth",
+    ]
 
 
 class TestDPSCreate(object):
@@ -110,6 +121,7 @@ class TestDPSUpdate(object):
         """Omitting --disable-local-auth must leave the existing value untouched."""
         mock_client = Mock()
         parameters = {"properties": {"disableLocalAuth": True}}
+        mock_client.iot_dps_resource.get.return_value = {"properties": {"disableLocalAuth": True}}
 
         iot_dps_update(
             mock_client, dps_name, parameters, resource_group, disable_local_auth=disable_local_auth
@@ -125,6 +137,7 @@ class TestDPSUpdate(object):
 
     def test_dps_update_resolves_resource_group(self):
         mock_client = Mock()
+        mock_client.iot_dps_resource.get.return_value = {"properties": {}}
         mock_client.iot_dps_resource.list_by_subscription.return_value = [
             {"name": dps_name, "resourcegroup": resource_group}
         ]

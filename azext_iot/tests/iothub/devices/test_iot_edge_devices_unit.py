@@ -29,7 +29,6 @@ from azext_iot.iothub.providers.helpers.edge_device_config import (
     EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
     EDGE_ROOT_CERTIFICATE_FILENAME,
     EDGE_ROOT_CERTIFICATE_SUBJECT,
-    MAX_DEVICE_SCOPE_RETRIES,
     create_edge_device_config_script,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
@@ -64,23 +63,6 @@ test_certs_folder = "./test_certs"
 test_root_cert = "root-cert.pem"
 test_root_key = "root-key.pem"
 
-test_device_scopes = [
-    {"deviceId": "device_1", "deviceScope": "dev1-scope-value"},
-    {"deviceId": "device_2", "deviceScope": "dev2-scope-value"},
-    {"deviceId": "device_3", "deviceScope": "dev3-scope-value"},
-    {"deviceId": "device_4", "deviceScope": "dev4-scope-value"},
-    {"deviceId": "device_5", "deviceScope": "dev5-scope-value"},
-    {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
-    {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
-]
-unrelated_device_scopes = [
-    {"deviceId": f"unrelated_device_{index}", "deviceScope": device["deviceScope"]}
-    for index, device in enumerate(test_device_scopes)
-]
-empty_device_scopes = [
-    {"deviceId": device["deviceId"], "deviceScope": ""}
-    for device in test_device_scopes
-]
 test_path = getcwd()
 
 
@@ -128,7 +110,7 @@ class TestEdgeHierarchyCreateArgs:
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/dev\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({"deviceScope": "registry-scope"}),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -222,6 +204,13 @@ class TestEdgeHierarchyCreateArgs:
             bundle_output_path=output,
         )
 
+        query_calls = [call for call in service_client.calls if "/devices/query?" in call.request.url]
+        assert len(query_calls) == 1
+        for request in (call.request for call in service_client.calls if call.request.method == "PUT"):
+            parent_scopes = json.loads(request.body).get("parentScopes")
+            if parent_scopes:
+                assert parent_scopes == ["registry-scope"]
+
         if output:
             assert exists(output)
             for device in devices:
@@ -229,6 +218,40 @@ class TestEdgeHierarchyCreateArgs:
                 assert exists(join(output, f"{device_id}.tgz"))
 
             rmtree(output)
+
+    @pytest.mark.parametrize("status", [404, 403, 409, 500])
+    def test_clean_handles_only_missing_stale_query_rows(self, fixture_cmd, set_cwd, service_client, status):
+        service_client.replace(
+            responses.DELETE,
+            url=re.compile(r"https://{}/devices/dev\d+".format(hub_entity)),
+            json={"Message": "Registry delete error"},
+            status=status,
+        )
+        if status == 404:
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd, devices=[["id=dev1", "parent=dev2"], ["id=dev2"]],
+                clean=True, yes=True, visualize=False,
+            )
+        else:
+            with pytest.raises(AzureResponseError):
+                subject.iot_edge_devices_create(
+                    cmd=fixture_cmd, devices=[["id=dev1", "parent=dev2"], ["id=dev2"]],
+                    clean=True, yes=True, visualize=False,
+                )
+            assert not any(call.request.method == "PUT" for call in service_client.calls)
+
+    def test_explicit_device_delete_keeps_not_found_strict(self, fixture_cmd, service_client):
+        from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+
+        service_client.replace(
+            responses.DELETE,
+            url=re.compile(r"https://{}/devices/dev\d+".format(hub_entity)),
+            json={"Message": "Device not found"},
+            status=404,
+        )
+        provider = DeviceIdentityProvider(cmd=fixture_cmd)
+        with pytest.raises(AzureResponseError):
+            provider.delete_device_identities(["dev1"])
 
 
 class TestHierarchyCreateFailures:
@@ -435,20 +458,15 @@ class TestHierarchyCreateConfig:
     def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
         mocked_response.assert_all_requests_are_fired = False
         devices_url = f"https://{hub_entity}/devices"
-        # get scopes (force retry)
-        for scope_response in [
-            [],  # Query existing devices
-            test_device_scopes[:-2],  # Get Scopes [missing last 2]
-            test_device_scopes  # On retry, return full list
-        ]:
-            mocked_response.add(
-                method=responses.POST,
-                url=f"{devices_url}/query",
-                body=json.dumps(scope_response),
-                status=200,
-                content_type="application/json",
-                match_querystring=False,
-            )
+        # Keep the query index empty; known parent scopes come from registry GETs.
+        mocked_response.add(
+            method=responses.POST,
+            url=f"{devices_url}/query",
+            body="[]",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
 
         # delete any existing devices
         mocked_response.add(
@@ -486,7 +504,7 @@ class TestHierarchyCreateConfig:
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({"deviceScope": "registry-scope"}),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -507,19 +525,16 @@ class TestHierarchyCreateConfig:
         yield mocked_response
 
     @pytest.fixture()
-    def scope_query_client(self, request, mocked_response, fixture_ghcs, fixture_sas):
+    def scope_missing_client(self, mocked_response, fixture_ghcs, fixture_sas):
         devices_url = f"https://{hub_entity}/devices"
-        query_devices, registry_device_scope = request.param
-
-        def query_response(request):
-            query = json.loads(request.body)["query"]
-            response = [] if query == "SELECT deviceId FROM devices" else query_devices
-            return 200, {"Content-Type": "application/json"}, json.dumps(response)
-
-        mocked_response.add_callback(
+        # always return empty query
+        mocked_response.add(
             method=responses.POST,
             url=f"{devices_url}/query",
-            callback=query_response,
+            body="[]",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
         )
 
         # Create / Update device-identities
@@ -533,31 +548,14 @@ class TestHierarchyCreateConfig:
             content_type="application/json",
             match_querystring=False,
         )
-
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body=json.dumps(
-                {"deviceScope": registry_device_scope}
-                if registry_device_scope
-                else {}
-            ),
+            body="{}",
             status=200,
             content_type="application/json",
             match_querystring=False,
         )
-
-        if registry_device_scope:
-            mocked_response.add(
-                method=responses.POST,
-                url=re.compile(
-                    r"{}/device_\d+/applyConfigurationContent".format(devices_url)
-                ),
-                body="{}",
-                status=200,
-                content_type="application/json",
-                match_querystring=False,
-            )
         return mocked_response
 
     @pytest.fixture()
@@ -739,60 +737,44 @@ class TestHierarchyCreateConfig:
 
             rmtree(out)
 
-    @pytest.mark.parametrize(
-        "scope_query_client, expect_failure",
-        [
-            (([], "registry-device-scope"), False),
-            (([], None), True),
-            ((unrelated_device_scopes, "registry-device-scope"), False),
-            ((empty_device_scopes, "registry-device-scope"), False),
-        ],
-        indirect=["scope_query_client"],
-    )
-    def test_edge_devices_scope_registry_fallback(
-        self, fixture_cmd, scope_query_client, set_cwd, expect_failure, mocker
-    ):
-        mocker.patch("azext_iot.iothub.providers.device_identity.sleep")
-
-        if expect_failure:
-            with pytest.raises(AzureResponseError):
-                subject.iot_edge_devices_create(
-                    cmd=fixture_cmd,
-                    devices=None,
-                    config_file="device_configs/nested_edge_config.yml"
-                )
-        else:
+    def test_edge_devices_missing_parent_scope_fails(self, fixture_cmd, scope_missing_client, set_cwd):
+        with pytest.raises(AzureResponseError, match="Parent device.*did not return a device scope"):
             subject.iot_edge_devices_create(
                 cmd=fixture_cmd,
                 devices=None,
                 config_file="device_configs/nested_edge_config.yml"
             )
 
-        scope_queries = [
-            json.loads(request_call.request.body)["query"]
-            for request_call in scope_query_client.calls
-            if (
-                request_call.request.method == "POST"
-                and "/query" in request_call.request.url
-                and json.loads(request_call.request.body)["query"]
-                == "SELECT deviceId, deviceScope FROM devices"
-            )
+    @pytest.mark.parametrize("query_scopes", [
+        [],
+        [{"deviceId": "unrelated", "deviceScope": "wrong-scope"}],
+        [{"deviceId": "device_1", "deviceScope": ""}],
+    ])
+    def test_edge_parent_scopes_do_not_depend_on_query_contents(
+        self, fixture_cmd, service_client, set_cwd, query_scopes,
+    ):
+        def query_response(request):
+            query = json.loads(request.body)["query"]
+            rows = [] if query == "SELECT deviceId FROM devices" else query_scopes
+            return 200, {"Content-Type": "application/json"}, json.dumps(rows)
+
+        service_client.remove(responses.POST, f"https://{hub_entity}/devices/query")
+        service_client.add_callback(
+            responses.POST, f"https://{hub_entity}/devices/query", callback=query_response,
+        )
+        subject.iot_edge_devices_create(
+            cmd=fixture_cmd, devices=None, config_file="device_configs/nested_edge_config.yml", visualize=False,
+        )
+        queries = [
+            json.loads(item.request.body)["query"] for item in service_client.calls
+            if item.request.method == "POST" and "/query" in item.request.url
         ]
-        assert len(scope_queries) == MAX_DEVICE_SCOPE_RETRIES + 1
-
-        if not expect_failure:
-            updated_devices = []
-            for request_call in scope_query_client.calls:
-                if request_call.request.method == "PUT":
-                    request_body = json.loads(request_call.request.body)
-                    if request_body.get("parentScopes"):
-                        updated_devices.append(request_body)
-
-            assert updated_devices
-            assert all(
-                device["parentScopes"] == ["registry-device-scope"]
-                for device in updated_devices
-            )
+        assert queries == ["SELECT deviceId FROM devices"]
+        updates = [
+            json.loads(item.request.body) for item in service_client.calls if item.request.method == "PUT"
+        ]
+        parents = [device["parentScopes"] for device in updates if device.get("parentScopes")]
+        assert parents and all(scopes == ["registry-scope"] for scopes in parents)
 
 
 class TestEdgeHierarchyConfigFunctions:

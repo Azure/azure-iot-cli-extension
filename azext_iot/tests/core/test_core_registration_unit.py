@@ -36,18 +36,25 @@ def test_load_core_commands():
     load_core_commands(MagicMock(), None)
 
 
+def test_load_root_hub_and_dps_data_commands():
+    from azext_iot.commands import load_command_table
+
+    load_command_table(MagicMock(), None)
+
+
 def test_load_core_arguments():
     load_core_arguments(MagicMock(), None)
 
 
-def test_patch_core_help_with_existing_keys():
-    from knack.help_files import helps
-
+def test_patch_core_help_with_existing_keys(monkeypatch):
     # Pre-populate the help keys so the conditional append branches execute.
-    helps["iot hub create"] = "type: command"
-    helps["iot dps create"] = "type: command"
+    helps = {name: "type: command\nexamples:\n" for name in ("iot hub create", "iot dps create")}
+    monkeypatch.setattr("azext_iot.core.help.helps", helps)
     patch_core_help()
     assert "iot dps identity" in helps
+    from yaml import safe_load
+    assert safe_load(helps["iot hub create"])["examples"]
+    assert safe_load(helps["iot dps create"])["examples"]
 
 
 def test_policy_update_result_transform(mocker):

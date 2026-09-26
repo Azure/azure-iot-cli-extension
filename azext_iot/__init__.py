@@ -47,7 +47,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.dps.params import load_dps_arguments
         from azext_iot.deviceupdate.params import load_deviceupdate_arguments
         from azext_iot.core.params import load_core_arguments
-        from azext_iot.adr.params_adr_management import load_adr_management_arguments
+        from azext_iot.adr.params import load_adr_arguments
 
         load_arguments(self, command)
         load_iothub_arguments(self, command)
@@ -57,7 +57,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         load_deviceupdate_arguments(self, command)
 
         load_core_arguments(self, command)
-        load_adr_management_arguments(self, command)
+        load_adr_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader

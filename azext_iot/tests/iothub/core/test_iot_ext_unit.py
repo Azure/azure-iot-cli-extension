@@ -16,6 +16,8 @@ import json
 import os
 import responses
 import re
+from argparse import Namespace
+from azext_iot._validators import process_top
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
@@ -865,6 +867,8 @@ class TestDeviceTwinList:
     @pytest.mark.parametrize("top", [-2, 0])
     def test_device_list_invalid_args(self, fixture_cmd, fixture_ghcs, top):
         with pytest.raises(CLIError):
+            # Preview validates --top in argument processing, before dispatch.
+            process_top(Namespace(top=top))
             subject.iot_device_twin_list(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
@@ -1796,6 +1800,7 @@ class TestQuery:
     @pytest.mark.parametrize("top", [-2, 0])
     def test_query_invalid_args(self, top, fixture_ghcs):
         with pytest.raises(CLIError):
+            process_top(Namespace(top=top))
             subject.iot_query(
                 cmd=None, hub_name_or_hostname=mock_target["entity"], query_command=generic_query, top=top
             )

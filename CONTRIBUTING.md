@@ -121,6 +121,21 @@ _Hub:_
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
 
+Integration workflows run the full suite for each selected service. Use the
+existing service runners and their required Azure permissions; focused debug
+runs are partial coverage. Provisioning failures fail the run, and resource
+ownership and verified cleanup remain mandatory.
+See [integration workflow guidance](docs/tox-testing.md#integration-workflow-topology).
+
+The GitHub integration workflow's `regions` input accepts Azure public-region
+identifiers, such as `australiaeast` or `westeurope`, without a per-region allowlist.
+With `arm-endpoint=auto`, `centraluseuap` uses canary ARM and other regions use
+`https://management.azure.com`. Select `public` or `canary` explicitly to override
+automatic endpoint selection; canary routing requires `centraluseuap`.
+Resource location and ARM routing are passed together through the full service
+run. Public ARM is not a region-derived hostname. Unsupported API or region
+operations fail rather than falling back to canary or changing the selected tests.
+
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`
 

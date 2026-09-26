@@ -40,6 +40,12 @@ jobs:
         with:
           python-version: ${{ matrix.py }}
       - uses: actions/checkout@v5
+      - name: Select OpenSSL 3 for CSR signing
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          source scripts/select-openssl.sh
+          echo "$openssl_bin" >> "$GITHUB_PATH"
       - name: Setup test suite
         run: |
           python -m pip install tox

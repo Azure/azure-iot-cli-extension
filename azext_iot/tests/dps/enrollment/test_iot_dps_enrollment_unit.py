@@ -559,7 +559,7 @@ class TestEnrollmentShow():
         assert "{}/enrollments/{}/attestationmechanism?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'POST'
 
-    def test_enrollment_show_error(self, fixture_cmd, serviceclient_generic_error):
+    def test_enrollment_show_error(self, fixture_cmd, dps_service_client_generic_errors):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_get(
                 cmd=fixture_cmd,
@@ -600,7 +600,7 @@ class TestEnrollmentList():
         assert method == "POST"
         assert json.dumps(result)
 
-    def test_enrollment_list_error(self, fixture_cmd, serviceclient_generic_error):
+    def test_enrollment_list_error(self, fixture_cmd, dps_service_client_generic_errors):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_list(
                 cmd=fixture_cmd,
@@ -641,7 +641,7 @@ class TestEnrollmentDelete():
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
-    def test_enrollment_delete_error(self, serviceclient_generic_error, fixture_cmd):
+    def test_enrollment_delete_error(self, dps_service_client_generic_errors, fixture_cmd):
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_delete(
                 cmd=fixture_cmd,
@@ -684,7 +684,7 @@ class TestRegistrationShow():
         assert "{}/registrations/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'GET'
 
-    def test_registration_show_error(self, fixture_cmd):
+    def test_registration_show_error(self, fixture_cmd, dps_service_client_generic_errors):
         with pytest.raises(CLIError):
             subject.iot_dps_registration_get(
                 cmd=fixture_cmd,
@@ -726,7 +726,7 @@ class TestRegistrationDelete():
         assert method == 'DELETE'
         assert request.headers["If-Match"] == etag if etag else "*"
 
-    def test_registration_delete_error(self, fixture_cmd):
+    def test_registration_delete_error(self, fixture_cmd, dps_service_client_generic_errors):
         with pytest.raises(CLIError):
             subject.iot_dps_registration_delete(
                 cmd=fixture_cmd,
