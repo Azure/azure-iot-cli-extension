@@ -66,7 +66,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             self.addCleanup(self._cleanup_reader, principal, scope)
         self._delete_owned_resource(kind, target_name, TEST_RG)
         submitted = self.cmd(
-            f"iot adr ns link {kind} delete {selector} -n {endpoint_name} --yes",
+            f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes",
         ).get_output_in_json()
         assert submitted["id"].casefold() == before["id"].casefold()
         assert submitted["properties"]["provisioningState"] in {"Accepted", "Updating", "Succeeded"}
@@ -99,7 +99,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             if endpoint_section == section:
                 retained.pop(endpoint_name)
             assert after["properties"].get(endpoint_section, {}).get("endpoints", {}) == retained
-        self.cmd(f"iot adr ns link {kind} delete {selector} -n {endpoint_name} --yes", expect_failure=True)
+        self.cmd(f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes", expect_failure=True)
 
     @pytest.mark.timeout(3600)
     def test_adr_link_hub_dps_delete(self):

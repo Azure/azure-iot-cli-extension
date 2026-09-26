@@ -1229,9 +1229,7 @@ def test_link_mutation_supports_no_wait(fixture_link_provider, mock_poller):
 
 
 def test_composite_remove_provider_methods_are_absent(fixture_link_provider):
-    for method in (
-        "hub_remove", "dps_remove", "su_remove",
-        "_delete_link", "_wait_for_linked_resource_deleted",
-    ):
+    # Endpoint-only hub/dps/su_remove replaced the retired resource-deleting composite.
+    for method in ("_delete_link", "_wait_for_linked_resource_deleted"):
         assert not hasattr(LinkProvider, method)
         assert not hasattr(fixture_link_provider, method)

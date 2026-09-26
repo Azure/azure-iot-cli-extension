@@ -96,7 +96,7 @@ def test_delete_preserves_namespace_without_target_reads_or_waits(
         mocker.patch.object(provider, name, side_effect=AssertionError(f"Unexpected {name}"))
     unlink_rbac.ensure_unlink_reader.side_effect = lambda *_: client.namespaces.begin_create_or_replace.assert_not_called()
 
-    assert getattr(provider, kind + "_delete")("primary", "ns", "rg") is initial
+    assert getattr(provider, kind + "_remove")("primary", "ns", "rg") is initial
     unlink_rbac.ensure_unlink_reader.assert_called_once_with("ns-system" if identity == "system" else "ns-user", TARGET_RG)
 
     client.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="ns", retry_total=0)
@@ -138,7 +138,7 @@ def test_delete_requires_the_named_endpoint_of_the_correct_kind(fixture_cmd, unl
     client = Mock()
     client.namespaces.get.return_value = source
     with pytest.raises(ResourceNotFoundError, match="primary"):
-        getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     client.namespaces.begin_create_or_replace.assert_not_called()
     unlink_rbac.ensure_unlink_reader.assert_not_called()
 
@@ -167,7 +167,7 @@ def test_delete_preflight_failure_prevents_put(fixture_cmd, unlink_rbac, kind, s
     client.namespaces.get.return_value = source
     original = deepcopy(source)
     with pytest.raises(error_type):
-        getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert source == original
     client.namespaces.begin_create_or_replace.assert_not_called()
     if defect != "rbac":
@@ -184,7 +184,7 @@ def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, 
     operation = client.namespaces.get if stage == "get" else client.namespaces.begin_create_or_replace
     operation.side_effect = error
     with pytest.raises(error_type) as raised:
-        getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert raised.value is error
     if stage == "get":
         client.namespaces.begin_create_or_replace.assert_not_called()
@@ -193,11 +193,11 @@ def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 def test_delete_command_handler_forwards_only_endpoint_selectors(mocker, kind, section, _endpoint_type):
     provider_type = mocker.patch.object(commands_link, "LinkProvider")
-    handler = getattr(commands_link, f"adr_link_{kind}_delete")
+    handler = getattr(commands_link, f"adr_link_{kind}_remove")
     cmd, client = Mock(), Mock()
-    assert handler(cmd, client, "primary", "ns", "rg") is getattr(provider_type.return_value, kind + "_delete").return_value
+    assert handler(cmd, client, "primary", "ns", "rg") is getattr(provider_type.return_value, kind + "_remove").return_value
     provider_type.assert_called_once_with(cmd, client=client)
-    getattr(provider_type.return_value, kind + "_delete").assert_called_once_with(
+    getattr(provider_type.return_value, kind + "_remove").assert_called_once_with(
         endpoint_name="primary", namespace_name="ns", resource_group_name="rg",
     )
 
@@ -216,7 +216,7 @@ def test_delete_real_sdk_sends_only_get_and_put_after_rbac(
         network.put(URL, json=initial, status=status, headers={
             "Azure-AsyncOperation": URL + "/must-not-poll", "Location": URL + "/must-not-follow", "Retry-After": "60",
         })
-        result = getattr(LinkProvider(fixture_cmd, client=client), kind + "_delete")("primary", "ns", "rg")
+        result = getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
         assert result == initial
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
         assert all(call.request.url == URL + "?api-version=2026-11-02-preview" for call in network.calls)
@@ -237,7 +237,7 @@ def test_delete_real_sdk_preserves_backend_error_without_retries(fixture_cmd, st
             network.get(URL, json=namespace())
         network.add("GET" if stage == "get" else "PUT", URL, json=failure, status=status)
         with pytest.raises(HttpResponseError, match="Original backend deletion detail") as raised:
-            LinkProvider(fixture_cmd, client=client).hub_delete("primary", "ns", "rg")
+            LinkProvider(fixture_cmd, client=client).hub_remove("primary", "ns", "rg")
         assert raised.value.status_code == status
         assert raised.value.error.code == "BackendUnlinkRejected"
         assert len(network.calls) == (1 if stage == "get" else 2)
@@ -250,7 +250,7 @@ def test_delete_real_cli_returns_initial_response(offline_cli, mocker, kind, sec
     put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
                        return_value=SimpleNamespace(result=lambda: initial))
     output = StringIO()
-    assert offline_cli.invoke(["iot", "adr", "ns", "link", kind, "delete", "-n", "primary", "--ns", "ns",
+    assert offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
                                "-g", "rg", "--yes", "-o", "json"], out_file=output) == 0
     assert json.loads(output.getvalue()) == initial
     assert get.call_count == put.call_count == 1
@@ -261,6 +261,6 @@ def test_delete_real_cli_returns_initial_response(offline_cli, mocker, kind, sec
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):  # noqa: F811
     with pytest.raises(SystemExit) as raised:
-        offline_cli.invoke(["iot", "adr", "ns", "link", kind, "delete", "-n", "primary", "--ns", "ns",
+        offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
                             "-g", "rg", "--yes", option, *(["10"] if option in ("--timeout", "--interval") else [])])
     assert raised.value.code == 2

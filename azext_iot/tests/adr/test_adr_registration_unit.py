@@ -209,10 +209,11 @@ def test_2026_command_surface_is_registered():
     )
     assert len(commands) == 112
     for endpoint in ("hub", "dps", "su"):
-        assert commands[f"iot adr ns link {endpoint} delete"] == (
-            "command", f"adr_link_{endpoint}_delete", {"confirmation": True},
+        assert commands[f"iot adr ns link {endpoint} remove"] == (
+            "command", f"adr_link_{endpoint}_remove", {"confirmation": True},
         )
-        assert hasattr(commands_link, f"adr_link_{endpoint}_delete")
+        assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
+        assert f"iot adr ns link {endpoint} delete" not in commands
     assert commands["iot adr ns migrate"] == (
         "command",
         "adr_namespace_migrate",
@@ -699,7 +700,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
         assert command in helps
     assert "iot adr ns job run create" not in helps
     for kind in ("hub", "dps", "su"):
-        assert f"iot adr ns link {kind} delete" in helps
+        assert f"iot adr ns link {kind} remove" in helps
 
     assert "Microsoft.DeviceUpdate/updateInstances" in helps["iot adr ns link su"]
     assert "linkedAccounts" not in helps["iot adr ns link su"]
@@ -753,7 +754,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
     )
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} remove" not in helps
-        assert f"iot adr ns link {endpoint} delete" in helps
+        assert f"iot adr ns link {endpoint} remove" in helps
     assert not any(command.startswith("iot adr ns su link") for command in helps)
     assert not any(
         command.startswith("iot adr ns su update") for command in helps

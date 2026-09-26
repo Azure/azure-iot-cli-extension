@@ -195,7 +195,7 @@ class LinkProvider(ADRProvider):
             **kwargs,
         )
 
-    def _delete_endpoint(
+    def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
     ):
         namespace = self.client.namespaces.get(
@@ -223,18 +223,18 @@ class LinkProvider(ADRProvider):
             resource=resource, polling=False, retry_total=0,
         ).result()
 
-    def hub_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
         )
 
-    def dps_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
         )
 
-    def su_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def su_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
         )
 
@@ -328,7 +328,8 @@ class LinkProvider(ADRProvider):
                 f"Messaging endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be repointed by link hub add. "
                 "Use 'az iot adr ns link hub update' for an existing Hub link, "
-                "or choose an unused endpoint name. To unlink, delete the Hub resource first, then use link hub delete."
+                "or choose an unused endpoint name. To remove the existing link, delete the linked IoT Hub first, "
+                "then run 'az iot adr ns link hub remove'."
             )
 
         endpoint_body = _build_hub_endpoint_body(
@@ -535,7 +536,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Provisioning endpoint '{endpoint_name}' already exists on "
                 f"namespace '{namespace_name}'. Choose an unused endpoint name. "
-                "To unlink, delete the DPS resource first, then use link dps delete."
+                "To remove the existing link, delete the linked DPS first, then run 'az iot adr ns link dps remove'."
             )
 
         endpoint_body = _build_dps_endpoint_body(
@@ -671,7 +672,8 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Updating endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be overwritten by link su add. "
-                "Choose an unused endpoint name. To unlink, delete the Update Instance first, then use link su delete."
+                "Choose an unused endpoint name. To remove the existing link, delete the linked Update Instance first, "
+                "then run 'az iot adr ns link su remove'."
             )
 
         endpoint_body = _build_su_endpoint_body(

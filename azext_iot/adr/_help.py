@@ -582,7 +582,7 @@ def load_adr_help():
   """
 
     for kind, resource in (("hub", "IoT Hub"), ("dps", "DPS"), ("su", "Software Updates instance")):
-        helps[f"iot adr ns link {kind} delete"] = f"""
+        helps[f"iot adr ns link {kind} remove"] = f"""
   type: command
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
@@ -611,7 +611,7 @@ def load_adr_help():
     Avoid concurrent namespace updates between this command's GET and PUT.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
-      text: az iot adr ns link {kind} delete -n primary --ns myNamespace -g myResourceGroup --yes
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
   """
 
     helps[

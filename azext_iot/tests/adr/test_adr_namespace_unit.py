@@ -612,9 +612,9 @@ def test_namespace_delete_not_empty_does_not_recommend_deleting_linked_targets(
     message = str(raised.value)
     assert "job run delete" in message
     assert "ca policy delete" in message
-    assert "link hub delete" not in message
-    assert "link dps delete" not in message
-    assert "link su delete" not in message
+    assert "link hub remove" not in message
+    assert "link dps remove" not in message
+    assert "link su remove" not in message
     assert "Only remove resources you own" in message
 
 

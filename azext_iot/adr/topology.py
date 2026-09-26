@@ -25,20 +25,23 @@ DPS_REQUIRED_MSG = (
 DPS_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked DPS. Only one DPS may be linked per namespace. "
     "Use 'az iot adr ns link dps update' to change its identity or retry a Failed link, "
-    "not to change the target DPS. To unlink, delete the DPS resource first, then use link dps delete."
+    "not to change the target DPS. To remove the existing link, delete the linked DPS first, "
+    "then run 'az iot adr ns link dps remove'."
 )
 
 SU_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked Software Updates instance; only one may be "
     "linked per namespace. Use 'az iot adr ns link su update' to modify the "
     "existing link's identity or retry a Failed link, not to change its target. "
-    "To unlink, delete the Update Instance first, then use link su delete."
+    "To remove the existing link, delete the linked Update Instance first, "
+    "then run 'az iot adr ns link su remove'."
 )
 
 HUB_CAP_EXCEEDED_MSG = (
     "Namespace already has the maximum of 10 linked IoT Hubs. "
     "Use 'az iot adr ns link hub update' to retry an existing Failed link. "
-    "To unlink, delete the Hub resource first, then use link hub delete."
+    "To remove the existing link, delete the linked IoT Hub first, "
+    "then run 'az iot adr ns link hub remove'."
 )
 
 

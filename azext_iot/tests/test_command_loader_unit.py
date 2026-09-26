@@ -106,7 +106,7 @@ for _kind, _resource_option, _resource_id in (
         _resource_option,
         _resource_id,
     ]
-    for _action in ("update", "show", "wait", "delete"):
+    for _action in ("update", "show", "wait", "remove"):
         _LINK_PARSER_CASES[
             f"iot adr ns link {_kind} {_action}"
         ] = _ENDPOINT_ARGUMENTS
@@ -475,7 +475,7 @@ def test_pnp_update_authentication_default_has_only_the_standard_linter_exceptio
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_link_delete_is_registered(command_table, kind):
-    assert f"iot adr ns link {kind} delete" in command_table
+    assert f"iot adr ns link {kind} remove" in command_table
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)
