@@ -106,6 +106,8 @@ Pre-existing resources are rejected before creation, and the certificate action
 tracker independently enforces exact ownership before any mutation.
 Unrelated optional external/preprovisioned fixtures retain their safety controls:
 selecting the full suite never authorizes mutation of external credentials.
+The live suite does not require a pre-provisioned failed DPS link. Deterministic
+unit tests retain coverage of failed-link recovery and identity-preserving updates.
 Local focused-debug controls remain available and cannot qualify a full suite.
 
 ## ADR live-test budgets
