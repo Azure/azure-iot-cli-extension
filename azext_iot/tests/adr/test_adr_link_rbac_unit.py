@@ -161,7 +161,8 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
     "/providers/Microsoft.Management/managementGroups/ancestor",
 ])
 def test_unlink_reader_reuses_inherited_grants_without_caller_privileges(mocker, token_profile, scope):
-    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    sleeper = MagicMock()
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=sleeper)
     target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
     manager.cli.invoke.return_value = _result([{
         "principalId": "outbound-mi", "scope": scope,
@@ -177,6 +178,7 @@ def test_unlink_reader_reuses_inherited_grants_without_caller_privileges(mocker,
     assert manager.cli.invoke.call_count == 1
     token_profile.return_value.get_raw_token.assert_not_called()
     caller.assert_not_called()
+    sleeper.assert_not_called()
 
 
 @pytest.mark.parametrize("authorized", [True, False])
@@ -184,7 +186,8 @@ def test_unlink_reader_reuses_inherited_grants_without_caller_privileges(mocker,
 def test_unlink_reader_creates_only_rg_reader_or_returns_exact_remediation(
     mocker, caplog, authorized, existing_scope,
 ):
-    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    sleeper = MagicMock()
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=sleeper)
     target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
     assignment = {
         "principalId": "outbound-mi", "scope": existing_scope or target_rg,
@@ -207,12 +210,14 @@ def test_unlink_reader_creates_only_rg_reader_or_returns_exact_remediation(
         )
         assert "namespace outbound MI -> Reader" in caplog.text
         assert "propagate" in caplog.text
+        sleeper.assert_called_once_with(30)
     else:
         with pytest.raises(AzureResponseError, match="No link mutation") as error:
             manager.ensure_unlink_reader("outbound-mi", target_rg)
         assert "--role 'Reader'" in str(error.value)
         assert f"--scope '{target_rg}' --subscription 'target-sub'" in str(error.value)
         assert manager.cli.invoke.call_count == 1
+        sleeper.assert_not_called()
     caller.assert_called_once_with("caller-object-id", target_rg)
     assert all(call.kwargs["subscription"] == "target-sub" for call in manager.cli.invoke.call_args_list)
 

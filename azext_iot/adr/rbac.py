@@ -33,6 +33,7 @@ OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
+UNLINK_READER_PROPAGATION_DELAY_SECONDS = 30
 LINK_ROLE_IDS = {
     READER_ROLE: "acdd72a7-3385-48ef-bd42-f606fba81ae7",
     CONTRIBUTOR_ROLE: "b24988ac-6180-42a0-ab88-20f7382dd24c",
@@ -534,6 +535,12 @@ class LinkRbacManager:
                 [assignment],
                 {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
             )
+            logger.warning(
+                "Waiting %s seconds for the new Reader grant to propagate before submitting unlink. "
+                "This does not wait for unlink completion.",
+                UNLINK_READER_PROPAGATION_DELAY_SECONDS,
+            )
+            self._sleep(UNLINK_READER_PROPAGATION_DELAY_SECONDS)
         except AzureResponseError as error:
             raise AzureResponseError(
                 f"{error}\nUnlink Reader setup requires resource group '{resource_group_scope}' to exist. "
