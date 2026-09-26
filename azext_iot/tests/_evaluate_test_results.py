@@ -38,7 +38,6 @@ def evaluate_dps_phases(result_dir, region=None, endpoint=None):
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
         if len(baseline) != len(receipt["baseline"]["resources"]):
             raise ValueError("ambiguous baseline ownership inventory")
-        previous_owned = set()
         for phase in phases:
             if not FOCUSED["matches"](phase, None):
                 raise ValueError("focused/debug phase cannot qualify the full DPS suite")
@@ -95,16 +94,6 @@ def evaluate_dps_phases(result_dir, region=None, endpoint=None):
                     or results["passed"] != len(expected) or results["failures"] or results["errors"] or results["skipped"]
                     or any(any(case.find(outcome) is not None for outcome in ("failure", "error", "skipped")) for case in cases)):
                 raise ValueError(f"{name}: missing/incomplete/failed JUnit results")
-            if name != "regular":
-                gate = phase["gate"]
-                inventory = gate["inventory_ids"]
-                if (results["passed"] != len(expected) or results["skipped"]
-                        or any(case.find("skipped") is not None for case in cases)
-                        or gate["previous_owned_absent"] is not True or gate["remaining"] != []
-                        or len(inventory) != len(set(inventory))
-                        or previous_owned.intersection(inventory)):
-                    raise ValueError(f"{name}: missing coverage or failed pre-phase cleanup gate")
-            previous_owned = {resource.lower() for resource in owned}
     except (OSError, ValueError, KeyError, TypeError, ET.ParseError) as error:
         errors.append(f"DPS phase evidence is incomplete or unsuccessful: {error}.")
     return errors

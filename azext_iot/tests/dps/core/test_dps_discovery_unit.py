@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
+from azure.core.exceptions import HttpResponseError
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.common._azure import parse_iot_dps_connection_string
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -27,6 +29,52 @@ def get_mgmt_client(mocker, fixture_cmd):
 
 
 class TestDPSDiscovery:
+    @pytest.mark.parametrize("status,kind", [(401, UnauthorizedError), (403, ForbiddenError)])
+    @pytest.mark.parametrize("resource_group", [None, "test-rg"])
+    def test_bulk_targets_skip_translated_authorization_errors(
+        self, mocker, fixture_cmd, caplog, status, kind, resource_group
+    ):
+        discovery = DPSDiscovery(cmd=fixture_cmd)
+        resources = [
+            {"name": name, "id": f"/subscriptions/sub/resourceGroups/test-rg/"
+             f"providers/Microsoft.Devices/provisioningServices/{name}"}
+            for name in ("accessible-first", "denied", "accessible-last")
+        ]
+        mocker.patch.object(discovery, "get_resources", return_value=resources)
+        denied = HttpResponseError("AuthorizationFailed")
+        denied.status_code = status
+        first, last = {"entity": "first"}, {"entity": "last"}
+        target = mocker.patch(
+            "azext_iot.common.base_discovery.BaseDiscovery.get_target",
+            side_effect=[first, denied, last],
+        )
+
+        assert discovery.get_targets(resource_group_name=resource_group, auth_type="key") == [first, last]
+        assert target.call_count == 3
+        assert "Could not access denied" in caplog.text
+        assert "AuthorizationFailed" in caplog.text
+        target.side_effect = denied
+        with pytest.raises(kind) as raised:
+            discovery.get_target("denied", "test-rg", auth_type="key")
+        assert raised.value.__cause__ is denied
+
+    @pytest.mark.parametrize("error", [UnauthorizedError("Subscription denied"), RuntimeError("Listing failed")])
+    def test_bulk_targets_propagate_subscription_enumeration_errors(self, mocker, fixture_cmd, error):
+        discovery = DPSDiscovery(cmd=fixture_cmd)
+        mocker.patch.object(discovery, "get_resources", side_effect=error)
+        with pytest.raises(type(error)) as raised:
+            discovery.get_targets(auth_type="key")
+        assert raised.value is error
+
+    def test_bulk_targets_propagate_unexpected_target_errors(self, mocker, fixture_cmd):
+        discovery = DPSDiscovery(cmd=fixture_cmd)
+        mocker.patch.object(discovery, "get_resources", return_value=[{"name": "dps"}])
+        error = RuntimeError("Unexpected target failure")
+        mocker.patch("azext_iot.common.base_discovery.BaseDiscovery.get_target", side_effect=error)
+        with pytest.raises(RuntimeError) as raised:
+            discovery.get_targets(resource_group_name="test-rg", auth_type="key")
+        assert raised.value is error
+
     def test_get_target_by_cstring(self, fixture_cmd, get_mgmt_client):
         discovery = DPSDiscovery(cmd=fixture_cmd)
 

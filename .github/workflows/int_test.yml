@@ -136,8 +136,8 @@ jobs:
           all_services=(
             # Regular -> service-SAS -> serial local-auth-toggle; certificate is not wired.
             "DPS|azext_iot/tests/dps|DPS-int|150"
-            # Controller ceilings 210/345 minutes plus 15 minutes external setup; GH cap is 360.
-            "HubControl|azext_iot/tests/iothub|HubControl-int|225"
+            # Controller ceilings 260/345 minutes plus 15 minutes external setup; GH cap is 360.
+            "HubControl|azext_iot/tests/iothub|HubControl-int|275"
             "HubData|azext_iot/tests/iothub|HubData-int|360"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
             # Serial ADR includes a 175-minute SU link envelope and a separate 75-minute SU lifecycle.

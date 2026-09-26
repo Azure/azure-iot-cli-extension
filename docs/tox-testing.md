@@ -98,6 +98,18 @@ The existing canary scope, identities/RBAC, quarantine and ownership checks stil
 Overlapping runs and additional Python/region combinations can consume resources
 concurrently; the former bounded-cohort reservation does not apply.
 
+DPS phases continue with fresh resources after a prior phase's cleanup fails,
+with a warning and the failed cleanup retained in the report. Cleanup and
+ownership checks still apply to each phase, and full qualification still requires
+every test and cleanup to pass. Cancellation and insufficient remaining runtime
+still stop scheduling. Leftover resources can consume quota; subsequent Azure
+provisioning failures are reported normally.
+
+HubControl reserves 240 minutes for serial execution, including normal pytest
+fixture teardown, plus 15 minutes for controller cleanup and 5 minutes for
+admission. GitHub and Azure DevOps jobs allow 275 minutes, including 15 minutes
+for external setup/reporting. Individual test timeouts remain unchanged.
+
 Every selected service runs its full branch-specific suite. GitHub dispatch and
 reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
 capacity-limit input; the release caller does not supply a quota override either.
@@ -106,6 +118,8 @@ Pre-existing resources are rejected before creation, and the certificate action
 tracker independently enforces exact ownership before any mutation.
 Unrelated optional external/preprovisioned fixtures retain their safety controls:
 selecting the full suite never authorizes mutation of external credentials.
+The live suite does not require a pre-provisioned failed DPS link. Deterministic
+unit tests retain coverage of failed-link recovery and identity-preserving updates.
 Local focused-debug controls remain available and cannot qualify a full suite.
 
 ## ADR live-test budgets

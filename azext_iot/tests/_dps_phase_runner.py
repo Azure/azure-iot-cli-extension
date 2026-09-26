@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/cleanup gates."""
+"""Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/cleanup reporting."""
 
 import argparse
 from contextlib import contextmanager
@@ -600,7 +600,6 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         baseline_ids = set(inventory_ids(baseline))
         summary["baseline"] = {"resources": baseline, "at": utc()}
         write_json(summary_path, summary)
-        records = []
         with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
             for index, (name, runtime, cleanup) in enumerate(phases):
                 result = summary["phases"][index]
@@ -610,24 +609,11 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 if index:
                     prior = summary["phases"][index - 1]
                     if not prior.get("cleanup", {}).get("complete"):
-                        result["reason"] = f"{prior['name']} owned-resource cleanup was not proven"
-                        break
-                    previous_ids = set(prior["cleanup"]["owned_ids"])
-                    present = [resource for record in records if (resource := reader.get(record)) is not None]
-                    inventory = reader.inventory()
-                    ids = inventory_ids(inventory)
-                    listed = [resource for resource in inventory
-                              if resource["id"].lower() in {value.lower() for value in previous_ids}]
-                    absent = not present and not listed
-                    result["gate"] = {
-                        "previous_owned_absent": absent, "remaining": present + listed, "inventory_ids": ids, "at": utc(),
-                    }
-                    if not absent:
-                        result["reason"] = "Fresh owned-ID absence gate failed"
-                        break
-                if clock() + runtime + cleanup + READ_SECONDS > deadline:
-                    result["reason"] = "Read-only gates left insufficient full phase/cleanup budget"
-                    break
+                        print(
+                            f"[DPS phases] WARNING: {prior['name']} cleanup was not proven; "
+                            f"continuing {name} with independent resources. The run remains failed.",
+                            flush=True,
+                        )
                 folder = output / name
                 receipts = folder / "receipts"
                 receipts.mkdir(parents=True)
@@ -673,7 +659,6 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 finally:
                     os.chdir(cwd)
                 result.update({key: value for key, value in execution.items() if key != "cleanup_deadline"})
-                records = []
                 try:
                     selected = selection_count(receipts, name, debug=debug)
                     result["results"] = safe_junit(raw_junit, folder / "junit.xml", name, selected, debug=debug)

@@ -18,6 +18,7 @@ Release History
 * DPS enrollment retains unknown writable JSON fields and supports ``--adr-namespace``, ``--adr-ca-name``, and ``--adr-cert-policy-name``, with namespace/certificate-name aliases and deprecated credential-policy aliases. All three empty references explicitly clear the association; incomplete references fail validation.
 * DPS queries follow continuation headers, reject repeated tokens and malformed pages, preserve service error codes and conditional ETags, and honor zero-item limits. ``--top -1`` retains its unlimited compatibility meaning.
 * DPS service authentication renews per request through in-process CLI credentials or SAS, preserves exact sovereign/custom hostnames, and blocks authentication redirects.
+* DPS bulk target discovery warns and skips resources whose ARM key/policy access is denied, including translated authorization errors. Explicit target requests and subscription enumeration failures still surface their errors.
 * Both CSR and non-CSR device registration use REST. ``--csr`` / ``--csr-file-path`` accept validated PEM or base64 DER PKCS #10 requests; signatures and Common Names are checked and the wire value is base64 DER. Payload, TPM attestation, operation-status, issued certificate-chain JSON, connection profiles, and Registry Device external-ID correlation remain available.
 * Explicit registration ``--timeout`` bounds worker startup, HTTP, and polling after preliminary discovery/bootstrap authentication, with worker reaping and no mutation replay. Encrypted X.509 keys and requests 2.32 connection-pool SSL contexts are supported; worker diagnostics expose only bounded, allowlisted metadata.
 * Registration timeouts preserve accepted operation IDs through bounded worker progress and provide ``operation-status`` follow-up guidance. Pre-acceptance timeouts explicitly identify the operation ID as unknown; help and authorization errors lead with supported workflows and next actions.
@@ -73,8 +74,9 @@ Release History
 
 * Added secret-redacted command logging, timed steps, and separate cohort reports. Workflow runs execute full selected-service suites without per-test workflow filters.
 * Integration cleanup confirms exact owned-child GET404 before bounded namespace deletion and preserves cleanup failures. Narrow link-readiness recovery handles the recognized namespace-identity condition without retrying unrelated failures or deleting borrowed targets.
-* Strengthened authentication-phase isolation, role-creation coordination, ownership receipts, and ownership/cleanup-only admission without quota or capacity gating. Expanded generated-client, parser-retirement, identity-safety, SDK/HTTP, and cross-platform regression coverage.
+* Strengthened authentication-phase isolation, role-creation coordination, ownership receipts, and cleanup verification without quota or capacity gating. Expanded generated-client, parser-retirement, identity-safety, SDK/HTTP, and cross-platform regression coverage.
 * Reclassified Hub integration into ``HubControl`` and ``HubData``, with mandatory isolated Entra and SAS Data phases and exact ownership and cleanup accounting.
+* DPS phases continue independently after cleanup failures while retaining failed cleanup results and ownership safeguards. HubControl allows 240 minutes for execution and fixture teardown, with 275-minute GitHub and Azure DevOps job ceilings.
 
 0.33.0b1 (Preview)
 ++++++++++++++++++

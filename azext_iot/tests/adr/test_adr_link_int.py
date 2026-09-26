@@ -44,7 +44,7 @@ from typing import Optional
 
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
-from msrestazure.tools import is_valid_resource_id, parse_resource_id
+from msrestazure.tools import parse_resource_id
 
 from azext_iot._factory import _ADR_DPS_API_VERSION
 from azext_iot.tests.adr import ADRLiveScenarioTest
@@ -74,7 +74,7 @@ from azext_iot.tests.adr.conftest import (
 )
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import HUB_TEST_LOCATION
-from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG, failed_link_recovery_commands
+from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
@@ -638,52 +638,6 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
 
         finally:
             self.cleanup_full_infra()
-
-
-@pytest.mark.usefixtures("set_cwd")
-class TestADRLinkRecovery(ADRLiveScenarioTest):
-    """Opt-in repair of a pre-provisioned failed DPS endpoint, without deletion.
-
-    Setting azext_iot_adr_failed_dps_namespace_id and
-    azext_iot_adr_failed_dps_endpoint authorizes an update with its existing
-    inbound identity. The namespace and linked DPS remain in place.
-    """
-
-    def test_preprovisioned_failed_dps_link_recovery(self):
-        namespace_id = os.getenv("azext_iot_adr_failed_dps_namespace_id")
-        endpoint_name = os.getenv("azext_iot_adr_failed_dps_endpoint")
-        if not namespace_id or not endpoint_name:
-            pytest.skip(
-                "Set azext_iot_adr_failed_dps_namespace_id and "
-                "azext_iot_adr_failed_dps_endpoint to repair a persisted failed DPS link."
-            )
-        assert is_valid_resource_id(namespace_id), "A namespace ARM resource ID is required."
-        parsed = parse_resource_id(namespace_id)
-        assert parsed.get("namespace", "").casefold() == "microsoft.deviceregistry"
-        assert parsed.get("type", "").casefold() == "namespaces"
-        assert "child_name_1" not in parsed
-        namespace_args = shlex.join([
-            "-n", parsed["name"], "-g", parsed["resource_group"],
-            "--subscription", parsed["subscription"],
-        ])
-        namespace = self.cmd(f"iot adr ns show {namespace_args}").get_output_in_json()
-        endpoint = namespace["properties"]["provisioning"]["endpoints"][endpoint_name]
-        assert endpoint["linkingState"] == "Failed", endpoint
-        recovery = failed_link_recovery_commands({
-            "id": namespace["id"],
-            "properties": {"provisioning": {"endpoints": {endpoint_name: endpoint}}},
-        })
-        assert len(recovery) == 1, "The failed endpoint must have a known inbound identity."
-        self.cmd(recovery[0])
-        endpoint_args = shlex.join([
-            "-n", endpoint_name, "--ns", parsed["name"], "-g", parsed["resource_group"],
-            "--subscription", parsed["subscription"],
-        ])
-        self.cmd(f"iot adr ns link dps wait {endpoint_args} --timeout 120 --interval 5")
-        shown = self.cmd(f"iot adr ns link dps show {endpoint_args}").get_output_in_json()
-        assert shown["linkingState"] == "Succeeded"
-        assert shown["resourceId"] == endpoint["resourceId"]
-        assert shown["inboundCallerIdentity"] == endpoint["inboundCallerIdentity"]
 
 
 @pytest.mark.usefixtures("set_cwd")

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import ABC, abstractmethod
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -387,7 +387,7 @@ class BaseDiscovery(ABC):
                             **kwargs
                         )
                     )
-                except (HttpResponseError, ResourceNotFoundError) as e:
+                except (HttpResponseError, ResourceNotFoundError, ForbiddenError, UnauthorizedError) as e:
                     logger.warning("Could not access %s. %s", resource["name"], e)
 
         return targets

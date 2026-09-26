@@ -323,10 +323,10 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubControl": "225", "HubData": "360", "ADR": "360"}
+    assert budgets == {"HubControl": "275", "HubData": "360", "ADR": "360"}
     ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
-    assert ado_budgets == {"HubControl": 225, "HubData": 360}
+    assert ado_budgets == {"HubControl": 275, "HubData": 360}
     for suite, phases in BUDGETS.items():
         assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
@@ -608,9 +608,11 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 31
+        assert len(nodes) == 32
         assert {
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
+            "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
+            "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_su_delete",
         } <= nodes
         assert expected <= nodes
         assert {

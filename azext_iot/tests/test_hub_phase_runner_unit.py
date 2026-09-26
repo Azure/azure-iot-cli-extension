@@ -537,12 +537,12 @@ def test_cleanup_requires_exact_descendant_absence(tmp_path):
 
 def test_budgets_leave_external_setup_below_github_cap():
     assert runner.BUDGETS == {
-        "HubControl": (("regular", 190 * 60),),
+        "HubControl": (("regular", 240 * 60),),
         "HubData": (("entra", 210 * 60), ("sas", 100 * 60)),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60
-    for suite, job_minutes in (("HubControl", 225), ("HubData", 360)):
+    for suite, job_minutes in (("HubControl", 275), ("HubData", 360)):
         controller = sum(seconds + runner.CLEANUP for _, seconds in runner.BUDGETS[suite]) + runner.RESERVE
         assert controller + 15 * 60 == job_minutes * 60 <= 360 * 60
 
