@@ -5,13 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
+from time import sleep
 
 import pytest
 
 from azext_iot.adr.topology import writable_namespace_properties
+from azext_iot.adr.rbac import LINK_ROLE_IDS, READER_ROLE, resolve_namespace_outbound_principal
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
+    ROLE_PROPAGATION_DELAY,
     SU_LIFECYCLE_TIMEOUT,
     wait_for_condition,
     wait_for_resource_absent,
@@ -29,6 +32,22 @@ from azext_iot.tests.generators import generate_generic_id
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
+    def _reader_assignments(self, principal, scope):
+        assignments = self.cmd(
+            f"role assignment list --assignee-object-id {principal} --role Reader "
+            f"--scope {scope} --fill-principal-name false",
+        ).get_output_in_json()
+        for assignment in assignments:
+            assert assignment["principalId"].casefold() == principal.casefold()
+            assert assignment["scope"].casefold() == scope.casefold()
+            assert assignment["roleDefinitionId"].rsplit("/", 1)[-1] == LINK_ROLE_IDS[READER_ROLE]
+        return assignments
+
+    def _cleanup_reader(self, principal, scope):
+        for assignment in self._reader_assignments(principal, scope):
+            self.cmd(f"role assignment delete --ids {assignment['id']}")
+        assert not self._reader_assignments(principal, scope)
+
     def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
         super()._delete_owned_resource(kind, name, resource_group, no_wait=kind == "su" or no_wait)
         wait_for_resource_absent(
@@ -40,12 +59,21 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         selector = f"--ns {namespace_name} -g {TEST_RG}"
         before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         assert before["properties"][section]["endpoints"][endpoint_name]["linkingState"] == "Succeeded"
+        principal = resolve_namespace_outbound_principal(before)
+        scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
+        existing_reader = self._reader_assignments(principal, scope)
+        if not existing_reader:
+            self.addCleanup(self._cleanup_reader, principal, scope)
         self._delete_owned_resource(kind, target_name, TEST_RG)
         submitted = self.cmd(
             f"iot adr ns link {kind} delete {selector} -n {endpoint_name} --yes",
         ).get_output_in_json()
         assert submitted["id"].casefold() == before["id"].casefold()
         assert submitted["properties"]["provisioningState"] in {"Accepted", "Updating", "Succeeded"}
+        reader = self._reader_assignments(principal, scope)
+        assert len(reader) == 1
+        if existing_reader:
+            assert reader[0]["id"] == existing_reader[0]["id"], "Reuse Reader rather than creating duplicate grants."
 
         # Completion belongs to the test, not the nonwaiting delete command.
         after = wait_for_condition(
@@ -105,7 +133,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         finally:
             self.cleanup_full_infra()
 
-    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT)
+    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT * 2)
     def test_adr_link_su_delete(self):
         namespace_name = generate_adr_namespace_name()
         su_name = f"unlinksu{generate_generic_id()[:8]}"
@@ -121,10 +149,11 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 kind="su", name=su_name, resource_group=TEST_RG,
             ).get_output_in_json()
             assert su["properties"]["provisioningState"] == "Succeeded", su
-            assert self.assign_role(
-                namespace["identity"]["principalId"], "Device Update Administrator", su["id"],
-                assignee_type="ServicePrincipal",
-            ), "Namespace outbound identity requires access to the owned Update Instance."
+            for role in ("Contributor", "Device Update Administrator"):
+                assert self.assign_role(
+                    namespace["identity"]["principalId"], role, su["id"], assignee_type="ServicePrincipal",
+                ), f"Namespace outbound identity requires {role} on the owned Update Instance."
+            sleep(ROLE_PROPAGATION_DELAY)
             self.cmd(
                 f"iot adr ns link su add --ns {namespace_name} -g {TEST_RG} -n su "
                 f"--su-id {su['id']} --system-assigned-mi --timeout 1200",

@@ -56,7 +56,7 @@ from azext_iot.adr.providers.link_preflight import (
 )
 from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.rbac import LinkRbacManager
+from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -201,13 +201,22 @@ class LinkProvider(ADRProvider):
         namespace = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
         )
-        self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
+        endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
+        parse_target = {
+            "messaging": _parse_hub_resource_id,
+            "provisioning": _parse_dps_resource_id,
+            "updating": _parse_su_resource_id,
+        }[section]
+        target = parse_target(endpoint.get("resourceId"))
+        self._rbac_manager().ensure_unlink_reader(
+            resolve_namespace_outbound_principal(namespace),
+            f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
+        )
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
         resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
         resource["properties"] = properties
-        if "identity" in namespace:
-            resource["identity"] = sanitize_arm_identity(namespace["identity"])
+        resource["identity"] = sanitize_arm_identity(namespace["identity"])
         # NoPolling returns the initial PUT response, not asynchronous completion.
         return self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name, namespace_name=namespace_name,
