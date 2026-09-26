@@ -598,7 +598,9 @@ def load_adr_help():
     deleted too, recreate it at the original subscription and name before retrying.
     This command never substitutes a broader subscription-level Reader grant.
     The Reader grant remains in place after unlinking. Newly created grants must become
-    visible to ARM, but service authorization may still take time to propagate.
+    visible to ARM, followed by a 30-second RBAC propagation pause before PUT.
+    Existing Reader grants do not add this pause. Service authorization may still
+    take longer to propagate.
     It does not check or delete the linked resource, retry the namespace update,
     or wait for unlink completion. Initial GET/PUT errors are returned directly;
     later asynchronous failures are not observed by this command.
