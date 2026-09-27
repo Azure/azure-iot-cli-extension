@@ -156,8 +156,7 @@ def test_show_calls_generated_sdk(update_instance_provider):
 def test_wait_uses_standard_arm_poller(update_instance_provider):
     poller = Mock()
     with patch(
-        "azext_iot.adr.providers.base."
-        "ADRProvider._bounded_poller_result",
+        "azext_iot.adr.providers.update_instance.wait_for_terminal_state",
         return_value={"name": INSTANCE},
     ) as wait:
         assert update_instance_provider._await_terminal(poller, wait_sec=0) == {

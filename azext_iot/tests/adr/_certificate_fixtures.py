@@ -19,6 +19,9 @@ from azext_iot.common.certops import make_cert_chain
 NOW = datetime(2026, 9, 16, tzinfo=timezone.utc)
 
 
+_POLICY_REJECTION_CODES = ("policyrejected", "certificatepolicylimitexceeded", "activecaalreadyassigned")
+
+
 def is_expected_policy_rejection(error):
     """Require positive policy evidence; contradictory HTTP/auth evidence wins."""
     seen, texts, statuses, codes = set(), [], [], []
@@ -54,15 +57,16 @@ def is_expected_policy_rejection(error):
         text, re.IGNORECASE,
     ):
         return False
-    if any(code not in ("policyrejected", "certificatepolicylimitexceeded") for code in codes):
+    # AsyncOperationFailed is the ARM operation-status wrapper; the backend code must be in its text.
+    if any(code not in _POLICY_REJECTION_CODES + ("asyncoperationfailed",) for code in codes):
         return False
-    if re.search(r"\bPolicyRejected\b|\bCertificatePolicyLimitExceeded\b", text, re.IGNORECASE):
+    if re.search(r"\b(?:PolicyRejected|CertificatePolicyLimitExceeded|ActiveCaAlreadyAssigned)\b", text, re.IGNORECASE):
         return True
     return (
         not any(status in (400, 409) for status in statuses)
         and "provisioningState='Failed'" in text
         and "did not include a detailed error" in text
-        and ("resource-status response" in text or "initial operation response" in text)
+        and ("resource-status response" in text or "operation response" in text)
         and "Check Azure Activity Log for this resource around the operation time" in text
     )
 

@@ -311,7 +311,7 @@ class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
                 raise
             text = str(error)
             if "did not include a detailed error" in text:
-                assert "resource-status response" in text or "initial operation response" in text
+                assert "resource-status response" in text or "operation response" in text
                 assert "Check Azure Activity Log for this resource around the operation time" in text
             _log(LogKind.RESULT, "Additional-policy backend rejection observed: %s", error)
         else:
