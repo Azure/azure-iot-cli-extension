@@ -11,10 +11,15 @@ from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumen
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
+    CONCURRENT_PUT_RETRY_INTERVAL,
+    CONCURRENT_PUT_RETRY_TIMEOUT,
     CleanupLedger,
     SU_LIFECYCLE_TIMEOUT,
     SU_PROVISIONING_MAX_POLLS,
     SU_PROVISIONING_POLL_INTERVAL,
+    is_concurrent_put_rejection,
+    resource_is_absent,
+    wait_for_condition,
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr.conftest import TEST_LOCATION, TEST_RG
@@ -87,10 +92,17 @@ class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
                 f"iot adr ns su instance wait -n {instance_name} -g {TEST_RG}"
             )
 
-            sami_upsert = self.cmd(
-                f"iot adr ns su instance create -n {instance_name} "
-                f"-g {TEST_RG}"
-            ).get_output_in_json()
+            sami_upsert = wait_for_condition(
+                lambda: self.cmd(
+                    f"iot adr ns su instance create -n {instance_name} "
+                    f"-g {TEST_RG}"
+                ).get_output_in_json(),
+                lambda _: True,
+                description="Update Instance upsert accepted after the previous PUT",
+                timeout=CONCURRENT_PUT_RETRY_TIMEOUT,
+                interval=CONCURRENT_PUT_RETRY_INTERVAL,
+                is_retryable_error=is_concurrent_put_rejection,
+            )
             assert "SystemAssigned" in sami_upsert["identity"]["type"]
             assert sami_upsert["tags"] == {"env": "integration"}
 
@@ -209,13 +221,13 @@ class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
                 expect_failure=True,
             )
 
+            # ADU deletion can take 20+ minutes, beyond this lifecycle's budget:
+            # verify acceptance only, and leave the in-flight delete to finish.
             self.cmd(f"{delete_command} --no-wait")
-            self.cmd(
-                f"iot adr ns su instance wait -n {instance_name} "
-                f"-g {TEST_RG} --deleted"
-            )
             cleanup.dismiss("UpdateInstance")
-            self.cmd(show_command, expect_failure=True)
+            if not resource_is_absent(self, show_command, description="Update Instance"):
+                deleting = self.cmd(show_command).get_output_in_json()
+                assert deleting["properties"]["provisioningState"] == "Deleting"
 
 
 @pytest.mark.usefixtures("set_cwd")

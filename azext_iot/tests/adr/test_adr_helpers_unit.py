@@ -13,6 +13,7 @@ from azext_iot.tests.adr import _helpers as subject
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     CleanupLedger,
+    is_concurrent_put_rejection,
     is_retryable_resource_error,
     is_resource_not_found_error,
     wait_for_condition,
@@ -242,6 +243,43 @@ def test_retryable_resource_error_uses_structured_status(status_code):
 )
 def test_retryable_resource_error_uses_symbolic_code(message):
     assert is_retryable_resource_error(RuntimeError(message))
+
+
+ADU_CONCURRENT_PUT = (
+    "(InvalidResourceOperation) Another 'PUT' operation on the same resource '/subscriptions/sub/resourceGroups/rg"
+    "/providers/Microsoft.DeviceUpdate/updateInstances/su' is in progress. Concurrent 'PUT' operations are "
+    "disallowed for resource type updateInstances. Please wait for the previous operation to complete and try again."
+)
+
+
+@pytest.mark.parametrize(
+    "message, expected",
+    [
+        (ADU_CONCURRENT_PUT, True),
+        ("(Conflict) The resource is in a conflicting state.", False),
+        ("(InvalidResourceOperation) The operation is not supported.", False),
+    ],
+)
+def test_concurrent_put_rejection_is_specific(message, expected):
+    assert is_concurrent_put_rejection(RuntimeError(message)) is expected
+
+
+def test_concurrent_put_rejection_retries_only_until_accepted():
+    fetch = Mock(side_effect=[RuntimeError(ADU_CONCURRENT_PUT), {"name": "su"}])
+    sleeper = Mock()
+    result = wait_for_condition(
+        fetch, lambda _: True, description="upsert", interval=30,
+        is_retryable_error=is_concurrent_put_rejection, clock=lambda: 0, sleeper=sleeper,
+    )
+    assert result == {"name": "su"}
+    sleeper.assert_called_once_with(30)
+    other = Mock(side_effect=RuntimeError("(Conflict) other"))
+    with pytest.raises(RuntimeError, match="other"):
+        wait_for_condition(
+            other, lambda _: True, description="upsert",
+            is_retryable_error=is_concurrent_put_rejection, clock=lambda: 0, sleeper=sleeper,
+        )
+    other.assert_called_once()
 
 
 def test_resource_not_found_error_is_specific():

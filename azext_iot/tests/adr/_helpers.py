@@ -69,6 +69,10 @@ RESOURCE_NOT_FOUND_ERROR = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 RESOURCE_NOT_FOUND_CODES = {"resourcenotfound", "parentresourcenotfound", "resourcegroupnotfound", "notfound"}
+# ADU can reject a PUT for minutes after reporting the previous one Succeeded.
+CONCURRENT_PUT_REJECTION = re.compile(r"\(InvalidResourceOperation\) Another 'PUT' operation")
+CONCURRENT_PUT_RETRY_TIMEOUT = 600
+CONCURRENT_PUT_RETRY_INTERVAL = 30
 HUB_NOT_FOUND_RESPONSE = re.compile(r"Not Found\((.*)\)", re.DOTALL)
 T = TypeVar("T")
 
@@ -136,6 +140,10 @@ def is_retryable_resource_error(error: Exception) -> bool:
         status_code in RESOURCE_RETRYABLE_STATUS_CODES
         or RESOURCE_RETRYABLE_ERROR.search(str(error)) is not None
     )
+
+
+def is_concurrent_put_rejection(error: Exception) -> bool:
+    return CONCURRENT_PUT_REJECTION.search(str(error)) is not None
 
 
 def is_resource_not_found_error(error: Exception, *, ambient_context=None) -> bool:
