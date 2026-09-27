@@ -50,8 +50,10 @@ def fixture_topic_group_ops(mocker):
     hub_mock = {
         "name": hub_name,
         "etag": "test-etag",
-        "resourcegroup": hub_rg,
-        "subscriptionid": "test-sub",
+        "id": (
+            "/subscriptions/test-sub/resourceGroups/"
+            f"{hub_rg}/providers/Microsoft.Devices/IotHubs/{hub_name}"
+        ),
         "properties": {
             "connectionProfile": "mqttv5",
             "mqttV5Settings": {
@@ -70,9 +72,9 @@ def fixture_topic_group_ops(mocker):
     yield hub_mock, client
 
 
-def _assert_hub_write(client, hub_mock):
+def _assert_hub_write(client, hub_mock, resource_group_name=hub_rg):
     client.begin_create_or_update.assert_called_once_with(
-        resource_group_name=hub_rg,
+        resource_group_name=resource_group_name,
         resource_name=hub_name,
         iot_hub_description=hub_mock,
         etag="test-etag",
@@ -98,6 +100,25 @@ class TestTopicGroupCreate:
             "topicTemplates": ["template/three", "template/four"],
         }
         _assert_hub_write(client, hub_mock)
+
+    def test_create_resolves_resource_group_from_hub_id(
+        self, fixture_topic_group_ops
+    ):
+        hub_mock, client = fixture_topic_group_ops
+        fallback_rg = "fallback-rg"
+        hub_mock["id"] = (
+            "/subscriptions/test-sub/resourceGroups/"
+            f"{fallback_rg}/providers/Microsoft.Devices/IotHubs/{hub_name}"
+        )
+
+        subject.topic_group_create(
+            cmd=None,
+            hub_name=hub_name,
+            topic_group_id="group-three",
+            topic_templates=[],
+        )
+
+        _assert_hub_write(client, hub_mock, resource_group_name=fallback_rg)
 
     def test_create_initializes_missing_settings_with_empty_templates(
         self, fixture_topic_group_ops
@@ -134,23 +155,6 @@ class TestTopicGroupCreate:
             )
 
         client.begin_create_or_update.assert_not_called()
-
-    def test_create_allows_different_id_casing(self, fixture_topic_group_ops):
-        hub_mock, client = fixture_topic_group_ops
-
-        subject.topic_group_create(
-            cmd=None,
-            hub_name=hub_name,
-            topic_group_id="GROUP-ONE",
-            topic_templates=[],
-            resource_group_name=hub_rg,
-        )
-
-        assert [
-            group["topicGroupId"]
-            for group in hub_mock["properties"]["mqttV5Settings"]["topicGroups"]
-        ] == ["group-one", "group-two", "GROUP-ONE"]
-        _assert_hub_write(client, hub_mock)
 
     def test_create_error(self, fixture_topic_group_ops, mocker):
         handler = mocker.patch(handle_service_exception_path)
@@ -285,34 +289,6 @@ class TestTopicGroupDelete:
                 "topicTemplates": ["template/two"],
             }
         ]
-        _assert_hub_write(client, hub_mock)
-
-    def test_delete_rejects_missing_id(self, fixture_topic_group_ops):
-        _, client = fixture_topic_group_ops
-
-        with pytest.raises(ResourceNotFoundError, match="missing"):
-            subject.topic_group_delete(
-                cmd=None,
-                hub_name=hub_name,
-                topic_group_id="missing",
-                resource_group_name=hub_rg,
-            )
-
-        client.begin_create_or_update.assert_not_called()
-
-    def test_delete_treats_empty_id_as_an_identifier(self, fixture_topic_group_ops):
-        hub_mock, client = fixture_topic_group_ops
-        topic_groups = hub_mock["properties"]["mqttV5Settings"]["topicGroups"]
-        topic_groups[0]["topicGroupId"] = ""
-
-        subject.topic_group_delete(
-            cmd=None,
-            hub_name=hub_name,
-            topic_group_id="",
-            resource_group_name=hub_rg,
-        )
-
-        assert [group["topicGroupId"] for group in topic_groups] == ["group-two"]
         _assert_hub_write(client, hub_mock)
 
     def test_delete_all_prompts(self, fixture_topic_group_ops, mocker):

@@ -14,6 +14,7 @@ from azure.cli.core.azclierror import (
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from knack.prompting import prompt_y_n
+from msrestazure.tools import parse_resource_id
 
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.core.shared import IotHubConnectionProfile
@@ -107,9 +108,12 @@ class TopicGroup(IoTHubProvider):
         return topic_groups
 
     def _update_hub(self):
+        resource_group_name = self.rg or parse_resource_id(
+            self.hub_resource["id"]
+        )["resource_group"]
         try:
             return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource["resourcegroup"],
+                resource_group_name=resource_group_name,
                 resource_name=self.hub_resource["name"],
                 iot_hub_description=self.hub_resource,
                 etag=self.hub_resource["etag"],
