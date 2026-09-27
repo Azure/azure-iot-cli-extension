@@ -135,7 +135,7 @@ def preflight_target(
         ),
     }
     if link_type == "dps":
-        # ADR's registry-device ARM write uses the namespace SAMI, not its outbound UAMI.
+        # ADR's registry-device ARM write additionally requires the namespace SAMI.
         request["namespace_system_principal_id"] = resolve_linked_resource_principal(
             namespace, {"type": "SystemAssigned"}, "namespace"
         )

@@ -486,6 +486,10 @@ class DeviceRegistrationProvider:
             "retry_total": 0,
         }
 
+    @staticmethod
+    def _check_deadline(deadline):
+        DeviceRegistrationProvider._request_options(deadline)
+
     def _perform_registration(self, body, deadline=None):
         self._operation_id = None
         try:
@@ -504,7 +508,7 @@ class DeviceRegistrationProvider:
                 result = self._wait_for_registration(response, deadline=deadline)
             else:
                 result = response.body
-            self._request_options(deadline)
+            self._check_deadline(deadline)
         except RegistrationTimeoutError as error:
             raise AzureConnectionError(self._timeout_message()) from error
         except HttpResponseError as error:

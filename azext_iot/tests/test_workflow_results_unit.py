@@ -7,7 +7,6 @@
 from pathlib import Path
 import json
 import runpy
-import re
 import os
 import shutil
 import subprocess
@@ -26,6 +25,10 @@ SUCCESSFUL_JOBS = {
     "int-test": "success",
     "gate preparation": "success",
 }
+
+
+def _ci_budgets():
+    return json.loads((REPOSITORY_ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(params=["github", "ado"])
@@ -322,13 +325,15 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    budgets = dict(re.findall(r'"(HubControl|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubControl": "275", "HubData": "360", "ADR": "360"}
+    assert "ci_budgets.json" in matrix["run"]
+    budgets = _ci_budgets()
     ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
-    assert ado_budgets == {"HubControl": 275, "HubData": 360}
+    assert ado_budgets == {suite: budgets[suite]["job_timeout_minutes"] for suite in BUDGETS}
     for suite, phases in BUDGETS.items():
-        assert int(budgets[suite]) == (sum(runtime + CLEANUP for _, runtime in phases) + RESERVE) / 60 + 15
+        assert budgets[suite]["job_timeout_minutes"] == (
+            sum(runtime + CLEANUP for _, runtime in phases) + RESERVE
+        ) / 60 + budgets[suite]["setup_minutes"]
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
@@ -338,7 +343,8 @@ def test_adr_budget_applies_directly_to_service_job():
 
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     matrix = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
-    budget = int(re.search(r'"ADR\|[^"]+\|(\d+)"', matrix["run"])[1])
+    assert "ci_budgets.json" in matrix["run"]
+    budget = _ci_budgets()["ADR"]["job_timeout_minutes"]
     assert budget == 360
     assert SU_LIFECYCLE_TIMEOUT == 75 * 60
     assert _SU_LINK_LIFECYCLE_TIMEOUT == 175 * 60
@@ -352,7 +358,10 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert '"DPS|azext_iot/tests/dps|DPS-int|150"' in matrix["run"]
+    assert "ci_budgets.json" in matrix["run"]
+    budget = _ci_budgets()["DPS"]
+    assert budget["job_timeout_minutes"] == 150
+    assert [phase["name"] for phase in budget["phases"]] == ["regular", "service-sas", "local-auth-toggle"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")
     assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]

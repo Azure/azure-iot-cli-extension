@@ -34,9 +34,13 @@ def validate_dps_capacity_update(parameters):
     # Modeless generic update preserves dictionary casing. Check aliases too,
     # rather than allowing a second SKU/capacity spelling to bypass validation.
     skus = [value for key, value in parameters.items() if key.lower() == "sku"]
-    for sku in skus or [None]:
+    if not skus or None in skus:
+        raise InvalidArgumentValueError("sku is required and cannot be removed.")
+    for sku in skus:
         capacities = (
             [value for key, value in sku.items() if key.lower() == "capacity"] if isinstance(sku, dict) else []
         )
-        for capacity in capacities or [None]:
+        if not capacities or None in capacities:
+            raise InvalidArgumentValueError("sku.capacity is required.")
+        for capacity in capacities:
             validate_dps_unit(capacity, "sku.capacity")

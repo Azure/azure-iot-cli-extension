@@ -150,7 +150,6 @@ class Harness:
         self.clock.now += self.wait_cost
         if self.wait_error:
             raise self.wait_error
-        kwargs["resource_observer"](deepcopy(self.namespace))
         outcome = self.outcomes.pop(0) if self.outcomes else "auth"
         endpoint = self.namespace["properties"][poller.section]["endpoints"][poller.name]
         endpoint["linkingState"] = "Succeeded" if outcome == "success" else "Failed"
@@ -450,7 +449,6 @@ def test_combined_dps_auth_deadline_prevents_hub(mocker, caplog):
 
 def test_real_azure_core_poller_result_is_not_replaced_with_timeout_none(mocker):
     h = Harness(mocker)
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", False)
     h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     response = {"real": "result"}
     poller = LROPoller(Mock(), response, lambda value: value, NoPolling())
@@ -465,93 +463,6 @@ def test_unknown_cli_error_is_not_treated_as_structured_authorization(mocker):
         h.run()
     assert caught.value is h.wait_error
     assert len(h.patches) == 1 and not h.clock.delays
-
-
-def _real_resource_pollers(h, mocker):
-    """Real Azure Core pollers with canary metadata; no background network."""
-    h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
-    pollers = []
-    url = "https://centraluseuap.management.azure.com" + NS_ID + "?api-version=2026-11-02-preview"
-
-    def submit(**kwargs):
-        endpoint = h.submit(**kwargs)
-        request = SimpleNamespace(url=url, method="PATCH")
-        initial = SimpleNamespace(
-            http_request=request,
-            http_response=Mock(status_code=202, headers={
-                "Azure-AsyncOperation": "https://control-plane.prod.centraluseuap.iotadr.net/broken-status",
-            }),
-        )
-        poller = LROPoller(Mock(), initial, lambda value: value, NoPolling())
-        poller.endpoint = endpoint
-        mocker.spy(poller, "result")
-        pollers.append(poller)
-        return poller
-
-    def read(request):
-        assert request.method == "GET" and request.url == url
-        try:
-            h.wait(pollers[-1].endpoint, resource_observer=lambda _: None)
-        except ADRResourceStateError:
-            pass  # Return the structured service body to the real resource waiter.
-        return Mock(status_code=200, headers={}, json=Mock(return_value=deepcopy(h.namespace)))
-
-    h.client.namespaces.begin_update.side_effect = submit
-    h.client.send_request.side_effect = read
-    return pollers
-
-
-def test_real_azure_core_poller_canary_resource_failure_recovers_without_async_status_call(mocker):
-    h = Harness(mocker)
-    pollers = _real_resource_pollers(h, mocker)
-    result = h.run(wait_sec=1)
-    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
-    assert len(h.patches) == len(pollers) == 2
-    assert h.clock.delays == [1, 30, 1]
-    assert h.client.send_request.call_count == 2
-    for poller in pollers:
-        poller.result.assert_not_called()
-    assert all(call.kwargs["polling"] is False for call in h.client.namespaces.begin_update.call_args_list)
-
-
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 429, 500, 503])
-def test_real_canary_wait_does_not_retry_unrelated_http_failures(mocker, status):
-    h = Harness(mocker)
-    _real_resource_pollers(h, mocker)
-    error = HttpResponseError(f"original HTTP {status}")
-    error.status_code = status
-    error.error = SimpleNamespace(code="AdrMiNotAuthorized")
-    h.client.send_request.side_effect = None
-    h.client.send_request.return_value = Mock(status_code=status, raise_for_status=Mock(side_effect=error))
-    with pytest.raises(HttpResponseError) as caught:
-        h.run(wait_sec=1)
-    assert caught.value is error
-    assert len(h.patches) == 1
-    assert h.client.send_request.call_count == 1
-    assert h.client.namespaces.get.call_count == 1
-    assert h.clock.delays == [1]
-
-
-def test_real_canary_late_success_is_rejected_before_endpoint_get_or_retry(mocker):
-    h = Harness(mocker)
-    h.outcomes = ["success"]
-    _real_resource_pollers(h, mocker)
-    h.wait_cost = 3
-    with pytest.raises(AzureResponseError, match="timed out"):
-        h.run(wait_sec=1, timeout_sec=3)
-    assert h.client.send_request.call_count == 1
-    assert h.client.namespaces.get.call_count == 1
-    assert len(h.patches) == 1
-
-
-def test_expired_before_canary_poll_does_not_issue_resource_get(mocker):
-    h = Harness(mocker)
-    _real_resource_pollers(h, mocker)
-    with pytest.raises(AzureResponseError, match="timed out"):
-        h.run(wait_sec=30, timeout_sec=3)
-    h.client.send_request.assert_not_called()
-    assert h.client.namespaces.get.call_count == 1
-    assert h.clock.delays == [3]
 
 
 @pytest.mark.parametrize("mutation", ["target", "assignment"])
@@ -600,7 +511,7 @@ def test_slow_recovery_preflight_expires_before_assignment_reads_or_retry(mocker
     assert h.client.namespaces.get.call_count == 2
 
 
-def test_stale_failed_after_recovery_never_causes_another_update_without_progress(mocker):
+def test_operation_failure_after_recovery_backs_off_within_shared_deadline(mocker):
     h = Harness(mocker)
     original_submit = h.submit
     failed = []
@@ -618,7 +529,7 @@ def test_stale_failed_after_recovery_never_causes_another_update_without_progres
     with pytest.raises(AzureResponseError, match="timed out"):
         h.run(timeout_sec=65, wait_sec=10)
     assert len(h.patches) == 2
-    assert h.clock.delays == [30, 10, 10, 10, 5]
+    assert h.clock.delays == [30, 35]
 
 
 @pytest.mark.parametrize("mutation", ["namespace", "endpoint", "state", "error", "error-message", "collection"])
@@ -810,36 +721,27 @@ def test_hub_recovery_requires_original_succeeded_dps_dependency(mocker, change)
     assert not h.clock.delays
 
 
-def test_canary_resource_get_transport_error_is_not_a_mutation_authorization_error(mocker):
-    h = Harness(mocker)
-    _real_resource_pollers(h, mocker)
-    error = HttpResponseError("Resource GET authorization failure")
-    error.status_code = 400
-    error.error = SimpleNamespace(code="AdrMiNotAuthorized")
-    h.client.send_request.side_effect = error
-    with pytest.raises(HttpResponseError) as caught:
-        h.run(wait_sec=1)
-    assert caught.value is error
-    assert h.client.namespaces.get.call_count == 1
-    assert len(h.patches) == 1
-
-
 @pytest.mark.parametrize("scenario,expected_patches", [
-    ("fresh-rejection", [0, 31, 91]),
-    ("repeated-rejection", [0, 31, 91]),
-    ("stale-get", [0, 31]),
-    ("changed-target", [0, 31]),
-    ("missing-role", [0, 31]),
+    ("fresh-rejection", [0, 30, 90]),
+    ("repeated-rejection", [0, 30, 90]),
+    ("stale-get", [0, 30, 90]),
+    ("async-failure", [0, 30, 90]),
+    ("changed-target", [0, 30]),
+    ("missing-role", [0, 30]),
 ])
 def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_get(
     mocker, mocked_response, scenario, expected_patches,
 ):
-    """Drive the generated client, HTTP transport, real provider and base waiter."""
+    """Drive the generated client, HTTP transport, real provider and SDK poller."""
     h = Harness(mocker)
     h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     patch_times, requests, bodies = [], [], []
     base_url = "https://centraluseuap.management.azure.com"
     url = base_url + NS_ID
+    status_url = (
+        f"{base_url}/subscriptions/sub/providers/Microsoft.DeviceRegistry"
+        "/locations/centraluseuap/asyncOperationStatuses/link"
+    )
     error = {"code": "AdrMiNotAuthorized", "message": "Namespace MI authorization has not propagated."}
 
     def respond(request):
@@ -848,7 +750,8 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
             patch_times.append(h.clock.now)
             bodies.append(json.loads(request.body))
             if len(patch_times) >= 2 and (
-                scenario == "repeated-rejection" or len(patch_times) == 2 and scenario != "stale-get"
+                scenario == "repeated-rejection"
+                or len(patch_times) == 2 and scenario not in {"stale-get", "async-failure"}
             ):
                 if scenario == "changed-target":
                     h.namespace["properties"]["updating"]["endpoints"]["su"]["resourceId"] += "-other"
@@ -863,37 +766,42 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
             h.namespace["properties"]["updating"] = {"endpoints": {"su": endpoint}}
             return 202, {
                 "Content-Type": "application/json",
-                "Azure-AsyncOperation": "https://control-plane.prod.centraluseuap.iotadr.net/unused",
+                "Azure-AsyncOperation": status_url,
+                "Retry-After": "0",
             }, json.dumps(h.namespace)
+        if "/asyncOperationStatuses/link" in request.url:
+            if scenario == "async-failure" and h.namespace["properties"]["provisioningState"] == "Failed":
+                return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Failed", "error": error})
+            return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Succeeded"})
         return 200, {"Content-Type": "application/json"}, json.dumps(h.namespace)
 
     mocked_response.add_callback("PATCH", url, callback=respond)
     mocked_response.add_callback("GET", url, callback=respond)
+    mocked_response.add_callback("GET", status_url, callback=respond)
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-unit-token", 4102444800)
     verify = mocker.spy(h.provider._rbac, "verify_many")
     with DeviceRegistryMgmtClient(credential, "sub", base_url=base_url, retry_total=0) as client:
         h.provider.client = client
-        if scenario == "fresh-rejection":
+        if scenario in {"fresh-rejection", "stale-get", "async-failure"}:
             result = h.run(timeout_sec=120, wait_sec=1)
             assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
-            assert h.clock.now == 92
-            assert h.clock.delays == [1, 30, 60, 1]
+            assert h.clock.now == 90
+            assert h.clock.delays == [30, 60]
             assert verify.call_count == 4
         else:
             message = {
                 "changed-target": "changed", "missing-role": "Cannot confirm",
-                "repeated-rejection": "timed out", "stale-get": "timed out",
+                "repeated-rejection": "timed out",
             }[scenario]
             with pytest.raises(AzureResponseError, match=message):
                 h.run(timeout_sec=120, wait_sec=1)
             if scenario == "repeated-rejection":
-                assert h.clock.delays == [1, 30, 60, 29]
+                assert h.clock.delays == [30, 60, 30]
                 assert verify.call_count == 5
-            if scenario in {"stale-get", "repeated-rejection"}:
                 assert h.clock.now == 120
     assert patch_times == expected_patches
     assert bodies == [{"properties": {"updating": {"endpoints": {"su": h.body}}}}] * len(patch_times)
     assert len(h.created) == 3
     assert all(at < 120 for _, at in requests)
-    assert len(mocked_response.calls) == len(requests)  # No async-status/Graph/extra requests.
+    assert len(mocked_response.calls) == len(requests)  # No Graph or extra requests.

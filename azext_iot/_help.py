@@ -26,6 +26,7 @@ helps[
 ] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
+    long-summary: Preview APIs support the Azure public cloud only; management requests use canary ARM by default.
 """
 
 helps[
@@ -1053,6 +1054,7 @@ helps[
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
+    long-summary: Preview APIs support the Azure public cloud only; management requests use canary ARM by default.
 """
 
 helps[

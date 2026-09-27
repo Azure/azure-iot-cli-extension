@@ -29,12 +29,13 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 ARM = "https://centraluseuap.management.azure.com"
-PHASES = (
-    ("regular", 45 * 60, 10 * 60),
-    ("service-sas", 40 * 60, 10 * 60),
-    ("local-auth-toggle", 20 * 60, 5 * 60),
+CI_BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+DPS_CI_BUDGET = CI_BUDGETS["DPS"]
+PHASES = tuple(
+    (phase["name"], phase["runtime_minutes"] * 60, phase["cleanup_minutes"] * 60)
+    for phase in DPS_CI_BUDGET["phases"]
 )
-RUNNER_SECONDS = 140 * 60
+RUNNER_SECONDS = (DPS_CI_BUDGET["job_timeout_minutes"] - DPS_CI_BUDGET["setup_minutes"]) * 60
 READ_SECONDS = 60
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
@@ -609,6 +610,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 if index:
                     prior = summary["phases"][index - 1]
                     if not prior.get("cleanup", {}).get("complete"):
+                        result["continued_after_unproven_cleanup"] = prior["name"]
                         print(
                             f"[DPS phases] WARNING: {prior['name']} cleanup was not proven; "
                             f"continuing {name} with independent resources. The run remains failed.",

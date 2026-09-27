@@ -320,6 +320,89 @@ def test_wait_explicit_predicate_surfaces_failed_provisioning_state():
     )
 
 
+def test_wait_deleted_tolerates_failed_until_not_found():
+    getter = MagicMock(
+        side_effect=[
+            {"properties": {"provisioningState": "Failed"}},
+            ResourceNotFoundError("gone"),
+        ]
+    )
+
+    assert (
+        wait_for_resource(
+            MagicMock(),
+            getter,
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=lambda _: None,
+        )
+        is None
+    )
+    assert getter.call_count == 2
+
+
+def test_wait_deleted_fails_after_deleting_then_failed():
+    getter = MagicMock(
+        side_effect=[
+            {"properties": {"provisioningState": "Deleting"}},
+            {"properties": {"provisioningState": "Failed"}},
+        ]
+    )
+
+    with pytest.raises(AzureResponseError, match="operation failed"):
+        wait_for_resource(
+            MagicMock(),
+            getter,
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=lambda _: None,
+        )
+
+
+def test_wait_deleted_times_out_with_last_failed_state():
+    now = 0
+
+    def sleep_for(delay):
+        nonlocal now
+        now += delay
+
+    with pytest.raises(CLIError, match=r"still exists \(provisioningState Failed\)"):
+        wait_for_resource(
+            MagicMock(),
+            lambda: {"properties": {"provisioningState": "Failed"}},
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=sleep_for,
+            clock=lambda: now,
+        )
+
+
+def test_wait_deleted_times_out_without_provisioning_state():
+    now = 0
+
+    def sleep_for(delay):
+        nonlocal now
+        now += delay
+
+    with pytest.raises(CLIError, match="still exists"):
+        wait_for_resource(
+            MagicMock(),
+            lambda: {"properties": {}},
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=sleep_for,
+            clock=lambda: now,
+        )
+
+
 def test_wait_preserves_deleted_and_not_found_retry_semantics():
     assert (
         wait_for_resource(

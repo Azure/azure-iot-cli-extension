@@ -25,14 +25,12 @@ from azext_iot.tests.adr import test_adr_validation_scenarios_unit as cli_tests
 offline_cli = cli_tests.offline_cli
 
 
-@pytest.mark.parametrize("hub_option,dps_option,deprecated", [
-    ("--hub-name", "--dps-name", True),
-    ("--hn", "--dn", True),
-    ("--hub-endpoint-name", "--dps-endpoint-name", False),
-    ("--hen", "--den", False),
+@pytest.mark.parametrize("hub_option,dps_option", [
+    ("--hub-endpoint-name", "--dps-endpoint-name"),
+    ("--hen", "--den"),
 ])
-def test_composite_label_aliases_warn_through_native_cli(
-    offline_cli, mocker, capfd, hub_option, dps_option, deprecated,
+def test_composite_label_options_parse_through_native_cli(
+    offline_cli, mocker, capfd, hub_option, dps_option,
 ):
     provider = mocker.patch("azext_iot.adr.commands_link.LinkProvider").return_value
     provider.link_add.return_value = {"name": "ns"}
@@ -48,12 +46,7 @@ def test_composite_label_aliases_warn_through_native_cli(
     assert provider.link_add.call_args.kwargs["hub_endpoint_name"] == "hub"
     assert provider.link_add.call_args.kwargs["dps_endpoint_name"] == "dps"
     warnings = capfd.readouterr().err
-    if deprecated:
-        assert hub_option in warnings and "--hub-endpoint-name" in warnings
-        assert dps_option in warnings and "--dps-endpoint-name" in warnings
-        assert "deprecated" in warnings.lower()
-    else:
-        assert "deprecated" not in warnings.lower()
+    assert "deprecated" not in warnings.lower()
 
 
 def test_hash_remains_local_through_native_cli(offline_cli, tmp_path):

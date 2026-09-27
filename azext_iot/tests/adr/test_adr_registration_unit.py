@@ -308,7 +308,7 @@ def test_unsupported_command_surfaces_are_not_registered():
         for command in commands
     )
     for endpoint in ("hub", "dps", "su"):
-        assert f"iot adr ns link {endpoint} remove" not in commands
+        assert f"iot adr ns link {endpoint} delete" not in commands
     # Pre-rename spellings must not resurface.
     assert not any(
         command.startswith("iot adr ns su link") for command in commands
@@ -380,17 +380,17 @@ def test_load_adr_arguments():
         "--hub-endpoint-name",
         "--hen",
     ]
-    assert bundled["hub_endpoint_name"]["options_list"][2:] == [
-        {"target": alias, "redirect": "--hub-endpoint-name", "hide": True}
-        for alias in ("--hub-name", "--hn")
+    assert bundled["hub_endpoint_name"]["options_list"] == [
+        "--hub-endpoint-name",
+        "--hen",
     ]
     assert bundled["dps_endpoint_name"]["options_list"][:2] == [
         "--dps-endpoint-name",
         "--den",
     ]
-    assert bundled["dps_endpoint_name"]["options_list"][2:] == [
-        {"target": alias, "redirect": "--dps-endpoint-name", "hide": True}
-        for alias in ("--dps-name", "--dn")
+    assert bundled["dps_endpoint_name"]["options_list"] == [
+        "--dps-endpoint-name",
+        "--den",
     ]
     assert "has no effect" in arguments["iot adr ns group delete"]["no_wait"]["help"]
     assert "Wait for DPS linking to succeed" in bundled["no_wait"]["help"]
@@ -533,7 +533,7 @@ def test_load_adr_arguments():
     } <= set(arguments["iot adr ns link wait"])
 
 
-def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names():
+def test_every_adr_identity_option_has_canonical_and_compact_names():
     loader = _ArgumentLoader()
     load_adr_arguments(loader, None)
     arguments = loader.records
@@ -547,14 +547,12 @@ def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names
                     "outbound_mi_system_assigned",
                     "--outbound-system-assigned-mi",
                     "--omi-sa",
-                    "--outbound-mi-system-assigned",
                 ),
                 (
                     command,
                     "outbound_mi_user_assigned",
                     "--outbound-user-assigned-mi",
                     "--omi-ua",
-                    "--outbound-mi-user-assigned",
                 ),
             ]
         )
@@ -568,14 +566,12 @@ def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names
                         "mi_system_assigned",
                         "--system-assigned-mi",
                         "--mi-sa",
-                        "--mi-system-assigned",
                     ),
                     (
                         command,
                         "mi_user_assigned",
                         "--user-assigned-mi",
                         "--mi-ua",
-                        "--mi-user-assigned",
                     ),
                 ]
             )
@@ -588,14 +584,12 @@ def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names
                     "mi_system_assigned",
                     "--system-assigned-mi",
                     "--mi-sa",
-                    "--mi-system-assigned",
                 ),
                 (
                     command,
                     "mi_user_assigned",
                     "--user-assigned-mi",
                     "--mi-ua",
-                    "--mi-user-assigned",
                 ),
             ]
         )
@@ -606,42 +600,31 @@ def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names
                 "hub_mi_system_assigned",
                 "--hub-system-assigned-mi",
                 "--hub-mi-sa",
-                "--hub-mi-system-assigned",
             ),
             (
                 "iot adr ns link add",
                 "hub_mi_user_assigned",
                 "--hub-user-assigned-mi",
                 "--hub-mi-ua",
-                "--hub-mi-user-assigned",
             ),
             (
                 "iot adr ns link add",
                 "dps_mi_system_assigned",
                 "--dps-system-assigned-mi",
                 "--dps-mi-sa",
-                "--dps-mi-system-assigned",
             ),
             (
                 "iot adr ns link add",
                 "dps_mi_user_assigned",
                 "--dps-user-assigned-mi",
                 "--dps-mi-ua",
-                "--dps-mi-user-assigned",
             ),
         ]
     )
 
-    for command, argument, canonical, compact, legacy in cases:
+    for command, argument, canonical, compact in cases:
         options = arguments[command][argument]["options_list"]
-        assert options[:2] == [canonical, compact]
-        assert any(
-            isinstance(option, dict)
-            and option.get("target") == legacy
-            and option.get("redirect") == canonical
-            and option.get("hide") is True
-            for option in options
-        ), (command, argument)
+        assert options == [canonical, compact]
 
     for command in (
         "iot adr ns identity assign",
@@ -753,7 +736,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
         for command in helps
     )
     for endpoint in ("hub", "dps", "su"):
-        assert f"iot adr ns link {endpoint} remove" not in helps
+        assert f"iot adr ns link {endpoint} delete" not in helps
         assert f"iot adr ns link {endpoint} remove" in helps
     assert not any(command.startswith("iot adr ns su link") for command in helps)
     assert not any(

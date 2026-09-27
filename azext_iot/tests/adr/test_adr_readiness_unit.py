@@ -267,7 +267,7 @@ def test_real_sdk_get_404_and_testsdk_rethrow_gate_bounded_namespace_delete(mock
         mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=client)
         provider = NamespaceProvider(Mock())
 
-        def command(text):
+        def command(text, **_):
             try:
                 if "job show" in text:
                     return _output(client.jobs.get("rg", "ns", "job"))
@@ -365,7 +365,7 @@ def test_accepted_delete_only_polls_even_if_namespace_state_is_stale(already_del
     scenario = Mock()
     accepted = [already_deleting]
 
-    def command(cmd):
+    def command(cmd, **_):
         if "job show" in cmd:
             raise _missing("job")
         if "group show" in cmd:
@@ -408,7 +408,7 @@ def _link(scenario, clock, expected=None, *, kind="hub", **kwargs):
     # exercise this GET, its deadline and identity failures directly.
     first = True
 
-    def command(text):
+    def command(text, **_):
         nonlocal first
         if first:
             first = False
@@ -544,7 +544,7 @@ def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind
     writes = []
     progressing = [False]
 
-    def command(cmd):
+    def command(cmd, **_):
         clock.now += 1  # CLI time counts, including reads and preflight/write.
         if " add " in cmd or " update " in cmd:
             writes.append(clock.now)
@@ -612,7 +612,7 @@ def test_deadline_exhausted_inside_cli_call_cannot_pass_or_start_another_write(l
     clock = Clock()
     scenario = Mock()
 
-    def command(_cmd):
+    def command(_cmd, **_):
         clock.now += 25
         return _output(_namespace("Succeeded", "Succeeded", kind=link_kind))
 
@@ -674,7 +674,7 @@ def test_native_namespace_get_drives_only_precise_link_recovery(mocked_response,
     scenario = Mock()
     clock = Clock()
     with DeviceRegistryMgmtClient(credential, "sub", retry_total=0) as client:
-        def command(text):
+        def command(text, **_):
             if text.startswith("iot adr ns show "):
                 return _output(client.namespaces.get("rg", "ns"))
             return _output(None)
@@ -708,7 +708,7 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     monkeypatch.setattr(link_scenarios, "link_dps_with_readiness", dps_readiness)
     monkeypatch.setattr(link_scenarios, "link_hub_with_readiness", hub_readiness)
 
-    def command(text):
+    def command(text, **_):
         if text.startswith("iot adr ns show "):
             return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
@@ -784,7 +784,7 @@ def test_sequential_scenario_exercises_combined_command_without_helper_recovery(
             "properties": {"provisioningState": "Succeeded"},
         })
 
-    def command(text):
+    def command(text, **_):
         if text.startswith("iot hub show "):
             state = {"hub_failed": "Failed", "hub_timeout": "Creating"}.get(failure, "Active")
             return _output({"id": HUB_ID, "properties": {"state": state}})
@@ -897,10 +897,12 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
     )
     dps_shows = []
 
-    def command(text):
+    def command(text, expect_failure=False, **_):
         events.append(text)
         if "linked-hub" in text:
             raise AssertionError("The namespace-linked DPS Hub list is read-only")
+        if text.startswith("iot adr ns identity show "):
+            return _output({"type": "SystemAssigned", "principalId": "namespace-system"})
         if text.startswith("iot adr ns show "):
             return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
@@ -923,6 +925,8 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
             " identity remove " in text or " --remove identity." in text
             or text.startswith("iot hub create ")
         ):
+            if expect_failure:
+                return _output({})
             raise ArgumentUsageError("identity is used by an active ADR link")
         if text.startswith("iot adr ns link dps show "):
             dps_shows.append(text)
@@ -1009,7 +1013,7 @@ def test_all_job_group_scenarios_pass_known_children_even_after_setup_failure(
     monkeypatch.setattr(module, helper_name, cleanup)
     scenario = Mock()
 
-    def command(cmd):
+    def command(cmd, **_):
         if "ns create" in cmd or " delete " in cmd:
             return _output({})
         raise RuntimeError("intentional fixture setup failure")

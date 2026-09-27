@@ -116,6 +116,17 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
 
 
+def test_dps_budgets_come_from_ci_budget_source():
+    budget = RUNNER["DPS_CI_BUDGET"]
+    assert RUNNER["PHASES"] == tuple(
+        (phase["name"], phase["runtime_minutes"] * 60, phase["cleanup_minutes"] * 60)
+        for phase in budget["phases"]
+    )
+    assert RUNNER["RUNNER_SECONDS"] == (budget["job_timeout_minutes"] - budget["setup_minutes"]) * 60
+    phase_seconds = sum(runtime + cleanup for _, runtime, cleanup in RUNNER["PHASES"])
+    assert phase_seconds + budget["reserve_minutes"] * 60 == RUNNER["RUNNER_SECONDS"]
+
+
 @pytest.mark.parametrize("damage", [None, "wrong-matrix", "wrong-target", "missing-target"])
 @pytest.mark.parametrize("region,endpoint", [
     ("australiaeast", None), ("westeurope", None), ("centraluseuap", "https://management.azure.com"),
@@ -228,12 +239,36 @@ def test_cleanup_failure_warns_and_continues_independent_phases(tmp_path, capsys
     assert len({phase["run_uid"] for phase in summary["phases"]}) == 3
     assert f"WARNING: {phase_name} cleanup was not proven; continuing" in capsys.readouterr().out
     failed = next(phase for phase in summary["phases"] if phase["name"] == phase_name)
+    continued = summary["phases"][["regular", "service-sas"].index(phase_name) + 1]
+    assert continued["continued_after_unproven_cleanup"] == phase_name
+    assert json.loads(
+        (tmp_path / "dps-phases" / continued["name"] / "result.json").read_text(encoding="utf-8")
+    )["continued_after_unproven_cleanup"] == phase_name
     assert failed["cleanup"]["remaining"]
     # Even a self-consistent green summary cannot hide failed cleanup evidence.
     summary["status"] = failed["status"] = "passed"
     _json(tmp_path / "dps-phases.json", summary)
     _json(tmp_path / "dps-phases" / phase_name / "result.json", failed)
     assert GATE(tmp_path)
+
+
+def test_workflow_summary_reports_dps_continuation_without_new_failure(tmp_path):
+    from azext_iot.tests.test_workflow_results_unit import EVALUATE, SUCCESSFUL_JOBS, _result
+
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
+    summary = json.loads((tmp_path / "dps-phases.json").read_text(encoding="utf-8"))
+    summary["phases"][1]["continued_after_unproven_cleanup"] = "regular"
+    _json(tmp_path / "dps-phases.json", summary)
+    _json(tmp_path / "dps-phases/service-sas/result.json", summary["phases"][1])
+    combination = {
+        "service": "DPS", "python": "3.13", "region": "centraluseuap",
+        "arm_endpoint": RUNNER["TARGETS"]["target"]()["endpoint"],
+    }
+    _result(tmp_path, combination)
+    (tmp_path / "arm-endpoint.txt").write_text(combination["arm_endpoint"], encoding="utf-8")
+    text, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
+    assert "DPS continued service-sas after unproven regular cleanup" in text
+    assert not errors
 
 
 @pytest.mark.parametrize("stop", ["cancellation", "deadline"])

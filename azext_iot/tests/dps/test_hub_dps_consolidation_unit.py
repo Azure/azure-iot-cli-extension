@@ -522,6 +522,7 @@ def test_deadline_options_and_registration_dispatch(mocker, clock_start):
         "connection_timeout": remaining / 2, "read_timeout": remaining / 2, "retry_total": 0,
     }
     assert options["connection_timeout"] + options["read_timeout"] == remaining
+    device.DeviceRegistrationProvider._check_deadline(deadline)
     provider = device.DeviceRegistrationProvider(
         SimpleNamespace(cli_ctx=None), "reg", id_scope="scope", device_symmetric_key="key"
     )

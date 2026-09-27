@@ -9,7 +9,9 @@
 import base64
 import binascii
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 import json
+from shlex import quote
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
@@ -32,9 +34,18 @@ ADU_ADMINISTRATOR_ROLE = "Device Update Administrator"
 ADR_ADMINISTRATOR_ROLE = "Azure Device Registry Administrator"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
+ARM_TOKEN_RESOURCE = "https://management.azure.com"
+PERMISSIONS_API_VERSION = "2022-04-01"
+ROLE_ASSIGNMENTS_WRITE_ACTION = "Microsoft.Authorization/roleAssignments/write"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
 UNLINK_READER_PROPAGATION_DELAY_SECONDS = 30
+NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE = (
+    "DPS links additionally require the namespace system-assigned identity, "
+    "even when outbound uses a user-assigned identity. Enable it with "
+    "'az iot adr ns identity assign --system-assigned -n <namespace> "
+    "-g <resource-group>' and retry."
+)
 LINK_ROLE_IDS = {
     READER_ROLE: "acdd72a7-3385-48ef-bd42-f606fba81ae7",
     CONTRIBUTOR_ROLE: "b24988ac-6180-42a0-ab88-20f7382dd24c",
@@ -102,6 +113,39 @@ def _scope_subscription(scope: str) -> Optional[str]:
         if part.casefold() == "subscriptions":
             return parts[index + 1]
     return None
+
+
+def _matches_action(pattern: str, action: str) -> bool:
+    return fnmatchcase(str(action).casefold(), str(pattern).casefold())
+
+
+def _allows_role_assignment_write(permission: dict) -> bool:
+    if not isinstance(permission, dict):
+        return False
+    actions = permission.get("actions") or []
+    not_actions = permission.get("notActions") or []
+    return (
+        any(_matches_action(pattern, ROLE_ASSIGNMENTS_WRITE_ACTION) for pattern in actions)
+        and not any(_matches_action(pattern, ROLE_ASSIGNMENTS_WRITE_ACTION) for pattern in not_actions)
+    )
+
+
+def _resource_id_value(resource_id: str, key: str) -> Optional[str]:
+    parts = [part for part in (resource_id or "").split("/") if part]
+    key = key.casefold()
+    for index, part in enumerate(parts[:-1]):
+        if part.casefold() == key:
+            return parts[index + 1]
+    return None
+
+
+def _namespace_system_identity_required_message(namespace: dict) -> str:
+    resource_id = (namespace or {}).get("id")
+    namespace_name = _resource_id_value(resource_id, "namespaces") or "<namespace>"
+    resource_group = _resource_id_value(resource_id, "resourceGroups") or "<resource-group>"
+    return NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE.replace(
+        "<namespace>", namespace_name
+    ).replace("<resource-group>", resource_group)
 
 
 def _identity_type_contains(identity: dict, value: str) -> bool:
@@ -173,6 +217,10 @@ def resolve_linked_resource_principal(
     inbound_type = str(inbound_identity.get("type") or "")
     if inbound_type.casefold() == "systemassigned":
         if not _identity_type_contains(identity, "SystemAssigned"):
+            if display_name == "namespace":
+                raise InvalidArgumentValueError(
+                    _namespace_system_identity_required_message(resource)
+                )
             raise InvalidArgumentValueError(
                 f"The selected system-assigned identity is not enabled on "
                 f"{display_name}. Assign it and retry."
@@ -255,6 +303,7 @@ class LinkRbacManager:
         self._cli_ctx = cli_ctx
         self.cli = cli or EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
         self._caller_object_ids = {}
+        self._caller_can_assign_cache = {}
         self._clock = clock or monotonic
         self._sleep = sleeper or sleep
         self._propagation_timeout = propagation_timeout
@@ -267,8 +316,10 @@ class LinkRbacManager:
         try:
             result = self.cli.invoke(command, subscription=subscription)
             if not result.success():
+                detail = result.get_error() or result.output or "no output"
                 raise AzureResponseError(
-                    f"Azure CLI command failed during link RBAC preflight: az {command}"
+                    f"Azure CLI command failed during link RBAC preflight: az {command}. "
+                    f"Detail: {detail}"
                 )
             return result.as_json()
         except AzureResponseError:
@@ -344,10 +395,18 @@ class LinkRbacManager:
                 exists = self._assignment_exists(principal, rule.role, scopes[rule.scope], strict=True)
                 guard()
                 if not exists:
+                    guidance = (
+                        " For Software Updates, fix the link with "
+                        "'az iot adr ns link su update' after restoring the "
+                        "required service-role assignment."
+                        if request["link_type"] == "su"
+                        else ""
+                    )
                     raise AzureResponseError(
                         f"Cannot confirm unconditional {rule.role} for principalId={principal} "
                         f"at scope={scopes[rule.scope]}. Recovery stopped without another namespace mutation. "
                         "Verify the required service-role assignment; no broader roles or caller data access were granted."
+                        f"{guidance}"
                     )
 
     def _current_assignee_object_id(self, subscription_id: str) -> str:
@@ -379,17 +438,46 @@ class LinkRbacManager:
         return object_id
 
     def _caller_can_assign(self, assignee_object_id: str, scope: str) -> bool:
-        for role in (OWNER_ROLE, USER_ACCESS_ADMINISTRATOR_ROLE):
-            assignments = self._invoke_json(
-                "role assignment list "
-                f"--assignee-object-id '{assignee_object_id}' "
-                f"--role '{role}' --scope '{scope}' "
-                "--include-inherited --include-groups "
-                "--fill-principal-name false",
-                subscription=_scope_subscription(scope),
+        if not assignee_object_id:
+            return False
+        cache_key = _normalized_id(scope)
+        if cache_key in self._caller_can_assign_cache:
+            return self._caller_can_assign_cache[cache_key]
+
+        from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
+        subscription_id = _scope_subscription(scope)
+        url = (
+            f"{get_adr_arm_endpoint()}{scope.rstrip('/')}"
+            "/providers/Microsoft.Authorization/permissions"
+            f"?api-version={PERMISSIONS_API_VERSION}"
+        )
+        while url:
+            payload = self._invoke_json(
+                "rest --method get "
+                f"--url {quote(url)} --resource {ARM_TOKEN_RESOURCE}",
+                subscription=subscription_id,
             )
-            if assignments:
+            if not isinstance(payload, dict):
+                raise AzureResponseError(
+                    "Malformed ARM permissions response during link RBAC preflight."
+                )
+            permissions = payload.get("value", [])
+            if permissions is None:
+                permissions = []
+            if not isinstance(permissions, list):
+                raise AzureResponseError(
+                    "Malformed ARM permissions response during link RBAC preflight."
+                )
+            if any(_allows_role_assignment_write(item) for item in permissions):
+                self._caller_can_assign_cache[cache_key] = True
                 return True
+            url = payload.get("nextLink")
+            if url is not None and not isinstance(url, str):
+                raise AzureResponseError(
+                    "Malformed ARM permissions response during link RBAC preflight."
+                )
+        self._caller_can_assign_cache[cache_key] = False
         return False
 
     def _wait_for_assignments(
@@ -545,11 +633,20 @@ class LinkRbacManager:
             )
             self._sleep(UNLINK_READER_PROPAGATION_DELAY_SECONDS)
         except AzureResponseError as error:
-            raise AzureResponseError(
-                f"{error}\nUnlink Reader setup requires resource group '{resource_group_scope}' to exist. "
-                "If that group was deleted, recreate it before retrying. "
-                "No namespace PUT or broader subscription-level grant was submitted."
-            ) from error
+            if "ResourceGroupNotFound" in str(error):
+                message = (
+                    f"{error}\nUnlink Reader setup requires resource group "
+                    f"'{resource_group_scope}' to exist. If that group was "
+                    "deleted, recreate it before retrying. No namespace PUT "
+                    "or broader subscription-level grant was submitted."
+                )
+            else:
+                message = (
+                    f"{error}\nUnlink Reader setup did not complete. No "
+                    "namespace PUT or broader subscription-level grant was "
+                    "submitted."
+                )
+            raise AzureResponseError(message) from error
 
     def _ensure_assignments(self, missing, descriptions) -> None:
         if not missing:
@@ -568,8 +665,10 @@ class LinkRbacManager:
             scopes_text = ", ".join(unauthorized_scopes)
             raise AzureResponseError(
                 "Missing link role assignments, and the signed-in principal is "
-                "not an inherited Owner or User Access Administrator at every "
-                f"required scope ({scopes_text}). No link mutation was submitted. "
+                "not assigned a role that can create role assignments (for "
+                "example Owner, User Access Administrator, or Role Based Access "
+                "Control Administrator) at every required scope "
+                f"({scopes_text}). No link mutation was submitted. "
                 "Run these exact remediation commands as an authorized principal:\n"
                 f"{commands}"
             )

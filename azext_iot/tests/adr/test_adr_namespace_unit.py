@@ -1361,29 +1361,109 @@ def test_namespace_identity_remove_rejects_system_outbound_identity(
         )
 
 
-def test_namespace_identity_remove_rejects_implicit_system_outbound_with_links(
+def test_namespace_identity_remove_rejects_implicit_system_outbound_with_hub_link(
     fixture_namespace_provider,
 ):
     fixture_namespace_provider.client.namespaces.get.return_value = {
-        "identity": {
-            "type": "SystemAssigned",
-            "principalId": "namespace-principal",
-        },
+        "identity": {"type": "SystemAssigned"},
         "properties": {
             "messaging": {
                 "endpoints": {
                     "hub": {
-                        "endpointType": "Microsoft.Devices/IotHubs",
+                        "endpointType": IOT_HUB_ENDPOINT_TYPE,
+                    }
+                }
+            }
+        },
+    }
+    with pytest.raises(InvalidArgumentValueError, match="outbound"):
+        fixture_namespace_provider.identity_remove(
+            "namespace", "rg", system_assigned=True
+        )
+
+
+def test_namespace_identity_remove_rejects_system_identity_with_dps_link(
+    fixture_namespace_provider,
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "principalId": "namespace-principal",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        },
+        "properties": {
+            "outboundIdentity": {
+                "type": "UserAssigned",
+                "userAssignedIdentity": UAMI_ID,
+            },
+            "provisioning": {
+                "endpoints": {
+                    "primary": {
+                        "endpointType": DPS_ENDPOINT_TYPE,
                     }
                 }
             }
         },
     }
 
-    with pytest.raises(InvalidArgumentValueError, match="outbound"):
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match=(
+            "The namespace system-assigned identity is required by DPS "
+            "link 'primary' for device provisioning. Remove the DPS link first."
+        ),
+    ):
         fixture_namespace_provider.identity_remove(
             "namespace", "rg", system_assigned=True
         )
+
+
+@pytest.mark.parametrize(
+    "section,endpoint_type",
+    [
+        ("messaging", IOT_HUB_ENDPOINT_TYPE),
+        ("updating", SU_ENDPOINT_TYPE),
+    ],
+)
+def test_namespace_identity_remove_allows_non_dps_links(
+    fixture_namespace_provider, mock_poller, section, endpoint_type
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        },
+        "properties": {
+            "outboundIdentity": {
+                "type": "UserAssigned",
+                "userAssignedIdentity": UAMI_ID,
+            },
+            section: {
+                "endpoints": {
+                    "primary": {
+                        "endpointType": endpoint_type,
+                    }
+                }
+            }
+        },
+    }
+    poller = mock_poller({})
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = poller
+
+    result = fixture_namespace_provider.identity_remove(
+        "namespace", "rg", system_assigned=True, no_wait=True
+    )
+
+    assert result is poller
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body == {
+        "identity": {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+    }
 
 
 def test_namespace_identity_remove_system_only_no_wait(

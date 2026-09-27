@@ -597,7 +597,7 @@ def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
 
 
 @pytest.fixture
-def monitor_scenario(mocker):
+def monitor_scenario(mocker, tmp_path):
     from azext_iot.tests.iothub import _integration_helpers as helpers
     devices = [f"device-{index}" for index in range(10)]
     scenario = SimpleNamespace(
@@ -613,6 +613,8 @@ def monitor_scenario(mocker):
         helpers, "sleep", side_effect=lambda seconds: setattr(scenario.clock, "now", scenario.clock.now + seconds),
     )
     mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    mocker.patch.dict(os.environ, {"AZEXT_IOT_TEST_ARTIFACT_DIR": str(tmp_path)})
+    scenario.artifact = tmp_path / "hub-monitor-events-failure.json"
 
     def monitor(command, expected):
         if "--device-query" in command:
@@ -643,6 +645,11 @@ def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(monitor_
     else:
         with pytest.raises(RuntimeError, match="Offline proof stops"):
             messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+        artifact = json.loads(scenario.artifact.read_text(encoding="utf-8"))
+        assert artifact["error_type"] == "RuntimeError"
+        assert artifact["monitor_outputs"][-1]["command"].endswith("--login <redacted>")
+        assert artifact["monitor_outputs"][-1]["error"] == "Offline proof stops after query filter"
+        assert "unit" not in json.dumps(artifact["monitor_outputs"][-1]["command"])
     assert len(scenario.query_monitors) == 1
     command, reads_before_monitor = scenario.query_monitors[0]
     assert reads_before_monitor == 5

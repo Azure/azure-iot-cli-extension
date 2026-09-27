@@ -82,8 +82,8 @@ def test_provider_uses_registry_and_data_factories():
 def test_wait_uses_standard_sdk_poller(provider):
     poller = MagicMock()
     with patch(
-        "azext_iot.adr.providers.software_update."
-        "provider_base.wait_for_terminal_state",
+        "azext_iot.adr.providers.base."
+        "ADRProvider._bounded_poller_result",
         return_value={"status": "Succeeded"},
     ) as wait:
         assert provider._await_terminal(poller, wait_sec=0) == {

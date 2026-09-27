@@ -113,7 +113,7 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           sparse-checkout: |
             azext_iot/tests
@@ -133,16 +133,15 @@ jobs:
         run: |
           set -euo pipefail
           # --- Service registry: service|test_dir|tox_env|timeout ---
-          all_services=(
-            # Regular -> service-SAS -> serial local-auth-toggle; certificate is not wired.
-            "DPS|azext_iot/tests/dps|DPS-int|150"
-            # Controller ceilings 260/345 minutes plus 15 minutes external setup; GH cap is 360.
-            "HubControl|azext_iot/tests/iothub|HubControl-int|275"
-            "HubData|azext_iot/tests/iothub|HubData-int|360"
-            "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
-            # Serial ADR includes a 175-minute SU link envelope and a separate 75-minute SU lifecycle.
-            # Reserve the hosted-job ceiling; per-operation waits and ordinary 15-minute caps stay unchanged.
-            "ADR|azext_iot/tests/adr|ADR-int|360"
+          mapfile -t all_services < <(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          budgets = json.loads(Path("azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+          for service in ("DPS", "HubControl", "HubData", "ADU", "ADR"):
+              config = budgets[service]
+              print(f"{service}|{config['test_dir']}|{config['tox_env']}|{config['job_timeout_minutes']}")
+          PY
           )
 
           # --- Determine which services to include ---
@@ -286,10 +285,10 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: "Setup Python 3.13"
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.13"
           cache: "pip" # Cache pip downloads to avoid re-downloading packages across runs
@@ -304,7 +303,7 @@ jobs:
 
       - name: "Upload coverage report"
         if: ${{ always() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: coverage-unit
           overwrite: true
@@ -333,10 +332,10 @@ jobs:
       TEST_ARM_ENDPOINT: ${{ matrix.config.arm_endpoint }}
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: "Setup Python ${{ matrix.config.python }}"
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "${{ matrix.config.python }}"
           cache: "pip" # Saves ~30-60s per matrix job by caching pip downloads
@@ -364,7 +363,7 @@ jobs:
           fi
 
       - name: "Az CLI login"
-        uses: azure/login@v3
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -496,7 +495,7 @@ jobs:
 
       - name: "Upload test result"
         if: ${{ always() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-result-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
           overwrite: true
@@ -505,7 +504,7 @@ jobs:
 
       - name: "Upload coverage artifact"
         if: ${{ always() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: coverage-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
           overwrite: true
@@ -521,10 +520,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: "Download all test results"
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: test-result-*
           path: ./test-results
@@ -548,10 +547,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: "Download all coverage artifacts"
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: coverage-*
           path: ./coverage_parts
@@ -570,7 +569,7 @@ jobs:
           fi
 
       - name: "Upload combined coverage artifact"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: combined-coverage
           overwrite: true

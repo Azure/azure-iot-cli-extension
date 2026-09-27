@@ -210,7 +210,7 @@ def test_http_error_text_is_not_a_current_structured_endpoint_denial(mocker, sta
     assert not h.patches and not h.clock.delays
 
 
-def test_stale_link_initiate_failure_does_not_replay_an_accepted_recovery(mocker):
+def test_link_initiate_failure_after_recovery_backs_off_within_shared_deadline(mocker):
     h = _harness(mocker)
     original_submit = h.submit
 
@@ -225,7 +225,7 @@ def test_stale_link_initiate_failure_does_not_replay_an_accepted_recovery(mocker
     h.outcomes = ["initiate"] * 5
     with pytest.raises(AzureResponseError, match="timed out"):
         h.run(timeout_sec=65, wait_sec=10)
-    assert len(h.patches) == 2 and h.clock.delays == [30, 10, 10, 10, 5]
+    assert len(h.patches) == 2 and h.clock.delays == [30, 35]
 
 
 def test_no_wait_does_not_start_link_initiate_observation_or_recovery(mocker):
@@ -253,9 +253,16 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
     h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     section = KINDS[kind][0]
     patches = []
-    url = "https://centraluseuap.management.azure.com" + NS_ID
+    base_url = "https://centraluseuap.management.azure.com"
+    url = base_url + NS_ID
+    status_url = (
+        f"{base_url}/subscriptions/sub/providers/Microsoft.DeviceRegistry"
+        "/locations/centraluseuap/asyncOperationStatuses/link"
+    )
 
     def respond(request):
+        if "/asyncOperationStatuses/link" in request.url:
+            return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Succeeded"})
         if request.method == "PATCH":
             patches.append(json.loads(request.body))
             succeeded = len(patches) == 2
@@ -264,15 +271,20 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
             if not succeeded:
                 endpoint["linkingError"] = h.denial
             h.namespace["properties"][section] = {"endpoints": {kind: endpoint}}
-            return 202, {"Content-Type": "application/json"}, json.dumps(h.namespace)
+            return 202, {
+                "Content-Type": "application/json",
+                "Azure-AsyncOperation": status_url,
+                "Retry-After": "0",
+            }, json.dumps(h.namespace)
         return 200, {"Content-Type": "application/json"}, json.dumps(h.namespace)
 
     mocked_response.add_callback("PATCH", url, callback=respond)
     mocked_response.add_callback("GET", url, callback=respond)
+    mocked_response.add_callback("GET", status_url, callback=respond)
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-unit-token", 4102444800)
     with DeviceRegistryMgmtClient(
-        credential, "sub", base_url="https://centraluseuap.management.azure.com", retry_total=0,
+        credential, "sub", base_url=base_url, retry_total=0,
     ) as client:
         h.provider.client = client
         result = h.run(timeout_sec=120, wait_sec=1)

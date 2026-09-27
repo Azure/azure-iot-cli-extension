@@ -108,7 +108,6 @@ class CertificatePolicyProvider(ADRProvider):
         if tags is not None:
             resource["tags"] = tags
 
-        no_wait = kwargs.pop("no_wait", False)
         try:
             poller = self.client.certificate_policies.begin_create_or_replace(
                 resource_group_name=resource_group_name,
@@ -126,7 +125,6 @@ class CertificatePolicyProvider(ADRProvider):
             poller,
             f"Creating certificate policy '{certificate_policy_name}' on certificate authority "
             f"{certificate_authority_name}...",
-            no_wait=no_wait,
             **kwargs,
         )
 

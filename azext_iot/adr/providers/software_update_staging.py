@@ -25,6 +25,15 @@ from azext_iot.deviceupdate.providers.storage import StorageAccountManager
 _DEFAULT_PREFIX = "deviceupdate"
 _MINIMUM_SAS_EXPIRY_HOURS = 1
 _MAXIMUM_SAS_EXPIRY_HOURS = 24
+_HASH_CHUNK_SIZE = 4 * 1024 * 1024
+
+
+def _build_metadata(digest, size: int) -> Dict[str, object]:
+    return {
+        "size": size,
+        "sha256": b64encode(digest.digest()).decode("utf8"),
+        "sha256_hex": digest.hexdigest(),
+    }
 
 
 class SoftwareUpdateStager:
@@ -116,12 +125,20 @@ class SoftwareUpdateStager:
 
     @staticmethod
     def _calculate_content_metadata(content: bytes) -> Dict[str, object]:
-        digest = sha256(content)
-        return {
-            "size": len(content),
-            "sha256": b64encode(digest.digest()).decode("utf8"),
-            "sha256_hex": digest.hexdigest(),
-        }
+        return _build_metadata(sha256(content), len(content))
+
+    @staticmethod
+    def _calculate_file_metadata(path: Path) -> Dict[str, object]:
+        digest = sha256()
+        size = 0
+        with path.open("rb") as stream:
+            while True:
+                chunk = stream.read(_HASH_CHUNK_SIZE)
+                if not chunk:
+                    break
+                size += len(chunk)
+                digest.update(chunk)
+        return _build_metadata(digest, size)
 
     @classmethod
     def _read_artifact(
@@ -151,13 +168,12 @@ class SoftwareUpdateStager:
                 f"Manifest artifact does not exist beside the manifest: {filename}"
             )
         try:
-            content = path.read_bytes()
+            metadata = cls._calculate_file_metadata(path)
         except OSError as error:
             raise InvalidArgumentValueError(
                 f"Unable to read manifest artifact: {filename}"
             ) from error
 
-        metadata = cls._calculate_content_metadata(content)
         declared_size = definition.get("sizeInBytes")
         declared_hashes = definition.get("hashes")
         declared_sha256 = (
@@ -184,7 +200,6 @@ class SoftwareUpdateStager:
         return {
             "filename": filename,
             "path": path,
-            "content": content,
             **metadata,
         }
 
@@ -278,14 +293,20 @@ class SoftwareUpdateStager:
                     "Use --overwrite to replace it."
                 )
 
-        blob_client.upload_blob(
-            artifact["content"],
-            overwrite=overwrite,
-            metadata={
+        upload_kwargs = {
+            "overwrite": overwrite,
+            "metadata": {
                 "adu_sha256": artifact["sha256_hex"],
                 "adu_size": str(artifact["size"]),
             },
-        )
+        }
+        if "content" in artifact:
+            blob_client.upload_blob(artifact["content"], **upload_kwargs)
+        else:
+            with artifact["path"].open("rb") as stream:
+                blob_client.upload_blob(
+                    stream, length=artifact["size"], **upload_kwargs
+                )
         artifact["url"] = blob_client.url
         return "uploaded"
 

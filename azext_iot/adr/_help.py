@@ -190,11 +190,10 @@ def load_adr_help():
   type: group
   short-summary: Manage Azure Device Registry (ADR) resources.
   long-summary: |
-    ADR management clients default to https://centraluseuap.management.azure.com.
-    Set AZURE_IOT_ADR_ARM_ENDPOINT=https://management.azure.com to use public ARM
-    for ADR namespaces, Update Instances, and link-target management requests.
-    Resource location is configured separately with --location. Selecting public
-    ARM does not change API versions or retry unsupported operations against canary.
+    Preview APIs support the Azure public cloud only. ADR management clients default to
+    https://centraluseuap.management.azure.com. Set
+    AZURE_IOT_ADR_ARM_ENDPOINT=https://management.azure.com to use public ARM for ADR
+    namespaces, Update Instances, and link-target management requests.
   """
 
     helps[
@@ -383,21 +382,11 @@ def load_adr_help():
     its requested extensions. OpenSSL x509 -req does not copy them by default: the recipe below
     requires an OpenSSL version supporting -copy_extensions copy and req -addext.
     Protect the external root private key; use this disposable test root only for testing.
-    Remaining validity is measured at activation, not issuance. A service rejection has been
-    observed below 365 days remaining; this is not a universal service-policy guarantee.
-    Allow operational margin and ensure the root covers the ICA's entire validity. The example's
-    730 days is illustrative, not mandatory. clientAuth is not the only permitted EKU assumed
-    by the CLI; preserve the extensions requested in your CSR.
-    Local preflight rejects deterministic certificate defects and warns about unconfirmed
-    policy constraints; backend validation remains authoritative.
-    Successful waited activation returns a fresh CA resource. --no-wait returns submission only,
-    without an added completion wait or output read.
-    For an external ICA observed as PendingActivation before submission, completion is verified using
-    resource GET: the same CA must become Active with a thumbprint matching the submitted leaf
-    certificate and provisioningState Succeeded. This path does not read subscription-regional
-    async operation status, including in the background. An absent or non-PendingActivation baseline
-    retains action-status polling, with a diagnostic; a read error never selects another path.
-    An unrelated Active certificate, ETag change, or provisioningState alone is not completion.
+    Remaining validity is measured at activation. Activation may be rejected when less than
+    365 days of validity remain, so allow margin and make sure the root covers the ICA's entire
+    validity. Keep the extensions requested in the CSR.
+    The CLI checks common certificate defects; the service does final validation.
+    Without --no-wait, returns the CA once it is Active.
   examples:
     - name: Activate an externally issued ICA
       text: az iot adr ns ca activate -n myExternalICA --ns myNamespace -g myResourceGroup --certificate-chain-file ./signed-chain.pem
@@ -554,20 +543,11 @@ def load_adr_help():
     Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    To unlink, delete the linked resource separately, then use link hub/dps/su delete
-    to remove its endpoint from the namespace. Link delete ensures the namespace outbound
-    identity has Reader on the linked resource's resource group before submitting a
-    replacement PUT. Missing grants are created for authorized Owner/User Access
-    Administrator callers; other callers receive exact remediation commands.
-    It does not delete or check the linked resource or wait for unlink completion.
-    Initial backend errors are returned directly.
-    An accepted response does not confirm removal; inspect the namespace afterward
-    for asynchronous failures. Avoid concurrent namespace updates during GET/PUT.
-    Waited add/update commands require the actual endpoint to reach Succeeded. They recover only
-    confirmed AdrMiNotAuthorized, using an unchanged endpoint update and verified existing service-role
-    assignments. Positive --timeout/--interval values default to 600/30 seconds. The mutation/recovery
-    budget starts after initial RBAC preflight; effective authorization adds no propagation delay.
-    Atomic --no-wait and the terminal Hub stage of combined --no-wait do not recover later failures.
+    To unlink, delete the linked resource first, then run link hub/dps/su remove to remove
+    its endpoint from the namespace. Remove does not delete or check the linked resource
+    and does not wait for unlink completion.
+    Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
+    After --no-wait, use link hub/dps/su wait to track completion.
   """
 
     helps[
@@ -586,29 +566,12 @@ def load_adr_help():
   type: command
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
-    Delete the linked {resource} separately before removing its endpoint.
-    This command gets the namespace, removes the named endpoint, and submits a
-    replacement PUT preserving other endpoints and writable namespace settings.
-    Before PUT, it ensures the namespace outbound managed identity has Reader on the
-    linked resource's resource group, using the resource ID saved in the endpoint.
-    An existing inherited Reader grant is reused. Otherwise, an Owner or User Access
-    Administrator at that scope can create the missing grant automatically; callers
-    without that authority receive exact remediation commands and no PUT is submitted.
-    Keep the linked resource's resource group until unlink completes. If the group was
-    deleted too, recreate it at the original subscription and name before retrying.
-    This command never substitutes a broader subscription-level Reader grant.
-    The Reader grant remains in place after unlinking. Newly created grants must become
-    visible to ARM, followed by a 30-second RBAC propagation pause before PUT.
-    Existing Reader grants do not add this pause. Service authorization may still
-    take longer to propagate.
-    It does not check or delete the linked resource, retry the namespace update,
-    or wait for unlink completion. Initial GET/PUT errors are returned directly;
-    later asynchronous failures are not observed by this command.
-    Inspect the namespace with 'az iot adr ns show' to confirm removal and
-    provisioningState. A successful submission is not proof of completed removal.
-    If deletion confirmation fails after a new Reader grant, allow RBAC to propagate,
-    then retry removal of the retained endpoint.
-    Avoid concurrent namespace updates between this command's GET and PUT.
+    Delete the linked {resource} first; this command removes only the namespace endpoint.
+    The namespace outbound identity needs Reader on the linked resource's resource group.
+    A missing grant is created when you can create role assignments; it is kept after unlinking.
+    Keep that resource group until the unlink completes.
+    The command does not wait. Confirm removal with 'az iot adr ns show'.
+    Avoid concurrent namespace updates while this command runs.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
@@ -625,12 +588,10 @@ def load_adr_help():
     --system-assigned-mi and --user-assigned-mi are optional. When supplied, exactly one may be
     used to set the inbound caller identity that the Hub will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("hub")}.
-    The command reuses inherited assignments and automatically creates only missing assignments
-    when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
-    stops before namespace mutation and prints exact remediation commands. A newly created
-    assignment must become visible within the 180-second preflight deadline before PATCH.
-    The current role set includes IoT Hub Data Contributor; final service-owner confirmation
-    of the minimum required roles is pending.
+    The command reuses inherited assignments and creates only missing assignments when run by
+    a caller who can create role assignments (for example Owner, User Access Administrator,
+    or Role Based Access Control Administrator). Otherwise it stops before changing the namespace and prints the exact commands
+    to run. A newly created assignment must become visible within 180 seconds.
   examples:
     - name: Link a Hub using the Hub's system-assigned identity for inbound calls
       text: |
@@ -669,7 +630,7 @@ def load_adr_help():
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
     mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
     --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
-    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
+    With --no-wait, use the matching link wait command to track completion.
     Use update, not add, for a persisted failure. Do not delete the linked Hub to retry it.
   examples:
     - name: Retry a failed Hub link with its saved identity and settings
@@ -724,8 +685,8 @@ def load_adr_help():
   short-summary: Manage DPS links (provisioning endpoints) on a Device Registry namespace.
   long-summary: |
     Only one DPS may be linked per namespace today. Links live on the namespace, not on the
-    DPS resource. After deleting the DPS resource separately, use link dps delete
-    to submit removal of its namespace endpoint.
+    DPS resource. After deleting the DPS resource, run link dps remove to remove its
+    namespace endpoint.
   """
 
     helps[
@@ -742,10 +703,10 @@ def load_adr_help():
     Administrator on its own namespace for registry-device provisioning, even when the
     namespace outbound identity is user-assigned. No role is granted to the signed-in caller;
     DPS enrollment management with --auth-type login requires separate DPS data-plane access.
-    The command reuses inherited assignments and automatically creates only missing assignments
-    when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
-    stops before namespace mutation and prints exact remediation commands. A newly created
-    assignment must become visible within the 180-second preflight deadline before PATCH.
+    The command reuses inherited assignments and creates only missing assignments when run by
+    a caller who can create role assignments (for example Owner, User Access Administrator,
+    or Role Based Access Control Administrator). Otherwise it stops before changing the namespace and prints the exact commands
+    to run. A newly created assignment must become visible within 180 seconds.
   examples:
     - name: Link a DPS using the DPS resource's system-assigned identity
       text: |
@@ -778,7 +739,7 @@ def load_adr_help():
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
     mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
     --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
-    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
+    With --no-wait, use the matching link wait command to track completion.
     Use update, not add, for a persisted failure. Do not delete the linked DPS to retry it.
   examples:
     - name: Rotate to a system-assigned identity on an existing DPS link
@@ -861,9 +822,10 @@ def load_adr_help():
     alone does not grant data-plane access. The configured namespace outbound identity
     and the selected Update Instance inbound identity each support SAMI or an attached UAMI.
     No ADU first-party service principal or Microsoft Graph lookup is required.
-    Missing assignments are created only for an inherited Owner or User Access Administrator.
-    A newly created assignment must become visible within the 180-second preflight deadline
-    before PATCH. This link workflow never grants the signed-in user Software Updates content roles.
+    Missing assignments are created only when run by a caller who can create role assignments
+    (for example Owner, User Access Administrator, or Role Based Access Control Administrator).
+    A newly created assignment must become visible within 180 seconds.
+    This link workflow never grants the signed-in user Software Updates content roles.
   examples:
     - name: Link an Update Instance using its system-assigned identity for inbound calls
       text: |
@@ -896,7 +858,7 @@ def load_adr_help():
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
     mutation, polling and 30/60/120-second propagation backoff after initial RBAC preflight;
     --interval (30 seconds) controls polling. Success requires endpoint linkingState Succeeded.
-    --no-wait returns submission only; later asynchronous failures are not observed or recovered.
+    With --no-wait, use the matching link wait command to track completion.
     After verifying access and allowing recent assignments to propagate, retry a persisted
     failed endpoint with update, not add, passing its existing inbound identity. There is no
     need to delete the linked Update Instance to retry the link.
@@ -1315,7 +1277,7 @@ def load_adr_help():
     --timeout (600 seconds) is one shared mutation/recovery budget for both stages after initial RBAC
     preflight, including RPCs, polling and bounded 30/60/120-second backoff. --interval defaults to 30
     seconds. Both must be positive. No delay is added when authorization already works.
-    Terminal Hub --no-wait does not observe or recover later asynchronous failures.
+    With --no-wait, use link hub wait to track the Hub stage.
     Rejected if the namespace already has a linked DPS. A DPS failure or timeout prevents Hub submission.
     Partial completion is not rolled back. Inspect failed endpoints with link dps show or link hub show
     and repair persisted failures with the corresponding link update, preserving the existing identity.

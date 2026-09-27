@@ -222,5 +222,7 @@ def validate_iso8601_datetime(value: str) -> None:
         parsed = isodate.parse_datetime(value)
         if parsed.utcoffset() is None:
             raise ValueError("timezone offset is required")
-    except Exception:  # noqa: BLE001 - any parse error is invalid input
-        raise InvalidArgumentValueError(INVALID_SCHEDULED_TIME_MSG.format(value=value))
+    except (ValueError, TypeError) as error:
+        raise InvalidArgumentValueError(
+            INVALID_SCHEDULED_TIME_MSG.format(value=value)
+        ) from error

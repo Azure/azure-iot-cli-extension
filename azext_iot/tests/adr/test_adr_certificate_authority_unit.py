@@ -688,7 +688,7 @@ def test_external_ca_help_recipe_and_output_contract():
     load_adr_help()
     activation = helps["iot adr ns ca activate"]
     for text in ("properties.issuer.certificateSigningRequest", "-copy_extensions copy", "umask 077",
-                 "leaf to root", "730 days is illustrative", "not a universal", "--no-wait"):
+                 "leaf to root", "less than\n    365 days", "final validation", "--no-wait"):
         assert text in activation
     assert "does not prove" in helps["iot adr ns ca revoke"]
 

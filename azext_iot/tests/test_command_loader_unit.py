@@ -624,17 +624,17 @@ def test_load_arguments_for_all_commands(loader, command_table):
     assert "--hub-endpoint-name" in bundled["hub_endpoint_name"].settings[
         "options_list"
     ]
-    assert any(
-        getattr(option, "target", None) == "--hub-name" and option.hide
-        for option in bundled["hub_endpoint_name"].settings["options_list"]
-    )
+    assert "--hub-name" not in bundled["hub_endpoint_name"].settings[
+        "options_list"
+    ]
+    assert "--hn" not in bundled["hub_endpoint_name"].settings["options_list"]
     assert "--dps-endpoint-name" in bundled["dps_endpoint_name"].settings[
         "options_list"
     ]
-    assert any(
-        getattr(option, "target", None) == "--dps-name" and option.hide
-        for option in bundled["dps_endpoint_name"].settings["options_list"]
-    )
+    assert "--dps-name" not in bundled["dps_endpoint_name"].settings[
+        "options_list"
+    ]
+    assert "--dn" not in bundled["dps_endpoint_name"].settings["options_list"]
 
     for command_name in (
         "iot device registration request-software-updates",
@@ -982,7 +982,10 @@ def test_dps_generic_final_explicit_capacity_invalid_never_writes(dps_management
     before = deepcopy(runtime.resource)
     code, result, _ = runtime.invoke("update", arguments, use_ids=use_ids)
     assert code != 0
-    assert "sku.capacity must be an integer greater than or equal to 1" in str(result.error)
+    assert any(message in str(result.error) for message in (
+        "sku.capacity must be an integer greater than or equal to 1",
+        "sku.capacity is required.", "sku is required and cannot be removed.",
+    ))
     assert [request.method for request in runtime.requests] == ["GET"]
     assert runtime.resource == before
 

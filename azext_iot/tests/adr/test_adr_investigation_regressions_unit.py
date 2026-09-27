@@ -182,8 +182,8 @@ def _rotation(mocker):
     return harness
 
 
-@pytest.mark.parametrize("view", ["converge", "stale-failure", "timeout", "terminal-old", "foreign", "regression"])
-def test_real_sdk_rotation_polls_only_exact_pending_preupdate_projection(mocker, mocked_response, view):
+@pytest.mark.parametrize("view", ["converge", "stale-failure"])
+def test_real_sdk_rotation_uses_sdk_status_before_exact_namespace_projection(mocker, mocked_response, view):
     harness = _rotation(mocker)
     harness.provider._await_terminal = MethodType(LinkProvider._await_terminal, harness.provider)
     old = deepcopy(harness.namespace)
@@ -207,13 +207,17 @@ def test_real_sdk_rotation_polls_only_exact_pending_preupdate_projection(mocker,
     if view == "regression":
         reads = [projected, pending]
     writes, gets = [], []
+    status_url = ARM + "/subscriptions/sub/providers/Microsoft.DeviceRegistry/locations/centraluseuap/asyncOperationStatuses/link"
 
     def respond(request):
+        if "/asyncOperationStatuses/link" in request.url:
+            return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Succeeded"})
         if request.method == "PATCH":
             writes.append(json.loads(request.body))
             return 202, {
                 "Content-Type": "application/json",
-                "Azure-AsyncOperation": "https://foreign.invalid/must-not-poll",
+                "Azure-AsyncOperation": status_url,
+                "Retry-After": "0",
             }, json.dumps(pending)
         gets.append(request.url)
         body = old if not writes else (pending if view == "timeout" else reads.pop(0) if reads else desired)
@@ -221,6 +225,7 @@ def test_real_sdk_rotation_polls_only_exact_pending_preupdate_projection(mocker,
 
     mocked_response.add_callback("GET", ARM + NS_ID, callback=respond)
     mocked_response.add_callback("PATCH", ARM + NS_ID, callback=respond)
+    mocked_response.add_callback("GET", status_url, callback=respond)
     credential = Mock(spec=["get_token"], get_token=Mock(return_value=AccessToken("offline", 4102444800)))
     verify = mocker.spy(harness.provider._rbac, "verify_many")
     with DeviceRegistryMgmtClient(credential, "sub", base_url=ARM, retry_total=0) as client:
@@ -236,7 +241,7 @@ def test_real_sdk_rotation_polls_only_exact_pending_preupdate_projection(mocker,
                 assert harness.clock.now == 5
     assert writes == [{"properties": {"messaging": {"endpoints": {"hub": harness.body}}}}]
     verify.assert_not_called()  # In particular, no replay of the stale UAMI failure.
-    assert len(mocked_response.calls) == len(gets) + 1
+    assert len(mocked_response.calls) == len(gets) + len(writes) + 1
 
 
 @pytest.mark.parametrize("drift", [

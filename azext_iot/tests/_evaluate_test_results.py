@@ -122,6 +122,18 @@ def evaluate_hub_result(result_dir, service, region=None, endpoint=None):
     return []
 
 
+def dps_cleanup_continuations(result_dir):
+    try:
+        receipt = json.loads((result_dir / "dps-phases.json").read_text(encoding="utf-8"))
+        return [
+            f"DPS continued {phase['name']} after unproven {phase['continued_after_unproven_cleanup']} cleanup."
+            for phase in receipt.get("phases", [])
+            if phase.get("continued_after_unproven_cleanup")
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
 def evaluate_results(results_dir, matrix, job_results):
     errors = []
     summary = [
@@ -169,6 +181,8 @@ def evaluate_results(results_dir, matrix, job_results):
             errors.append(f"{service} / {python} / {region}: missing or mismatched ARM endpoint receipt.")
         if service == "DPS":
             errors.extend(evaluate_dps_phases(result_dir, region, scheduled.get("arm_endpoint")))
+            for continuation in dps_cleanup_continuations(result_dir):
+                summary.append(f"| {service} | {python} | {region} | {continuation} |")
         if service in ("HubControl", "HubData"):
             errors.extend(evaluate_hub_result(result_dir, service, region, scheduled.get("arm_endpoint")))
         if status != "success":

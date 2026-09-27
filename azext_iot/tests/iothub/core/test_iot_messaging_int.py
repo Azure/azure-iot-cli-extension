@@ -7,6 +7,7 @@
 import os
 import pytest
 import json
+from pathlib import Path
 from time import time
 
 from uuid import uuid4
@@ -1017,6 +1018,59 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_count = 10
         device_ids = self.generate_device_names(device_count)
         send_message_data = '{\r\n"payload_data1":"payload_value1"\r\n}'
+        sender_results = []
+        monitor_outputs = []
+        sensitive_values = [self.connection_string]
+
+        def redact(value):
+            value = str(value)
+            for secret in sensitive_values:
+                if secret:
+                    value = value.replace(secret, "<redacted>")
+            return value
+
+        def write_failure_artifact(error):
+            directory = Path(os.getenv("AZEXT_IOT_TEST_ARTIFACT_DIR", "test-result"))
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / "hub-monitor-events-failure.json").write_text(
+                json.dumps(
+                    {
+                        "error_type": type(error).__name__,
+                        "error": redact(error),
+                        "senders": sender_results,
+                        "monitor_outputs": monitor_outputs,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+
+        def send_message(**kwargs):
+            result = {"device_id": kwargs["device_id"]}
+            sender_results.append(result)
+            try:
+                value = iot_device_send_message(**kwargs)
+                result["completed"] = True
+                result["result"] = repr(value)
+                return value
+            except Exception as error:
+                result["completed"] = False
+                result["error_type"] = type(error).__name__
+                result["error"] = redact(error)
+                raise
+
+        def monitor_assert(command, asserts):
+            record = {"command": redact(command), "expected": list(asserts)}
+            monitor_outputs.append(record)
+            try:
+                output = self.command_execute_assert(command, asserts)
+            except Exception as error:
+                record.update(error_type=type(error).__name__, error=redact(error))
+                write_failure_artifact(error)
+                raise
+            record["output"] = redact(output)
+            return output
 
         # Test with invalid connection string
         self.cmd(
@@ -1037,7 +1091,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         for i in range(device_count):
             self.start_background(
-                method=iot_device_send_message,
+                method=send_message,
                 args={
                     "cmd": client,
                     "device_id": device_ids[i],
@@ -1052,7 +1106,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         print(enqueued_time, calculate_millisec_since_unix_epoch_utc())
         # Monitor events for all devices and include sys, anno, app
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y -p sys anno app".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
@@ -1070,7 +1124,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Monitor events for all devices, limiting monitor message count to 10
         num_messages = 10
         monitor_stop_msgs = ["Successfully parsed {} message(s).".format(num_messages), "Stopping event monitor..."]
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} --message-count {} -y -p sys anno app".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time, num_messages
             ),
@@ -1078,7 +1132,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor events for a single device
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 8 -y -p all".format(
                 self.entity_name, self.entity_rg, device_ids[0], LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
@@ -1094,7 +1148,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor events with device-id wildcards
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} -d {} --et {} -t 8 -y -p sys anno app".format(
                 self.entity_name, self.entity_rg, PREFIX_DEVICE + "*", enqueued_time
             ),
@@ -1120,7 +1174,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             id_key="deviceId",
         )
 
-        query_output = self.command_execute_assert(
+        query_output = monitor_assert(
             'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 8 -y -p sys anno app'.format(
                 self.entity_name, self.entity_rg, query_string, enqueued_time
             ),
@@ -1142,7 +1196,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
 
         # Monitor events with --login parameter (IoT Hub connection string)
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -t 8 -y -p all --cg {} --et {} --login {}".format(
                 LIVE_CONSUMER_GROUPS[2], enqueued_time, self.connection_string
             ),
@@ -1155,7 +1209,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub connection-string show -n {} --eh -o json".format(self.entity_name)
         ).get_output_in_json()
         eh_cs = eh_cs_output["connectionString"]
-        self.command_execute_assert(
+        sensitive_values.append(eh_cs)
+        monitor_assert(
             "iot hub monitor-events -t 8 -y --cg {} --et {} --login {}".format(
                 LIVE_CONSUMER_GROUPS[3], enqueued_time, eh_cs
             ),
@@ -1163,7 +1218,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor events with explicit --transport amqp_ws (AMQP over WebSocket)
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y --transport amqp_ws".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
@@ -1184,7 +1239,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor messages for ugly JSON output
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
@@ -1192,7 +1247,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor messages and parse payload as JSON with the --ct parameter
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 --ct application/json -y".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
@@ -1213,7 +1268,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor messages for pretty JSON output
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
@@ -1221,7 +1276,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor messages with yaml output
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y -o yaml".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
@@ -1242,7 +1297,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor messages to ensure it returns improperly formatted JSON
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
@@ -1263,7 +1318,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # Monitor events for a single device contains non-unicode decodable message body
-        self.command_execute_assert(
+        monitor_assert(
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -y -p all".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),

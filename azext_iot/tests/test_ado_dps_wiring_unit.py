@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import json
 from pathlib import Path
 import re
 import runpy
@@ -28,6 +29,10 @@ CONTROLLER_ENV = (
 LEGACY_DPS_EXPRESSION = (
     "_int.py and not test_register_and_issue_certificate_contract and not test_register_without_csr_deadline_contract"
 )
+
+
+def _ci_budgets():
+    return json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 
 
 def test_ado_hub_suite_has_a_nonempty_constrained_unset_default():
@@ -281,7 +286,10 @@ def test_ado_hub_public_jobs_are_serial_with_full_budgets_and_no_folder_selectio
     trigger = yaml.safe_load((ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     hub_jobs = [job for job in trigger["jobs"] if job["job"].startswith("Hub")]
     assert [job["job"] for job in hub_jobs] == ["HubControl", "HubData"]
-    assert [job["timeoutInMinutes"] for job in hub_jobs] == [275, 360]
+    budgets = _ci_budgets()
+    assert [job["timeoutInMinutes"] for job in hub_jobs] == [
+        budgets["HubControl"]["job_timeout_minutes"], budgets["HubData"]["job_timeout_minutes"],
+    ]
     assert hub_jobs[1]["dependsOn"] == "HubControl"
     assert {"testDPS", "testADU", "testADR"}.issubset(hub_jobs[0]["dependsOn"])
     for job in hub_jobs:

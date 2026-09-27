@@ -29,7 +29,6 @@ from azext_iot.adr.common import (
     IOT_HUB_ENDPOINT_TYPE,
     SU_ENDPOINT_TYPE,
 )
-from azext_iot.adr.providers import base
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import (
     MI_MUTEX_MSG as _MI_MUTEX_MSG,
@@ -290,10 +289,6 @@ class LinkProvider(ADRProvider):
         ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,
-                # The waited canary path owns resource polling. Do not also
-                # start an SDK thread against the broken async-status host.
-                # Terminal no-wait retains the ordinary, real Azure Core poller.
-                **({"polling": False} if not no_wait and base.POLL_PROVISIONING_STATE_WORKAROUND else {}),
             ),
             get=lambda: self._get_namespace(namespace_name, resource_group_name),
             status_message=status_message, no_wait=no_wait, endpoint_body=expected, **kwargs,

@@ -135,16 +135,7 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     )
 
 
-def adr_iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
-    """Use preview's modeless transport with the ADR target API contract."""
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
-    return _iot_hub_management_client(
-        cli_ctx,
-        subscription_id,
-        get_adr_arm_endpoint(),
-        api_version=_ADR_IOT_HUB_API_VERSION,
-    )
+adr_iot_hub_service_factory = iot_hub_service_factory
 
 
 def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
@@ -190,18 +181,7 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     )
 
 
-def adr_iot_service_provisioning_factory(
-    cli_ctx, *_, subscription_id=None
-):
-    """Use preview's modeless transport with the ADR target API contract."""
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
-    return _iot_dps_management_client(
-        cli_ctx,
-        subscription_id,
-        get_adr_arm_endpoint(),
-        api_version=_ADR_DPS_API_VERSION,
-    )
+adr_iot_service_provisioning_factory = iot_service_provisioning_factory
 
 
 def adr_service_factory(cli_ctx, *_, subscription_id=None):

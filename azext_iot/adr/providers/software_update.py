@@ -22,7 +22,6 @@ from azext_iot._factory import (
     adr_software_update_data_service_factory,
 )
 from azext_iot.adr.common import SU_ENDPOINT_TYPE
-from azext_iot.adr.providers import base as provider_base
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.adr.providers.software_update_staging import SoftwareUpdateStager
 
@@ -37,9 +36,6 @@ class SoftwareUpdateDataProvider(ADRProvider):
         self.cmd = cmd
         self.registry_client = adr_service_factory(cmd.cli_ctx)
         self.client = None
-
-    def _await_terminal(self, poller, **kwargs):
-        return provider_base.wait_for_terminal_state(poller, **kwargs)
 
     def _resolve_endpoint(
         self, namespace_name: str, resource_group_name: str

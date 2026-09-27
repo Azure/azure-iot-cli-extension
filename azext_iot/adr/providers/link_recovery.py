@@ -106,7 +106,6 @@ def _known_http_authorization(error):
     # 401/403, or an unrelated transport failure plus a stale Failed endpoint.
     return (
         error.status_code in (None, 400)
-        and not getattr(error, "adr_resource_read_failure", False)
         and getattr(error.error, "code", None) == "AdrMiNotAuthorized"
     )
 
@@ -202,12 +201,6 @@ class LinkRecovery:
             self.progressed = True
         return ns_state, endpoint
 
-    def observe_lro(self, namespace):
-        # Resource polling is the canary workaround, not an async-status-host
-        # call. Observing progress here prevents stale Failed reads from
-        # repeatedly resubmitting an already accepted recovery PATCH.
-        self.inspect(namespace)
-
     def authorized_failure(self, endpoint):
         error = endpoint.get("linkingError")
         if endpoint.get("linkingState") != "Failed" or not isinstance(error, dict):
@@ -274,8 +267,9 @@ class LinkRecovery:
                                 self.provider._wait, poller, status_message,
                                 **{**kwargs, "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
                                    "clock": self.budget.clock, "sleeper": self.budget.pause,
-                                   "deadline_guard": self.budget.remaining, "resource_observer": self.observe_lro},
+                                   "deadline_guard": self.budget.remaining},
                             )
+                            self.progressed = True
                         finally:
                             self.pending = False
                     except ADRResourceStateError as error:
@@ -285,10 +279,14 @@ class LinkRecovery:
                         _, failed = self.inspect(error.body)
                         if not failed or not self.authorized_failure(failed):
                             raise
+                        # The terminal body of this PATCH's own LRO, not a stale read.
+                        self.progressed = True
                         original_error = error
                         self.budget.observation = str(error)
                     except HttpResponseError as error:
-                        if no_wait or not _known_http_authorization(error):
+                        # HTTP 200 is this PATCH's Failed operation status; the namespace
+                        # read below decides whether its endpoint failure is recoverable.
+                        if no_wait or not (error.status_code == 200 or _known_http_authorization(error)):
                             raise
                         # This is an authoritative rejection of the latest
                         # mutation, not a stale Failed resource GET. No accepted

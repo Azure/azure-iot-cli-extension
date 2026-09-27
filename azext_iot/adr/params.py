@@ -335,11 +335,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--outbound-system-assigned-mi",
                     "--omi-sa",
-                    context.deprecate(
-                        target="--outbound-mi-system-assigned",
-                        redirect="--outbound-system-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 arg_type=get_three_state_flag(),
                 help="Enable the system-assigned managed identity as the outbound identity used by "
@@ -351,11 +346,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--outbound-user-assigned-mi",
                     "--omi-ua",
-                    context.deprecate(
-                        target="--outbound-mi-user-assigned",
-                        redirect="--outbound-user-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 help="User-assigned managed identity resource ID to assign to the namespace and use "
                      "for outbound calls.",
@@ -411,11 +401,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--system-assigned-mi",
                     "--mi-sa",
-                    context.deprecate(
-                        target="--mi-system-assigned",
-                        redirect="--system-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked IoT Hub's system-assigned identity as the inbound caller "
@@ -427,11 +412,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--user-assigned-mi",
                     "--mi-ua",
-                    context.deprecate(
-                        target="--mi-user-assigned",
-                        redirect="--user-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 help="Resource ID of a user-assigned identity attached to the linked IoT Hub.",
             )
@@ -478,11 +458,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--system-assigned-mi",
                     "--mi-sa",
-                    context.deprecate(
-                        target="--mi-system-assigned",
-                        redirect="--system-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked DPS resource's system-assigned identity as the inbound caller "
@@ -494,11 +469,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--user-assigned-mi",
                     "--mi-ua",
-                    context.deprecate(
-                        target="--mi-user-assigned",
-                        redirect="--user-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 help="Resource ID of a user-assigned identity attached to the linked DPS resource.",
             )
@@ -531,11 +501,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--system-assigned-mi",
                     "--mi-sa",
-                    context.deprecate(
-                        target="--mi-system-assigned",
-                        redirect="--system-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked Update Instance's system-assigned "
@@ -547,11 +512,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--user-assigned-mi",
                     "--mi-ua",
-                    context.deprecate(
-                        target="--mi-user-assigned",
-                        redirect="--user-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 help="Resource ID of a user-assigned identity attached to the "
                      "linked Update Instance.",
@@ -592,11 +552,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--system-assigned-mi",
                     "--mi-sa",
-                    context.deprecate(
-                        target="--mi-system-assigned",
-                        redirect="--system-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 arg_type=get_three_state_flag(),
                 help="Include or remove the system-assigned managed identity. "
@@ -608,11 +563,6 @@ def load_adr_arguments(self, _):
                 options_list=[
                     "--user-assigned-mi",
                     "--mi-ua",
-                    context.deprecate(
-                        target="--mi-user-assigned",
-                        redirect="--user-assigned-mi",
-                        hide=True,
-                    ),
                 ],
                 nargs="+",
                 help="Complete desired set of user-assigned managed identity "
@@ -906,11 +856,8 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--hub-endpoint-name",
                 "--hen",
-                context.deprecate(target="--hub-name", redirect="--hub-endpoint-name", hide=True),
-                context.deprecate(target="--hn", redirect="--hub-endpoint-name", hide=True),
             ],
-            help="Logical name of the Hub messaging endpoint entry on the namespace. "
-            "--hub-name and --hn are deprecated aliases.",
+            help="Logical name of the Hub messaging endpoint entry on the namespace.",
         )
         context.argument(
             "hub_resource_id",
@@ -924,11 +871,6 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--hub-system-assigned-mi",
                 "--hub-mi-sa",
-                context.deprecate(
-                    target="--hub-mi-system-assigned",
-                    redirect="--hub-system-assigned-mi",
-                    hide=True,
-                ),
             ],
             arg_type=get_three_state_flag(),
             help="Use the linked IoT Hub's system-assigned identity as its inbound caller identity.",
@@ -939,11 +881,6 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--hub-user-assigned-mi",
                 "--hub-mi-ua",
-                context.deprecate(
-                    target="--hub-mi-user-assigned",
-                    redirect="--hub-user-assigned-mi",
-                    hide=True,
-                ),
             ],
             help="User-assigned identity resource ID attached to the linked IoT Hub.",
         )
@@ -967,11 +904,8 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--dps-endpoint-name",
                 "--den",
-                context.deprecate(target="--dps-name", redirect="--dps-endpoint-name", hide=True),
-                context.deprecate(target="--dn", redirect="--dps-endpoint-name", hide=True),
             ],
-            help="Logical name of the DPS provisioning endpoint entry on the namespace. "
-            "--dps-name and --dn are deprecated aliases.",
+            help="Logical name of the DPS provisioning endpoint entry on the namespace.",
         )
         context.argument(
             "dps_resource_id",
@@ -985,11 +919,6 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--dps-system-assigned-mi",
                 "--dps-mi-sa",
-                context.deprecate(
-                    target="--dps-mi-system-assigned",
-                    redirect="--dps-system-assigned-mi",
-                    hide=True,
-                ),
             ],
             arg_type=get_three_state_flag(),
             help="Use the linked DPS resource's system-assigned identity as its inbound caller identity.",
@@ -1000,11 +929,6 @@ def load_adr_arguments(self, _):
             options_list=[
                 "--dps-user-assigned-mi",
                 "--dps-mi-ua",
-                context.deprecate(
-                    target="--dps-mi-user-assigned",
-                    redirect="--dps-user-assigned-mi",
-                    hide=True,
-                ),
             ],
             help="User-assigned identity resource ID attached to the linked DPS resource.",
         )

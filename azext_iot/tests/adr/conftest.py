@@ -232,22 +232,25 @@ def pytest_runtest_logreport(report):
 
 
 @pytest.fixture(autouse=True)
-def mock_wait_for_terminal_state(request, monkeypatch):
-    """Mock wait_for_terminal_state to avoid sleeping in unit tests.
+def mock_adr_poller_wait(request, monkeypatch):
+    """Mock ADR provider poller waits to avoid sleeping in unit tests.
 
     Skipped for integration tests (_int.py) which need real polling delays.
     """
-    if request.node.path.name.endswith("_int.py"):
+    if request.node.path.name.endswith("_int.py") or request.node.path.name in {
+        "test_adr_base_unit.py",
+        "test_adr_recovery_runtime_edges_unit.py",
+    }:
         return
 
     def fast_wait(poller, **kwargs):
         """Return poller result immediately without sleeping."""
         return poller.result()
 
-    # Patch the canonical wait helper. Every provider now defers to ADRProvider._wait /
-    # _await_terminal (defined in base), so patching the base reference covers them all — the
-    # individual providers no longer import wait_for_terminal_state directly.
-    monkeypatch.setattr("azext_iot.adr.providers.base.wait_for_terminal_state", fast_wait)
+    monkeypatch.setattr(
+        "azext_iot.adr.providers.base.ADRProvider._bounded_poller_result",
+        staticmethod(fast_wait),
+    )
 
 
 @pytest.fixture()

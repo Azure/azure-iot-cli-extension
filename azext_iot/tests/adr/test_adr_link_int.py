@@ -40,6 +40,7 @@ fresh service roles, explicit 1200-second mutation budgets, and no fixture repai
 import os
 import re
 import shlex
+from time import monotonic
 from typing import Optional
 
 import pytest
@@ -97,6 +98,8 @@ _SU_LINK_LIFECYCLE_TIMEOUT = (
     + SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL
     + 2 * _NATIVE_LINK_TIMEOUT
 )
+_REPORT_AUTH_POLL_ATTEMPTS = 21
+_REPORT_AUTH_POLL_INTERVAL_SECONDS = 15
 
 
 def _assert_service_roles(test_case, roles, *, present):
@@ -123,9 +126,55 @@ def _assert_native_link_result(namespace, section, name, resource_id, inbound_id
         assert actual["userAssignedIdentity"].casefold() == inbound_identity["userAssignedIdentity"].casefold(), endpoint
 
 
+def _assert_dps_blocks_namespace_sami_removal(test_case, namespace_name, resource_group_name):
+    test_case.cmd(
+        f"iot adr ns identity remove -n {namespace_name} -g {resource_group_name} "
+        "--system-assigned",
+        expect_failure=True,
+    )
+    identity = test_case.cmd(
+        f"iot adr ns identity show -n {namespace_name} -g {resource_group_name}"
+    ).get_output_in_json()
+    assert "SystemAssigned" in str(identity.get("type") or ""), identity
+
+
+def _is_adu_report_authorization_403(error) -> bool:
+    message = str(error).casefold()
+    return (getattr(error, "status_code", None) == 403 or "403" in message) and any(
+        token in message for token in ("authoriz", "forbidden")
+    )
+
+
 def _assert_namespace_update_report(test_case, namespace_name):
     selector = f"--ns {namespace_name} -g {TEST_RG} --report-type NamespaceUpdateComplianceReport"
-    generated = test_case.cmd(f"iot adr ns report generate {selector}").get_output_in_json()
+    attempts = 0
+
+    def generate():
+        nonlocal attempts
+        attempts += 1
+        return test_case.cmd(
+            f"iot adr ns report generate {selector}"
+        ).get_output_in_json()
+
+    start = monotonic()
+    generated = wait_for_condition(
+        generate,
+        lambda _: True,
+        description="ADU authorization for namespace update report generation",
+        timeout=None,
+        interval=_REPORT_AUTH_POLL_INTERVAL_SECONDS,
+        max_attempts=_REPORT_AUTH_POLL_ATTEMPTS,
+        is_retryable_error=_is_adu_report_authorization_403,
+        describe=lambda report: (
+            f"reportType={(report or {}).get('reportType')!r}"
+        ),
+    )
+    _log(
+        LogKind.OK if attempts == 1 else LogKind.WARN,
+        "Namespace update report generated after %.0fs (%d attempt(s))",
+        monotonic() - start,
+        attempts,
+    )
     assert generated["reportType"] == "NamespaceUpdateComplianceReport", generated
     assert generated["generatedAt"], generated
     latest = test_case.cmd(f"iot adr ns report latest {selector}").get_output_in_json()
@@ -290,6 +339,10 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _assert_service_roles(self, [self_role], present=True)
                 _log(LogKind.OK, "DPS link '%s' created", dps_endpoint)
+
+            with timed_step("Step 1b ❯ DPS link blocks namespace SAMI removal"):
+                _assert_dps_blocks_namespace_sami_removal(self, namespace_name, rg)
+                _log(LogKind.OK, "DPS link preserved namespace system-assigned identity")
 
             with timed_step("Step 2 ❯ link dps show / list"):
                 shown = self.cmd(
@@ -972,6 +1025,12 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     ).get_output_in_json()
                 namespace_principal_id = (ns.get("identity") or {}).get("principalId")
                 assert namespace_principal_id, "Namespace SAMI principalId is required."
+
+            with timed_step("Setup 3b > Verify caller can create SU link role assignments"):
+                for scope in (ns["id"], su_id):
+                    assert rbac_manager._caller_can_assign(  # pylint: disable=protected-access
+                        caller_id, scope
+                    ), f"CI principal must be able to create role assignments at {scope}"
 
             with timed_step("Step 1 > link su add (UAMI)"):
                 roles = (

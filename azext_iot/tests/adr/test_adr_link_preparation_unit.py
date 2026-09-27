@@ -34,6 +34,7 @@ def preparation(monkeypatch):
     monkeypatch.setattr("requests.sessions.Session.request", network)
     manager = LinkRbacManager(test.cli_ctx, cli=Mock())
     manager._current_assignee_object_id = Mock(return_value="caller")
+    manager._caller_can_assign = Mock(return_value=True)  # pylint: disable=protected-access
     manager.ensure = Mock()
     monkeypatch.setattr(subject, "LinkRbacManager", Mock(return_value=manager))
     monkeypatch.setattr(subject, "TEST_SUBSCRIPTION", "configured-sub")
@@ -440,7 +441,7 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
         "id": namespace_id, "identity": {"type": "SystemAssigned", "principalId": "namespace-sami"},
         "properties": {"provisioningState": "Succeeded"},
     }
-    native_commands, role_observations = [], []
+    native_commands, native_stages, role_observations = [], [], []
     endpoint = {}
 
     def output(value):
@@ -506,12 +507,13 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
                     raise HttpResponseError("discovery failed")
                 return output([])
             if command.startswith("iot adr ns report "):
-                phase = "add" if len(native_commands) == 1 else "update"
+                phase = native_stages[-1]
                 if failure == "report-" + phase:
                     raise HttpResponseError("ADU returned 403 for report generation")
                 return output({"reportType": "NamespaceUpdateComplianceReport", "generatedAt": "2026-09-25T00:00:00Z"})
             raise AssertionError(f"Unexpected command: {command}")
         native_commands.append(command)
+        native_stages.append(action)
         assert subject._NATIVE_LINK_OPTIONS in command and "--no-wait" not in command
         if failure == action:
             raise HttpResponseError(f"{action} failed")
@@ -590,6 +592,8 @@ def test_fresh_link_scenarios_do_not_import_fixture_service_role_recovery(scenar
     import inspect
 
     source = inspect.getsource(scenario)
+    if "_NATIVE_LINK_OPTIONS" not in source and scenario.__qualname__.startswith("TestADRLinkSU."):
+        source = inspect.getsource(subject.TestADRLinkSU)
     assert ".ensure(" not in source and ".ensure_many(" not in source
     assert "_ROLE_SETTLE_SECONDS" not in source
     assert "link_dps_with_readiness(" not in source and "link_hub_with_readiness(" not in source

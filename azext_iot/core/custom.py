@@ -292,13 +292,7 @@ def iot_dps_update(
             remove_user_identities=remove_user_identities,
         )
 
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            provisioning_service_name=dps_name,
-            iot_dps_description=_dps_description_for_write(parameters),
-        )
-    )
+    return _put_dps(client, resource_group_name, dps_name, parameters)
 
 
 def iot_dps_delete(client, dps_name, resource_group_name=None):
@@ -348,19 +342,9 @@ def iot_dps_policy_create(
     dps["properties"]["authorizationPolicies"] = dps_access_policies
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_policy_get(client, dps_name, access_policy_name, resource_group_name)
 
@@ -400,19 +384,9 @@ def iot_dps_policy_update(
     dps["properties"]["authorizationPolicies"] = dps_access_policies
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_policy_get(client, dps_name, access_policy_name, resource_group_name)
 
@@ -430,19 +404,9 @@ def iot_dps_policy_delete(cmd, client, dps_name, access_policy_name, resource_gr
     dps["properties"]["authorizationPolicies"] = updated_policies
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_policy_list(client, dps_name, resource_group_name)
 
@@ -602,19 +566,9 @@ def iot_dps_linked_hub_create(
     _warn_mixed_endpoint_types(dps["properties"]["iotHubs"])
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_linked_hub_list(client, dps_name, resource_group_name)
 
@@ -758,19 +712,9 @@ def iot_dps_linked_hub_update(
     _warn_mixed_endpoint_types(linked_hubs)
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_linked_hub_get(cmd, client, dps_name, target_entry["name"], resource_group_name)
 
@@ -791,19 +735,9 @@ def iot_dps_linked_hub_delete(cmd, client, dps_name, linked_hub, resource_group_
     dps["properties"]["iotHubs"] = updated_hubs
 
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        return _put_dps(client, resource_group_name, dps_name, dps)
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_dps_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, provisioning_service_name=dps_name,
-                iot_dps_description=_dps_description_for_write(dps)
-            )
-        )
+        _put_dps(client, resource_group_name, dps_name, dps)
     )
     return iot_dps_linked_hub_list(client, dps_name, resource_group_name)
 
@@ -2508,6 +2442,18 @@ def _dps_description_for_write(dps: dict) -> dict:
         properties.pop(key, None)
     body["properties"] = properties
     return body
+
+
+def _put_dps(client, resource_group_name, dps_name, dps):
+    return adapt_modeless_lro_poller(
+        client.iot_dps_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            provisioning_service_name=dps_name,
+            iot_dps_description=_dps_description_for_write(dps),
+        )
+    )
+
+
 # DPS Identity management functions
 def dps_identity_assign(client, dps_name: str, resource_group_name:Optional[str]=None,
                         system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None):
@@ -2523,13 +2469,7 @@ def dps_identity_assign(client, dps_name: str, resource_group_name:Optional[str]
         user_assigned,
     )
 
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            provisioning_service_name=dps_name,
-            iot_dps_description=_dps_description_for_write(dps),
-        )
-    )
+    return _put_dps(client, resource_group_name, dps_name, dps)
 
 
 def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]=None,
@@ -2588,13 +2528,7 @@ def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]
             enable_system, existing_user_identities if existing_user_identities else None
         )
 
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            provisioning_service_name=dps_name,
-            iot_dps_description=_dps_description_for_write(dps),
-        )
-    )
+    return _put_dps(client, resource_group_name, dps_name, dps)
 
 
 def dps_identity_show(client, dps_name: str, resource_group_name: Optional[str] = None) -> dict:
