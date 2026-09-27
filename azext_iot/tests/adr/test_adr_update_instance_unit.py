@@ -44,6 +44,13 @@ UAMI_ID = (
 )
 
 
+@pytest.fixture(autouse=True)
+def no_lro_sleep():
+    """wait_for_terminal_state sleeps 30 s before its first poll."""
+    with patch("time.sleep"):
+        yield
+
+
 @pytest.fixture()
 def update_instance_provider():
     with patch(
