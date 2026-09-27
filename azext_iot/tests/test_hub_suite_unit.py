@@ -30,12 +30,12 @@ def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path)
     control = manifest.nodes("HubControl", "regular")
     entra = manifest.nodes("HubData", "entra")
     sas = manifest.nodes("HubData", "sas")
-    assert (len(control), len(entra), len(sas)) == (28, 44 if preview else 42, 8 if preview else 6)
+    assert (len(control), len(entra), len(sas)) == (28, 43 if preview else 41, 8 if preview else 6)
     assert len(set(entra) & set(sas)) == (2 if preview else 0)
     assert not set(control) & (set(entra) | set(sas))
     exceptions = {case.node for case in cases if case.exclusion}
     assert set(control) | set(entra) | set(sas) | exceptions == set(manifest.inventory())
-    assert len(exceptions) == (3 if preview else 2)
+    assert len(exceptions) == (4 if preview else 3)
     assert all(case.group and case.protocol and case.auth and case.dependencies for case in cases)
     assert manifest.phases("HubData") == ("entra", "sas")
     assert manifest.phases("HubControl") == ("regular",)
@@ -98,7 +98,7 @@ def _checkout(tmp_path, capability="base"):
 def test_child_capability_is_not_optional_file_existence(tmp_path):
     root = _checkout(tmp_path, "preview")
     assert len(manifest.contract(root)) == 81
-    assert len(manifest.nodes("HubData", "entra", root)) == 44
+    assert len(manifest.nodes("HubData", "entra", root)) == 43
     assert len(manifest.nodes("HubData", "sas", root)) == 8
     with pytest.raises(ValueError, match="not enabled"):
         manifest.nodes("HubData", "linked-metadata", root)
