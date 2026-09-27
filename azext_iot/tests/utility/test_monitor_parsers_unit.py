@@ -86,10 +86,12 @@ class TestFeedbackMonitor:
         return factory.return_value
 
     @staticmethod
-    def _delivery(records, framed=True, sections=True):
+    def _delivery(records, framed=True, sections=True, raw_frame=True, delivery_id=1):
         data = json.dumps(records).encode("utf-8")
         message = Message(data=[data] if sections else data)
-        frame = TransferFrame(delivery_id=1, delivery_tag=b"feedback")
+        frame = TransferFrame(delivery_id=delivery_id, delivery_tag=str(delivery_id).encode("utf-8"))
+        if raw_frame:
+            frame = list(frame)
         return (frame, message) if framed else message
 
     @pytest.mark.parametrize("wait_on_id", [None, "requested-message"])
@@ -117,13 +119,43 @@ class TestFeedbackMonitor:
         assert "originalMessageId: unrelated" in capsys.readouterr().out
         receiver.open.assert_called_once_with()
         receiver.receive_messages_iter.assert_called_once_with()
-        receiver.settle_messages.assert_not_called()
+        receiver.settle_messages.assert_called_once_with(1, b"1", "accepted")
+        receiver.close.assert_called_once_with()
+
+    @pytest.mark.parametrize("device_id", [None, "target-device"])
+    def test_acknowledges_unrelated_deliveries_before_receiving_target(self, receiver, device_id, capsys):
+        def deliveries():
+            for delivery_id in range(1, 12):
+                yield self._delivery([{
+                    "deviceId": "other-device", "originalMessageId": f"unrelated-{delivery_id}",
+                }], delivery_id=delivery_id)
+                receiver.settle_messages.assert_called_with(
+                    delivery_id, str(delivery_id).encode("utf-8"), "accepted",
+                )
+            yield self._delivery([{
+                "deviceId": "target-device", "originalMessageId": "requested-message",
+            }], delivery_id=12)
+            raise AssertionError("Monitoring must stop after matching the requested ID.")
+
+        receiver.receive_messages_iter.return_value = deliveries()
+        assert event.monitor_feedback(
+            {"entity": "hub.unit.invalid"}, device_id, "requested-message",
+        ) == "requested-message"
+        assert receiver.settle_messages.call_args_list == [
+            mock.call(delivery_id, str(delivery_id).encode("utf-8"), "accepted")
+            for delivery_id in range(1, 13)
+        ]
+        output = capsys.readouterr().out
+        assert "originalMessageId: requested-message" in output
+        if device_id:
+            assert "originalMessageId: unrelated-" not in output
         receiver.close.assert_called_once_with()
 
     @pytest.mark.parametrize("device_id", [None, "TARGET-DEVICE"])
     @pytest.mark.parametrize("framed", [False, True])
     @pytest.mark.parametrize("sections", [False, True])
-    def test_matching_message_later_in_mixed_device_batch(self, receiver, device_id, framed, sections, capsys):
+    @pytest.mark.parametrize("raw_frame", [False, True])
+    def test_matching_message_later_in_mixed_device_batch(self, receiver, device_id, framed, sections, raw_frame, capsys):
         records = [
             {"deviceId": "other-device", "originalMessageId": "other-message"},
             {"deviceId": "target-device", "originalMessageId": "earlier-message"},
@@ -131,7 +163,7 @@ class TestFeedbackMonitor:
         ]
 
         def deliveries():
-            yield self._delivery(records, framed=framed, sections=sections)
+            yield self._delivery(records, framed=framed, sections=sections, raw_frame=raw_frame)
             raise AssertionError("Monitoring must stop immediately after matching the requested ID.")
 
         receiver.receive_messages_iter.return_value = deliveries()
@@ -144,7 +176,7 @@ class TestFeedbackMonitor:
         if device_id:
             assert "originalMessageId: other-message" not in output
         if framed:
-            receiver.settle_messages.assert_called_once_with(1, b"feedback", "accepted")
+            receiver.settle_messages.assert_called_once_with(1, b"1", "accepted")
         else:
             receiver.settle_messages.assert_not_called()
         receiver.close.assert_called_once_with()
@@ -164,6 +196,7 @@ class TestFeedbackMonitor:
         output = capsys.readouterr().out
         assert "originalMessageId: first" in output
         assert "originalMessageId: second" in output
+        receiver.settle_messages.assert_called_once_with(1, b"1", "accepted")
         receiver.close.assert_called_once_with()
 
     @pytest.mark.parametrize("error_type", [event.AMQPLinkError, event.AMQPConnectionError])

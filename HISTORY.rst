@@ -27,6 +27,7 @@ Release History
 * Transient registration failures are retried; a retried registration may issue an additional certificate.
 * Enrollment-group create/update/show hide symmetric keys unless ``--show-keys`` is passed.
 * Hub feedback monitoring reports AMQP transport failures, and device filtering keeps every matching record in a mixed feedback batch.
+* Hub feedback monitoring acknowledges consumed AMQP deliveries, including unrelated feedback, to prevent stalls while waiting for a specific message.
 
 **Azure Device Registry (ADR)**
 

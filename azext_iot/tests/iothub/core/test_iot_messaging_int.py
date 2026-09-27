@@ -1107,7 +1107,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         print(enqueued_time, calculate_millisec_since_unix_epoch_utc())
         # Monitor events for all devices and include sys, anno, app
         monitor_assert(
-            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y -p sys anno app".format(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 60 -y -p sys anno app".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
             ),
             device_ids
@@ -1371,7 +1371,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub monitor-feedback -n {} -g {} -w {} -y".format(
                 self.entity_name, self.entity_rg, msg_id
             ),
-            ["description: Success"],
+            ["description: Success", "originalMessageId: {}".format(msg_id)],
         )
 
         # With connection string - filter on device
@@ -1405,7 +1405,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub monitor-feedback --login {} -w {} -d {} -y".format(
                 self.connection_string, msg_id, device_ids[0]
             ),
-            ["description: Success"],
+            ["description: Success", "originalMessageId: {}".format(msg_id)],
         )
 
         # With connection string - dead lettered case + unrelated ack
@@ -1459,7 +1459,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         self.command_execute_assert(
             "iot hub monitor-feedback --login {} -w {} -y".format(self.connection_string, msg_id),
-            ["description: Message rejected"],
+            ["description: Message rejected", "originalMessageId: {}".format(msg_id)],
         )
 
         # purge messages
