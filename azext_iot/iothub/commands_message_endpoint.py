@@ -23,6 +23,7 @@ def message_endpoint_create_event_hub(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -38,7 +39,8 @@ def message_endpoint_create_event_hub(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -54,6 +56,7 @@ def message_endpoint_create_service_bus_queue(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -69,7 +72,8 @@ def message_endpoint_create_service_bus_queue(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -85,6 +89,7 @@ def message_endpoint_create_service_bus_topic(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -100,7 +105,8 @@ def message_endpoint_create_service_bus_topic(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -120,6 +126,7 @@ def message_endpoint_create_cosmos_db_container(
     partition_key_name: Optional[str] = None,
     partition_key_template: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -139,7 +146,8 @@ def message_endpoint_create_cosmos_db_container(
         secondary_key=secondary_key,
         partition_key_name=partition_key_name,
         partition_key_template=partition_key_template,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -158,6 +166,7 @@ def message_endpoint_create_storage_container(
     file_name_format: str = '{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}',
     endpoint_uri: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -176,7 +185,8 @@ def message_endpoint_create_storage_container(
         chunk_size_window=chunk_size_window,
         file_name_format=file_name_format,
         endpoint_uri=endpoint_uri,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -190,6 +200,7 @@ def message_endpoint_update_event_hub(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -203,7 +214,8 @@ def message_endpoint_update_event_hub(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -217,6 +229,7 @@ def message_endpoint_update_service_bus_queue(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -230,7 +243,8 @@ def message_endpoint_update_service_bus_queue(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -244,6 +258,7 @@ def message_endpoint_update_service_bus_topic(
     endpoint_uri: Optional[str] = None,
     entity_path: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -257,7 +272,8 @@ def message_endpoint_update_service_bus_topic(
         connection_string=connection_string,
         endpoint_uri=endpoint_uri,
         entity_path=entity_path,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -275,6 +291,7 @@ def message_endpoint_update_cosmos_db_container(
     partition_key_name: Optional[str] = None,
     partition_key_template: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -292,7 +309,8 @@ def message_endpoint_update_cosmos_db_container(
         secondary_key=secondary_key,
         partition_key_name=partition_key_name,
         partition_key_template=partition_key_template,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -308,6 +326,7 @@ def message_endpoint_update_storage_container(
     file_name_format: Optional[str] = None,
     endpoint_uri: Optional[str] = None,
     identity: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -323,7 +342,8 @@ def message_endpoint_update_storage_container(
         chunk_size_window=chunk_size_window,
         file_name_format=file_name_format,
         endpoint_uri=endpoint_uri,
-        identity=identity
+        identity=identity,
+        message_format=message_format,
     )
 
 
@@ -349,6 +369,7 @@ def message_endpoint_create_fabric_eventstream(
     workspace_id: str,
     eventstream_id: str,
     source_id: str,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -363,6 +384,7 @@ def message_endpoint_create_fabric_eventstream(
         workspace_id=workspace_id,
         eventstream_id=eventstream_id,
         source_id=source_id,
+        message_format=message_format,
     )
 
 
@@ -376,6 +398,7 @@ def message_endpoint_update_fabric_eventstream(
     workspace_id: Optional[str] = None,
     eventstream_id: Optional[str] = None,
     source_id: Optional[str] = None,
+    message_format: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
@@ -390,6 +413,7 @@ def message_endpoint_update_fabric_eventstream(
         workspace_id=workspace_id,
         eventstream_id=eventstream_id,
         source_id=source_id,
+        message_format=message_format,
     )
 
 

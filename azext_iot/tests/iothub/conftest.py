@@ -650,6 +650,30 @@ def _storage_removal(account_name: str):
 
 # Event Hub fixtures
 @pytest.fixture(scope="module")
+def provisioned_identity_only_event_hub_with_hub_module(
+    provisioned_only_iot_hubs_module, provisioned_identity_only_event_hub_module
+):
+    role = "Azure Event Hubs Data Sender"
+    scope = provisioned_identity_only_event_hub_module["eventhub"]["id"]
+    hub_principal_id = provisioned_only_iot_hubs_module[0]["hub"]["identity"]["principalId"]
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    yield provisioned_only_iot_hubs_module, provisioned_identity_only_event_hub_module
+
+
+@pytest.fixture(scope="module")
+def provisioned_identity_only_event_hub_module() -> Optional[list]:
+    result = _identity_only_event_hub_provisioner()
+    yield result
+    if result:
+        _event_hub_removal(result["namespace"]["name"])
+
+
+@pytest.fixture(scope="module")
 def provisioned_event_hub_with_identity_module(
     provisioned_user_identity_module, provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 ):
@@ -720,6 +744,26 @@ def _event_hub_provisioner():
         "eventhub": eventhub_obj,
         "policy": policy_obj,
         "connectionString": _event_hub_get_cstring(namespace_name, eventhub_name, policy_name)
+    }
+
+
+def _identity_only_event_hub_provisioner():
+    namespace_name = generate_hub_depenency_id()
+    eventhub_name = generate_hub_depenency_id()
+    namespace_obj = _invoke_fixture(
+        "eventhubs namespace create --name {} --resource-group {} --location {} "
+        "--disable-local-auth true".format(
+            namespace_name, RG, HUB_TEST_LOCATION
+        )
+    ).as_json()
+    eventhub_obj = _invoke_fixture(
+        "eventhubs eventhub create --namespace-name {} --resource-group {} --name {}".format(
+            namespace_name, RG, eventhub_name
+        )
+    ).as_json()
+    return {
+        "namespace": namespace_obj,
+        "eventhub": eventhub_obj,
     }
 
 
