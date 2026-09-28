@@ -66,6 +66,8 @@ class TopicGroup(IoTHubProvider):
     ):
         topic_groups = self._get_topic_groups()
         if delete_all:
+            if not topic_groups:
+                return []
             if not yes and not prompt_y_n(
                 msg=f"Confirm you want to delete all topic groups from IoT Hub '{self.hub_name}'",
                 default="n",

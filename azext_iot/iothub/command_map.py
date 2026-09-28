@@ -43,6 +43,8 @@ class RouteUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-f
 
 class TopicGroupUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
     def __call__(self, poller):
+        if isinstance(poller, list):
+            return poller
         result = super(TopicGroupUpdateResultTransform, self).__call__(poller)
         mqtt_v5_settings = result["properties"].get("mqttV5Settings")
         if mqtt_v5_settings is None:

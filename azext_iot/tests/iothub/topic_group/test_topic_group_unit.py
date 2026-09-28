@@ -332,7 +332,7 @@ class TestTopicGroupDelete:
         hub_mock, client = fixture_topic_group_ops
         del hub_mock["properties"]["mqttV5Settings"]
 
-        subject.topic_group_delete(
+        result = subject.topic_group_delete(
             cmd=None,
             hub_name=hub_name,
             delete_all=True,
@@ -340,8 +340,9 @@ class TestTopicGroupDelete:
             resource_group_name=hub_rg,
         )
 
+        assert result == []
         assert "mqttV5Settings" not in hub_mock["properties"]
-        _assert_hub_write(client, hub_mock)
+        client.begin_create_or_update.assert_not_called()
 
     def test_delete_all_rejected_confirmation_stops_write(
         self, fixture_topic_group_ops, mocker
