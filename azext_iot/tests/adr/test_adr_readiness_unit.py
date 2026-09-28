@@ -463,6 +463,44 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     assert clock.now == 50
 
 
+def _hub_data_read_message(host):
+    return (
+        f"The namespace's managed identity could not read the device count on hub '{host}' because it lacks "
+        "IoT Hub data-plane read access. Assign it a role that grants IoT Hub data-plane read "
+        "(for example IoT Hub Data Reader) on the hub, then resubmit the request."
+    )
+
+
+def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered():
+    expected = _expected("hub")
+    host = expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
+    failed = _namespace(expected=expected, message=_hub_data_read_message(host))
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(None), _output(failed), _output(failed), _output(None),
+        _output(_namespace("Succeeded", "Succeeded", expected)),
+    ]
+
+    endpoint = _link(scenario, Clock(), expected)
+
+    assert endpoint["linkingState"] == "Succeeded"
+    assert sum(" update " in command for command in _commands(scenario)) == 1
+
+
+@pytest.mark.parametrize("kind,host", [("hub", "otherhub.service.azure-devices.net"), ("dps", None)])
+def test_hub_data_plane_read_failure_is_bound_to_the_linked_hub(kind, host):
+    expected = _expected(kind)
+    host = host or expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
+    message = _hub_data_read_message(host)
+    scenario = Mock()
+    scenario.cmd.side_effect = [_output(None), _output(_namespace(expected=expected, message=message, kind=kind))]
+
+    with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure"):
+        _link(scenario, Clock(), expected, kind=kind)
+
+    assert scenario.cmd.call_count == 2
+
+
 @pytest.mark.parametrize("user_assigned", [False, True])
 def test_arm_id_casing_is_not_a_changed_link_target_or_identity(user_assigned, link_kind):
     persisted = _expected(link_kind)

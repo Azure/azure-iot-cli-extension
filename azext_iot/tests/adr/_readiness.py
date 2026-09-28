@@ -250,13 +250,23 @@ def _read_authorization_failure(endpoint):
     error = status.get("error") or endpoint.get("error") or endpoint.get("linkingError") or {}
     target = endpoint.get("resourceId")
     # Match the observed direction and exact target, not generic 403/Failed.
-    message = (
+    messages = {
         f"The namespace's managed identity is not authorized to read the linked resource '{target}'. "
         "Grant it read access on the resource, then resubmit the request."
-    )
+    }
+    hub = re.fullmatch(r"/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.Devices/IotHubs/([^/]+)",
+                       target or "", re.IGNORECASE)
+    if hub:
+        # Hub data-plane RBAC can lag its ARM assignment.
+        messages.add(
+            f"The namespace's managed identity could not read the device count on hub "
+            f"'{hub[1].lower()}.service.azure-devices.net' because it lacks IoT Hub data-plane read access. "
+            "Assign it a role that grants IoT Hub data-plane read (for example IoT Hub Data Reader) on the hub, "
+            "then resubmit the request."
+        )
     # LinkInitiateFailed must always use the production principal/action/scope
     # binding, never this older message-only read-authorization compatibility path.
-    return error.get("code") != "LinkInitiateFailed" and error.get("message") == message
+    return error.get("code") != "LinkInitiateFailed" and error.get("message") in messages
 
 
 def _authorization_failure(namespace, endpoint, binding):
