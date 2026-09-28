@@ -141,12 +141,15 @@ class ADRProvider(object):
         preserving the CLI's bounded wait budget. The SDK treats an inline 200 as
         complete, so a terminal failed ``provisioningState`` is raised here.
         """
+        failure_target = kwargs.pop("failure_target", None)
         result = self._bounded_poller_result(poller, **kwargs)
         properties = result.get("properties") if isinstance(result, dict) else None
         state = properties.get("provisioningState") if isinstance(properties, dict) else None
         if state in _PROVISIONING_FAILURES:
             response = self._poller_initial_http_response(poller)
-            raise ADRResourceStateError(self._format_failure(state, result, response, "operation response"), result)
+            raise ADRResourceStateError(
+                self._format_failure(state, result, response, "operation response", target=failure_target), result,
+            )
         return result
 
     @staticmethod
@@ -199,23 +202,25 @@ class ADRProvider(object):
         return getattr(initial, "http_response", None)
 
     @staticmethod
-    def _extract_failure_detail(body):
+    def _extract_failure_detail(body, target=None):
         """Best-effort human-readable reason from a Failed resource body.
 
         Scans the endpoint collections (provisioning / messaging / updating) for an
         entry that carries its own status/error (this is where a failed link records
-        *why* it failed), then falls back to a resource-level error object. Returns
-        "" when nothing useful is present.
+        *why* it failed), then falls back to a resource-level error object. A
+        ``(section, name)`` target limits the scan to the endpoint being mutated, so
+        another endpoint's older failure is never reported for it. Returns "" when
+        nothing useful is present.
         """
         if not isinstance(body, dict):
             return ""
         props = body.get("properties") or {}
-        for group in ("provisioning", "messaging", "updating"):
+        for group in (target[0],) if target else ("provisioning", "messaging", "updating"):
             endpoints = ((props.get(group) or {}).get("endpoints")) or {}
             if not isinstance(endpoints, dict):
                 continue
             for name, endpoint in endpoints.items():
-                if not isinstance(endpoint, dict):
+                if not isinstance(endpoint, dict) or (target and name != target[1]):
                     continue
                 status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
                 if not isinstance(status, dict):
@@ -249,10 +254,10 @@ class ADRProvider(object):
             if isinstance(value := error.get(key), str) and value.strip()
         )
 
-    def _format_failure(self, state, body, response, source="resource-status response"):
+    def _format_failure(self, state, body, response, source="resource-status response", target=None):
         """Preserve observed errors and label correlation by the response source."""
         message = f"The operation did not succeed (provisioningState='{state}')."
-        detail = self._extract_failure_detail(body)
+        detail = self._extract_failure_detail(body, target)
         if detail:
             message += f" {detail}" if detail.endswith((".", "!", "?")) else f" {detail}."
         else:

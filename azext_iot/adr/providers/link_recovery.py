@@ -125,6 +125,7 @@ class LinkRecovery:
         self.pending = False
         self.budget, self.verify = budget, verify
         self.progressed = True
+        self.target = (section, name)
 
     def inspect(self, namespace):
         if not isinstance(namespace, dict) or not isinstance(namespace.get("properties"), dict):
@@ -265,7 +266,8 @@ class LinkRecovery:
                         try:
                             self.budget.call(
                                 self.provider._wait, poller, status_message,
-                                **{**kwargs, "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
+                                **{**kwargs, "failure_target": self.target,
+                                   "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
                                    "clock": self.budget.clock, "sleeper": self.budget.pause,
                                    "deadline_guard": self.budget.remaining},
                             )
@@ -306,7 +308,7 @@ class LinkRecovery:
                 state = endpoint.get("linkingState") if endpoint else None
                 self.budget.observation = (
                     f"endpoint '{self.name}': namespace={ns_state}, linkingState={state}; "
-                    f"{self.provider._extract_failure_detail(namespace)}"
+                    f"{self.provider._extract_failure_detail(namespace, self.target)}"
                 )
                 if ns_state == "Succeeded" and state == "Succeeded":
                     if original_error:
@@ -320,7 +322,7 @@ class LinkRecovery:
                         if original_error:
                             raise original_error
                         raise ADRResourceStateError(
-                            self.provider._format_failure(ns_state, namespace, None), namespace,
+                            self.provider._format_failure(ns_state, namespace, None, target=self.target), namespace,
                         )
                     if self.progressed:
                         for error in (namespace.get("error"), namespace["properties"].get("error"), endpoint.get("error")):
@@ -351,7 +353,7 @@ class LinkRecovery:
                         )
                         failed_snapshot = deepcopy(namespace)
                         original_error = original_error or ADRResourceStateError(
-                            self.provider._format_failure(ns_state, namespace, None), namespace,
+                            self.provider._format_failure(ns_state, namespace, None, target=self.target), namespace,
                         )
                         try:
                             self.budget.call(self.verify, namespace, self.budget)

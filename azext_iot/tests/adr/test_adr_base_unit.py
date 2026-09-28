@@ -164,6 +164,52 @@ def test_extract_failure_detail(body, expected):
     assert ADRProvider._extract_failure_detail(body) == expected
 
 
+_TWO_FAILED_ENDPOINTS = {
+    "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns",
+    "properties": {
+        "provisioningState": "Failed",
+        "messaging": {"endpoints": {"primary-hub": {
+            "linkingState": "Failed",
+            "linkingError": {"code": "LinkInitiateFailed", "message": "stale hub failure"},
+        }}},
+        "updating": {"endpoints": {
+            "other-su": {"linkingState": "Failed", "linkingError": {"message": "other su failure"}},
+            "primary-su": {"linkingState": "Failed", "linkingError": {"code": "LinkOrphaned", "message": "orphaned"}},
+        }},
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "target,expected",
+    [
+        (None, "endpoint 'primary-hub': LinkInitiateFailed: stale hub failure"),
+        (("updating", "primary-su"), "endpoint 'primary-su': LinkOrphaned: orphaned"),
+        (("updating", "missing"), ""),
+        (("provisioning", "primary-su"), ""),
+    ],
+)
+def test_extract_failure_detail_reports_only_the_target_endpoint(target, expected):
+    assert ADRProvider._extract_failure_detail(_TWO_FAILED_ENDPOINTS, target) == expected
+
+
+def test_extract_failure_detail_target_falls_back_to_resource_error_not_other_endpoints():
+    body = {**_TWO_FAILED_ENDPOINTS, "error": {"code": "NamespaceFailed", "message": "root"}}
+
+    assert ADRProvider._extract_failure_detail(body, ("updating", "missing")) == "NamespaceFailed: root"
+
+
+def test_await_terminal_formats_failure_for_the_target_endpoint(fixture_adr_provider):
+    poller = SimpleNamespace(done=Mock(return_value=True), result=Mock(return_value=_TWO_FAILED_ENDPOINTS))
+
+    with pytest.raises(AzureResponseError) as raised:
+        fixture_adr_provider._await_terminal(poller, failure_target=("updating", "primary-su"))
+
+    assert "endpoint 'primary-su': LinkOrphaned: orphaned." in str(raised.value)
+    assert "primary-hub" not in str(raised.value)
+    assert raised.value.body is _TWO_FAILED_ENDPOINTS
+
+
 def test_format_failure_includes_authorization_guidance_and_correlation_id(fixture_adr_provider):
     body = {
         "properties": {

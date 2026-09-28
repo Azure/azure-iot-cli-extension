@@ -318,3 +318,34 @@ def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_w
     assert not clock.delays
     assert "Completed these role-assignment creation requests" not in caplog.text
     token.assert_not_called()
+
+
+@pytest.mark.parametrize("stage", ["operation", "namespace-read"])
+def test_link_failure_reports_the_target_endpoint_not_an_older_failed_one(mocker, stage):
+    harness = Harness(mocker, kind="su")
+    harness.namespace["properties"]["messaging"] = {"endpoints": {"primary-hub": {
+        "endpointType": KINDS["hub"][1], "resourceId": KINDS["hub"][2], "linkingState": "Failed",
+        "linkingError": {"code": "LinkInitiateFailed", "message": "stale hub failure"},
+    }}}
+    submit = harness.submit
+
+    def fail_target(**kwargs):
+        submit(**kwargs)
+        harness.namespace["properties"]["provisioningState"] = "Failed"
+        harness.namespace["properties"]["updating"]["endpoints"]["su"].update(
+            linkingState="Failed", linkingError={"code": "LinkOrphaned", "message": "orphaned"},
+        )
+        body = deepcopy(harness.namespace)
+        if stage == "namespace-read":
+            body["properties"]["provisioningState"] = "Succeeded"
+        return SimpleNamespace(done=lambda: True, result=lambda: body)
+
+    harness.client.namespaces.begin_update.side_effect = fail_target
+    del harness.provider._await_terminal  # exercise the real operation-failure formatter
+
+    with pytest.raises(base.ADRResourceStateError) as raised:
+        harness.run()
+
+    assert "endpoint 'su': LinkOrphaned: orphaned." in str(raised.value)
+    assert "stale hub failure" not in str(raised.value)
+    assert len(harness.patches) == 1
