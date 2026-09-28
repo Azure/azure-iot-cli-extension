@@ -86,6 +86,20 @@ def wait_for_query_ids(read, expected_ids, id_key=None, attempts=None, wait=10, 
     )
 
 
+def retry_not_found(read, attempts=6, wait=10):
+    """Retry a read while a just-created dependency is not yet visible; other errors propagate."""
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise ValueError("Not-found retry requires at least one attempt.")
+    for attempt in range(1, attempts + 1):
+        try:
+            return read()
+        except Exception as error:  # pylint: disable=broad-except
+            if not is_not_found(error) or attempt == attempts:
+                raise
+            logger.warning("Dependency not visible after read %s/%s: %s", attempt, attempts, error)
+            sleep(wait)
+
+
 def delete_known_devices(devices, device_ids):
     """Delete only test-owned IDs, without relying on the query index to enumerate them."""
     for device_id in dict.fromkeys(device_ids):
