@@ -696,7 +696,7 @@ def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_defau
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra", "sas")
-    assert len(nodes("HubData", "entra")) == 43
+    assert len(nodes("HubData", "entra")) == 44
     assert len(nodes("HubControl", "regular")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 

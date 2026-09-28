@@ -32,10 +32,6 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubJobs, self).__init__(test_case)
 
-    @pytest.mark.skip(
-        reason="Temporary: IoT Hub job list returns 400 ArgumentInvalid (service-side);"
-        " re-enable after the service fix."
-    )
     @pytest.mark.timeout(900 + 2 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
     def test_jobs(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
