@@ -17,7 +17,7 @@ from knack.prompting import prompt_y_n
 from msrestazure.tools import parse_resource_id
 
 from azext_iot.common.utility import handle_service_exception
-from azext_iot.core.shared import IotHubConnectionProfile
+from azext_iot.core.shared import is_mqtt_v5_profile
 from azext_iot.iothub.providers.base import IoTHubProvider
 
 
@@ -83,11 +83,7 @@ class TopicGroup(IoTHubProvider):
 
     def _validate_connection_profile(self):
         connection_profile = self.hub_resource["properties"].get("connectionProfile")
-        if (
-            not isinstance(connection_profile, str)
-            or connection_profile.casefold()
-            != IotHubConnectionProfile.MQTT_V5.value.casefold()
-        ):
+        if not is_mqtt_v5_profile(connection_profile):
             raise InvalidArgumentValueError(
                 "Topic groups are only supported for IoT Hubs using the MqttV5 connection profile."
             )
