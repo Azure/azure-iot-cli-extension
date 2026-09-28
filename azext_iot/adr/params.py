@@ -50,6 +50,11 @@ def load_adr_arguments(self, _):
         "iot adr ns job run wait",
     )
     for command in wait_commands:
+        created_help = (
+            "Wait until the software update exists. Software updates have no provisioningState."
+            if command == "iot adr ns su software-update wait"
+            else "Wait until provisioningState is Succeeded."
+        )
         with self.argument_context(command) as context:
             context.argument(
                 "timeout",
@@ -73,14 +78,14 @@ def load_adr_arguments(self, _):
                 options_list=["--created"],
                 action="store_true",
                 arg_group="Wait Condition",
-                help="Wait until provisioningState is Succeeded.",
+                help=created_help,
             )
             context.argument(
                 "updated",
                 options_list=["--updated"],
                 action="store_true",
                 arg_group="Wait Condition",
-                help="Wait until provisioningState is Succeeded.",
+                help=created_help,
             )
             context.argument(
                 "deleted",

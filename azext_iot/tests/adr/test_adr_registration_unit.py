@@ -533,6 +533,17 @@ def test_load_adr_arguments():
     } <= set(arguments["iot adr ns link wait"])
 
 
+def test_software_update_wait_help_does_not_promise_provisioning_state():
+    loader = _ArgumentLoader()
+    load_adr_arguments(loader, None)
+
+    for dest in ("created", "updated"):
+        assert "no provisioningState" in loader.records["iot adr ns su software-update wait"][dest]["help"]
+        assert loader.records["iot adr ns su instance wait"][dest]["help"] == (
+            "Wait until provisioningState is Succeeded."
+        )
+
+
 def test_every_adr_identity_option_has_canonical_and_compact_names():
     loader = _ArgumentLoader()
     load_adr_arguments(loader, None)

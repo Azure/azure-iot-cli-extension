@@ -724,6 +724,21 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     )
 
 
+@pytest.mark.parametrize("mode", ["created", "updated", "exists"])
+def test_software_update_wait_completes_once_update_exists(mocker, mode):
+    """Imported updates have no provisioningState, so --created/--updated mean exists."""
+    provider = MagicMock()
+    provider.show_update.return_value = {"updateId": {"provider": "p", "name": "n", "version": "1.0"}}
+    mocker.patch.object(commands_wait, "SoftwareUpdateProvider", return_value=provider)
+
+    result = commands_wait.adr_su_software_update_wait(
+        MagicMock(), "ns", "rg", "p", "n", "1.0", timeout=1, interval=1, **{mode: True}
+    )
+
+    assert result is None  # explicit predicates follow `az ... wait` and print nothing
+    provider.show_update.assert_called_once_with("ns", "rg", "p", "n", "1.0")
+
+
 def test_endpoint_wait_keeps_custom_predicates_on_namespace(mocker):
     provider = MagicMock()
     namespace = {"properties": {"ready": True}}

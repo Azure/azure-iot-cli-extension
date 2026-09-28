@@ -438,10 +438,11 @@ def adr_su_software_update_wait(
         resource_exists,
         timeout,
         interval,
-        created,
-        updated,
+        False,
+        False,
         deleted,
-        exists,
+        # Software updates have no provisioningState; a successful GET means created.
+        exists or created or updated,
         custom,
     )
 

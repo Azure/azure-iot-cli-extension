@@ -185,7 +185,7 @@ class TestADRSoftwareUpdateDiscovery(ADRLiveScenarioTest):
                         f"--ns {namespace_name} -g {TEST_RG} "
                         f"--update-provider '{provider}' "
                         f"--update-name '{names[0]}' "
-                        f"--update-version '{versions[0]}'"
+                        f"--update-version '{versions[0]}' --created --timeout 120"
                     )
 
         statuses = self.cmd(
