@@ -40,6 +40,8 @@ Release History
 * Added Update Instance lifecycle and identity management, software-update import/stage/list/show/delete/hash/wait, file and device-class discovery, and v5 manifest initialization. Staging streams artifacts to Azure Storage instead of loading them into memory.
 * Added catalog provider/name/version discovery and import operation-status list/show. ``calculate-hash`` runs locally without Azure calls.
 * ``group delete`` is synchronous; ``--no-wait`` is accepted but has no effect.
+* ``su software-update wait --created`` / ``--updated`` complete as soon as the imported update exists; Software Updates have no ``provisioningState``.
+* ``report generate|latest --group-name`` resolves the group name to the group UUID that the service requires as ``reportTarget``.
 * AIO custom-location resources, assets, and discovered resources remain under ``az iot ops ns``.
 
 **Namespace links**
@@ -52,6 +54,9 @@ Release History
 * ``link hub|dps|su update`` retries a Failed link with its saved identity and settings.
 * ``link hub|dps|su remove`` removes only the namespace endpoint. Delete the linked resource first. The command grants the namespace outbound identity Reader on the linked resource's resource group if missing; the grant is kept after unlinking.
 * ``link dps show`` reports ``brownfieldHubsAvailable: false`` when the linked Hubs cannot be read.
+* A failed link add/update reports the error of the endpoint being linked, not an older failure on another endpoint.
+* When a link add/update PATCH loses its connection, the command re-reads the namespace: it resubmits once only if the namespace is unchanged, tracks the change if the read shows it, and otherwise reports that the outcome is unknown.
+* After a link add/update creates role assignments, a Hub/DPS ``LinkInitiateFailed`` "rejected the link request as invalid" (for example DPS 400315 while the grants propagate) is retried up to twice after 30 s and 60 s before failing.
 
 0.33.0b1 (Preview)
 ++++++++++++++++++
