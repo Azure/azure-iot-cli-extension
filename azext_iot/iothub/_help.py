@@ -575,10 +575,10 @@ def load_iothub_help():
           - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
-          - name: Create an Event Hub endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
+          - name: Create an Event Hub endpoint using system assigned identity and Semantic Model DO Observation V1 formatting.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-              --entity-path {entity_path} --identity [system]
+              --entity-path {entity_path} --identity [system] --message-format DOObservationV1
           - name: Create an Event Hub endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
@@ -711,6 +711,9 @@ def load_iothub_help():
           - name: Update a key-based Event Hub endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+          - name: Reset an Event Hub endpoint to preserve the original message payload.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --message-format None
     """
 
     helps[
@@ -904,6 +907,10 @@ def load_iothub_help():
           - name: Create a route for an IoT Hub with the built-in endpoint and source type "DeviceMessages".
             text: >
               az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name events --source DeviceMessages
+          - name: Create a route with a Semantic Model data schema reference.
+            text: >
+              az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name events --source DeviceMessages
+              --data-schema-ref aio-sr://example/schema:1
           - name: Create a disabled route for an IoT Hub with the given endpoint, source type "DigitalTwinChangeEvents" and custom condition.
             text: >
               az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name {endpoint_name} --source DigitalTwinChangeEvents
@@ -915,7 +922,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Update a route for an IoT Hub.
-        long-summary: You can change the source, endpoint, condition, or enabled state on the route.
+        long-summary: You can change the source, endpoint, condition, enabled state, or Semantic Model data schema reference on the route.
         examples:
           - name: Update a route to a given endpoint and source type "DeviceMessages".
             text: >
@@ -926,6 +933,13 @@ def load_iothub_help():
           - name: Change a route's condition.
             text: >
               az iot hub message-route update -n {iothub_name} --route-name {route_name} --condition {condition}
+          - name: Replace a route's Semantic Model data schema reference.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name}
+              --data-schema-ref aio-sr://example/schema:2
+          - name: Remove a route's Semantic Model data schema reference.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name} --remove-data-schema-ref
     """
 
     helps[

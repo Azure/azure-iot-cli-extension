@@ -62,6 +62,40 @@ class TestCreateCommands:
             cmd=None, hub_name=hub_name, endpoint_name=endpoint_name, container_name="cont"
         ) == sentinel
 
+    @pytest.mark.parametrize(
+        "command, kwargs",
+        [
+            (subject.message_endpoint_create_event_hub, {}),
+            (subject.message_endpoint_create_service_bus_queue, {}),
+            (subject.message_endpoint_create_service_bus_topic, {}),
+            (
+                subject.message_endpoint_create_cosmos_db_container,
+                {"container_name": "cont", "database_name": "db"},
+            ),
+            (subject.message_endpoint_create_storage_container, {"container_name": "cont"}),
+            (
+                subject.message_endpoint_create_fabric_eventstream,
+                {
+                    "endpoint_uri": "sb://namespace.servicebus.windows.net",
+                    "entity_path": "entity",
+                    "identity": "[system]",
+                    "workspace_id": "workspace",
+                    "eventstream_id": "eventstream",
+                    "source_id": "source",
+                },
+            ),
+        ],
+    )
+    def test_create_forwards_message_format(self, mock_provider, command, kwargs):
+        command(
+            cmd=None,
+            hub_name=hub_name,
+            endpoint_name=endpoint_name,
+            message_format="DOObservationV1",
+            **kwargs,
+        )
+        assert mock_provider.create.call_args.kwargs["message_format"] == "DOObservationV1"
+
 
 class TestUpdateCommands:
     def test_update_event_hub(self, mock_provider):
@@ -89,6 +123,26 @@ class TestUpdateCommands:
         assert subject.message_endpoint_update_storage_container(
             cmd=None, hub_name=hub_name, endpoint_name=endpoint_name
         ) == sentinel
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            subject.message_endpoint_update_event_hub,
+            subject.message_endpoint_update_service_bus_queue,
+            subject.message_endpoint_update_service_bus_topic,
+            subject.message_endpoint_update_cosmos_db_container,
+            subject.message_endpoint_update_storage_container,
+            subject.message_endpoint_update_fabric_eventstream,
+        ],
+    )
+    def test_update_forwards_message_format(self, mock_provider, command):
+        command(
+            cmd=None,
+            hub_name=hub_name,
+            endpoint_name=endpoint_name,
+            message_format="None",
+        )
+        assert mock_provider.update.call_args.kwargs["message_format"] == "None"
 
 
 class TestShowListDeleteCommands:

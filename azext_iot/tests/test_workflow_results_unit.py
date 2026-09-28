@@ -686,7 +686,7 @@ def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_defau
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra", "sas")
     assert len(nodes("HubData", "entra")) == 44
-    assert len(nodes("HubControl", "regular")) == 28
+    assert len(nodes("HubControl", "regular")) == 30
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 
 
