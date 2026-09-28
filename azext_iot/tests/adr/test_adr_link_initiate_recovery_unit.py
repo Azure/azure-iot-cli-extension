@@ -274,11 +274,11 @@ def test_combined_add_retries_the_generic_rejection_of_either_freshly_granted_st
 
 
 def test_combined_add_grants_for_the_hub_stage_do_not_enable_dps_generic_retries(mocker):
-    combined = dict(
-        namespace_name="ns", resource_group_name="rg", dps_endpoint_name="dps", dps_resource_id=DPS_ID,
-        hub_endpoint_name="hub", hub_resource_id=HUB_ID, dps_mi_system_assigned=True,
-        hub_mi_user_assigned=UAMI_ID, timeout_sec=300,
-    )
+    combined = {
+        "namespace_name": "ns", "resource_group_name": "rg", "dps_endpoint_name": "dps", "dps_resource_id": DPS_ID,
+        "hub_endpoint_name": "hub", "hub_resource_id": HUB_ID, "dps_mi_system_assigned": True,
+        "hub_mi_user_assigned": UAMI_ID, "timeout_sec": 300,
+    }
     planned = _harness(mocker)
     planned.outcomes = ["success", "success"]
     planned.provider.link_add(**combined)
