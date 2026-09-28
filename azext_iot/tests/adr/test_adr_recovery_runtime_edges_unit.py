@@ -14,9 +14,13 @@ from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import AzureResponseError
+from azure.core.exceptions import ServiceRequestError, ServiceResponseError
 
 from azext_iot.adr.providers import base
-from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery
+from azext_iot.adr.providers.link_recovery import (
+    TRANSPORT_RETRIES, TRANSPORT_RETRY_DELAY, LinkDeadline, LinkRecovery,
+)
+from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
 from azext_iot.adr.rbac import LINK_ROLE_IDS, LinkRbacManager, _assignment_scope_applies, _scope_subscription
 from azext_iot.tests.adr.test_adr_link_propagation_unit import Clock, Harness, KINDS, NS_ID
 from azext_iot.tests.adr.test_adr_link_rbac_unit import NS_SCOPE, TARGET_SCOPE, _result
@@ -349,3 +353,186 @@ def test_link_failure_reports_the_target_endpoint_not_an_older_failed_one(mocker
     assert "endpoint 'su': LinkOrphaned: orphaned." in str(raised.value)
     assert "stale hub failure" not in str(raised.value)
     assert len(harness.patches) == 1
+
+
+def _connection_reset():
+    return ServiceResponseError("('Connection aborted.', RemoteDisconnected('Remote end closed connection'))")
+
+
+def _fail_submits(harness, count, landed=False):
+    """Fail the first ``count`` PATCHes without a response, optionally after they took effect."""
+    submit = harness.submit
+
+    def flaky(**kwargs):
+        if len(harness.client.namespaces.begin_update.call_args_list) <= count:
+            if landed:
+                submit(**kwargs)
+            raise _connection_reset()
+        return submit(**kwargs)
+
+    harness.client.namespaces.begin_update.side_effect = flaky
+
+
+def _on_nth_sleep(harness, n, action):
+    def hook():
+        if len(harness.clock.delays) == n:
+            action()
+
+    harness.clock.on_sleep = hook
+
+
+@pytest.mark.parametrize("kind", ["dps", "hub", "su"])
+@pytest.mark.parametrize("action", ["add", "update"])
+def test_unapplied_patch_connection_reset_is_resubmitted(mocker, kind, action):
+    harness = Harness(mocker, kind=kind, action=action)
+    harness.outcomes = ["success"]
+    _fail_submits(harness, 1)
+
+    result = harness.run()
+
+    section = KINDS[kind][0]
+    assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
+    assert harness.client.namespaces.begin_update.call_count == 2
+    assert harness.patches == [{section: {"endpoints": {kind: harness.body}}}]
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY]
+
+
+def test_applied_patch_connection_reset_is_tracked_without_a_second_write(mocker):
+    harness = Harness(mocker)
+    _fail_submits(harness, 1, landed=True)
+
+    def finish():
+        harness.namespace["properties"]["provisioningState"] = "Succeeded"
+        harness.namespace["properties"]["updating"]["endpoints"]["su"]["linkingState"] = "Succeeded"
+
+    _on_nth_sleep(harness, 2, finish)
+
+    result = harness.run()
+
+    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
+    harness.client.namespaces.begin_update.assert_called_once()
+    harness.provider._await_terminal.assert_not_called()
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY, DEFAULT_WAIT_INTERVAL]
+
+
+def test_applied_patch_connection_reset_still_recovers_an_authorization_failure(mocker):
+    harness = Harness(mocker)
+    harness.outcomes = ["success"]
+    _fail_submits(harness, 1, landed=True)
+
+    def fail_authorization():
+        harness.namespace["properties"]["provisioningState"] = "Failed"
+        harness.namespace["properties"]["updating"]["endpoints"]["su"].update(
+            linkingState="Failed", linkingError={"code": "AdrMiNotAuthorized", "message": "not authorized"},
+        )
+
+    _on_nth_sleep(harness, 1, fail_authorization)
+
+    result = harness.run()
+
+    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
+    assert harness.client.namespaces.begin_update.call_count == 2
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY, 30]
+
+
+def test_recovery_resubmission_reset_compares_against_the_recovery_snapshot(mocker):
+    harness = Harness(mocker)
+    submit = harness.submit
+
+    def reset_second(**kwargs):
+        if harness.client.namespaces.begin_update.call_count == 2:
+            raise _connection_reset()
+        return submit(**kwargs)
+
+    harness.client.namespaces.begin_update.side_effect = reset_second
+
+    result = harness.run()
+
+    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
+    assert harness.client.namespaces.begin_update.call_count == 3
+    assert harness.clock.delays == [30, TRANSPORT_RETRY_DELAY]
+
+
+@pytest.mark.parametrize("error_type", [ServiceRequestError, ServiceResponseError])
+def test_persistent_connection_failure_on_unchanged_namespace_asks_to_rerun(mocker, caplog, error_type):
+    harness = Harness(mocker)
+    harness.client.namespaces.begin_update.side_effect = error_type("connection reset")
+
+    with caplog.at_level(logging.WARNING), pytest.raises(AzureResponseError, match="namespace is unchanged") as raised:
+        harness.run()
+
+    assert f"lost its connection {TRANSPORT_RETRIES + 1} times" in str(raised.value)
+    assert isinstance(raised.value.__cause__, error_type)
+    assert harness.client.namespaces.begin_update.call_count == TRANSPORT_RETRIES + 1
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY] * (TRANSPORT_RETRIES + 1)
+    assert "No rollback was attempted" in caplog.text
+
+
+@pytest.mark.parametrize("no_wait", [False, True])
+def test_connection_reset_with_an_unrelated_namespace_change_reports_unknown_outcome(mocker, no_wait):
+    harness = Harness(mocker)
+    _fail_submits(harness, 1)
+    _on_nth_sleep(harness, 1, lambda: harness.namespace.update(tags={"changed": "elsewhere"}))
+
+    with pytest.raises(AzureResponseError, match="outcome is unknown") as raised:
+        harness.run(no_wait=no_wait)
+
+    assert "iot adr ns link su show" in str(raised.value)
+    harness.client.namespaces.begin_update.assert_called_once()
+    harness.provider._await_terminal.assert_not_called()
+
+
+@pytest.mark.parametrize("read_error", [AzureResponseError("read denied"), ServiceResponseError("read reset")])
+def test_connection_reset_without_a_confirming_read_does_not_resubmit(mocker, read_error):
+    harness = Harness(mocker)
+    _fail_submits(harness, 1)
+    reads = harness.client.namespaces.get.side_effect
+
+    def fail_after_reset(**kwargs):
+        if harness.client.namespaces.begin_update.called:
+            raise read_error
+        return reads(**kwargs)
+
+    harness.client.namespaces.get.side_effect = fail_after_reset
+
+    with pytest.raises(AzureResponseError, match="could not be read to confirm") as raised:
+        harness.run()
+
+    assert isinstance(raised.value.__cause__, ServiceResponseError)
+    harness.client.namespaces.begin_update.assert_called_once()
+
+
+@pytest.mark.parametrize("landed", [False, True])
+def test_no_wait_connection_reset_resubmits_only_an_unchanged_namespace(mocker, landed):
+    harness = Harness(mocker)
+    _fail_submits(harness, 1, landed=landed)
+
+    if landed:
+        with pytest.raises(AzureResponseError, match="outcome is unknown"):
+            harness.run(no_wait=True)
+    else:
+        assert harness.run(no_wait=True) is not None
+
+    assert harness.client.namespaces.begin_update.call_count == (1 if landed else 2)
+    harness.provider._await_terminal.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "namespace",
+    [
+        None,
+        {"properties": []},
+        {"properties": {"provisioningState": "Succeeded", "updating": []}},
+        {"properties": {"provisioningState": "Succeeded", "updating": {"endpoints": []}}},
+        {"properties": {"provisioningState": "Succeeded", "updating": {"endpoints": {"su": "invalid"}}}},
+        {"properties": {"provisioningState": "Succeeded", "updating": {"endpoints": {"other": {}}}}},
+    ],
+)
+def test_submission_evidence_ignores_malformed_or_missing_endpoints(mocker, namespace):
+    harness = Harness(mocker)
+    recovery = LinkRecovery(
+        harness.provider, harness.namespace, "updating", "su", harness.body,
+        LinkDeadline(clock=harness.clock.time, sleeper=harness.clock.sleep), Mock(),
+    )
+
+    assert recovery._shows_submission(namespace) is False

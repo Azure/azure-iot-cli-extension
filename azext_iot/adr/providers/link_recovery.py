@@ -11,7 +11,7 @@ import re
 from time import monotonic, sleep
 
 from azure.cli.core.azclierror import AzureResponseError, InvalidArgumentValueError
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import AzureError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.log import get_logger
 from knack.util import CLIError
 
@@ -21,6 +21,7 @@ from azext_iot.adr.topology import endpoint_update_body
 
 logger = get_logger(__name__)
 AUTHORIZATION_DELAYS = (30, 60, 120)
+TRANSPORT_RETRIES, TRANSPORT_RETRY_DELAY = 1, 10
 ACTIVE_STATES = {"Accepted", "Creating", "Updating", "InProgress", "Running"}
 TERMINAL_FAILURES = {"Failed", "Canceled", "Cancelled"}
 _GUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
@@ -126,6 +127,7 @@ class LinkRecovery:
         self.budget, self.verify = budget, verify
         self.progressed = True
         self.target = (section, name)
+        self.before_submit = deepcopy(namespace)
 
     def inspect(self, namespace):
         if not isinstance(namespace, dict) or not isinstance(namespace.get("properties"), dict):
@@ -247,6 +249,63 @@ class LinkRecovery:
             and match["scope"].casefold() == target.casefold()
         )
 
+    def _submit(self, submit, get, body, no_wait):
+        """Submit the PATCH; after a lost connection, retry only if a later read shows no change.
+
+        azure-core never retries a PATCH without a response. After a settling delay, a namespace
+        identical to the pre-submit read means the request did not take effect, so the same body
+        is resubmitted once. A read showing this endpoint's requested target or an operation in
+        progress returns None so the namespace reads track it without writing again. Any other
+        outcome (and any ambiguity with --no-wait) is reported instead of guessed.
+        """
+        attempt = 0
+        while True:
+            try:
+                return self.budget.call(submit, body)
+            except (ServiceRequestError, ServiceResponseError) as error:
+                logger.warning("Link '%s' update request got no service response: %s", self.name, error)
+                self.budget.pause(TRANSPORT_RETRY_DELAY)
+                try:
+                    current = self.budget.call(get)
+                except (CLIError, AzureError) as read_error:
+                    raise AzureResponseError(
+                        f"The namespace update for link '{self.name}' lost its connection ({error}), and the "
+                        f"namespace could not be read to confirm whether it was applied: {read_error}"
+                    ) from error
+                if current == self.before_submit:
+                    if attempt < TRANSPORT_RETRIES:
+                        attempt += 1
+                        continue
+                    raise AzureResponseError(
+                        f"The namespace update for link '{self.name}' lost its connection {attempt + 1} times "
+                        f"({error}); the namespace is unchanged. Re-run the command."
+                    ) from error
+                if not no_wait and self._shows_submission(current):
+                    return None
+                raise AzureResponseError(
+                    f"The namespace update for link '{self.name}' lost its connection ({error}) and the "
+                    f"namespace has changed since, so the outcome is unknown. Inspect it with "
+                    f"'iot adr ns link {self.kind} show' or 'iot adr ns link {self.kind} wait' before re-running."
+                ) from error
+
+    def _shows_submission(self, namespace):
+        """Evidence that the submitted PATCH landed: an operation in progress or its requested target."""
+        properties = namespace.get("properties") if isinstance(namespace, dict) else None
+        if not isinstance(properties, dict):
+            return False
+        if properties.get("provisioningState") in ACTIVE_STATES:
+            return True
+        group = properties.get(self.section)
+        endpoints = group.get("endpoints") if isinstance(group, dict) else None
+        endpoint = endpoints.get(self.name) if isinstance(endpoints, dict) else None
+        if not isinstance(endpoint, dict):
+            return False
+        actual = _normalized(endpoint_update_body(endpoint))
+        return all(
+            actual.get(key) == self.expected.get(key)
+            for key in ("resourceId", "endpointType", "inboundCallerIdentity")
+        )
+
     def run(self, *, submit, get, status_message, no_wait=False, **kwargs):
         original_error = None
         retries = 0
@@ -259,21 +318,23 @@ class LinkRecovery:
                 if pending_submission:
                     pending_submission = False
                     try:
-                        poller = self.budget.call(submit, body)
+                        poller = self._submit(submit, get, body, no_wait)
                         if no_wait:
                             return poller
                         self.pending = True
-                        try:
-                            self.budget.call(
-                                self.provider._wait, poller, status_message,
-                                **{**kwargs, "failure_target": self.target,
-                                   "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
-                                   "clock": self.budget.clock, "sleeper": self.budget.pause,
-                                   "deadline_guard": self.budget.remaining},
-                            )
-                            self.progressed = True
-                        finally:
-                            self.pending = False
+                        # Without a poller, the landed PATCH stays pending while namespace reads track it.
+                        if poller is not None:
+                            try:
+                                self.budget.call(
+                                    self.provider._wait, poller, status_message,
+                                    **{**kwargs, "failure_target": self.target,
+                                       "timeout_sec": self.budget.remaining(), "wait_sec": self.budget.interval,
+                                       "clock": self.budget.clock, "sleeper": self.budget.pause,
+                                       "deadline_guard": self.budget.remaining},
+                                )
+                            finally:
+                                self.pending = False
+                        self.progressed = True
                     except ADRResourceStateError as error:
                         logger.warning("Link '%s' service failure: %s", self.name, error)
                         if no_wait:
@@ -370,6 +431,7 @@ class LinkRecovery:
                         if current != failed_snapshot:
                             raise AzureResponseError("Namespace changed during link recovery; no retry PATCH submitted.")
                         body = endpoint_update_body(endpoint)
+                        self.before_submit = current
                         self.progressed = False
                         original_error = None
                         retries += 1
