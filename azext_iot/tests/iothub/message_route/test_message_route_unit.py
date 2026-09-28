@@ -6,7 +6,11 @@
 
 import logging
 import pytest
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import (
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
+    ResourceNotFoundError,
+)
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from azure.core.polling import LROPoller
@@ -18,6 +22,7 @@ logging.disable(logging.CRITICAL)
 hub_name = "hubname"
 hub_rg = "hubrg"
 generic_response = {"result": "ok"}
+schema_ref = "opaque schema reference"
 
 iot_hub_providers_path = "azext_iot.iothub.providers"
 path_find_resource = f"{iot_hub_providers_path}.discovery.IotHubDiscovery.find_resource"
@@ -100,7 +105,23 @@ class TestMessageRouteCreate:
         )
         assert result == generic_response
         routes = fixture_route_ops["properties"]["routing"]["routes"]
-        assert any(r["name"] == "newroute" and r["endpointNames"] == ["ep1", "ep2"] for r in routes)
+        created = next(route for route in routes if route["name"] == "newroute")
+        assert created["endpointNames"] == ["ep1", "ep2"]
+        assert "dataSchema" not in created
+
+    def test_create_rejects_empty_data_schema_ref(self, fixture_route_ops):
+        with pytest.raises(
+            InvalidArgumentValueError, match="--data-schema-ref cannot be empty"
+        ):
+            subject.message_route_create(
+                cmd=None,
+                hub_name=hub_name,
+                route_name="newroute",
+                source_type="DeviceMessages",
+                endpoint_name="events",
+                data_schema_ref="",
+                resource_group_name=hub_rg,
+            )
 
     def test_create_error(self, fixture_route_ops, mocker):
         handler = mocker.patch(handle_service_exception_path)
@@ -128,11 +149,18 @@ class TestMessageRouteCreate:
         }
         provider = MessageRoute(cmd=None, hub_name=hub_name, rg=hub_rg)
 
-        provider.create("new", "DeviceMessages", "events")
+        provider.create(
+            "new",
+            "DeviceMessages",
+            "events",
+            data_schema_ref=schema_ref,
+        )
 
         kwargs = provider.discovery.client.begin_create_or_update.call_args.kwargs
         assert kwargs["etag"] == "test-etag"
         assert kwargs["match_condition"] == MatchConditions.IfNotModified
+        routes = kwargs["iot_hub_description"]["properties"]["routing"]["routes"]
+        assert next(route for route in routes if route["name"] == "new")["dataSchema"] == schema_ref
         assert "deviceRegistry" not in kwargs[
             "iot_hub_description"
         ]["properties"]
@@ -157,6 +185,7 @@ class TestMessageRouteUpdate:
         assert result == generic_response
 
     def test_update_defaults_kept(self, fixture_route_ops):
+        fixture_route_ops["properties"]["routing"]["routes"][0]["dataSchema"] = schema_ref
         result = subject.message_route_update(
             cmd=None,
             hub_name=hub_name,
@@ -164,6 +193,53 @@ class TestMessageRouteUpdate:
             resource_group_name=hub_rg,
         )
         assert result == generic_response
+        assert fixture_route_ops["properties"]["routing"]["routes"][0]["dataSchema"] == schema_ref
+
+    @pytest.mark.parametrize(
+        ("data_schema_ref", "remove_data_schema_ref", "expected"),
+        [
+            ("replacement schema reference", False, "replacement schema reference"),
+            (None, True, None),
+        ],
+    )
+    def test_update_data_schema_ref(
+        self,
+        fixture_route_ops,
+        data_schema_ref,
+        remove_data_schema_ref,
+        expected,
+    ):
+        fixture_route_ops["properties"]["routing"]["routes"][0]["dataSchema"] = schema_ref
+
+        result = subject.message_route_update(
+            cmd=None,
+            hub_name=hub_name,
+            route_name="route1",
+            data_schema_ref=data_schema_ref,
+            remove_data_schema_ref=remove_data_schema_ref,
+            resource_group_name=hub_rg,
+        )
+
+        assert result == generic_response
+        route = fixture_route_ops["properties"]["routing"]["routes"][0]
+        if remove_data_schema_ref:
+            assert "dataSchema" not in route
+        else:
+            assert route["dataSchema"] == expected
+
+    def test_update_rejects_mutually_exclusive_data_schema_options(self, fixture_route_ops):
+        with pytest.raises(
+            MutuallyExclusiveArgumentError,
+            match="--data-schema-ref and --remove-data-schema-ref cannot be used together",
+        ):
+            subject.message_route_update(
+                cmd=None,
+                hub_name=hub_name,
+                route_name="route1",
+                data_schema_ref=schema_ref,
+                remove_data_schema_ref=True,
+                resource_group_name=hub_rg,
+            )
 
     def test_update_error(self, fixture_route_ops, mocker):
         handler = mocker.patch(handle_service_exception_path)

@@ -702,7 +702,7 @@ def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_defau
     assert tuple(nodes("HubData", "sas")) == NODES
     assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
     assert sum(len(nodes("HubData", phase)) for phase in phases("HubData") if phase.startswith("entra-")) == 44
-    assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 29
+    assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 31
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 
 

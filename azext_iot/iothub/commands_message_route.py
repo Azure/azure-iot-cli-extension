@@ -19,6 +19,7 @@ def message_route_create(
     endpoint_name: str,
     enabled: bool = True,
     condition: str = "true",
+    data_schema_ref: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     message_route_provider = MessageRoute(
@@ -29,7 +30,8 @@ def message_route_create(
         source_type=source_type,
         endpoint_name=endpoint_name,
         enabled=enabled,
-        condition=condition
+        condition=condition,
+        data_schema_ref=data_schema_ref,
     )
 
 
@@ -41,6 +43,8 @@ def message_route_update(
     endpoint_name: Optional[str] = None,
     enabled: Optional[bool] = None,
     condition: Optional[str] = None,
+    data_schema_ref: Optional[str] = None,
+    remove_data_schema_ref: bool = False,
     resource_group_name: Optional[str] = None,
 ):
     message_route_provider = MessageRoute(
@@ -51,7 +55,9 @@ def message_route_update(
         source_type=source_type,
         endpoint_name=endpoint_name,
         enabled=enabled,
-        condition=condition
+        condition=condition,
+        data_schema_ref=data_schema_ref,
+        remove_data_schema_ref=remove_data_schema_ref,
     )
 
 

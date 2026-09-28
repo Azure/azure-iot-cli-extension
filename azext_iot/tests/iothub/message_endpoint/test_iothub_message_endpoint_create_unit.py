@@ -169,6 +169,37 @@ class TestCreate:
         eh = hub["properties"]["routing"]["endpoints"]["eventHubs"]
         assert eh[0]["entityPath"] == "a/b"
 
+    @pytest.mark.parametrize("message_format", [None, "DOObservationV1"])
+    def test_create_message_payload_format(self, provider, message_format):
+        p, hub = provider()
+        p.create(
+            endpoint_name="ep1",
+            endpoint_type=EndpointType.EventHub.value,
+            connection_string="cs",
+            message_format=message_format,
+        )
+        endpoint = hub["properties"]["routing"]["endpoints"]["eventHubs"][0]
+        if message_format is None:
+            assert "messagePayloadFormat" not in endpoint
+        else:
+            assert endpoint["messagePayloadFormat"] == message_format
+
+    def test_create_fabric_eventstream_message_payload_format(self, provider):
+        p, hub = provider()
+        p.create(
+            endpoint_name="ep1",
+            endpoint_type=EndpointType.FabricEventStream.value,
+            endpoint_uri="sb://namespace.servicebus.windows.net",
+            entity_path="entity",
+            identity="[system]",
+            workspace_id="workspace",
+            eventstream_id="eventstream",
+            source_id="source",
+            message_format="DOObservationV1",
+        )
+        endpoint = hub["properties"]["routing"]["endpoints"]["eventStreams"][0]
+        assert endpoint["messagePayloadFormat"] == "DOObservationV1"
+
     def test_create_service_bus_queue(self, provider):
         p, hub = provider()
         p.create(
@@ -616,6 +647,28 @@ class TestUpdate:
         ep = hub["properties"]["routing"]["endpoints"]["eventHubs"][0]
         assert ep["connectionString"] == "newcs"
         assert ep["identity"] is None
+
+    def test_update_message_payload_format(self, provider):
+        p, hub = provider()
+        self._seed_endpoint(hub, "eventHubs", messagePayloadFormat="DOObservationV1")
+        p.update(
+            endpoint_name="ep1",
+            endpoint_type=EndpointType.EventHub.value,
+            message_format="None",
+        )
+        endpoint = hub["properties"]["routing"]["endpoints"]["eventHubs"][0]
+        assert endpoint["messagePayloadFormat"] == "None"
+
+    def test_update_preserves_message_payload_format(self, provider):
+        p, hub = provider()
+        self._seed_endpoint(hub, "eventHubs", messagePayloadFormat="DOObservationV1")
+        p.update(
+            endpoint_name="ep1",
+            endpoint_type=EndpointType.EventHub.value,
+            endpoint_resource_group="new-rg",
+        )
+        endpoint = hub["properties"]["routing"]["endpoints"]["eventHubs"][0]
+        assert endpoint["messagePayloadFormat"] == "DOObservationV1"
 
     def test_update_mutually_exclusive(self, provider):
         p, hub = provider()
