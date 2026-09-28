@@ -18,7 +18,7 @@ from azure.core.exceptions import ServiceRequestError, ServiceResponseError
 
 from azext_iot.adr.providers import base
 from azext_iot.adr.providers.link_recovery import (
-    TRANSPORT_RETRIES, TRANSPORT_RETRY_DELAY, LinkDeadline, LinkRecovery,
+    TRANSPORT_RETRY_DELAY, LinkDeadline, LinkRecovery,
 )
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
 from azext_iot.adr.rbac import LINK_ROLE_IDS, LinkRbacManager, _assignment_scope_applies, _scope_subscription
@@ -383,17 +383,15 @@ def _on_nth_sleep(harness, n, action):
 
 @pytest.mark.parametrize("kind", ["dps", "hub", "su"])
 @pytest.mark.parametrize("action", ["add", "update"])
-def test_unapplied_patch_connection_reset_is_resubmitted(mocker, kind, action):
+def test_connection_reset_on_an_unchanged_namespace_is_never_resubmitted(mocker, kind, action):
     harness = Harness(mocker, kind=kind, action=action)
-    harness.outcomes = ["success"]
     _fail_submits(harness, 1)
 
-    result = harness.run()
+    with pytest.raises(AzureResponseError, match="outcome is unknown; the namespace shows no change yet") as raised:
+        harness.run()
 
-    section = KINDS[kind][0]
-    assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
-    assert harness.client.namespaces.begin_update.call_count == 2
-    assert harness.patches == [{section: {"endpoints": {kind: harness.body}}}]
+    assert f"iot adr ns link {kind} show" in str(raised.value)
+    harness.client.namespaces.begin_update.assert_called_once()
     assert harness.clock.delays == [TRANSPORT_RETRY_DELAY]
 
 
@@ -415,7 +413,7 @@ def test_applied_patch_connection_reset_is_tracked_without_a_second_write(mocker
     assert harness.clock.delays == [TRANSPORT_RETRY_DELAY, DEFAULT_WAIT_INTERVAL]
 
 
-def test_applied_patch_connection_reset_still_recovers_an_authorization_failure(mocker):
+def test_tracked_submission_reports_an_authorization_failure_without_another_write(mocker, caplog):
     harness = Harness(mocker)
     harness.outcomes = ["success"]
     _fail_submits(harness, 1, landed=True)
@@ -428,11 +426,29 @@ def test_applied_patch_connection_reset_still_recovers_an_authorization_failure(
 
     _on_nth_sleep(harness, 1, fail_authorization)
 
-    result = harness.run()
+    with caplog.at_level(logging.WARNING), pytest.raises(base.ADRResourceStateError, match="AdrMiNotAuthorized"):
+        harness.run()
 
-    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
-    assert harness.client.namespaces.begin_update.call_count == 2
-    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY, 30]
+    harness.client.namespaces.begin_update.assert_called_once()
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY]
+    assert "No rollback was attempted" in caplog.text
+
+
+def test_connection_reset_on_a_failed_endpoint_with_only_a_tag_change_reports_unknown_outcome(mocker):
+    harness = Harness(mocker, action="update")
+    harness.namespace["properties"]["provisioningState"] = "Failed"
+    harness.namespace["properties"]["updating"]["endpoints"]["su"].update(
+        linkingState="Failed", linkingError={"code": "AdrMiNotAuthorized", "message": "not authorized"},
+    )
+    _fail_submits(harness, 1)
+    _on_nth_sleep(harness, 1, lambda: harness.namespace.update(tags={"changed": "elsewhere"}))
+
+    with pytest.raises(AzureResponseError, match="outcome is unknown") as raised:
+        harness.run()
+
+    assert "shows no change yet" not in str(raised.value)
+    harness.client.namespaces.begin_update.assert_called_once()
+    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY]
 
 
 def test_recovery_resubmission_reset_compares_against_the_recovery_snapshot(mocker):
@@ -446,25 +462,25 @@ def test_recovery_resubmission_reset_compares_against_the_recovery_snapshot(mock
 
     harness.client.namespaces.begin_update.side_effect = reset_second
 
-    result = harness.run()
+    # The failed endpoint differs from the pre-add read but equals the recovery baseline.
+    with pytest.raises(AzureResponseError, match="shows no change yet"):
+        harness.run()
 
-    assert result["properties"]["updating"]["endpoints"]["su"]["linkingState"] == "Succeeded"
-    assert harness.client.namespaces.begin_update.call_count == 3
+    assert harness.client.namespaces.begin_update.call_count == 2
     assert harness.clock.delays == [30, TRANSPORT_RETRY_DELAY]
 
 
 @pytest.mark.parametrize("error_type", [ServiceRequestError, ServiceResponseError])
-def test_persistent_connection_failure_on_unchanged_namespace_asks_to_rerun(mocker, caplog, error_type):
+def test_either_transport_error_reports_unknown_outcome_with_its_cause(mocker, caplog, error_type):
     harness = Harness(mocker)
     harness.client.namespaces.begin_update.side_effect = error_type("connection reset")
 
-    with caplog.at_level(logging.WARNING), pytest.raises(AzureResponseError, match="namespace is unchanged") as raised:
+    with caplog.at_level(logging.WARNING), pytest.raises(AzureResponseError, match="outcome is unknown") as raised:
         harness.run()
 
-    assert f"lost its connection {TRANSPORT_RETRIES + 1} times" in str(raised.value)
     assert isinstance(raised.value.__cause__, error_type)
-    assert harness.client.namespaces.begin_update.call_count == TRANSPORT_RETRIES + 1
-    assert harness.clock.delays == [TRANSPORT_RETRY_DELAY] * (TRANSPORT_RETRIES + 1)
+    harness.client.namespaces.begin_update.assert_called_once()
+    assert "got no service response" in caplog.text
     assert "No rollback was attempted" in caplog.text
 
 
@@ -503,18 +519,32 @@ def test_connection_reset_without_a_confirming_read_does_not_resubmit(mocker, re
 
 
 @pytest.mark.parametrize("landed", [False, True])
-def test_no_wait_connection_reset_resubmits_only_an_unchanged_namespace(mocker, landed):
+def test_no_wait_connection_reset_is_never_resubmitted_or_tracked(mocker, landed):
     harness = Harness(mocker)
     _fail_submits(harness, 1, landed=landed)
 
-    if landed:
-        with pytest.raises(AzureResponseError, match="outcome is unknown"):
-            harness.run(no_wait=True)
-    else:
-        assert harness.run(no_wait=True) is not None
+    with pytest.raises(AzureResponseError, match="outcome is unknown"):
+        harness.run(no_wait=True)
 
-    assert harness.client.namespaces.begin_update.call_count == (1 if landed else 2)
+    harness.client.namespaces.begin_update.assert_called_once()
     harness.provider._await_terminal.assert_not_called()
+
+
+def test_tracked_submission_ignores_stale_pre_submit_failure_reads(mocker):
+    harness = Harness(mocker, action="update")
+    harness.namespace["properties"]["provisioningState"] = "Failed"
+    harness.namespace["properties"]["updating"]["endpoints"]["su"]["linkingError"] = {
+        "code": "AdrMiNotAuthorized", "message": "not authorized",
+    }
+    before = deepcopy(harness.namespace)
+    _fail_submits(harness, 1, landed=True)
+    _on_nth_sleep(harness, 2, lambda: setattr(harness, "namespace", deepcopy(before)))
+
+    with pytest.raises(AzureResponseError, match="timed out"):
+        harness.run(timeout_sec=100)
+
+    harness.client.namespaces.begin_update.assert_called_once()
+    assert harness.clock.delays[0] == TRANSPORT_RETRY_DELAY
 
 
 @pytest.mark.parametrize(

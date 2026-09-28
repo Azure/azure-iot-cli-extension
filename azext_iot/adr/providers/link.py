@@ -55,7 +55,7 @@ from azext_iot.adr.providers.link_preflight import (
 )
 from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import LinkRbacManager, required_assignments, resolve_namespace_outbound_principal
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -283,14 +283,11 @@ class LinkProvider(ADRProvider):
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
             self._rbac_manager().verify_many(requests, guard=deadline.remaining)
 
-        link_scopes = {
-            scope.casefold() for request in original_requests or []
-            for scope in (request["namespace_scope"], request["target_scope"])
-        }
+        required = {assignment for request in original_requests or [] for _, assignment in required_assignments(request)}
         return LinkRecovery(
             self, namespace, section, name, expected, budget, verify,
             authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
-            recent_grants=bool(self._rbac) and any(scope.casefold() in link_scopes for _, _, scope in self._rbac.created),
+            recent_grants=bool(self._rbac) and not required.isdisjoint(self._rbac.created),
         ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,

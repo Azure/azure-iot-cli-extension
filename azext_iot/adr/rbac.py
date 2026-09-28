@@ -288,6 +288,18 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
     return principals
 
 
+def required_assignments(request: dict):
+    """Yield (rule, (principal_id, role, scope)) for every assignment a link request needs."""
+    principals = _request_principals(request)
+    scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
+    for rule in LINK_ROLE_MATRIX[request["link_type"]]:
+        principal_id = principals.get(rule.principal)
+        # Hub inbound identity is optional. There is no principal to grant
+        # in that direction when the endpoint omits it.
+        if principal_id:
+            yield rule, (principal_id, rule.role, scopes[rule.scope])
+
+
 class LinkRbacManager:
     """Idempotently establish all missing assignments before link mutation."""
 
@@ -593,25 +605,8 @@ class LinkRbacManager:
                 raise InvalidArgumentValueError(
                     f"Unsupported link type '{link_type}' for RBAC preflight."
                 )
-            principals = _request_principals(request)
-            scopes = {
-                "namespace": request["namespace_scope"],
-                "target": request["target_scope"],
-            }
-            for rule in LINK_ROLE_MATRIX[link_type]:
-                principal_id = principals.get(rule.principal)
-                # Hub inbound identity is optional. There is no principal to grant
-                # in that direction when the endpoint omits it.
-                if not principal_id:
-                    continue
-                scope = scopes[rule.scope]
-                assignment = (principal_id, rule.role, scope)
-                if (
-                    assignment not in missing
-                    and not self._assignment_exists(
-                        principal_id, rule.role, scope
-                    )
-                ):
+            for rule, assignment in required_assignments(request):
+                if assignment not in missing and not self._assignment_exists(*assignment):
                     missing.append(assignment)
                     descriptions[assignment] = _format_role_requirement(link_type, rule)
 

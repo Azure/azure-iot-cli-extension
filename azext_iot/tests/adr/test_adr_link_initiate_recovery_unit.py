@@ -19,7 +19,7 @@ from azure.core.exceptions import HttpResponseError
 from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.link_recovery import PROPAGATION_RETRIES, LinkDeadline, LinkRecovery
-from azext_iot.adr.rbac import LINK_ROLE_MATRIX, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import LINK_ROLE_IDS, LINK_ROLE_MATRIX, required_assignments, resolve_namespace_outbound_principal
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.adr.test_adr_link_propagation_unit import Harness, KINDS, NS_ID
 from azext_iot.tests.adr.test_adr_link_unit import DPS_ID, HUB_ID, UAMI_ID
@@ -254,6 +254,50 @@ def test_combined_add_recovers_dps_before_hub_using_one_deadline(mocker):
     )
     assert [next(iter(patch)) for patch in h.patches] == ["provisioning", "provisioning", "messaging"]
     assert h.clock.delays == [30]
+
+
+@pytest.mark.parametrize("rejected, outcomes, sections", [
+    ("dps", ["initiate", "success", "success"], ["provisioning", "provisioning", "messaging"]),
+    ("hub", ["success", "initiate", "success"], ["provisioning", "messaging", "messaging"]),
+])
+def test_combined_add_retries_the_generic_rejection_of_either_freshly_granted_stage(
+    mocker, rejected, outcomes, sections,
+):
+    h = _harness(mocker)
+    h.denial, h.outcomes = _rejected(rejected), outcomes
+    h.provider.link_add(
+        namespace_name="ns", resource_group_name="rg", dps_endpoint_name="dps", dps_resource_id=DPS_ID,
+        hub_endpoint_name="hub", hub_resource_id=HUB_ID, dps_mi_system_assigned=True, timeout_sec=300,
+    )
+    assert [next(iter(patch)) for patch in h.patches] == sections
+    assert h.clock.delays == [30]
+
+
+def test_combined_add_grants_for_the_hub_stage_do_not_enable_dps_generic_retries(mocker):
+    combined = dict(
+        namespace_name="ns", resource_group_name="rg", dps_endpoint_name="dps", dps_resource_id=DPS_ID,
+        hub_endpoint_name="hub", hub_resource_id=HUB_ID, dps_mi_system_assigned=True,
+        hub_mi_user_assigned=UAMI_ID, timeout_sec=300,
+    )
+    planned = _harness(mocker)
+    planned.outcomes = ["success", "success"]
+    planned.provider.link_add(**combined)
+    dps_request = next(request for (kind, _), requests in planned.provider._link_requests.items()
+                       if kind == "dps" for request in requests)
+
+    h = _harness(mocker)
+    h.assignments.extend(
+        {"principalId": principal, "scope": scope,
+         "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[role]}
+        for _, (principal, role, scope) in required_assignments(dps_request)
+    )
+    h.denial, h.outcomes = _rejected("dps"), ["initiate", "success"]
+    with pytest.raises(ADRResourceStateError):
+        h.provider.link_add(**combined)
+    # Only the Hub inbound identity is new, and it is granted on the shared namespace scope.
+    assert h.created and {scope for _, _, scope in h.created} >= {dps_request["namespace_scope"]}
+    assert [next(iter(patch)) for patch in h.patches] == ["provisioning"]
+    assert not h.clock.delays
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])

@@ -55,7 +55,7 @@ Release History
 * ``link hub|dps|su remove`` removes only the namespace endpoint. Delete the linked resource first. The command grants the namespace outbound identity Reader on the linked resource's resource group if missing; the grant is kept after unlinking.
 * ``link dps show`` reports ``brownfieldHubsAvailable: false`` when the linked Hubs cannot be read.
 * A failed link add/update reports the error of the endpoint being linked, not an older failure on another endpoint.
-* When a link add/update PATCH loses its connection, the command re-reads the namespace: it resubmits once only if the namespace is unchanged, tracks the change if the read shows it, and otherwise reports that the outcome is unknown.
+* When a link add/update PATCH loses its connection, the command never resubmits it: it re-reads the namespace, follows the change if the read shows it landed, and otherwise reports that the outcome is unknown with the commands to inspect it.
 * After a link add/update creates role assignments, a Hub/DPS ``LinkInitiateFailed`` "rejected the link request as invalid" (for example DPS 400315 while the grants propagate) is retried up to twice after 30 s and 60 s before failing.
 
 0.33.0b1 (Preview)
