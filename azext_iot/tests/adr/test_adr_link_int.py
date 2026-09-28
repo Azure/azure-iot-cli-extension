@@ -866,8 +866,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             )
 
     @pytest.mark.skip(
-        reason="Temporary: ADU linkInitiate returns 500 ResourcePostActionFailed for UAMI links (service-side); "
-        "re-enable after the ADU fix."
+        reason="Temporary: ADU linkInitiate returns 500 ResourcePostActionFailed for Update Instances with a "
+        "user-assigned identity (service-side); re-enable after the ADU fix."
     )
     @pytest.mark.timeout(_SU_LINK_LIFECYCLE_TIMEOUT, func_only=False)
     def test_adr_link_su_lifecycle(self):
