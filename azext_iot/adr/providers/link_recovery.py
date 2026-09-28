@@ -21,6 +21,7 @@ from azext_iot.adr.topology import endpoint_update_body
 
 logger = get_logger(__name__)
 AUTHORIZATION_DELAYS = (30, 60, 120)
+PROPAGATION_RETRIES = 2
 TRANSPORT_RETRIES, TRANSPORT_RETRY_DELAY = 1, 10
 ACTIVE_STATES = {"Accepted", "Creating", "Updating", "InProgress", "Running"}
 TERMINAL_FAILURES = {"Failed", "Canceled", "Cancelled"}
@@ -33,6 +34,12 @@ _LINK_INITIATE_AUTHORIZATION = re.compile(
     r"does not have authorization to perform action '(?P<action>[^'\r\n]+)' "
     r"over scope '(?P<scope>[^'\r\n]+)' or the scope is invalid\. "
     r"If access was recently granted, please refresh your credentials\.\)"
+)
+# ADR's generic envelope for a Hub/DPS linkInitiate 400, including DPS 400315
+# (inbound identity denied namespaces/read while a new grant propagates).
+_LINK_INITIATE_REJECTED = re.compile(
+    r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
+    r"Verify the endpoint configuration, then resubmit the request\."
 )
 _LINK_INITIATE_ACTIONS = {
     "hub": ("Hub", "Microsoft.Devices/IotHubs/linkInitiate/action"),
@@ -114,12 +121,16 @@ def _known_http_authorization(error):
 class LinkRecovery:
     """One endpoint UPDATE loop; never invokes public add or replaces collections."""
 
-    def __init__(self, provider, namespace, section, name, expected, budget, verify, *, authorization_request=None):
+    def __init__(
+        self, provider, namespace, section, name, expected, budget, verify, *,
+        authorization_request=None, recent_grants=False,
+    ):
         self.provider, self.section, self.name = provider, section, name
         self.kind = {"provisioning": "dps", "messaging": "hub", "updating": "su"}[section]
         self.expected = _normalized(endpoint_update_body(expected))
         self.namespace_identity = _namespace_identity(namespace)
         self.authorization_request = deepcopy(authorization_request)
+        self.recent_grants, self.retries = recent_grants, 0
         self.snapshot = None
         previous = ((namespace.get("properties") or {}).get(section) or {}).get("endpoints", {}).get(name)
         self.previous = _normalized(endpoint_update_body(previous)) if isinstance(previous, dict) else None
@@ -210,7 +221,23 @@ class LinkRecovery:
             return False
         if error.get("code") == "AdrMiNotAuthorized":
             return True
-        return self._bound_link_initiate_authorization(error)
+        return self._bound_link_initiate_authorization(error) or self._fresh_grant_rejection(error)
+
+    def _fresh_grant_rejection(self, error):
+        """Retry the generic Hub/DPS rejection briefly, only after this command created link grants.
+
+        ADR hides the service code, so this also matches real configuration
+        errors; PROPAGATION_RETRIES bounds the extra wait for those.
+        """
+        message = error.get("message")
+        match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
+        return bool(
+            self.recent_grants and self.retries < PROPAGATION_RETRIES
+            and match and self.kind in _LINK_INITIATE_ACTIONS
+            and match["service"] == _LINK_INITIATE_ACTIONS[self.kind][0]
+            and error.get("code") == "LinkInitiateFailed"
+            and not set(error) - {"code", "message"}
+        )
 
     def _bound_link_initiate_authorization(self, error):
         """Recognize only the observed service envelope, bound to original preflight.
@@ -308,7 +335,6 @@ class LinkRecovery:
 
     def run(self, *, submit, get, status_message, no_wait=False, **kwargs):
         original_error = None
-        retries = 0
         body = deepcopy(self.expected)
         # Keep caller spelling and full writable settings in the actual PATCH.
         body = deepcopy(kwargs.pop("endpoint_body", body))
@@ -418,7 +444,7 @@ class LinkRecovery:
                         )
                         try:
                             self.budget.call(self.verify, namespace, self.budget)
-                            self.budget.pause(AUTHORIZATION_DELAYS[min(retries, len(AUTHORIZATION_DELAYS) - 1)])
+                            self.budget.pause(AUTHORIZATION_DELAYS[min(self.retries, len(AUTHORIZATION_DELAYS) - 1)])
                             # A target principal or grant can change during the
                             # delay without changing the persisted endpoint.
                             self.budget.call(self.verify, namespace, self.budget)
@@ -434,7 +460,7 @@ class LinkRecovery:
                         self.before_submit = current
                         self.progressed = False
                         original_error = None
-                        retries += 1
+                        self.retries += 1
                         pending_submission = True
                         continue
                 self.budget.pause(self.budget.interval)

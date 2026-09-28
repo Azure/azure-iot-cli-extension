@@ -307,6 +307,7 @@ class LinkRbacManager:
         self._clock = clock or monotonic
         self._sleep = sleeper or sleep
         self._propagation_timeout = propagation_timeout
+        self.created = []
 
     def _invoke_json(
         self,
@@ -714,6 +715,7 @@ class LinkRbacManager:
                     "Complete these exact remediation commands, allow RBAC to "
                     f"propagate, and retry:\n{remaining}\nDetail: {error}"
                 ) from error
+        self.created.extend(created)
         if created:
             logger.warning(
                 "Completed these role-assignment creation requests "

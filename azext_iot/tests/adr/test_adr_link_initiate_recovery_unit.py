@@ -18,7 +18,7 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.providers.link import LinkProvider
-from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery
+from azext_iot.adr.providers.link_recovery import PROPAGATION_RETRIES, LinkDeadline, LinkRecovery
 from azext_iot.adr.rbac import LINK_ROLE_MATRIX, resolve_namespace_outbound_principal
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.adr.test_adr_link_propagation_unit import Harness, KINDS, NS_ID
@@ -46,6 +46,18 @@ def _denial(harness, *, kind=None, principal=None, action=None, scope=None):
             f"over scope '{scope}' or the scope is invalid. "
             "If access was recently granted, please refresh your credentials.)"
         ),
+    }
+
+
+def _rejected(kind, **extra):
+    service = {"hub": "Hub", "dps": "DPS", "su": "SU"}[kind]
+    return {
+        "code": "LinkInitiateFailed",
+        "message": (
+            f"The {service} resource rejected the link request as invalid. "
+            "Verify the endpoint configuration, then resubmit the request."
+        ),
+        **extra,
     }
 
 
@@ -94,10 +106,7 @@ def test_exact_link_initiate_authorization_recovers_with_verified_original_roles
 def test_unbound_or_other_link_initiate_failures_are_not_retried(mocker, kind, mutation):
     h = _harness(mocker, kind)
     if mutation == "invalid-request":
-        h.denial["message"] = (
-            "The DPS resource rejected the link request as invalid. "
-            "Verify the endpoint configuration, then resubmit the request."
-        )
+        h.denial = _rejected("hub" if kind == "dps" else "dps")
     elif mutation == "principal":
         h.denial = _denial(h, principal=UAMI)
     elif mutation == "client-is-principal":
@@ -291,3 +300,58 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert patches == [{"properties": {section: {"endpoints": {kind: h.body}}}}] * 2
     assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("action", ["add", "update"])
+def test_generic_rejection_after_fresh_grants_is_retried_while_they_propagate(mocker, kind, identity, action):
+    h = _harness(mocker, kind, identity, action)
+    h.denial = _rejected(kind)
+    verify = mocker.spy(h.provider._rbac, "verify_many")
+    result = h.run(timeout_sec=300, wait_sec=1)
+    section = KINDS[kind][0]
+    assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
+    assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
+    assert h.clock.delays == [30]
+    assert verify.call_count == 2
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+
+
+def test_generic_rejection_retries_are_bounded(mocker):
+    h = _harness(mocker)
+    h.denial = _rejected("dps")
+    h.outcomes = ["initiate"] * 10
+    with pytest.raises(ADRResourceStateError, match="rejected the link request as invalid"):
+        h.run(timeout_sec=600, wait_sec=1)
+    assert len(h.patches) == 1 + PROPAGATION_RETRIES
+    assert h.clock.delays == [30, 60]
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("grants", ["none", "other-scope"])
+def test_generic_rejection_without_fresh_link_grants_is_not_retried(mocker, kind, grants):
+    h = _harness(mocker, kind, action="update")
+    h.outcomes = ["success"]
+    h.run()
+    h.provider._rbac.created[:] = [] if grants == "none" else [(SAMI, "Contributor", NS_ID + "-other")]
+    h.denial = _rejected(kind)
+    h.outcomes = ["initiate", "success"]
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 2
+    assert not h.clock.delays
+
+
+@pytest.mark.parametrize("denial", [
+    _rejected("su"), _rejected("dps", details=[{"code": "IH400315"}]), {**_rejected("dps"), "code": "Other"},
+    {**_rejected("dps"), "message": _rejected("dps")["message"] + " Another error."},
+])
+def test_generic_rejection_retry_requires_the_exact_hub_or_dps_envelope(mocker, denial):
+    kind = "su" if "SU" in denial["message"] else "dps"
+    h = _harness(mocker, kind)
+    h.denial = denial
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 1
+    assert not h.clock.delays

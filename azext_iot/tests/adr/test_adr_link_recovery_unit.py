@@ -151,7 +151,7 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
             "userAssignedIdentities": {UAMI_ID: {"principalId": "target-user"}},
         },
     })
-    provider._rbac = Mock()
+    provider._rbac = Mock(created=[])
     provider._warn_if_hub_classically_linked = Mock()
     provider._wait = Mock()
     identity_args = {"mi_user_assigned": UAMI_ID} if user_assigned else {"mi_system_assigned": True}
@@ -208,7 +208,7 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     provider._get_target = Mock(return_value={
         "location": "centraluseuap", "sku": {"name": "S1"}, "properties": {"provisioningState": "Succeeded"},
     })
-    provider._rbac = Mock()
+    provider._rbac = Mock(created=[])
     provider._warn_if_hub_classically_linked = Mock()
     provider._wait = Mock()
     provider.hub_update("primary", "ns", "ns-rg", no_wait=True)
