@@ -37,10 +37,12 @@ GENERATE_URL = f"{NAMESPACE_URL}/generateReport"
 LATEST_URL = f"{NAMESPACE_URL}/getLatestReport"
 STATUS_URL = f"{NAMESPACE_URL}/operationStatuses/report"
 RESULT_URL = f"{NAMESPACE_URL}/operationResults/report"
+GROUP_URL = f"{NAMESPACE_URL}/groups/group"
+GROUP_UUID = "049e33ef-ba81-461d-8742-15c9c459dde9"
 REPORT_SELECTORS = [
     {"reportType": "NamespaceUpdateComplianceReport"},
-    {"reportType": "GroupBestUpdatesComplianceReport", "reportTarget": "group"},
-    {"reportType": "GroupInstallableUpdatesReport", "reportTarget": "group"},
+    {"reportType": "GroupBestUpdatesComplianceReport", "reportTarget": GROUP_UUID},
+    {"reportType": "GroupInstallableUpdatesReport", "reportTarget": GROUP_UUID},
 ]
 CA_URL = f"{NAMESPACE_URL}/certificateAuthorities/ca"
 CA_LOCATION = f"{NAMESPACE_URL}/operationResults/ca"
@@ -605,13 +607,16 @@ def test_generate_report_wire_output_and_no_wait(
     report = {**selector, "generatedAt": "2026-09-10T04:00:00Z", "reportData": {"deviceCount": 3}}
     if not no_wait:
         mocked_response.add("POST", LATEST_URL, json=report)
+    group_name = "group" if "reportTarget" in selector else None
+    if group_name:
+        mocked_response.add("GET", GROUP_URL, json={"name": "group", "properties": {"uuid": GROUP_UUID}})
     provider = ReportProvider(fixture_cmd, client=wire_client)
     begin = mocker.spy(wire_client.namespaces, "begin_generate_report")
     wait = mocker.spy(provider, "_wait")
 
     result = provider.generate(
         "namespace", "rg", selector["reportType"],
-        group_name=selector.get("reportTarget"), no_wait=no_wait, wait_sec=0,
+        group_name=group_name, no_wait=no_wait, wait_sec=0,
     )
 
     if no_wait:
@@ -623,6 +628,8 @@ def test_generate_report_wire_output_and_no_wait(
         wait.assert_called_once()
     # Join the real SDK poller before the mocked transport is torn down.
     assert begin.spy_return.result() is None
+    group_reads = [call for call in mocked_response.calls if call.request.url.startswith(GROUP_URL)]
+    assert len(group_reads) == (1 if group_name else 0)
     action_calls = [call for call in mocked_response.calls if call.request.method == "POST"]
     assert [urlsplit(call.request.url).path for call in action_calls] == [
         urlsplit(url).path for url in ([GENERATE_URL] if no_wait else [GENERATE_URL, LATEST_URL])

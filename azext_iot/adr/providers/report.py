@@ -6,7 +6,7 @@
 
 from typing import Optional
 
-from azure.cli.core.azclierror import ArgumentUsageError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError
 
 from azext_iot.adr.common import ReportType
 from azext_iot.adr.providers.base import ADRProvider
@@ -41,6 +41,23 @@ class ReportProvider(ADRProvider):
             selector["reportTarget"] = group_name
         return selector
 
+    def _resolve_selector(self, namespace_name, resource_group_name, report_type, group_name):
+        """Validate locally, then replace the group name with the UUID the RP requires."""
+        selector = self._build_selector(report_type, group_name)
+        if "reportTarget" in selector:
+            group = self.client.groups.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                group_name=selector["reportTarget"],
+            )
+            group_uuid = ((group or {}).get("properties") or {}).get("uuid")
+            if not isinstance(group_uuid, str) or not group_uuid:
+                raise AzureResponseError(
+                    f"Group '{selector['reportTarget']}' did not return a UUID to use as the report target."
+                )
+            selector["reportTarget"] = group_uuid
+        return selector
+
     def generate(
         self,
         namespace_name: str,
@@ -49,10 +66,11 @@ class ReportProvider(ADRProvider):
         group_name: Optional[str] = None,
         **kwargs,
     ):
+        selector = self._resolve_selector(namespace_name, resource_group_name, report_type, group_name)
         poller = self.client.namespaces.begin_generate_report(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
-            body=self._build_selector(report_type, group_name),
+            body=selector,
         )
         if kwargs.pop("no_wait", False):
             return poller
@@ -61,11 +79,10 @@ class ReportProvider(ADRProvider):
             f"Generating {report_type} for namespace {namespace_name}...",
             **kwargs,
         )
-        return self.latest(
-            namespace_name=namespace_name,
+        return self.client.namespaces.get_latest_report(
             resource_group_name=resource_group_name,
-            report_type=report_type,
-            group_name=group_name,
+            namespace_name=namespace_name,
+            body=selector,
         )
 
     def latest(
@@ -78,5 +95,5 @@ class ReportProvider(ADRProvider):
         return self.client.namespaces.get_latest_report(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
-            body=self._build_selector(report_type, group_name),
+            body=self._resolve_selector(namespace_name, resource_group_name, report_type, group_name),
         )

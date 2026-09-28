@@ -1162,5 +1162,6 @@ def load_adr_arguments(self, _):
         context.argument(
             "group_name",
             options_list=["--group-name", "--gn"],
-            help="Group target. Required for group report types.",
+            help="Name of the device group. Required for group report types. The report "
+                 "identifies the group by its UUID (reportTarget).",
         )

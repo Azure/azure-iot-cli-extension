@@ -50,10 +50,10 @@ class TestADRReports(ADRLiveScenarioTest):
         rg = TEST_RG
 
         with CleanupLedger() as cleanup:
-            self.cmd(
+            group_uuid = self.cmd(
                 f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
                 '--query-string "*"'
-            )
+            ).get_output_in_json()["properties"]["uuid"]
             cleanup.register(
                 "group",
                 lambda: self.cmd(
@@ -83,14 +83,14 @@ class TestADRReports(ADRLiveScenarioTest):
             assert generated_group_report["reportType"] == (
                 "GroupBestUpdatesComplianceReport"
             )
-            assert generated_group_report["reportTarget"] == group_name
+            assert generated_group_report["reportTarget"] == group_uuid
             group_report = self._get_latest_report(
                 namespace_name,
                 "GroupBestUpdatesComplianceReport",
                 group_name=group_name,
             )
             assert group_report["reportType"] == "GroupBestUpdatesComplianceReport"
-            assert group_report["reportTarget"] == group_name
+            assert group_report["reportTarget"] == group_uuid
 
             generated_installable_report = self.cmd(
                 f"iot adr ns report generate --ns {namespace_name} -g {rg} "
@@ -100,7 +100,7 @@ class TestADRReports(ADRLiveScenarioTest):
             assert generated_installable_report["reportType"] == (
                 "GroupInstallableUpdatesReport"
             )
-            assert generated_installable_report["reportTarget"] == group_name
+            assert generated_installable_report["reportTarget"] == group_uuid
             installable_report = self._get_latest_report(
                 namespace_name,
                 "GroupInstallableUpdatesReport",
@@ -109,7 +109,7 @@ class TestADRReports(ADRLiveScenarioTest):
             assert installable_report["reportType"] == (
                 "GroupInstallableUpdatesReport"
             )
-            assert installable_report["reportTarget"] == group_name
+            assert installable_report["reportTarget"] == group_uuid
 
             self.cmd(
                 f"iot adr ns report generate --ns {namespace_name} -g {rg} "
