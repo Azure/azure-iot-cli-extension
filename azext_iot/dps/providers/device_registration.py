@@ -51,7 +51,6 @@ from azext_iot.operations.dps import (
 
 _REGISTRATION_TIMEOUT_SECONDS = 5 * 60
 _REGISTRATION_RETRY_SECONDS = 2
-_REGISTRATION_MAX_RETRY_SECONDS = 30
 _CSR_PEM = re.compile(
     r"\A\s*-----BEGIN (?P<label>(?:NEW )?CERTIFICATE REQUEST)-----"
     r"\s+.+?\s+-----END (?P=label)-----\s*\Z",
@@ -80,21 +79,6 @@ def _as_device_response(value) -> _DeviceResponse:
     # Test doubles and older compatible clients may ignore `cls`. Such a
     # direct return has historically represented a completed response.
     return _DeviceResponse(status_code=200, body=value, headers={})
-
-
-def _retry_after_seconds(headers, fallback=_REGISTRATION_RETRY_SECONDS):
-    value = None
-    for key, candidate in (headers or {}).items():
-        if str(key).casefold() == "retry-after":
-            value = candidate
-            break
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = 0
-    if parsed <= 0:
-        parsed = fallback
-    return min(parsed, _REGISTRATION_MAX_RETRY_SECONDS)
 
 
 def _read_csr_argument(value: str) -> str:
@@ -572,12 +556,13 @@ class DeviceRegistrationProvider:
 
                 _wait(current.headers, deadline)
             else:
-                self._sleep(
-                    min(
-                        _retry_after_seconds(current.headers),
-                        remaining,
-                    )
-                )
+                from azext_iot.dps.services._registration import retry_after_seconds
+
+                delay = retry_after_seconds(current.headers, _REGISTRATION_RETRY_SECONDS)
+                # Never poll before DPS permits it; time out instead.
+                if delay >= remaining:
+                    break
+                self._sleep(delay)
             if deadline - self._clock() <= 0:
                 break
             try:
@@ -608,7 +593,7 @@ class DeviceRegistrationProvider:
                 )
         if current.status_code == 200:
             return current.body
-        raise AzureResponseError(self._timeout_message())
+        raise AzureConnectionError(self._timeout_message())
 
     def _correlate_registration(self, result):
         registration_state = (result or {}).get("registrationState")

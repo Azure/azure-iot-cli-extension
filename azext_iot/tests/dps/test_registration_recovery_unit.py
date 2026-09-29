@@ -255,8 +255,8 @@ def test_worker_rejects_invalid_diagnostic_envelopes(diagnostics):
 
 
 def test_default_retry_after_ignores_other_headers():
-    assert device._retry_after_seconds({"other": "secret"}) == 2
-    assert device._retry_after_seconds({"other": "secret", "retry-after": "3"}) == 3
+    assert registration.retry_after_seconds({"other": "secret"}, 2) == 2
+    assert registration.retry_after_seconds({"other": "secret", "retry-after": "3"}, 2) == 3
 
 
 @pytest.mark.parametrize("with_csr", [False, True])

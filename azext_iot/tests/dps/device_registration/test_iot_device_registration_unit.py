@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from azure.cli.core.azclierror import (
+    AzureConnectionError,
     AzureResponseError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
@@ -68,8 +69,11 @@ def test_generated_response_capture_and_retry_header_parsing():
     assert captured == subject._DeviceResponse(
         202, {"operationId": "operation"}, {"Retry-After": "4"}
     )
-    assert subject._retry_after_seconds({"retry-after": "invalid"}) == 2
-    assert subject._retry_after_seconds({"RETRY-AFTER": "45"}) == 30
+    from azext_iot.dps.services._registration import retry_after_seconds
+    assert retry_after_seconds({"retry-after": "invalid"}, 2) == 2
+    assert retry_after_seconds({"retry-after": "0"}, 2) == 2
+    assert retry_after_seconds({"RETRY-AFTER": "45"}, 2) == 45
+    assert retry_after_seconds({"Retry-After": 7}, 2) == 7
 
 
 def test_terminal_registration_validation_ignores_non_object_results():
@@ -861,11 +865,12 @@ def test_registration_wait_times_out_with_safe_status_guidance():
         )
     )
 
-    with pytest.raises(AzureResponseError, match="operation-status") as raised:
+    with pytest.raises(AzureConnectionError, match="operation-status") as raised:
         provider.create()
 
     assert "may still complete" in str(raised.value)
-    assert sleeps == [5]
+    # Retry-After exceeds the remaining budget: fail now instead of polling early.
+    assert not sleeps
     # pylint: disable=no-member
     provider.client.runtime_registration.operation_status_lookup_preview.assert_not_called()
 
@@ -878,7 +883,7 @@ def test_registration_wait_handles_preexpired_deadline():
         )
     )
 
-    with pytest.raises(AzureResponseError, match="operation-status"):
+    with pytest.raises(AzureConnectionError, match="operation-status"):
         provider.create()
 
     # pylint: disable=no-member

@@ -441,7 +441,7 @@ def adr_su_software_update_wait(
         False,
         False,
         deleted,
-        # Software updates have no provisioningState; a successful GET means created.
+        # Software updates have no provisioningState; --created and --updated both wait for existence.
         exists or created or updated,
         custom,
     )

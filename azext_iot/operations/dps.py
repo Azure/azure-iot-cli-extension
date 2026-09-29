@@ -55,11 +55,10 @@ def _drop_none(value):
 def _clean_twin_collection(collection):
     if not isinstance(collection, dict):
         return {}
-    readonly = {"$metadata", "$version", "count", "metadata", "version"}
     return {
         key: value
         for key, value in collection.items()
-        if key not in readonly
+        if key not in ("$metadata", "$version")
     }
 
 

@@ -62,7 +62,6 @@ class BaseDiscovery(ABC):
         self.client = None
         self.sub_id = "unknown"
         self.last_resource_group = None
-        self.last_subscription_id = None
         self.resource_type = resource_type
         self.necessary_rights_set = necessary_rights_set
 
@@ -151,7 +150,6 @@ class BaseDiscovery(ABC):
             ),
             resource_label=getattr(self, "resource_type", None) or "resource",
         )
-        self.last_subscription_id = subscription_id
         return subscription_id
 
     def find_resource(self, resource_name: str, rg: str = None):

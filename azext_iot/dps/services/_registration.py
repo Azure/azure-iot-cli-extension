@@ -38,19 +38,23 @@ def _remaining(deadline):
     return remaining
 
 
-def _wait(headers, deadline):
-    value = next((v for k, v in headers.items() if k.casefold() == "retry-after"), None)
-    delay = 1.0
-    if value is not None:
+def retry_after_seconds(headers, fallback):
+    """Return the Retry-After delay (seconds or HTTP-date), or ``fallback`` if absent, invalid or not positive."""
+    value = next((v for k, v in (headers or {}).items() if str(k).casefold() == "retry-after"), None)
+    if value is None:
+        return fallback
+    try:
+        delay = float(value)
+    except (TypeError, ValueError):
         try:
-            delay = float(value)
-        except ValueError:
-            try:
-                delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
-            except (ValueError, TypeError, OverflowError):
-                delay = 1.0
-    if not math.isfinite(delay) or delay < 0:
-        delay = 1.0
+            delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            return fallback
+    return delay if math.isfinite(delay) and delay > 0 else fallback
+
+
+def _wait(headers, deadline):
+    delay = retry_after_seconds(headers, 1.0)
     if delay >= _remaining(deadline):
         raise RegistrationTimeoutError("DPS registration timed out before the next permitted retry. " + timeout_message())
     sleep(delay)

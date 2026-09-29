@@ -271,14 +271,6 @@ class SdkResolver(object):
         self.device_id = device_id
         self.auth_override = auth_override
 
-        # This initialization will likely need to change to support more variation of SDK
-        self.sas_uri = self.target["entity"]
-        self.endpoint = "https://{}".format(self.sas_uri)
-
-        # Base endpoints stay the same
-        if self.device_id:
-            self.sas_uri = "{}/devices/{}".format(self.sas_uri, self.device_id)
-
     def get_sdk(self, sdk_type):
         sdk_map = self._construct_sdk_map()
         return sdk_map[sdk_type]()

@@ -66,15 +66,15 @@ def test_twin_helpers_build_and_preserve_raw_mappings():
     }
     record = {
         "initialTwin": {
-            "tags": {"site": "one", "$metadata": {}},
+            "tags": {"site": "one", "version": "v1", "$metadata": {}},
             "properties": {
-                "desired": {"interval": 5, "$version": 3}
+                "desired": {"interval": 5, "count": 2, "$version": 3}
             },
         }
     }
     assert subject._get_updated_inital_twin(record) == {
-        "tags": {"site": "one"},
-        "properties": {"desired": {"interval": 5}},
+        "tags": {"site": "one", "version": "v1"},
+        "properties": {"desired": {"interval": 5, "count": 2}},
     }
 
 
@@ -94,14 +94,16 @@ def test_drop_none_and_readonly_enrollment_fields():
             },
         },
         "initialTwin": {
-            "tags": {"site": "one", "metadata": {}},
-            "properties": {"desired": {"interval": 5, "version": 2}},
+            "tags": {"site": "one", "metadata": {}, "$metadata": {}},
+            "properties": {"desired": {"interval": 5, "version": 2, "$version": 4}},
         },
         "optionalDeviceInformation": {
             "manufacturer": "Contoso",
             "count": 1,
             "metadata": {},
             "version": 2,
+            "$metadata": {},
+            "$version": 4,
         },
     }
 
@@ -112,10 +114,11 @@ def test_drop_none_and_readonly_enrollment_fields():
     assert result["attestation"]["x509"]["clientCertificates"]["primary"] == {
         "certificate": "cert", "info": {"version": 3}
     }
-    assert result["initialTwin"]["tags"] == {"site": "one"}
-    assert result["initialTwin"]["properties"]["desired"] == {"interval": 5}
+    # Only the service's $-prefixed twin metadata is read-only; same-named user keys survive.
+    assert result["initialTwin"]["tags"] == {"site": "one", "metadata": {}}
+    assert result["initialTwin"]["properties"]["desired"] == {"interval": 5, "version": 2}
     assert result["optionalDeviceInformation"] == {
-        "manufacturer": "Contoso"
+        "manufacturer": "Contoso", "count": 1, "metadata": {}, "version": 2,
     }
 
 

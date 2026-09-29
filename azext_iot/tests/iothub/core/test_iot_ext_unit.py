@@ -2550,7 +2550,9 @@ class TestEdgeOffline:
             build_mock_response(
                 mocker, request.param[0], generate_child_device(**child_kvp)
             ),
-            build_mock_response(mocker, request.param[1], {}),
+        ] + [
+            # A failing device read may be retried when the status is transient.
+            build_mock_response(mocker, request.param[1], {}) for _ in range(4)
         ]
         service_client.side_effect = test_side_effect
         return service_client

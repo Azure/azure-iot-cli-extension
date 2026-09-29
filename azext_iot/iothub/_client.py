@@ -33,6 +33,34 @@ _BODIES = {
     ("device", "update_file_upload_status"): ("file_upload_completion_status", "FileUploadCompletionStatus"),
 }
 
+# requests applies this to connect and to each socket read; it is not a total upload deadline.
+_BLOB_REQUEST_TIMEOUT_SECONDS = 60
+
+# Replay-safe reads retry transient failures, as the msrest-based Hub SDKs did.
+# Everything else, including message receives that lock messages, is never replayed.
+_READ_RETRY_TOTAL = 4
+_READ_OPERATIONS = frozenset({
+    ("configuration", "get"),
+    ("configuration", "get_configurations"),
+    ("configuration", "test_queries"),
+    ("devices", "get_devices"),
+    ("devices", "get_identity"),
+    ("devices", "get_twin"),
+    ("digital_twin", "get_digital_twin"),
+    ("jobs", "get_import_export_job"),
+    ("jobs", "get_import_export_jobs"),
+    ("jobs", "get_scheduled_job"),
+    ("jobs", "query_scheduled_jobs"),
+    ("modules", "get_identity"),
+    ("modules", "get_modules_on_device"),
+    ("modules", "get_twin"),
+    ("query", "get_twins"),
+    ("statistics", "get_device_statistics"),
+    ("statistics", "get_service_statistics"),
+    ("device", "get_device_and_module_in_scope"),
+    ("device", "get_devices_and_modules_in_scope"),
+})
+
 
 def _response(response):
     """Expose the requests-style raw contract used by messaging and query consumers."""
@@ -71,8 +99,7 @@ class HubOperationGroup:
         timeout = kwargs.pop("timeout", None)
         if timeout is not None:
             kwargs.update(connection_timeout=timeout, read_timeout=timeout)
-        # CLI controls retries explicitly; do not replay uncertain mutations.
-        kwargs.setdefault("retry_total", 0)
+        kwargs.setdefault("retry_total", _READ_RETRY_TOTAL if (self.name, name) in _READ_OPERATIONS else 0)
         kwargs["headers"] = headers
         if self.name == "jobs" and name == "query_scheduled_jobs":
             kwargs.update(zip(("job_type", "job_status"), args))
@@ -209,7 +236,7 @@ def upload_file_to_container(storage_endpoint, content, content_type):
         content = content.encode("utf-8")
     headers = {"x-ms-blob-type": "BlockBlob", "Content-Type": content_type, "Content-Length": str(len(content))}
     try:
-        response = requests.put(url, data=content, headers=headers, timeout=60, allow_redirects=False)
+        response = requests.put(url, data=content, headers=headers, timeout=_BLOB_REQUEST_TIMEOUT_SECONDS, allow_redirects=False)
     except requests.RequestException:
         raise FileOperationError("Storage upload transport failed.") from None
     if response.status_code not in (200, 201):

@@ -399,6 +399,8 @@ class TestEnrollmentUpdate():
                                         initial_twin_properties={'newKey': 'newValue'},
                                         provisioning_status='enabled',
                                         device_id='newId')),
+        (generate_enrollment_update_req(initial_twin_tags={'version': 'v1', 'count': 2, 'metadata': {'a': 1}},
+                                        initial_twin_properties={'version': 3, 'count': 4, 'metadata': 'm'})),
         (generate_enrollment_update_req(reprovision_policy='reprovisionandmigratedata')),
         (generate_enrollment_update_req(reprovision_policy='reprovisionandresetdata')),
         (generate_enrollment_update_req(reprovision_policy='never')),

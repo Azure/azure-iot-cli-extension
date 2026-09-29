@@ -286,6 +286,37 @@ def test_http_errors_preserve_details_without_replay(group, method, kwargs, path
     client.close()
 
 
+def test_read_retry_allowlist_names_real_operations():
+    from azext_iot.iothub._client import _READ_OPERATIONS
+    assert _READ_OPERATIONS <= {(case[1], case[2]) for case in CASES}
+
+
+@pytest.mark.parametrize("group,method,kwargs,verb,path,retried", [
+    ("devices", "get_identity", {"id": "device"}, "GET", "/devices/device", True),
+    ("query", "get_twins", {"query_specification": {"query": "select * from devices"}}, "POST", "/devices/query", True),
+    ("devices", "create_or_update_identity", {"id": "device", "device": {"deviceId": "device"}}, "PUT",
+     "/devices/device", False),
+    ("devices", "invoke_method", {"device_id": "device", "direct_method_request": {"methodName": "m"}}, "POST",
+     "/twins/device/methods", False),
+    ("cloud_to_device_messages", "receive_feedback_notification", {}, "GET", "/messages/serviceBound/feedback", False),
+])
+def test_only_replay_safe_reads_retry_transient_failures(group, method, kwargs, verb, path, retried):
+    sdk = IotHubGatewayServiceAPIs(
+        AzureKeyCredential("SharedAccessSignature offline"), endpoint=ENDPOINT, retry_total=0, retry_backoff_factor=0,
+    )
+    client = HubClient(sdk, {group})
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
+        network.add(verb, ENDPOINT + path, status=503, json={"Message": "busy"})
+        network.add(verb, ENDPOINT + path, status=200, json={})
+        if retried:
+            getattr(getattr(client, group), method)(**kwargs)
+        else:
+            with pytest.raises(CloudError):
+                getattr(getattr(client, group), method)(**kwargs)
+        assert len(network.calls) == (2 if retried else 1)
+    client.close()
+
+
 def test_error_without_response_is_not_reclassified(mocker):
     client = adapter()
     error = HttpResponseError("credential failure")

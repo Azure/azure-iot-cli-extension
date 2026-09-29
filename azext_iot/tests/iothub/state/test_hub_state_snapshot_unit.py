@@ -61,8 +61,14 @@ def _twin(device_id, module=False, populated=True):
     return result
 
 
+def _read_attempts(status):
+    # Reads are replay-safe: a 5xx gets azure-core's three status retries; other failures are final.
+    return 4 if status >= 500 else 1
+
+
 @pytest.fixture
 def snapshot_service(mocker):
+    mocker.patch("azure.core.pipeline.policies.RetryPolicy.sleep")
     mocker.patch("azure.cli.core._profile.Profile.__init__", side_effect=AssertionError("No live Profile allowed"))
     mocker.patch("socket.socket.connect", side_effect=AssertionError("No live socket allowed"))
     stores = {
@@ -229,7 +235,7 @@ def test_authoritative_twin_failure_precedes_destination_changes(snapshot_servic
     assert filename.read_text(encoding="utf-8") == "existing snapshot"
     assert not runtime.stores["destination"]
     assert all(urlsplit(request.url).hostname == "origin.unit.invalid" for request in runtime.requests)
-    assert sum(urlsplit(request.url).path == "/twins/parent" for request in runtime.requests) == 1
+    assert sum(urlsplit(request.url).path == "/twins/parent" for request in runtime.requests) == _read_attempts(status)
 
 
 @pytest.mark.parametrize("method,path", [
@@ -257,7 +263,9 @@ def test_every_authoritative_read_failure_precedes_mutation(snapshot_service, tm
     assert runtime.stores == original
     assert filename.read_text(encoding="utf-8") == "existing snapshot"
     assert all(urlsplit(request.url).hostname == "origin.unit.invalid" for request in runtime.requests)
-    assert sum((request.method, urlsplit(request.url).path) == (method, path) for request in runtime.requests) == 1
+    assert sum(
+        (request.method, urlsplit(request.url).path) == (method, path) for request in runtime.requests
+    ) == _read_attempts(status)
 
 
 @pytest.mark.parametrize("operation", ["migrate", "file"])
