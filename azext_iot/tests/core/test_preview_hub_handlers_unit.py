@@ -485,31 +485,31 @@ def test_hub_identity_show_and_scoped_assignment(mocker, preview_mgmt):
 
 
 def test_role_assignment_uses_cli_helper_when_available(mocker):
+    create, assign = mocker.Mock(), mocker.Mock()
     arm = ModuleType("azure.cli.core.commands.arm")
-    arm.create_role_assignment = mocker.Mock()
-    arm.assign_identity = mocker.Mock()
+    arm.create_role_assignment = create
+    arm.assign_identity = assign
     mocker.patch.dict(sys.modules, {"azure.cli.core.commands.arm": arm})
     context = object()
 
     custom._create_role_assignment(context, "principal", identity_role="Reader", identity_scope="/scope")
 
-    arm.create_role_assignment.assert_called_once_with(
-        context, "principal", identity_role="Reader", identity_scope="/scope"
-    )
-    arm.assign_identity.assert_not_called()
+    create.assert_called_once_with(context, "principal", identity_role="Reader", identity_scope="/scope")
+    assign.assert_not_called()
 
 
 def test_role_assignment_falls_back_to_assign_identity_before_cli_2_83(mocker):
     # azure-cli 2.73-2.82 only expose assign_identity(cli_ctx, getter, setter, ...).
+    assign = mocker.Mock()
     arm = ModuleType("azure.cli.core.commands.arm")
-    arm.assign_identity = mocker.Mock()
+    arm.assign_identity = assign
     mocker.patch.dict(sys.modules, {"azure.cli.core.commands.arm": arm})
     context = object()
 
     custom._create_role_assignment(context, "principal", identity_role="Reader", identity_scope="/scope")
 
-    arm.assign_identity.assert_called_once()
-    args, kwargs = arm.assign_identity.call_args
+    assign.assert_called_once()
+    args, kwargs = assign.call_args
     cli_ctx, getter, setter = args
     assert cli_ctx is context
     assert kwargs == {"identity_role": "Reader", "identity_scope": "/scope"}

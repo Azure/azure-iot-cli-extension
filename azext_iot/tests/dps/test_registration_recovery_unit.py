@@ -272,7 +272,7 @@ runpy.run_path({worker.__file__!r}, run_name="__main__")
     config = tmp_path / "private-cli"
     config.mkdir(mode=0o700)
     child = subprocess.run(
-        [sys.executable, "-I", "-c", driver], input=b"{}", capture_output=True, timeout=120,
+        [sys.executable, "-I", "-c", driver], input=b"{}", capture_output=True, timeout=120, check=False,
         env=dict(os.environ, AZURE_CONFIG_DIR=str(config), AZURE_TEST_RUN_LIVE="False"),
     )
     if pass_cli_root:
