@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from argcomplete.completers import FilesCompleter  # pylint: disable=import-error
-from knack.arguments import CLIArgumentType
+from knack.arguments import CLIArgumentType, ignore_type
 from azure.cli.core.commands.parameters import (get_location_type,
                                                 file_type,
                                                 get_resource_name_completion_list,
@@ -21,6 +21,7 @@ from azure.cli.command_modules.iot.shared import (EndpointType,
 
 
 from .custom import KeyType, SimpleAccessRights
+from ._validators import capture_dps_capacity_edit, validate_dps_create_unit
 from .shared import IotDpsSku, IotHubSku, AccessRightsDescription, IotHubAuthenticationType
 from azure.cli.command_modules.iot._validators import (validate_policy_permissions,
                                                        validate_retention_days,
@@ -44,14 +45,6 @@ dps_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/ProvisioningServices'),
     help='IoT Hub Device Provisioning Service name')
 
-mi_system_assigned_type = CLIArgumentType(
-    options_list=['--mi-system-assigned'],
-    help='Provide this flag to use system assigned identity.')
-
-system_assigned_type = CLIArgumentType(
-    options_list=['--system-assigned'],
-    help='Provide this flag to refer to the system-assigned identity.')
-
 
 def load_arguments(self, _):  # pylint: disable=too-many-statements
     # Arguments for IoT DPS
@@ -64,17 +57,27 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
             c.argument('dps_name', dps_name_type, id_part='name')
 
     with self.argument_context('iot dps create') as c:
+        c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
+                   arg_type=get_three_state_flag(),
+                   help='Disable DPS service scoped SAS keys for authentication. '
+                   'Defaults to true for new resources. Use --auth-type login for service data-plane commands.')
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub Device Provisioning Service. '
                    'Default is the location of target resource group.')
         c.argument('sku', arg_type=get_enum_type(IotDpsSku),
                    help='Pricing tier for the IoT Hub Device Provisioning Service.')
-        c.argument('unit', help='Units in your IoT Hub Device Provisioning Service.', type=int)
+        c.argument('unit', help='Units in your IoT Hub Device Provisioning Service. Integer minimum: 1.',
+                   type=int, validator=validate_dps_create_unit)
         c.argument('enable_data_residency', arg_type=get_three_state_flag(),
                    options_list=['--enforce-data-residency', '--edr'],
                    help='Enforce data residency for this IoT Hub Device Provisioning Service by disabling '
                    'cross geo-pair disaster recovery. This property is immutable once set on the resource. '
                    'Only available in select regions. Learn more at https://aka.ms/dpsdr')
+
+    with self.argument_context('iot dps update') as c:
+        # Command-level validation would bypass normal argument validators, including tags.
+        c.argument('dps_capacity_edited', arg_type=ignore_type, options_list=['--__DPS_CAPACITY_EDITED'],
+                   validator=capture_dps_capacity_edit)
 
     # plan to slowly align this with extension naming patterns - n should be aligned with dps_name
     for subgroup in ['linked-hub', 'certificate']:
@@ -239,7 +242,9 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable '
-                        'IoT hub scoped SAS keys for authentication.')
+                        'IoT hub scoped SAS keys for authentication. Defaults to true for new Hubs; '
+                        'existing Hub settings are preserved unless specified. '
+                        'Use --auth-type login for service data-plane commands.')
         c.argument('disable_device_sas', options_list=['--disable-device-sas', '--dds'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable all device '
@@ -303,12 +308,29 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    type=str, help='Specify the minimum TLS version to support for this hub. Can be set to '
                                   '"1.0" or "1.2". For example, minimum TLS version set to "1.2" '
                                   'results in clients that use a TLS version below 1.2 to be rejected.')
-        c.argument('system_identity', options_list=['--mi-system-assigned'],
-                   arg_type=get_three_state_flag(),
-                   help="Enable system-assigned managed identity for this hub")
-        c.argument('user_identities', options_list=['--mi-user-assigned'],
-                   nargs='*', help="Enable user-assigned managed identities for this hub. "
-                   "Accept space-separated list of identity resource IDs.")
+        c.argument(
+            'system_identity',
+            options_list=[
+                '--system-assigned-mi',
+                c.deprecate(
+                    target='--mi-system-assigned',
+                    redirect='--system-assigned-mi',
+                    hide=True),
+            ],
+            arg_type=get_three_state_flag(),
+            help="Enable system-assigned managed identity for this hub")
+        c.argument(
+            'user_identities',
+            options_list=[
+                '--user-assigned-mi',
+                c.deprecate(
+                    target='--mi-user-assigned',
+                    redirect='--user-assigned-mi',
+                    hide=True),
+            ],
+            nargs='*',
+            help="Enable user-assigned managed identities for this hub. "
+                 "Accept space-separated list of identity resource IDs.")
         c.argument('identity_role', options_list=['--role'],
                    help="Role to assign to the hub's system-assigned managed identity.")
         c.argument('identity_scopes', options_list=['--scopes'], nargs='*',
@@ -425,6 +447,10 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
 
     with self.argument_context('iot hub create') as c:
         c.argument('hub_name', completer=None)
+        c.argument('sku', help='Pricing tier. New Hubs default to S1. Only one free F1 Hub is allowed per subscription.')
+        c.argument('unit', help='Number of units. New Hubs default to 1.')
+        c.argument('partition_count', help='Device-to-cloud Event Hub partitions. New Hubs default to 4.')
+        c.argument('retention_day', help='Device-to-cloud event retention in days (1-7). New Hubs default to 1.')
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub. Default is the location of target resource group.')
         c.argument('enable_data_residency', arg_type=get_three_state_flag(),

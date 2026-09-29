@@ -5,8 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+import json
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.iothub.conftest import generate_hub_id, RG
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 cli = EmbeddedCLI()
 DEVICE_STREAMS_API_VERSION = "2023-06-30-preview"
@@ -15,9 +17,13 @@ DEVICE_STREAMS_API_VERSION = "2023-06-30-preview"
 @pytest.fixture()
 def provisioned_preview_hub():
     name = generate_hub_id()
+    payload = json.dumps({
+        "sku": {"capacity": 1, "name": "S1", "tier": "Standard"},
+        "location": HUB_TEST_LOCATION,
+        "properties": {"disableLocalAuth": True},
+    })
     hub_resource = cli.invoke(
-        f"resource create --name {name} -g {RG} --properties "
-        "'{\"sku\": {\"capacity\": 1, \"name\": \"S1\", \"tier\": \"Standard\"}, \"location\": \"northeurope\"}' "
+        f"resource create --name {name} -g {RG} --properties '{payload}' "
         f"--resource-type Microsoft.Devices/IotHubs --is-full-object --api-version \"{DEVICE_STREAMS_API_VERSION}\"",
         capture_stderr=True
     )
@@ -25,7 +31,7 @@ def provisioned_preview_hub():
     cli.invoke(f"iot hub delete -n {name} -g {RG} --no-wait", capture_stderr=True)
 
 
-@pytest.mark.hub_infrastructure(location="northeurope")
+@pytest.mark.hub_infrastructure(location=HUB_TEST_LOCATION)
 def test_device_stream(provisioned_preview_hub):
     device_stream = provisioned_preview_hub["properties"]["deviceStreams"]
     hub_name = provisioned_preview_hub["name"]

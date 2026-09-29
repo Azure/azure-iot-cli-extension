@@ -32,8 +32,9 @@ def discovery():
 def test_find_resource_returns_hostname_properties(discovery, provisioned_only_iot_hubs_module):
     """Verify find_resource returns TLS 1.3 hostname properties."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
+    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
 
-    resource = discovery.find_resource(resource_name=hub_name)
+    resource = discovery.find_resource(resource_name=hub_name, rg=hub_rg)
     props = resource.get("properties", {})
 
     assert props.get("hostName"), "hostName (classic) should be present"
@@ -53,7 +54,7 @@ def test_build_target_includes_hostname_fields(discovery, provisioned_only_iot_h
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
 
-    resource = discovery.find_resource(resource_name=hub_name)
+    resource = discovery.find_resource(resource_name=hub_name, rg=hub_rg)
     policy = discovery.find_policy(resource_name=hub_name, rg=hub_rg)
     target = discovery._build_target(resource=resource, policy=policy)
 
@@ -68,7 +69,7 @@ def test_gwv2_target_uses_service_hostname(discovery, provisioned_only_iot_hubs_
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
 
-    resource = discovery.find_resource(resource_name=hub_name)
+    resource = discovery.find_resource(resource_name=hub_name, rg=hub_rg)
     props = resource.get("properties", {})
     gw_version = props.get("iotHubDetails", {}).get("gatewayVersion")
     service_hostname = props.get("serviceHostName")
@@ -88,12 +89,13 @@ def test_gwv2_target_uses_service_hostname(discovery, provisioned_only_iot_hubs_
 def test_connection_string_uses_gwv2_hostname(provisioned_only_iot_hubs_module):
     """Verify connection-string show uses the device hostname for GWv2 hubs."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
+    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
 
-    hub = cli.invoke(f"iot hub show -n {hub_name}").as_json()
+    hub = cli.invoke(f"iot hub show -n {hub_name} -g {hub_rg}").as_json()
     props = hub.get("properties", {})
     device_hostname = props.get("deviceHostName")
 
-    result = cli.invoke(f"iot hub connection-string show -n {hub_name}").as_json()
+    result = cli.invoke(f"iot hub connection-string show -n {hub_name} -g {hub_rg}").as_json()
     cs = result["connectionString"]
     assert "HostName=" in cs
 
