@@ -19,7 +19,7 @@ SoftwareUpdate jobs require a target Group in the same namespace; CRUD does **no
 any Hub/DPS infrastructure. We keep the namespace lightweight (no certificate
 infrastructure or linked Hub) since job CRUD does not exercise
 linking surfaces. Immediate/custom-name execution and the missing-SU-link failure
-belong to test_adr_job_run_int.py, as does opt-in healthy cancellation. Neither
+belong to test_adr_job_run_int.py. Neither
 SoftwareUpdate CRUD nor OnboardingUpdate scheduling proves rollout health.
 """
 

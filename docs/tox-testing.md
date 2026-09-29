@@ -130,8 +130,11 @@ without fixture service-role grants. It generates and reads back a namespace
 update-compliance report after both add and inbound-identity rotation through
 update. The fixture caller's separate Device Update Reader grant covers CLI
 discovery only; it cannot substitute for the namespace's report permissions.
-The opt-in `test_adr_report_int.py` suite additionally covers all three report
-types on a supplied SU-linked namespace.
+`TestADRSoftwareUpdateLinked` provisions its own Update Instance (system-assigned
+identity), storage account and SU-linked namespace, then covers stage, import,
+`software-update wait --created`, catalog and operation status, and all three
+report types. The healthy job-run cancellation case was removed: an Active run
+needs devices in a controllable rollout, which the suite does not provision.
 
 The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
 The root integration matrix applies this budget directly to each ADR service job.

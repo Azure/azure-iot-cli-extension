@@ -54,16 +54,7 @@ OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_su_link_poll_attempts",
     "azext_iot_adr_su_probe_reader",
     "azext_iot_adr_run_resource_parity_int",
-    "azext_iot_adr_reports_enabled",
     "azext_iot_adr_ca_auth_profile_name",
-    "azext_iot_adr_job_run_resource_group",
-    "azext_iot_adr_job_run_namespace",
-    "azext_iot_adr_job_run_job",
-    "azext_iot_adr_job_run_name",
-    "azext_iot_adr_uami_resource_id",
-    "azext_iot_adr_su_namespace",
-    "azext_iot_adr_su_storage_account",
-    "azext_iot_adr_su_storage_subscription",
 )
 
 

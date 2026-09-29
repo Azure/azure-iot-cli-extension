@@ -128,7 +128,7 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
     monkeypatch,
 ):
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "true")
-    monkeypatch.setenv("azext_iot_adr_reports_enabled", "1")
+    monkeypatch.setenv("azext_iot_adr_ca_auth_profile_name", "1")
     config, reporter = _config()
 
     with patch.object(
@@ -162,7 +162,7 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
     messages = [call.args[0] for call in reporter.write_line.call_args_list]
     assert any("subscription=00000000" in message for message in messages)
     assert any("endpoint=" in message and "api=" in message for message in messages)
-    assert any("azext_iot_adr_reports_enabled" in message for message in messages)
+    assert any("azext_iot_adr_ca_auth_profile_name" in message for message in messages)
     assert any("azext_iot_adr_update_instance_id" in message for message in messages)
 
 
