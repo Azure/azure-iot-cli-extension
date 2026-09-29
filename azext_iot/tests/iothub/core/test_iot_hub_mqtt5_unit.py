@@ -8,7 +8,7 @@ import pytest
 from azure.cli.core.azclierror import ManualInterrupt
 
 from azext_iot.core import custom as subject
-from azext_iot.core.shared import IotHubConnectionProfile
+from azext_iot.core.shared import IotHubConnectionProfile, is_mqtt_v5_profile
 
 
 @pytest.fixture()
@@ -105,4 +105,4 @@ def test_connection_profile_enum_matches_contract():
 
 
 def test_mqtt_v5_profile_detection_is_case_insensitive():
-    assert subject._is_mqtt_v5_profile("mQtTv5")
+    assert is_mqtt_v5_profile("mQtTv5")

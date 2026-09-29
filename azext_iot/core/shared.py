@@ -111,6 +111,14 @@ class IotHubConnectionProfile(Enum):
     MQTT_V5 = "MqttV5"
 
 
+def is_mqtt_v5_profile(connection_profile):
+    return (
+        isinstance(connection_profile, str)
+        and connection_profile.casefold()
+        == IotHubConnectionProfile.MQTT_V5.value.casefold()
+    )
+
+
 class IotDpsSku(Enum):
     """DPS SKU name."""
 

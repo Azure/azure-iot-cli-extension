@@ -47,10 +47,10 @@ from azext_iot.core.shared import (
     IdentityType,
     IotDpsSku,
     IotHubAuthenticationType,
-    IotHubConnectionProfile,
     IotHubSku,
     ManagedServiceIdentityType,
     RenewKeyType,
+    is_mqtt_v5_profile,
 )
 from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
 
@@ -81,13 +81,6 @@ class SimpleAccessRights(Enum):
     registry_write = AccessRights.REGISTRY_WRITE
     service_connect = AccessRights.SERVICE_CONNECT
     device_connect = AccessRights.DEVICE_CONNECT
-
-
-def _is_mqtt_v5_profile(connection_profile):
-    return (
-        isinstance(connection_profile, str)
-        and connection_profile.casefold() == IotHubConnectionProfile.MQTT_V5.value.casefold()
-    )
 
 
 def _get_resource_group_from_hub(hub):
@@ -1006,7 +999,7 @@ def iot_hub_create(
         )
 
     if (
-        _is_mqtt_v5_profile(connection_profile)
+        is_mqtt_v5_profile(connection_profile)
         and not yes
         and not prompt_y_n(msg=MQTT_V5_CREATE_CONFIRMATION, default='n')
     ):
@@ -1047,7 +1040,7 @@ def iot_hub_create(
     properties["enableFileUploadNotifications"] = enable_fileupload_notifications
     if connection_profile is not None:
         properties["connectionProfile"] = connection_profile
-    if _is_mqtt_v5_profile(connection_profile):
+    if is_mqtt_v5_profile(connection_profile):
         properties["routing"] = {"endpoints": {}}
 
     # TODO - CMS Preview - Hub Create ADR property validation
