@@ -135,9 +135,13 @@ def register_with_deadline(provider, body, timeout):
         "deadline": deadline,
     }
     _remaining(deadline)
+    import azure.cli.core
+
+    # azure/cli/core/__init__.py -> the site-packages directory holding azure-cli.
+    cli_root = str(Path(azure.cli.core.__file__).resolve().parents[3])
     try:
         worker = subprocess.Popen(  # pylint: disable=consider-using-with
-            [sys.executable, "-I", str(worker_path)],
+            [sys.executable, "-I", str(worker_path), cli_root],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
     except OSError as error:

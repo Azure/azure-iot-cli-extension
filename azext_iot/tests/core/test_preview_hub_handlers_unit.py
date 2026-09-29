@@ -4,9 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
+import sys
 from copy import deepcopy
 from datetime import timedelta
 from itertools import combinations
+from pathlib import Path
+from types import ModuleType
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -405,7 +409,7 @@ def test_hub_create_existing_lookup_errors(preview_mgmt, status):
 def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
-    assignment = mocker.patch.object(custom, "create_role_assignment")
+    assignment = mocker.patch.object(custom, "_create_role_assignment")
     client.iot_hub_resource.begin_create_or_update.return_value = mocker.Mock(spec=LROPoller)
     poller = custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/one", "/two"]
@@ -432,7 +436,7 @@ def test_hub_create_assigns_roles_after_completion(mocker, preview_mgmt):
 def test_hub_create_callback_does_not_assign_roles_without_a_principal(mocker, preview_mgmt, identity):
     cmd, client, _, _, _ = preview_mgmt
     client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
-    assignment = mocker.patch.object(custom, "create_role_assignment")
+    assignment = mocker.patch.object(custom, "_create_role_assignment")
     client.iot_hub_resource.begin_create_or_update.return_value = mocker.Mock(spec=LROPoller)
     poller = custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/scope"]
@@ -455,7 +459,7 @@ def test_hub_create_assigns_roles_with_completed_azure_core_poller(mocker, previ
     response.http_response.json.return_value = result
     poller = LROPoller(None, response, lambda value: value.http_response.json(), NoPolling())
     client.iot_hub_resource.begin_create_or_update.return_value = poller
-    assignment = mocker.patch.object(custom, "create_role_assignment")
+    assignment = mocker.patch.object(custom, "_create_role_assignment")
 
     assert custom.iot_hub_create(
         cmd, client, "hub", "rg", system_identity=True, identity_role="Reader", identity_scopes=["/scope"]
@@ -472,12 +476,54 @@ def test_hub_identity_show_and_scoped_assignment(mocker, preview_mgmt):
     assert custom.iot_hub_identity_show(cmd, client, "hub") == hub["identity"]
     hub["identity"]["principalId"] = "principal"
     wait.return_value = hub
-    assignment = mocker.patch.object(custom, "create_role_assignment")
+    assignment = mocker.patch.object(custom, "_create_role_assignment")
     assert custom.iot_hub_identity_assign(
         cmd, client, "hub", system_identity=True, identity_role="Reader", identity_scopes=["/one", "/two"]
     ) == hub["identity"]
     assert [call.kwargs["identity_scope"] for call in assignment.call_args_list] == ["/one", "/two"]
     assert all(call.kwargs["identity_role"] == "Reader" for call in assignment.call_args_list)
+
+
+def test_role_assignment_uses_cli_helper_when_available(mocker):
+    arm = ModuleType("azure.cli.core.commands.arm")
+    arm.create_role_assignment = mocker.Mock()
+    arm.assign_identity = mocker.Mock()
+    mocker.patch.dict(sys.modules, {"azure.cli.core.commands.arm": arm})
+    context = object()
+
+    custom._create_role_assignment(context, "principal", identity_role="Reader", identity_scope="/scope")
+
+    arm.create_role_assignment.assert_called_once_with(
+        context, "principal", identity_role="Reader", identity_scope="/scope"
+    )
+    arm.assign_identity.assert_not_called()
+
+
+def test_role_assignment_falls_back_to_assign_identity_before_cli_2_83(mocker):
+    # azure-cli 2.73-2.82 only expose assign_identity(cli_ctx, getter, setter, ...).
+    arm = ModuleType("azure.cli.core.commands.arm")
+    arm.assign_identity = mocker.Mock()
+    mocker.patch.dict(sys.modules, {"azure.cli.core.commands.arm": arm})
+    context = object()
+
+    custom._create_role_assignment(context, "principal", identity_role="Reader", identity_scope="/scope")
+
+    arm.assign_identity.assert_called_once()
+    args, kwargs = arm.assign_identity.call_args
+    cli_ctx, getter, setter = args
+    assert cli_ctx is context
+    assert kwargs == {"identity_role": "Reader", "identity_scope": "/scope"}
+    resource = getter()
+    assert setter(resource) is resource
+    assert resource.identity.principal_id == "principal"
+
+
+def test_custom_module_does_not_require_cli_2_83_at_import():
+    tree = ast.parse(Path(custom.__file__).read_text(encoding="utf-8"))
+    top_level_imports = [
+        alias.name for node in tree.body if isinstance(node, ast.ImportFrom) for alias in node.names
+    ]
+    assert "create_role_assignment" not in top_level_imports
 
 
 def test_build_identity_explicitly_disables_identity():

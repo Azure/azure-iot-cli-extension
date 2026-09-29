@@ -17,6 +17,19 @@ from types import SimpleNamespace
 # -I excludes the current directory/PYTHONPATH; anchor imports to the caller's extension.
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    # -I also drops user site-packages, e.g. for `pip install --user azure-cli`; the parent
+    # passes the directory it loaded azure.cli from. Restore it where the site module would:
+    # after the stdlib, before system site-packages.
+    if len(sys.argv) > 1 and Path(sys.argv[1]).is_dir():
+        import site
+
+        cli_root = Path(sys.argv[1]).resolve()
+        if cli_root not in {Path(entry).resolve() for entry in sys.path if entry}:
+            system_sites = {Path(entry).resolve() for entry in site.getsitepackages()}
+            sys.path.insert(next(
+                (index for index, entry in enumerate(sys.path) if entry and Path(entry).resolve() in system_sites),
+                len(sys.path),
+            ), str(cli_root))
     from azure.cli.core.extension import get_extension_path
     from azext_iot.constants import EXTENSION_NAME
 

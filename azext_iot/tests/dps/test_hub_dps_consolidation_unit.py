@@ -427,8 +427,9 @@ def test_worker_secrets_only_on_pipe_and_exact_endpoint(fake_worker):
     child, popen = fake_worker
     result = registration.register_with_deadline(bootstrap_provider(), {"registrationId": "reg"}, 10)
     assert result == {"status": "assigned"}
-    assert len(popen.call_args.args[0]) == 3
+    assert len(popen.call_args.args[0]) == 4
     assert popen.call_args.args[0][1] == "-I"
+    assert (Path(popen.call_args.args[0][3]) / "azure" / "cli" / "core" / "__init__.py").is_file()
     request = json.loads(child.stdin.write.call_args.args[0])
     assert request["provider"]["device_symmetric_key"] == "key"
     assert request["provider"]["provisioning_host"] == "device.custom.test"

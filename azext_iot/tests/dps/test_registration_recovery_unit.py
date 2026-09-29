@@ -16,9 +16,11 @@ import runpy
 import secrets
 import shlex
 import shutil
+import site
 import socket
 import subprocess
 import sys
+import sysconfig
 import threading
 import time
 from types import SimpleNamespace
@@ -42,6 +44,7 @@ def _frame(value):
 
 ACCEPTED = _frame({"version": 1, "accepted": {"operationId": "4.operation-01"}})
 FINAL = _frame({"version": 1, "ok": True, "result": {"status": "assigned"}})
+CLI_ROOT = str(Path(__import__("azure.cli.core").cli.core.__file__).resolve().parents[3])
 
 
 def _provider():
@@ -231,7 +234,8 @@ def test_worker_source_remains_first_when_extension_dependency_path_is_added(moc
 
     output = io.StringIO()
     mocker.patch.object(azure.cli.core.extension, "get_extension_path", return_value=str(tmp_path))
-    mocker.patch.object(sys, "path", list(sys.path))
+    mocker.patch.object(sys, "path", [path for path in sys.path if not path or str(Path(path).resolve()) != CLI_ROOT])
+    mocker.patch.object(sys, "argv", [worker.__file__, CLI_ROOT])
     mocker.patch.object(sys, "stdin", io.StringIO(json.dumps({
         "provider": {"device_symmetric_key": "key", "passphrase": None}, "body": {}, "deadline": 100,
     })))
@@ -239,7 +243,46 @@ def test_worker_source_remains_first_when_extension_dependency_path_is_added(moc
     mocker.patch.object(registration, "register_in_worker", return_value={})
     runpy.run_path(worker.__file__, run_name="__main__")
     assert sys.path[:2] == [str(Path(worker.__file__).resolve().parents[3]), str(tmp_path)]
+    # The CLI directory is restored after the stdlib and before system site-packages.
+    resolved = [str(Path(path).resolve()) if path else path for path in sys.path]
+    cli_index = sys.path.index(CLI_ROOT)
+    assert resolved.index(str(Path(sysconfig.get_paths()["stdlib"]).resolve())) < cli_index
+    system_sites = {str(Path(path).resolve()) for path in site.getsitepackages()} - {CLI_ROOT}
+    assert all(index > cli_index for index, path in enumerate(resolved) if path in system_sites)
     assert worker.decode_response(output.getvalue()) == {}
+
+
+@pytest.mark.parametrize("pass_cli_root", [True, False])
+def test_isolated_worker_imports_azure_cli_from_parent_location(tmp_path, pass_cli_root):
+    """`python -I` drops user site-packages; `pip install --user azure-cli` must still load."""
+    parent_paths = list(dict.fromkeys(os.path.realpath(entry) for entry in sys.path if entry))
+    hidden = [path for path in parent_paths if (Path(path) / "azure" / "cli" / "core" / "__init__.py").is_file()]
+    assert CLI_ROOT in hidden
+    # Keep other parent runtime paths (ADO injects extension dependencies); hide every azure-cli copy.
+    visible = [path for path in parent_paths if path not in hidden]
+    argv = [worker.__file__, CLI_ROOT] if pass_cli_root else [worker.__file__]
+    driver = f"""
+import importlib.util, runpy, sys
+import os
+sys.path[:] = [path for path in sys.path if os.path.realpath(path) not in {hidden!r}] + {visible!r}
+assert importlib.util.find_spec("azure") is None or importlib.util.find_spec("azure.cli") is None
+sys.argv = {argv!r}
+runpy.run_path({worker.__file__!r}, run_name="__main__")
+"""
+    config = tmp_path / "private-cli"
+    config.mkdir(mode=0o700)
+    child = subprocess.run(
+        [sys.executable, "-I", "-c", driver], input=b"{}", capture_output=True, timeout=120,
+        env=dict(os.environ, AZURE_CONFIG_DIR=str(config), AZURE_TEST_RUN_LIVE="False"),
+    )
+    if pass_cli_root:
+        response = json.loads(child.stdout)
+        # Import succeeded: the empty request fails only after the extension loaded.
+        assert response["error"]["diagnostics"]["stage"] == "read-request", child.stderr.decode()
+    else:
+        assert child.returncode and not child.stdout
+        # Depending on the install layout, the whole `azure` namespace or only `azure.cli` is missing.
+        assert b"No module named 'azure" in child.stderr
 
 
 @pytest.mark.parametrize("diagnostics", [
@@ -333,7 +376,7 @@ def start_peer(mocker, tmp_path):
     with ExitStack() as processes:
         def install(driver):
             def start(args, **kwargs):
-                assert args == [sys.executable, "-I", str(Path(worker.__file__).resolve())]
+                assert args == [sys.executable, "-I", str(Path(worker.__file__).resolve()), CLI_ROOT]
                 config = tmp_path / f"private-cli-{len(children)}"
                 config.mkdir(mode=0o700)
                 env = dict(os.environ, AZURE_CONFIG_DIR=str(config), AZURE_TEST_RUN_LIVE="False")

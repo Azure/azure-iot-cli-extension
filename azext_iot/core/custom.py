@@ -24,7 +24,6 @@ from azure.cli.core.azclierror import (
     UnclassifiedUserFault,
 )
 from azure.cli.core.commands import LongRunningOperation
-from azure.cli.core.commands.arm import create_role_assignment
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from azure.core.polling import PollingMethod
@@ -963,6 +962,22 @@ def iot_hub_certificate_verify(client, hub_name, certificate_name, certificate_p
     )
 
 
+def _create_role_assignment(cli_ctx, principal_id, identity_role=None, identity_scope=None):
+    try:
+        from azure.cli.core.commands.arm import create_role_assignment
+    except ImportError:
+        # azure-cli < 2.83 has no create_role_assignment; assign_identity runs the same assignment inline.
+        from types import SimpleNamespace
+        from azure.cli.core.commands.arm import assign_identity
+
+        resource = SimpleNamespace(identity=SimpleNamespace(principal_id=principal_id))
+        assign_identity(
+            cli_ctx, lambda: resource, lambda value: value, identity_role=identity_role, identity_scope=identity_scope,
+        )
+        return
+    create_role_assignment(cli_ctx, principal_id, identity_role=identity_role, identity_scope=identity_scope)
+
+
 # pylint: disable=too-many-statements
 def iot_hub_create(
     cmd,
@@ -1199,7 +1214,7 @@ def iot_hub_create(
                 "principalId, so role assignment could not be completed."
             )
         for scope in identity_scopes:
-            create_role_assignment(cmd.cli_ctx, principal_id, identity_role=identity_role, identity_scope=scope)
+            _create_role_assignment(cmd.cli_ctx, principal_id, identity_role=identity_role, identity_scope=scope)
 
     create = adapt_modeless_lro_poller(
         client.iot_hub_resource.begin_create_or_update(
@@ -1517,7 +1532,7 @@ def iot_hub_identity_assign(cmd, client, hub_name, system_identity=None, user_id
                 "principalId, so role assignment could not be completed."
             )
         for scope in identity_scopes:
-            create_role_assignment(
+            _create_role_assignment(
                 cmd.cli_ctx, principal_id, identity_role=identity_role, identity_scope=scope,
             )
     return result["identity"]
