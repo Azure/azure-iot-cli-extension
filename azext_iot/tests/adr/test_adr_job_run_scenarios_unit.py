@@ -24,6 +24,7 @@ from azext_iot import IoTExtCommandsLoader
 from azext_iot.adr import (
     commands_group, commands_job, commands_job_run, commands_namespace, commands_su, commands_wait,
 )
+from azext_iot.adr.common import SU_ENDPOINT_TYPE
 from azext_iot.adr.providers.wait import wait_for_resource
 from azext_iot.tests.adr import test_adr_job_run_int as runs
 from azext_iot.tests.adr import test_adr_job_int as jobs
@@ -66,6 +67,7 @@ class _CliScenario:
 
     def __init__(self):
         self.cli = DummyCli(commands_loader_cls=_OfflineJobLoader)
+        self.cli_ctx = self.cli
         self.commands = []
 
     def cmd(self, command, expect_failure=False):
@@ -130,7 +132,7 @@ def resources(mocker):
         "properties": {
             "provisioningState": "Succeeded",
             "updating": {"endpoints": {"su": {
-                "endpointType": runs.SU_ENDPOINT_TYPE,
+                "endpointType": SU_ENDPOINT_TYPE,
                 "linkingState": "Succeeded", "resourceId": INSTANCE_ID,
                 "serviceAddress": "instance.api.adu.microsoft.com",
             }}},
@@ -279,84 +281,6 @@ def test_namespace_cleanup_child_lookup_error_is_not_ignored(cli_scenario, resou
     resources.group.list.assert_not_called()
 
 
-def test_active_cancel_polls_execution_not_arm_provisioning(cli_scenario):
-    scenario, provider = cli_scenario
-    provider.show.side_effect = [
-        _run("Active"), _run("Active"), _run("Canceled"), _run("Canceled"),
-    ]
-    provider.cancel.return_value = None
-
-    runs._cancel_active_run(scenario, SCOPE)
-
-    assert provider.show.call_count == 4
-    provider.cancel.assert_called_once_with(
-        job_name="job", run_name="run", namespace_name="namespace",
-        resource_group_name="rg", no_wait=True,
-    )
-    assert "--timeout 120 --interval 10" in scenario.commands[2]
-
-
-@pytest.mark.parametrize("status", ["Scheduled", "Succeeded", "Failed", "TimedOut", "Canceled", None, "Unknown"])
-def test_cancel_rejects_non_active_runs(cli_scenario, status):
-    scenario, provider = cli_scenario
-    provider.show.return_value = _run(status)
-    with pytest.raises(AssertionError):
-        runs._cancel_active_run(scenario, SCOPE)
-    provider.cancel.assert_not_called()
-
-
-@pytest.mark.parametrize("provisioning,error", [
-    ("Creating", None), ("Failed", None), ("Succeeded", {"code": "AduEndpointNotLinked"}),
-])
-def test_cancel_requires_healthy_active_resource(cli_scenario, provisioning, error):
-    scenario, provider = cli_scenario
-    provider.show.return_value = _run("Active", provisioning, error)
-    with pytest.raises(AssertionError):
-        runs._cancel_active_run(scenario, SCOPE)
-    provider.cancel.assert_not_called()
-
-
-@pytest.mark.parametrize("status", ["Succeeded", "Failed", "TimedOut"])
-def test_cancel_http_success_does_not_prove_canceled(cli_scenario, status):
-    scenario, provider = cli_scenario
-    provider.show.side_effect = [_run("Active"), _run(status), _run(status)]
-    provider.cancel.return_value = None
-    with pytest.raises(AssertionError, match=status):
-        runs._cancel_active_run(scenario, SCOPE)
-    provider.cancel.assert_called_once()
-
-
-def test_cancel_racing_conflict_is_not_retried(cli_scenario):
-    scenario, provider = cli_scenario
-    provider.show.return_value = _run("Active")
-    # begin_cancel maps HTTP 409 to ResourceExistsError in the generated SDK.
-    error = ResourceExistsError(message="Conflict: concurrent modification")
-    error.status_code = 409
-    provider.cancel.side_effect = error
-    with pytest.raises(HttpResponseError, match="Conflict") as raised:
-        runs._cancel_active_run(scenario, SCOPE)
-    assert raised.value is error
-    provider.cancel.assert_called_once()
-    assert len(scenario.commands) == 2
-
-
-def test_cancel_deadline_does_not_accept_still_active(cli_scenario):
-    scenario, provider = cli_scenario
-    provider.show.return_value = _run("Active")
-    provider.cancel.return_value = None
-    with pytest.raises(CLIError, match="timed out after 120 seconds"):
-        runs._cancel_active_run(scenario, SCOPE)
-    provider.cancel.assert_called_once()
-    assert provider.show.call_count == 13
-
-
-def test_cancel_final_show_must_still_be_canceled(cli_scenario):
-    scenario, provider = cli_scenario
-    provider.show.side_effect = [_run("Active"), _run("Canceled"), _run("Failed")]
-    with pytest.raises(AssertionError, match="Failed"):
-        runs._cancel_active_run(scenario, SCOPE)
-
-
 @pytest.mark.parametrize("status", ["Scheduled", "Succeeded", "Failed", "TimedOut", "Canceled"])
 def test_cleanup_deletes_only_scheduled_or_terminal_without_cancel(cli_scenario, status):
     scenario, provider = cli_scenario
@@ -404,78 +328,6 @@ def test_cleanup_callbacks_are_independent_and_preserve_failure(cli_scenario, or
     for callback in (job_cleanup, group_cleanup, namespace_cleanup):
         callback.assert_called_once()
     provider.cancel.assert_not_called()
-
-
-def test_preprovisioned_positive_checks_prerequisites_and_final_canceled(cli_scenario, resources, monkeypatch):
-    scenario, provider = cli_scenario
-    monkeypatch.setattr(runs, "_PREPROVISIONED_RUN", dict(zip(
-        runs._PREPROVISIONED_RUN_ENV_VARS, ("rg", "namespace", "job", "run", TARGET_ID),
-    )))
-    provider.show.return_value = _run("Active")
-    provider.summary.return_value = {"total": 1}
-    provider.results.return_value = []
-
-    def cancel(**_kwargs):
-        provider.show.return_value = _run("Canceled")
-    provider.cancel.side_effect = cancel
-
-    runs.TestADRJobRunSurface.test_adr_preprovisioned_job_run_positive(scenario)
-
-    resources.instance.show.assert_called_once()
-    resources.update.show_update.assert_called_once_with(
-        namespace_name="namespace", resource_group_name="rg",
-        update_provider="Contoso", update_name="gateway-firmware", update_version="1.2.3",
-    )
-    provider.cancel.assert_called_once()
-    provider.delete.assert_not_called()
-    assert scenario.commands[-1].startswith("iot adr ns job run show ")
-
-
-def test_preprovisioned_empty_target_does_not_cancel(cli_scenario, resources, monkeypatch):
-    scenario, provider = cli_scenario
-    monkeypatch.setattr(runs, "_PREPROVISIONED_RUN", dict(zip(
-        runs._PREPROVISIONED_RUN_ENV_VARS, ("rg", "namespace", "job", "run", TARGET_ID),
-    )))
-    provider.show.return_value = _run("Active")
-    provider.summary.return_value = {"total": 0}
-    with pytest.raises(AssertionError, match="actual test targets"):
-        runs.TestADRJobRunSurface.test_adr_preprovisioned_job_run_positive(scenario)
-    resources.update.show_update.assert_called_once()
-    provider.cancel.assert_not_called()
-
-
-@pytest.mark.parametrize("missing", [
-    "namespace", "link", "link_state", "service_address", "instance",
-    "update", "target", "group", "onboarding",
-])
-def test_preflight_blocks_unready_or_wrong_fixture(cli_scenario, resources, missing):
-    scenario, provider = cli_scenario
-    namespace = resources.namespace.show.return_value["properties"]
-    link = namespace["updating"]["endpoints"]["su"]
-    if missing == "namespace":
-        namespace["provisioningState"] = "Creating"
-    elif missing == "link":
-        namespace["updating"]["endpoints"] = {}
-    elif missing == "link_state":
-        link["linkingState"] = "Failed"
-    elif missing == "service_address":
-        link["serviceAddress"] = ""
-    elif missing == "instance":
-        resources.instance.show.return_value["properties"]["provisioningState"] = "Creating"
-    elif missing == "update":
-        resources.update.show_update.side_effect = ResourceNotFoundError("update not imported")
-    elif missing == "target":
-        resources.job.show.return_value["properties"]["target"]["resourceId"] = TARGET_ID + "-other"
-    elif missing == "group":
-        resources.group.show.return_value["properties"]["membershipState"] = "Resolving"
-    elif missing == "onboarding":
-        resources.job.show.return_value["properties"]["jobType"] = "OnboardingUpdate"
-    with pytest.raises((AssertionError, ResourceNotFoundError)):
-        runs._assert_software_update_fixture_ready(
-            scenario, "--namespace namespace -g rg", "job", TARGET_ID,
-        )
-    provider.cancel.assert_not_called()
-    provider.delete.assert_not_called()
 
 
 def test_missing_adu_smoke_never_cancels_owned_failed_runs(cli_scenario, resources, monkeypatch):

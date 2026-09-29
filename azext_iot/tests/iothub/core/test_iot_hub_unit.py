@@ -25,7 +25,7 @@ hub_connection_string = "HostName={};SharedAccessKeyName={};SharedAccessKey={}".
 blob_container_uri = "https://example.com"
 resource_group_name = "RESOURCEGROUP"
 managed_identity = "EXAMPLEMANAGEDIDENTITY"
-generic_job_response = {"JobResponse": generate_generic_id()}
+generic_job_response = {"jobId": generate_generic_id(), "status": "enqueued", "extraServiceField": "retained"}
 qualified_hostname = "{}.subdomain.domain".format(hub_name)
 hub_policy = "test_policy"
 
@@ -57,14 +57,7 @@ def generate_device_identity(include_keys=False, identity=None, rg=None):
 
 
 def assert_device_identity_result(actual, expected):
-    # the body from the call will be put into additional_properties
-    assert actual.job_id is None
-    assert actual.start_time_utc is None
-    assert actual.end_time_utc is None
-    assert actual.type is None
-    assert actual.status is None
-    assert actual.failure_reason is None
-    assert actual.additional_properties == expected
+    assert actual == expected
 
 
 @pytest.fixture(params=[(400, BadRequestError), (403, ForbiddenError)])
@@ -73,7 +66,7 @@ def importexport_service_client_error(mocked_response, get_mgmt_client, request)
 
     mocked_response.add(
         method=responses.POST,
-        url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
+        url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
         body=json.dumps(
             {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
         ),
@@ -93,7 +86,7 @@ class TestIoTHubDeviceIdentityExport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
+            url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",
@@ -163,7 +156,7 @@ class TestIoTHubDeviceIdentityImport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2024-03-31".format(hub_name),
+            url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",

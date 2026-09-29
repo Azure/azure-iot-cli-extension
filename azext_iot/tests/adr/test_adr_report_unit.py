@@ -5,8 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError
 from azure.core.exceptions import HttpResponseError
+
+GROUP_UUID = "049e33ef-ba81-461d-8742-15c9c459dde9"
+
+
+@pytest.fixture(autouse=True)
+def group_uuid(fixture_report_provider):
+    fixture_report_provider.client.groups.get.return_value = {"name": "group", "properties": {"uuid": GROUP_UUID}}
 
 
 @pytest.mark.parametrize(
@@ -22,7 +29,7 @@ from azure.core.exceptions import HttpResponseError
             "  group  ",
             {
                 "reportType": "GroupBestUpdatesComplianceReport",
-                "reportTarget": "group",
+                "reportTarget": GROUP_UUID,
             },
         ),
         (
@@ -30,7 +37,7 @@ from azure.core.exceptions import HttpResponseError
             "group",
             {
                 "reportType": "GroupInstallableUpdatesReport",
-                "reportTarget": "group",
+                "reportTarget": GROUP_UUID,
             },
         ),
     ],
@@ -71,6 +78,16 @@ def test_report_generate_all_types(
         namespace_name="namespace",
         body=selector,
     )
+    _assert_group_resolved_once(fixture_report_provider, group_name)
+
+
+def _assert_group_resolved_once(provider, group_name):
+    if group_name:
+        provider.client.groups.get.assert_called_once_with(
+            resource_group_name="rg", namespace_name="namespace", group_name="group",
+        )
+    else:
+        provider.client.groups.get.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -86,7 +103,7 @@ def test_report_generate_all_types(
             "group",
             {
                 "reportType": "GroupBestUpdatesComplianceReport",
-                "reportTarget": "group",
+                "reportTarget": GROUP_UUID,
             },
         ),
         (
@@ -94,7 +111,7 @@ def test_report_generate_all_types(
             "group",
             {
                 "reportType": "GroupInstallableUpdatesReport",
-                "reportTarget": "group",
+                "reportTarget": GROUP_UUID,
             },
         ),
     ],
@@ -119,6 +136,28 @@ def test_report_latest_all_types(
         namespace_name="namespace",
         body=selector,
     )
+    _assert_group_resolved_once(fixture_report_provider, group_name)
+
+
+@pytest.mark.parametrize("group", [None, {}, {"properties": {}}, {"properties": {"uuid": ""}}])
+def test_group_report_requires_group_uuid(fixture_report_provider, group):
+    fixture_report_provider.client.groups.get.return_value = group
+
+    with pytest.raises(AzureResponseError, match="did not return a UUID"):
+        fixture_report_provider.generate("namespace", "rg", "GroupInstallableUpdatesReport", group_name="group")
+
+    fixture_report_provider.client.namespaces.begin_generate_report.assert_not_called()
+
+
+def test_group_report_propagates_missing_group(fixture_report_provider):
+    error = HttpResponseError(message="Group not found")
+    fixture_report_provider.client.groups.get.side_effect = error
+
+    with pytest.raises(HttpResponseError) as raised:
+        fixture_report_provider.latest("namespace", "rg", "GroupBestUpdatesComplianceReport", group_name="group")
+
+    assert raised.value is error
+    fixture_report_provider.client.namespaces.get_latest_report.assert_not_called()
 
 
 @pytest.mark.parametrize(

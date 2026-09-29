@@ -316,7 +316,7 @@ def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_
         result = client.iot_dps_resource.get(provisioning_service_name="test-dps", resource_group_name="rg")
 
     assert result == {"name": "test-dps"}
-    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-08-31"]
+    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-06-01-preview"]
     assert credential.get_token.call_args.args == tuple(cloud_config["expected_scopes"])
 
 
@@ -341,7 +341,7 @@ class TestSdkResolverHostnames:
         SdkResolver(self._target(), device_id="device1")._get_iothub_device_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.device.azure-devices.net/devices/device1"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.device.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.device.azure-devices.net"
 
     def test_service_sdk_uses_service_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -352,7 +352,7 @@ class TestSdkResolverHostnames:
         SdkResolver(self._target())._get_iothub_service_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.service.azure-devices.net"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.service.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.service.azure-devices.net"
 
     def test_device_sdk_falls_back_to_classic_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -368,7 +368,7 @@ class TestSdkResolverHostnames:
         SdkResolver(target, device_id="device1")._get_iothub_device_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net/devices/device1"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"
 
     def test_service_sdk_falls_back_to_classic_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -384,14 +384,14 @@ class TestSdkResolverHostnames:
         SdkResolver(target)._get_iothub_service_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"
 
 
 ORDINARY_MANAGEMENT_OPERATIONS = [
     ("iot_hub_service_factory", "iot_hub_resource", "IotHubs",
-     "resource_name", "iot_hub_description", "2026-05-01-preview"),
+     "resource_name", "iot_hub_description", "2026-10-01-preview"),
     ("iot_service_provisioning_factory", "iot_dps_resource", "provisioningServices",
-     "provisioning_service_name", "iot_dps_description", "2026-08-31"),
+     "provisioning_service_name", "iot_dps_description", "2026-06-01-preview"),
 ]
 
 

@@ -13,6 +13,7 @@ from azext_iot.tests.iothub.devices import test_iothub_devices_int as devices
 from azext_iot.tests.iothub.devices import test_iothub_nested_edge_int as nested
 from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as jobs
 from azext_iot.tests.iothub.message_endpoint import test_iothub_message_endpoint_int as endpoints
+from azext_iot.tests.iothub.message_endpoint import test_iothub_message_route_int as routes
 from azext_iot.tests.iothub.modules import test_iothub_modules_int as modules
 from azext_iot.tests.iothub.state import test_hub_state_int as state
 from azext_iot.tests.iothub.state import test_hub_state_dataplane_int as state_dataplane
@@ -39,8 +40,9 @@ def test_every_controlplane_fixture_consumer_can_initialize_the_shared_resources
 @pytest.mark.parametrize("scenario,seconds", [
     (state.test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char, 2700),
     (endpoints.test_iot_endpoint_force_delete, 2100),
+    (routes.test_route_lifecycle, 1800),
 ])
-def test_expensive_last_items_include_shared_resource_teardown(scenario, seconds):
+def test_expensive_scenarios_budget_shared_resource_setup_or_teardown(scenario, seconds):
     _assert_lifecycle_budget(scenario, seconds)
 
 

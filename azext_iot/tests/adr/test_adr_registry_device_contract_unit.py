@@ -10,7 +10,6 @@ import json
 import logging
 import shlex
 from copy import deepcopy
-from functools import partial
 from io import StringIO
 from unittest.mock import Mock
 from urllib.parse import parse_qs, urlsplit
@@ -25,7 +24,6 @@ from azure.core.polling import LROPoller
 
 from azext_iot.adr import commands_wait
 from azext_iot.adr.providers.registry_device import RegistryDeviceProvider
-from azext_iot.common.utility import wait_for_terminal_state
 from azext_iot.tests.adr import test_adr_registry_device_unit as provider_tests
 from azext_iot.tests.adr import test_adr_sdk_unit as sdk_tests
 from azext_iot.tests.adr import test_adr_validation_scenarios_unit as validation_tests
@@ -418,15 +416,10 @@ def test_auth_metadata_never_mutates_sdk_objects(registry_device_provider):
 
 
 @pytest.mark.parametrize("no_wait", [False, True])
-@pytest.mark.parametrize("workaround", [False, True])
 def test_registry_revoke_202_uses_current_sdk_poller_and_location(
-    wire_client, mocked_response, fixture_cmd, mocker, no_wait, workaround,
+    wire_client, mocked_response, fixture_cmd, mocker, no_wait,
 ):
     mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=wire_client)
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
-    mocker.patch(
-        "azext_iot.adr.providers.base.wait_for_terminal_state", partial(wait_for_terminal_state, wait_sec=0)
-    )
     provider = RegistryDeviceProvider(fixture_cmd)
     url = NAMESPACE_URL + "/registryDevices/device/authenticationProfiles/profile"
     location = NAMESPACE_URL + "/operationResults/registry-revoke"

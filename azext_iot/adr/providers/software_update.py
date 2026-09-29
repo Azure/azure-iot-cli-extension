@@ -22,8 +22,8 @@ from azext_iot._factory import (
     adr_software_update_data_service_factory,
 )
 from azext_iot.adr.common import SU_ENDPOINT_TYPE
-from azext_iot.adr.providers import base as provider_base
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.common.utility import wait_for_terminal_state
 from azext_iot.adr.providers.software_update_staging import SoftwareUpdateStager
 
 _READ_CHUNK_SIZE = 4 * 1024 * 1024
@@ -39,7 +39,8 @@ class SoftwareUpdateDataProvider(ADRProvider):
         self.client = None
 
     def _await_terminal(self, poller, **kwargs):
-        return provider_base.wait_for_terminal_state(poller, **kwargs)
+        # ADU resources, unlike ADR, can exceed the ADR default LRO budget.
+        return wait_for_terminal_state(poller, **kwargs)
 
     def _resolve_endpoint(
         self, namespace_name: str, resource_group_name: str

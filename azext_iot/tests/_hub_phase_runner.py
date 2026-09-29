@@ -6,9 +6,8 @@
 
 """Serial Hub controller. Gate from stdlib-only checkout via runpy.run_path(__file__).
 
-HubControl: 190m execution + 15m cleanup + 5m admission = 210m controller.
-HubData: 210m Entra + 100m SAS + 15m cleanup EACH + 5m admission = 345m controller.
-Use 225m/360m jobs respectively, leaving another 15m for external setup.
+Budgets come from ci_budgets.json. Current values are 260m/345m
+controller ceilings for HubControl/HubData plus 15m external setup.
 Control includes margin for the observed late state teardown and final TLS cases.
 Cleanup is a shared child-unwind/parent-verification budget, never an extra grace.
 """
@@ -26,9 +25,14 @@ from uuid import uuid4
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-BUDGETS = {"HubControl": (("regular", 190 * 60),), "HubData": (("entra", 210 * 60), ("sas", 100 * 60))}
-CLEANUP = 15 * 60
-RESERVE = 5 * 60
+CI_BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+HUB_CI_BUDGETS = {name: CI_BUDGETS[name] for name in ("HubControl", "HubData")}
+BUDGETS = {
+    suite: tuple((phase["name"], phase["runtime_minutes"] * 60) for phase in budget["phases"])
+    for suite, budget in HUB_CI_BUDGETS.items()
+}
+CLEANUP = HUB_CI_BUDGETS["HubControl"]["phases"][0]["cleanup_minutes"] * 60
+RESERVE = HUB_CI_BUDGETS["HubControl"]["reserve_minutes"] * 60
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 

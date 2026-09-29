@@ -79,8 +79,8 @@ def test_selection_is_explicit_exact_branch_known_and_canonical(suite, phase):
      "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets"),
     ("HubData", "linked-metadata",
      "azext_iot/tests/iothub/metadata/test_hub_metadata_int.py::test_linked_metadata_state_and_service_bulk_portability"),
-    ("DPS", "regular", "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py::"
-     "test_register_and_issue_certificate_contract[default]"),
+    ("DPS", "regular", "azext_iot/tests/dps/enrollment/test_iot_dps_enrollment_int.py::"
+     "test_dps_enrollment_adr_certificate_reference_round_trip"),
 ])
 def test_excluded_or_separately_opted_in_nodes_are_not_debug_authority(suite, phase, node):
     with pytest.raises(ValueError):
@@ -252,6 +252,11 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         result = _execution(command, regular_env, log, runtime, cleanup, cancelled)
         directory = Path(env["azext_iot_dps_phase_receipts"])
         short = [dps.MANIFEST["normalize_nodeid"](node) for node in expected]
+        if phase == "regular" and short and set(short) <= dps.MANIFEST["CSR_NODEIDS"]:
+            for kind in dps.MANIFEST["resource_kinds"](phase):
+                if kind not in dps.MANIFEST["CSR_RESOURCE_KINDS"]:
+                    (directory / f"owned-{kind}.json").unlink()
+                    (directory / f"created-{kind}.json").unlink()
         for path in directory.glob("selection-*.json"):
             path.write_text(json.dumps({"selected": len(short), "nodeids": sorted(short), **focused.provenance(debug)}))
         tree = ET.parse(env["azext_iot_dps_junit"])
@@ -269,6 +274,11 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         if defect == "uncertain":
             for path in directory.glob("created-*.json"):
                 path.unlink()
+        elif defect == "wrong-resource-type":
+            path = directory / "owned-csrns.json"
+            record = json.loads(path.read_text())
+            record["id"] = record["id"].replace("Microsoft.DeviceRegistry/namespaces", "Microsoft.Devices/provisioningServices")
+            path.write_text(json.dumps(record))
         if defect in ("timed_out", "interrupted"):
             result[defect] = True
         return result
@@ -296,20 +306,6 @@ def test_dps_debug_phase_keeps_ownership_cleanup_and_never_qualifies(tmp_path, m
     assert "UNSAFE_CAPTURED_CREDENTIAL" not in (tmp_path / "dps-phases" / phase / "junit.xml").read_text()
 
 
-@pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
-@pytest.mark.parametrize("count", [10, 1000])
-def test_preview_debug_keeps_cleanup_and_nonqualification_without_quota(tmp_path, monkeypatch, phase, count):
-    result, summary, captured = run_dps(
-        tmp_path, monkeypatch, phase, reader=DpsReader(count),
-    )
-    assert result == 0
-    assert summary["qualifiesFullSuite"] is False
-    assert len(captured) == 1
-    assert GATE["evaluate_dps_phases"](tmp_path)
-    assert summary["phases"][0]["cleanup"]["complete"]
-    assert len(summary["phases"][0]["cleanup"]["inventory_ids"]) == count
-
-
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
@@ -335,7 +331,64 @@ def test_debug_ignores_foreign_resource_count_but_never_qualifies(tmp_path, monk
     assert len(captured) == 1
 
 
-@pytest.mark.parametrize("selection", ["full", "empty-full", "regular", "service-sas", "local-auth-toggle"])
+def csr_nodes():
+    return sorted(focused.DPS_PREFIX + node for node in dps.MANIFEST["CSR_NODEIDS"])
+
+
+@pytest.mark.parametrize("count", [7, 10, 1000])
+@pytest.mark.parametrize("variant", ["default", "deadline", "both"])
+def test_csr_only_debug_keeps_dedicated_owned_resources_without_quota_admission(tmp_path, monkeypatch, count, variant):
+    chosen = [node for node in csr_nodes() if variant == "both" or node.endswith(f"[{variant}]")]
+    reader = DpsReader(count)
+    for index, resource in enumerate(reader.resources):
+        resource["location"] = "centraluseuap" if index < 4 else "westus"
+    result, summary, captured = run_dps(tmp_path, monkeypatch, "regular", chosen=chosen, reader=reader)
+    assert result == 0
+    assert summary["status"] == "debug-passed"
+    assert summary["qualifiesFullSuite"] is False
+    assert summary["debug"] == focused.select("DPS", "regular", chosen)
+    assert summary["baseline"]["resources"] == reader.resources
+    assert len(captured) == 1
+    assert GATE["evaluate_dps_phases"](tmp_path)
+    phase = summary["phases"][0]
+    assert phase["cleanup"]["complete"]
+    assert phase["cleanup"]["inventory_ids"] == dps.inventory_ids(reader.resources)
+    saved = hub.read_json(tmp_path / "dps-phases/regular/result.json")
+    assert saved == phase
+    receipts = tmp_path / "dps-phases/regular/receipts"
+    records = [hub.read_json(path) for path in receipts.glob("owned-*.json")]
+    assert {record["kind"] for record in records} == set(dps.MANIFEST["CSR_RESOURCE_KINDS"])
+    assert sum("/provisioningServices/" in record["id"] for record in records) == 1
+    assert set(reader.gets).isdisjoint(dps.inventory_ids(reader.resources))
+
+
+@pytest.mark.parametrize("selection", ["csr", "mixed", "other"])
+def test_focused_selection_keeps_cleanup_and_nonqualification_without_quota(tmp_path, monkeypatch, selection):
+    chosen = csr_nodes() if selection == "csr" else nodes("DPS", "regular")[:1]
+    if selection == "mixed":
+        chosen += csr_nodes()
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, "regular", chosen=chosen, reader=DpsReader(1000),
+    )
+    assert result == 0
+    assert summary["qualifiesFullSuite"] is False
+    assert len(captured) == 1
+    assert GATE["evaluate_dps_phases"](tmp_path)
+    assert summary["phases"][0]["cleanup"]["complete"]
+
+
+@pytest.mark.parametrize("defect", ["uncertain", "wrong-resource-type"])
+def test_csr_debug_keeps_creation_and_typed_ownership_gates(tmp_path, monkeypatch, defect):
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, "regular", chosen=csr_nodes(), reader=DpsReader(1000), defect=defect,
+    )
+    assert len(captured) == 1
+    assert result == 1 and summary["status"] == "debug-failed"
+    assert not summary["phases"][0]["cleanup"]["complete"]
+    assert GATE["evaluate_dps_phases"](tmp_path)
+
+
+@pytest.mark.parametrize("selection", ["full", "empty-full", "mixed", "other", "service-sas", "local-auth-toggle"])
 def test_all_dps_selections_run_without_quota_but_only_full_evidence_qualifies(tmp_path, monkeypatch, selection):
     if selection in ("full", "empty-full"):
         execute = Mock(side_effect=_execution)
@@ -348,7 +401,7 @@ def test_all_dps_selections_run_without_quota_but_only_full_evidence_qualifies(t
         assert not GATE["evaluate_dps_phases"](tmp_path)
     else:
         phase = selection if selection in ("service-sas", "local-auth-toggle") else "regular"
-        chosen = nodes("DPS", phase)[:1]
+        chosen = nodes("DPS", phase)[:1] + (csr_nodes() if selection == "mixed" else [])
         result, summary, captured = run_dps(tmp_path, monkeypatch, phase, chosen=chosen, reader=DpsReader(1000))
         assert len(captured) == 1
         assert GATE["evaluate_dps_phases"](tmp_path)
@@ -357,8 +410,8 @@ def test_all_dps_selections_run_without_quota_but_only_full_evidence_qualifies(t
 
 
 @pytest.mark.parametrize("defect", ["empty", "duplicate", "unknown", "no-phase", "wrong-phase"])
-def test_invalid_debug_is_rejected_before_inventory_or_launch(tmp_path, defect):
-    phase, chosen = "regular", nodes("DPS", "regular")[:1]
+def test_invalid_csr_debug_is_rejected_before_inventory_or_launch(tmp_path, defect):
+    phase, chosen = "regular", csr_nodes()
     if defect == "empty":
         chosen = []
     elif defect == "duplicate":
@@ -380,7 +433,7 @@ def test_invalid_debug_is_rejected_before_inventory_or_launch(tmp_path, defect):
 
 @pytest.mark.parametrize("defect", ["empty", "suite", "phase", "manifest", "nodes", "duplicate"])
 def test_debug_selection_cannot_trust_a_forged_or_stale_envelope(defect):
-    debug = focused.select("DPS", "regular", nodes("DPS", "regular")[:1])
+    debug = focused.select("DPS", "regular", csr_nodes())
     if defect == "empty":
         debug = {}
     elif defect == "nodes":

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import io
 import json
 from base64 import b64encode
 from datetime import datetime, timedelta, timezone
@@ -103,6 +104,56 @@ def test_stage_uploads_manifest_and_payload_without_sas(stager, tmp_path):
     for blob in blobs.values():
         blob.upload_blob.assert_called_once()
     generate_sas.assert_not_called()
+
+
+def test_prepare_manifest_does_not_retain_artifact_bytes(stager, tmp_path):
+    manifest_path, _ = _write_manifest(tmp_path, payload=b"payload")
+
+    prepared = SoftwareUpdateStager._prepare_manifest(
+        str(manifest_path), "deviceupdate"
+    )
+
+    assert "content" in prepared["manifest"]
+    assert prepared["artifacts"][0]["filename"] == "payload.bin"
+    assert "content" not in prepared["artifacts"][0]
+
+
+def test_stage_uploads_artifacts_as_streams_with_length(stager, tmp_path):
+    value, blob_service, _ = stager
+    payload = b"streamed payload"
+    manifest_path, _ = _write_manifest(tmp_path, payload=payload)
+    blobs = _configure_new_blobs(blob_service)
+
+    value.stage([str(manifest_path)], "updates")
+
+    blob_name = "deviceupdate/Contoso/Thermostat/1.0/payload.bin"
+    upload = blobs[blob_name].upload_blob.call_args
+    uploaded = upload.args[0]
+    assert not isinstance(uploaded, bytes)
+    assert hasattr(uploaded, "read")
+    assert upload.kwargs["length"] == len(payload)
+    assert upload.kwargs["metadata"] == {
+        "adu_sha256": sha256(payload).hexdigest(),
+        "adu_size": str(len(payload)),
+    }
+
+
+def test_artifact_hashing_reads_chunks_across_boundary(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "azext_iot.adr.providers.software_update_staging._HASH_CHUNK_SIZE",
+        4,
+    )
+    payload = b"0123456789"
+    manifest_path, _ = _write_manifest(tmp_path, payload=payload)
+
+    prepared = SoftwareUpdateStager._prepare_manifest(
+        str(manifest_path), "deviceupdate"
+    )
+
+    artifact = prepared["artifacts"][0]
+    assert artifact["size"] == len(payload)
+    assert artifact["sha256"] == b64encode(sha256(payload).digest()).decode("utf8")
+    assert artifact["sha256_hex"] == sha256(payload).hexdigest()
 
 
 def test_stage_generates_batch_import_item(stager, tmp_path):
@@ -454,6 +505,7 @@ def test_stage_wraps_filesystem_read_errors_before_upload(stager, tmp_path, file
     manifest_path, _ = _write_manifest(tmp_path)
     unreadable = tmp_path / filename
     read_bytes = Path.read_bytes
+    open_file = Path.open
     failure = PermissionError("Synthetic access denied")
     failed_reads = []
 
@@ -463,7 +515,18 @@ def test_stage_wraps_filesystem_read_errors_before_upload(stager, tmp_path, file
             raise failure
         return read_bytes(path)
 
-    with patch.object(Path, "read_bytes", read_file):
+    def open_artifact(path, *args, **kwargs):
+        if path == unreadable:
+            failed_reads.append(path)
+            raise failure
+        return open_file(path, *args, **kwargs)
+
+    open_patch = (
+        patch.object(Path, "open", open_artifact)
+        if filename == "payload.bin"
+        else patch.object(Path, "read_bytes", read_file)
+    )
+    with open_patch:
         with pytest.raises(InvalidArgumentValueError, match=message) as error:
             value.stage([str(manifest_path)], "updates")
 
@@ -577,18 +640,22 @@ def test_stage_rejects_conflicting_duplicate_when_local_content_changes(stager, 
     })
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     artifact_path = tmp_path / "payload.bin"
-    read_bytes = Path.read_bytes
+    open_file = Path.open
     payload_reads = []
 
-    def read_and_replace(path):
-        content = read_bytes(path)
+    def read_and_replace(path, *args, **kwargs):
+        if path != artifact_path:
+            return open_file(path, *args, **kwargs)
+        with open_file(path, "rb") as stream:
+            content = stream.read()
         if path == artifact_path:
             payload_reads.append(content)
             if len(payload_reads) == 1:
-                path.write_bytes(replacement)
-        return content
+                with open_file(path, "wb") as stream:
+                    stream.write(replacement)
+        return io.BytesIO(content)
 
-    with patch.object(Path, "read_bytes", read_and_replace):
+    with patch.object(Path, "open", read_and_replace):
         with pytest.raises(InvalidArgumentValueError, match="conflicting definitions for 'payload.bin'"):
             value.stage([str(manifest_path)], "updates")
 

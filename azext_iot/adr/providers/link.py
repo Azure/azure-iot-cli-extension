@@ -29,7 +29,6 @@ from azext_iot.adr.common import (
     IOT_HUB_ENDPOINT_TYPE,
     SU_ENDPOINT_TYPE,
 )
-from azext_iot.adr.providers import base
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import (
     MI_MUTEX_MSG as _MI_MUTEX_MSG,
@@ -56,7 +55,7 @@ from azext_iot.adr.providers.link_preflight import (
 )
 from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import LinkRbacManager, required_assignments, resolve_namespace_outbound_principal
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -195,7 +194,7 @@ class LinkProvider(ADRProvider):
             **kwargs,
         )
 
-    def _delete_endpoint(
+    def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
     ):
         namespace = self.client.namespaces.get(
@@ -223,18 +222,18 @@ class LinkProvider(ADRProvider):
             resource=resource, polling=False, retry_total=0,
         ).result()
 
-    def hub_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
         )
 
-    def dps_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
         )
 
-    def su_delete(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
-        return self._delete_endpoint(
+    def su_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+        return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
         )
 
@@ -284,16 +283,14 @@ class LinkProvider(ADRProvider):
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
             self._rbac_manager().verify_many(requests, guard=deadline.remaining)
 
+        required = {assignment for request in original_requests or [] for _, assignment in required_assignments(request)}
         return LinkRecovery(
             self, namespace, section, name, expected, budget, verify,
             authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
+            recent_grants=bool(self._rbac) and not required.isdisjoint(self._rbac.created),
         ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,
-                # The waited canary path owns resource polling. Do not also
-                # start an SDK thread against the broken async-status host.
-                # Terminal no-wait retains the ordinary, real Azure Core poller.
-                **({"polling": False} if not no_wait and base.POLL_PROVISIONING_STATE_WORKAROUND else {}),
             ),
             get=lambda: self._get_namespace(namespace_name, resource_group_name),
             status_message=status_message, no_wait=no_wait, endpoint_body=expected, **kwargs,
@@ -328,7 +325,8 @@ class LinkProvider(ADRProvider):
                 f"Messaging endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be repointed by link hub add. "
                 "Use 'az iot adr ns link hub update' for an existing Hub link, "
-                "or choose an unused endpoint name. To unlink, delete the Hub resource first, then use link hub delete."
+                "or choose an unused endpoint name. To remove the existing link, delete the linked IoT Hub first, "
+                "then run 'az iot adr ns link hub remove'."
             )
 
         endpoint_body = _build_hub_endpoint_body(
@@ -535,7 +533,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Provisioning endpoint '{endpoint_name}' already exists on "
                 f"namespace '{namespace_name}'. Choose an unused endpoint name. "
-                "To unlink, delete the DPS resource first, then use link dps delete."
+                "To remove the existing link, delete the linked DPS first, then run 'az iot adr ns link dps remove'."
             )
 
         endpoint_body = _build_dps_endpoint_body(
@@ -671,7 +669,8 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Updating endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be overwritten by link su add. "
-                "Choose an unused endpoint name. To unlink, delete the Update Instance first, then use link su delete."
+                "Choose an unused endpoint name. To remove the existing link, delete the linked Update Instance first, "
+                "then run 'az iot adr ns link su remove'."
             )
 
         endpoint_body = _build_su_endpoint_body(

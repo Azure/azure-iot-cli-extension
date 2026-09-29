@@ -91,27 +91,28 @@ def test_selected_adr_integration_fixture_preserves_mandatory_live_guard(mocker,
     command.assert_not_called()
 
 
-@pytest.mark.parametrize("filename,integration", [
+@pytest.mark.parametrize("filename,patched", [
     ("test_adr_base_unit.py", False),
-    ("test_adr_integration_timeouts_unit.py", False),
-    ("test_adr_namespace_int.py", True),
-], ids=["unit", "unit-with-integration-name", "integration"])
-def test_fast_unit_polling_uses_file_path_not_test_names_or_parameters(mocker, monkeypatch, filename, integration):
+    ("test_adr_integration_timeouts_unit.py", True),
+    ("test_adr_namespace_int.py", False),
+], ids=["base-unit", "unit-with-integration-name", "integration"])
+def test_fast_unit_polling_uses_file_path_not_test_names_or_parameters(monkeypatch, filename, patched):
     from azext_iot.adr.providers import base
 
-    original = mocker.patch.object(base, "wait_for_terminal_state")
+    original = Mock(return_value="original")
+    monkeypatch.setattr(base.ADRProvider, "_bounded_poller_result", staticmethod(original))
     request = SimpleNamespace(node=SimpleNamespace(
         path=Path(subject.__file__).resolve().parent / filename,
         nodeid=f"{filename}::test_internal_error[test_example_int.py]",
     ))
-    subject.mock_wait_for_terminal_state.__wrapped__(request, monkeypatch)
+    subject.mock_adr_poller_wait.__wrapped__(request, monkeypatch)
 
-    if integration:
-        assert base.wait_for_terminal_state is original
+    if not patched:
+        assert base.ADRProvider._bounded_poller_result is original
     else:
-        assert base.wait_for_terminal_state is not original
+        assert base.ADRProvider._bounded_poller_result is not original
         poller = Mock()
-        assert base.wait_for_terminal_state(poller, poll_interval=30) is poller.result.return_value
+        assert base.ADRProvider._bounded_poller_result(poller, poll_interval=30) is poller.result.return_value
         poller.result.assert_called_once_with()
     original.assert_not_called()
 
@@ -127,7 +128,7 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
     monkeypatch,
 ):
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "true")
-    monkeypatch.setenv("azext_iot_adr_reports_enabled", "1")
+    monkeypatch.setenv("azext_iot_adr_ca_auth_profile_name", "1")
     config, reporter = _config()
 
     with patch.object(
@@ -161,7 +162,7 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
     messages = [call.args[0] for call in reporter.write_line.call_args_list]
     assert any("subscription=00000000" in message for message in messages)
     assert any("endpoint=" in message and "api=" in message for message in messages)
-    assert any("azext_iot_adr_reports_enabled" in message for message in messages)
+    assert any("azext_iot_adr_ca_auth_profile_name" in message for message in messages)
     assert any("azext_iot_adr_update_instance_id" in message for message in messages)
 
 

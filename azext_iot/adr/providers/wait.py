@@ -290,6 +290,7 @@ def wait_for_resource(
     progress = IndeterminateProgressBar(cli_ctx, message="Waiting")
     progress.begin()
     last_observation = None
+    delete_observed_deleting = False
     try:
         while clock() < deadline:
             complete = False
@@ -298,7 +299,18 @@ def wait_for_resource(
                 if clock() >= deadline:
                     break
                 resource = getter()
-                if explicit:
+                if deleted and not any((created, updated, exists, custom)):
+                    state = _get_provisioning_state(resource)
+                    normalized = str(state or "").casefold()
+                    if normalized == "deleting":
+                        delete_observed_deleting = True
+                    if normalized == "failed" and delete_observed_deleting:
+                        raise AzureResponseError("The operation failed.")
+                    if state:
+                        last_observation = f"still exists (provisioningState {state})"
+                    else:
+                        last_observation = "still exists"
+                elif explicit:
                     complete = _explicit_condition(
                         resource,
                         created=created,

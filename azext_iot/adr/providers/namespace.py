@@ -18,13 +18,18 @@ from knack.log import get_logger
 from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
 from azext_iot.adr.common import (
+    DPS_ENDPOINT_TYPE,
     IdentityType,
     ManagedServiceIdentityType,
     build_mi_body,
     validate_uami_resource_id,
 )
 from azext_iot.adr.providers.base import ADRProvider, console
-from azext_iot.adr.topology import writable_namespace_properties
+from azext_iot.adr.topology import (
+    endpoint_is_type,
+    get_endpoints,
+    writable_namespace_properties,
+)
 
 logger = get_logger(__name__)
 
@@ -671,15 +676,27 @@ class NamespaceProvider(ADRProvider):
         outbound_identity = ((namespace or {}).get("properties") or {}).get(
             "outboundIdentity"
         ) or {}
-        namespace_properties = (namespace or {}).get("properties") or {}
+        dps_endpoint_name = next(
+            (
+                name
+                for name, endpoint in get_endpoints(namespace, "provisioning").items()
+                if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE)
+            ),
+            None,
+        )
+        if system_assigned and dps_endpoint_name:
+            raise InvalidArgumentValueError(
+                "The namespace system-assigned identity is required by DPS "
+                f"link '{dps_endpoint_name}' for device provisioning. Remove "
+                "the DPS link first."
+            )
         has_links = any(
-            ((namespace_properties.get(section) or {}).get("endpoints") or {})
+            get_endpoints(namespace, section)
             for section in ("provisioning", "messaging", "updating")
         )
         outbound_type = outbound_identity.get("type")
         if system_assigned and (
-            outbound_type == "SystemAssigned"
-            or not outbound_type and has_links
+            outbound_type == "SystemAssigned" or (not outbound_type and has_links)
         ):
             raise InvalidArgumentValueError(
                 "The system-assigned identity is configured as the outbound "

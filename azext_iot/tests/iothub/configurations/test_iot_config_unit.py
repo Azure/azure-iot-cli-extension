@@ -1047,7 +1047,7 @@ class TestConfigExport:
     def test_export_reuses_resolved_target(self, mocker, fixture_cmd, auth_type, login):
         discovery = mocker.patch.object(subject, "IotHubDiscovery")
         target = discovery.return_value.get_target.return_value
-        module = mocker.Mock(module_id="module")
+        module = {"moduleId": "module"}
         list_modules = mocker.patch.object(subject, "_iot_device_module_list", return_value=[module])
         show_twin = mocker.patch.object(subject, "_iot_device_module_twin_show", return_value={
             "moduleId": "module",
@@ -1075,7 +1075,7 @@ class TestConfigExport:
     def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
+            url="https://{}/devices/{}/modules?api-version=2026-11-01-preview".format(
                 mock_target["entity"],
                 device_id
             ),
@@ -1087,7 +1087,7 @@ class TestConfigExport:
 
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2021-04-12".format(
+            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2026-11-01-preview".format(
                 mock_target["entity"],
                 device_id
             ),
@@ -1099,7 +1099,7 @@ class TestConfigExport:
 
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2021-04-12".format(
+            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2026-11-01-preview".format(
                 mock_target["entity"],
                 device_id
             ),

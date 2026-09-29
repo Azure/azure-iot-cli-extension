@@ -20,6 +20,10 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 from azure.core.credentials import AccessToken
+from azure.core.exceptions import ServiceRequestError, ServiceResponseError
+from azure.core.pipeline import Pipeline
+from azure.core.pipeline.policies import RetryPolicy
+from azure.core.pipeline.transport import HttpRequest, RequestsTransport
 from azure.cli.core._profile import Profile
 from azure.cli.core.aaz._poller import AAZLROPoller
 from urllib3.response import HTTPResponse
@@ -197,6 +201,147 @@ def test_public_hub_create_requires_authorized_location_before_any_arm_request(t
         with pytest.raises(ownership.OwnershipError, match="authorized region"):
             wire.submit("PUT", HUB, body)
         assert not wire.calls and not observer.data["resources"]
+
+
+@pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE", "POST"])
+@pytest.mark.parametrize("transport", ["centraluseuap", "australiaeast"], indirect=True)
+@pytest.mark.parametrize("failure", [503, 429, "connect", "read"])
+def test_azure_core_and_requests_do_not_retry_uncertain_arm_mutations(transport, monkeypatch, method, failure):
+    observer, _, wire = transport
+    create_hub(wire)
+    original = wire.handle
+    target = CERTIFICATE + "/verify" if method == "POST" else HUB
+
+    def fail(request):
+        if request.method != method:
+            return original(request)
+        if failure == "connect":
+            raise requests.ConnectionError("offline uncertain connection")
+        if failure == "read":
+            raise requests.ReadTimeout("offline uncertain response")
+        return failure, None, {"Retry-After": "0"}
+
+    monkeypatch.setattr(wire, "handle", fail)
+    with Pipeline(transport=RequestsTransport(), policies=[
+        RetryPolicy(retry_total=3, retry_backoff_factor=0, retry_on_methods=[method]),
+    ]) as pipeline:
+        request = HttpRequest(method, ownership.ARM + target + "?api-version=test")
+        request.set_json_body({})
+        before = len(wire.calls)
+        if isinstance(failure, str):
+            error = ServiceRequestError if failure == "connect" else ServiceResponseError
+            with pytest.raises(error):
+                pipeline.run(request)
+        else:
+            assert pipeline.run(request).http_response.status_code == failure
+    sent = [call for call in wire.calls[before:] if call[0] == method]
+    assert len(sent) == 1
+    item = json.loads(observer.path.read_text())["resources"][HUB]
+    assert len(item["mutations"]) == 2 and item["uncertain"]
+    assert item["mutations"][-1]["status"] == (None if isinstance(failure, str) else failure)
+    assert not observer.data["violations"]
+
+
+@pytest.mark.parametrize("method,host,suffix", [
+    ("GET", ownership.ARM, ""), ("POST", ownership.ARM, "/listkeys"), ("DELETE", "https://storage.example.test", ""),
+])
+def test_retry_suppression_does_not_affect_reads_or_non_arm_clients(transport, monkeypatch, method, host, suffix):
+    observer, _, _ = transport
+    responses = []
+
+    def send(_adapter, request, **_kwargs):
+        response = requests.Response()
+        response.request = request
+        response.status_code = 503 if not responses else 404
+        response._content = b""
+        response.raw = HTTPResponse(body=b"", status=response.status_code)
+        if response.status_code == 503:
+            response.headers["Retry-After"] = "0"
+        responses.append(response)
+        return response
+
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
+    with Pipeline(transport=RequestsTransport(), policies=[RetryPolicy(retry_backoff_factor=0)]) as pipeline:
+        request = HttpRequest(method, host + HUB + suffix + "?api-version=test")
+        assert pipeline.run(request).http_response.status_code == 404
+    assert len(responses) == 2
+    original = observer.original_retry_send
+    observer.restore()
+    assert RetryPolicy.send is original
+
+
+@pytest.mark.parametrize("status", [None, 408, 429, 503])
+@pytest.mark.parametrize("transport", ["centraluseuap", "australiaeast"], indirect=True)
+def test_uncertain_delete_absence_reconciles_cleanup_without_replay(transport, monkeypatch, status):
+    observer, arm, wire = transport
+    create_hub(wire)
+    original = wire.handle
+
+    def delete(request):
+        result = original(request)
+        if request.method == "DELETE":
+            if status is None:
+                raise requests.ReadTimeout("Response lost after deletion")
+            return status, None, {}
+        return result
+
+    monkeypatch.setattr(wire, "handle", delete)
+    if status is None:
+        with pytest.raises(requests.ReadTimeout):
+            wire.submit("DELETE", HUB)
+    else:
+        assert wire.submit("DELETE", HUB).status_code == status
+    item = observer.data["resources"][HUB]
+    assert item["uncertain"]
+    result = runner.cleanup_regular(
+        arm, observer.data, "uid", "regular", time.monotonic() + 10, observer.path,
+        region=ownership.REGION, endpoint=ownership.ARM,
+    )
+    assert result["complete"] and result["absentIds"] == [HUB]
+    assert [call[0] for call in wire.calls].count("DELETE") == 1
+    assert item["mutations"][-1]["status"] == status
+    assert item["mutations"][-1]["absenceConfirmed"] and not item["uncertain"]
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+    # Even proven absence does not authorize replay or a new generation.
+    with pytest.raises(ownership.OwnershipError, match="Unacknowledged DELETE"):
+        wire.submit("DELETE", HUB)
+    assert [call[0] for call in wire.calls].count("DELETE") == 1
+
+
+@pytest.mark.parametrize("status,body", [(200, None), (204, None), (200, {"status": "Succeeded"})])
+def test_controller_delete_success_does_not_require_json_but_requires_absence(transport, monkeypatch, status, body):
+    observer, arm, wire = transport
+    create_hub(wire)
+    original = wire.handle
+    reads_after_delete = []
+
+    def handle(request):
+        if request.method == "DELETE":
+            return status, body, {}
+        if any(call[0] == "DELETE" for call in wire.calls):
+            reads_after_delete.append(request.method)
+            if len(reads_after_delete) == 2:
+                wire.resources.pop(HUB)
+        return original(request)
+
+    monkeypatch.setattr(wire, "handle", handle)
+    monkeypatch.setattr(runner.time, "sleep", lambda _seconds: None)
+    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 10, observer.path)
+    assert result["complete"] and reads_after_delete == ["GET", "GET"]
+    assert observer.data["resources"][HUB]["mutations"][-1]["status"] == status
+    assert observer.data["resources"][HUB]["mutations"][-1]["absenceConfirmed"]
+    assert [call[0] for call in wire.calls].count("DELETE") == 1
+
+
+@pytest.mark.parametrize("body", [b"", b"malformed-json"])
+def test_controller_get_200_requires_valid_json(transport, monkeypatch, body):
+    _, arm, _ = transport
+    response = requests.Response()
+    response.status_code = 200
+    response._content = body
+    monkeypatch.setattr(arm.session, "request", Mock(return_value=response))
+    with pytest.raises(requests.exceptions.JSONDecodeError):
+        arm.request("GET", HUB, "test")
 
 
 def create_identity(monkeypatch):

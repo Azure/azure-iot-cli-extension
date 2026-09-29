@@ -190,7 +190,7 @@ def test_lifecycle_cleanup_keeps_collision_quarantine_and_testsdk_json(mocker, c
     mocker.patch("azext_iot.tests.adr._readiness.time.sleep")
     scenario = scenarios.TestADRRegistryDeviceLifecycle("test_registry_device_lifecycle")
     scenario.kwargs = {}
-    scenario.cli_ctx = Mock()
+    scenario.cli_ctx = Mock(data={"subscription_id": scenarios.TEST_SUBSCRIPTION})
     backend = _LifecycleBackend(scenario, collision)
     mocker.patch.object(ADRLiveScenarioTest, "cmd", side_effect=lambda command, **_kwargs: backend.cmd(command))
     client = _spec_adr_client()
@@ -255,7 +255,7 @@ def attribute_listing_case(mocker):
     mocker.patch("azext_iot.tests.adr._readiness.time.sleep")
     scenario = scenarios.TestADRRegistryDeviceLifecycle("test_registry_device_lifecycle")
     scenario.kwargs = {}
-    scenario.cli_ctx = Mock()
+    scenario.cli_ctx = Mock(data={"subscription_id": scenarios.TEST_SUBSCRIPTION})
     backend = _LifecycleBackend(scenario)
     read = Mock()
 
@@ -359,7 +359,7 @@ def test_cleanup_uses_sdk_404_while_unwinding_primary_error(mocker):
     mocker.patch("azext_iot.tests.adr._readiness.time.sleep")
     scenario = scenarios.TestADRRegistryDeviceLifecycle("test_registry_device_lifecycle")
     scenario.kwargs = {}
-    scenario.cli_ctx = Mock()
+    scenario.cli_ctx = Mock(data={"subscription_id": scenarios.TEST_SUBSCRIPTION})
     backend = _LifecycleBackend(scenario, primary_failure=True)
     scenario.cmd = backend.cmd
     client = _spec_adr_client()
@@ -439,7 +439,7 @@ def test_owned_cleanup_of_absent_resource_never_submits_delete():
 def test_namespace_bound_get_does_not_relax_existing_scope_checks():
     namespace_id = OWNED_ID.rsplit("/registryDevices/", 1)[0]
     command = f"iot adr ns show --namespace owned -g {scenarios.TEST_RG}"
-    scenario = Mock()
+    scenario = Mock(cli_ctx=Mock(data={"subscription_id": scenarios.TEST_SUBSCRIPTION}))
     getter = Mock(side_effect=_sdk_error(namespace_id))
     assert readiness._get_resource(scenario, command, getter) is None
     scenario.cmd.assert_not_called()

@@ -688,7 +688,7 @@ def test_external_ca_help_recipe_and_output_contract():
     load_adr_help()
     activation = helps["iot adr ns ca activate"]
     for text in ("properties.issuer.certificateSigningRequest", "-copy_extensions copy", "umask 077",
-                 "leaf to root", "730 days is illustrative", "not a universal", "--no-wait"):
+                 "leaf to root", "less than\n    365 days", "final validation", "--no-wait"):
         assert text in activation
     assert "does not prove" in helps["iot adr ns ca revoke"]
 
@@ -769,6 +769,7 @@ def test_live_private_key_directory_removed_after_failure(signer_fails, ca_pki, 
     from azext_iot.tests.adr import test_adr_certificate_authority_int as live
 
     scenario = live.TestADRCAActions("test_external_activation_no_wait")
+    ca_pki["resource"]["properties"]["issuer"]["status"] = "PendingActivation"
 
     @contextmanager
     def owned():

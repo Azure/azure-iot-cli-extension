@@ -25,6 +25,8 @@ from azext_iot.tests import _hub_ownership as ownership, _hub_phase_runner as ru
 from azext_iot.tests.test_hub_ownership_transport_unit import Wire, Credential, HUB, create_hub
 
 
+pytest_plugins = ["pytester"]
+
 ROOT = Path(__file__).resolve().parents[2]
 OPERATION = HUB + "/operations/offline"
 NEGATIVE = HUB.replace(ownership.GROUP, "fakerg").rsplit("/", 1)[0] + "/fakehub"
@@ -72,6 +74,24 @@ def transport(tmp_path, monkeypatch):
     finally:
         observer.restore()
         scope.restore()
+
+
+@pytest.fixture
+def owned_cli(transport, pytestconfig):
+    from azure.cli.core import get_default_cli
+    from pytest_mock import MockerFixture
+    from azext_iot.tests.dps.core.test_dps_phase_runtime_unit import _real_cli
+
+    # The shared mocker is created by an autouse fixture before transport.
+    # These nested patches must unwind before Observer/ProcessScope.restore,
+    # not reinstall their saved wrappers during the shared mocker's teardown.
+    patches = MockerFixture(pytestconfig)
+    try:
+        patches.patch.object(get_default_cli(), "commands_loader_cls")
+        patches.patch.dict(get_default_cli().data)
+        yield _real_cli(patches)
+    finally:
+        patches.stopall()
 
 
 @pytest.mark.parametrize("path", [
@@ -226,21 +246,102 @@ def test_terminal_delete_poll_never_substitutes_for_exact_absence(transport, hea
     assert not observer.data["resources"][HUB]["uncertain"]
 
 
-@pytest.mark.parametrize("status", [None, 408, 429, 500])
-def test_root_absence_never_resolves_unacknowledged_or_ambiguous_delete(transport, status):
-    observer, _, wire = transport
+@pytest.mark.parametrize("status", [None, 408, 429, 500, 503])
+@pytest.mark.parametrize("replay", ["DELETE", "PUT", "PATCH"])
+def test_exact_owned_root_absence_resolves_cleanup_without_acknowledging_or_replaying_delete(transport, status, replay):
+    observer, arm, wire = transport
     create_hub(wire)
     observer.prepare("DELETE", HUB, "test", {})
     if status is not None:
         observer.complete(HUB, status)
-    mutation = observer.data["resources"][HUB]["mutations"][-1]
-    ownership.observe_get(observer.data, HUB, 404, None)
-    assert not mutation.get("absenceConfirmed") and not mutation.get("reconciled")
-    assert observer.data["resources"][HUB]["uncertain"]
+    record = observer.data["resources"][HUB]
+    mutation = record["mutations"][-1]
+    original = deepcopy(mutation)
+    assert record["before"] == 404 and record["resolved"] and record["ownerTag"] == "uid"
+    assert wire.submit("GET", NEGATIVE).status_code == 404
+    assert mutation == original and record["uncertain"]
+
+    del wire.resources[HUB]
+    assert wire.submit("GET", HUB).status_code == 404
+    # Absence resolves cleanup only; retain the unknown/error response verbatim.
+    assert mutation == dict(original, absenceConfirmed=True)
+    assert not record["uncertain"] and not ownership.ownership_errors(observer.data, "uid", "entra")
+    assert json.loads(observer.path.read_text(encoding="utf-8")) == observer.data
+    arm.request.reset_mock()
     before = len(wire.calls)
-    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+    cleanup = runner.cleanup_regular(arm, observer.data, "uid", "entra", time.monotonic() + 2, observer.path)
+    assert cleanup["complete"] and cleanup["absentIds"] == [HUB]
+    assert arm.request.call_args_list and all(call.args[0] == "GET" for call in arm.request.call_args_list)
+    assert len(wire.calls) == before and len(record["mutations"]) == 2
+
+    arm.request.reset_mock()
+    with pytest.raises(ownership.OwnershipError, match="Unacknowledged DELETE cannot be replayed"):
+        wire.submit(replay, HUB, {})
+    arm.request.assert_not_called()
+    assert len(wire.calls) == before and record["mutations"][-1] == dict(original, absenceConfirmed=True)
+    assert not record.get("generations") and record.get("generation", 1) == 1
+
+
+@pytest.mark.parametrize("status", [None, 503])
+@pytest.mark.parametrize("kind", [
+    "unknown-create", "unresolved-owner", "child-put", "child-delete", "responseError", "pollingFailed", "not-final",
+])
+def test_root_absence_does_not_resolve_other_uncertainty_or_authorize_cleanup(transport, status, kind):
+    observer, arm, wire = transport
+    if kind != "unknown-create":
+        create_hub(wire)
+    method = "PUT" if kind in ("unknown-create", "child-put") else "DELETE"
+    target = HUB + "/certificates/offline" if kind in ("child-put", "child-delete") else HUB
+    observer.prepare(method, target, "test", {"properties": {"disableLocalAuth": True}})
+    if status is not None:
+        observer.complete(HUB, status)
+    record = observer.data["resources"][HUB]
+    mutation = record["mutations"][-1]
+    if kind == "unresolved-owner":
+        record["resolved"] = False
+        record["mutations"][0]["status"] = None
+    elif kind in ("responseError", "pollingFailed"):
+        mutation[kind] = True
+    elif kind == "not-final":
+        record["mutations"].append({"method": "PATCH", "id": HUB, "apiVersion": "test", "status": None})
+    original = deepcopy(mutation)
+    wire.resources.pop(HUB, None)
+    assert wire.submit("GET", HUB).status_code == 404
+    assert mutation == original and record["uncertain"]
+    assert ownership.ownership_errors(observer.data, "uid", "entra")
+
+    arm.request.reset_mock()
+    before = len(wire.calls)
+    cleanup = runner.cleanup_regular(arm, observer.data, "uid", "entra", time.monotonic() + 2, observer.path)
+    assert not cleanup["complete"] and cleanup["errors"]
+    with pytest.raises(ownership.OwnershipError, match="Uncertain mutation cannot be replayed"):
         wire.submit("DELETE", HUB)
+    arm.request.assert_not_called()
     assert len(wire.calls) == before
+
+
+@pytest.mark.parametrize("status", [None, 408, 429, 500, 503])
+def test_absence_after_uncertain_delete_cannot_validate_a_recreated_generation(transport, status):
+    observer, arm, wire = transport
+    create_hub(wire)
+    current = deepcopy(observer.data["resources"][HUB])
+    observer.prepare("DELETE", HUB, "test", {})
+    if status is not None:
+        observer.complete(HUB, status)
+    del wire.resources[HUB]
+    assert wire.submit("GET", HUB).status_code == 404
+    previous = observer.data["resources"][HUB]
+    assert previous["mutations"][-1]["absenceConfirmed"] and not previous["uncertain"]
+    # Even a forged new generation cannot turn this response into an acknowledged DELETE.
+    current.update(generation=2, generations=[previous])
+    observer.data["resources"][HUB] = current
+    assert "unconfirmed previous generation deletion" in ownership.ownership_errors(observer.data, "uid", "entra")
+    arm.request.reset_mock()
+    before = len(wire.calls)
+    cleanup = runner.cleanup_regular(arm, observer.data, "uid", "entra", time.monotonic() + 2, observer.path)
+    assert not cleanup["complete"] and cleanup["errors"]
+    arm.request.assert_not_called()
+    assert len(wire.calls) == before and previous["mutations"][-1]["status"] == status
 
 
 @pytest.mark.parametrize("state", ["Failed", "Canceled", "Cancelled"])
@@ -251,6 +352,8 @@ def test_failed_delete_poll_cannot_be_rehabilitated_by_absence_or_replayed(trans
     ownership.observe_poll(observer.data, ownership.ARM + OPERATION, 200, {"status": state})
     ownership.observe_get(observer.data, HUB, 404, None)
     assert mutation["pollingFailed"] and not mutation.get("reconciled")
+    assert observer.data["resources"][HUB]["uncertain"]
+    assert ownership.ownership_errors(observer.data, "uid", "entra")
     before = len(wire.calls)
     with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
         wire.submit("DELETE", HUB)
@@ -262,12 +365,10 @@ def test_failed_delete_poll_cannot_be_rehabilitated_by_absence_or_replayed(trans
     ("test_export_import_migrate_missing_hubs_error", 4),
 ])
 def test_actual_negative_state_body_retains_assertions_without_poisoning_ownership(
-    transport, monkeypatch, mocker, test_name, negative_reads,
+    transport, monkeypatch, owned_cli, test_name, negative_reads,
 ):
-    from azure.cli.core import get_default_cli
     from azext_iot.iothub.providers import discovery
     from azext_iot.sdk.iothub.mgmt import IotHubClient
-    from azext_iot.tests.dps.core.test_dps_phase_runtime_unit import _real_cli
     from azext_iot.tests.iothub.state import _state_helpers
 
     observer, _, wire = transport
@@ -278,8 +379,7 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
     monkeypatch.setattr(discovery, "iot_hub_service_factory", lambda _ctx: client)
     monkeypatch.setattr(discovery, "get_subscription_id", lambda _ctx: ownership.SUBSCRIPTION)
     monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
-    mocker.patch.object(get_default_cli(), "commands_loader_cls")
-    cli = _real_cli(mocker)
+    cli = owned_cli
     cli.capture_stderr = False
     cli.user_subscription = ownership.SUBSCRIPTION
     source = ROOT / "azext_iot/tests/iothub/state/test_hub_state_int.py"
@@ -304,6 +404,55 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
     assert observer.data.get("violationDetails", []) == []
     assert set(observer.data["resources"]) == {HUB}
     assert len([call for call in wire.calls if call[0] == "PUT"]) == 1
+
+
+def test_nested_cli_patches_restore_profile_after_all_fixture_finalizers(pytester):
+    config = pytester.makeini("[pytest]")
+    path = pytester.makepyfile("""
+        import pytest
+        import requests
+        from azure.cli.core import get_default_cli
+        from azure.cli.core._profile import Profile
+        from azure.core.pipeline.policies import RetryPolicy
+        from azext_iot.tests.test_hub_observer_polling_unit import transport, owned_cli
+        from azext_iot.tests.test_hub_observer_polling_unit import (
+            test_actual_negative_state_body_retains_assertions_without_poisoning_ownership as exercise,
+        )
+
+        ORIGINAL = (
+            Profile.get_subscription, Profile.get_login_credentials, Profile.get_raw_token,
+            requests.Session.send, RetryPolicy.send, get_default_cli().commands_loader_cls,
+        )
+        ORIGINAL_DATA = dict(get_default_cli().data)
+
+        @pytest.fixture(autouse=True)
+        def early_mocker(mocker):
+            # Match the repository's autouse version-check fixture ordering.
+            return mocker
+
+        @pytest.mark.parametrize("test_name,negative_reads", [
+            ("test_mirgate_hub_dataplane_error", 1),
+            ("test_export_import_migrate_missing_hubs_error", 4),
+        ])
+        @pytest.mark.parametrize("fail_after_cli", [False, True])
+        def test_owned_cli(transport, monkeypatch, owned_cli, test_name, negative_reads, fail_after_cli):
+            exercise(transport, monkeypatch, owned_cli, test_name, negative_reads)
+            if fail_after_cli:
+                pytest.xfail("Exercise fixture unwinding after an interrupted test body")
+
+        def test_globals_restored_in_the_same_process():
+            current = (
+                Profile.get_subscription, Profile.get_login_credentials, Profile.get_raw_token,
+                requests.Session.send, RetryPolicy.send, get_default_cli().commands_loader_cls,
+            )
+            assert all(actual is original for actual, original in zip(current, ORIGINAL))
+            assert get_default_cli().data == ORIGINAL_DATA
+    """)
+    result = pytester.inline_run(
+        "-c", str(config), "--rootdir", str(pytester.path), "--confcutdir", str(pytester.path),
+        str(path), "-q", "-p", "pytest_mock", "-o", "addopts=",
+    )
+    result.assertoutcome(passed=3, skipped=2)
 
 
 def test_real_hub_delete_poll_success_still_requires_exact_root_absence(transport, monkeypatch):

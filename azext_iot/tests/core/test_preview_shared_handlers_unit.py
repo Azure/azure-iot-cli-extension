@@ -205,8 +205,22 @@ def test_service_sdk_factory_uses_login_or_explicit_credentials(mocker, kind, re
     oauth = mocker.patch.object(_factory, "IoTOAuth", return_value=credential)
     constructor = mocker.patch(sdk_class)
     resolver = _factory.SdkResolver(target, auth_override=credential if override else None)
-    assert getattr(resolver, f"_get_{kind}_service_sdk")() is constructor.return_value
-    constructor.assert_called_once_with(credentials=credential, base_url="https://service.example.test")
+    result = getattr(resolver, f"_get_{kind}_service_sdk")()
+    if kind == "dps":
+        assert result is constructor.return_value
+        options = constructor.call_args.kwargs
+        assert options["dps_name"] == "service"
+        assert options["authentication_policy"].authentication is credential
+        assert options["authentication_policy"].endpoint == "https://service.example.test"
+        assert options["redirect_max"] == 0
+        assert constructor.return_value._client._base_url == "https://service.example.test"
+    else:
+        assert result.sdk is constructor.return_value
+        options = constructor.call_args.kwargs
+        assert options["endpoint"] == "https://service.example.test"
+        assert options["authentication_policy"].authentication is credential
+        assert options["authentication_policy"].endpoint == options["endpoint"]
+        assert options["redirect_max"] == options["retry_total"] == 0
     if override:
         oauth.assert_not_called()
     else:
@@ -225,5 +239,10 @@ def test_fabric_endpoint_delete_by_type_preserves_other_types(mocker, preview_mg
     assert provider.delete(endpoint_type="FABRIC-EVENTSTREAM") is client.iot_hub_resource.begin_create_or_update.return_value
     assert endpoints["eventStreams"] == []
     assert endpoints["eventHubs"] == [{"name": "keep-eventhub"}]
-    client.iot_hub_resource.begin_create_or_update.assert_called_once_with("rg", "hub", hub, etag="hub-etag")
+    from azext_iot.common.arm import hub_description_for_write, hub_etag_arguments
+
+    client.iot_hub_resource.begin_create_or_update.assert_called_once_with(
+        resource_group_name="rg", resource_name="hub",
+        iot_hub_description=hub_description_for_write(hub), **hub_etag_arguments(hub)
+    )
     factory.assert_called_once_with(cmd.cli_ctx)

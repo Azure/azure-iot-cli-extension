@@ -30,6 +30,10 @@ POSIX_WORKFLOW = pytest.mark.skipif(
 )
 
 
+def _ci_budgets():
+    return json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+
+
 def _workflows():
     return [yaml.safe_load((ROOT / ".github/workflows" / name).read_text(encoding="utf-8")) for name in FILES]
 
@@ -116,6 +120,17 @@ def test_flat_matrix_makes_all_combinations_concurrently_eligible_without_wrappe
         assert not value.get("continue-on-error", False)
     for name in ("int_test_bundle.yml", "int_test_cohort.yml"):
         assert not (ROOT / ".github/workflows" / name).exists()
+
+
+def test_external_actions_are_pinned_to_full_shas_with_version_comments():
+    for path in (ROOT / ".github/workflows").glob("*.yml"):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = re.search(r"uses:\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?@([^ #]+))", line)
+            if not match:
+                continue
+            ref = match.group(2)
+            assert re.fullmatch(r"[0-9a-f]{40}", ref), f"{path.name}: {line}"
+            assert re.search(r"# v\d+\.\d+\.\d+\s*$", line), f"{path.name}: {line}"
 
 
 def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
@@ -246,7 +261,7 @@ def test_flat_matrix_preserves_exact_cartesian_membership_budgets_names_and_arti
         return config["service"], config["python"], config["region"]
 
     assert Counter(identity(config) for config in flat) == Counter(expected)
-    ceilings = {"DPS": 120, "HubControl": 225, "HubData": 360, "ADU": 200, "ADR": 360}
+    ceilings = {service: budget["job_timeout_minutes"] for service, budget in _ci_budgets().items()}
     job = _workflows()[0]["jobs"]["int-test"]
     uploads = [step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
     names, artifacts = [], []
@@ -270,6 +285,21 @@ def test_flat_matrix_preserves_exact_cartesian_membership_budgets_names_and_arti
         ]
     assert len(set(names)) == len(expected)
     assert len(set(artifacts)) == 2 * len(expected)
+
+
+def test_ci_budget_source_covers_matrix_and_controller_arithmetic():
+    budgets = _ci_budgets()
+    assert set(budgets) == set(SERVICES)
+    for service, config in budgets.items():
+        assert config["tox_env"] == service + "-int"
+        controller = (
+            sum((phase["runtime_minutes"] + phase["cleanup_minutes"]) for phase in config["phases"])
+            + config["reserve_minutes"]
+        )
+        assert controller + config["setup_minutes"] <= config["job_timeout_minutes"]
+    assert {
+        service: budgets[service]["job_timeout_minutes"] for service in ("DPS", "HubControl", "HubData", "ADU", "ADR")
+    } == {"DPS": 150, "HubControl": 275, "HubData": 360, "ADU": 200, "ADR": 360}
 
 
 @POSIX_WORKFLOW

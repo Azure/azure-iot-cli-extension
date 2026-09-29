@@ -5,18 +5,37 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import os
 from base64 import b64encode
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from msrestazure.tools import parse_resource_id
 
+from azext_iot.adr.rbac import LinkRbacManager
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr.conftest import TEST_RG
+from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper,
+    CleanupLedger,
+    ROLE_PROPAGATION_DELAY,
+    SU_LIFECYCLE_TIMEOUT,
+    SU_PROVISIONING_MAX_POLLS,
+    SU_PROVISIONING_POLL_INTERVAL,
+    wait_for_condition,
+)
+from azext_iot.tests.adr._log import timed_step
+from azext_iot.tests.adr.conftest import (
+    TEST_LOCATION,
+    TEST_RG,
+    TEST_SUBSCRIPTION,
+    generate_adr_namespace_name,
+)
 from azext_iot.tests.generators import generate_generic_id
+
+_REPORT_POLL_ATTEMPTS = 12
+_REPORT_POLL_INTERVAL_SECONDS = 10
+_ACCESS_POLL_ATTEMPTS = 30
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -49,155 +68,226 @@ class TestADRSoftwareUpdateLocalCommands(ADRLiveScenarioTest):
             assert manifest["files"][0]["filename"] == payload_path.name
 
 
-@pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateStage(ADRLiveScenarioTest):
-    def test_software_update_stage_upload_and_reuse(self):
-        namespace_name = os.getenv("azext_iot_adr_su_namespace")
-        storage_account = os.getenv("azext_iot_adr_su_storage_account")
-        storage_subscription = os.getenv(
-            "azext_iot_adr_su_storage_subscription"
-        )
-        if not namespace_name or not storage_account:
-            pytest.skip(
-                "Set azext_iot_adr_su_namespace and "
-                "azext_iot_adr_su_storage_account to run the stage integration test."
-            )
+def _write_update(directory, name):
+    """Write an importable single-step update and return its manifest path and update ID."""
+    payload = json.dumps({"name": name, "version": "1.0", "packages": [{"name": "libcurl4-doc"}]}).encode("utf8")
+    payload_path = Path(directory) / f"{name}-apt-manifest.json"
+    payload_path.write_bytes(payload)
+    update_id = {"provider": "Contoso", "name": name, "version": "1.0"}
+    manifest_path = Path(directory) / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({
+            "updateId": update_id,
+            "compatibility": [{"deviceManufacturer": "Contoso", "deviceModel": "StageTest"}],
+            "instructions": {
+                "steps": [{
+                    "handler": "microsoft/apt:1",
+                    "files": [payload_path.name],
+                    "handlerProperties": {"installedCriteria": "1.0"},
+                }]
+            },
+            "files": [{
+                "filename": payload_path.name,
+                "sizeInBytes": len(payload),
+                "hashes": {"sha256": b64encode(sha256(payload).digest()).decode("utf8")},
+            }],
+            "manifestVersion": "5.0",
+            "createdDateTime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }),
+        encoding="utf-8",
+    )
+    return manifest_path, update_id
 
-        parsed_storage = (
-            parse_resource_id(storage_account)
-            if storage_account.startswith("/")
-            else {}
-        )
-        account_name = parsed_storage.get("name") or storage_account
-        subscription = (
-            parsed_storage.get("subscription") or storage_subscription
-        )
-        container = f"adr-stage-{generate_generic_id()[:12]}".lower()
-        subscription_arg = (
-            f" --storage-subscription {storage_subscription}"
-            if storage_subscription and not parsed_storage
-            else ""
-        )
 
-        with TemporaryDirectory() as directory:
-            payload_path = Path(directory) / "payload.bin"
-            payload = b"ADR stage integration payload"
-            payload_path.write_bytes(payload)
-            manifest_path = Path(directory) / "manifest.json"
-            manifest_path.write_text(
-                json.dumps(
-                    {
-                        "updateId": {
-                            "provider": "Contoso",
-                            "name": f"stage-{generate_generic_id()[:8]}",
-                            "version": "1.0",
-                        },
-                        "compatibility": [
-                            {
-                                "deviceManufacturer": "Contoso",
-                                "deviceModel": "StageTest",
-                            }
-                        ],
-                        "instructions": {"steps": []},
-                        "files": [
-                            {
-                                "filename": payload_path.name,
-                                "sizeInBytes": len(payload),
-                                "hashes": {
-                                    "sha256": b64encode(
-                                        sha256(payload).digest()
-                                    ).decode("utf8")
-                                },
-                            }
-                        ],
-                        "manifestVersion": "5.0",
-                    }
-                ),
-                encoding="utf-8",
-            )
-            command = (
-                "iot adr ns su software-update stage "
-                f"--ns {namespace_name} -g {TEST_RG} "
-                f"--manifest-path '{manifest_path}' "
-                f"--storage-account '{storage_account}' "
-                f"--storage-container {container}{subscription_arg}"
-            )
-            try:
-                first = self.cmd(command).get_output_in_json()
-                assert first["readyToImport"] is True
-                assert "sasExpiresOn" not in first
-                assert {
-                    artifact["status"]
-                    for artifact in first["updates"][0]["artifacts"]
-                } == {"uploaded"}
+def _access_pending(error):
+    message = str(error).lower()
+    return any(token in message for token in ("403", "forbidden", "unauthorized", "not authorized"))
 
-                second = self.cmd(command).get_output_in_json()
-                assert {
-                    artifact["status"]
-                    for artifact in second["updates"][0]["artifacts"]
-                } == {"reused"}
-            finally:
-                cleanup = (
-                    f"storage container delete --account-name {account_name} "
-                    f"--name {container} --auth-mode key"
-                )
-                if subscription:
-                    cleanup += f" --subscription {subscription}"
-                self.cmd(cleanup)
+
+def _report_pending(error):
+    message = str(error).lower().replace(" ", "")
+    return any(token in message for token in ("404", "notfound", "reportnotready", "inprogress"))
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateDiscovery(ADRLiveScenarioTest):
-    """Validate catalog and no-wait follow-up surfaces against a linked service."""
+class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
+    """Stage, import, catalog, operation status and reports on an owned SU-linked namespace."""
 
-    def test_catalog_and_operation_status_discovery(self):
-        namespace_name = os.getenv("azext_iot_adr_su_namespace")
-        if not namespace_name:
-            pytest.skip(
-                "Set azext_iot_adr_su_namespace to run Software Updates "
-                "catalog/status integration coverage."
-            )
+    def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
+        super()._delete_owned_resource(kind, name, resource_group, no_wait=kind == "su" or no_wait)
 
-        providers = self.cmd(
-            "iot adr ns su software-update catalog provider list "
-            f"--ns {namespace_name} -g {TEST_RG}"
-        ).get_output_in_json()
-        assert isinstance(providers, list)
-        if providers:
-            provider = providers[0]
-            names = self.cmd(
-                "iot adr ns su software-update catalog name list "
-                f"--ns {namespace_name} -g {TEST_RG} "
-                f"--update-provider '{provider}'"
-            ).get_output_in_json()
-            assert isinstance(names, list)
-            if names:
-                versions = self.cmd(
-                    "iot adr ns su software-update catalog version list "
-                    f"--ns {namespace_name} -g {TEST_RG} "
-                    f"--update-provider '{provider}' "
-                    f"--update-name '{names[0]}'"
+    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT * 2)
+    def test_linked_namespace_software_update_and_reports(self):
+        namespace_name = generate_adr_namespace_name()
+        su_name = f"testsu{generate_generic_id()[:8]}"
+        storage_account = f"adrsu{generate_generic_id()[:16]}"
+        storage_created = False
+        try:
+            with timed_step("Setup 1/3 ❯ Namespace, Update Instance and storage account"):
+                namespace = self.create_owned_resource(
+                    f"iot adr ns create -n {namespace_name} -g {TEST_RG} --location {TEST_LOCATION}",
+                    kind="namespace", name=namespace_name, resource_group=TEST_RG,
                 ).get_output_in_json()
-                assert isinstance(versions, list)
-                if versions:
-                    self.cmd(
-                        "iot adr ns su software-update wait "
-                        f"--ns {namespace_name} -g {TEST_RG} "
-                        f"--update-provider '{provider}' "
-                        f"--update-name '{names[0]}' "
-                        f"--update-version '{versions[0]}'"
-                    )
+                self.create_owned_resource(
+                    f"iot adr ns su instance create -n {su_name} -g {TEST_RG} "
+                    f"--location {TEST_LOCATION} --system-assigned-mi --no-wait",
+                    kind="su", name=su_name, resource_group=TEST_RG,
+                )
+                storage_created = True
+                self.cmd(
+                    f"storage account create -n {storage_account} -g {TEST_RG} --location {TEST_LOCATION}"
+                )
 
-        statuses = self.cmd(
-            "iot adr ns su software-update operation-status list "
-            f"--ns {namespace_name} -g {TEST_RG}"
-        ).get_output_in_json()
-        assert isinstance(statuses, list)
-        if statuses:
-            operation_id = statuses[0]["operationId"]
-            shown = self.cmd(
-                "iot adr ns su software-update operation-status show "
-                f"--ns {namespace_name} -g {TEST_RG} "
-                f"--operation-id '{operation_id}'"
-            ).get_output_in_json()
-            assert shown["operationId"] == operation_id
+            with timed_step("Setup 2/3 ❯ Grant roles while the Update Instance provisions"):
+                su_id = wait_for_condition(
+                    lambda: self.cmd(f"iot adr ns su instance show -n {su_name} -g {TEST_RG}").get_output_in_json(),
+                    lambda resource: bool(resource.get("id")),
+                    description="owned SU materialization",
+                    timeout=120,
+                )["id"]
+                caller_id = LinkRbacManager(self.cli_ctx)._current_assignee_object_id(  # pylint: disable=protected-access
+                    TEST_SUBSCRIPTION
+                )
+                grants = [
+                    (namespace["identity"]["principalId"], "Contributor", "ServicePrincipal"),
+                    (namespace["identity"]["principalId"], "Device Update Administrator", "ServicePrincipal"),
+                    (caller_id, "Device Update Administrator", None),
+                ]
+                for principal, role, principal_type in grants:
+                    assert self.assign_role(principal, role, su_id, assignee_type=principal_type), (
+                        f"The SU fixture requires {role} on the owned Update Instance."
+                    )
+                wait_for_condition(
+                    lambda: self.cmd(f"iot adr ns su instance show -n {su_name} -g {TEST_RG}").get_output_in_json(),
+                    lambda resource: resource["properties"]["provisioningState"] == "Succeeded",
+                    is_terminal_failure=lambda resource: resource["properties"].get("provisioningState")
+                    in {"Failed", "Canceled", "Cancelled"},
+                    description="owned SU provisioning Succeeded",
+                    timeout=None,
+                    max_attempts=SU_PROVISIONING_MAX_POLLS,
+                    interval=SU_PROVISIONING_POLL_INTERVAL,
+                    describe=lambda resource: f"provisioningState={resource['properties'].get('provisioningState')}",
+                )
+
+            with timed_step("Setup 3/3 ❯ link su add (system-assigned identity)"):
+                self.cmd(
+                    f"iot adr ns link su add --ns {namespace_name} -g {TEST_RG} -n su "
+                    f"--su-id {su_id} --system-assigned-mi --timeout 1200"
+                )
+                wait_for_condition(
+                    lambda: self.cmd(
+                        f"iot adr ns su software-update catalog provider list --ns {namespace_name} -g {TEST_RG}"
+                    ).get_output_in_json(),
+                    lambda providers: isinstance(providers, list),
+                    description="caller SU data-plane access",
+                    timeout=None,
+                    max_attempts=_ACCESS_POLL_ATTEMPTS,
+                    interval=ROLE_PROPAGATION_DELAY,
+                    is_retryable_error=_access_pending,
+                )
+
+            with TemporaryDirectory() as directory:
+                update_name = f"stage{generate_generic_id()[:8]}"
+                manifest_path, update_id = _write_update(directory, update_name)
+                stage = (
+                    f"iot adr ns su software-update stage --ns {namespace_name} -g {TEST_RG} "
+                    f"--manifest-path '{manifest_path}' --storage-account {storage_account} "
+                    f"--storage-container {update_name}"
+                )
+                with timed_step("Stage ❯ Upload, then reuse"):
+                    first = self.cmd(stage).get_output_in_json()
+                    assert first["readyToImport"] is True
+                    assert "sasExpiresOn" not in first
+                    assert {a["status"] for a in first["updates"][0]["artifacts"]} == {"uploaded"}
+                    second = self.cmd(stage).get_output_in_json()
+                    assert {a["status"] for a in second["updates"][0]["artifacts"]} == {"reused"}
+
+                with timed_step("Import ❯ stage --then-import --no-wait, then wait --created"):
+                    self.cmd(f"{stage} --then-import --no-wait")
+                    version_args = (
+                        f"--update-provider {update_id['provider']} --update-name {update_name} "
+                        f"--update-version {update_id['version']}"
+                    )
+                    self.cmd(
+                        f"iot adr ns su software-update wait --ns {namespace_name} -g {TEST_RG} "
+                        f"{version_args} --created --timeout 1200"
+                    )
+                    shown = self.cmd(
+                        f"iot adr ns su software-update show --ns {namespace_name} -g {TEST_RG} {version_args}"
+                    ).get_output_in_json()
+                    assert shown["updateId"] == update_id
+
+            with timed_step("Discovery ❯ Catalog and operation status"):
+                catalog = f"iot adr ns su software-update catalog {{}} list --ns {namespace_name} -g {TEST_RG}"
+                assert update_id["provider"] in self.cmd(catalog.format("provider")).get_output_in_json()
+                names = self.cmd(
+                    catalog.format("name") + f" --update-provider {update_id['provider']}"
+                ).get_output_in_json()
+                assert update_name in names
+                versions = self.cmd(
+                    catalog.format("version")
+                    + f" --update-provider {update_id['provider']} --update-name {update_name}"
+                ).get_output_in_json()
+                assert update_id["version"] in versions
+
+                statuses = self.cmd(
+                    f"iot adr ns su software-update operation-status list --ns {namespace_name} -g {TEST_RG}"
+                ).get_output_in_json()
+                assert statuses, "The import must report an operation status."
+                operation_id = statuses[0]["operationId"]
+                status = self.cmd(
+                    f"iot adr ns su software-update operation-status show --ns {namespace_name} -g {TEST_RG} "
+                    f"--operation-id {operation_id}"
+                ).get_output_in_json()
+                assert status["operationId"] == operation_id
+
+            with timed_step("Reports ❯ Namespace and group reports"):
+                self._assert_reports(namespace_name)
+        finally:
+            with CleanupLedger() as cleanup:
+                if storage_created:
+                    cleanup.register(
+                        "storage account",
+                        lambda: self.cmd(f"storage account delete -n {storage_account} -g {TEST_RG} --yes"),
+                    )
+                cleanup.register("owned ADR resources", self.cleanup_full_infra)
+
+    def _assert_reports(self, namespace_name):
+        group_name = f"testgrp{generate_generic_id()[:8]}"
+        report = f"iot adr ns report {{}} --ns {namespace_name} -g {TEST_RG} --report-type {{}}"
+        with CleanupLedger() as cleanup:
+            group_uuid = self.cmd(
+                f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {TEST_RG} --query-string \"*\""
+            ).get_output_in_json()["properties"]["uuid"]
+            cleanup.register(
+                "group",
+                lambda: self.cmd(f"iot adr ns group delete -n {group_name} --ns {namespace_name} -g {TEST_RG} --yes"),
+            )
+            for report_type, group in (
+                ("NamespaceUpdateComplianceReport", None),
+                ("GroupBestUpdatesComplianceReport", group_name),
+                ("GroupInstallableUpdatesReport", group_name),
+            ):
+                group_arg = f" --group-name {group}" if group else ""
+                generated = self.cmd(report.format("generate", report_type) + group_arg).get_output_in_json()
+                assert generated["reportType"] == report_type
+                latest = wait_for_condition(
+                    lambda: self.cmd(report.format("latest", report_type) + group_arg).get_output_in_json(),
+                    lambda _: True,
+                    description=f"{report_type} publication",
+                    timeout=None,
+                    interval=_REPORT_POLL_INTERVAL_SECONDS,
+                    max_attempts=_REPORT_POLL_ATTEMPTS,
+                    describe=lambda value: f"reportType={(value or {}).get('reportType')!r}",
+                    is_retryable_error=_report_pending,
+                )
+                assert latest["reportType"] == report_type
+                if group:
+                    assert generated["reportTarget"] == group_uuid
+                    assert latest["reportTarget"] == group_uuid
+
+            self.cmd(
+                report.format("generate", "NamespaceUpdateComplianceReport") + f" --group-name {group_name}",
+                expect_failure=True,
+            )
+            self.cmd(report.format("generate", "GroupBestUpdatesComplianceReport"), expect_failure=True)

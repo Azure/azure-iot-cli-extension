@@ -16,11 +16,13 @@ from urllib.parse import urljoin, urlsplit
 
 import requests
 from azure.cli.core._profile import Profile
+from azure.cli.core.azclierror import AzureResponseError
 from azure.core.exceptions import AzureError
 from knack.util import CLIError
 from urllib3.util import Timeout
 
 from azext_iot.adr.providers.base import _retry_after_seconds
+from azext_iot.adr.providers.certificate_activation import ExternalActivationEvidence
 
 
 def _protect_action_logs():
@@ -97,12 +99,23 @@ class CertificateActionTracker:
         self._deadline = None
         self._cleanup_deadline = None
         self._reader = None
+        self._activation = None
         self.acknowledgement_status = None
         self.terminal = False
         self.succeeded = False
 
     def __repr__(self):
         return f"<CertificateActionTracker posts={self._posts} terminal={self.terminal}>"
+
+    def use_activation_resource(self, before, chain, api_version):
+        """Select evidence before the POST; never switch after a failed status read."""
+        if (
+            self._posts or self._deadline is not None or not self._action_path.endswith("/activate")
+            or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", api_version)
+        ):
+            raise AssertionError("CA activation resource tracking requires pre-submission activation scope.")
+        self._activation = ExternalActivationEvidence(before, chain, resource_id=self.resource_id)
+        self._url = f"{self._endpoint}{self.resource_id}?api-version={api_version}"
 
     def _matches(self, request, *, negative=False):
         parts = urlsplit(request.url)
@@ -160,7 +173,9 @@ class CertificateActionTracker:
             if matches and self._posts == 1:
                 self.acknowledgement_status = response.status_code
                 self._retry_after = _retry_after_seconds(response, 1)
-                if response.status_code == 204:
+                if self._activation and response.status_code in (202, 204):
+                    pass  # Only the correlated resource GET can complete this tracker.
+                elif response.status_code == 204:
                     self.terminal = self.succeeded = True
                 elif response.status_code == 202:
                     self._url = self._location(response.headers.get("Location"))
@@ -263,6 +278,14 @@ class CertificateActionTracker:
 
     def _inspect(self, response, body):
         code = response.status_code
+        if self._activation and code in (200, 202, 204):
+            if code != 200:
+                raise AssertionError("CA activation resource GET requires HTTP 200; completion is uncertain.")
+            try:
+                self.succeeded = self.terminal = self._activation.completed(body)
+            except AzureResponseError as error:
+                raise AssertionError(str(error)) from None
+            return
         if code == 204:
             self.terminal = self.succeeded = True
             return

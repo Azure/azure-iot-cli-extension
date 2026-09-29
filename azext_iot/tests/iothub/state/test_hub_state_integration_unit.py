@@ -901,7 +901,7 @@ def comparison_data(mocker, fake_cli, tmp_path):
         name, kind = key = _comparison_read_key(args)
         counts[key] += 1
         response = overrides[key](counts[key]) if key in overrides else views[name][kind]
-        if kind in ("identity", "children", "twin") and isinstance(response, dict):
+        if kind in ("twin", "identity", "children") and isinstance(response, dict):
             response = response[args[args.index("-d") + 1]]
         out_file.write(json.dumps(response))
         return 0
@@ -1058,19 +1058,32 @@ def test_comparison_rejects_missing_wrong_and_extra_twin_content(
 
 @pytest.mark.parametrize("mode", ["migration", "file"])
 @pytest.mark.parametrize("auth_type", ["sas", "selfSigned", "certificateAuthority"])
-def test_authoritative_comparison_preserves_authentication_types(comparison_data, mode, auth_type):
+@pytest.mark.parametrize("edge", [False, True])
+def test_authoritative_comparison_preserves_auth_types_and_parent_checks(comparison_data, mode, auth_type, edge):
     authentication = {"type": auth_type}
     if auth_type == "sas":
         authentication["symmetricKey"] = {"primaryKey": "unit-primary", "secondaryKey": "unit-secondary"}
     elif auth_type == "selfSigned":
         authentication["x509Thumbprint"] = {"primaryThumbprint": "unit-primary", "secondaryThumbprint": "unit-secondary"}
+    ids = comparison_data.owned.device_ids
+    comparison_data.owned.parent_ids = {
+        device_id: None if device_id == ids[0] else ids[0] for device_id in ids
+    }
     for view in comparison_data.views.values():
-        for identity in view["identity"].values():
+        for device_id, twin in view["twin"].items():
+            identity = view["identity"][device_id]
             identity["authentication"] = deepcopy(authentication)
-        for twin in view["twin"].values():
-            twin.pop("authenticationType")
-    for device in comparison_data.exported["devices"].values():
+            identity["capabilities"]["iotEdge"] = twin["capabilities"]["iotEdge"] = edge or device_id == ids[0]
+            scopes = [] if device_id == ids[0] else [view["identity"][ids[0]]["deviceScope"]]
+            identity["parentScopes"] = scopes
+            twin["parentScopes"] = deepcopy(scopes)
+        view["children"] = {
+            device_id: ids[1:] if device_id == ids[0] else [] for device_id in ids
+        }
+    for device_id, device in comparison_data.exported["devices"].items():
         device["identity"]["authentication"] = deepcopy(authentication)
+        device["twin"]["capabilities"]["iotEdge"] = edge or device_id == ids[0]
+        device["parent"] = comparison_data.owned.parent_ids[device_id]
     comparison_data.compare(mode)
 
 
@@ -1081,6 +1094,13 @@ def test_twin_comparison_preserves_absence_without_empty_fallback():
         subject._compare_twin_content(twin, dict(twin, tags={}))
     with pytest.raises(AssertionError):
         subject._compare_twin_content(dict(twin, tags={}), twin)
+
+
+def test_migration_comparison_rejects_same_count_with_wrong_module_id(comparison_data):
+    comparison_data.views["destination"]["modules"][0]["moduleId"] = "unowned-module"
+    with pytest.raises(AssertionError):
+        comparison_data.compare("migration")
+    subject.time.sleep.assert_not_called()
 
 
 @pytest.mark.parametrize("mode", ["migration", "file"])

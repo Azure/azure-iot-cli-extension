@@ -57,6 +57,18 @@ def test_patch_core_help_with_existing_keys(monkeypatch):
     assert safe_load(helps["iot dps create"])["examples"]
 
 
+def test_patch_dps_update_help_retains_authentication_and_capacity_examples(monkeypatch):
+    from yaml import safe_load
+
+    helps = {"iot dps update": "type: command\nexamples:\n"}
+    monkeypatch.setattr("azext_iot.core.help.helps", helps)
+    patch_core_help()
+    examples = safe_load(helps["iot dps update"])["examples"]
+    commands = [example["text"] for example in examples]
+    assert any("--disable-local-auth" in command for command in commands)
+    assert any("--set sku.capacity=1" in command for command in commands)
+
+
 def test_policy_update_result_transform(mocker):
     transform = PolicyUpdateResultTransform(MagicMock())
     result = {"properties": {"authorizationPolicies": ["p"]}}

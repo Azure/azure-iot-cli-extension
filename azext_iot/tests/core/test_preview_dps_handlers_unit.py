@@ -118,7 +118,7 @@ def test_dps_policy_mutations(preview_mgmt, action, no_wait):
         assert policies[1]["primaryKey"] == (None if action == "update" else "p")
         assert policies[1]["secondaryKey"] == (None if action == "update" else "s")
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value
@@ -147,6 +147,14 @@ def test_dps_create_unavailable_name_does_not_write(preview_mgmt):
     with pytest.raises(BadRequestError, match="DPS name is taken"):
         custom.iot_dps_create(cmd, client, "dps", "rg")
     client.iot_dps_resource.begin_create_or_update.assert_not_called()
+
+
+@pytest.mark.parametrize("unit", [0, -1, -999, None, True, False, 1.5, "1"])
+def test_dps_direct_create_guard_precedes_all_client_access(mocker, unit):
+    cmd, client = mocker.Mock(), mocker.Mock()
+    with pytest.raises(InvalidArgumentValueError, match="--unit.*greater than or equal to 1"):
+        custom.iot_dps_create(cmd, client, "dps", "rg", unit=unit)
+    assert cmd.mock_calls == client.mock_calls == []
 
 
 @pytest.mark.parametrize("disable_local_auth,expected", [(None, None), (True, True), (False, False)])
@@ -182,7 +190,7 @@ def test_dps_classic_link_creation_and_namespace_warning(mocker, preview_mgmt, n
     assert all("namespace-side" in call.args[0] for call in warning.call_args_list)
     assert warning.called
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value
@@ -224,7 +232,7 @@ def test_dps_link_show_and_delete(preview_mgmt, short_name, no_wait):
     result = custom.iot_dps_linked_hub_delete(cmd, client, "dps", name, no_wait=no_wait)
     assert dps["properties"]["iotHubs"] == [keep]
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value

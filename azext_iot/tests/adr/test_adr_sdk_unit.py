@@ -7,7 +7,6 @@
 import importlib.util
 import inspect
 import json
-from functools import partial
 from io import StringIO
 from threading import current_thread, main_thread
 from unittest.mock import Mock
@@ -24,7 +23,6 @@ from azure.cli.core import MainCommandsLoader
 from azext_iot.adr.providers.group import GroupProvider
 from azext_iot.adr.providers.report import ReportProvider
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient, operations
-from azext_iot.common.utility import wait_for_terminal_state
 from azext_iot import IoTExtCommandsLoader
 from azext_iot.adr.providers.base import ADRProvider
 
@@ -39,10 +37,12 @@ GENERATE_URL = f"{NAMESPACE_URL}/generateReport"
 LATEST_URL = f"{NAMESPACE_URL}/getLatestReport"
 STATUS_URL = f"{NAMESPACE_URL}/operationStatuses/report"
 RESULT_URL = f"{NAMESPACE_URL}/operationResults/report"
+GROUP_URL = f"{NAMESPACE_URL}/groups/group"
+GROUP_UUID = "049e33ef-ba81-461d-8742-15c9c459dde9"
 REPORT_SELECTORS = [
     {"reportType": "NamespaceUpdateComplianceReport"},
-    {"reportType": "GroupBestUpdatesComplianceReport", "reportTarget": "group"},
-    {"reportType": "GroupInstallableUpdatesReport", "reportTarget": "group"},
+    {"reportType": "GroupBestUpdatesComplianceReport", "reportTarget": GROUP_UUID},
+    {"reportType": "GroupInstallableUpdatesReport", "reportTarget": GROUP_UUID},
 ]
 CA_URL = f"{NAMESPACE_URL}/certificateAuthorities/ca"
 CA_LOCATION = f"{NAMESPACE_URL}/operationResults/ca"
@@ -65,10 +65,6 @@ def ca_wire_cli(wire_client, mocker, ca_pki):
         Mock(), SUBSCRIPTION, "offline-tenant",
     ))
     mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=wire_client)
-    mocker.patch(
-        "azext_iot.adr.providers.base.wait_for_terminal_state",
-        partial(wait_for_terminal_state, wait_sec=0),
-    )
     ticks = [0]
 
     def advance(seconds):
@@ -109,13 +105,11 @@ def _ca_resource(pki, action, *, completed=False):
 
 @pytest.mark.parametrize("action", ["activate", "revoke"])
 @pytest.mark.parametrize("response_kind", ["inline", "204", "empty", "succeeded"])
-@pytest.mark.parametrize("workaround", [True, False])
 @pytest.mark.parametrize("no_wait", [True, False])
 def test_ca_action_command_wire_completion_matrix(
     ca_wire_cli, ca_pki, wire_client, mocked_response, mocker, tmp_path,
-    action, response_kind, workaround, no_wait,
+    action, response_kind, no_wait,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
     before = _ca_resource(ca_pki, action)
     after = _ca_resource(ca_pki, action, completed=True)
     mocked_response.add("GET", CA_URL, json=before)
@@ -156,17 +150,16 @@ def test_ca_action_command_wire_completion_matrix(
 
 
 @pytest.mark.parametrize("action", ["activate", "revoke"])
-@pytest.mark.parametrize("failure,workaround,no_wait", [
-    (failure, workaround, no_wait) for failure in (
-        "initial400", "initial403", "initial409", "failed", "empty-failure", "timeout",
+@pytest.mark.parametrize("failure,no_wait", [
+    (failure, no_wait) for failure in (
+        "initial400", "initial403", "initial409", "failed", "empty-failure",
         "read403", "read404", "read500", "readtransport",
-    ) for workaround in (True, False) for no_wait in (False, True)
-    if (failure != "timeout" or workaround) and (not no_wait or failure.startswith("initial"))
+    ) for no_wait in (False, True)
+    if not no_wait or failure.startswith("initial")
 ])
 def test_ca_action_command_wire_failures(
-    ca_wire_cli, ca_pki, mocked_response, tmp_path, action, failure, workaround, no_wait, caplog, mocker, wire_client,
+    ca_wire_cli, ca_pki, mocked_response, tmp_path, action, failure, no_wait, caplog, mocker, wire_client,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
     method = "begin_activate" if action == "activate" else "begin_revoke_and_rotate"
     begin = mocker.spy(wire_client.certificate_authorities, method)
     mocked_response.add("GET", CA_URL, json=_ca_resource(ca_pki, action))
@@ -184,39 +177,26 @@ def test_ca_action_command_wire_failures(
                 "GET", CA_URL, status=int(failure[4:]), json={"error": {"code": "ReadFailed", "message": "read denied"}},
             )
     else:
-        headers = {"Location": CA_LOCATION, "Retry-After": "30"}
-        if not workaround:
-            headers["Azure-AsyncOperation"] = CA_LOCATION
+        headers = {"Location": CA_LOCATION, "Azure-AsyncOperation": CA_LOCATION, "Retry-After": "30"}
         mocked_response.add("POST", url, status=202, headers=headers)
-        body = {"status": "Running" if failure == "timeout" else "Failed"}
+        body = {"status": "Failed"}
         if failure == "failed":
             body["error"] = {"code": "ActionFailed", "message": "action rejected"}
-        if failure == "timeout":
-            def status_response(_request):
-                status = body if current_thread() is main_thread() else {"status": "Succeeded"}
-                return 200, {"Content-Type": "application/json"}, json.dumps(status)
-            mocked_response.add_callback("GET", CA_LOCATION, callback=status_response)
-        else:
-            mocked_response.add("GET", CA_LOCATION, json=body)
+        mocked_response.add("GET", CA_LOCATION, json=body)
     code, output = _invoke_ca(ca_wire_cli, action, ca_pki, tmp_path, no_wait=no_wait)
     assert code != 0
     assert not output.strip()
     error = str(ca_wire_cli.result.error)
-    expected = {"failed": "action rejected", "empty-failure": "did not include",
-                "timeout": "Timed out"}
+    expected = {"failed": "action rejected", "empty-failure": "Operation returned an invalid status"}
     if failure.startswith("read"):
         assert "action completed" in caplog.text
         assert ("read connection lost" if failure == "readtransport" else "read denied") in error
     else:
-        if failure != "empty-failure" or workaround:
-            assert ("denied" if failure.startswith("initial") else expected[failure]) in error
+        assert ("denied" if failure.startswith("initial") else expected[failure]) in error
         assert "action completed" not in caplog.text
     if not failure.startswith(("initial", "read")):
-        if failure == "timeout" or workaround:
+        with pytest.raises(HttpResponseError):
             begin.spy_return.result()
-        else:
-            with pytest.raises(HttpResponseError):
-                begin.spy_return.result()
     calls = list(mocked_response.calls)
     assert len([call for call in calls if call.request.method == "POST"]) == 1
     assert len([call for call in calls if urlsplit(call.request.url).path == urlsplit(CA_URL).path]) == (
@@ -337,7 +317,7 @@ def test_activation_wire_hint_preserves_service_error(
     headers = {"x-ms-correlation-request-id": "action-correlation"}
     if async_failure:
         mocked_response.add("POST", f"{CA_URL}/activate", status=202, headers={"Location": CA_LOCATION})
-        mocked_response.add("GET", CA_LOCATION, json={"status": "Failed", "error": detail}, headers=headers)
+        mocked_response.add("GET", CA_LOCATION, status=500, json={"error": detail}, headers=headers)
     else:
         mocked_response.add("POST", f"{CA_URL}/activate", status=400, json={"error": detail}, headers=headers)
     begin = mocker.spy(wire_client.certificate_authorities, "begin_activate")
@@ -352,23 +332,21 @@ def test_activation_wire_hint_preserves_service_error(
     if hint:
         assert hint in warnings[0].message
     if async_failure:
-        assert "Correlation ID from the Location-status response: action-correlation" in error
-        begin.spy_return.result()
+        with pytest.raises(HttpResponseError):
+            begin.spy_return.result()
     assert len([call for call in mocked_response.calls if urlsplit(call.request.url).path == urlsplit(CA_URL).path]) == 1
 
 
-@pytest.mark.parametrize("workaround", [True, False])
 @pytest.mark.parametrize("inline", [True, False])
 @pytest.mark.parametrize("detail,expected", [
     ({"code": "RealCode", "message": "real reason"}, "RealCode"),
     ({"code": "OnlyCode"}, "OnlyCode"),
     ({"message": "only message"}, "only message"),
-    (None, None), ({}, None), ("absent", None), ("malformed", None), ({"code": 4, "message": []}, None),
+    (None, None), ({}, None), ("absent", None), ("malformed", None), ({"code": 4, "message": []}, "Code: 4"),
 ])
 def test_policy_create_real_command_failure(
-    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker, workaround, inline, detail, expected,
+    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker, inline, detail, expected,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
     policy_url = f"{CA_URL}/certificatePolicies/policy"
     status_url = f"{NAMESPACE_URL}/operationStatuses/policy"
     mocked_response.add("GET", CA_URL, json=_ca_resource(ca_pki, "revoke"))
@@ -381,8 +359,6 @@ def test_policy_create_real_command_failure(
         headers.update({"Azure-AsyncOperation": status_url, "Retry-After": "1"})
     mocked_response.add("PUT", policy_url, status=201 if not inline else 200, json=body, headers=headers)
     if not inline:
-        if workaround:
-            mocked_response.add("GET", policy_url, json=body, headers={"x-ms-correlation-request-id": "get-correlation"})
         mocked_response.add("GET", status_url, json={"status": "Failed", "error": detail})
     begin = mocker.spy(wire_client.certificate_policies, "begin_create_or_replace")
     wait = mocker.spy(ADRProvider, "_wait")
@@ -393,31 +369,19 @@ def test_policy_create_real_command_failure(
     ], out_file=output)
     assert isinstance(begin.spy_return, LROPoller)
     wait.assert_called_once()
-    if inline and not workaround:
-        # The unmodified SDK treats headerless HTTP 200 as completed, even when
-        # the resource says Failed. The enabled ADR workaround detects this.
-        assert code == 0
-        assert json.loads(output.getvalue()) == body
-        assert begin.spy_return.result() == body
-        return
     assert code != 0
     assert not output.getvalue().strip()
     error = str(ca_wire_cli.result.error)
-    if workaround:
-        assert "provisioningState='Failed'" in error
-        assert (expected or "did not include a detailed error") in error
-        assert "Check Azure Activity Log for this resource around the operation time" in error
-        source = "initial operation response" if inline else "resource-status response"
-        correlation = "write-correlation" if inline else "get-correlation"
-        assert f"Correlation ID from the {source}: {correlation}" in error
-        assert policy_url in error
-        assert "None" not in error
-    elif expected:
-        assert expected in error
-    # Join the real SDK worker, including its independently observed failure.
     if inline:
+        # The SDK treats headerless HTTP 200 as completed; the CLI still rejects the Failed body.
         assert begin.spy_return.result() == body
+        assert "provisioningState='Failed'" in error and "write-correlation" in error
+        # Only string code/message fields are rendered from a resource body.
+        rendered = expected if expected and expected != "Code: 4" else "did not include a detailed error"
+        assert rendered in error
     else:
+        assert (expected or "Operation returned an invalid status") in error
+        # Join the real SDK worker, including its independently observed failure.
         with pytest.raises(HttpResponseError):
             begin.spy_return.result()
     writes = [call for call in mocked_response.calls if call.request.method == "PUT"]
@@ -425,14 +389,10 @@ def test_policy_create_real_command_failure(
     assert json.loads(writes[0].request.body)["properties"]["certificate"]["validityPeriodInDays"] == 60
 
 
-@pytest.mark.parametrize("outcome,workaround", [
-    (outcome, workaround) for outcome in ("success", "timeout", "400", "403", "409")
-    for workaround in (True, False) if outcome != "timeout" or workaround
-])
+@pytest.mark.parametrize("outcome", ["success", "400", "403", "409"])
 def test_policy_create_real_command_outcomes(
-    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker, outcome, workaround,
+    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker, outcome,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
     policy_url = f"{CA_URL}/certificatePolicies/policy"
     status_url = f"{NAMESPACE_URL}/operationStatuses/policy"
     mocked_response.add("GET", CA_URL, json=_ca_resource(ca_pki, "revoke"))
@@ -464,18 +424,16 @@ def test_policy_create_real_command_outcomes(
         assert json.loads(output.getvalue()) == body
     else:
         assert code != 0
-        assert ("Timed out" if outcome == "timeout" else "real rejection") in str(ca_wire_cli.result.error)
+        assert "real rejection" in str(ca_wire_cli.result.error)
         assert not output.getvalue().strip()
     if not outcome.isdigit():
         begin.spy_return.result()
     assert len([call for call in mocked_response.calls if call.request.method == "PUT"]) == 1
 
 
-@pytest.mark.parametrize("workaround", [True, False])
 def test_policy_create_preserves_unsupported_async_auth_behavior(
-    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker, workaround,
+    ca_wire_cli, ca_pki, mocked_response, wire_client, mocker,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", workaround)
     policy_url = f"{CA_URL}/certificatePolicies/policy"
     status_url = f"{NAMESPACE_URL}/operationStatuses/policy"
     mocked_response.add("GET", CA_URL, json=_ca_resource(ca_pki, "revoke"))
@@ -487,11 +445,6 @@ def test_policy_create_preserves_unsupported_async_auth_behavior(
         "GET", status_url, status=500,
         json={"error": {"code": "AuthenticationFailed", "message": "ARM PoP token authentication failed"}},
     )
-    if workaround:
-        mocked_response.add(
-            "GET", policy_url, json={"id": policy_url, "properties": {"provisioningState": "Failed"}},
-            headers={"x-ms-correlation-request-id": "get-correlation"},
-        )
     begin = mocker.spy(wire_client.certificate_policies, "begin_create_or_replace")
     output = StringIO()
     code = ca_wire_cli.invoke([
@@ -501,12 +454,7 @@ def test_policy_create_preserves_unsupported_async_auth_behavior(
     assert code != 0
     assert not output.getvalue().strip()
     error = str(ca_wire_cli.result.error)
-    if workaround:
-        assert "resource-status response did not include a detailed error" in error
-        assert "get-correlation" in error
-        assert "ARM PoP" not in error
-    else:
-        assert "ARM PoP token authentication failed" in error
+    assert "ARM PoP token authentication failed" in error
     with pytest.raises(HttpResponseError, match="ARM PoP"):
         begin.spy_return.result()
     assert len([call for call in mocked_response.calls if call.request.method == "PUT"]) == 1
@@ -651,23 +599,24 @@ def test_generate_report_wire_rejects_old_200_response(wire_client, mocked_respo
 @pytest.mark.parametrize("selector", REPORT_SELECTORS)
 @pytest.mark.parametrize("status_code", [202, 204])
 @pytest.mark.parametrize("no_wait", [False, True])
-@pytest.mark.parametrize("use_workaround", [False, True])
 def test_generate_report_wire_output_and_no_wait(
     fixture_cmd, wire_client, mocked_response, mocker,
-    selector, status_code, no_wait, use_workaround,
+    selector, status_code, no_wait,
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", use_workaround)
     _mock_report_generation(mocked_response, status_code)
     report = {**selector, "generatedAt": "2026-09-10T04:00:00Z", "reportData": {"deviceCount": 3}}
     if not no_wait:
         mocked_response.add("POST", LATEST_URL, json=report)
+    group_name = "group" if "reportTarget" in selector else None
+    if group_name:
+        mocked_response.add("GET", GROUP_URL, json={"name": "group", "properties": {"uuid": GROUP_UUID}})
     provider = ReportProvider(fixture_cmd, client=wire_client)
     begin = mocker.spy(wire_client.namespaces, "begin_generate_report")
     wait = mocker.spy(provider, "_wait")
 
     result = provider.generate(
         "namespace", "rg", selector["reportType"],
-        group_name=selector.get("reportTarget"), no_wait=no_wait, wait_sec=0,
+        group_name=group_name, no_wait=no_wait, wait_sec=0,
     )
 
     if no_wait:
@@ -679,6 +628,8 @@ def test_generate_report_wire_output_and_no_wait(
         wait.assert_called_once()
     # Join the real SDK poller before the mocked transport is torn down.
     assert begin.spy_return.result() is None
+    group_reads = [call for call in mocked_response.calls if call.request.url.startswith(GROUP_URL)]
+    assert len(group_reads) == (1 if group_name else 0)
     action_calls = [call for call in mocked_response.calls if call.request.method == "POST"]
     assert [urlsplit(call.request.url).path for call in action_calls] == [
         urlsplit(url).path for url in ([GENERATE_URL] if no_wait else [GENERATE_URL, LATEST_URL])
@@ -697,7 +648,6 @@ def test_generate_report_wire_output_and_no_wait(
 def test_generate_report_wire_failure_does_not_retrieve_latest(
     fixture_cmd, wire_client, mocked_response, mocker
 ):
-    mocker.patch("azext_iot.adr.providers.base.POLL_PROVISIONING_STATE_WORKAROUND", False)
     mocked_response.add(
         "POST", GENERATE_URL, status=202, headers={"Azure-AsyncOperation": STATUS_URL}
     )

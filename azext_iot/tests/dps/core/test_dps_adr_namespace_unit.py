@@ -120,12 +120,11 @@ def test_dps_create_omits_unspecified_properties(mocker, system_assigned):
     assert description["properties"] == {}
     assert description["location"] == "westus2"
     assert description["sku"] == {"name": "S1", "capacity": 1}
-    if system_assigned is None:
-        assert "identity" not in description
-    elif system_assigned:
-        assert description["identity"] == {"type": "SystemAssigned", "userAssignedIdentities": None}
+    assert "tags" not in description
+    if system_assigned:
+        assert description["identity"] == {"type": "SystemAssigned"}
     else:
-        assert description["identity"] is None
+        assert "identity" not in description
 
 
 def test_dps_partial_identity_update_preserves_existing_identities():

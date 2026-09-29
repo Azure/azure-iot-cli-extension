@@ -303,7 +303,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         provider = DeviceIdentityProvider(
             cmd=self, hub_name=self.entity_name, rg=self.entity_rg, auth_type_dataplane="login"
         )
-        actual_ids = {device.device_id for device in provider.service_sdk.devices.get_devices()}
+        actual_ids = {device["deviceId"] for device in provider.service_sdk.devices.get_devices()}
         assert actual_ids == {device.id for device in devices}
         # validate each device
         for device_tuple in devices:

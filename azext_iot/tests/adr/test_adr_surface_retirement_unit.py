@@ -76,16 +76,17 @@ def test_resource_cleanup_does_not_use_endpoint_delete_commands(module):
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_endpoint_delete_is_registered_without_restoring_composite_deletion(offline_cli, kind):
     table = MainCommandsLoader(offline_cli).load_command_table(["iot", "adr", "ns", "link", kind])
-    for verb in ("add", "update", "show", "list", "wait", "delete"):
+    for verb in ("add", "update", "show", "list", "wait", "remove"):
         assert f"iot adr ns link {kind} {verb}" in table
+    assert f"iot adr ns link {kind} delete" not in table
     for command in ("iot adr ns delete", "iot hub delete", "iot dps delete", "iot adr ns su instance delete"):
         assert command in table
     load_adr_help()
-    assert f"iot adr ns link {kind} delete" in helps
+    assert f"iot adr ns link {kind} remove" in helps
     assert "Destructive delete" not in helps["iot adr ns link"]
     assert "does not delete or check the linked resource" in helps["iot adr ns link"]
     with pytest.raises(SystemExit) as error:
-        offline_cli.invoke(["iot", "adr", "ns", "link", kind, "delete"])
+        offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove"])
     assert error.value.code == 2
 
 

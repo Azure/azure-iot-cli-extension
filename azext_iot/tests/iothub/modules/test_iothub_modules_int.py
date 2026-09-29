@@ -316,10 +316,11 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             ).get_output_in_json()
             assert renew_result.get("policyKey") == "secondaryKey"
             # only one sas module, one result
+            assert len(renew_result["rotatedKeys"]) == 1
             device_result = renew_result["rotatedKeys"][0]
             assert device_result["id"] == device_ids[0]
             assert device_result["moduleId"] == module_ids[0]
-            assert not device_result["primaryKey"]
+            assert not device_result.get("primaryKey")
             assert device_result["secondaryKey"]
 
     def test_iothub_module_connection_string_show(self):

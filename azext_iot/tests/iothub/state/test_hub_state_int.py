@@ -13,6 +13,7 @@ import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError
 
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.iothub._integration_helpers import retry_not_found
 from azext_iot.tests.iothub.conftest import generate_hub_id
 from azext_iot.tests.iothub.state import _state_helpers as state
 from azext_iot.tests.settings import HUB_TEST_LOCATION
@@ -207,10 +208,11 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
             f"servicebus topic authorization-rule create --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute --rights Send"
         )
-        endpoint_cstring = state.cli.invoke(
+        # Service Bus can briefly report a just-created topic as missing.
+        endpoint_cstring = retry_not_found(lambda: state.cli.invoke(
             f"servicebus topic authorization-rule keys list --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute"
-        ).as_json()["primaryConnectionString"]
+        ).as_json())["primaryConnectionString"]
         state.cli.invoke(
             f"iot hub message-endpoint create servicebus-topic -n {hub_name} -g {hub_rg} "
             f"--en {endpoint_name} -c '{endpoint_cstring}' --erg {hub_rg}"

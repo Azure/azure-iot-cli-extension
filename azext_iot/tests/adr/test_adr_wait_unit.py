@@ -320,6 +320,89 @@ def test_wait_explicit_predicate_surfaces_failed_provisioning_state():
     )
 
 
+def test_wait_deleted_tolerates_failed_until_not_found():
+    getter = MagicMock(
+        side_effect=[
+            {"properties": {"provisioningState": "Failed"}},
+            ResourceNotFoundError("gone"),
+        ]
+    )
+
+    assert (
+        wait_for_resource(
+            MagicMock(),
+            getter,
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=lambda _: None,
+        )
+        is None
+    )
+    assert getter.call_count == 2
+
+
+def test_wait_deleted_fails_after_deleting_then_failed():
+    getter = MagicMock(
+        side_effect=[
+            {"properties": {"provisioningState": "Deleting"}},
+            {"properties": {"provisioningState": "Failed"}},
+        ]
+    )
+
+    with pytest.raises(AzureResponseError, match="operation failed"):
+        wait_for_resource(
+            MagicMock(),
+            getter,
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=lambda _: None,
+        )
+
+
+def test_wait_deleted_times_out_with_last_failed_state():
+    now = 0
+
+    def sleep_for(delay):
+        nonlocal now
+        now += delay
+
+    with pytest.raises(CLIError, match=r"still exists \(provisioningState Failed\)"):
+        wait_for_resource(
+            MagicMock(),
+            lambda: {"properties": {"provisioningState": "Failed"}},
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=sleep_for,
+            clock=lambda: now,
+        )
+
+
+def test_wait_deleted_times_out_without_provisioning_state():
+    now = 0
+
+    def sleep_for(delay):
+        nonlocal now
+        now += delay
+
+    with pytest.raises(CLIError, match="still exists"):
+        wait_for_resource(
+            MagicMock(),
+            lambda: {"properties": {}},
+            resource_exists,
+            deleted=True,
+            timeout=2,
+            interval=1,
+            sleeper=sleep_for,
+            clock=lambda: now,
+        )
+
+
 def test_wait_preserves_deleted_and_not_found_retry_semantics():
     assert (
         wait_for_resource(
@@ -639,6 +722,21 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     provider.show_update.assert_called_once_with(
         "ns", "rg", "provider", "update", "1.0"
     )
+
+
+@pytest.mark.parametrize("mode", ["created", "updated", "exists"])
+def test_software_update_wait_completes_once_update_exists(mocker, mode):
+    """Imported updates have no provisioningState, so --created/--updated mean exists."""
+    provider = MagicMock()
+    provider.show_update.return_value = {"updateId": {"provider": "p", "name": "n", "version": "1.0"}}
+    mocker.patch.object(commands_wait, "SoftwareUpdateProvider", return_value=provider)
+
+    result = commands_wait.adr_su_software_update_wait(
+        MagicMock(), "ns", "rg", "p", "n", "1.0", timeout=1, interval=1, **{mode: True}
+    )
+
+    assert result is None  # explicit predicates follow `az ... wait` and print nothing
+    provider.show_update.assert_called_once_with("ns", "rg", "p", "n", "1.0")
 
 
 def test_endpoint_wait_keeps_custom_predicates_on_namespace(mocker):

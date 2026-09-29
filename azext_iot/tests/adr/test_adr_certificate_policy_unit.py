@@ -102,6 +102,27 @@ def test_live_policy_detail_free_text_requires_uncontradicted_terminal_evidence(
     assert caught.value is error
 
 
+@pytest.mark.parametrize("inner,observed", [
+    ("ActiveCaAlreadyAssigned", True), ("PolicyRejected", True), ("InternalServerError", False), ("Unrelated", False),
+])
+def test_live_policy_async_operation_wrapper_requires_policy_code(inner, observed, caplog):
+    from azext_iot.tests.adr.test_adr_certificate_authority_int import TestADRCertificateAuthorityLifecycle
+
+    error = HttpResponseError(
+        f'(AsyncOperationFailed) ARM PUT failed: {{"error":{{"code":"{inner}","message":"backend detail"}}}}'
+    )
+    error.status_code = 200
+    error.error = Mock(code="AsyncOperationFailed")
+    command = Mock(side_effect=error)
+    if observed:
+        TestADRCertificateAuthorityLifecycle._observe_additional_policy(command)
+        assert "rejection observed" in caplog.text
+    else:
+        with pytest.raises(HttpResponseError) as caught:
+            TestADRCertificateAuthorityLifecycle._observe_additional_policy(command)
+        assert caught.value is error
+
+
 def _set_parent_ca(fixture_ca_policy_provider, ca_type="ICA"):
     fixture_ca_policy_provider.client.certificate_authorities.get.return_value = {
         "properties": {"certificateAuthorityType": ca_type}

@@ -5,13 +5,14 @@
 # --------------------------------------------------------------------------------------------
 
 from os.path import exists, basename
+from pathlib import Path
 from time import time, sleep
 from typing import Dict, Optional
 from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from knack.log import get_logger
 from azext_iot.common.shared import DeviceAuthApiType, KeyType, ProtocolType, SdkType, SettleType
 from azext_iot.common.utility import (
-    handle_service_exception, process_json_arg, read_file_content, validate_key_value_pairs
+    handle_service_exception, process_json_arg, validate_key_value_pairs
 )
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
@@ -22,6 +23,7 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
 )
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.operations.hub import (
@@ -395,7 +397,7 @@ class DeviceMessagingProvider(IoTHubProvider):
 
         def http_wrap(generator, msg_interval, msg_count):
             for _ in tqdm(range(0, msg_count), desc='Sending and receiving events via https', ascii=' #'):
-                d = generator.generate(False)
+                d = generator.generate()
                 self.device_send_message_http(d, headers=properties_to_send)
                 if cancellation_token.wait(msg_interval):
                     break
@@ -446,20 +448,20 @@ class DeviceMessagingProvider(IoTHubProvider):
         except Exception as x:
             raise CLIInternalError(x)
         finally:
-            if cancellation_token:
-                cancellation_token.set()
+            cancellation_token.set()
 
     def device_upload_file(
         self,
         file_path: str,
         content_type: str,
     ):
-        from azext_iot.sdk.iothub.device.models import FileUploadCompletionStatus
-
         if not exists(file_path):
             raise FileOperationError('File path "{}" does not exist!'.format(file_path))
 
-        content = read_file_content(file_path)
+        try:
+            content = Path(file_path).read_bytes()
+        except OSError as error:
+            raise FileOperationError("Unable to read the upload file.") from error
         file_name = basename(file_path)
 
         try:
@@ -472,16 +474,23 @@ class DeviceMessagingProvider(IoTHubProvider):
                 upload_meta["blobName"],
                 upload_meta["sasToken"],
             )
-            completion_status = FileUploadCompletionStatus(
-                correlation_id=upload_meta["correlationId"], is_success=True
+            completion_status = {"correlationId": upload_meta["correlationId"], "isSuccess": False}
+            try:
+                upload_response = self.device_sdk.device.upload_file_to_container(
+                    storage_endpoint=storage_endpoint, content=content, content_type=content_type,
+                )
+            except FileOperationError:
+                completion_status.update(statusCode=500, statusDescription="Storage upload failed.")
+                try:
+                    self.device_sdk.device.update_file_upload_status(
+                        device_id=self.device_id, file_upload_completion_status=completion_status
+                    )
+                except (CloudError, AzCLIError, HttpResponseError, ServiceRequestError, ServiceResponseError):
+                    logger.warning("The failed upload's completion notification also failed.")
+                raise
+            completion_status.update(
+                isSuccess=True, statusCode=upload_response.status_code, statusDescription=upload_response.reason
             )
-            upload_response = self.device_sdk.device.upload_file_to_container(
-                storage_endpoint=storage_endpoint,
-                content=content,
-                content_type=content_type,
-            )
-            completion_status.status_code = upload_response.status_code
-            completion_status.status_reason = upload_response.reason
 
             return self.device_sdk.device.update_file_upload_status(
                 device_id=self.device_id, file_upload_completion_status=completion_status

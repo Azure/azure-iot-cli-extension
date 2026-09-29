@@ -18,8 +18,8 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.providers.link import LinkProvider
-from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery
-from azext_iot.adr.rbac import LINK_ROLE_MATRIX, resolve_namespace_outbound_principal
+from azext_iot.adr.providers.link_recovery import PROPAGATION_RETRIES, LinkDeadline, LinkRecovery
+from azext_iot.adr.rbac import LINK_ROLE_IDS, LINK_ROLE_MATRIX, required_assignments, resolve_namespace_outbound_principal
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.adr.test_adr_link_propagation_unit import Harness, KINDS, NS_ID
 from azext_iot.tests.adr.test_adr_link_unit import DPS_ID, HUB_ID, UAMI_ID
@@ -46,6 +46,18 @@ def _denial(harness, *, kind=None, principal=None, action=None, scope=None):
             f"over scope '{scope}' or the scope is invalid. "
             "If access was recently granted, please refresh your credentials.)"
         ),
+    }
+
+
+def _rejected(kind, **extra):
+    service = {"hub": "Hub", "dps": "DPS", "su": "SU"}[kind]
+    return {
+        "code": "LinkInitiateFailed",
+        "message": (
+            f"The {service} resource rejected the link request as invalid. "
+            "Verify the endpoint configuration, then resubmit the request."
+        ),
+        **extra,
     }
 
 
@@ -94,10 +106,7 @@ def test_exact_link_initiate_authorization_recovers_with_verified_original_roles
 def test_unbound_or_other_link_initiate_failures_are_not_retried(mocker, kind, mutation):
     h = _harness(mocker, kind)
     if mutation == "invalid-request":
-        h.denial["message"] = (
-            "The DPS resource rejected the link request as invalid. "
-            "Verify the endpoint configuration, then resubmit the request."
-        )
+        h.denial = _rejected("hub" if kind == "dps" else "dps")
     elif mutation == "principal":
         h.denial = _denial(h, principal=UAMI)
     elif mutation == "client-is-principal":
@@ -210,7 +219,7 @@ def test_http_error_text_is_not_a_current_structured_endpoint_denial(mocker, sta
     assert not h.patches and not h.clock.delays
 
 
-def test_stale_link_initiate_failure_does_not_replay_an_accepted_recovery(mocker):
+def test_link_initiate_failure_after_recovery_backs_off_within_shared_deadline(mocker):
     h = _harness(mocker)
     original_submit = h.submit
 
@@ -225,7 +234,7 @@ def test_stale_link_initiate_failure_does_not_replay_an_accepted_recovery(mocker
     h.outcomes = ["initiate"] * 5
     with pytest.raises(AzureResponseError, match="timed out"):
         h.run(timeout_sec=65, wait_sec=10)
-    assert len(h.patches) == 2 and h.clock.delays == [30, 10, 10, 10, 5]
+    assert len(h.patches) == 2 and h.clock.delays == [30, 35]
 
 
 def test_no_wait_does_not_start_link_initiate_observation_or_recovery(mocker):
@@ -247,15 +256,66 @@ def test_combined_add_recovers_dps_before_hub_using_one_deadline(mocker):
     assert h.clock.delays == [30]
 
 
+@pytest.mark.parametrize("rejected, outcomes, sections", [
+    ("dps", ["initiate", "success", "success"], ["provisioning", "provisioning", "messaging"]),
+    ("hub", ["success", "initiate", "success"], ["provisioning", "messaging", "messaging"]),
+])
+def test_combined_add_retries_the_generic_rejection_of_either_freshly_granted_stage(
+    mocker, rejected, outcomes, sections,
+):
+    h = _harness(mocker)
+    h.denial, h.outcomes = _rejected(rejected), outcomes
+    h.provider.link_add(
+        namespace_name="ns", resource_group_name="rg", dps_endpoint_name="dps", dps_resource_id=DPS_ID,
+        hub_endpoint_name="hub", hub_resource_id=HUB_ID, dps_mi_system_assigned=True, timeout_sec=300,
+    )
+    assert [next(iter(patch)) for patch in h.patches] == sections
+    assert h.clock.delays == [30]
+
+
+def test_combined_add_grants_for_the_hub_stage_do_not_enable_dps_generic_retries(mocker):
+    combined = {
+        "namespace_name": "ns", "resource_group_name": "rg", "dps_endpoint_name": "dps", "dps_resource_id": DPS_ID,
+        "hub_endpoint_name": "hub", "hub_resource_id": HUB_ID, "dps_mi_system_assigned": True,
+        "hub_mi_user_assigned": UAMI_ID, "timeout_sec": 300,
+    }
+    planned = _harness(mocker)
+    planned.outcomes = ["success", "success"]
+    planned.provider.link_add(**combined)
+    dps_request = next(request for (kind, _), requests in planned.provider._link_requests.items()
+                       if kind == "dps" for request in requests)
+
+    h = _harness(mocker)
+    h.assignments.extend(
+        {"principalId": principal, "scope": scope,
+         "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[role]}
+        for _, (principal, role, scope) in required_assignments(dps_request)
+    )
+    h.denial, h.outcomes = _rejected("dps"), ["initiate", "success"]
+    with pytest.raises(ADRResourceStateError):
+        h.provider.link_add(**combined)
+    # Only the Hub inbound identity is new, and it is granted on the shared namespace scope.
+    assert h.created and {scope for _, _, scope in h.created} >= {dps_request["namespace_scope"]}
+    assert [next(iter(patch)) for patch in h.patches] == ["provisioning"]
+    assert not h.clock.delays
+
+
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocked_response, kind):
     h = _harness(mocker, kind)
     h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     section = KINDS[kind][0]
     patches = []
-    url = "https://centraluseuap.management.azure.com" + NS_ID
+    base_url = "https://centraluseuap.management.azure.com"
+    url = base_url + NS_ID
+    status_url = (
+        f"{base_url}/subscriptions/sub/providers/Microsoft.DeviceRegistry"
+        "/locations/centraluseuap/asyncOperationStatuses/link"
+    )
 
     def respond(request):
+        if "/asyncOperationStatuses/link" in request.url:
+            return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Succeeded"})
         if request.method == "PATCH":
             patches.append(json.loads(request.body))
             succeeded = len(patches) == 2
@@ -264,18 +324,78 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
             if not succeeded:
                 endpoint["linkingError"] = h.denial
             h.namespace["properties"][section] = {"endpoints": {kind: endpoint}}
-            return 202, {"Content-Type": "application/json"}, json.dumps(h.namespace)
+            return 202, {
+                "Content-Type": "application/json",
+                "Azure-AsyncOperation": status_url,
+                "Retry-After": "0",
+            }, json.dumps(h.namespace)
         return 200, {"Content-Type": "application/json"}, json.dumps(h.namespace)
 
     mocked_response.add_callback("PATCH", url, callback=respond)
     mocked_response.add_callback("GET", url, callback=respond)
+    mocked_response.add_callback("GET", status_url, callback=respond)
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-unit-token", 4102444800)
     with DeviceRegistryMgmtClient(
-        credential, "sub", base_url="https://centraluseuap.management.azure.com", retry_total=0,
+        credential, "sub", base_url=base_url, retry_total=0,
     ) as client:
         h.provider.client = client
         result = h.run(timeout_sec=120, wait_sec=1)
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert patches == [{"properties": {section: {"endpoints": {kind: h.body}}}}] * 2
     assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("action", ["add", "update"])
+def test_generic_rejection_after_fresh_grants_is_retried_while_they_propagate(mocker, kind, identity, action):
+    h = _harness(mocker, kind, identity, action)
+    h.denial = _rejected(kind)
+    verify = mocker.spy(h.provider._rbac, "verify_many")
+    result = h.run(timeout_sec=300, wait_sec=1)
+    section = KINDS[kind][0]
+    assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
+    assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
+    assert h.clock.delays == [30]
+    assert verify.call_count == 2
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+
+
+def test_generic_rejection_retries_are_bounded(mocker):
+    h = _harness(mocker)
+    h.denial = _rejected("dps")
+    h.outcomes = ["initiate"] * 10
+    with pytest.raises(ADRResourceStateError, match="rejected the link request as invalid"):
+        h.run(timeout_sec=600, wait_sec=1)
+    assert len(h.patches) == 1 + PROPAGATION_RETRIES
+    assert h.clock.delays == [30, 60]
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("grants", ["none", "other-scope"])
+def test_generic_rejection_without_fresh_link_grants_is_not_retried(mocker, kind, grants):
+    h = _harness(mocker, kind, action="update")
+    h.outcomes = ["success"]
+    h.run()
+    h.provider._rbac.created[:] = [] if grants == "none" else [(SAMI, "Contributor", NS_ID + "-other")]
+    h.denial = _rejected(kind)
+    h.outcomes = ["initiate", "success"]
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 2
+    assert not h.clock.delays
+
+
+@pytest.mark.parametrize("denial", [
+    _rejected("su"), _rejected("dps", details=[{"code": "IH400315"}]), {**_rejected("dps"), "code": "Other"},
+    {**_rejected("dps"), "message": _rejected("dps")["message"] + " Another error."},
+])
+def test_generic_rejection_retry_requires_the_exact_hub_or_dps_envelope(mocker, denial):
+    kind = "su" if "SU" in denial["message"] else "dps"
+    h = _harness(mocker, kind)
+    h.denial = denial
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 1
+    assert not h.clock.delays

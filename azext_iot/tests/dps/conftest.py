@@ -98,10 +98,16 @@ def pytest_sessionstart(session):
 def pytest_sessionfinish(session):
     if not _phase_receipts.settings() or hasattr(session.config, "workerinput"):
         return
+    from azext_iot.tests.adr._helpers import CleanupLedger
+
     run_uid = _get_run_uid(session)
-    with ExitStack() as cleanup:
-        for kind in reversed(_phase.resource_kinds(_phase.get_phase())):
-            cleanup.callback(_release_phase_fixture, run_uid, kind)
+    cleanup = CleanupLedger()
+    for kind in reversed(_phase.resource_kinds(_phase.get_phase())):
+        cleanup.register(kind, lambda kind=kind: _release_phase_fixture(run_uid, kind))
+    failures = cleanup.cleanup()
+    if failures:
+        # Report every callback failure without replacing the original service error with a later release guard.
+        raise failures[0][1]
 
 
 @pytest.hookimpl(trylast=True)
@@ -158,6 +164,14 @@ def provisioned_iot_dps_module(request, provisioned_only_iot_hubs_session) -> It
     yield result
     if result:
         _iot_dps_removal(result)
+
+
+@pytest.fixture(scope="module")
+def provisioned_csr_issuance(request):
+    from azext_iot.tests.dps._csr_issuance import provisioned_issuance
+
+    with provisioned_issuance(request) as result:
+        yield result
 
 
 @pytest.fixture(scope="session")
@@ -271,7 +285,7 @@ def _shared_acquire(run_uid: str, kind: str, create_fn, find_fn) -> dict:
         with ExitStack() as cleanup:
             cleanup.callback(
                 _cleanup_created_resource, name, run_uid, kind, find_fn,
-                _delete_hub if kind == "hub" else _delete_dps,
+                _resource_handlers(kind)[1],
             )
             _write_state(state_path, {"name": name, "refcount": 2 if _phase_receipts.settings() else 1})
             cleanup.pop_all()
@@ -294,13 +308,25 @@ def _shared_release(run_uid: str, kind: str, delete_fn) -> None:
 
 
 def _release_phase_fixture(run_uid: str, kind: str) -> None:
+    if kind in ("csrdps", "csrhub"):
+        from azext_iot.tests.dps._csr_registry import require_registry_cleanup_resolved, require_namespace_cleanup_resolved
+
+        require_registry_cleanup_resolved()
+        require_namespace_cleanup_resolved()
     logger.info("Releasing phase controller reference for '%s' fixture.", kind)
-    find_fn = _find_hub_by_name if kind == "hub" else _find_dps_by_name
-    delete_fn = _delete_hub if kind == "hub" else _delete_dps
+    find_fn, delete_fn = _resource_handlers(kind)
     _shared_release(
         run_uid, kind,
         lambda name: _cleanup_created_resource(name, run_uid, kind, find_fn, delete_fn),
     )
+
+
+def _resource_handlers(kind):
+    if kind == "csrns":
+        from azext_iot.tests.dps._csr_issuance import find_namespace, delete_namespace
+
+        return find_namespace, delete_namespace
+    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (_find_dps_by_name, _delete_dps)
 
 
 # --- Age-based garbage collection of orphans (from crashed runs) -------------------------------
@@ -641,6 +667,8 @@ def _find_hub_by_name(name: str) -> Optional[dict]:
 
 def _create_managed_hub(run_uid: str, kind: str) -> tuple:
     name = f"{INT_TEST_HUB_PREFIX}-{_timestamp()}-{run_uid[:8]}"
+    if kind != "hub":
+        name += f"-{kind}"
     with ExitStack() as cleanup:
         if _phase_receipts.settings() and _find_hub_by_name(name) is not None:
             raise CLIInternalError("Isolated Hub name already exists; refusing to overwrite it.")
@@ -650,7 +678,7 @@ def _create_managed_hub(run_uid: str, kind: str) -> tuple:
             target_hub = cli.invoke(
                 f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
                 f"--location {HUB_TEST_LOCATION} --disable-local-auth {str(_phase.local_auth_disabled()).lower()} "
-                f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())} authPhase={_phase.get_phase()}",
+                f"--tags intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())} authPhase={_phase.get_phase()}",
                 capture_stderr=True,
             ).as_json()
         _phase_receipts.after_create(name, target_hub)
@@ -667,9 +695,10 @@ def _delete_hub(name: str) -> None:
     _phase_receipts.after_delete(name)
 
 
-def _iot_hubs_provisioner(request):
+def _iot_hubs_provisioner(request, managed_kind=None):
     """Provision (or reuse) a single IoT Hub shared by all workers of the run for DPS tests."""
-    if settings.env.azext_iot_testdps_hub:
+    kind = managed_kind or "hub"
+    if settings.env.azext_iot_testdps_hub and managed_kind is None:
         name = settings.env.azext_iot_testdps_hub
         target_hub = _find_hub_by_name(name)
         if not target_hub:
@@ -680,15 +709,15 @@ def _iot_hubs_provisioner(request):
     else:
         run_uid = _get_run_uid(request)
         target_hub = _shared_acquire(
-            run_uid, "hub", create_fn=_create_managed_hub, find_fn=_find_hub_by_name
+            run_uid, kind, create_fn=_create_managed_hub, find_fn=_find_hub_by_name
         )
         name = target_hub["name"]
 
     with ExitStack() as cleanup:
         if run_uid:
             cleanup.callback(
-                _shared_release, run_uid, "hub",
-                lambda target: _cleanup_created_resource(target, run_uid, "hub", _find_hub_by_name, _delete_hub),
+                _shared_release, run_uid, kind,
+                lambda target: _cleanup_created_resource(target, run_uid, kind, _find_hub_by_name, _delete_hub),
             )
         _assert_local_auth_policy(target_hub)
         assert target_hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold(), (
@@ -700,6 +729,7 @@ def _iot_hubs_provisioner(request):
             "name": name,
             "rg": ENTITY_RG,
             "_runUid": run_uid,
+            "_kind": kind,
         }
         cleanup.pop_all()
         return result
@@ -710,4 +740,4 @@ def _iot_hubs_removal(hub_result):
     # (azext_iot_testdps_hub) carries no run id and is intentionally left in place.
     run_uid = hub_result.get("_runUid")
     if run_uid:
-        _shared_release(run_uid, "hub", delete_fn=_delete_hub)
+        _shared_release(run_uid, hub_result.get("_kind", "hub"), delete_fn=_delete_hub)

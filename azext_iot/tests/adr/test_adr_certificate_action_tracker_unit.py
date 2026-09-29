@@ -10,6 +10,8 @@ import json
 import logging
 import shlex
 import weakref
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from contextlib import contextmanager
 from threading import Event, current_thread, main_thread
 from time import monotonic
@@ -81,8 +83,9 @@ def live_action_scenario(ca_wire_cli, tracker_factory, mocker):
         scenario.doCleanups()
 
 
+@pytest.mark.parametrize("ack", [202, 204])
 def test_actual_waited_activation_recipe_formats_and_projects_one_post(
-    live_action_scenario, ca_wire_cli, ca_pki, mocked_response, mocker, tmp_path,
+    live_action_scenario, ca_wire_cli, ca_pki, wire_client, mocked_response, mocker, tmp_path, ack,
 ):
     from azext_iot.tests.adr._certificate_fixtures import NOW
 
@@ -91,6 +94,10 @@ def test_actual_waited_activation_recipe_formats_and_projects_one_post(
     resource_url = "https://management.azure.com" + resource_id
     before = dict(sdk._ca_resource(ca_pki, "activate"), id=resource_id, name="ica")
     after = dict(sdk._ca_resource(ca_pki, "activate", completed=True), id=resource_id, name="ica")
+    before["properties"]["issuer"]["status"] = "PendingActivation"
+    after["properties"]["issuer"]["thumbprint"] = x509.load_pem_x509_certificate(
+        ca_pki["leaf"].encode()
+    ).fingerprint(hashes.SHA1()).hex()
     scenario._owned_ca_ids = {resource_id, resource_id.rsplit("/certificateAuthorities/", 1)[0]}
     scenario.kwargs.update(namespace_name="namespace", resource_group="rg")
 
@@ -109,6 +116,13 @@ def test_actual_waited_activation_recipe_formats_and_projects_one_post(
     rejected = mocker.spy(scenario, "_rejected_ca_action")
     tracked = mocker.spy(scenario, "_tracked_ca_action")
     invoke = mocker.spy(ca_wire_cli, "invoke")
+    begin = mocker.spy(wire_client.certificate_authorities, "begin_activate")
+    from azext_iot.adr.providers import certificate_activation
+    wait = certificate_activation.wait_for_activation
+    mocker.patch(
+        "azext_iot.adr.providers.certificate_authority.wait_for_activation",
+        side_effect=lambda *args, **kwargs: wait(*args, **kwargs, sleeper=lambda _seconds: None),
+    )
     posts = []
 
     def resource(_request):
@@ -116,7 +130,7 @@ def test_actual_waited_activation_recipe_formats_and_projects_one_post(
 
     def activate(request):
         posts.append(request)
-        return 204, {}, ""
+        return ack, {"Location": CA_LOCATION}, ""
 
     mocked_response.add_callback("GET", resource_url, callback=resource)
     mocked_response.add_callback("POST", resource_url + "/activate", callback=activate)
@@ -126,6 +140,9 @@ def test_actual_waited_activation_recipe_formats_and_projects_one_post(
 
     scenario.test_external_activation_recipe()
 
+    assert begin.call_args.kwargs["polling"] is False
+    begin.spy_return.result()
+    assert not any(urlsplit(call.request.url).path == urlsplit(CA_LOCATION).path for call in mocked_response.calls)
     assert rejected.call_count == len(negative_chains.spy_return) + 2
     assert len(posts) == 1
     assert json.loads(posts[0].body) == {"certificateChain": ca_pki["chain"]}

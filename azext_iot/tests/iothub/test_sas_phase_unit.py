@@ -103,9 +103,18 @@ def test_sas_authorized_target_is_attested_without_reducing_manifest(tmp_path, m
         assert not list(tmp_path.iterdir())
 
 
+def test_manifest_retains_eight_upload_first_local_auth_and_preview_nodes():
+    assert len(subject.NODES) == len(set(subject.NODES)) == 8
+    assert subject.NODES[0].endswith("::TestIoTStorage::test_device_upload_file")
+    assert subject.NODES[-2:] == (
+        subject.ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_identity_roundtrip",
+        subject.ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_responding_digital_twin",
+    )
+
+
 @pytest.mark.parametrize("args", [
     [], ["azext_iot/tests/iothub"], list(reversed(subject.NODES)),
-    subject.NODES[1:], subject.NODES + (subject.NODES[0],),
+    subject.NODES[:6], subject.NODES[1:], subject.NODES + (subject.NODES[0],),
     subject.NODES + ("azext_iot/tests/dps",),
 ])
 def test_exact_arguments_fail_before_constructors(args):
@@ -161,7 +170,7 @@ def test_collection_must_preserve_order(phase):
 
 
 def test_all_six_existing_nodes_have_conditional_not_unconditional_skips():
-    for node in subject.NODES:
+    for node in subject.NODES[:6]:
         path, cls, method = node.split("::")
         tree = ast.parse((REPO / path).read_text(encoding="utf-8"))
         owner = next(value for value in tree.body if isinstance(value, ast.ClassDef) and value.name == cls)
@@ -172,7 +181,8 @@ def test_all_six_existing_nodes_have_conditional_not_unconditional_skips():
 
 
 def test_http_case_has_only_the_local_three_auth_matrix():
-    path = REPO / subject.NODES[-1].split("::", maxsplit=1)[0]
+    node = next(node for node in subject.NODES if node.endswith("::test_iothub_c2d_messages_http"))
+    path = REPO / node.split("::", maxsplit=1)[0]
     tree = ast.parse(path.read_text(encoding="utf-8"))
     loops = [value for value in ast.walk(tree) if isinstance(value, ast.For) and ast.unparse(value.target) == "auth_phase"]
     assert len(loops) == 1 and ast.unparse(loops[0].iter) == "AUTH_TYPES"
@@ -587,7 +597,7 @@ def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
 
 
 @pytest.fixture
-def monitor_scenario(mocker):
+def monitor_scenario(mocker, tmp_path):
     from azext_iot.tests.iothub import _integration_helpers as helpers
     devices = [f"device-{index}" for index in range(10)]
     scenario = SimpleNamespace(
@@ -603,6 +613,8 @@ def monitor_scenario(mocker):
         helpers, "sleep", side_effect=lambda seconds: setattr(scenario.clock, "now", scenario.clock.now + seconds),
     )
     mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    mocker.patch.dict(os.environ, {"AZEXT_IOT_TEST_ARTIFACT_DIR": str(tmp_path)})
+    scenario.artifact = tmp_path / "hub-monitor-events-failure.json"
 
     def monitor(command, expected):
         if "--device-query" in command:
@@ -633,6 +645,11 @@ def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(monitor_
     else:
         with pytest.raises(RuntimeError, match="Offline proof stops"):
             messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+        artifact = json.loads(scenario.artifact.read_text(encoding="utf-8"))
+        assert artifact["error_type"] == "RuntimeError"
+        assert artifact["monitor_outputs"][-1]["command"].endswith("--login <redacted>")
+        assert artifact["monitor_outputs"][-1]["error"] == "Offline proof stops after query filter"
+        assert "unit" not in json.dumps(artifact["monitor_outputs"][-1]["command"])
     assert len(scenario.query_monitors) == 1
     command, reads_before_monitor = scenario.query_monitors[0]
     assert reads_before_monitor == 5
@@ -723,7 +740,9 @@ def test_phase_command_still_requires_json_unless_explicitly_void(phase, mocker)
     assert subject.HubSasPhase.command(phase, "owned-delete", expect_json=False) is None
 
 
-@pytest.mark.parametrize("passed,bad", [(subject.NODES[:-1], False), (subject.NODES, True), (subject.NODES, False)])
+@pytest.mark.parametrize("passed,bad", [
+    (subject.NODES[:6], False), (subject.NODES[:-1], False), (subject.NODES, True), (subject.NODES, False),
+])
 def test_phase_requires_every_node_pass_and_no_skips(phase, passed, bad, monkeypatch):
     monkeypatch.setattr(subject, "signal", SimpleNamespace())  # Policy also runs where SIGALRM does not exist.
     phase.passed, phase.bad_report = set(passed), bad
@@ -731,10 +750,10 @@ def test_phase_requires_every_node_pass_and_no_skips(phase, passed, bad, monkeyp
     phase.absent = set(phase.ids)
     session = SimpleNamespace(exitstatus=0)
     phase.check_results(session)
-    assert (session.exitstatus == 0) == (len(passed) == 6 and not bad)
+    assert (session.exitstatus == 0) == (len(passed) == len(subject.NODES) and not bad)
 
 
-def test_six_pass_reports_without_provisioning_receipts_cannot_pass(phase, monkeypatch):
+def test_all_pass_reports_without_provisioning_receipts_cannot_pass(phase, monkeypatch):
     monkeypatch.setattr(subject, "signal", SimpleNamespace())
     phase.passed = set(subject.NODES)
     session = SimpleNamespace(exitstatus=0)
@@ -911,7 +930,7 @@ class Proof:
         assert tuple(item.nodeid for item in session.items) == NODES
         skipped = sum(evaluate_skip_marks(item) is not None for item in session.items)
         assert skipped == (6 if os.environ["azext_iot_hub_auth_phase"] == "regular" else 0)
-        print("SAFE_COLLECTION nodes=6 skipped=" + str(skipped))
+        print(f"SAFE_COLLECTION nodes={len(NODES)} skipped=" + str(skipped))
 
 sys.exit(pytest.main(["-c", "setup.cfg", "--collect-only", "-q", "-o", "addopts=",
                      "-o", "log_cli=false", *NODES], plugins=[Proof()]))
@@ -939,7 +958,7 @@ sys.exit(pytest.main(["-c", "setup.cfg", "--collect-only", "-q", "-o", "addopts=
         assert not (tmp_path / "receipt.json").exists()
     else:
         assert result.returncode == 0, result.stdout + result.stderr
-        assert "SAFE_COLLECTION nodes=6 skipped=" + ("6" if mode == "regular" else "0") in result.stdout
+        assert f"SAFE_COLLECTION nodes={len(subject.NODES)} skipped=" + ("6" if mode == "regular" else "0") in result.stdout
 
 
 @pytest.mark.parametrize("subscription", [None, "", " \t\n"])

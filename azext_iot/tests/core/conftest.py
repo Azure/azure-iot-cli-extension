@@ -19,6 +19,7 @@ def block_core_test_network(mocker, mocked_response):
 def preview_mgmt(mocker):
     cmd, client = mocker.Mock(), mocker.Mock()
     hub = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub",
         "name": "hub", "resourcegroup": "rg", "location": "westus", "etag": "hub-etag",
         "sku": {"name": "S1", "capacity": 1, "tier": "Standard"},
         "identity": {"type": "SystemAssigned"},
@@ -38,6 +39,7 @@ def preview_mgmt(mocker):
         },
     }
     dps = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps",
         "name": "dps", "resourcegroup": "rg", "location": "westus",
         "identity": {"type": "SystemAssigned,UserAssigned", "userAssignedIdentities": {"/identities/user": {}}},
         "properties": {"iotHubs": []},

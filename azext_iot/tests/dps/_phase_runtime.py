@@ -32,6 +32,7 @@ from azext_iot.tests.dps import _phase
 
 _WRITE = ContextVar("owned_dps_fixture_write", default=None)
 _COMMAND = ContextVar("dps_cli_command_writes", default=None)
+_LINK_COMMAND = ContextVar("dps_native_adr_link_command", default=False)
 _FENCE = "_dps_arm_write_fence"
 _READ_ACTIONS = {"listkeys", "checknameavailability", "checkprovisioningservicenameavailability"}
 
@@ -136,7 +137,13 @@ class ScopedTransport(HttpTransport):
             command = _COMMAND.get()
             key = (request.method, url.path.lower())
             if command is not None:
-                if key in command:
+                namespace = url.path.lower().partition("/providers/microsoft.deviceregistry/namespaces/")[2]
+                native_link_update = (
+                    _LINK_COMMAND.get() and request.method == "PATCH" and namespace and "/" not in namespace
+                )
+                # Native DPS-first linking and confirmed authorization recovery deliberately
+                # submit fresh namespace operations. The per-operation fence still forbids transport replay.
+                if key in command and not native_link_update:
                     raise ScopeError("Refusing replay of an ARM mutation within one CLI command.")
                 command.add(key)
             fence["sent"] = True
@@ -324,6 +331,7 @@ def activate(subscription, existing=()):
     from azext_iot.common.embedded_cli import EmbeddedCLI
     from azext_iot.sdk.dps.mgmt import IotDpsClient
     from azext_iot.sdk.iothub.mgmt import IotHubClient
+    from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
     def check(value):
         if value and value.lower() != subscription.lower():
@@ -356,11 +364,18 @@ def activate(subscription, existing=()):
             elif argument.startswith("--subscription="):
                 check(argument.partition("=")[2])
         token = _COMMAND.set(set())
+        link_token = _LINK_COMMAND.set(
+            arguments[:4] == ["iot", "adr", "ns", "link"] and (
+                arguments[4:5] in (["add"], ["update"])
+                or (arguments[4:5] in (["hub"], ["dps"]) and arguments[5:6] in (["add"], ["update"]))
+            )
+        )
         try:
             with patch.dict(self.az_cli.data, {"subscription_id": target}):
                 return original_invoke(self, command, subscription=target, capture_stderr=capture_stderr)
         finally:
             _COMMAND.reset(token)
+            _LINK_COMMAND.reset(link_token)
 
     def profile_method(original, parameter):
         @wraps(original)
@@ -405,7 +420,7 @@ def activate(subscription, existing=()):
             ("get_login_credentials", "subscription_id"),
         ):
             stack.enter_context(patch.object(Profile, method, profile_method(getattr(Profile, method), parameter)))
-        for client in (IotDpsClient, IotHubClient, AuthorizationManagementClient, resource_client):
+        for client in (IotDpsClient, IotHubClient, DeviceRegistryMgmtClient, AuthorizationManagementClient, resource_client):
             stack.enter_context(patch.object(
                 client, "__init__", sdk_init(
                     client.__init__, authorization=client is AuthorizationManagementClient,

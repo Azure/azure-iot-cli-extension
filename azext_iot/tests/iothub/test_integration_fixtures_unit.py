@@ -969,6 +969,43 @@ def test_query_wait_exhaustion_preserves_observed_ids_and_fails(mocker):
     assert sleep.call_count == 6
 
 
+def test_not_found_retry_waits_for_dependency_visibility(mocker):
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    read = Mock(side_effect=[service_error(404, "EntityNotFound"), service_error(404, "EntityNotFound"), "keys"])
+    assert integration_helpers.retry_not_found(read, attempts=3, wait=5) == "keys"
+    assert read.call_count == 3
+    assert sleep.call_args_list == [mocker.call(5)] * 2
+
+
+def test_not_found_retry_raises_the_last_not_found_after_its_attempts(mocker):
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    error = service_error(404, "EntityNotFound")
+    read = Mock(side_effect=error)
+    with pytest.raises(HttpResponseError) as raised:
+        integration_helpers.retry_not_found(read, attempts=2)
+    assert raised.value is error
+    assert read.call_count == 2
+    sleep.assert_called_once_with(10)
+
+
+@pytest.mark.parametrize("status", [400, 403, 409, 500])
+def test_not_found_retry_never_retries_other_errors(mocker, status):
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    error = service_error(status, "Conflict")
+    read = Mock(side_effect=error)
+    with pytest.raises(HttpResponseError) as raised:
+        integration_helpers.retry_not_found(read)
+    assert raised.value is error
+    read.assert_called_once_with()
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("attempts", [0, -1, True, 1.5])
+def test_not_found_retry_requires_a_positive_attempt_count(attempts):
+    with pytest.raises(ValueError, match="at least one attempt"):
+        integration_helpers.retry_not_found(Mock(), attempts=attempts)
+
+
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 502])
 def test_query_wait_never_retries_service_errors(mocker, status):
     sleep = mocker.patch.object(integration_helpers, "sleep")

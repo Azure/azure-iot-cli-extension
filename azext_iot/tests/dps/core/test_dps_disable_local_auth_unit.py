@@ -27,9 +27,12 @@ def test_local_auth_option_does_not_shift_existing_positional_parameters():
     assert list(inspect.signature(iot_dps_create).parameters)[-3:] == [
         "mi_system_assigned", "mi_user_assigned", "disable_local_auth",
     ]
-    assert list(inspect.signature(iot_dps_update).parameters)[-4:] == [
+    update_parameters = inspect.signature(iot_dps_update).parameters
+    assert list(update_parameters)[-5:] == [
         "mi_system_assigned", "mi_user_assigned", "cmd", "disable_local_auth",
+        "dps_capacity_edited",
     ]
+    assert update_parameters["dps_capacity_edited"].default is False
 
 
 class TestDPSCreate(object):
