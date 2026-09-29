@@ -47,7 +47,6 @@ from azext_iot.core.shared import (
     IdentityType,
     IotDpsSku,
     IotHubAuthenticationType,
-    IotHubConnectionProfile,
     IotHubSku,
     ManagedServiceIdentityType,
     RenewKeyType,
