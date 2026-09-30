@@ -49,7 +49,9 @@ settings = DynamoSettings(
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_LOCATION = settings.env.azext_iot_dps_test_location or "westus"
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
-ROLE_PROPAGATION_TIMEOUT_SECONDS = 75
+# Polling usually returns in seconds; the deadline stays well above the old fixed 60s wait
+# plus a full confirmation streak so a slow propagation is never worse than before.
+ROLE_PROPAGATION_TIMEOUT_SECONDS = 300
 ROLE_PROPAGATION_POLL_SECONDS = 5
 DATA_PLANE_READY_CONFIRMATIONS = 3
 DPS_IDENTITY_SETTLE_SECONDS = 60

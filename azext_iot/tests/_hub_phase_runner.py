@@ -30,34 +30,15 @@ CI_BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(enc
 HUB_CI_BUDGETS = {name: CI_BUDGETS[name] for name in ("HubControl", "HubData")}
 
 
-class BudgetPhases(tuple):
-    """Real full-suite phases, with legacy debug aliases exposed to dict()."""
-
-    def __new__(cls, values, aliases=()):
-        result = super().__new__(cls, values)
-        result.aliases = dict(aliases)
-        return result
-
-    def keys(self):
-        return [name for name, _ in self] + list(self.aliases)
-
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            for name, seconds in self:
-                if name == key:
-                    return seconds
-            return self.aliases[key]
-        return super().__getitem__(key)
-
-
 BUDGETS = {
-    suite: BudgetPhases(tuple((phase["name"], phase["runtime_minutes"] * 60) for phase in budget["phases"]))
+    suite: tuple((phase["name"], phase["runtime_minutes"] * 60) for phase in budget["phases"])
     for suite, budget in HUB_CI_BUDGETS.items()
 }
-BUDGETS["HubControl"] = BudgetPhases(BUDGETS["HubControl"], {"regular": max(seconds for _, seconds in BUDGETS["HubControl"])})
-BUDGETS["HubData"] = BudgetPhases(BUDGETS["HubData"], {"entra": max(
-    seconds for name, seconds in BUDGETS["HubData"] if name.startswith("entra-")
-)})
+# Legacy debug phase names cover all of their concurrent shards.
+ALIAS_BUDGETS = {
+    "HubControl": {"regular": max(seconds for _, seconds in BUDGETS["HubControl"])},
+    "HubData": {"entra": max(seconds for name, seconds in BUDGETS["HubData"] if name.startswith("entra-"))},
+}
 CLEANUPS = {
     suite: {phase["name"]: phase["cleanup_minutes"] * 60 for phase in budget["phases"]}
     for suite, budget in HUB_CI_BUDGETS.items()
@@ -490,7 +471,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 write_json(folder / "cleanup.json", {
                     "runId": result["runId"], "complete": False, "errors": ["child execution failed"]
                 })
-                cancel.set()
+                # Record only this phase; siblings own disjoint resources and deadlines.
                 return
             with summary_lock:
                 result.update({k: v for k, v in execution.items() if k != "cleanup_deadline"})

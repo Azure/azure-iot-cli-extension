@@ -173,8 +173,10 @@ def test_dps_budgets_come_from_ci_budget_source():
         for phase in budget["phases"]
     )
     assert budget["concurrent_phases"] is True
+    assert budget["serial_cleanup_verification"] is True
     phase_seconds = max(runtime + cleanup for _, runtime, cleanup in RUNNER["PHASES"])
-    assert RUNNER["RUNNER_SECONDS"] == phase_seconds + budget["reserve_minutes"] * 60
+    verification = sum(cleanup for _, _, cleanup in RUNNER["PHASES"])
+    assert RUNNER["RUNNER_SECONDS"] == phase_seconds + verification + budget["reserve_minutes"] * 60
     assert RUNNER["RUNNER_SECONDS"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
 
 
@@ -261,7 +263,16 @@ def test_dps_cli_rejects_noncentral_canary_clearly_before_reader(monkeypatch, mo
 @pytest.mark.parametrize("phase_name", ["regular", "service-sas"])
 @pytest.mark.parametrize("defect", ["uncertain-create", "remaining", "invalid-ownership"])
 def test_cleanup_failure_cannot_block_concurrent_independent_phases(tmp_path, capsys, phase_name, defect):
-    reader = Reader()
+    now = [0]
+    stuck = set()
+
+    class StuckReader(Reader):
+        def get(self, record):
+            if record["id"] in stuck:
+                now[0] += 3600  # One observation outlasts the phase's fresh cleanup window.
+            return super().get(record)
+
+    reader = StuckReader()
 
     def execute(*args):
         result = _execution(*args)
@@ -273,7 +284,7 @@ def test_cleanup_failure_cannot_block_concurrent_independent_phases(tmp_path, ca
             elif defect == "remaining":
                 record = json.loads((directory / "owned-h.json").read_text())
                 reader.resources.append({"id": record["id"], "tags": record["tags"]})
-                result["cleanup_deadline"] = time.monotonic()
+                stuck.add(record["id"])
             else:
                 path = directory / "owned-h.json"
                 record = json.loads(path.read_text())
@@ -281,7 +292,7 @@ def test_cleanup_failure_cannot_block_concurrent_independent_phases(tmp_path, ca
                 _json(path, record)
         return result
 
-    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
+    status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute, clock=lambda: now[0])
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert status == 1 and GATE(tmp_path)
     assert [phase["status"] for phase in summary["phases"]] == [
@@ -376,11 +387,14 @@ def test_final_gate_requires_complete_toggle_evidence(tmp_path, defect):
 ])
 def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     reader = Reader()
+    now = [0]
     if defect == "remaining":
         original_get = reader.get
 
         def get(record):
             original_get(record)
+            if record["phase"] == "regular":
+                now[0] += 3600  # One observation outlasts the phase's fresh cleanup window.
             return {"id": record["id"], "state": "Deleting"} if record["phase"] == "regular" else None
         reader.get = get
 
@@ -396,7 +410,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
             elif defect in ("timeout", "interrupt"):
                 result["timed_out" if defect == "timeout" else "interrupted"] = True
             elif defect == "remaining":
-                result["cleanup_deadline"] = time.monotonic()
+                pass  # The reader keeps the owned resource Deleting past the cleanup window.
             elif defect == "missing-junit":
                 Path(environment["azext_iot_dps_junit"]).unlink()
             elif defect == "missing-selection":
@@ -430,7 +444,7 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
                 tree.write(raw)
         return result
 
-    assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute) == 1
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute, clock=lambda: now[0]) == 1
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert GATE(tmp_path)
     phases = summary["phases"]
@@ -504,18 +518,46 @@ def test_subscription_inventory_never_imposes_quota_admission(tmp_path, mocker, 
 @pytest.mark.parametrize("phase", ["regular", "service-sas"])
 def test_phase_cleanup_retains_inventory_despite_foreign_resource_growth(tmp_path, phase):
     reader = Reader(7)
+    # Phases run concurrently; hold every phase until the growth lands so all cleanups observe it.
+    grown = threading.Barrier(3, timeout=30)
 
     def execute(*args):
         result = _execution(*args)
         if args[1]["azext_iot_dps_test_phase"] == phase:
             reader.resources = Reader(1000).resources
+        grown.wait()
         return result
 
     status = RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=execute)
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
-    next_phase = summary["phases"][1 if phase == "regular" else 2]
-    assert len(next_phase["cleanup"]["inventory_ids"]) == 1000
-    assert next_phase["cleanup"]["complete"]
+    for record in summary["phases"]:
+        assert len(record["cleanup"]["inventory_ids"]) == 1000
+        assert record["cleanup"]["complete"]
+    assert status == 0 and not GATE(tmp_path)
+
+
+def test_each_phase_gets_a_fresh_cleanup_window_despite_slow_sibling_verification(tmp_path):
+    now = [0]
+    windows = []
+
+    class SlowReader(Reader):
+        deadline = None
+
+        def inventory(self):
+            if self.inventories:  # The first read is the pre-launch baseline.
+                windows.append(self.deadline - now[0])
+                now[0] += 900  # Each verification outlasts every phase's original cleanup window.
+            return super().inventory()
+
+    def execute(*args):
+        result = _execution(*args)
+        result["cleanup_deadline"] = now[0] + args[4]
+        return result
+
+    status = RUN(SUB, GROUP, tmp_path / "dps-phases", SlowReader(), execute=execute, clock=lambda: now[0])
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    assert sorted(windows) == sorted(cleanup for _, _, cleanup in RUNNER["PHASES"])
+    assert all(phase["cleanup"]["complete"] for phase in summary["phases"])
     assert status == 0 and not GATE(tmp_path)
 
 

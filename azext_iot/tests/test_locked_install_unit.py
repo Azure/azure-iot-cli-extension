@@ -10,6 +10,8 @@ from threading import Barrier, Lock, Thread
 from types import SimpleNamespace
 import time
 
+import pytest
+
 from azext_iot.tests import _locked_install
 
 
@@ -30,7 +32,12 @@ def _recorder(returncode=0, delay=0.0):
     return run, calls, peak
 
 
-def test_concurrent_phases_share_one_serialized_install_per_runner_token(tmp_path):
+@pytest.mark.parametrize("posix_lock", [True, False])
+def test_concurrent_phases_share_one_serialized_install_per_runner_token(tmp_path, monkeypatch, posix_lock):
+    if not posix_lock:
+        monkeypatch.setattr(_locked_install, "fcntl", None)
+    elif _locked_install.fcntl is None:
+        pytest.skip("POSIX file locks are unavailable on this platform")
     run, calls, peak = _recorder(delay=0.05)
     target = tmp_path / "extensions" / "azure-iot"
     barrier = Barrier(3)

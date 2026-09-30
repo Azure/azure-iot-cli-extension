@@ -207,7 +207,8 @@ def test_hub_debug_success_is_not_full_qualification(tmp_path, monkeypatch, suit
     assert result == 0 and calls == [phase]
     assert captured[0]["COVERAGE_FILE"] == str(output / phase / ".coverage")
     assert summary["status"] == "debug-passed" and summary["qualifiesFullSuite"] is False
-    assert summary["runnerSeconds"] == dict(hub.BUDGETS[suite])[phase] + hub.CLEANUP + hub.RESERVE
+    budgets = {**dict(hub.BUDGETS[suite]), **hub.ALIAS_BUDGETS[suite]}
+    assert summary["runnerSeconds"] == budgets[phase] + hub.CLEANUP + hub.RESERVE
     assert hub.evaluate_hub_phases(output, debug=True) == {"passed": True, "errors": []}
     assert not hub.evaluate_hub_phases(output)["passed"]
     summary["status"] = "passed"

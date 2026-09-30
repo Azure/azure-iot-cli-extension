@@ -294,10 +294,6 @@ def auth_phase(phase):
     return "local-auth" if phase == "sas" else "regular"
 
 
-def regular_phase(phase):
-    return phase == "regular" or phase.startswith("regular-")
-
-
 def expanded_phases(suite, phase, *, linked_metadata=False):
     enabled = phases(suite, linked_metadata=linked_metadata)
     if phase in enabled:

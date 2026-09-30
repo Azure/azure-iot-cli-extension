@@ -311,9 +311,14 @@ def test_ci_budget_source_covers_matrix_and_controller_arithmetic():
         assert isinstance(config.get("concurrent_phases", False), bool)
         # Concurrent controllers run every phase at once, so only the slowest phase bounds the job.
         combine = max if config.get("concurrent_phases") else sum
+        assert isinstance(config.get("serial_cleanup_verification", False), bool)
+        verification = (
+            sum(phase["cleanup_minutes"] for phase in config["phases"])
+            if config.get("serial_cleanup_verification") else 0
+        )
         controller = (
             combine([phase["runtime_minutes"] + phase["cleanup_minutes"] for phase in config["phases"]] or [0])
-            + config["reserve_minutes"]
+            + verification + config["reserve_minutes"]
         )
         assert controller + config["setup_minutes"] <= config["job_timeout_minutes"]
     assert {

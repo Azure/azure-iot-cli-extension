@@ -58,7 +58,7 @@ def execute_factory(damage=None, handlers=None):
         assert command[0] == sys.executable and command[1:3] == ["-m", "pytest"]
         assert "tox" not in command and "--timeout=900" in command
         assert env["PYTHONPATH"] == "inherited-dependencies"
-        assert runtime == dict(runner.BUDGETS[suite]).get(phase, runtime)
+        assert runtime == {**dict(runner.BUDGETS[suite]), **runner.ALIAS_BUDGETS[suite]}.get(phase, runtime)
         assert cleanup == runner.cleanup_seconds(suite, phase)
         expected = list(runner.selection()["nodes"](suite, phase))
         receipt = plugin.PhaseReceipt(
@@ -272,11 +272,11 @@ def test_owned_arm_delete_off_main_thread_requires_dispatch():
     assert callable(dispatched[0]) and dispatched[1] == (202, None)
 
 
-@pytest.mark.parametrize("damage", ["timeout", "cleanup"])
+@pytest.mark.parametrize("damage", ["timeout", "cleanup", "raise"])
 def test_failed_phase_does_not_interrupt_concurrent_siblings(tmp_path, damage):
     handlers = {}
     base_execute, _ = execute_factory()
-    damaged_execute, _ = execute_factory(damage)
+    damaged_execute, _ = execute_factory(None if damage == "raise" else damage)
     phases = [phase for phase, _ in runner.BUDGETS["HubControl"]]
     barrier = threading.Barrier(len(phases), timeout=5)
     first_done = threading.Event()
@@ -286,6 +286,8 @@ def test_failed_phase_does_not_interrupt_concurrent_siblings(tmp_path, damage):
         barrier.wait()
         if env["AZEXT_IOT_HUB_PHASE"] == phases[0]:
             try:
+                if damage == "raise":
+                    raise RuntimeError("child launch failed")
                 return damaged_execute(command, env, log_path, runtime, cleanup, cancelled)
             finally:
                 first_done.set()
@@ -716,12 +718,12 @@ def test_budgets_leave_external_setup_below_github_cap():
     budgets = runner.CI_BUDGETS
     assert runner.BUDGETS == {
         "HubControl": (
-            ("regular-state-workflow", 70 * 60),
-            ("regular-state-schemes-cert", 70 * 60),
-            ("regular-endpoints-a", 70 * 60),
-            ("regular-endpoints-b", 70 * 60),
+            ("regular-state-workflow", 90 * 60),
+            ("regular-state-schemes-cert", 90 * 60),
+            ("regular-endpoints-a", 90 * 60),
+            ("regular-endpoints-b", 90 * 60),
         ),
-        "HubData": (("entra-state-config", 55 * 60), ("entra-devices-protocol", 55 * 60), ("sas", 45 * 60)),
+        "HubData": (("entra-state-config", 75 * 60), ("entra-devices-protocol", 75 * 60), ("sas", 45 * 60)),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60

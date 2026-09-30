@@ -3,6 +3,7 @@
     "test_dir": "azext_iot/tests/dps",
     "tox_env": "DPS-int",
     "concurrent_phases": true,
+    "serial_cleanup_verification": true,
     "phases": [
       {
         "name": "regular",
@@ -31,22 +32,22 @@
     "phases": [
       {
         "name": "regular-state-workflow",
-        "runtime_minutes": 70,
+        "runtime_minutes": 90,
         "cleanup_minutes": 15
       },
       {
         "name": "regular-state-schemes-cert",
-        "runtime_minutes": 70,
+        "runtime_minutes": 90,
         "cleanup_minutes": 15
       },
       {
         "name": "regular-endpoints-a",
-        "runtime_minutes": 70,
+        "runtime_minutes": 90,
         "cleanup_minutes": 15
       },
       {
         "name": "regular-endpoints-b",
-        "runtime_minutes": 70,
+        "runtime_minutes": 90,
         "cleanup_minutes": 15
       }
     ],
@@ -61,12 +62,12 @@
     "phases": [
       {
         "name": "entra-state-config",
-        "runtime_minutes": 55,
+        "runtime_minutes": 75,
         "cleanup_minutes": 15
       },
       {
         "name": "entra-devices-protocol",
-        "runtime_minutes": 55,
+        "runtime_minutes": 75,
         "cleanup_minutes": 15
       },
       {

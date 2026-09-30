@@ -778,6 +778,12 @@ def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, resu
     assert sleep.call_count == calls - 1
 
 
+def test_readiness_deadline_is_never_tighter_than_the_old_fixed_wait():
+    # A late first success still needs its full confirmation streak before the deadline.
+    streak = (dps_fixtures.DATA_PLANE_READY_CONFIRMATIONS - 1) * dps_fixtures.ROLE_PROPAGATION_POLL_SECONDS
+    assert dps_fixtures.ROLE_PROPAGATION_TIMEOUT_SECONDS >= 2 * (60 + streak)
+
+
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
 def test_dps_fixture_waits_after_assigning_caller_data_role(mocker, role):
     cli = mocker.patch.object(dps_fixtures, "cli")

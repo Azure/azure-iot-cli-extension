@@ -46,7 +46,9 @@ def controller_seconds(budget, phases=None):
     ))
     totals = [runtime + cleanup for _, runtime, cleanup in selected] or [0]
     combine = max if budget.get("concurrent_phases") else sum
-    return combine(totals) + budget["reserve_minutes"] * 60
+    # ARM verification runs on the main thread (signal-bounded reads), one fresh window per phase.
+    verification = sum(cleanup for _, _, cleanup in selected) if budget.get("serial_cleanup_verification") else 0
+    return combine(totals) + verification + budget["reserve_minutes"] * 60
 
 
 RUNNER_SECONDS = controller_seconds(DPS_CI_BUDGET)
@@ -748,7 +750,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                             result["results"] = {"valid": False, "reason": "Missing/invalid collection or JUnit results"}
                         try:
                             records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
-                            reader.deadline = min(execution["cleanup_deadline"], deadline)
+                            # Serial verification: a sibling's slow cleanup must not consume this phase's window.
+                            reader.deadline = min(deadline, clock() + phase["cleanup"])
                             result["cleanup"] = verify_cleanup(
                                 reader, records, uid, reader.deadline, clock=clock,
                             )

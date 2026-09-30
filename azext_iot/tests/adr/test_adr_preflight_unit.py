@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -99,6 +100,22 @@ def test_adr_xdist_groups_split_long_delete_cases_and_sort_long_groups_first():
     ]
     groups = {item.nodeid.rsplit("::", 1)[-1]: item.markers[0].args[0] for item in items}
     assert groups["test_adr_link_su_delete"] != groups["test_adr_link_hub_dps_delete"]
+
+
+def test_adr_xdist_groups_map_every_integration_test_exactly_once():
+    # The fallback group silently absorbs unmapped tests and would erode the time balance.
+    base = Path(subject.__file__).resolve().parent
+    collected = []
+    for path in sorted(base.rglob("*_int.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        collected.extend(
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        )
+    mapped = [test for tests in subject._ADR_XDIST_GROUPS.values() for test in tests]
+    assert len(collected) == len(set(collected))
+    assert len(mapped) == len(set(mapped))
+    assert sorted(mapped) == sorted(collected)
 
 
 @pytest.mark.parametrize("live", [None, "", "false", "0"])
