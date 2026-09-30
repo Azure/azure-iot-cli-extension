@@ -159,10 +159,16 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    default="auto",
                    is_preview=True,
                    help="Type of IoT Hub hostname to use when linking. "
-                   "'auto' uses the TLS 1.3 device hostname if available, classic otherwise. "
+                   "'auto' uses the service hostname for MqttV5 links; otherwise it uses the "
+                   "TLS 1.3 device hostname if available, classic otherwise. "
                    "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
                    "'classic' uses the classic hostname (hub.azure-devices.net). "
                    "Only applies when --hub-name is provided.")
+        c.argument('connection_profile',
+                   options_list=['--connection-profile'],
+                   arg_type=get_enum_type(IotHubConnectionProfile),
+                   is_preview=True,
+                   help='Connection profile to use for device connections to the linked IoT Hub.')
         c.argument('apply_allocation_policy',
                    help='A boolean indicating whether to apply allocation policy to the IoT hub.',
                    arg_type=get_three_state_flag())

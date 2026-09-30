@@ -90,6 +90,15 @@ def _get_resource_group_from_hub(hub):
 
 def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
     """Resolve IoT Hub hostname for DPS linked hub based on hostname type."""
+    if hostname_type == "service":
+        service_hostname = hub["properties"].get("serviceHostName")
+        if not service_hostname:
+            hub_name = hub.get("name", "unknown")
+            raise InvalidArgumentValueError(
+                f"The service hostname is not available for IoT Hub '{hub_name}'. "
+                "This hostname type is only supported on GWv2 IoT Hubs."
+            )
+        return service_hostname
     if hostname_type == "classic":
         return hub["properties"]["hostName"]
     device_hostname = hub["properties"].get("deviceHostName")
@@ -387,15 +396,11 @@ def iot_dps_linked_hub_list(client, dps_name, resource_group_name=None):
 
 
 def iot_dps_linked_hub_get(cmd, client, dps_name, linked_hub, resource_group_name=None):
-    if '.' not in linked_hub:
-        hub_client = iot_hub_service_factory(cmd.cli_ctx)
-        linked_hub = _get_iot_hub_hostname(hub_client, linked_hub)
-
     dps = iot_dps_get(client, dps_name, resource_group_name)
-    for hub in dps["properties"]["iotHubs"]:
-        if hub["name"] == linked_hub:
-            return hub
-    raise ResourceNotFoundError("Linked hub '{0}' does not exist. Use 'iot dps linked-hub show to see all linked hubs.".format(linked_hub))
+    linked_hubs = dps["properties"]["iotHubs"]
+    if '.' not in linked_hub:
+        return _find_linked_hub_entry(linked_hubs, hub_name=linked_hub)
+    return _find_linked_hub_entry(linked_hubs, linked_hub=linked_hub)
 
 
 def iot_dps_linked_hub_create(
@@ -410,10 +415,20 @@ def iot_dps_linked_hub_create(
     authentication_type=None,
     user_assigned_identity=None,
     hostname_type="auto",
+    connection_profile=None,
     apply_allocation_policy=None,
     allocation_weight=None,
     no_wait=False
 ):
+    if is_mqtt_v5_profile(connection_profile) and hostname_type == "auto":
+        # DPS validates an MQTT 5 linked Hub through its split service endpoint.
+        hostname_type = "service"
+
+    if user_assigned_identity and authentication_type != IotHubAuthenticationType.USER_ASSIGNED.value:
+        raise MutuallyExclusiveArgumentError(
+            "--user-assigned-identity only applies with --authentication-type UserAssigned."
+        )
+
     is_mi = authentication_type in (
         IotHubAuthenticationType.SYSTEM_ASSIGNED.value,
         IotHubAuthenticationType.USER_ASSIGNED.value,
@@ -479,10 +494,13 @@ def iot_dps_linked_hub_create(
                 host_name, policies["keyName"], policies["primaryKey"]
             )
         else:
-            if ".service.azure-devices" in connection_string.lower():
+            if (
+                ".service.azure-devices" in connection_string.lower()
+                and not is_mqtt_v5_profile(connection_profile)
+            ):
                 raise InvalidArgumentValueError(
-                    "Service hostname is not supported for DPS hub linking. "
-                    "Use a connection string with device or classic hostname."
+                    "Service hostname is only supported for DPS hub linking with "
+                    "--connection-profile MqttV5."
                 )
             parsed_cs = validate_key_value_pairs(connection_string)
             host_name = parsed_cs.get("HostName")
@@ -512,6 +530,8 @@ def iot_dps_linked_hub_create(
         linked_hub_entry["applyAllocationPolicy"] = apply_allocation_policy
     if allocation_weight is not None:
         linked_hub_entry["allocationWeight"] = allocation_weight
+    if connection_profile is not None:
+        linked_hub_entry["connectionProfile"] = connection_profile
 
     dps["properties"]["iotHubs"].append(linked_hub_entry)
 
@@ -644,10 +664,33 @@ def iot_dps_linked_hub_update(
     )
     if cs_needs_rebuild:
         if connection_string:
-            if ".service.azure-devices" in connection_string.lower():
+            parsed_connection_string = validate_key_value_pairs(connection_string) or {}
+            connection_string_hostname = next(
+                (
+                    value.strip()
+                    for key, value in parsed_connection_string.items()
+                    if key.strip().casefold() == "hostname"
+                ),
+                None,
+            )
+            if not connection_string_hostname:
                 raise InvalidArgumentValueError(
-                    "Service hostname is not supported for DPS hub linking. "
-                    "Use a connection string with device or classic hostname."
+                    "Please provide a valid IoT Hub connection string containing HostName."
+                )
+            if (
+                ".service.azure-devices" in connection_string_hostname.casefold()
+                and not is_mqtt_v5_profile(target_entry.get("connectionProfile"))
+            ):
+                raise InvalidArgumentValueError(
+                    "Service hostname is only supported for DPS hub linking with "
+                    "connection profile MqttV5."
+                )
+            target_hostname = target_entry.get("hostName") or target_entry["name"]
+            if connection_string_hostname.casefold() != target_hostname.casefold():
+                raise InvalidArgumentValueError(
+                    f"The connection string HostName must match the existing linked hub hostname "
+                    f"'{target_hostname}'. To change a linked hub endpoint, delete the existing "
+                    "link and recreate it with the desired hostname."
                 )
             target_entry["connectionString"] = connection_string
         else:
@@ -684,15 +727,14 @@ def iot_dps_linked_hub_update(
 
 
 def iot_dps_linked_hub_delete(cmd, client, dps_name, linked_hub, resource_group_name=None, no_wait=False):
-    if '.' not in linked_hub:
-        hub_client = iot_hub_service_factory(cmd.cli_ctx)
-        linked_hub = _get_iot_hub_hostname(hub_client, linked_hub)
-
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     dps_linked_hubs = []
     dps_linked_hubs.extend(iot_dps_linked_hub_list(client, dps_name, resource_group_name))
-    if not _is_linked_hub_existed(dps_linked_hubs, linked_hub):
-        raise ResourceNotFoundError("Linked hub {0} doesn't exist.".format(linked_hub))
+    if '.' not in linked_hub:
+        target_entry = _find_linked_hub_entry(dps_linked_hubs, hub_name=linked_hub)
+    else:
+        target_entry = _find_linked_hub_entry(dps_linked_hubs, linked_hub=linked_hub)
+    linked_hub = target_entry["name"]
     updated_hubs = [p for p in dps_linked_hubs if p["name"].lower() != linked_hub.lower()]
 
     dps = iot_dps_get(client, dps_name, resource_group_name)

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Exercise handwritten DPS handlers against the real, synchronous stable SDK."""
+"""Exercise handwritten DPS handlers against the real, synchronous management SDK."""
 
 import base64
 from copy import deepcopy
@@ -16,6 +16,7 @@ import pytest
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import ResourceModifiedError
 
+from azext_iot._factory import _configure_dps_modeless_lro_polling
 from azext_iot.core import custom
 from azext_iot.sdk.dps.mgmt import IotDpsClient
 
@@ -33,7 +34,7 @@ def stable_client():
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
     with IotDpsClient(credential, SUBSCRIPTION, polling_interval=0) as client:
-        yield client
+        yield _configure_dps_modeless_lro_polling(client)
 
 
 @pytest.fixture
@@ -59,10 +60,10 @@ def dps_resource():
     }
 
 
-def assert_stable_requests(mocked_response):
+def assert_dps_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-08-31"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-02-preview"]
 
 
 @pytest.mark.parametrize(
@@ -102,7 +103,7 @@ def test_create_serializes_stable_resource(
         assert "identity" not in body
     assert "deviceRegistryNamespace" not in body["properties"]
     assert "disableLocalAuth" not in body["properties"]
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize("tags", [None, {}, {"changed": "tag"}])
@@ -110,6 +111,12 @@ def test_create_serializes_stable_resource(
 def test_get_put_update_preserves_supported_properties(
     stable_client, mocked_response, dps_resource, tags, identity_args
 ):
+    dps_resource["properties"]["iotHubs"] = [{
+        "name": "test-hub.azure-devices.net",
+        "hostName": "test-hub.azure-devices.net",
+        "location": "westus2",
+        "connectionProfile": "MqttV5",
+    }]
     mocked_response.add("GET", RESOURCE_URL, json=dps_resource)
     mocked_response.add("PUT", RESOURCE_URL, json=dps_resource)
     parameters = custom.iot_dps_get(stable_client, "test-dps", "test-rg")
@@ -122,6 +129,7 @@ def test_get_put_update_preserves_supported_properties(
     assert mocked_response.calls[1].request.method == "PUT"
     assert body["properties"] == dps_resource["properties"]
     assert body["properties"]["disableLocalAuth"] is True
+    assert body["properties"]["iotHubs"][0]["connectionProfile"] == "MqttV5"
     assert "deviceRegistryNamespace" not in body["properties"]
     assert body["tags"] == (dps_resource["tags"] if tags is None else tags)
     assert body["id"] == dps_resource["id"]
@@ -130,7 +138,7 @@ def test_get_put_update_preserves_supported_properties(
         assert body["identity"] == dps_resource["identity"]
     else:
         assert body["identity"]["type"] == ("SystemAssigned" if "mi_system_assigned" in identity_args else "UserAssigned")
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize("handler", [custom.dps_identity_assign, custom.dps_identity_remove])
@@ -146,7 +154,7 @@ def test_identity_roundtrip_preserves_local_auth(stable_client, mocked_response,
     assert body["identity"]["type"] == (
         "SystemAssigned,UserAssigned" if handler is custom.dps_identity_assign else "UserAssigned"
     )
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize("authentication_type", ["KeyBased", "SystemAssigned", "UserAssigned"])
@@ -188,7 +196,37 @@ def test_linked_hub_authentication_roundtrip(
         assert entry["selectedUserAssignedIdentityResourceId"] == USER_ID
     else:
         assert "selectedUserAssignedIdentityResourceId" not in entry
-    assert_stable_requests(mocked_response)
+    assert "connectionProfile" not in entry
+    assert_dps_requests(mocked_response)
+
+
+def test_linked_hub_connection_profile_roundtrip(
+    fixture_cmd, stable_client, mocked_response, mocker, dps_resource
+):
+    mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
+    mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+        "location": "westus2", "properties": {"hostName": "test-hub.azure-devices.net"}
+    })
+    mocked_response.add("GET", RESOURCE_URL, json=dps_resource)
+    mocked_response.add("PUT", RESOURCE_URL, json=dps_resource)
+
+    custom.iot_dps_linked_hub_create(
+        fixture_cmd,
+        stable_client,
+        "test-dps",
+        connection_string=(
+            "HostName=test-hub.azure-devices.net;"
+            "SharedAccessKeyName=owner;SharedAccessKey=test-key"
+        ),
+        connection_profile="MqttV5",
+        location="westus2",
+        resource_group_name="test-rg",
+        no_wait=True,
+    ).result()
+
+    body = json.loads(mocked_response.calls[1].request.body)
+    assert body["properties"]["iotHubs"][0]["connectionProfile"] == "MqttV5"
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize("update", [False, True])
@@ -216,7 +254,7 @@ def test_certificate_upload_bytes_and_etag(stable_client, mocked_response, mocke
         assert request.headers["If-Match"] == '"old-etag"'
     else:
         assert "If-Match" not in request.headers
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize(
@@ -242,7 +280,7 @@ def test_certificate_conditional_operations(stable_client, mocked_response, mock
     assert request.headers["If-Match"] == '"certificate-etag"'
     if handler is custom.iot_dps_certificate_verify:
         assert json.loads(request.body) == {"certificate": CERTIFICATE}
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 def test_certificate_stale_etag_raises_sdk_error(stable_client, mocked_response):
@@ -253,11 +291,11 @@ def test_certificate_stale_etag_raises_sdk_error(stable_client, mocked_response)
     with pytest.raises(ResourceModifiedError, match="etag is stale"):
         custom.iot_dps_certificate_delete(stable_client, "test-dps", "test-cert", '"stale"', "test-rg")
     assert mocked_response.calls[0].request.headers["If-Match"] == '"stale"'
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 @pytest.mark.parametrize("resource_group", [None, "test-rg"])
-def test_resource_lists_use_stable_paging(stable_client, mocked_response, dps_resource, resource_group):
+def test_resource_lists_use_preview_paging(stable_client, mocked_response, dps_resource, resource_group):
     url = (
         f"{BASE_URL}/providers/Microsoft.Devices/provisioningServices"
         if resource_group is None else RESOURCE_URL.rsplit("/", 1)[0]
@@ -265,7 +303,7 @@ def test_resource_lists_use_stable_paging(stable_client, mocked_response, dps_re
     mocked_response.add("GET", url, json={"value": [dps_resource]})
 
     assert list(custom.iot_dps_list(stable_client, resource_group)) == [dps_resource]
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
 def test_policy_get_and_put_preserve_wire_fields(fixture_cmd, stable_client, mocked_response, dps_resource):
@@ -285,11 +323,11 @@ def test_policy_get_and_put_preserve_wire_fields(fixture_cmd, stable_client, moc
     expected_policy["primaryKey"] = "replacement"
     assert body["properties"]["authorizationPolicies"] == [expected_policy]
     assert body["properties"]["disableLocalAuth"] is True
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)
 
 
-def test_delete_uses_stable_lro(stable_client, mocked_response):
+def test_delete_uses_preview_lro(stable_client, mocked_response):
     mocked_response.add("DELETE", RESOURCE_URL, status=204)
 
     assert custom.iot_dps_delete(stable_client, "test-dps", "test-rg").result() is None
-    assert_stable_requests(mocked_response)
+    assert_dps_requests(mocked_response)

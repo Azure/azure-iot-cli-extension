@@ -11,12 +11,37 @@ Tests cover:
 - Linked hub create with hostname types (auto, classic, device)
 - Hostname resolution for GWv2 hubs
 - Linked hub list after creation
+- MQTT 5 connection profile creation and preservation
 """
 
 import pytest
+from knack.log import get_logger
+
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.iothub.conftest import generate_hub_id
 
 cli = EmbeddedCLI()
+logger = get_logger(__name__)
+
+
+@pytest.fixture()
+def provisioned_mqtt5_hub(provisioned_iot_dps_no_hub_module):
+    name = generate_hub_id()
+    rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
+    try:
+        yield cli.invoke(
+            f"iot hub create -n {name} -g {rg} --sku S1 "
+            "--connection-profile MqttV5 --yes",
+            capture_stderr=True,
+        ).as_json()
+    finally:
+        cleanup = EmbeddedCLI().invoke(f"iot hub delete -n {name} -g {rg}")
+        if not cleanup.success():
+            logger.error(
+                "Failed to clean up MQTT 5 integration-test Hub '%s': %s",
+                name,
+                cleanup.get_error(),
+            )
 
 
 def _require_gwv2_hub(provisioned_hub):
@@ -32,6 +57,44 @@ def _cleanup_linked_hub(dps_name, rg, linked_hub_name):
         f"iot dps linked-hub delete --dps-name {dps_name} -g {rg} "
         f"--linked-hub {linked_hub_name}"
     )
+
+
+def test_linked_hub_create_mqtt5_connection_profile(
+    provisioned_iot_dps_no_hub_module, provisioned_mqtt5_hub
+):
+    dps_name = provisioned_iot_dps_no_hub_module["name"]
+    dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
+    hub_name = provisioned_mqtt5_hub["name"]
+    hub_properties = provisioned_mqtt5_hub["properties"]
+    linked_hub_name = (
+        hub_properties.get("serviceHostName")
+        or f"{hub_name}.service.azure-devices.net"
+    )
+
+    try:
+        result = cli.invoke(
+            f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
+            f"--hub-name {hub_name} --connection-profile MqttV5"
+        ).as_json()
+
+        matching = [hub for hub in result if hub["name"] == linked_hub_name]
+        assert len(matching) == 1
+        assert matching[0]["connectionProfile"] == "MqttV5"
+
+        shown = cli.invoke(
+            f"iot dps linked-hub show --dps-name {dps_name} -g {dps_rg} "
+            f"--linked-hub {linked_hub_name}"
+        ).as_json()
+        assert shown["connectionProfile"] == "MqttV5"
+
+        updated = cli.invoke(
+            f"iot dps linked-hub update --dps-name {dps_name} -g {dps_rg} "
+            f"--linked-hub {linked_hub_name} --allocation-weight 5"
+        ).as_json()
+        assert updated["allocationWeight"] == 5
+        assert updated["connectionProfile"] == "MqttV5"
+    finally:
+        _cleanup_linked_hub(dps_name, dps_rg, linked_hub_name)
 
 
 def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
