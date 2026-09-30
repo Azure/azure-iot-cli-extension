@@ -308,8 +308,11 @@ def test_ci_budget_source_covers_matrix_and_controller_arithmetic():
     assert set(budgets) == set(SERVICES)
     for service, config in budgets.items():
         assert config["tox_env"] == service + "-int"
+        assert isinstance(config.get("concurrent_phases", False), bool)
+        # Concurrent controllers run every phase at once, so only the slowest phase bounds the job.
+        combine = max if config.get("concurrent_phases") else sum
         controller = (
-            sum((phase["runtime_minutes"] + phase["cleanup_minutes"]) for phase in config["phases"])
+            combine([phase["runtime_minutes"] + phase["cleanup_minutes"] for phase in config["phases"]] or [0])
             + config["reserve_minutes"]
         )
         assert controller + config["setup_minutes"] <= config["job_timeout_minutes"]

@@ -217,6 +217,14 @@ def test_hub_debug_success_is_not_full_qualification(tmp_path, monkeypatch, suit
     assert not hub.evaluate_hub_phases(output)["passed"]
 
 
+def test_hub_debug_never_appends_to_the_checkout_coverage_database(tmp_path, monkeypatch):
+    combine = Mock(side_effect=AssertionError("debug must not combine into the checkout database"))
+    monkeypatch.setattr(hub, "combine_coverage", combine)
+    result, summary, *_ = run_hub(tmp_path, monkeypatch, "HubData", "entra")
+    assert result == 0 and summary["status"] == "debug-passed"
+    assert summary["coverage"] == {"skipped": "debug run"} and not combine.called
+
+
 @pytest.mark.parametrize("defect", [
     "missing-stage", "duplicate-stage", "skip", "duplicate-node", "provenance", "observer", "uncertain",
     "malformed-stages", "timed_out", "interrupted",
@@ -663,9 +671,17 @@ def test_real_tox_configuration_preserves_install_and_routes_only_controller_sel
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     commands = tox_commands(completed.stdout)
-    installation = next(command for command in commands if command[:2] == ["pip", "install"])
-    assert installation[-1] == "." and "--target" in installation
-    assert Path(installation[installation.index("--target") + 1]).parts[-2:] == ("azure-cli-extensions", "azure-iot")
+    if service == "DPS":
+        # Concurrent DPS phases share the env, so the extension installs once under a lock.
+        assert not any(command[:2] == ["pip", "install"] for command in commands)
+        installation = next(command for command in commands if command[:1] == ["python"] and len(command) == 3
+                            and Path(command[1]) == ROOT / "azext_iot/tests/_locked_install.py")
+        target = installation[2]
+    else:
+        installation = next(command for command in commands if command[:2] == ["pip", "install"])
+        assert installation[-1] == "." and "--target" in installation
+        target = installation[installation.index("--target") + 1]
+    assert Path(target).parts[-2:] == ("azure-cli-extensions", "azure-iot")
     launch = commands[-1]
     if service == "DPS":
         assert launch[:3] == ["python", "-m", "pytest"] and "-k" not in launch
@@ -1003,7 +1019,7 @@ def test_dps_rejects_ambient_managed_coverage_before_inventory_or_execution(tmp_
     assert hub.read_json(tmp_path / "dps-phases.json")["error"]["type"] == "PhaseError"
 
 
-def test_dps_full_mode_keeps_global_coverage_and_ignores_unmanaged_ambient_file(tmp_path, monkeypatch):
+def test_dps_full_mode_isolates_phase_coverage_and_ignores_unmanaged_ambient_file(tmp_path, monkeypatch):
     monkeypatch.setenv("COVERAGE_FILE", str(tmp_path / "must-not-use"))
     captured = []
 
@@ -1016,8 +1032,10 @@ def test_dps_full_mode_keeps_global_coverage_and_ignores_unmanaged_ambient_file(
         assert dps.run(SUB, GROUP, tmp_path / "dps-phases", DpsReader(), execute=execute) == 0
     assert len(captured) == 3
     for environment in captured:
-        assert "azext_iot_dps_coverage_file" not in environment
-        assert dps_tox_coverage_environment(tmp_path, environment)["COVERAGE_FILE"] == ".coverage"
+        phase = environment["azext_iot_dps_test_phase"]
+        expected = tmp_path / "dps-phases" / phase / ".coverage"
+        assert environment["azext_iot_dps_coverage_file"] == str(expected)
+        assert dps_tox_coverage_environment(tmp_path, environment)["COVERAGE_FILE"] == str(expected)
     assert not (tmp_path / "must-not-use").exists()
 
 

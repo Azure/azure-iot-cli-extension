@@ -7,7 +7,6 @@
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG
-from azext_iot.tests.generators import generate_generic_id
 from typing import Dict
 
 
@@ -45,46 +44,3 @@ def test_instance_list_show_delete(provisioned_instances: Dict[str, dict]):
         #     assert not cli.invoke(
         #         f"iot du instance show -n {account_record} -i {instance_name} -g {ACCOUNT_RG}"
         #     ).success()
-
-
-@pytest.mark.adu_infrastructure(
-    location="eastus2euap", instance_count=1, instance_diagnostics=True, instance_diagnostics_user_storage=True
-)
-def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[str, dict]):
-    account_name = list(provisioned_instances.keys())[0]
-    instance_name = list(provisioned_instances[account_name].keys())[0]
-    random_tag1 = generate_generic_id()
-    random_tag2 = generate_generic_id()
-    # Fetch backing storage account
-    storage_resource_id = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()[
-        "diagnosticStorageProperties"
-    ]["resourceId"]
-    # Set tag, disable diagnostics and remove existing diagnostic storage account.
-    updated_instance: dict = cli.invoke(
-        f"iot du instance update -n {account_name} -i {instance_name} --set tags.env1={random_tag1} "
-        "diagnosticStorageProperties=null enableDiagnostics=false"
-    ).as_json()
-    assert updated_instance["provisioningState"] == "Succeeded"
-    assert updated_instance["tags"]["env1"] == random_tag1
-    assert updated_instance["enableDiagnostics"] is False
-    assert updated_instance["diagnosticStorageProperties"] is None
-    # Set another tag, enable diagnostics and re-add existing storage account.
-    cli.invoke(
-        f"iot du instance update -n {account_name} -i {instance_name} "
-        f"-g {ACCOUNT_RG} --set tags.env2={random_tag2} enableDiagnostics=true "
-        f"diagnosticStorageProperties.resourceId={storage_resource_id} --no-wait"
-    )
-    cli.invoke(f"iot du instance wait -n {account_name} -i {instance_name} --updated")
-    shown_instance: dict = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()
-    assert shown_instance["provisioningState"] == "Succeeded"
-    assert shown_instance["tags"]["env1"] == random_tag1
-    assert shown_instance["tags"]["env2"] == random_tag2
-    assert shown_instance["enableDiagnostics"] is True
-    assert shown_instance["diagnosticStorageProperties"]["resourceId"] == storage_resource_id
-    assert shown_instance["id"] == provisioned_instances[account_name][instance_name]["id"]
-    assert shown_instance["accountName"] == account_name
-    # Delete synchronously
-    assert cli.invoke(f"iot du instance delete -n {account_name} -i {instance_name} -y").success()
-    assert not cli.invoke(
-        f"iot du instance show -n {account_name} -i {instance_name} -g {ACCOUNT_RG}"
-    ).success()

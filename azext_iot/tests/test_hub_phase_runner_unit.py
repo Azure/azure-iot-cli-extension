@@ -9,6 +9,7 @@
 from pathlib import Path
 import subprocess
 import sys
+import threading
 import time
 import json
 import xml.etree.ElementTree as ET
@@ -57,7 +58,8 @@ def execute_factory(damage=None, handlers=None):
         assert command[0] == sys.executable and command[1:3] == ["-m", "pytest"]
         assert "tox" not in command and "--timeout=900" in command
         assert env["PYTHONPATH"] == "inherited-dependencies"
-        assert runtime == dict(runner.BUDGETS[suite])[phase] and cleanup == runner.CLEANUP
+        assert runtime == dict(runner.BUDGETS[suite]).get(phase, runtime)
+        assert cleanup == runner.cleanup_seconds(suite, phase)
         expected = list(runner.selection()["nodes"](suite, phase))
         receipt = plugin.PhaseReceipt(
             suite, phase, expected, Path(env["AZEXT_IOT_HUB_RECEIPT"]), env["AZEXT_IOT_HUB_RUN_ID"],
@@ -134,7 +136,7 @@ def run(tmp_path, suite="HubData", damage=None, reader=None, region="centraluseu
 def test_controller_success_and_stdlib_only_gate(tmp_path, suite, region, endpoint):
     result, calls = run(tmp_path, suite=suite, region=region, endpoint=endpoint)
     assert result == 0
-    assert calls == [phase for phase, _ in runner.BUDGETS[suite]]
+    assert sorted(calls) == sorted(phase for phase, _ in runner.BUDGETS[suite])
     assert runner.evaluate_hub_phases(tmp_path / "phases", region=region, endpoint=endpoint)["passed"]
     script = (
         "import runpy,sys\n"
@@ -151,18 +153,176 @@ def test_controller_success_and_stdlib_only_gate(tmp_path, suite, region, endpoi
     assert completed.returncode == 0, completed.stderr
 
 
+def test_controller_overlaps_phase_children_and_preserves_summary_order(tmp_path):
+    handlers = {}
+    base_execute, calls = execute_factory()
+    phases = [phase for phase, _ in runner.BUDGETS["HubData"]]
+    barrier = threading.Barrier(len(phases), timeout=5)
+    lock = threading.Lock()
+    active = {"count": 0, "max": 0}
+
+    def execute(command, env, log_path, runtime, cleanup, cancelled):
+        with lock:
+            active["count"] += 1
+            active["max"] = max(active["max"], active["count"])
+        try:
+            try:
+                barrier.wait()
+            except threading.BrokenBarrierError:
+                pass
+            return base_execute(command, env, log_path, runtime, cleanup, cancelled)
+        finally:
+            with lock:
+                active["count"] -= 1
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(dps_runner, "require_linux", lambda: None)
+        patch.setattr(runner.signal, "signal", lambda sig, handler: handlers.setdefault(sig, handler))
+        result = runner.run(
+            "HubData", ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, tmp_path / "phases",
+            arm=Reader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
+        )
+    assert result == 0
+    assert active["max"] > 1
+    assert sorted(calls) == sorted(phases)
+    summary = runner.read_json(tmp_path / "phases/hub-phases.json")
+    assert [phase["name"] for phase in summary["phases"]] == phases
+
+
+class MainThreadDeleteReader(Reader):
+    """Mirrors Arm: timer-bounded DELETE only on the main thread, otherwise via dispatch."""
+
+    main_thread_dispatch = None
+
+    def __init__(self):
+        super().__init__()
+        self.deleted, self.delete_threads, self.lock = set(), [], threading.Lock()
+
+    def request(self, method, resource_id, api):
+        if method == "DELETE" and threading.current_thread() is not threading.main_thread():
+            if self.main_thread_dispatch is None:
+                raise ownership.OwnershipError("Controller DELETE requires the main thread")
+            return self.main_thread_dispatch(lambda: self.request(method, resource_id, api))
+        with self.lock:
+            self.calls.append((method, resource_id, api))
+            if method == "DELETE":
+                self.delete_threads.append(threading.current_thread() is threading.main_thread())
+                self.deleted.add(resource_id)
+                return 202, None
+            if resource_id in self.deleted or "microsoft.devices/iothubs/test-hub-" not in resource_id:
+                return 404, None
+            run_id = resource_id.rsplit("-", 1)[-1]
+            return 200, {"id": resource_id, "tags": {ownership.OWNER_TAG: run_id}}
+
+
+def test_threaded_phase_cleanup_deletes_leftovers_on_the_main_thread(tmp_path):
+    handlers = {}
+    base_execute, _ = execute_factory()
+    readers = []
+
+    def execute(command, env, log_path, runtime, cleanup, cancelled):
+        result = base_execute(command, env, log_path, runtime, cleanup, cancelled)
+        phase, run_id = env["AZEXT_IOT_HUB_PHASE"], env["AZEXT_IOT_HUB_RUN_ID"]
+        path = Path(env["AZEXT_IOT_HUB_OWNERSHIP"])
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # Simulate a child that could not delete its Hub: the controller must remove it.
+        leftover = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-" + phase + "-" + run_id).casefold()
+        data["resources"] = {leftover: record(leftover, run_id)}
+        ownership.write(path, data)
+        return result
+
+    def arm():
+        reader = MainThreadDeleteReader()
+        readers.append(reader)
+        return reader
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(dps_runner, "require_linux", lambda: None)
+        patch.setattr(runner.signal, "signal", lambda sig, handler: handlers.setdefault(sig, handler))
+        result = runner.run(
+            "HubControl", ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, tmp_path / "phases",
+            arm=arm, execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
+        )
+    phases = [phase for phase, _ in runner.BUDGETS["HubControl"]]
+    assert result == 0
+    assert sorted(len(reader.deleted) for reader in readers) == [1] * len(phases)
+    assert all(reader.delete_threads == [True] for reader in readers)
+    summary = runner.read_json(tmp_path / "phases/hub-phases.json")
+    assert [phase["status"] for phase in summary["phases"]] == ["passed"] * len(phases)
+
+
+def test_owned_arm_delete_off_main_thread_requires_dispatch():
+    arm = ownership.Arm.__new__(ownership.Arm)
+    arm.read_failed, arm.deadline, arm.main_thread_dispatch = False, None, None
+    resource_id = PREFIX + "Microsoft.Devices/IotHubs/test-hub-x"
+    errors, dispatched = [], []
+
+    def worker():
+        try:
+            arm.request("DELETE", resource_id, "v")
+        except ownership.OwnershipError as error:
+            errors.append(str(error))
+        arm.main_thread_dispatch = lambda operation: dispatched.append(operation) or (202, None)
+        dispatched.append(arm.request("DELETE", resource_id, "v"))
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join()
+    assert errors == ["Controller DELETE requires the main thread"]
+    assert callable(dispatched[0]) and dispatched[1] == (202, None)
+
+
+@pytest.mark.parametrize("damage", ["timeout", "cleanup"])
+def test_failed_phase_does_not_interrupt_concurrent_siblings(tmp_path, damage):
+    handlers = {}
+    base_execute, _ = execute_factory()
+    damaged_execute, _ = execute_factory(damage)
+    phases = [phase for phase, _ in runner.BUDGETS["HubControl"]]
+    barrier = threading.Barrier(len(phases), timeout=5)
+    first_done = threading.Event()
+    sibling_cancelled = []
+
+    def execute(command, env, log_path, runtime, cleanup, cancelled):
+        barrier.wait()
+        if env["AZEXT_IOT_HUB_PHASE"] == phases[0]:
+            try:
+                return damaged_execute(command, env, log_path, runtime, cleanup, cancelled)
+            finally:
+                first_done.set()
+        first_done.wait(5)
+        time.sleep(0.2)  # Let the failed phase finish its cleanup evaluation first.
+        sibling_cancelled.append(cancelled())
+        return base_execute(command, env, log_path, runtime, cleanup, cancelled)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(dps_runner, "require_linux", lambda: None)
+        patch.setattr(runner.signal, "signal", lambda sig, handler: handlers.setdefault(sig, handler))
+        result = runner.run(
+            "HubControl", ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, tmp_path / "phases",
+            arm=Reader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
+        )
+    assert result == 1
+    assert sibling_cancelled == [False] * (len(phases) - 1)
+    summary = runner.read_json(tmp_path / "phases/hub-phases.json")
+    assert [phase["status"] for phase in summary["phases"]] == ["failed"] + ["passed"] * (len(phases) - 1)
+    assert summary["cancelled"] is False
+
+
 @pytest.mark.parametrize("damage", ["skip", "failure", "missing", "duplicate", "cancel", "cleanup", "exit", "timeout"])
 def test_controller_fail_closed(tmp_path, damage):
     result, calls = run(tmp_path, damage=damage)
     assert result == 1
     assert not runner.evaluate_hub_phases(tmp_path / "phases")["passed"]
-    assert calls == (["entra"] if damage in ("cancel", "cleanup", "timeout") else ["entra", "sas"])
+    phases = {phase for phase, _ in runner.BUDGETS["HubData"]}
+    assert calls and set(calls).issubset(phases)
+    if damage not in ("cancel", "cleanup", "timeout"):
+        assert set(calls) == phases
 
 
 @pytest.mark.parametrize("damage", ["sas-failure", "sas-missing-pass"])
 def test_sas_case_failure_does_not_erase_verified_cleanup(tmp_path, damage):
     result, calls = run(tmp_path, damage=damage)
-    assert result == 1 and calls == ["entra", "sas"]
+    assert result == 1 and set(calls) == {phase for phase, _ in runner.BUDGETS["HubData"]}
     output = tmp_path / "phases"
     cleanup = runner.read_json(output / "sas/cleanup.json")
     assert cleanup["complete"] and cleanup["errors"] == []
@@ -196,7 +356,7 @@ def test_gate_revalidates_evidence_not_summary_exit(tmp_path, damage):
         data = runner.read_json(path)
         data["phases"] = data["phases"][:1] if damage == "phase" else data["phases"] * 2
     elif damage in ("ownership", "absent", "status"):
-        path = output / "entra" / ("ownership.json" if damage == "ownership" else "cleanup.json")
+        path = output / "entra-state-config" / ("ownership.json" if damage == "ownership" else "cleanup.json")
         data = runner.read_json(path)
         if damage == "ownership":
             next(iter(data["resources"].values()))["before"] = 200
@@ -227,7 +387,9 @@ def test_ambient_overrides_rejected(tmp_path, key):
 
 def test_auth_environments_are_independent(tmp_path):
     base = {"PYTHONPATH": "existing", "AZURE_CONFIG_DIR": "/existing/never-copied"}
-    regular = runner.environment(base, "HubData", "entra", tmp_path, "one", ownership.SUBSCRIPTION, ownership.GROUP)
+    regular = runner.environment(
+        base, "HubData", "entra-state-config", tmp_path, "one", ownership.SUBSCRIPTION, ownership.GROUP
+    )
     sas = runner.environment(base, "HubData", "sas", tmp_path, "two", ownership.SUBSCRIPTION, ownership.GROUP)
     assert regular["azext_iot_hub_auth_phase"] == "regular"
     assert sas["azext_iot_hub_auth_phase"] == "local-auth"
@@ -249,6 +411,21 @@ def test_coverage_is_cumulative_and_junit_omits_diagnostics(tmp_path):
     assert list(ET.parse(path).getroot().iter("testcase"))[0].find("error") is not None
 
 
+def test_coverage_combine_uses_phase_local_files(tmp_path, monkeypatch):
+    for phase in ("a", "b"):
+        folder = tmp_path / phase
+        folder.mkdir()
+        (folder / ".coverage").write_text("offline", encoding="utf-8")
+    completed = Mock(returncode=0, stdout="combined")
+    run = Mock(return_value=completed)
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    result = runner.combine_coverage(tmp_path, ("a", "b", "missing"))
+    assert result["combined"] and result["files"] == ["a/.coverage", "b/.coverage"]
+    args = run.call_args.args[0]
+    assert args[:6] == [sys.executable, "-m", "coverage", "combine", "--append", "--keep"]
+    assert run.call_args.kwargs["env"]["COVERAGE_FILE"] == str(runner.ROOT / ".coverage")
+
+
 def test_gate_requires_sanitized_junit_for_every_phase(tmp_path):
     assert run(tmp_path)[0] == 0
     (tmp_path / "phases/sas/junit.xml").unlink()
@@ -267,7 +444,7 @@ def test_unsupported_platform_rejects_before_output_credentials_or_mutation(tmp_
 @pytest.mark.parametrize("count", [48, 50, 1000])
 def test_foreign_hub_count_does_not_block_owned_phases(tmp_path, count):
     result, calls = run(tmp_path, reader=Reader(count=count))
-    assert result == 0 and len(calls) == 2
+    assert result == 0 and len(calls) == len(runner.BUDGETS["HubData"])
     assert runner.evaluate_hub_phases(tmp_path / "phases")["passed"]
 
 
@@ -367,7 +544,7 @@ def test_process_scope_explicit_tokens_endpoint_and_restore(monkeypatch, region)
     assert requests.Session.send is send
 
 
-@pytest.mark.parametrize("phase", ["entra", "sas"])
+@pytest.mark.parametrize("phase", ["entra-state-config", "sas"])
 @pytest.mark.parametrize("damage", ["missing-target", "wrong-target", "wrong-matrix"])
 def test_public_hub_evidence_cannot_be_relabelled_or_qualify_another_target(tmp_path, phase, damage):
     assert run(tmp_path, region="australiaeast")[0] == 0
@@ -538,14 +715,20 @@ def test_cleanup_requires_exact_descendant_absence(tmp_path):
 def test_budgets_leave_external_setup_below_github_cap():
     budgets = runner.CI_BUDGETS
     assert runner.BUDGETS == {
-        "HubControl": (("regular", 240 * 60),),
-        "HubData": (("entra", 210 * 60), ("sas", 100 * 60)),
+        "HubControl": (
+            ("regular-state-workflow", 70 * 60),
+            ("regular-state-schemes-cert", 70 * 60),
+            ("regular-endpoints-a", 70 * 60),
+            ("regular-endpoints-b", 70 * 60),
+        ),
+        "HubData": (("entra-state-config", 55 * 60), ("entra-devices-protocol", 55 * 60), ("sas", 45 * 60)),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60
     for suite in ("HubControl", "HubData"):
-        controller = sum(seconds + runner.CLEANUP for _, seconds in runner.BUDGETS[suite]) + runner.RESERVE
-        assert controller + budgets[suite]["setup_minutes"] * 60 == budgets[suite]["job_timeout_minutes"] * 60
+        controller = runner.runner_seconds(suite, runner.BUDGETS[suite])
+        assert controller + budgets[suite]["setup_minutes"] * 60 <= budgets[suite]["job_timeout_minutes"] * 60
+        assert budgets[suite]["concurrent_phases"] is True
         assert budgets[suite]["job_timeout_minutes"] <= 360
 
 

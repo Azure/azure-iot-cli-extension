@@ -730,7 +730,10 @@ def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker
         "assign_role_assignment_once" if receipt_mode else "assign_role_assignment",
         side_effect=lambda **_: events.append("assign"),
     )
-    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
+    ready = mocker.patch.object(
+        dps_fixtures, "_wait_for_assignment_visibility", side_effect=lambda *_: events.append("ready"),
+    )
+    settle = mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda *_: events.append("settle"))
     monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
 
     dps_fixtures._enable_dps_hub_identity("test-dps", {"hub": {"id": "/hub-id"}})
@@ -744,7 +747,35 @@ def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker
         assignee_principal_type="ServicePrincipal",
         max_tries=dps_fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
     )
-    assert events == ["assign", ("wait", 60)]
+    ready.assert_called_once_with("IoT Hub Data Contributor", "/hub-id", "dps-principal")
+    # ARM visibility does not prove the DPS identity's Hub data-plane access.
+    settle.assert_called_once_with(dps_fixtures.DPS_IDENTITY_SETTLE_SECONDS)
+    assert events == ["assign", "ready", "settle"]
+
+
+@pytest.mark.parametrize("results,calls", [
+    ([True, True, True], 3),
+    ([True, False, True, True, True], 5),
+    ([True, RuntimeError("403"), True, True, True], 5),
+])
+def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, results, calls):
+    probes = iter(results)
+
+    def probe(*_, **__):
+        value = next(probes)
+        if isinstance(value, Exception):
+            raise value
+        return SimpleNamespace(success=lambda: value)
+
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.side_effect = probe
+    sleep = mocker.patch.object(dps_fixtures, "sleep")
+    scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps"
+
+    dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.DPS_USER_ROLE, scope)
+
+    assert cli.invoke.call_count == calls
+    assert sleep.call_count == calls - 1
 
 
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
@@ -755,7 +786,9 @@ def test_dps_fixture_waits_after_assigning_caller_data_role(mocker, role):
     assign_role = mocker.patch.object(
         dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign")
     )
-    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
+    ready = mocker.patch.object(
+        dps_fixtures, "_wait_for_current_user_data_plane", side_effect=lambda *_: events.append("ready"),
+    )
 
     dps_fixtures._assign_current_user_role(role, "/resource-id")
 
@@ -763,7 +796,8 @@ def test_dps_fixture_waits_after_assigning_caller_data_role(mocker, role):
         role=role, scope="/resource-id", assignee="caller",
         max_tries=dps_fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
     )
-    assert events == ["assign", ("wait", 60)]
+    ready.assert_called_once_with(role, "/resource-id")
+    assert events == ["assign", "ready"]
 
 
 @pytest.mark.parametrize("managed_identity", [False, True])
@@ -794,14 +828,14 @@ def test_dps_managed_fixture_waits_before_finishing_setup(mocker, linked_hub):
     cli.invoke.return_value.as_json.side_effect = [target, {"user": {"name": "caller"}}]
     events = []
     mocker.patch.object(dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign"))
-    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
+    mocker.patch.object(dps_fixtures, "_wait_for_current_user_data_plane", side_effect=lambda *_: events.append("ready"))
     mocker.patch.object(dps_fixtures, "_link_hub", side_effect=lambda *_: events.append("link"))
     mocker.patch.object(dps_fixtures, "_unlink_all_hubs", side_effect=lambda *_: events.append("unlink"))
 
     _, resource = dps_fixtures._create_managed_dps("run", "h" if linked_hub else "nh", linked_hub)
 
     assert resource is target
-    assert events == ["assign", ("wait", 60), "link" if linked_hub else "unlink"]
+    assert events == ["assign", "ready", "link" if linked_hub else "unlink"]
 
 
 def test_dps_pinned_no_hub_fixture_waits_before_returning(mocker, monkeypatch):
@@ -812,13 +846,13 @@ def test_dps_pinned_no_hub_fixture_waits_before_returning(mocker, monkeypatch):
     monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps", "pinned-dps")
     events = []
     mocker.patch.object(dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign"))
-    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
+    mocker.patch.object(dps_fixtures, "_wait_for_current_user_data_plane", side_effect=lambda *_: events.append("ready"))
     mocker.patch.object(dps_fixtures, "_unlink_all_hubs", side_effect=lambda *_: events.append("unlink"))
 
     result = dps_fixtures._iot_dps_provisioner(SimpleNamespace(config=SimpleNamespace()))
 
     assert result["dps"] is target
-    assert events == ["assign", ("wait", 60), "unlink"]
+    assert events == ["assign", "ready", "unlink"]
 
 
 def test_dps_hub_fixture_waits_after_granting_caller_role(mocker, monkeypatch):
@@ -833,12 +867,12 @@ def test_dps_hub_fixture_waits_after_granting_caller_role(mocker, monkeypatch):
     monkeypatch.setattr(dps_fixtures, "HUB_TEST_LOCATION", "centraluseuap")
     events = []
     mocker.patch.object(dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign"))
-    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
+    mocker.patch.object(dps_fixtures, "_wait_for_current_user_data_plane", side_effect=lambda *_: events.append("ready"))
 
     result = dps_fixtures._iot_hubs_provisioner(SimpleNamespace(config=SimpleNamespace()))
 
     assert result["hub"] is target
-    assert events == ["assign", ("wait", 60)]
+    assert events == ["assign", "ready"]
 
 
 @pytest.mark.parametrize("existing_auth", [None, "KeyBased", "SystemAssigned"])

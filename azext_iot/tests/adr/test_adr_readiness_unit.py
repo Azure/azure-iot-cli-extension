@@ -775,6 +775,123 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
     scenario.cleanup_full_infra.assert_called_once()
 
 
+def _rotation_endpoint(state="Failed", identity_type="UserAssigned", *, code="IdentityRotationUpdateFailed", message=None):
+    identity = {"type": identity_type}
+    if identity_type == "UserAssigned":
+        identity["userAssignedIdentity"] = UAMI_ID
+    endpoint = {
+        "resourceId": HUB_ID,
+        "linkingState": state,
+        "inboundCallerIdentity": identity,
+    }
+    if state == "Failed":
+        endpoint["linkingError"] = {
+            "code": code,
+            "message": message or (
+                "IdentityRotationUpdateFailed: Hub resource reported IH400913: "
+                "the system-assigned identity was denied namespace read access."
+            ),
+        }
+    return endpoint
+
+
+@pytest.mark.parametrize("message,expected", [
+    ("IdentityRotationUpdateFailed: Hub resource reported IH400913: denied namespace read.", True),
+    ("IdentityRotationUpdateFailed: AuthorizationFailed while reading namespace.", True),
+    ("IdentityRotationUpdateFailed: target identity shape changed.", False),
+    ("IH400913: denied namespace read.", True),
+    ("Authentication failed: IdentityRotationUpdateFailed.", False),
+])
+def test_hub_rotation_authorization_classifier_is_specific(message, expected):
+    endpoint = _rotation_endpoint(message=message)
+    assert link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint) is expected
+
+
+def test_hub_rotation_authorization_classifier_requires_identity_rotation_code():
+    endpoint = _rotation_endpoint(code="LinkUpdateFailed", message="IH400913: denied namespace read.")
+    assert not link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint)
+
+
+def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    scenario = Mock()
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    roles = [{"id": "role"}]
+    responses = [
+        _output(None),
+        _output(_rotation_endpoint()),
+        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output({"identity": {"principalId": "hub-sami"}}),
+        _output(roles),
+        _output(roles),
+        _output(roles),
+        _output(None),
+        _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
+    ]
+    scenario.cmd.side_effect = responses
+
+    result = link_scenarios._update_hub_to_sami_with_recovery(
+        scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+    )
+
+    assert result["linkingState"] == "Succeeded"
+    assert clock.sleeps == [30]
+    commands = _commands(scenario)
+    assert commands.count(update_cmd) == 2
+    assert any("role assignment list" in command and "hub-sami" in command for command in commands)
+
+
+def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    waits = []
+
+    def terminal(*_, timeout, **__):
+        waits.append(timeout)
+        clock.now += 250  # Each observation (and synchronous update) consumes budget.
+        return _rotation_endpoint()
+
+    monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
+    monkeypatch.setattr(link_scenarios, "_assert_hub_sami_rotation_grants", lambda *_: None)
+    scenario = Mock()
+    scenario.cmd.return_value = _output(None)
+
+    with pytest.raises(AssertionError, match="budget exhausted"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+
+    assert all(timeout > 0 for timeout in waits)
+    assert clock.now <= link_scenarios._HUB_IDENTITY_ROTATION_BUDGET_SECONDS + 250
+    assert _commands(scenario).count(update_cmd) == 3
+    assert clock.sleeps == [30, 60]
+
+
+def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    changed = _rotation_endpoint()
+    changed["resourceId"] = HUB_ID + "-other"
+    scenario = Mock()
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    scenario.cmd.side_effect = [_output(None), _output(changed)]
+
+    with pytest.raises(AssertionError, match="resourceId"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+
+    assert _commands(scenario) == [
+        update_cmd,
+        "iot adr ns link hub show --ns ns -g rg -n secondary",
+    ]
+
+
 @pytest.mark.parametrize("failure", [
     None, "combined", "final_dps", "final_hub", "setup", "preauthorized",
     "hub_failed", "hub_timeout", "namespace_not_empty", "pending_result",

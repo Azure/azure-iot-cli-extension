@@ -14,6 +14,7 @@ from pathlib import Path
 import runpy
 import subprocess
 import sys
+import threading
 import time
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
@@ -116,15 +117,49 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
 
 
+def test_concurrent_phases_use_isolated_coverage_and_combine_in_manifest_order(tmp_path, mocker):
+    started = []
+    release = threading.Event()
+    guard = threading.Lock()
+    captured = {}
+    tox_dirs = {}
+
+    def execute(*args):
+        phase = args[1]["azext_iot_dps_test_phase"]
+        with guard:
+            started.append(phase)
+            captured[phase] = Path(args[1]["azext_iot_dps_coverage_file"])
+            tox_dirs[phase] = (args[1]["azext_iot_tox_log_dir"], args[1]["azext_iot_tox_tmp_dir"])
+            if len(started) == len(RUNNER["MANIFEST"]["PHASE_NAMES"]):
+                release.set()
+        assert release.wait(5), "all DPS phases should launch before any child has to finish"
+        result = _execution(*args)
+        captured[phase].write_text(f"coverage for {phase}", encoding="utf-8")
+        return result
+
+    combine = mocker.Mock(return_value={"status": "passed", "destination": str(tmp_path / ".coverage")})
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=execute, combine=combine) == 0
+    phases = RUNNER["MANIFEST"]["PHASE_NAMES"]
+    assert set(started) == set(phases)
+    assert list(combine.call_args.args[0]) == [tmp_path / "dps-phases" / phase / ".coverage" for phase in phases]
+    assert len(set(captured.values())) == len(phases)
+    # tox empties its log/tmp dirs per run; each phase needs its own, outside uploaded artifacts.
+    all_dirs = [Path(path) for pair in tox_dirs.values() for path in pair]
+    assert len(set(all_dirs)) == 2 * len(phases)
+    assert not any(tmp_path in path.parents for path in all_dirs)
+    assert json.loads((tmp_path / "dps-phases.json").read_text())["coverage"]["status"] == "passed"
+
+
 def test_dps_budgets_come_from_ci_budget_source():
     budget = RUNNER["DPS_CI_BUDGET"]
     assert RUNNER["PHASES"] == tuple(
         (phase["name"], phase["runtime_minutes"] * 60, phase["cleanup_minutes"] * 60)
         for phase in budget["phases"]
     )
-    assert RUNNER["RUNNER_SECONDS"] == (budget["job_timeout_minutes"] - budget["setup_minutes"]) * 60
-    phase_seconds = sum(runtime + cleanup for _, runtime, cleanup in RUNNER["PHASES"])
-    assert phase_seconds + budget["reserve_minutes"] * 60 == RUNNER["RUNNER_SECONDS"]
+    assert budget["concurrent_phases"] is True
+    phase_seconds = max(runtime + cleanup for _, runtime, cleanup in RUNNER["PHASES"])
+    assert RUNNER["RUNNER_SECONDS"] == phase_seconds + budget["reserve_minutes"] * 60
+    assert RUNNER["RUNNER_SECONDS"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
 
 
 @pytest.mark.parametrize("damage", [None, "wrong-matrix", "wrong-target", "missing-target"])
@@ -209,7 +244,7 @@ def test_dps_cli_rejects_noncentral_canary_clearly_before_reader(monkeypatch, mo
 
 @pytest.mark.parametrize("phase_name", ["regular", "service-sas"])
 @pytest.mark.parametrize("defect", ["uncertain-create", "remaining", "invalid-ownership"])
-def test_cleanup_failure_warns_and_continues_independent_phases(tmp_path, capsys, phase_name, defect):
+def test_cleanup_failure_cannot_block_concurrent_independent_phases(tmp_path, capsys, phase_name, defect):
     reader = Reader()
 
     def execute(*args):
@@ -237,13 +272,9 @@ def test_cleanup_failure_warns_and_continues_independent_phases(tmp_path, capsys
         "failed" if phase["name"] == phase_name else "passed" for phase in summary["phases"]
     ]
     assert len({phase["run_uid"] for phase in summary["phases"]}) == 3
-    assert f"WARNING: {phase_name} cleanup was not proven; continuing" in capsys.readouterr().out
+    assert "cleanup was not proven; continuing" not in capsys.readouterr().out
     failed = next(phase for phase in summary["phases"] if phase["name"] == phase_name)
-    continued = summary["phases"][["regular", "service-sas"].index(phase_name) + 1]
-    assert continued["continued_after_unproven_cleanup"] == phase_name
-    assert json.loads(
-        (tmp_path / "dps-phases" / continued["name"] / "result.json").read_text(encoding="utf-8")
-    )["continued_after_unproven_cleanup"] == phase_name
+    assert all("continued_after_unproven_cleanup" not in phase for phase in summary["phases"])
     assert failed["cleanup"]["remaining"]
     # Even a self-consistent green summary cannot hide failed cleanup evidence.
     summary["status"] = failed["status"] = "passed"
@@ -272,7 +303,7 @@ def test_workflow_summary_reports_dps_continuation_without_new_failure(tmp_path)
 
 
 @pytest.mark.parametrize("stop", ["cancellation", "deadline"])
-def test_continuation_still_respects_cancellation_and_runner_budget(tmp_path, mocker, stop):
+def test_concurrent_launch_records_cancellation_and_runner_budget_failures(tmp_path, mocker, stop):
     cancel = RUNNER["Event"]()
     heartbeat_stop = RUNNER["Event"]()
     mocker.patch.dict(RUN.__globals__, Event=mocker.Mock(side_effect=[cancel, heartbeat_stop]))
@@ -281,19 +312,20 @@ def test_continuation_still_respects_cancellation_and_runner_budget(tmp_path, mo
 
     def execute(*args):
         result = _execution(*args)
-        calls.append(args[1]["azext_iot_dps_test_phase"])
-        (Path(args[1]["azext_iot_dps_phase_receipts"]) / "created-h.json").unlink()
-        if stop == "cancellation":
-            cancel.set()
-        else:
-            clock.return_value = RUNNER["RUNNER_SECONDS"]
+        phase = args[1]["azext_iot_dps_test_phase"]
+        calls.append(phase)
+        if phase == "regular":
+            (Path(args[1]["azext_iot_dps_phase_receipts"]) / "created-h.json").unlink()
+            if stop == "cancellation":
+                cancel.set()
+            else:
+                clock.return_value = RUNNER["RUNNER_SECONDS"]
         return result
 
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=execute, clock=clock) == 1
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
-    assert calls == ["regular"]
-    assert [phase["status"] for phase in summary["phases"]] == ["failed", "blocked", "blocked"]
-    assert summary["phases"][1]["reason"] == "Cancelled or insufficient remaining runtime/cleanup budget"
+    assert set(calls) == set(RUNNER["MANIFEST"]["PHASE_NAMES"])
+    assert [phase["status"] for phase in summary["phases"]] == ["failed", "passed", "passed"]
     assert GATE(tmp_path)
 
 
@@ -389,7 +421,8 @@ def test_failed_first_cannot_be_masked_by_successful_second(tmp_path, defect):
     if defect == "quota-rejection":
         assert "QuotaExceeded" in (tmp_path / "dps-phases/regular/output.log").read_text(encoding="utf-8")
     if defect == "duplicate-inventory":
-        assert [phase["status"] for phase in phases] == ["failed", "failed", "failed"]
+        assert phases[0]["status"] == "failed"
+        assert any(phase["status"] == "failed" for phase in phases)
     else:
         assert [phase["status"] for phase in phases] == ["failed", "passed", "passed"]
 
@@ -813,7 +846,7 @@ def test_windows_missing_posix_members_are_not_accessed_directly():
 
 
 @pytest.mark.parametrize("defect", [
-    "summary", "junit", "log", "phase-result", "exit", "cleanup", "ownership", "skip", "count",
+    "summary", "junit", "log", "phase-result", "exit", "cleanup", "ownership", "skip", "count", "coverage",
 ])
 def test_final_gate_independently_rejects_missing_or_false_green_evidence(tmp_path, defect):
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution) == 0
@@ -837,6 +870,8 @@ def test_final_gate_independently_rejects_missing_or_false_green_evidence(tmp_pa
             tree.write(folder / "junit.xml")
         elif defect == "count":
             sas["results"]["selected"] = 28
+        elif defect == "coverage":
+            summary["coverage"] = {"status": "failed"}
         _json(summary_path, summary)
         _json(folder / "result.json", sas)
     assert GATE(tmp_path)

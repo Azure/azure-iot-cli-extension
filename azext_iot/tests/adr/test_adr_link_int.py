@@ -40,7 +40,7 @@ fresh service roles, explicit 1200-second mutation budgets, and no fixture repai
 import os
 import re
 import shlex
-from time import monotonic
+from time import monotonic, sleep
 from typing import Optional
 
 import pytest
@@ -80,7 +80,12 @@ from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
 )
-from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import (
+    CONTRIBUTOR_ROLE,
+    HUB_DATA_ROLE,
+    LinkRbacManager,
+    resolve_namespace_outbound_principal,
+)
 
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
@@ -100,6 +105,155 @@ _SU_LINK_LIFECYCLE_TIMEOUT = (
 )
 _REPORT_AUTH_POLL_ATTEMPTS = 21
 _REPORT_AUTH_POLL_INTERVAL_SECONDS = 15
+_HUB_IDENTITY_ROTATION_BACKOFFS = (30, 60, 120)
+_HUB_IDENTITY_ROTATION_BUDGET_SECONDS = 600
+_TERMINAL_LINK_STATES = {"Succeeded", "Failed", "Canceled", "Cancelled"}
+
+
+def _link_properties(shown):
+    return shown.get("properties") or shown
+
+
+def _link_observation(shown):
+    properties = _link_properties(shown)
+    identity = properties.get("inboundCallerIdentity") or {}
+    return properties.get("linkingState"), identity.get("type")
+
+
+def _link_failure_detail(shown):
+    properties = _link_properties(shown)
+    status = properties.get("provisioningStatus") or properties.get("status") or {}
+    error = properties.get("linkingError") or status.get("error") or properties.get("error") or {}
+    return error if isinstance(error, dict) else {}
+
+
+def _error_chain_text(error):
+    seen = set()
+    texts = []
+    current = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        texts.append(str(current))
+        detail = getattr(current, "error", None)
+        code = detail.get("code") if isinstance(detail, dict) else getattr(detail, "code", None)
+        if isinstance(code, str):
+            texts.append(code)
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
+    return " ".join(texts)
+
+
+def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
+    detail = _link_failure_detail(endpoint or {}) if endpoint else {}
+    text = " ".join(filter(None, [detail.get("code"), detail.get("message"), _error_chain_text(error) if error else ""]))
+    if "IdentityRotationUpdateFailed" not in text:
+        return False
+    return bool(
+        "IH400913" in text
+        or re.search(
+            r"\b(denied|not authorized|does not have authorization|AuthorizationFailed)\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _show_link(test_case, link_kind, namespace_name, resource_group_name, endpoint_name):
+    return test_case.cmd(
+        f"iot adr ns link {link_kind} show --ns {namespace_name} "
+        f"-g {resource_group_name} -n {endpoint_name}"
+    ).get_output_in_json()
+
+
+def _wait_for_link_terminal(
+    test_case, link_kind, namespace_name, resource_group_name, endpoint_name, *, timeout,
+):
+    def fetch():
+        return _show_link(test_case, link_kind, namespace_name, resource_group_name, endpoint_name)
+
+    return wait_for_condition(
+        fetch,
+        lambda shown: _link_observation(shown)[0] in _TERMINAL_LINK_STATES,
+        description=f"{link_kind} endpoint '{endpoint_name}' terminal linking state",
+        timeout=timeout,
+        interval=_LINKING_POLL_INTERVAL_SECONDS,
+        describe=lambda shown: (
+            f"linkingState={_link_observation(shown)[0]!r}, "
+            f"identityType={_link_observation(shown)[1]!r}, "
+            f"failure={_link_failure_detail(shown)}"
+        ),
+    )
+
+
+def _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity):
+    properties = _link_properties(endpoint)
+    assert properties.get("resourceId", "").casefold() == hub_id.casefold(), properties
+    identity = properties.get("inboundCallerIdentity") or {}
+    identity_type = identity.get("type")
+    assert identity_type in {"SystemAssigned", "UserAssigned"}, properties
+    if identity_type == "UserAssigned":
+        assert identity.get("userAssignedIdentity", "").casefold() == previous_user_identity.casefold(), properties
+
+
+def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id):
+    namespace = test_case.cmd(
+        f"iot adr ns show -n {namespace_name} -g {resource_group_name}"
+    ).get_output_in_json()
+    hub = test_case.cmd(
+        f"iot hub show --ids {shlex.quote(hub_id)}"
+    ).get_output_in_json()
+    namespace_principal = namespace["identity"]["principalId"]
+    hub_principal = hub["identity"]["principalId"]
+    _assert_service_roles(
+        test_case,
+        [
+            (namespace_principal, CONTRIBUTOR_ROLE, hub_id),
+            (namespace_principal, HUB_DATA_ROLE, hub_id),
+            (hub_principal, CONTRIBUTOR_ROLE, namespace["id"]),
+        ],
+        present=True,
+    )
+
+
+def _update_hub_to_sami_with_recovery(
+    test_case, update_cmd, namespace_name, resource_group_name, endpoint_name, hub_id, previous_user_identity,
+):
+    deadline = monotonic() + _HUB_IDENTITY_ROTATION_BUDGET_SECONDS
+    first_error = None
+    try:
+        test_case.cmd(update_cmd)
+    except Exception as error:  # noqa: BLE001 - only recovered when persisted state proves the known race.
+        first_error = error
+
+    for attempt in range(len(_HUB_IDENTITY_ROTATION_BACKOFFS) + 1):
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
+        endpoint = _wait_for_link_terminal(
+            test_case, "hub", namespace_name, resource_group_name, endpoint_name, timeout=remaining,
+        )
+        state, identity_type = _link_observation(endpoint)
+        if state == "Succeeded" and identity_type == "SystemAssigned":
+            return endpoint
+        recoverable = _is_identity_rotation_authorization_failure(error=first_error, endpoint=endpoint)
+        if state not in {"Failed", "Succeeded"} or not recoverable:
+            if first_error is not None:
+                raise first_error
+            raise AssertionError(f"Non-recoverable Hub identity rotation failure: {_link_failure_detail(endpoint)}")
+        if attempt == len(_HUB_IDENTITY_ROTATION_BACKOFFS):
+            break
+        _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity)
+        _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id)
+        sleep_for = _HUB_IDENTITY_ROTATION_BACKOFFS[attempt]
+        # Never start another mutation that could not be observed within the recovery budget.
+        if deadline - monotonic() <= sleep_for:
+            break
+        sleep(sleep_for)
+        first_error = None
+        try:
+            test_case.cmd(update_cmd)
+        except Exception as error:  # noqa: BLE001 - recovered only with matching persisted failure evidence.
+            first_error = error
+    raise AssertionError("Hub identity rotation authorization recovery budget exhausted") from first_error
 
 
 def _assert_service_roles(test_case, roles, *, present):
@@ -199,42 +353,24 @@ def _wait_for_linking_succeeded(
     expected_identity_type: Optional[str] = None,
 ) -> dict:
     """Poll a namespace endpoint until its contract linking state succeeds."""
-    def fetch():
-        return test_case.cmd(
-            f"iot adr ns link {link_kind} show --ns {namespace_name} "
-            f"-g {resource_group_name} -n {endpoint_name}"
-        ).get_output_in_json()
-
-    def observation(shown):
-        properties = shown.get("properties") or shown
-        linking_state = properties.get("linkingState") or shown.get(
-            "linkingState"
-        )
-        identity = (
-            properties.get("inboundCallerIdentity")
-            or shown.get("inboundCallerIdentity")
-            or {}
-        )
-        return linking_state, identity.get("type")
-
     def succeeded(shown):
-        linking_state, identity_type = observation(shown)
+        linking_state, identity_type = _link_observation(shown)
         return linking_state == "Succeeded" and (
             expected_identity_type is None
             or identity_type == expected_identity_type
         )
 
     return wait_for_condition(
-        fetch,
+        lambda: _show_link(test_case, link_kind, namespace_name, resource_group_name, endpoint_name),
         succeeded,
         description=f"{link_kind} endpoint '{endpoint_name}' linking",
-        is_terminal_failure=lambda shown: observation(shown)[0] == "Failed",
+        is_terminal_failure=lambda shown: _link_observation(shown)[0] == "Failed",
         timeout=None,
         interval=_LINKING_POLL_INTERVAL_SECONDS,
         max_attempts=_LINKING_POLL_ATTEMPTS,
         describe=lambda shown: (
-            f"linkingState={observation(shown)[0]!r}, "
-            f"identityType={observation(shown)[1]!r}"
+            f"linkingState={_link_observation(shown)[0]!r}, "
+            f"identityType={_link_observation(shown)[1]!r}"
         ),
     )
 
@@ -604,14 +740,14 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"-n {secondary_endpoint} --system-assigned-mi"
                 )
                 _log(LogKind.CMD, "az %s", update_cmd)
-                self.cmd(update_cmd)
-                updated = _wait_for_linking_succeeded(
+                updated = _update_hub_to_sami_with_recovery(
                     self,
-                    "hub",
+                    update_cmd,
                     namespace_name,
                     rg,
                     secondary_endpoint,
-                    expected_identity_type="SystemAssigned",
+                    hub_id,
+                    identity_resource_id,
                 )
                 identity = (
                     updated.get("properties", updated).get("inboundCallerIdentity")

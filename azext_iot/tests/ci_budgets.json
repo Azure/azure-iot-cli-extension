@@ -2,20 +2,21 @@
   "DPS": {
     "test_dir": "azext_iot/tests/dps",
     "tox_env": "DPS-int",
+    "concurrent_phases": true,
     "phases": [
       {
         "name": "regular",
-        "runtime_minutes": 45,
+        "runtime_minutes": 35,
         "cleanup_minutes": 10
       },
       {
         "name": "service-sas",
-        "runtime_minutes": 40,
+        "runtime_minutes": 25,
         "cleanup_minutes": 10
       },
       {
         "name": "local-auth-toggle",
-        "runtime_minutes": 20,
+        "runtime_minutes": 15,
         "cleanup_minutes": 5
       }
     ],
@@ -26,10 +27,26 @@
   "HubControl": {
     "test_dir": "azext_iot/tests/iothub",
     "tox_env": "HubControl-int",
+    "concurrent_phases": true,
     "phases": [
       {
-        "name": "regular",
-        "runtime_minutes": 240,
+        "name": "regular-state-workflow",
+        "runtime_minutes": 70,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-state-schemes-cert",
+        "runtime_minutes": 70,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-endpoints-a",
+        "runtime_minutes": 70,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-endpoints-b",
+        "runtime_minutes": 70,
         "cleanup_minutes": 15
       }
     ],
@@ -40,15 +57,21 @@
   "HubData": {
     "test_dir": "azext_iot/tests/iothub",
     "tox_env": "HubData-int",
+    "concurrent_phases": true,
     "phases": [
       {
-        "name": "entra",
-        "runtime_minutes": 210,
+        "name": "entra-state-config",
+        "runtime_minutes": 55,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "entra-devices-protocol",
+        "runtime_minutes": 55,
         "cleanup_minutes": 15
       },
       {
         "name": "sas",
-        "runtime_minutes": 100,
+        "runtime_minutes": 45,
         "cleanup_minutes": 15
       }
     ],

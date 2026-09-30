@@ -13,12 +13,20 @@ The root argument is a repository root, defaulting to this module's checkout.
 
 import ast
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PREFIX = "azext_iot/tests/iothub/"
 SUITES = ("HubControl", "HubData")
+HUB_CONTROL_PHASES = (
+    "regular-state-workflow",
+    "regular-state-schemes-cert",
+    "regular-endpoints-a",
+    "regular-endpoints-b",
+)
+HUB_DATA_ENTRA_PHASES = ("entra-state-config", "entra-devices-protocol")
+HUB_DATA_PHASES = HUB_DATA_ENTRA_PHASES + ("sas",)
 
 
 @dataclass(frozen=True)
@@ -166,15 +174,142 @@ CASES = (
 )
 
 
+SHARDS = {
+    "HubControl": {
+        "regular-state-workflow": (
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_migrate_controlplane",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_migrate_controlplane_with_create",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_export_import_controlplane",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_export_import_controlplane_with_create",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_custom_scenarios_controlplane",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_export_import_migrate_missing_hubs_error",
+        ),
+        "regular-state-schemes-cert": (
+            "azext_iot/tests/iothub/core/test_iothub_certificate_int.py::"
+            "TestIoTHubCertificates::test_hub_certificate_lifecycle_int",
+            "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
+            "TestIoTHubDiscovery::test_iothub_discovery",
+            "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
+            "TestIoTHubDiscovery::test_iothub_discovery_lists",
+            "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
+            "TestIoTHubDiscovery::test_iothub_target_lists",
+            "azext_iot/tests/iothub/core/test_iothub_utilities_int.py::"
+            "TestIoTHubUtilities::test_iothub_generate_sas_token",
+            "azext_iot/tests/iothub/core/test_iothub_utilities_int.py::"
+            "TestIoTHubUtilities::test_iothub_generate_sas_token_hostname_type",
+            "azext_iot/tests/iothub/core/test_iothub_utilities_int.py::"
+            "TestIoTHubUtilities::test_iothub_connection_string_show",
+            "azext_iot/tests/iothub/core/test_iothub_utilities_int.py::"
+            "TestIoTHubUtilities::test_iothub_connection_string_lists",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::"
+            "test_export_endpoint_resource_name_starting_with_scheme_char",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::"
+            "test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char",
+            "azext_iot/tests/iothub/tls13/test_tls13_int.py::test_find_resource_returns_hostname_properties",
+            "azext_iot/tests/iothub/tls13/test_tls13_int.py::test_build_target_includes_hostname_fields",
+            "azext_iot/tests/iothub/tls13/test_tls13_int.py::test_connection_string_uses_gwv2_hostname",
+            "azext_iot/tests/iothub/tls13/test_tls13_int.py::test_gwv2_target_uses_service_hostname",
+        ),
+        "regular-endpoints-a": (
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_eventhub_endpoint_lifecycle",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_servicebus_endpoint_lifecycle",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_storage_endpoint_lifecycle",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_fabric_eventstream_endpoint_lifecycle",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_route_int.py::"
+            "test_route_fallback_lifecycle",
+        ),
+        "regular-endpoints-b": (
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_cosmos_endpoint_lifecycle",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
+            "test_iot_endpoint_force_delete",
+            "azext_iot/tests/iothub/message_endpoint/test_iothub_message_route_int.py::test_route_lifecycle",
+        ),
+    },
+    "HubData": {
+        "entra-state-config": (
+            "azext_iot/tests/iothub/configurations/test_iot_config_int.py::"
+            "TestIoTConfigurations::test_edge_set_modules",
+            "azext_iot/tests/iothub/configurations/test_iot_config_int.py::"
+            "TestIoTConfigurations::test_edge_export_modules",
+            "azext_iot/tests/iothub/configurations/test_iot_config_int.py::"
+            "TestIoTConfigurations::test_edge_deployments",
+            "azext_iot/tests/iothub/configurations/test_iot_config_int.py::"
+            "TestIoTConfigurations::test_device_configurations",
+            "azext_iot/tests/iothub/state/test_hub_state_dataplane_int.py::test_migrate_dataplane",
+            "azext_iot/tests/iothub/state/test_hub_state_dataplane_int.py::test_export_import_dataplane",
+            "azext_iot/tests/iothub/state/test_hub_state_int.py::test_mirgate_hub_dataplane_error",
+        ),
+        "entra-devices-protocol": (),
+    },
+}
+
+
+def _assigned_phase(case):
+    if case.suite == "HubControl" and "regular" in case.phases:
+        matches = tuple(phase for phase, nodes_ in SHARDS["HubControl"].items() if case.node in nodes_)
+        if len(matches) != 1:
+            raise ValueError("HubControl shard partition mismatch for " + case.node)
+        return matches
+    if case.suite == "HubData" and "entra" in case.phases:
+        state_config = case.node in SHARDS["HubData"]["entra-state-config"]
+        phases_ = ["entra-state-config" if state_config else "entra-devices-protocol"]
+        if "sas" in case.phases:
+            phases_.append("sas")
+        return tuple(phases_)
+    return case.phases
+
+
+def _shard_cases(cases):
+    base_cases = cases
+    cases = tuple(replace(case, phases=_assigned_phase(case)) for case in base_cases)
+    for suite, old, new in (
+        ("HubControl", "regular", HUB_CONTROL_PHASES),
+        ("HubData", "entra", HUB_DATA_ENTRA_PHASES),
+    ):
+        base = {case.node for case in base_cases if case.suite == suite and old in case.phases}
+        explicit = {node for phase in new for node in SHARDS[suite].get(phase, ())}
+        assigned = [case.node for case in cases if case.suite == suite and set(new).intersection(case.phases)]
+        if len(assigned) != len(set(assigned)) or set(assigned) != base or not explicit.issubset(base):
+            raise ValueError(f"{suite}/{old} shard partition does not match the manifest.")
+    return cases
+
+
 def phases(suite, *, linked_metadata=False):
     """Required phases; linked metadata requires an explicit separate opt-in."""
     if suite == "HubControl":
         if linked_metadata:
             raise ValueError("Linked metadata belongs to HubData.")
-        return ("regular",)
+        return HUB_CONTROL_PHASES
     if suite == "HubData":
-        return ("entra", "sas") + (("linked-metadata",) if linked_metadata else ())
+        return HUB_DATA_PHASES + (("linked-metadata",) if linked_metadata else ())
     raise ValueError(f"Unknown Hub suite: {suite}")
+
+
+def auth_phase(phase):
+    return "local-auth" if phase == "sas" else "regular"
+
+
+def regular_phase(phase):
+    return phase == "regular" or phase.startswith("regular-")
+
+
+def expanded_phases(suite, phase, *, linked_metadata=False):
+    enabled = phases(suite, linked_metadata=linked_metadata)
+    if phase in enabled:
+        return (phase,)
+    aliases = {
+        ("HubControl", "regular"): HUB_CONTROL_PHASES,
+        ("HubData", "entra"): HUB_DATA_ENTRA_PHASES,
+    }
+    result = aliases.get((suite, phase))
+    if result:
+        return result
+    raise ValueError(f"Phase {phase} is not enabled for {suite}.")
 
 
 def _capability(root):
@@ -216,14 +351,15 @@ def contract(root=ROOT):
     if any(count != 1 for count in expected.values()) or actual != expected:
         raise ValueError(f"Hub inventory mismatch; missing={list((expected - actual).elements())}; "
                          f"unknown/duplicate={list((actual - expected).elements())}")
-    return cases
+    return _shard_cases(cases)
 
 
 def nodes(suite, phase, root=ROOT, *, linked_metadata=False):
     """Exact repository-relative, expanded pytest node args, in required order."""
-    if phase not in phases(suite, linked_metadata=linked_metadata):
-        raise ValueError(f"Phase {phase} is not enabled for {suite}.")
-    selected = tuple(case.node for case in contract(root) if case.suite == suite and phase in case.phases)
+    selected_phases = expanded_phases(suite, phase, linked_metadata=linked_metadata)
+    selected = tuple(
+        case.node for case in contract(root) if case.suite == suite and set(selected_phases).intersection(case.phases)
+    )
     if not selected:
         raise ValueError(f"No {suite}/{phase} capability in this checkout.")
     return selected
@@ -236,6 +372,7 @@ def manifest(suite, phase, root=ROOT, *, linked_metadata=False):
         "schemaVersion": 1, "suite": suite, "phase": phase, "expected": list(expected),
         "cases": [asdict(case) for case in contract(root) if case.node in expected],
         "intentionalAuthOverlap": [
-            case.node for case in contract(root) if "entra" in case.phases and "sas" in case.phases
+            case.node for case in contract(root)
+            if set(HUB_DATA_ENTRA_PHASES).intersection(case.phases) and "sas" in case.phases
         ],
     }

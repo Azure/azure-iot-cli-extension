@@ -321,7 +321,7 @@ def test_coverage_summary_cannot_mask_missing_cancelled_or_failed_independent_ga
 
 
 def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
-    from azext_iot.tests._hub_phase_runner import BUDGETS, CLEANUP, RESERVE
+    from azext_iot.tests._hub_phase_runner import BUDGETS, runner_seconds
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
@@ -331,9 +331,14 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
     assert ado_budgets == {suite: budgets[suite]["job_timeout_minutes"] for suite in BUDGETS}
     for suite, phases in BUDGETS.items():
-        assert budgets[suite]["job_timeout_minutes"] == (
-            sum(runtime + CLEANUP for _, runtime in phases) + RESERVE
-        ) / 60 + budgets[suite]["setup_minutes"]
+        assert budgets[suite].get("concurrent_phases") is True
+        # Concurrent phases are bounded by the slowest phase; job timeouts keep their serial-era headroom.
+        assert runner_seconds(suite, phases) == 60 * (max(
+            phase["runtime_minutes"] + phase["cleanup_minutes"] for phase in budgets[suite]["phases"]
+        ) + budgets[suite]["reserve_minutes"])
+        assert runner_seconds(suite, phases) / 60 + budgets[suite]["setup_minutes"] <= (
+            budgets[suite]["job_timeout_minutes"]
+        )
     assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
@@ -695,9 +700,9 @@ def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_defau
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
-    assert phases("HubData") == ("entra", "sas")
-    assert len(nodes("HubData", "entra")) == 44
-    assert len(nodes("HubControl", "regular")) == 28
+    assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert sum(len(nodes("HubData", phase)) for phase in phases("HubData") if phase.startswith("entra-")) == 44
+    assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 28
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 
 
