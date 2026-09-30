@@ -353,7 +353,7 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
 
 def combine_coverage(output, phase_names):
     files = [output / name / ".coverage" for name in phase_names if (output / name / ".coverage").exists()]
-    result = {"combined": False, "files": [str(path.relative_to(output)) for path in files], "exitCode": None}
+    result = {"combined": False, "files": [path.relative_to(output).as_posix() for path in files], "exitCode": None}
     if not files:
         result["skipped"] = "no phase coverage files"
         return result
