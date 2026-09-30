@@ -60,7 +60,8 @@ jobs:
     with:
       test-services: "auto"
       python-versions: "3.10,3.13"
-      regions: "centraluseuap"
+      regions: "australiaeast"
+      arm-endpoint: "public"
       resource-group: "cli-int-test-rg"
       subscription-id: "a386d5ea-ea90-441a-8263-d816368c84a1"
     secrets: inherit

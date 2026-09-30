@@ -754,13 +754,19 @@ def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_p
     assert not output.exists()
 
 
-def test_hub_release_and_schedule_callers_use_owned_canary_scope():
+def test_release_caller_uses_owned_australiaeast_public_scope():
     release = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    assert release["jobs"]["int_test"]["uses"] == "./.github/workflows/int_test.yml"
     inputs = release["jobs"]["int_test"]["with"]
     assert inputs["test-services"] == "auto"
-    assert inputs["regions"] == "centraluseuap"
+    assert inputs["python-versions"] == "3.10,3.13"
+    assert inputs["regions"] == "australiaeast"
+    assert inputs["arm-endpoint"] == "public"
     assert inputs["resource-group"] == "cli-int-test-rg"
     assert inputs["subscription-id"] == "a386d5ea-ea90-441a-8263-d816368c84a1"
+
+
+def test_schedule_caller_uses_owned_canary_scope():
     scheduler = (REPOSITORY_ROOT / ".github/workflows/int_test_schedule.yml").read_text(encoding="utf-8")
     assert 'region="centraluseuap"' in scheduler
     assert "-f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1" in scheduler

@@ -136,6 +136,11 @@ Resource location and ARM routing are passed together through the full service
 run. Public ARM is not a region-derived hostname. Unsupported API or region
 operations fail rather than falling back to canary or changing the selected tests.
 
+Release integration tests explicitly select `australiaeast` with public ARM routing
+for all services on Python 3.10 and 3.13. Scheduled integration runs continue to use
+`centraluseuap` with automatic canary routing; both callers retain the existing test
+subscription and `cli-int-test-rg` resource group.
+
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`
 

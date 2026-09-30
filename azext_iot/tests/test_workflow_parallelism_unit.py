@@ -236,9 +236,25 @@ def test_subscription_resolution_is_shared_by_setup_and_direct_service_login(tmp
 
 
 @POSIX_WORKFLOW
+def test_release_inputs_build_complete_australiaeast_public_matrix(tmp_path):
+    release = yaml.safe_load((ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    inputs = release["jobs"]["int_test"]["with"]
+    result, outputs = _matrix(
+        tmp_path, INPUT_SERVICES=inputs["test-services"], INPUT_PYTHON_VERSIONS=inputs["python-versions"],
+        INPUT_REGIONS=inputs["regions"], INPUT_ARM_ENDPOINT=inputs["arm-endpoint"],
+        RESOURCE_GROUP=inputs["resource-group"], TEST_SUBSCRIPTION_ID=inputs["subscription-id"],
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    rows = json.loads(outputs["matrix"])
+    expected = Counter(itertools.product(SERVICES, ("3.10", "3.13"), ("australiaeast",)))
+    assert Counter((row["service"], row["python"], row["region"]) for row in rows) == expected
+    assert all(row["arm_endpoint"] == "https://management.azure.com" for row in rows)
+
+
+@POSIX_WORKFLOW
 @pytest.mark.parametrize("services,pythons,regions", [
     ("auto", "3.13", "centraluseuap"),
-    ("auto", "3.10,3.13", "centraluseuap"),  # Release caller: all services for EACH Python.
+    ("auto", "3.10,3.13", "australiaeast"),  # Release caller: all services for EACH Python.
     ("ADR,DPS,ADU", "3.10,3.13", "centraluseuap,westus"),
     ("ADU,ADR", "3.13", "centraluseuap"),  # ADU has the same eligibility as the other services.
     ("HubControl,HubData,DPS,ADR", "3.13", "centraluseuap"),
