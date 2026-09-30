@@ -640,6 +640,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         private = Path(tempfile.mkdtemp(prefix="dps-phases-private-"))
         install_token = uuid4().hex
         planned = []
+        previous_cwd = Path.cwd()
         try:
             for index, (name, runtime, cleanup) in enumerate(phases):
                 result = summary["phases"][index]
@@ -703,6 +704,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 )
 
             if planned:
+                # child() inherits the process cwd; set it once, not per thread, and restore in finally.
+                os.chdir(ROOT)
                 with ThreadPoolExecutor(max_workers=len(planned), thread_name_prefix="dps-phase") as pool:
                     futures = {}
                     for phase in planned:
@@ -780,6 +783,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
             if summary.get("coverage", {}).get("status") == "failed":
                 summary["status"] = "failed"
         finally:
+            os.chdir(previous_cwd)
             shutil.rmtree(private, ignore_errors=True)
     except Exception as error:  # Preserve a failed result without a credential-bearing traceback.
         summary["error"] = {

@@ -150,6 +150,22 @@ def test_concurrent_phases_use_isolated_coverage_and_combine_in_manifest_order(t
     assert json.loads((tmp_path / "dps-phases.json").read_text())["coverage"]["status"] == "passed"
 
 
+def test_concurrent_phases_launch_tox_from_the_checkout_and_restore_cwd(tmp_path, monkeypatch):
+    # child() inherits the process cwd, so a caller elsewhere must not break tox.ini discovery.
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    seen = []
+
+    def execute(*args):
+        seen.append(Path.cwd())
+        return _execution(*args)
+
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=execute) == 0
+    assert seen and set(seen) == {ROOT}
+    assert Path.cwd() == elsewhere
+
+
 def test_dps_budgets_come_from_ci_budget_source():
     budget = RUNNER["DPS_CI_BUDGET"]
     assert RUNNER["PHASES"] == tuple(
