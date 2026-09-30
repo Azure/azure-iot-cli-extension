@@ -88,6 +88,14 @@ def _get_resource_group_from_hub(hub):
     return hub["resourcegroup"]
 
 
+def _get_connection_string_value(connection_string, key):
+    normalized_key = key.strip().casefold()
+    for candidate_key, value in (validate_key_value_pairs(connection_string) or {}).items():
+        if candidate_key.strip().casefold() == normalized_key:
+            return value.strip()
+    return None
+
+
 def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
     """Resolve IoT Hub hostname for DPS linked hub based on hostname type."""
     if hostname_type == "service":
@@ -129,11 +137,7 @@ def _warn_mixed_endpoint_types(linked_hubs):
             continue
         hostname = hub.get("hostName", "")
         if not hostname:
-            cs = hub.get("connectionString", "")
-            for part in cs.split(";"):
-                if part.lower().startswith("hostname="):
-                    hostname = part.split("=", 1)[1]
-                    break
+            hostname = _get_connection_string_value(hub.get("connectionString"), "HostName")
         if not hostname:
             hostname = hub.get("name", "")
         parts = hostname.split(".")
@@ -502,8 +506,7 @@ def iot_dps_linked_hub_create(
                     "Service hostname is only supported for DPS hub linking with "
                     "--connection-profile MqttV5."
                 )
-            parsed_cs = validate_key_value_pairs(connection_string)
-            host_name = parsed_cs.get("HostName")
+            host_name = _get_connection_string_value(connection_string, "HostName")
             if not location:
                 if not hub_name:
                     try:
@@ -664,14 +667,8 @@ def iot_dps_linked_hub_update(
     )
     if cs_needs_rebuild:
         if connection_string:
-            parsed_connection_string = validate_key_value_pairs(connection_string) or {}
-            connection_string_hostname = next(
-                (
-                    value.strip()
-                    for key, value in parsed_connection_string.items()
-                    if key.strip().casefold() == "hostname"
-                ),
-                None,
+            connection_string_hostname = _get_connection_string_value(
+                connection_string, "HostName"
             )
             if not connection_string_hostname:
                 raise InvalidArgumentValueError(
@@ -694,8 +691,12 @@ def iot_dps_linked_hub_update(
                 )
             target_entry["connectionString"] = connection_string
         else:
-            parsed_existing_cs = validate_key_value_pairs(target_entry.get("connectionString")) or {}
-            existing_policy = parsed_existing_cs.get("SharedAccessKeyName") or IOT_HUB_DEFAULT_POLICY
+            existing_policy = (
+                _get_connection_string_value(
+                    target_entry.get("connectionString"), "SharedAccessKeyName"
+                )
+                or IOT_HUB_DEFAULT_POLICY
+            )
             policies = iot_hub_policy_get(
                 hub_client, hub_name, existing_policy, _get_resource_group_from_hub(hub)
             )

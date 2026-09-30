@@ -125,7 +125,7 @@ class TestLinkedHubCreateValidation:
             client=mock_deps,
             dps_name="dps",
             connection_string=(
-                "HostName=hub.service.azure-devices.net;"
+                "hostname=hub.service.azure-devices.net;"
                 "SharedAccessKeyName=x;SharedAccessKey=y"
             ),
             location="eastus2euap",
@@ -544,7 +544,7 @@ class TestLinkedHubUpdate:
         from azext_iot.core.custom import iot_dps_linked_hub_update
         existing_entries[0]["connectionString"] = (
             "HostName=myhub.azure-devices.net;"
-            "SharedAccessKeyName=service;SharedAccessKey=existing-key"
+            "sharedaccesskeyname=service;SharedAccessKey=existing-key"
         )
         policy_spy = mocker.patch(
             "azext_iot.core.custom.iot_hub_policy_get",
