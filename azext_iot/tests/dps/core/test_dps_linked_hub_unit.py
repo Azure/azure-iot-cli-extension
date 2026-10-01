@@ -353,10 +353,21 @@ class TestLinkedHubShortNameResolution:
             "azext_iot.core.custom._ensure_dps_resource_group_name",
             return_value="test-rg",
         )
-        mocker.patch("azext_iot.core.custom.iot_dps_get", return_value=dps)
+        client = mocker.MagicMock()
+        dps_get = mocker.patch(
+            "azext_iot.core.custom.iot_dps_get", return_value=dps
+        )
+
+        def list_after_update(*_):
+            assert client.iot_dps_resource.begin_create_or_update.called
+            return [{"name": "other.azure-devices.net"}]
+
+        linked_hub_list = mocker.patch(
+            "azext_iot.core.custom.iot_dps_linked_hub_list",
+            side_effect=list_after_update,
+        )
         mocker.patch("azext_iot.core.custom.LongRunningOperation")
         hub_factory = mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
-        client = mocker.MagicMock()
 
         result = iot_dps_linked_hub_delete(
             fixture_cmd, client, "dps", "myhub", "test-rg"
@@ -367,6 +378,8 @@ class TestLinkedHubShortNameResolution:
             "iot_dps_description"
         ]
         assert body["properties"]["iotHubs"] == [{"name": "other.azure-devices.net"}]
+        linked_hub_list.assert_called_once_with(client, "dps", "test-rg")
+        dps_get.assert_called_once_with(client, "dps", "test-rg")
         hub_factory.assert_not_called()
 
 

@@ -108,7 +108,13 @@ def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
             )
         return service_hostname
     if hostname_type == "classic":
-        return hub["properties"]["hostName"]
+        classic_hostname = hub["properties"].get("hostName")
+        if not classic_hostname:
+            hub_name = hub.get("name", "unknown")
+            raise InvalidArgumentValueError(
+                f"The classic hostname is not available for IoT Hub '{hub_name}'."
+            )
+        return classic_hostname
     device_hostname = hub["properties"].get("deviceHostName")
     if hostname_type == "device" and not device_hostname:
         hub_name = hub.get("name", "unknown")
@@ -729,8 +735,8 @@ def iot_dps_linked_hub_update(
 
 def iot_dps_linked_hub_delete(cmd, client, dps_name, linked_hub, resource_group_name=None, no_wait=False):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
-    dps_linked_hubs = []
-    dps_linked_hubs.extend(iot_dps_linked_hub_list(client, dps_name, resource_group_name))
+    dps = iot_dps_get(client, dps_name, resource_group_name)
+    dps_linked_hubs = dps["properties"]["iotHubs"]
     if '.' not in linked_hub:
         target_entry = _find_linked_hub_entry(dps_linked_hubs, hub_name=linked_hub)
     else:
@@ -738,7 +744,6 @@ def iot_dps_linked_hub_delete(cmd, client, dps_name, linked_hub, resource_group_
     linked_hub = target_entry["name"]
     updated_hubs = [p for p in dps_linked_hubs if p["name"].lower() != linked_hub.lower()]
 
-    dps = iot_dps_get(client, dps_name, resource_group_name)
     dps["properties"]["iotHubs"] = updated_hubs
 
     if no_wait:
