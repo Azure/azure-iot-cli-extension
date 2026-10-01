@@ -23,7 +23,7 @@
     ],
     "reserve_minutes": 10,
     "setup_minutes": 10,
-    "job_timeout_minutes": 150
+    "job_timeout_minutes": 100
   },
   "HubControl": {
     "test_dir": "azext_iot/tests/iothub",
@@ -53,7 +53,7 @@
     ],
     "reserve_minutes": 5,
     "setup_minutes": 15,
-    "job_timeout_minutes": 275
+    "job_timeout_minutes": 140
   },
   "HubData": {
     "test_dir": "azext_iot/tests/iothub",
@@ -78,7 +78,7 @@
     ],
     "reserve_minutes": 5,
     "setup_minutes": 15,
-    "job_timeout_minutes": 360
+    "job_timeout_minutes": 120
   },
   "ADU": {
     "test_dir": "azext_iot/tests/deviceupdate",
@@ -86,7 +86,7 @@
     "phases": [],
     "reserve_minutes": 0,
     "setup_minutes": 0,
-    "job_timeout_minutes": 200
+    "job_timeout_minutes": 150
   },
   "ADR": {
     "test_dir": "azext_iot/tests/adr",

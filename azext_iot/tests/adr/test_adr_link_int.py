@@ -59,7 +59,7 @@ from azext_iot.tests.adr._helpers import (
 )
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr._readiness import (
-    LINK_READINESS_TIMEOUT, link_dps_with_readiness, link_hub_with_readiness,
+    _LINK_INITIATE_REJECTED, LINK_READINESS_TIMEOUT, link_dps_with_readiness, link_hub_with_readiness,
 )
 from azext_iot.tests.adr._su_reader_probe import SUReaderProbe
 from azext_iot.tests.adr.conftest import (
@@ -147,8 +147,10 @@ def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     text = " ".join(filter(None, [detail.get("code"), detail.get("message"), _error_chain_text(error) if error else ""]))
     if "IdentityRotationUpdateFailed" not in text:
         return False
+    rejected = _LINK_INITIATE_REJECTED.search(text)
     return bool(
-        "IH400913" in text
+        (rejected and rejected.group("service") == "Hub")
+        or "IH400913" in text
         or re.search(
             r"\b(denied|not authorized|does not have authorization|AuthorizationFailed)\b",
             text,

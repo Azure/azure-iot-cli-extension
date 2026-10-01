@@ -105,10 +105,10 @@ every test and cleanup to pass. Cancellation and insufficient remaining runtime
 still stop scheduling. Leftover resources can consume quota; subsequent Azure
 provisioning failures are reported normally.
 
-HubControl reserves 240 minutes for serial execution, including normal pytest
-fixture teardown, plus 15 minutes for controller cleanup and 5 minutes for
-admission. GitHub and Azure DevOps jobs allow 275 minutes, including 15 minutes
-for external setup/reporting. Individual test timeouts remain unchanged.
+HubControl runs its four shards concurrently, each capped at 90 minutes plus
+15 minutes for controller cleanup and 5 minutes for admission. GitHub and Azure
+DevOps jobs allow 140 minutes (HubData: 120), including 15 minutes for external
+setup/reporting. Individual test timeouts remain unchanged.
 
 Every selected service runs its full branch-specific suite. GitHub dispatch and
 reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS

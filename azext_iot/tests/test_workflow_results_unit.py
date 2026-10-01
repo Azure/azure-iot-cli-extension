@@ -365,7 +365,7 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     assert "ci_budgets.json" in matrix["run"]
     budget = _ci_budgets()["DPS"]
-    assert budget["job_timeout_minutes"] == 150
+    assert budget["job_timeout_minutes"] == 100
     assert [phase["name"] for phase in budget["phases"]] == ["regular", "service-sas", "local-auth-toggle"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")

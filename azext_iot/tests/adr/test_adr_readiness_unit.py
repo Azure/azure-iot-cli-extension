@@ -801,6 +801,17 @@ def _rotation_endpoint(state="Failed", identity_type="UserAssigned", *, code="Id
     ("IdentityRotationUpdateFailed: target identity shape changed.", False),
     ("IH400913: denied namespace read.", True),
     ("Authentication failed: IdentityRotationUpdateFailed.", False),
+    (
+        "IdentityRotationUpdateFailed: The Hub resource rejected the link request as invalid. "
+        "Verify the endpoint configuration, then resubmit the request.",
+        True,
+    ),
+    (
+        "IdentityRotationUpdateFailed: The DPS resource rejected the link request as invalid. "
+        "Verify the endpoint configuration, then resubmit the request.",
+        False,
+    ),
+    ("IdentityRotationUpdateFailed: The Hub resource rejected the link request as invalid.", False),
 ])
 def test_hub_rotation_authorization_classifier_is_specific(message, expected):
     endpoint = _rotation_endpoint(message=message)
@@ -841,6 +852,46 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     commands = _commands(scenario)
     assert commands.count(update_cmd) == 2
     assert any("role assignment list" in command and "hub-sami" in command for command in commands)
+
+
+def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_rollback(monkeypatch):
+    from azure.cli.core.azclierror import AzureResponseError
+    from azure.core.exceptions import HttpResponseError
+
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    service_error = HttpResponseError(
+        "(LinkingFailed) One or more endpoints failed to link. (IdentityRotationUpdateFailed) "
+        "The Hub resource rejected the link request as invalid. "
+        "Verify the endpoint configuration, then resubmit the request."
+    )
+    product_error = AzureResponseError(
+        "Link target, type, inbound identity or settings changed; recovery stopped."
+    )
+    product_error.__cause__ = service_error
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    roles = [{"id": "role"}]
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        product_error,
+        _output(_rotation_endpoint("Succeeded", "UserAssigned")),
+        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output({"identity": {"principalId": "hub-sami"}}),
+        _output(roles),
+        _output(roles),
+        _output(roles),
+        _output(None),
+        _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
+    ]
+
+    result = link_scenarios._update_hub_to_sami_with_recovery(
+        scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+    )
+
+    assert result["inboundCallerIdentity"]["type"] == "SystemAssigned"
+    assert clock.sleeps == [30]
+    assert _commands(scenario).count(update_cmd) == 2
 
 
 def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):

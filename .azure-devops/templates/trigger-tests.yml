@@ -102,7 +102,7 @@ jobs:
           serviceConnection: $(AzureServiceConnection)
 
   - job: "HubControl"
-    timeoutInMinutes: 275
+    timeoutInMinutes: 140
     displayName: "HubControl - owned control-plane"
     dependsOn: [testCentral, testADT, testDPS, testADU, testADR]
     condition: and(not(canceled()), eq('${{ parameters.testHub }}', true))
@@ -122,7 +122,7 @@ jobs:
           serviceConnection: $(AzureServiceConnection)
 
   - job: "HubData"
-    timeoutInMinutes: 360
+    timeoutInMinutes: 120
     dependsOn: HubControl
     condition: and(not(canceled()), eq('${{ parameters.testHub }}', true))
     displayName: "HubData - owned Entra and SAS phases"
