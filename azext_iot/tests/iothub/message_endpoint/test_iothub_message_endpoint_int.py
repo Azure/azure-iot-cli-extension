@@ -905,6 +905,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
 
 @pytest.mark.skipif(not ensure_iothub_sdk_min_version("2.3.0"), reason="Cosmos Db Endpoints requires azure-mgmt-iothub>=2.3.0.")
+# First in its concurrent shard, so setup also pays for the shared hub and Cosmos account (~9 minutes).
+@pytest.mark.timeout(30 * 60, func_only=False)
 def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module):
     iot_hub_objs, cosmosdb_obj = provisioned_cosmosdb_with_identity_module
     iot_hub_entry = iot_hub_objs[0]

@@ -40,6 +40,7 @@ def test_every_controlplane_fixture_consumer_can_initialize_the_shared_resources
 @pytest.mark.parametrize("scenario,seconds", [
     (state.test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char, 2700),
     (endpoints.test_iot_endpoint_force_delete, 2100),
+    (endpoints.test_iot_cosmos_endpoint_lifecycle, 1800),
     (routes.test_route_lifecycle, 1800),
 ])
 def test_expensive_scenarios_budget_shared_resource_setup_or_teardown(scenario, seconds):
