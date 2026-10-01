@@ -771,10 +771,10 @@ def test_release_caller_uses_owned_australiaeast_public_scope():
     assert inputs["subscription-id"] == "a386d5ea-ea90-441a-8263-d816368c84a1"
 
 
-def test_schedule_caller_uses_owned_canary_scope():
+def test_schedule_caller_uses_owned_australiaeast_public_scope():
     scheduler = (REPOSITORY_ROOT / ".github/workflows/int_test_schedule.yml").read_text(encoding="utf-8")
-    assert 'region="centraluseuap"' in scheduler
-    assert "-f arm-endpoint=canary" in scheduler
+    assert 'region="australiaeast"' in scheduler
+    assert "arm-endpoint" not in scheduler
     assert "-f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1" in scheduler
     assert "-f resource-group=cli-int-test-rg" in scheduler
     assert "region_list=" not in scheduler
