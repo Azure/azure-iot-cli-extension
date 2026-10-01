@@ -1183,8 +1183,8 @@ def test_native_preflight_reaches_one_recorded_write_after_all_fresh404s(phase, 
     phase.command.side_effect = first_write
     scenario = SimpleNamespace(_testMethodName="test_device_upload_file")
     with responses.RequestsMock() as wire:
-        for kind, resource_id in phase.ids.items():
-            root = "https://management.azure.com" if kind == "hub" else "https://management.azure.com"
+        for resource_id in phase.ids.values():
+            root = "https://management.azure.com"
             wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
         wire.add_callback("PUT", "https://management.azure.com" + phase.ids["storage"], callback=accepted)
         with pytest.raises(RuntimeError, match="proof stops"):
@@ -1230,7 +1230,7 @@ def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(
     monkeypatch.setattr(phase, "command", partial(subject.HubSasPhase.command, phase))
     with responses.RequestsMock() as wire:
         for kind, resource_id in phase.ids.items():
-            root = "https://management.azure.com" if kind == "hub" else "https://management.azure.com"
+            root = "https://management.azure.com"
             resource = {"id": resource_id, "tags": {"runUid": subject.UID}, "properties": {}}
             wire.add("GET", root + resource_id, json=resource, status=200)
             wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)

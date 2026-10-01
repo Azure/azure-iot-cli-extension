@@ -324,7 +324,7 @@ def test_setup_does_not_create_on_other_service_errors(status, code):
     create.assert_not_called()
 
 
-@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-11-01"])
+@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-10-01-preview", "2026-11-01"])
 @pytest.mark.parametrize("status,code", [
     (400, "400024"), (403, "AuthorizationFailed"), (502, "OtherError"),
     (400, "ProviderError"), (403, "ProviderError"), (500, "ProviderError"),
@@ -337,7 +337,7 @@ def test_enumeration_workaround_does_not_hide_other_errors(status, code, api_ver
     assert raised.value is error
 
 
-@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-11-01"])
+@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-10-01-preview"])
 @pytest.mark.parametrize("resource_group", [True, False])
 def test_only_confirmed_list_provider_error_is_skipped(api_version, resource_group):
     error = service_error(502, "ProviderError", api_version)
@@ -370,7 +370,18 @@ def test_other_provider_502_operations_are_not_skipped(url):
     assert raised.value is error
 
 
-@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-11-01"])
+@pytest.mark.parametrize("resource_group", [True, False])
+def test_ga_canary_list_provider_error_is_not_a_confirmed_preview_defect(resource_group):
+    error = service_error(502, "ProviderError", "2026-11-01")
+    if not resource_group:
+        error.response.request.url = error.response.request.url.replace("/resourceGroups/rg", "")
+    with pytest.raises(HttpResponseError) as raised:
+        with skip_hub_list_provider_error():
+            raise error
+    assert raised.value is error
+
+
+@pytest.mark.parametrize("api_version", ["2026-05-01-preview", "2026-10-01-preview", "2026-11-01"])
 @pytest.mark.parametrize("method,suffix", [
     ("POST", ""), ("PUT", ""), ("DELETE", ""), ("HEAD", ""),
     ("GET", "/hub"), ("POST", "/hub/listKeys"),

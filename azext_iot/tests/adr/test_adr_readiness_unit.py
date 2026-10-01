@@ -86,7 +86,7 @@ class Clock:
 
 def _http(
     status=404, code="ResourceNotFound", method="GET", error_type=HttpResponseError,
-    resource_id=NS_ID + "/jobs/job",
+    resource_id=NS_ID + "/registryDevices/device",
 ):
     error = error_type(message=f"({code}) synthetic service error")
     error.status_code = status
@@ -99,7 +99,9 @@ def _http(
 
 
 def _missing(kind):
-    return _http(resource_id=NS_ID + {"job": "/jobs/job", "group": "/groups/group", "namespace": ""}[kind])
+    return _http(resource_id=NS_ID + {
+        "device": "/registryDevices/device", "ca": "/certificateAuthorities/ca", "namespace": "",
+    }[kind])
 
 
 def _output(value):
@@ -108,7 +110,7 @@ def _output(value):
 
 def _cleanup(scenario, clock, **kwargs):
     return readiness.delete_test_namespace(
-        scenario, "ns", "rg", jobs=("job",), groups=("group",),
+        scenario, "ns", "rg", devices=("device",), certificate_authorities=("ca",),
         clock=clock, sleeper=clock.sleep, **kwargs,
     )
 
@@ -117,19 +119,19 @@ def _commands(scenario):
     return [call.args[0] for call in scenario.cmd.call_args_list]
 
 
-def test_owned_job_and_group_require_exact_get_404_before_namespace_delete():
+def test_owned_device_and_ca_require_exact_get_404_before_namespace_delete():
     clock = Clock()
     scenario = Mock()
     scenario.cmd.side_effect = [
         _output({"properties": {"provisioningState": "Deleting"}}), _http(),
-        _output({}), _output({}), _sdk_error(_missing("group")),
+        _output({}), _output({}), _sdk_error(_missing("ca")),
         _output({"properties": {"provisioningState": "Succeeded"}}), _output(None),
-        _missing("job"), _missing("group"), _missing("namespace"),
+        _missing("device"), _missing("ca"), _missing("namespace"),
     ]
     _cleanup(scenario, clock)
     commands = _commands(scenario)
-    assert "job show" in commands[0]
-    assert "group show" in commands[2]
+    assert "device show" in commands[0]
+    assert "ca show" in commands[2]
     assert commands[6] == "iot adr ns delete --namespace ns -g rg -y --no-wait"
     assert clock.sleeps == [10, 10, 10, 10]
     assert sum(" delete " in command for command in commands) == 1
@@ -148,7 +150,7 @@ def test_child_lookup_failures_are_not_absence_and_never_delete_namespace(error)
     with pytest.raises(type(error)):
         _cleanup(scenario, Clock())
     assert len(_commands(scenario)) == 1
-    assert "job show" in _commands(scenario)[0]
+    assert "device show" in _commands(scenario)[0]
 
 
 @pytest.mark.parametrize("output", [None, "", []])
@@ -162,8 +164,8 @@ def test_blank_get_is_not_absence(output):
 
 @pytest.mark.parametrize("url,method", [
     ("https://login.microsoftonline.com/tenant/oauth2/token", "GET"),
-    ("https://management.azure.com" + NS_ID + "/groups/other", "GET"),
-    ("https://management.azure.com" + NS_ID + "/jobs/job", "POST"),
+    ("https://management.azure.com" + NS_ID + "/certificateAuthorities/other", "GET"),
+    ("https://management.azure.com" + NS_ID + "/registryDevices/device", "POST"),
 ])
 def test_credential_or_other_resource_http_404_is_not_child_absence(url, method):
     error = _http(method=method)
@@ -184,10 +186,10 @@ def _cli_exit(error, code=3):
 @pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error, _cli_exit])
 def test_matching_resource_get_404_with_api_version_proves_absence(wrap):
     missing = _http()
-    missing.response.request.url = "https://management.azure.com" + NS_ID + "/jobs/job?api-version=preview"
+    missing.response.request.url = "https://management.azure.com" + NS_ID + "/registryDevices/device?api-version=preview"
     scenario = Mock()
     scenario.cmd.side_effect = wrap(missing)
-    assert readiness._get_resource(scenario, "iot adr ns job show --namespace ns -g rg -n job") is None
+    assert readiness._get_resource(scenario, "iot adr ns device show --namespace ns -g rg -n device") is None
 
 
 def _remove_response_metadata(error, missing):
@@ -208,7 +210,7 @@ def _remove_response_metadata(error, missing):
 ])
 @pytest.mark.parametrize("wrap", [lambda error: error, _sdk_error, _cli_exit])
 def test_unproven_get_404_metadata_propagates_without_parent_delete(missing, wrap):
-    error = _missing("job")
+    error = _missing("device")
     _remove_response_metadata(error, missing)
     error = wrap(error)
     scenario = Mock()
@@ -222,7 +224,7 @@ def test_unproven_get_404_metadata_propagates_without_parent_delete(missing, wra
 @pytest.mark.parametrize("code", [0, 1, 2])
 def test_other_cli_exit_codes_cannot_prove_absence_even_with_get_404_context(code):
     scenario = Mock()
-    error = _cli_exit(_missing("job"), code=code)
+    error = _cli_exit(_missing("device"), code=code)
     scenario.cmd.side_effect = error
     with pytest.raises(SystemExit) as caught:
         _cleanup(scenario, Clock())
@@ -247,14 +249,65 @@ def test_lazy_credential_404_without_request_url_never_proves_resource_absence(m
     assert scenario.cmd.call_count == 1
 
 
+def test_real_sdk_get_404_and_testsdk_rethrow_gate_bounded_namespace_delete(mocked_response, mocker):
+    namespace_url = "https://management.azure.com" + NS_ID
+    absent = {"error": {"code": "ResourceNotFound", "message": "Owned resource was deleted"}}
+    mocked_response.add("GET", namespace_url + "/registryDevices/device", status=404, json=absent)
+    mocked_response.add(
+        "GET", namespace_url + "/certificateAuthorities/ca", json={"properties": {"provisioningState": "Deleting"}},
+    )
+    mocked_response.add("GET", namespace_url + "/certificateAuthorities/ca", status=404, json=absent)
+    mocked_response.add("GET", namespace_url, json={"properties": {"provisioningState": "Succeeded"}})
+    mocked_response.add("GET", namespace_url, status=404, json=absent)
+    mocked_response.add("DELETE", namespace_url, status=204)
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    proofs = []
+    clock = Clock()
+    with DeviceRegistryMgmtClient(credential, "sub", retry_total=0, polling_interval=0) as client:
+        mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=client)
+        provider = NamespaceProvider(Mock())
+
+        def command(text, **_):
+            try:
+                if "device show" in text:
+                    return _output(client.registry_devices.get("rg", "ns", "device"))
+                if "ca show" in text:
+                    return _output(client.certificate_authorities.get("rg", "ns", "ca"))
+                if "ns show" in text:
+                    return _output(client.namespaces.get("rg", "ns"))
+                assert text == "iot adr ns delete --namespace ns -g rg -y --no-wait"
+                provider.delete("ns", "rg", no_wait=True)
+                return _output(None)
+            except HttpResponseError as error:
+                shaped = _sdk_error(error)
+                proofs.append(shaped)
+                raise shaped
+
+        _cleanup(SimpleNamespace(cmd=command, cli_ctx=Mock(data={"subscription_id": "sub"})), clock)
+    assert clock.sleeps == [10, 10]
+    assert len(proofs) == 5
+    assert all(error.response.status_code == 404 and error.response.request.method == "GET" for error in proofs)
+    assert [(call.request.method, urlsplit(call.request.url).path) for call in mocked_response.calls] == [
+        ("GET", NS_ID + "/registryDevices/device"),
+        ("GET", NS_ID + "/certificateAuthorities/ca"),
+        ("GET", NS_ID + "/certificateAuthorities/ca"),
+        ("GET", NS_ID),
+        ("DELETE", NS_ID),
+        ("GET", NS_ID + "/registryDevices/device"),
+        ("GET", NS_ID + "/certificateAuthorities/ca"),
+        ("GET", NS_ID),
+    ]
+
+
 def test_lingering_child_exhausts_deadline_without_parent_delete():
     clock = Clock()
     scenario = Mock()
     scenario.cmd.return_value = _output({})
-    with pytest.raises(AssertionError, match="owned job GET still readable"):
+    with pytest.raises(AssertionError, match="owned device GET still readable"):
         _cleanup(scenario, clock, timeout=25)
     assert clock.sleeps == [10, 10, 5]
-    assert all("job show" in command for command in _commands(scenario))
+    assert all("device show" in command for command in _commands(scenario))
 
 
 @pytest.mark.parametrize("translated", [False, True])
@@ -267,16 +320,57 @@ def test_explicit_child_rejection_rechecks_absence_before_retry(translated, code
         rejection = _sdk_error(wrapped)
     scenario = Mock()
     scenario.cmd.side_effect = [
-        _missing("job"), _missing("group"), _output({}), rejection,
-        _missing("job"), _missing("group"), _output({}), _output([]), _output([]), _output(None),
-        _missing("job"), _missing("group"), _missing("namespace"),
+        _missing("device"), _missing("ca"), _output({}), rejection,
+        _missing("device"), _missing("ca"), _output({}), _output([]), _output([]), _output(None),
+        _missing("device"), _missing("ca"), _missing("namespace"),
     ]
     clock = Clock()
     _cleanup(scenario, clock)
     commands = _commands(scenario)
     assert sum(" delete " in command for command in commands) == 2
     assert commands[4:6] == commands[:2]
+    assert commands[7:9] == [
+        "iot adr ns device list --namespace ns -g rg",
+        "iot adr ns ca list --namespace ns -g rg",
+    ]
     assert clock.sleeps == [10, 10]
+
+
+def test_child_index_rejection_without_owned_children_uses_only_ga_lists():
+    rejection = _http(409, "NamespaceNotEmpty", method="DELETE", resource_id=NS_ID)
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output({}), rejection, _output({}), _output([]), _output([]), _output(None), _missing("namespace"),
+    ]
+    clock = Clock()
+    readiness.delete_test_namespace(scenario, "ns", "rg", clock=clock, sleeper=clock.sleep)
+    assert _commands(scenario) == [
+        "iot adr ns show --namespace ns -g rg",
+        "iot adr ns delete --namespace ns -g rg -y --no-wait",
+        "iot adr ns show --namespace ns -g rg",
+        "iot adr ns device list --namespace ns -g rg",
+        "iot adr ns ca list --namespace ns -g rg",
+        "iot adr ns delete --namespace ns -g rg -y --no-wait",
+        "iot adr ns show --namespace ns -g rg",
+    ]
+    assert clock.sleeps == [10, 10]
+
+
+@pytest.mark.parametrize("kind", ["device", "ca"])
+@pytest.mark.parametrize("children", [[{"name": "foreign"}], None, {}])
+def test_foreign_or_unproven_children_prevent_replaying_rejected_namespace_delete(kind, children):
+    rejection = _http(409, "NamespaceNotEmpty", method="DELETE", resource_id=NS_ID)
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _missing("device"), _missing("ca"), _output({}), rejection,
+        _missing("device"), _missing("ca"), _output({}),
+        *([_output([])] if kind == "ca" else []), _output(children),
+    ]
+    with pytest.raises(HttpResponseError) as raised:
+        _cleanup(scenario, Clock())
+    assert raised.value is rejection
+    assert sum(" delete " in cmd for cmd in _commands(scenario)) == 1
+    assert _commands(scenario)[-1] == f"iot adr ns {kind} list --namespace ns -g rg"
 
 
 @pytest.mark.parametrize("error", [
@@ -288,7 +382,7 @@ def test_explicit_child_rejection_rechecks_absence_before_retry(translated, code
 ])
 def test_uncertain_or_unrelated_delete_error_is_never_replayed(error):
     scenario = Mock()
-    scenario.cmd.side_effect = [_missing("job"), _missing("group"), _output({}), error]
+    scenario.cmd.side_effect = [_missing("device"), _missing("ca"), _output({}), error]
     with pytest.raises(type(error)):
         _cleanup(scenario, Clock())
     assert len(_commands(scenario)) == 4
@@ -301,7 +395,7 @@ def test_unproven_delete_rejection_is_not_replayed(missing):
     error = _http(409, "CannotDeleteResource", method="DELETE", resource_id=NS_ID)
     _remove_response_metadata(error, missing)
     scenario = Mock()
-    scenario.cmd.side_effect = [_missing("job"), _missing("group"), _output({}), error]
+    scenario.cmd.side_effect = [_missing("device"), _missing("ca"), _output({}), error]
     with pytest.raises(HttpResponseError) as caught:
         _cleanup(scenario, Clock())
     assert caught.value is error
@@ -314,10 +408,10 @@ def test_accepted_delete_only_polls_even_if_namespace_state_is_stale(already_del
     accepted = [already_deleting]
 
     def command(cmd, **_):
-        if "job show" in cmd:
-            raise _missing("job")
-        if "group show" in cmd:
-            raise _missing("group")
+        if "device show" in cmd:
+            raise _missing("device")
+        if "ca show" in cmd:
+            raise _missing("ca")
         if " delete " in cmd:
             assert not accepted[0]
             accepted[0] = True
@@ -961,7 +1055,7 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
 def test_real_namespace_not_empty_translation_survives_testsdk_context_loss():
     original = HttpResponseError(message=(
         "(NamespaceNotEmpty) Namespace cannot be deleted while it contains child resources: "
-        "1 group. Delete these resources before deleting the namespace."
+        "1 registry device. Delete these resources before deleting the namespace."
     ))
     original.status_code = 409
     with pytest.raises(AzureResponseError) as caught:
@@ -970,9 +1064,9 @@ def test_real_namespace_not_empty_translation_survives_testsdk_context_loss():
     assert readiness._http_error(translated)[1] is None
     scenario = Mock()
     scenario.cmd.side_effect = [
-        _missing("job"), _missing("group"), _output({}), translated,
-        _missing("job"), _missing("group"), _output({}), _output([]), _output([]), _output(None),
-        _missing("job"), _missing("group"), _missing("namespace"),
+        _missing("device"), _missing("ca"), _output({}), translated,
+        _missing("device"), _missing("ca"), _output({}), _output([]), _output([]), _output(None),
+        _missing("device"), _missing("ca"), _missing("namespace"),
     ]
     _cleanup(scenario, Clock())
     assert sum(" delete " in cmd for cmd in _commands(scenario)) == 2

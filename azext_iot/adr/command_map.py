@@ -144,9 +144,3 @@ def load_adr_commands(self, _):
         cmd_group.command(
             "wait", "adr_link_dps_wait", command_type=adr_link_wait_ops
         )
-
-    # Group commands
-
-    # Job commands
-
-    # Job run commands

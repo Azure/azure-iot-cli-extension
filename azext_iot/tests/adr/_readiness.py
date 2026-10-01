@@ -120,8 +120,9 @@ def _get_resource(scenario, command, getter=None):
         namespace = parts[parts.index("--namespace") + 1]
         group = parts[parts.index("-g") + 1]
         path = f"/resourceGroups/{group}/providers/Microsoft.DeviceRegistry/namespaces/{namespace}"
-        if parts[3] in {"job", "group"}:
-            path += f"/{parts[3]}s/{parts[parts.index('-n') + 1]}"
+        collection = {"device": "registryDevices", "ca": "certificateAuthorities"}.get(parts[3])
+        if collection:
+            path += f"/{collection}/{parts[parts.index('-n') + 1]}"
         if (
             (not isinstance(error, SystemExit) or error.code == 3)
             and is_resource_not_found_error(evidence) and status == 404
@@ -173,10 +174,10 @@ def _child_rejection(error):
 
 
 def delete_test_namespace(
-    scenario, namespace_name, resource_group, *, jobs=(), groups=(),
+    scenario, namespace_name, resource_group, *, devices=(), certificate_authorities=(),
     timeout=120, interval=10, clock=None, sleeper=None, namespace_getter=None,
 ):
-    """Require owned job/group GET 404 before sending the parent's DELETE.
+    """Require owned device/CA GET 404 before sending the parent's DELETE.
 
     Names include children explicitly deleted earlier in the lifecycle. Empty
     lists alone cannot prove their absence. Lists are an additional guard after
@@ -190,7 +191,7 @@ def delete_test_namespace(
     accepted = False
     rejected = None
     while True:
-        for kind, names in (("job", jobs), ("group", groups)):
+        for kind, names in (("device", devices), ("ca", certificate_authorities)):
             for name in names:
                 shown = budget.call(_get_resource, scenario, f"iot adr ns {kind} show {scope} -n {shlex.quote(name)}")
                 while shown is not None:
@@ -210,7 +211,7 @@ def delete_test_namespace(
             budget.pause(interval)
             continue
         if rejected is not None:
-            for kind in ("job", "group"):
+            for kind in ("device", "ca"):
                 children = budget.call(scenario.cmd, f"iot adr ns {kind} list {scope}").get_output_in_json()
                 if children != []:
                     raise rejected

@@ -669,8 +669,8 @@ def test_real_route_sdk_path_requires_current_exact_owned_hub(transport, operati
     from azext_iot.sdk.iothub.mgmt import IotHubClient
     observer, _, wire = transport
     create_hub(wire)
-    # Ordinary product factories still default to canary; the owned transport
-    # must route those generated requests to the explicitly selected endpoint.
+    # The owned transport must route public ARM requests to the explicitly
+    # selected endpoint.
     client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url="https://management.azure.com")
     test_route = getattr(client.iot_hub_resource, operation)
     assert test_route(HUB.rsplit("/", 1)[1], ownership.GROUP, input={"message": {"body": "{}"}}) == {"routes": []}

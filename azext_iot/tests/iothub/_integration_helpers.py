@@ -31,7 +31,7 @@ LOCAL_AUTH_DEVICE_HTTP_REASON = (
     "IoT Hub integration policy requires disableLocalAuth=true. This CLI device HTTP "
     "operation uses a Hub shared-access policy, not a device key, and has no Entra/device-key option."
 )
-_CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-11-01"})
+_CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-preview"})
 # Documented query tolerance, not a maximum-latency guarantee:
 # https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
 QUERY_VISIBILITY_TIMEOUT = 30 * 60
@@ -303,7 +303,7 @@ def device_method_responder(scenario, device_id, readiness_timeout=15):
 
 @contextmanager
 def skip_hub_list_provider_error():
-    """Scope the canary list defect to enumeration tests and the two branch APIs.
+    """Scope the canary list defect to enumeration tests and the observed preview APIs.
 
     Never return a partial list or treat any other service error as a pass/skip.
     """

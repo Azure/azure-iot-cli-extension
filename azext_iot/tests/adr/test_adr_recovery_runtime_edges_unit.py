@@ -381,7 +381,7 @@ def _on_nth_sleep(harness, n, action):
     harness.clock.on_sleep = hook
 
 
-@pytest.mark.parametrize("kind", ["dps", "hub", "dps"])
+@pytest.mark.parametrize("kind", ["hub", "dps"])
 @pytest.mark.parametrize("action", ["add", "update"])
 def test_connection_reset_on_an_unchanged_namespace_is_never_resubmitted(mocker, kind, action):
     harness = Harness(mocker, kind=kind, action=action)

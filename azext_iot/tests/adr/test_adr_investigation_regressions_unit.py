@@ -18,6 +18,7 @@ from azure.cli.testsdk.base import ExecutionResult
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import (
     ClientAuthenticationError,
+    HttpResponseError,
     ServiceRequestError,
     ServiceResponseError,
 )
@@ -29,13 +30,11 @@ from azext_iot.tests.adr import _readiness as readiness
 
 from azext_iot.tests.adr.test_adr_link_propagation_unit import Harness, NS_ID
 from azext_iot.tests.adr.test_adr_link_unit import UAMI_ID
-from azext_iot.tests.adr.test_adr_readiness_unit import (
-    _http,
-)
+from azext_iot.tests.adr.test_adr_readiness_unit import Clock, _http
 
 
-GROUP_SHOW = "iot adr ns group show --namespace ns -g rg -n group"
-GROUP_ID = NS_ID + "/groups/group"
+CA_SHOW = "iot adr ns ca show --namespace ns -g rg -n ca"
+CA_ID = NS_ID + "/certificateAuthorities/ca"
 ARM = "https://centraluseuap.management.azure.com"
 
 
@@ -55,39 +54,79 @@ def _outside_except(error):
     show_exception_handler(error)
 
 
+@pytest.mark.parametrize("primary_type", [AssertionError, ClientAuthenticationError, ServiceRequestError])
+def test_real_arm_show_exit_retains_exact_sdk_404_during_cleanup(
+    wrapper_scenario, mocked_response, primary_type,
+):
+    missing = {"error": {"code": "ResourceNotFound", "message": "owned resource absent"}}
+    mocked_response.add("GET", ARM + CA_ID, status=404, json=missing)
+    mocked_response.add("GET", ARM + NS_ID, status=404, json=missing)
+    credential = Mock(spec=["get_token"], get_token=Mock(return_value=AccessToken("offline", 4102444800)))
+    clock = Clock()
+    primary = primary_type("original lifecycle assertion")
+    errors = []
+    with DeviceRegistryMgmtClient(credential, "sub", base_url=ARM, retry_total=0) as client:
+        def invoke(command, **_):
+            try:
+                if "ca" in command:
+                    client.certificate_authorities.get("rg", "ns", "ca")
+                else:
+                    client.namespaces.get("rg", "ns")
+            except HttpResponseError as error:
+                errors.append(error)
+            _outside_except(errors[-1])
+
+        wrapper_scenario.cli_ctx.invoke.side_effect = invoke
+        with pytest.raises(primary_type) as raised:
+            try:
+                raise primary
+            finally:
+                readiness.delete_test_namespace(
+                    wrapper_scenario, "ns", "rg", certificate_authorities=("ca",),
+                    clock=clock, sleeper=clock.sleep,
+                )
+        assert raised.value is primary
+    assert len(errors) == 2
+    assert all(error.response.status_code == 404 for error in errors)
+    assert [(call.request.method, call.request.url.split("?")[0]) for call in mocked_response.calls] == [
+        ("GET", ARM + CA_ID), ("GET", ARM + NS_ID),
+    ]
+    assert not clock.sleeps
+
+
 @pytest.mark.parametrize("url,method,status,code", [
-    ("https://foreign.invalid" + GROUP_ID, "GET", 404, "ResourceNotFound"),
-    ("https://management.azure.com.evil.invalid" + GROUP_ID, "GET", 404, "ResourceNotFound"),
-    (ARM + GROUP_ID.replace("/sub/", "/foreign/"), "GET", 404, "ResourceNotFound"),
-    (ARM + GROUP_ID + "-foreign", "GET", 404, "ResourceNotFound"),
-    (ARM + "/prefix" + GROUP_ID, "GET", 404, "ResourceNotFound"),
-    (ARM.replace("https:", "http:") + GROUP_ID, "GET", 404, "ResourceNotFound"),
-    (ARM + GROUP_ID, "POST", 404, "ResourceNotFound"),
-    (ARM + GROUP_ID, "GET", 403, "ResourceNotFound"),
-    (ARM + GROUP_ID, "GET", 502, "ResourceNotFound"),
-    (ARM + GROUP_ID, "GET", 404, "AuthorizationFailed"),
+    ("https://foreign.invalid" + CA_ID, "GET", 404, "ResourceNotFound"),
+    ("https://management.azure.com.evil.invalid" + CA_ID, "GET", 404, "ResourceNotFound"),
+    (ARM + CA_ID.replace("/sub/", "/foreign/"), "GET", 404, "ResourceNotFound"),
+    (ARM + CA_ID + "-foreign", "GET", 404, "ResourceNotFound"),
+    (ARM + "/prefix" + CA_ID, "GET", 404, "ResourceNotFound"),
+    (ARM.replace("https:", "http:") + CA_ID, "GET", 404, "ResourceNotFound"),
+    (ARM + CA_ID, "POST", 404, "ResourceNotFound"),
+    (ARM + CA_ID, "GET", 403, "ResourceNotFound"),
+    (ARM + CA_ID, "GET", 502, "ResourceNotFound"),
+    (ARM + CA_ID, "GET", 404, "AuthorizationFailed"),
 ])
 def test_real_show_wrapper_rejects_foreign_http_evidence(wrapper_scenario, url, method, status, code):
-    original = _http(status, code, method, resource_id=GROUP_ID)
+    original = _http(status, code, method, resource_id=CA_ID)
     original.response.request.url = url
     wrapper_scenario.cli_ctx.invoke.side_effect = lambda *_args, **_kwargs: _outside_except(original)
     with pytest.raises((SystemExit, AssertionError)):
-        readiness._get_resource(wrapper_scenario, GROUP_SHOW)
+        readiness._get_resource(wrapper_scenario, CA_SHOW)
     wrapper_scenario.cli_ctx.invoke.assert_called_once()
 
 
 @pytest.mark.parametrize("error_type", [ClientAuthenticationError, ServiceRequestError, ServiceResponseError])
 def test_authentication_and_transport_evidence_is_never_404(wrapper_scenario, error_type):
-    error = _http(error_type=error_type, resource_id=GROUP_ID)
+    error = _http(error_type=error_type, resource_id=CA_ID)
     wrapper_scenario.cli_ctx.invoke.side_effect = lambda *_args, **_kwargs: _outside_except(error)
     with pytest.raises(SystemExit):
-        readiness._get_resource(wrapper_scenario, GROUP_SHOW)
+        readiness._get_resource(wrapper_scenario, CA_SHOW)
 
 
 @pytest.mark.parametrize("error_type", [ClientAuthenticationError, ServiceRequestError, ServiceResponseError])
 @pytest.mark.parametrize("suppressed", [False, True])
 def test_handler_traceback_never_discards_new_lookup_errors(wrapper_scenario, error_type, suppressed):
-    missing = _http(resource_id=GROUP_ID)
+    missing = _http(resource_id=CA_ID)
     lookup_error = error_type("new lookup failure")
 
     def invoke(*_args, **_kwargs):
@@ -103,7 +142,7 @@ def test_handler_traceback_never_discards_new_lookup_errors(wrapper_scenario, er
 
     wrapper_scenario.cli_ctx.invoke.side_effect = invoke
     with pytest.raises(SystemExit) as raised:
-        readiness._get_resource(wrapper_scenario, GROUP_SHOW)
+        readiness._get_resource(wrapper_scenario, CA_SHOW)
     assert raised.value.__context__ is lookup_error
 
 
@@ -115,14 +154,14 @@ def test_real_handler_with_non_http_argument_and_bare_exit_cannot_prove_absence(
             _outside_except(error)
         wrapper_scenario.cli_ctx.invoke.side_effect = invoke
         with pytest.raises(SystemExit):
-            readiness._get_resource(wrapper_scenario, GROUP_SHOW)
+            readiness._get_resource(wrapper_scenario, CA_SHOW)
 
 
 @pytest.mark.parametrize("conflict", ["cause", "status", "response"])
 def test_exit_metadata_cannot_override_contradictory_lookup_evidence(wrapper_scenario, conflict):
     def invoke(*_args, **_kwargs):
         try:
-            _outside_except(_http(resource_id=GROUP_ID))
+            _outside_except(_http(resource_id=CA_ID))
         except SystemExit as error:
             if conflict == "cause":
                 raise error from ClientAuthenticationError("lookup denied")
@@ -133,7 +172,7 @@ def test_exit_metadata_cannot_override_contradictory_lookup_evidence(wrapper_sce
             raise
     wrapper_scenario.cli_ctx.invoke.side_effect = invoke
     with pytest.raises(SystemExit):
-        readiness._get_resource(wrapper_scenario, GROUP_SHOW)
+        readiness._get_resource(wrapper_scenario, CA_SHOW)
 
 
 def _rotation(mocker):

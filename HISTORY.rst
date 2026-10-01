@@ -27,6 +27,10 @@ Release History
 * Repaired the generated modeless LRO callback defect outside generated files while preserving healthy callbacks, void DELETE results, and the original poller interface.
 * Set the extension package version to ``1.0.0`` and removed extension-wide preview metadata. This branch is preparation only: deployment readiness and live release qualification remain separate approval gates.
 
+**Device Update bug fixes**
+
+* ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 
