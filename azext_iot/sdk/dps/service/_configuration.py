@@ -7,61 +7,42 @@
 # Changes may cause incorrect behavior and will be lost if the code is regenerated.
 # --------------------------------------------------------------------------
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any
 
+from azure.core.credentials import AzureKeyCredential
 from azure.core.pipeline import policies
-from azure.mgmt.core.policies import ARMChallengeAuthenticationPolicy, ARMHttpLoggingPolicy
 
 from ._version import VERSION
 
-if TYPE_CHECKING:
-    from azure.core import AzureClouds
-    from azure.core.credentials import TokenCredential
 
-
-class DeviceRegistryMgmtClientConfiguration:  # pylint: disable=too-many-instance-attributes,docstring-keyword-should-match-keyword-only
-    """Configuration for DeviceRegistryMgmtClient.
+class ProvisioningServiceClientConfiguration:  # pylint: disable=too-many-instance-attributes,docstring-keyword-should-match-keyword-only
+    """Configuration for ProvisioningServiceClient.
 
     Note that all parameters used to create this instance are saved as instance
     attributes.
 
+    :param dps_name: The DPS instance hostname. Required.
+    :type dps_name: str
     :param credential: Credential used to authenticate requests to the service. Required.
-    :type credential: ~azure.core.credentials.TokenCredential
-    :param subscription_id: The ID of the target subscription. The value must be an UUID. Required.
-    :type subscription_id: str
-    :param base_url: Service host. Default value is "https://management.azure.com".
-    :type base_url: str
-    :param cloud_setting: The cloud setting for which to get the ARM endpoint. Default value is
-     None.
-    :type cloud_setting: ~azure.core.AzureClouds
+    :type credential: ~azure.core.credentials.AzureKeyCredential
     :keyword api_version: The API version to use for this operation. Known values are "2026-11-01"
      and None. Default value is None. If not set, the operation's default API version will be used.
      Note that overriding this default value may result in unsupported behavior.
     :paramtype api_version: str
     """
 
-    def __init__(
-        self,
-        credential: "TokenCredential",
-        subscription_id: str,
-        base_url: str = "https://management.azure.com",
-        cloud_setting: Optional["AzureClouds"] = None,
-        **kwargs: Any
-    ) -> None:
+    def __init__(self, dps_name: str, credential: AzureKeyCredential, **kwargs: Any) -> None:
         api_version: str = kwargs.pop("api_version", "2026-11-01")
 
+        if dps_name is None:
+            raise ValueError("Parameter 'dps_name' must not be None.")
         if credential is None:
             raise ValueError("Parameter 'credential' must not be None.")
-        if subscription_id is None:
-            raise ValueError("Parameter 'subscription_id' must not be None.")
 
+        self.dps_name = dps_name
         self.credential = credential
-        self.subscription_id = subscription_id
-        self.base_url = base_url
-        self.cloud_setting = cloud_setting
         self.api_version = api_version
-        self.credential_scopes = kwargs.pop("credential_scopes", ["https://management.azure.com/.default"])
-        kwargs.setdefault("sdk_moniker", "azext_iot-sdk-deviceregistry/{}".format(VERSION))
+        kwargs.setdefault("sdk_moniker", "azext_iot-sdk-dps-service/{}".format(VERSION))
         self.polling_interval = kwargs.get("polling_interval", 30)
         self._configure(**kwargs)
 
@@ -70,12 +51,10 @@ class DeviceRegistryMgmtClientConfiguration:  # pylint: disable=too-many-instanc
         self.headers_policy = kwargs.get("headers_policy") or policies.HeadersPolicy(**kwargs)
         self.proxy_policy = kwargs.get("proxy_policy") or policies.ProxyPolicy(**kwargs)
         self.logging_policy = kwargs.get("logging_policy") or policies.NetworkTraceLoggingPolicy(**kwargs)
-        self.http_logging_policy = kwargs.get("http_logging_policy") or ARMHttpLoggingPolicy(**kwargs)
+        self.http_logging_policy = kwargs.get("http_logging_policy") or policies.HttpLoggingPolicy(**kwargs)
         self.custom_hook_policy = kwargs.get("custom_hook_policy") or policies.CustomHookPolicy(**kwargs)
         self.redirect_policy = kwargs.get("redirect_policy") or policies.RedirectPolicy(**kwargs)
         self.retry_policy = kwargs.get("retry_policy") or policies.RetryPolicy(**kwargs)
         self.authentication_policy = kwargs.get("authentication_policy")
         if self.credential and not self.authentication_policy:
-            self.authentication_policy = ARMChallengeAuthenticationPolicy(
-                self.credential, *self.credential_scopes, **kwargs
-            )
+            self.authentication_policy = policies.AzureKeyCredentialPolicy(self.credential, "Authorization", **kwargs)

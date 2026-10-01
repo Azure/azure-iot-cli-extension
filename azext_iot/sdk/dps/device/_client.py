@@ -8,78 +8,42 @@
 
 from copy import deepcopy
 import sys
-from typing import Any, Optional, TYPE_CHECKING, cast
+from typing import Any
 
+from azure.core import PipelineClient
 from azure.core.pipeline import policies
 from azure.core.rest import HttpRequest, HttpResponse
-from azure.core.settings import settings
-from azure.mgmt.core import ARMPipelineClient
-from azure.mgmt.core.policies import ARMAutoResourceProviderRegistrationPolicy
-from azure.mgmt.core.tools import get_arm_endpoints
 
-from ._configuration import IotDpsClientConfiguration
+from ._configuration import ProvisioningDeviceClientConfiguration
 from ._utils.serialization import Deserializer, Serializer
-from .operations import DpsCertificateOperations, IotDpsResourceOperations, Operations
+from .operations import RuntimeRegistrationOperations
 
 if sys.version_info >= (3, 11):
     from typing import Self
 else:
     from typing_extensions import Self  # type: ignore
 
-if TYPE_CHECKING:
-    from azure.core import AzureClouds
-    from azure.core.credentials import TokenCredential
 
+class ProvisioningDeviceClient:  # pylint: disable=docstring-keyword-should-match-keyword-only
+    """API for device runtime operations with the Azure IoT Hub Device Provisioning Service.
 
-class IotDpsClient:  # pylint: disable=docstring-keyword-should-match-keyword-only
-    """API for using the Azure IoT Hub Device Provisioning Service features.
-
-    :ivar operations: Operations operations
-    :vartype operations: azext_iot.sdk.dps.mgmt.operations.Operations
-    :ivar dps_certificate: DpsCertificateOperations operations
-    :vartype dps_certificate: azext_iot.sdk.dps.mgmt.operations.DpsCertificateOperations
-    :ivar iot_dps_resource: IotDpsResourceOperations operations
-    :vartype iot_dps_resource: azext_iot.sdk.dps.mgmt.operations.IotDpsResourceOperations
-    :param credential: Credential used to authenticate requests to the service. Required.
-    :type credential: ~azure.core.credentials.TokenCredential
-    :param subscription_id: The ID of the target subscription. The value must be an UUID. Required.
-    :type subscription_id: str
-    :param base_url: Service host. Default value is None.
-    :type base_url: str
-    :keyword cloud_setting: The cloud setting for which to get the ARM endpoint. Default value is
-     None.
-    :paramtype cloud_setting: ~azure.core.AzureClouds
+    :ivar runtime_registration: RuntimeRegistrationOperations operations
+    :vartype runtime_registration:
+     azext_iot.sdk.dps.device.operations.RuntimeRegistrationOperations
+    :keyword endpoint: Service host. Default value is
+     "https://global.azure-devices-provisioning.net".
+    :paramtype endpoint: str
     :keyword api_version: The API version to use for this operation. Known values are "2026-11-01"
      and None. Default value is None. If not set, the operation's default API version will be used.
      Note that overriding this default value may result in unsupported behavior.
     :paramtype api_version: str
-    :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-     Retry-After header is present.
     """
 
-    def __init__(
-        self,
-        credential: "TokenCredential",
-        subscription_id: str,
-        base_url: Optional[str] = None,
-        *,
-        cloud_setting: Optional["AzureClouds"] = None,
-        **kwargs: Any
+    def __init__(  # pylint: disable=missing-client-constructor-parameter-credential
+        self, *, endpoint: str = "https://global.azure-devices-provisioning.net", **kwargs: Any
     ) -> None:
         _endpoint = "{endpoint}"
-        _cloud = cloud_setting or settings.current.azure_cloud  # type: ignore
-        _endpoints = get_arm_endpoints(_cloud)
-        if not base_url:
-            base_url = _endpoints["resource_manager"]
-        credential_scopes = kwargs.pop("credential_scopes", _endpoints["credential_scopes"])
-        self._config = IotDpsClientConfiguration(
-            credential=credential,
-            subscription_id=subscription_id,
-            base_url=cast(str, base_url),
-            cloud_setting=cloud_setting,
-            credential_scopes=credential_scopes,
-            **kwargs
-        )
+        self._config = ProvisioningDeviceClientConfiguration(endpoint=endpoint, **kwargs)
 
         _policies = kwargs.pop("policies", None)
         if _policies is None:
@@ -89,7 +53,6 @@ class IotDpsClient:  # pylint: disable=docstring-keyword-should-match-keyword-on
                 self._config.user_agent_policy,
                 self._config.proxy_policy,
                 policies.ContentDecodePolicy(**kwargs),
-                ARMAutoResourceProviderRegistrationPolicy(),
                 self._config.redirect_policy,
                 self._config.retry_policy,
                 self._config.authentication_policy,
@@ -99,14 +62,14 @@ class IotDpsClient:  # pylint: disable=docstring-keyword-should-match-keyword-on
                 policies.SensitiveHeaderCleanupPolicy(**kwargs) if self._config.redirect_policy else None,
                 self._config.http_logging_policy,
             ]
-        self._client: ARMPipelineClient = ARMPipelineClient(base_url=cast(str, _endpoint), policies=_policies, **kwargs)
+        self._client: PipelineClient = PipelineClient(base_url=_endpoint, policies=_policies, **kwargs)
 
         self._serialize = Serializer()
         self._deserialize = Deserializer()
         self._serialize.client_side_validation = False
-        self.operations = Operations(self._client, self._config, self._serialize, self._deserialize)
-        self.dps_certificate = DpsCertificateOperations(self._client, self._config, self._serialize, self._deserialize)
-        self.iot_dps_resource = IotDpsResourceOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.runtime_registration = RuntimeRegistrationOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
 
     def send_request(self, request: HttpRequest, *, stream: bool = False, **kwargs: Any) -> HttpResponse:
         """Runs the network request through the client's chained policies.
@@ -128,7 +91,7 @@ class IotDpsClient:  # pylint: disable=docstring-keyword-should-match-keyword-on
 
         request_copy = deepcopy(request)
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.base_url", self._config.base_url, "str", skip_quote=True),
+            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
         }
 
         request_copy.url = self._client.format_url(request_copy.url, **path_format_arguments)
