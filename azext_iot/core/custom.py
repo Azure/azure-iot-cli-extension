@@ -147,14 +147,21 @@ def _warn_mixed_endpoint_types(linked_hubs):
         if not hostname:
             hostname = hub.get("name", "")
         parts = hostname.split(".")
-        if len(parts) > 1 and parts[1] == "device":
-            types.add("device")
+        if len(parts) > 1 and parts[1] in {"device", "service"}:
+            types.add(parts[1])
         elif hostname:
             types.add("classic")
     if len(types) > 1:
+        type_names = sorted(types)
+        type_description = (
+            " and ".join(type_names)
+            if len(type_names) == 2
+            else f"{', '.join(type_names[:-1])}, and {type_names[-1]}"
+        )
         logger.warning(
-            "DPS has linked hubs with mixed hostname types (device and classic). "
-            "This may cause inconsistent behavior during device provisioning."
+            "DPS has linked hubs with mixed hostname types (%s). "
+            "This may cause inconsistent behavior during device provisioning.",
+            type_description,
         )
 
 
@@ -544,7 +551,7 @@ def iot_dps_linked_hub_create(
 
     dps["properties"]["iotHubs"].append(linked_hub_entry)
 
-    # Warn if linked hubs have mixed hostname types (device + classic)
+    # Warn if linked hubs have mixed hostname types
     _warn_mixed_endpoint_types(dps["properties"]["iotHubs"])
 
     if no_wait:

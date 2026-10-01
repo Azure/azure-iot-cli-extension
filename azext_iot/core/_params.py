@@ -159,8 +159,8 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    default="auto",
                    is_preview=True,
                    help="Type of IoT Hub hostname to use when linking. "
-                   "'auto' uses the service hostname for MqttV5 links; otherwise it uses the "
-                   "TLS 1.3 device hostname if available, classic otherwise. "
+                   "'auto' selects the service hostname for MqttV5 links. Otherwise, it prefers "
+                   "the TLS 1.3 device hostname and falls back to the classic hostname. "
                    "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
                    "'classic' uses the classic hostname (hub.azure-devices.net). "
                    "Only applies when --hub-name is provided.")

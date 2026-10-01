@@ -229,6 +229,25 @@ class TestMixedEndpointWarning:
             _warn_mixed_endpoint_types(hubs)
             assert "mixed hostname types" in caplog.text
 
+    @pytest.mark.parametrize(
+        "hostnames, expected_types",
+        [
+            (
+                ["hub1.service.azure-devices.net", "hub2.device.azure-devices.net"],
+                "device and service",
+            ),
+            (
+                ["hub1.service.azure-devices.net", "hub2.azure-devices.net"],
+                "classic and service",
+            ),
+        ],
+    )
+    def test_warning_reports_service_hostname_type(self, caplog, hostnames, expected_types):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            _warn_mixed_endpoint_types([{"name": hostname} for hostname in hostnames])
+            assert f"mixed hostname types ({expected_types})" in caplog.text
+
     def test_warning_on_mixed_with_connection_string(self, caplog):
         import logging
         with caplog.at_level(logging.WARNING):
