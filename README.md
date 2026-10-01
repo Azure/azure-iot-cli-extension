@@ -7,7 +7,7 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
-- This branch prepares **azure-iot 1.0.0** using `2026-11-01` ADR/CMS, IoT Hub control-plane, and DPS APIs. IoT Hub data-plane clients intentionally use `2026-11-01-preview`. The supported scope and deferred deployment/live-qualification gates are documented in [the GA release plan](GA_RELEASE_PLAN.md); this is not a publication or deployment announcement.
+- This branch prepares **azure-iot 1.0.0** using `2026-11-01` ADR/CMS, IoT Hub control-plane, and DPS APIs. IoT Hub data-plane clients intentionally use `2026-11-01-preview`. See [HISTORY.rst](HISTORY.rst) for the supported scope. Deployment and live qualification remain deferred; this is not a publication or deployment announcement.
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
