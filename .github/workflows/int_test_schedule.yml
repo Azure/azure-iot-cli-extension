@@ -49,5 +49,6 @@ jobs:
                     --ref "$branch" \
                     -f python-versions="$python_ver" \
                     -f regions="$region" \
+                    -f arm-endpoint=canary \
                     -f resource-group=cli-int-test-rg \
                     -f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1

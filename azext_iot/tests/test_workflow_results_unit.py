@@ -671,7 +671,7 @@ def test_hub_public_matrix_auto_includes_complete_data_suite(services, toggle, e
                INPUT_TEST_DPS="false", INPUT_TEST_HUB_CONTROL="false",
                INPUT_TEST_ADU="false", INPUT_TEST_ADR="false", INPUT_PYTHON_VERSIONS="3.13",
                TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1", RESOURCE_GROUP="cli-int-test-rg",
-               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="auto",
+               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="canary",
                GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
     result = subprocess.run(
         ["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
@@ -748,7 +748,7 @@ def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_p
     step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
     output = tmp_path / "output"
     env = dict(os.environ, INPUT_SERVICES="HubData", INPUT_PYTHON_VERSIONS="3.13",
-               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="auto", RESOURCE_GROUP="cli-int-test-rg",
+               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="canary", RESOURCE_GROUP="cli-int-test-rg",
                TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1",
                GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
     env.update(override)
@@ -774,6 +774,7 @@ def test_release_caller_uses_owned_australiaeast_public_scope():
 def test_schedule_caller_uses_owned_canary_scope():
     scheduler = (REPOSITORY_ROOT / ".github/workflows/int_test_schedule.yml").read_text(encoding="utf-8")
     assert 'region="centraluseuap"' in scheduler
+    assert "-f arm-endpoint=canary" in scheduler
     assert "-f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1" in scheduler
     assert "-f resource-group=cli-int-test-rg" in scheduler
     assert "region_list=" not in scheduler
