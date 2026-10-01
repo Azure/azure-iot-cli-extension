@@ -41,6 +41,7 @@ def test_every_controlplane_fixture_consumer_can_initialize_the_shared_resources
     (state.test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char, 2700),
     (endpoints.test_iot_endpoint_force_delete, 2100),
     (endpoints.test_iot_cosmos_endpoint_lifecycle, 1800),
+    (state.test_export_import_migrate_missing_hubs_error, 1800),
     (routes.test_route_lifecycle, 1800),
 ])
 def test_expensive_scenarios_budget_shared_resource_setup_or_teardown(scenario, seconds):
@@ -50,7 +51,6 @@ def test_expensive_scenarios_budget_shared_resource_setup_or_teardown(scenario, 
 @pytest.mark.parametrize("scenario", [
     state.test_custom_scenarios_controlplane,
     state.test_mirgate_hub_dataplane_error,
-    state.test_export_import_migrate_missing_hubs_error,
     endpoints.test_iot_eventhub_endpoint_lifecycle,
 ])
 def test_ordinary_scenarios_keep_the_default_timeout(scenario):
