@@ -667,10 +667,7 @@ def load_iothub_arguments(self, _):
                 options_list=["--topic-templates"],
                 nargs="*",
                 required=True,
-                help=(
-                    "Space-separated topic templates. Specify the option without values "
-                    "to use an empty list."
-                ),
+                help="Space-separated topic templates.",
             )
 
     with self.argument_context("iot hub topic-group show") as context:

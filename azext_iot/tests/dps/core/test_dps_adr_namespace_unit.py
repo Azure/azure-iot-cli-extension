@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""DPS stable management does not expose the removed namespace association."""
+"""DPS management does not expose the removed namespace association."""
 
 from inspect import signature
 from unittest.mock import MagicMock
@@ -51,6 +51,26 @@ def test_dps_namespace_arguments_removed_without_changing_hub():
     assert {"--ns-resource-id", "--ns-id", "--ns-identity-id"}.isdisjoint(options)
     assert {"--mi-system-assigned", "--mi-user-assigned"} <= options
 
+    linked_hub_create_calls = (
+        contexts["iot dps linked-hub create"].__enter__.return_value.argument.call_args_list
+    )
+    linked_hub_create_options = {
+        option
+        for call in linked_hub_create_calls
+        for option in call.kwargs.get("options_list", [])
+    }
+    assert "--connection-profile" in linked_hub_create_options
+
+    linked_hub_update_calls = (
+        contexts["iot dps linked-hub update"].__enter__.return_value.argument.call_args_list
+    )
+    linked_hub_update_options = {
+        option
+        for call in linked_hub_update_calls
+        for option in call.kwargs.get("options_list", [])
+    }
+    assert "--connection-profile" not in linked_hub_update_options
+
     hub_calls = contexts["iot hub"].__enter__.return_value.argument.call_args_list
     hub_options = {option for call in hub_calls for option in call.kwargs.get("options_list", [])}
     assert {"--ns-resource-id", "--ns-identity-id"} <= hub_options
@@ -60,12 +80,14 @@ def test_dps_help_preserves_identity_without_namespace(monkeypatch):
     from knack.help_files import helps
 
     monkeypatch.setitem(helps, "iot dps create", "type: command")
+    monkeypatch.setitem(helps, "iot dps linked-hub create", "type: command")
     monkeypatch.setitem(helps, "iot hub create", "type: command")
     patch_core_help()
     assert "--mi-system-assigned" in helps["iot dps create"]
     assert "--mi-user-assigned" in helps["iot dps create"]
     assert "--ns-" not in helps["iot dps create"]
     assert "Device Registry namespace" not in helps["iot dps create"]
+    assert "--connection-profile MqttV5" in helps["iot dps linked-hub create"]
     assert "--ns-resource-id" in helps["iot hub create"]
     assert "--ns-identity-id" in helps["iot hub create"]
 

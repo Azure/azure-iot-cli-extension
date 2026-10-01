@@ -36,6 +36,10 @@ class TestResolveLinkedHubHostname:
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub, "classic") == "hub.azure-devices.net"
 
+    def test_service(self):
+        hub = {"name": "hub", "properties": {"serviceHostName": "hub.service.azure-devices.net"}}
+        assert _resolve_linked_hub_hostname(hub, "service") == "hub.service.azure-devices.net"
+
     def test_default_is_auto(self):
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub) == "hub.device.azure-devices.net"
@@ -48,7 +52,11 @@ class TestLinkedHubCreateValidation:
     def mock_deps(self, mocker):
         mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
         mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
-            "properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"},
+            "properties": {
+                "deviceHostName": "hub.device.azure-devices.net",
+                "serviceHostName": "hub.service.azure-devices.net",
+                "hostName": "hub.azure-devices.net",
+            },
             "location": "eastus2euap",
             "resourcegroup": "test-rg",
         })
@@ -83,13 +91,53 @@ class TestLinkedHubCreateValidation:
                 hub_name="hub", authentication_type="UserAssigned"
             )
 
-    def test_service_hostname_rejected(self, fixture_cmd, mock_deps):
+    @pytest.mark.parametrize("authentication_type", [None, "KeyBased", "SystemAssigned"])
+    def test_user_assigned_identity_rejected_for_other_auth_types(
+        self, fixture_cmd, mock_deps, authentication_type
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+        with pytest.raises(
+            MutuallyExclusiveArgumentError,
+            match="--user-assigned-identity only applies with --authentication-type UserAssigned",
+        ):
+            iot_dps_linked_hub_create(
+                cmd=fixture_cmd,
+                client=mock_deps,
+                dps_name="dps",
+                hub_name="hub",
+                authentication_type=authentication_type,
+                user_assigned_identity="/subscriptions/x/.../myuami",
+            )
+
+    def test_service_hostname_rejected_without_mqtt_v5(self, fixture_cmd, mock_deps):
         from azext_iot.core.custom import iot_dps_linked_hub_create
         with pytest.raises(InvalidArgumentValueError, match="Service hostname"):
             iot_dps_linked_hub_create(
                 cmd=fixture_cmd, client=mock_deps, dps_name="dps",
                 connection_string="HostName=hub.service.azure-devices.net;SharedAccessKeyName=x;SharedAccessKey=y"
             )
+
+    def test_service_hostname_allowed_for_mqtt_v5(self, fixture_cmd, mock_deps):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        iot_dps_linked_hub_create(
+            cmd=fixture_cmd,
+            client=mock_deps,
+            dps_name="dps",
+            connection_string=(
+                "hostname=hub.service.azure-devices.net;"
+                "SharedAccessKeyName=x;SharedAccessKey=y"
+            ),
+            location="eastus2euap",
+            connection_profile="MqttV5",
+        )
+
+        dps = mock_deps.iot_dps_resource.begin_create_or_update.call_args.kwargs[
+            "iot_dps_description"
+        ]
+        linked_hub = dps["properties"]["iotHubs"][0]
+        assert linked_hub["hostName"] == "hub.service.azure-devices.net"
+        assert linked_hub["connectionProfile"] == "MqttV5"
 
     def test_mi_system_assigned_not_enabled(self, fixture_cmd, mock_deps, mocker):
         from azext_iot.core.custom import iot_dps_linked_hub_create
@@ -124,6 +172,35 @@ class TestLinkedHubCreateValidation:
                 hub_name="hub", authentication_type="SystemAssigned"
             )
 
+    @pytest.mark.parametrize(
+        "hostname_type,expected_hostname",
+        [
+            ("auto", "hub.service.azure-devices.net"),
+            ("device", "hub.device.azure-devices.net"),
+        ],
+    )
+    def test_mqtt_v5_hostname_selection(
+        self, fixture_cmd, mock_deps, hostname_type, expected_hostname
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        iot_dps_linked_hub_create(
+            cmd=fixture_cmd,
+            client=mock_deps,
+            dps_name="dps",
+            hub_name="hub",
+            hostname_type=hostname_type,
+            connection_profile="MqttV5",
+        )
+
+        dps = mock_deps.iot_dps_resource.begin_create_or_update.call_args.kwargs[
+            "iot_dps_description"
+        ]
+        linked_hub = dps["properties"]["iotHubs"][0]
+        assert linked_hub["hostName"] == expected_hostname
+        assert f"HostName={expected_hostname};" in linked_hub["connectionString"]
+        assert linked_hub["connectionProfile"] == "MqttV5"
+
 
 class TestMixedEndpointWarning:
     def test_no_warning_all_device(self, caplog):
@@ -151,6 +228,25 @@ class TestMixedEndpointWarning:
             ]
             _warn_mixed_endpoint_types(hubs)
             assert "mixed hostname types" in caplog.text
+
+    @pytest.mark.parametrize(
+        "hostnames, expected_types",
+        [
+            (
+                ["hub1.service.azure-devices.net", "hub2.device.azure-devices.net"],
+                "device and service",
+            ),
+            (
+                ["hub1.service.azure-devices.net", "hub2.azure-devices.net"],
+                "classic and service",
+            ),
+        ],
+    )
+    def test_warning_reports_service_hostname_type(self, caplog, hostnames, expected_types):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            _warn_mixed_endpoint_types([{"name": hostname} for hostname in hostnames])
+            assert f"mixed hostname types ({expected_types})" in caplog.text
 
     def test_warning_on_mixed_with_connection_string(self, caplog):
         import logging
@@ -225,6 +321,87 @@ class TestFindLinkedHubEntry:
             _find_linked_hub_entry(self.HUBS_GWV2, linked_hub="ghost.azure-devices.net")
 
 
+class TestLinkedHubShortNameResolution:
+    @pytest.mark.parametrize(
+        "hostname",
+        [
+            "myhub.azure-devices.net",
+            "myhub.device.azure-devices.net",
+            "myhub.service.azure-devices.net",
+        ],
+    )
+    def test_show_resolves_dotless_name_without_hub_lookup(
+        self, fixture_cmd, mocker, hostname
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_get
+
+        linked_hub = {"name": hostname}
+        mocker.patch(
+            "azext_iot.core.custom.iot_dps_get",
+            return_value={"properties": {"iotHubs": [linked_hub]}},
+        )
+        hub_factory = mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
+
+        assert iot_dps_linked_hub_get(
+            fixture_cmd, mocker.MagicMock(), "dps", "myhub", "test-rg"
+        ) is linked_hub
+        hub_factory.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "hostname",
+        [
+            "myhub.azure-devices.net",
+            "myhub.device.azure-devices.net",
+            "myhub.service.azure-devices.net",
+        ],
+    )
+    def test_delete_resolves_dotless_name_without_hub_lookup(
+        self, fixture_cmd, mocker, hostname
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_delete
+
+        dps = {
+            "properties": {
+                "iotHubs": [
+                    {"name": hostname},
+                    {"name": "other.azure-devices.net"},
+                ]
+            }
+        }
+        mocker.patch(
+            "azext_iot.core.custom._ensure_dps_resource_group_name",
+            return_value="test-rg",
+        )
+        client = mocker.MagicMock()
+        dps_get = mocker.patch(
+            "azext_iot.core.custom.iot_dps_get", return_value=dps
+        )
+
+        def list_after_update(*_):
+            assert client.iot_dps_resource.begin_create_or_update.called
+            return [{"name": "other.azure-devices.net"}]
+
+        linked_hub_list = mocker.patch(
+            "azext_iot.core.custom.iot_dps_linked_hub_list",
+            side_effect=list_after_update,
+        )
+        mocker.patch("azext_iot.core.custom.LongRunningOperation")
+        hub_factory = mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
+
+        result = iot_dps_linked_hub_delete(
+            fixture_cmd, client, "dps", "myhub", "test-rg"
+        )
+
+        assert result == [{"name": "other.azure-devices.net"}]
+        body = client.iot_dps_resource.begin_create_or_update.call_args.kwargs[
+            "iot_dps_description"
+        ]
+        assert body["properties"]["iotHubs"] == [{"name": "other.azure-devices.net"}]
+        linked_hub_list.assert_called_once_with(client, "dps", "test-rg")
+        dps_get.assert_called_once_with(client, "dps", "test-rg")
+        hub_factory.assert_not_called()
+
+
 class TestLinkedHubUpdate:
     @pytest.fixture
     def existing_entries(self):
@@ -240,6 +417,7 @@ class TestLinkedHubUpdate:
                 "location": "eastus2euap",
                 "allocationWeight": 1,
                 "applyAllocationPolicy": True,
+                "connectionProfile": "MqttV5",
             }
         ]
 
@@ -353,6 +531,27 @@ class TestLinkedHubUpdate:
         )
         assert existing_entries[0]["connectionString"] == new_cs
 
+    def test_cs_for_different_hostname_is_rejected(
+        self, fixture_cmd, mock_deps
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_update
+
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="HostName must match.*delete the existing link and recreate",
+        ):
+            iot_dps_linked_hub_update(
+                cmd=fixture_cmd,
+                client=mock_deps,
+                dps_name="dps",
+                hub_name="myhub",
+                connection_string=(
+                    "HostName=other.azure-devices.net;"
+                    "SharedAccessKeyName=k;SharedAccessKey=v"
+                ),
+            )
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
+
     def test_dotless_linked_hub_treated_as_hub_name(self, fixture_cmd, mock_deps, existing_entries):
         """Backward compat: --linked-hub myhub (dotless) routes to the hub-name fuzzy match path."""
         from azext_iot.core.custom import iot_dps_linked_hub_update
@@ -377,7 +576,7 @@ class TestLinkedHubUpdate:
         from azext_iot.core.custom import iot_dps_linked_hub_update
         existing_entries[0]["connectionString"] = (
             "HostName=myhub.azure-devices.net;"
-            "SharedAccessKeyName=service;SharedAccessKey=existing-key"
+            "sharedaccesskeyname=service;SharedAccessKey=existing-key"
         )
         policy_spy = mocker.patch(
             "azext_iot.core.custom.iot_hub_policy_get",
@@ -421,14 +620,59 @@ class TestLinkedHubUpdate:
                 hub_name="myhub", authentication_type="SystemAssigned",
             )
 
-    def test_service_hostname_in_cs_rejected(self, fixture_cmd, mock_deps):
+    def test_service_hostname_in_cs_rejected_for_classic(
+        self, fixture_cmd, mock_deps, existing_entries
+    ):
         from azext_iot.core.custom import iot_dps_linked_hub_update
+        existing_entries[0]["connectionProfile"] = "Classic"
         with pytest.raises(InvalidArgumentValueError, match="Service hostname"):
             iot_dps_linked_hub_update(
                 cmd=fixture_cmd, client=mock_deps, dps_name="dps",
                 hub_name="myhub", authentication_type="KeyBased",
                 connection_string="HostName=myhub.service.azure-devices.net;SharedAccessKeyName=k;SharedAccessKey=v",
             )
+
+    def test_service_hostname_in_cs_allowed_for_mqtt_v5(
+        self, fixture_cmd, mock_deps, existing_entries
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_update
+        existing_entries[0]["name"] = "myhub.service.azure-devices.net"
+        existing_entries[0]["hostName"] = "myhub.service.azure-devices.net"
+        connection_string = (
+            "hostname=MYHUB.SERVICE.AZURE-DEVICES.NET;"
+            "SharedAccessKeyName=k;SharedAccessKey=rotated"
+        )
+
+        iot_dps_linked_hub_update(
+            cmd=fixture_cmd,
+            client=mock_deps,
+            dps_name="dps",
+            hub_name="myhub",
+            connection_string=connection_string,
+        )
+
+        assert existing_entries[0]["connectionString"] == connection_string
+
+    def test_service_hostname_in_cs_cannot_change_existing_mqtt_v5_endpoint(
+        self, fixture_cmd, mock_deps
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_update
+
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="HostName must match.*delete the existing link and recreate",
+        ):
+            iot_dps_linked_hub_update(
+                cmd=fixture_cmd,
+                client=mock_deps,
+                dps_name="dps",
+                hub_name="myhub",
+                connection_string=(
+                    "hostname=myhub.service.azure-devices.net;"
+                    "SharedAccessKeyName=k;SharedAccessKey=v"
+                ),
+            )
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
 
     def test_allocation_only_preserves_auth_and_hostname(self, fixture_cmd, mock_deps, existing_entries):
         from azext_iot.core.custom import iot_dps_linked_hub_update
@@ -440,6 +684,7 @@ class TestLinkedHubUpdate:
         assert entry["allocationWeight"] == 5
         assert entry["authenticationType"] == "KeyBased"
         assert entry["name"] == "myhub.azure-devices.net"
+        assert entry["connectionProfile"] == "MqttV5"
 
     def test_keybased_to_system_assigned(self, fixture_cmd, mock_deps, existing_entries):
         from azext_iot.core.custom import iot_dps_linked_hub_update

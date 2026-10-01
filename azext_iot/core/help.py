@@ -62,6 +62,16 @@ def patch_core_help():
         az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
 """
 
+    if "iot dps linked-hub create" in helps:
+        helps[
+            "iot dps linked-hub create"
+        ] += """
+  - name: Link an MQTT 5 IoT Hub to a Device Provisioning Service.
+    text: >
+        az iot dps linked-hub create --dps-name MyDps --resource-group MyResourceGroup
+        --hub-name MyHub --connection-profile MqttV5
+"""
+
     # add DPS identity help
     helps[
         "iot dps identity"

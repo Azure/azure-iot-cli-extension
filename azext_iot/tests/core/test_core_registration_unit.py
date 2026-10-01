@@ -46,8 +46,10 @@ def test_patch_core_help_with_existing_keys():
     # Pre-populate the help keys so the conditional append branches execute.
     helps["iot hub create"] = "type: command"
     helps["iot dps create"] = "type: command"
+    helps["iot dps linked-hub create"] = "type: command"
     patch_core_help()
     assert "iot dps identity" in helps
+    assert "--connection-profile MqttV5" in helps["iot dps linked-hub create"]
 
 
 def test_policy_update_result_transform(mocker):

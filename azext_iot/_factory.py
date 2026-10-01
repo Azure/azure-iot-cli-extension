@@ -61,7 +61,7 @@ def _get_arm_endpoint(cli_ctx):
 
 
 # TODO: Remove after https://github.com/microsoft/typespec/issues/11966 is fixed
-# and the IoT Hub SDK is regenerated.
+# and the affected IoT Hub and DPS SDKs are regenerated.
 # This temporary workaround intentionally covers only the default ARM polling path used by extension call sites.
 class _ModelessJsonARMPolling(ARMPolling):
     """Deserialize modeless ARM LRO results without the generated callback."""
@@ -102,6 +102,18 @@ def _configure_iot_hub_modeless_lro_polling(client):
     _wrap_modeless_lro_operation(client.private_endpoint_connections, "begin_delete")
     _wrap_modeless_lro_operation(client.iot_hub_resource, "begin_create_or_update")
     _wrap_modeless_lro_operation(client.iot_hub_resource, "begin_delete")
+    return client
+
+
+def _configure_dps_modeless_lro_polling(client):
+    _wrap_modeless_lro_operation(client.iot_dps_resource, "begin_create_or_update")
+    _wrap_modeless_lro_operation(client.iot_dps_resource, "begin_delete")
+    _wrap_modeless_lro_operation(
+        client.iot_dps_resource, "begin_create_or_update_private_endpoint_connection"
+    )
+    _wrap_modeless_lro_operation(
+        client.iot_dps_resource, "begin_delete_private_endpoint_connection"
+    )
     return client
 
 
@@ -153,13 +165,15 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
 
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
-    return IotDpsClient(
-        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
-        subscription_id=subscription_id,
-        base_url=_get_arm_endpoint(cli_ctx),
-        credential_scopes=_get_credential_scopes(cli_ctx),
-        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
-        http_logging_policy=_get_default_logging_policy(),
+    return _configure_dps_modeless_lro_polling(
+        IotDpsClient(
+            credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
+            subscription_id=subscription_id,
+            base_url=_get_arm_endpoint(cli_ctx),
+            credential_scopes=_get_credential_scopes(cli_ctx),
+            user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+            http_logging_policy=_get_default_logging_policy(),
+        )
     )
 
 
