@@ -6,7 +6,7 @@
 
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG
+from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG, EASTUS2EUAP_INSTANCE_OUTAGE
 from typing import Dict
 
 
@@ -18,11 +18,7 @@ cli = EmbeddedCLI()
 
 #  Currently only 1 iothub can be created per instance, even though the API definition shows a collection.
 
-@pytest.mark.skip(
-    reason="Service-side regression in eastus2euap: since 2026-10-01 the DeviceUpdate RP fails instance creation"
-    " with InternalServerError ('Job failed due to an internal error') on all branches. There is no CLI-side defect"
-    " and no CLI change is being made. Re-enable when the RP fix is deployed."
-)
+@pytest.mark.skip(reason=EASTUS2EUAP_INSTANCE_OUTAGE)
 @pytest.mark.adu_infrastructure(location="eastus2euap", instance_count=2)
 def test_instance_list_show_delete(provisioned_instances: Dict[str, dict]):
     for account_record in provisioned_instances.keys():

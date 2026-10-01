@@ -29,8 +29,12 @@ from azext_iot.tests import _hub_suite_plugin as plugin
 from azext_iot.tests import _dps_phase_runner as dps
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
 from azext_iot.tests.iothub import _sas_phase as sas
-from azext_iot.tests.test_hub_phase_runner_unit import Reader as HubReader, execute_factory, ownership
-from azext_iot.tests.test_dps_phase_runner_unit import Reader as DpsReader, _execution, SUB, GROUP, RUN as FULL_DPS_RUN
+from azext_iot.tests.test_hub_phase_runner_unit import (  # noqa: F401 - autouse fixture
+    Reader as HubReader, execute_factory, offline_hub_coverage_combine, ownership,
+)
+from azext_iot.tests.test_dps_phase_runner_unit import (  # noqa: F401 - autouse fixture
+    Reader as DpsReader, _execution, offline_dps_coverage_combine, SUB, GROUP, RUN as FULL_DPS_RUN,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 GATE = runpy.run_path(str(ROOT / "azext_iot/tests/_evaluate_test_results.py"))

@@ -6,17 +6,17 @@
 
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG
+from azext_iot.tests.deviceupdate.conftest import ACCOUNT_RG, EASTUS2EUAP_INSTANCE_OUTAGE
 from azext_iot.tests.generators import generate_generic_id
 from typing import Dict
 
 
 cli = EmbeddedCLI()
 
-#  Kept in its own module so --dist=loadfile runs it beside test_adu_instance_int.py;
-#  each instance lifecycle takes over an hour.
+#  Kept in its own module so --dist=loadfile can run each hour-long instance lifecycle on its own worker.
 
 
+@pytest.mark.skip(reason=EASTUS2EUAP_INSTANCE_OUTAGE)
 @pytest.mark.adu_infrastructure(
     location="eastus2euap", instance_count=1, instance_diagnostics=True, instance_diagnostics_user_storage=True
 )

@@ -37,6 +37,12 @@ settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
 DEFAULT_ADU_RBAC_SLEEP_SEC = 90
+# Instance provisioning happens in fixture setup, so every eastus2euap instance module shares this skip.
+EASTUS2EUAP_INSTANCE_OUTAGE = (
+    "Service-side regression in eastus2euap: since 2026-10-01 the DeviceUpdate RP intermittently fails instance"
+    " creation with InternalServerError ('Job failed due to an internal error') on all branches. There is no"
+    " CLI-side defect and no CLI change is being made. Re-enable when the RP fix is deployed."
+)
 
 # Manifest v4 will work with deviceUpdateModel;[1|2] but v5 only with deviceUpdateModel;2
 ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;2"

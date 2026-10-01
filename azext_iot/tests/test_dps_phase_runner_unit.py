@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 from types import SimpleNamespace
+from unittest.mock import Mock
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -84,8 +85,21 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
         ET.SubElement(case, "system-out").text = "UNSAFE_CAPTURED_CREDENTIAL"
     ET.ElementTree(suite).write(env["azext_iot_dps_junit"])
     log.write_text("Sanitized phase output\n", encoding="utf-8")
+    if RUNNER["FOCUSED"]["ENV"] not in env:  # Debug runs never combine; keep their fresh database absent.
+        Path(env["azext_iot_dps_coverage_file"]).write_text("offline", encoding="utf-8")
     return {"exit_code": 0, "timed_out": False, "interrupted": False,
             "cleanup_deadline": time.monotonic() + cleanup}
+
+
+@pytest.fixture(autouse=True)
+def offline_dps_coverage_combine(monkeypatch):
+    # Keep the real fail-closed combine logic, but never spawn coverage or touch the checkout database.
+    from azext_iot.tests import _dps_phase_runner
+
+    combined = Mock(return_value=Mock(returncode=0))
+    for function in (RUNNER["combine_coverage"], _dps_phase_runner.combine_coverage):
+        monkeypatch.setitem(function.__kwdefaults__, "run_process", combined)
+    return combined
 
 
 @pytest.fixture(autouse=True)
@@ -115,6 +129,37 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
         assert "UNSAFE_CAPTURED_CREDENTIAL" not in (folder / "junit.xml").read_text()
     with pytest.raises(FileExistsError):
         RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution)
+
+
+def test_missing_phase_coverage_fails_the_full_run(tmp_path):
+    def execute(*args):
+        result = _execution(*args)
+        if args[1]["azext_iot_dps_test_phase"] == "service-sas":
+            Path(args[1]["azext_iot_dps_coverage_file"]).unlink()
+        return result
+
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=execute) == 1
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    assert all(phase["status"] == "passed" for phase in summary["phases"])
+    assert summary["status"] == "failed" and summary["coverage"]["status"] == "failed"
+    assert summary["coverage"]["missing"] == [str(tmp_path / "dps-phases" / "service-sas" / ".coverage")]
+    assert GATE(tmp_path)
+
+
+def test_signal_during_coverage_combine_fails_the_run(tmp_path, mocker):
+    handlers = {}
+    mocker.patch.dict(RUN.__globals__, signal=SimpleNamespace(
+        SIGINT=2, SIGTERM=15, signal=lambda sig, handler: handlers.setdefault(sig, handler),
+    ))
+
+    def combine(files):
+        handlers[15](None, None)  # SIGTERM after every child exited and verification passed.
+        return {"status": "passed", "files": list(map(str, files))}
+
+    assert RUN(SUB, GROUP, tmp_path / "dps-phases", Reader(), execute=_execution, combine=combine) == 1
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    assert all(phase["status"] == "passed" for phase in summary["phases"])
+    assert summary["cancelled"] is True and summary["status"] == "failed"
 
 
 def test_concurrent_phases_use_isolated_coverage_and_combine_in_manifest_order(tmp_path, mocker):

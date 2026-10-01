@@ -107,6 +107,8 @@ _REPORT_AUTH_POLL_ATTEMPTS = 21
 _REPORT_AUTH_POLL_INTERVAL_SECONDS = 15
 _HUB_IDENTITY_ROTATION_BACKOFFS = (30, 60, 120)
 _HUB_IDENTITY_ROTATION_BUDGET_SECONDS = 600
+_HUB_ROTATION_REJECTED_CHAIN = re.compile(r"\(IdentityRotationUpdateFailed\) " + _LINK_INITIATE_REJECTED.pattern)
+_HUB_ROTATION_REJECTED_MESSAGE = re.compile(r"(?:IdentityRotationUpdateFailed: )?" + _LINK_INITIATE_REJECTED.pattern)
 _TERMINAL_LINK_STATES = {"Succeeded", "Failed", "Canceled", "Cancelled"}
 
 
@@ -142,14 +144,29 @@ def _error_chain_text(error):
     return " ".join(texts)
 
 
+def _structured_hub_rotation_rejection(endpoint):
+    """Persisted form, held to the same structural guards as the DPS readiness classifier."""
+    properties = _link_properties(endpoint or {})
+    error = properties.get("linkingError")
+    if properties.get("linkingState") != "Failed" or not isinstance(error, dict) or set(error) - {"code", "message"}:
+        return False
+    message = error.get("message")
+    match = _HUB_ROTATION_REJECTED_MESSAGE.fullmatch(message) if isinstance(message, str) else None
+    return bool(error.get("code") == "IdentityRotationUpdateFailed" and match and match["service"] == "Hub")
+
+
 def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     detail = _link_failure_detail(endpoint or {}) if endpoint else {}
-    text = " ".join(filter(None, [detail.get("code"), detail.get("message"), _error_chain_text(error) if error else ""]))
+    chain = _error_chain_text(error) if error else ""
+    text = " ".join(filter(None, [detail.get("code"), detail.get("message"), chain]))
     if "IdentityRotationUpdateFailed" not in text:
         return False
-    rejected = _LINK_INITIATE_REJECTED.search(text)
+    # The generic "rejected as invalid" text is otherwise a permanent configuration error; accept it only
+    # when the service attributes it to identity rotation, either in the error chain or the persisted state.
+    rejected = _HUB_ROTATION_REJECTED_CHAIN.search(chain)
     return bool(
-        (rejected and rejected.group("service") == "Hub")
+        (rejected and rejected["service"] == "Hub")
+        or _structured_hub_rotation_rejection(endpoint)
         or "IH400913" in text
         or re.search(
             r"\b(denied|not authorized|does not have authorization|AuthorizationFailed)\b",
@@ -220,9 +237,14 @@ def _update_hub_to_sami_with_recovery(
     test_case, update_cmd, namespace_name, resource_group_name, endpoint_name, hub_id, previous_user_identity,
 ):
     deadline = monotonic() + _HUB_IDENTITY_ROTATION_BUDGET_SECONDS
+
+    def submit():
+        # Bound the synchronous link wait so a slow mutation cannot outlive the recovery budget.
+        test_case.cmd(f"{update_cmd} --timeout {max(1, int(deadline - monotonic()))}")
+
     first_error = None
     try:
-        test_case.cmd(update_cmd)
+        submit()
     except Exception as error:  # noqa: BLE001 - only recovered when persisted state proves the known race.
         first_error = error
 
@@ -252,7 +274,7 @@ def _update_hub_to_sami_with_recovery(
         sleep(sleep_for)
         first_error = None
         try:
-            test_case.cmd(update_cmd)
+            submit()
         except Exception as error:  # noqa: BLE001 - recovered only with matching persisted failure evidence.
             first_error = error
     raise AssertionError("Hub identity rotation authorization recovery budget exhausted") from first_error

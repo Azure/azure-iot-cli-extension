@@ -552,18 +552,22 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     }
 
 
-def combine_coverage(coverage_files, destination=None, run_process=subprocess.run):
-    files = [str(path) for path in coverage_files if Path(path).is_file()]
+def combine_coverage(coverage_files, destination=None, *, run_process=subprocess.run):
+    """Append every launched phase database; a missing database fails closed."""
+    expected = [str(path) for path in coverage_files]
+    files = [path for path in expected if Path(path).is_file()]
+    missing = [path for path in expected if path not in files]
+    destination = str(Path(destination or ROOT / ".coverage").resolve())
     if not files:
-        return {"status": "skipped", "reason": "No phase coverage files were produced."}
-    destination = str((destination or ROOT / ".coverage").resolve())
+        return {"status": "failed", "reason": "No phase coverage files were produced.", "missing": missing,
+                "destination": destination}
     result = run_process(
         [sys.executable, "-m", "coverage", "combine", "--append", "--keep", "--data-file", destination, *files],
         cwd=str(ROOT), capture_output=True, text=True, timeout=300, check=False,
     )
     return {
-        "status": "passed" if result.returncode == 0 else "failed",
-        "files": files, "destination": destination, "exit_code": result.returncode,
+        "status": "passed" if result.returncode == 0 and not missing else "failed",
+        "files": files, "missing": missing, "destination": destination, "exit_code": result.returncode,
     }
 
 
@@ -794,6 +798,10 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
             "message": str(error) if isinstance(error, PhaseError) else "Diagnostic omitted to protect credentials",
         }
     finally:
+        # A signal during serialized verification/combine must not leave a green summary.
+        summary["cancelled"] = cancel.is_set()
+        if summary["cancelled"]:
+            summary["status"] = "failed"
         if debug:
             summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
         summary["finished_at"] = utc()

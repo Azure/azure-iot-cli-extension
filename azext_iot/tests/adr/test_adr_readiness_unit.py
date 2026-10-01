@@ -118,6 +118,11 @@ def _commands(scenario):
     return [call.args[0] for call in scenario.cmd.call_args_list]
 
 
+def _bounded_update_timeouts(scenario, update_cmd):
+    prefix = update_cmd + " --timeout "
+    return [int(command[len(prefix):]) for command in _commands(scenario) if command.startswith(prefix)]
+
+
 def test_owned_job_and_group_require_exact_get_404_before_namespace_delete():
     clock = Clock()
     scenario = Mock()
@@ -812,6 +817,11 @@ def _rotation_endpoint(state="Failed", identity_type="UserAssigned", *, code="Id
         False,
     ),
     ("IdentityRotationUpdateFailed: The Hub resource rejected the link request as invalid.", False),
+    (
+        "IdentityRotationUpdateFailed: retry later. The Hub resource rejected the link request as invalid. "
+        "Verify the endpoint configuration, then resubmit the request.",
+        False,
+    ),
 ])
 def test_hub_rotation_authorization_classifier_is_specific(message, expected):
     endpoint = _rotation_endpoint(message=message)
@@ -821,6 +831,30 @@ def test_hub_rotation_authorization_classifier_is_specific(message, expected):
 def test_hub_rotation_authorization_classifier_requires_identity_rotation_code():
     endpoint = _rotation_endpoint(code="LinkUpdateFailed", message="IH400913: denied namespace read.")
     assert not link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint)
+
+
+_HUB_REJECTED = (
+    "The Hub resource rejected the link request as invalid. Verify the endpoint configuration, then resubmit the request."
+)
+
+
+def test_hub_rotation_rejection_requires_structural_or_attributed_evidence():
+    from azure.core.exceptions import HttpResponseError
+
+    extra = _rotation_endpoint(message=_HUB_REJECTED)
+    extra["linkingError"]["details"] = [{"code": "Other"}]
+    wrong_code = _rotation_endpoint(code="LinkInitiateFailed", message="IdentityRotationUpdateFailed: " + _HUB_REJECTED)
+    not_failed = _rotation_endpoint(message=_HUB_REJECTED)
+    not_failed["linkingState"] = "Succeeded"
+    for endpoint in (extra, wrong_code, not_failed):
+        assert not link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint)
+    assert link_scenarios._is_identity_rotation_authorization_failure(endpoint=_rotation_endpoint(message=_HUB_REJECTED))
+
+    detached = HttpResponseError("(IdentityRotationUpdateFailed) Rotation failed. (LinkFailed) " + _HUB_REJECTED)
+    attributed = HttpResponseError("(LinkingFailed) Failed. (IdentityRotationUpdateFailed) " + _HUB_REJECTED)
+    rolled_back = _rotation_endpoint("Succeeded", "UserAssigned")
+    assert not link_scenarios._is_identity_rotation_authorization_failure(error=detached, endpoint=rolled_back)
+    assert link_scenarios._is_identity_rotation_authorization_failure(error=attributed, endpoint=rolled_back)
 
 
 def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch):
@@ -850,7 +884,8 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     assert result["linkingState"] == "Succeeded"
     assert clock.sleeps == [30]
     commands = _commands(scenario)
-    assert commands.count(update_cmd) == 2
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600, 570]
+    assert update_cmd not in commands
     assert any("role assignment list" in command and "hub-sami" in command for command in commands)
 
 
@@ -891,7 +926,7 @@ def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_roll
 
     assert result["inboundCallerIdentity"]["type"] == "SystemAssigned"
     assert clock.sleeps == [30]
-    assert _commands(scenario).count(update_cmd) == 2
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600, 570]
 
 
 def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):
@@ -918,7 +953,10 @@ def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):
 
     assert all(timeout > 0 for timeout in waits)
     assert clock.now <= link_scenarios._HUB_IDENTITY_ROTATION_BUDGET_SECONDS + 250
-    assert _commands(scenario).count(update_cmd) == 3
+    timeouts = _bounded_update_timeouts(scenario, update_cmd)
+    assert len(timeouts) == 3 and timeouts[0] == 600
+    # Every synchronous mutation is capped by the budget remaining when it is submitted.
+    assert all(0 < later < earlier for earlier, later in zip(timeouts, timeouts[1:]))
     assert clock.sleeps == [30, 60]
 
 
@@ -938,7 +976,7 @@ def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
         )
 
     assert _commands(scenario) == [
-        update_cmd,
+        update_cmd + " --timeout 600",
         "iot adr ns link hub show --ns ns -g rg -n secondary",
     ]
 

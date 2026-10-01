@@ -351,21 +351,27 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
     return result
 
 
-def combine_coverage(output, phase_names):
-    files = [output / name / ".coverage" for name in phase_names if (output / name / ".coverage").exists()]
-    result = {"combined": False, "files": [path.relative_to(output).as_posix() for path in files], "exitCode": None}
-    if not files:
-        result["skipped"] = "no phase coverage files"
-        return result
-    completed = subprocess.run(
-        [sys.executable, "-m", "coverage", "combine", "--append", "--keep", *(str(path) for path in files)],
-        cwd=ROOT, env={**os.environ, "COVERAGE_FILE": str(ROOT / ".coverage")},
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120, check=False,
-    )
-    result["exitCode"] = completed.returncode
-    result["combined"] = completed.returncode == 0
-    if completed.returncode:
-        result["outputTail"] = completed.stdout[-1000:]
+def combine_coverage(output, phase_names, destination=None, *, run_process=subprocess.run):
+    """Append every phase database to the caller's coverage file; any missing phase fails closed."""
+    expected = [output / name / ".coverage" for name in phase_names]
+    files = [path for path in expected if path.exists()]
+    destination = Path(destination or ROOT / ".coverage").resolve()
+    result = {
+        "combined": False, "status": "failed", "files": [path.relative_to(output).as_posix() for path in files],
+        "missing": [path.relative_to(output).as_posix() for path in expected if not path.exists()],
+        "destination": str(destination), "exitCode": None,
+    }
+    if files:
+        completed = run_process(
+            [sys.executable, "-m", "coverage", "combine", "--append", "--keep", *(str(path) for path in files)],
+            cwd=ROOT, env={**os.environ, "COVERAGE_FILE": str(destination)},
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120, check=False,
+        )
+        result["exitCode"] = completed.returncode
+        result["combined"] = completed.returncode == 0
+        if completed.returncode:
+            result["outputTail"] = completed.stdout[-1000:]
+    result["status"] = "passed" if result["combined"] and not result["missing"] else "failed"
     return result
 
 
@@ -381,7 +387,8 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         raise ValueError("Controller is restricted to the authorized integration scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
-    base.pop("COVERAGE_FILE", None)
+    # Children use phase-local databases; the combined result goes where the caller publishes it.
+    coverage_destination = Path(base.pop("COVERAGE_FILE", None) or ROOT / ".coverage").resolve()
     budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
     if debug and not budgets:
         expanded = selection()["expanded_phases"](suite, debug["phase"])
@@ -534,9 +541,9 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
             os.chdir(cwd)
         # Debug evidence stays phase-local; never append to the checkout's shared database.
         summary["coverage"] = {"skipped": "debug run"} if debug else combine_coverage(
-            output, [name for name, _ in budgets])
+            output, [name for name, _ in budgets], coverage_destination)
         summary["status"] = "passed" if all(p["status"] == "passed" for p in summary["phases"]) else "failed"
-        if summary["coverage"].get("exitCode") not in (None, 0):
+        if summary["coverage"].get("status") == "failed":
             summary["status"] = "failed"
     except Exception as error:
         summary["errorType"] = type(error).__name__

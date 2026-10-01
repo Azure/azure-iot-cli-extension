@@ -25,6 +25,14 @@ from azext_iot.tests import _dps_phase_runner as dps_runner
 PREFIX = f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{ownership.GROUP}/providers/"
 
 
+@pytest.fixture(autouse=True)
+def offline_hub_coverage_combine(monkeypatch):
+    # Keep the real fail-closed combine logic, but never spawn coverage or touch the checkout database.
+    combined = Mock(return_value=Mock(returncode=0, stdout="combined"))
+    monkeypatch.setitem(runner.combine_coverage.__kwdefaults__, "run_process", combined)
+    return combined
+
+
 def record(resource_id, run_id="uid"):
     return {
         "id": resource_id, "apiVersion": "test-version", "before": 404, "attempted": True,
@@ -55,6 +63,8 @@ def execute_factory(damage=None, handlers=None):
     def execute(command, env, log_path, runtime, cleanup, cancelled):
         phase, suite = env["AZEXT_IOT_HUB_PHASE"], env["AZEXT_IOT_HUB_SUITE"]
         calls.append(phase)
+        if damage != "no-coverage" and runner.FOCUSED["ENV"] not in env:
+            Path(env["COVERAGE_FILE"]).write_text("offline", encoding="utf-8")
         assert command[0] == sys.executable and command[1:3] == ["-m", "pytest"]
         assert "tox" not in command and "--timeout=900" in command
         assert env["PYTHONPATH"] == "inherited-dependencies"
@@ -413,19 +423,52 @@ def test_coverage_is_cumulative_and_junit_omits_diagnostics(tmp_path):
     assert list(ET.parse(path).getroot().iter("testcase"))[0].find("error") is not None
 
 
-def test_coverage_combine_uses_phase_local_files(tmp_path, monkeypatch):
+def test_coverage_combine_uses_phase_local_files(tmp_path, offline_hub_coverage_combine):
     for phase in ("a", "b"):
         folder = tmp_path / phase
         folder.mkdir()
         (folder / ".coverage").write_text("offline", encoding="utf-8")
-    completed = Mock(returncode=0, stdout="combined")
-    run = Mock(return_value=completed)
-    monkeypatch.setattr(runner.subprocess, "run", run)
-    result = runner.combine_coverage(tmp_path, ("a", "b", "missing"))
-    assert result["combined"] and result["files"] == ["a/.coverage", "b/.coverage"]
-    args = run.call_args.args[0]
+    result = runner.combine_coverage(tmp_path, ("a", "b"))
+    assert result["combined"] and result["status"] == "passed"
+    assert result["files"] == ["a/.coverage", "b/.coverage"] and result["missing"] == []
+    args = offline_hub_coverage_combine.call_args.args[0]
     assert args[:6] == [sys.executable, "-m", "coverage", "combine", "--append", "--keep"]
-    assert run.call_args.kwargs["env"]["COVERAGE_FILE"] == str(runner.ROOT / ".coverage")
+    assert offline_hub_coverage_combine.call_args.kwargs["env"]["COVERAGE_FILE"] == str(runner.ROOT / ".coverage")
+
+
+def test_coverage_combine_fails_closed_when_any_phase_database_is_missing(tmp_path, offline_hub_coverage_combine):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / ".coverage").write_text("offline", encoding="utf-8")
+    partial = runner.combine_coverage(tmp_path, ("a", "missing"))
+    # Available data is still appended for diagnostics, but the result cannot qualify.
+    assert partial["combined"] and partial["status"] == "failed" and partial["missing"] == ["missing/.coverage"]
+    offline_hub_coverage_combine.reset_mock()
+    absent = runner.combine_coverage(tmp_path, ("missing",))
+    assert absent["status"] == "failed" and not absent["combined"] and not offline_hub_coverage_combine.called
+
+
+def test_controller_combines_into_the_callers_published_coverage_file(tmp_path, monkeypatch, offline_hub_coverage_combine):
+    # Azure DevOps publishes the caller's COVERAGE_FILE (.coverage.<name>), resolved from its working directory.
+    monkeypatch.chdir(tmp_path)
+    handlers = {}
+    execute, _ = execute_factory(handlers=handlers)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(dps_runner, "require_linux", lambda: None)
+        patch.setattr(runner.signal, "signal", lambda sig, handler: handlers.setdefault(sig, handler))
+        assert runner.run("HubData", ownership.SUBSCRIPTION, ownership.GROUP, "centraluseuap", tmp_path / "phases",
+                          arm=Reader(), execute=execute,
+                          base={"PYTHONPATH": "inherited-dependencies", "COVERAGE_FILE": ".coverage.HubData"}) == 0
+    destination = str(tmp_path / ".coverage.HubData")
+    assert offline_hub_coverage_combine.call_args.kwargs["env"]["COVERAGE_FILE"] == destination
+    summary = json.loads((tmp_path / "phases" / "hub-phases.json").read_text(encoding="utf-8"))
+    assert summary["coverage"]["destination"] == destination
+
+
+def test_controller_fails_when_a_passing_phase_produced_no_coverage(tmp_path):
+    assert run(tmp_path, damage="no-coverage")[0] == 1
+    summary = json.loads((tmp_path / "phases" / "hub-phases.json").read_text(encoding="utf-8"))
+    assert all(phase["status"] == "passed" for phase in summary["phases"])
+    assert summary["status"] == "failed" and summary["coverage"]["status"] == "failed"
 
 
 def test_gate_requires_sanitized_junit_for_every_phase(tmp_path):

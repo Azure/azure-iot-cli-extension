@@ -137,7 +137,10 @@ operations fail rather than falling back to canary or changing the selected test
 
 Release-build integration tests explicitly select `australiaeast` with public ARM
 routing for all services on Python 3.10 and 3.13, retaining the existing test
-subscription and `cli-int-test-rg` resource group.
+subscription and `cli-int-test-rg` resource group. The scheduled workflow also uses
+`australiaeast` with public ARM. ADR commands default to canary ARM when
+`AZURE_IOT_ADR_ARM_ENDPOINT` is unset, so canary routing is exercised only by an
+explicit `arm-endpoint=canary` / `regions=centraluseuap` dispatch.
 
 Scheduled integration tests are configured separately in
 `.github/workflows/int_test_schedule.yml` on the default branch (`dev`), not the

@@ -222,6 +222,8 @@ SHARDS = {
             "azext_iot/tests/iothub/message_endpoint/test_iothub_message_route_int.py::"
             "test_route_fallback_lifecycle",
         ),
+        # Per-node timeouts here (30 + 35 + 30 min) are failure guards, not expected
+        # durations; the measured shard takes ~45-55 min against its 90-min runtime cap.
         "regular-endpoints-b": (
             "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::"
             "test_iot_cosmos_endpoint_lifecycle",

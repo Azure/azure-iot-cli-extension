@@ -429,7 +429,8 @@ def test_unfinished_background_prevents_resource_cleanup(phase):
     with pytest.raises(subject.HubSasError, match="must not be deleted"):
         phase.cleanup()
     phase.command.assert_not_called()
-    assert 0 <= thread.join.call_args.args[0] <= 90
+    # Windows monotonic() float arithmetic can leave the remaining budget a hair above 90.
+    assert 0 <= thread.join.call_args.args[0] <= 90 + 1e-6
 
 
 def test_background_workers_share_one_drain_budget(monkeypatch):
