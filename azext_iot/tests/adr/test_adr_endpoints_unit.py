@@ -42,7 +42,7 @@ def cli_ctx(mocker):
 
 
 @pytest.mark.parametrize("value,expected", [
-    (None, CANARY_ARM_ENDPOINT),
+    (None, PUBLIC_ARM_ENDPOINT),
     (CANARY_ARM_ENDPOINT, CANARY_ARM_ENDPOINT),
     (PUBLIC_ARM_ENDPOINT, PUBLIC_ARM_ENDPOINT),
     ("HTTPS://MANAGEMENT.AZURE.COM/", PUBLIC_ARM_ENDPOINT),

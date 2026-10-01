@@ -56,6 +56,8 @@ def phase(tmp_path, monkeypatch):
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "True")
     monkeypatch.setenv("azext_iot_hubsas_subscription", "subscription")
     monkeypatch.setenv("azext_iot_hubsas_receipt", str(tmp_path / "receipt.json"))
+    # The Hub runner pins canary ARM for centraluseuap targets.
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", "https://centraluseuap.management.azure.com")
     runtime = subject.HubSasPhase(configuration(), "hub", "storage", "rg", "centraluseuap")
     monkeypatch.setattr(runtime, "command", Mock())
     yield runtime

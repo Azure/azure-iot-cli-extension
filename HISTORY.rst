@@ -8,7 +8,7 @@ Release History
 
 **Known limitations**
 
-* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use the Central US EUAP (canary) ARM endpoint by default.
+* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.
 * ``az iot adr ns link hub|dps|su remove`` submits the unlink and returns without waiting; inspect the namespace with ``az iot adr ns show`` afterward.
 * Link add/update automatically create the service role assignments that the link requires when the caller can create role assignments.
 
