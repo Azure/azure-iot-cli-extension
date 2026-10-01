@@ -7,6 +7,8 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
+- This branch prepares **azure-iot 1.0.0** using `2026-11-01` ADR/CMS, IoT Hub control-plane, and DPS APIs. IoT Hub data-plane clients intentionally use `2026-11-01-preview`. The supported scope and deferred deployment/live-qualification gates are documented in [the GA release plan](GA_RELEASE_PLAN.md); this is not a publication or deployment announcement.
+
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
@@ -39,7 +41,7 @@ Please refer to the official `az iot` reference on [Microsoft Docs](https://lear
 ## Installation
 
 1. Install the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-    - You must have at least `v2.59.0` for the latest versions of `azure-iot`, which you can verify with `az --version`
+    - You must have at least `v2.73.0` for this version of `azure-iot`, which you can verify with `az --version`
 1. Add, Update or Remove the IoT extension with the following commands:
     - Add: `az extension add --name azure-iot`
     - Update: `az extension update --name azure-iot`
@@ -49,7 +51,7 @@ Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) i
 
 ## Usage
 
-After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge` and `device` commands.
+After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge`, `device`, `adr` and `du` commands.
 
 For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for the following IoT services.
 

@@ -11,6 +11,7 @@ import yaml
 from typing import Optional, Tuple, Union
 from uuid import uuid4
 from knack.log import get_logger
+from azure.cli.core.azclierror import AzureConnectionError
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import shell_safe_json_parse
@@ -21,6 +22,7 @@ from azure.eventhub._pyamqp.authentication import JWTTokenAuth as PyAMQPJWTToken
 from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
 from azure.eventhub._pyamqp.message import Message as PyAMQPMessage
 from azure.eventhub._pyamqp.error import AMQPLinkError, AMQPConnectionError
+from azure.eventhub._pyamqp.performatives import TransferFrame
 
 # To provide amqp frame trace
 DEBUG = False
@@ -149,7 +151,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
                 and p.get("deviceId")
                 and p["deviceId"].lower() != device_id.lower()
             ):
-                return None
+                continue
             print(yaml.safe_dump({"feedback": p}, default_flow_style=False), flush=True)
             if wait_on_id:
                 msg_id = p["originalMessageId"]
@@ -169,6 +171,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         f"Starting C2D feedback monitor,{device_filter_txt if device_filter_txt else ''} use ctrl-c to stop..."
     )
 
+    match = None
     try:
         client = PyAMQPReceiveClient(
             hostname=_service_hostname(target),
@@ -181,25 +184,30 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         message_generator = client.receive_messages_iter()
         for msg_tuple in message_generator:
             # PyAMQP returns (frame, message) tuples from _received_messages queue
-            # frame is a TransferFrame NamedTuple with delivery_id and delivery_tag
+            # The decoded frame is a sequence, not necessarily a TransferFrame.
             if isinstance(msg_tuple, tuple) and len(msg_tuple) == 2:
                 frame, msg = msg_tuple
             else:
                 # Fallback for when only message is returned
                 frame, msg = None, msg_tuple
 
+            if isinstance(frame, (list, tuple)):
+                frame = TransferFrame(*frame)
             match = handle_msg(msg)
+            # Unrelated deliveries must not exhaust the service's unsettled window.
+            if frame and hasattr(frame, 'delivery_id') and hasattr(frame, 'delivery_tag'):
+                client.settle_messages(frame.delivery_id, frame.delivery_tag, 'accepted')
             if match:
                 logger.info("Requested message Id has been matched...")
-                if frame and hasattr(frame, 'delivery_id') and hasattr(frame, 'delivery_tag'):
-                    client.settle_messages(frame.delivery_id, frame.delivery_tag, 'accepted')
-                else:
-                    # If no frame info, message is auto-settled by PyAMQP
-                    logger.debug("No frame delivery info available for settlement")
                 return match
     except KeyboardInterrupt:
         logger.info("Stopping C2D feedback monitor...")
     except AMQPLinkError as e:
+        if wait_on_id and not match:
+            raise AzureConnectionError(
+                f"Feedback monitoring failed before receiving feedback for message '{wait_on_id}': {e}",
+                recommendation="Check the connection and retry monitoring without resending the message.",
+            ) from e
         # Link detachment is expected when device disconnects or service closes the connection
         error_condition = getattr(e, 'condition', None)
         if error_condition and 'detach' in str(error_condition).lower():
@@ -207,6 +215,11 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         else:
             logger.warning(f"AMQP link error during feedback monitoring: {e}")
     except AMQPConnectionError as e:
+        if wait_on_id and not match:
+            raise AzureConnectionError(
+                f"Feedback monitoring failed before receiving feedback for message '{wait_on_id}': {e}",
+                recommendation="Check the connection and retry monitoring without resending the message.",
+            ) from e
         # Connection errors can occur due to transient network issues or server-side disconnects
         logger.warning(f"AMQP connection error during feedback monitoring: {e}")
         # Don't re-raise - this is often a transient issue that shouldn't fail the operation
