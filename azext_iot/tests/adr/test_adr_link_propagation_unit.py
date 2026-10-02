@@ -528,6 +528,23 @@ def test_later_stop_after_service_failure_preserves_original_service_error(mocke
     assert len(h.patches) == 1
 
 
+def test_namespace_change_during_backoff_preserves_original_service_error(mocker):
+    h = Harness(mocker)
+    h.clock.on_sleep = lambda: h.namespace.update(tags={"concurrent": "change"})
+
+    with pytest.raises(
+        AzureResponseError, match="^Namespace changed during link recovery; no retry PATCH submitted\\.$",
+    ) as caught:
+        h.run()
+
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
+    assert "tags" not in caught.value.__cause__.body
+    assert h.namespace["tags"] == {"concurrent": "change"}
+    assert h.clock.delays == [30]
+    assert len(h.patches) == 1
+
+
 def test_slow_recovery_preflight_expires_before_assignment_reads_or_retry(mocker):
     h = Harness(mocker)
     target_reads = h.provider._get_target
@@ -589,8 +606,10 @@ def test_malformed_current_state_never_succeeds_or_retries(mocker, mutation):
                 endpoints["su"]["linkingError"] = "AdrMiNotAuthorized"
 
     h.get_hook = corrupt
-    with pytest.raises(AzureResponseError, match="Malformed"):
+    with pytest.raises(AzureResponseError, match="Malformed") as caught:
         h.run()
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
     assert len(h.patches) == 1 and not h.clock.delays
 
 
