@@ -668,8 +668,7 @@ def load_iothub_arguments(self, _):
                 nargs="*",
                 required=True,
                 help=(
-                    "Space-separated topic templates. Specify the option without values "
-                    "to use an empty list."
+                    "Provide one or more space-separated topic templates."
                 ),
             )
 

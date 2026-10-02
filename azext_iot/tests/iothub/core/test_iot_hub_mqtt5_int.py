@@ -93,23 +93,6 @@ def test_mqtt5_profile_and_topic_group_lifecycle(provisioned_mqtt5_hub):
         }
     ]
 
-    topic_groups = cli.invoke(
-        f"iot hub topic-group update -n {hub_name} -g {RG} "
-        f"--topic-group-id {topic_group_id} --topic-templates",
-        capture_stderr=True,
-    ).as_json()
-    assert topic_groups == [
-        {
-            "topicGroupId": topic_group_id,
-            "topicTemplates": [],
-        }
-    ]
-    assert cli.invoke(
-        f"iot hub topic-group show -n {hub_name} -g {RG} "
-        f"--topic-group-id {topic_group_id}",
-        capture_stderr=True,
-    ).as_json() == topic_groups[0]
-
     assert cli.invoke(
         f"iot hub topic-group delete -n {hub_name} -g {RG} "
         f"--topic-group-id {topic_group_id}",

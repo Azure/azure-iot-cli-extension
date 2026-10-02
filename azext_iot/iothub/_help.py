@@ -910,10 +910,6 @@ def load_iothub_help():
             text: >
               az iot hub topic-group create -n {iothub_name} --topic-group-id {topic_group_id}
               --topic-templates {topic_template_1} {topic_template_2}
-          - name: Create a topic group with an empty topic-template list.
-            text: >
-              az iot hub topic-group create -n {iothub_name} --topic-group-id {topic_group_id}
-              --topic-templates
     """
 
     helps[
@@ -948,10 +944,6 @@ def load_iothub_help():
             text: >
               az iot hub topic-group update -n {iothub_name} --topic-group-id {topic_group_id}
               --topic-templates {topic_template_1} {topic_template_2}
-          - name: Clear all templates from a topic group.
-            text: >
-              az iot hub topic-group update -n {iothub_name} --topic-group-id {topic_group_id}
-              --topic-templates
     """
 
     helps[
