@@ -622,7 +622,15 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 29
+        assert len(nodes) == 34
+        assert {
+            "test_adr_namespace_workflow_int.py::TestADRNamespaceWorkflow::" + name
+            for name in (
+                "test_namespace_setup_tagged_plan_is_read_only", "test_namespace_setup_check_and_resume",
+                "test_namespace_setup_links_dps", "test_namespace_setup_links_hub_after_dps",
+                "test_namespace_setup_links_software_updates",
+            )
+        } <= nodes
         assert {
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
