@@ -459,7 +459,7 @@ def load_adr_help():
   long-summary: |
     Certificate policies can only be created under an issuing certificate
     authority with type ICA. Create the ICA under a Root CA, then pass the ICA
-    name to --ca-name. The leaf certificate validity period must be between 7
+    name to --ca-name. The leaf certificate validity period must be between 1
     and 90 days, inclusive. Use 'ca policy update --validity-days' to change
     the validity period of an existing policy.
   examples:
@@ -493,7 +493,7 @@ def load_adr_help():
   type: command
   short-summary: Update a certificate policy for a certificate authority.
   long-summary: |
-    When supplied, the leaf certificate validity period must be between 7 and
+    When supplied, the leaf certificate validity period must be between 1 and
     90 days, inclusive.
   examples:
     - name: Update certificate policy tags
