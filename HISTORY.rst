@@ -6,6 +6,13 @@ Release History
 1.0.0b1 (Preview)
 +++++++++++++++++
 
+**Namespace terminal UI**
+
+* Added ``az iot adr ns ui`` for namespace browsing, read-only diagnostics, and guided connectivity setup.
+* Onboarding uses the release providers and role matrix, including the namespace system-assigned identity's DPS provisioning role and the three Software Updates service roles. Missing grants require role-assignment write permission at each scope; existing grants are reused.
+* Link operations wait inside the execution worker through the shared provider, retaining bounded propagation recovery and ambiguous-write protection without blocking the terminal UI.
+* Guided setup cannot overlap pending or running operations. Provider progress displays are disabled while the UI owns the terminal and restored when it exits.
+
 **Known limitations**
 
 * Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.

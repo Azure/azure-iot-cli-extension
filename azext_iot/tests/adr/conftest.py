@@ -66,6 +66,7 @@ _ADR_XDIST_GROUPS = {
         "test_namespace_crud_lifecycle",
         "test_namespace_list_by_resource_group",
         "test_namespace_list_by_subscription",
+        "test_radar_readonly_namespace_smoke",
     },
     "adr-g2-su-delete-ca": {
         "test_adr_link_su_delete",
