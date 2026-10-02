@@ -8,7 +8,13 @@
         },
         {
             "file": "azext_iot\\tests\\adr\\test_adr_command_log_unit.py",
-            "_justification": "Fake URL password used to verify command redaction in unit tests."
+            "placeholder": "https://user:redactme@host/path",
+            "_justification": "CSCAN-GENERAL0060: synthetic URL userinfo used only to verify command redaction; not a service credential."
+        },
+        {
+            "file": "azext_iot\\tests\\dps\\core\\test_dps_phase_runtime_unit.py",
+            "placeholder": "eA==",
+            "_justification": "CSCAN-GENERAL0060: base64 of the single byte x in a mocked Hub key response; not a service credential."
         },
         {
             "file": "azext_iot\\tests\\iothub\\core\\test_iothub_discovery_unit.py",

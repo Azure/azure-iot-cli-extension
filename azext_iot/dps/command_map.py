@@ -21,6 +21,9 @@ def load_dps_commands(self, _):
     with self.command_group(
         "iot device registration",
         command_type=dps_device_registration_ops,
-        is_preview=True
+        is_preview=False
     ) as cmd_group:
         cmd_group.command("create", "create_device_registration")
+        cmd_group.show_command(
+            "operation-status", "show_device_registration_operation"
+        )

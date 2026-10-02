@@ -137,7 +137,6 @@ stages:
           testADR: ${{ parameters.testADR }}
           maxParallelADT: 2
           maxParallelDPS: 2
-          maxParallelHub: 2
           maxParallelADU: 4
           maxParallelADR: 2
       - job: "evaluateCmdTable"

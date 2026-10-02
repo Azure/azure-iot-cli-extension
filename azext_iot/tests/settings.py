@@ -7,6 +7,8 @@
 from os import environ
 from enum import Enum
 
+HUB_TEST_LOCATION = environ.get("azext_iot_testhub_location", "centraluseuap")
+
 ENV_SET_TEST_IOTHUB_REQUIRED = [
     "azext_iot_testrg"
 ]

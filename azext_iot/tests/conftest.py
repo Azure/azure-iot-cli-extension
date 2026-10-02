@@ -5,11 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 import re
+import logging
 import responses
 import pytest
 import json
-import logging
 import os
+import inspect
 from functools import partial
 from urllib3.util.retry import Retry
 
@@ -69,8 +70,11 @@ mock_target["resourcegroup"] = "myresourcegroup"
 
 # Mock Iot DPS Target
 mock_dps_target = {}
-mock_dps_target["cs"] = "HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value"
-mock_dps_target["entity"] = "mydps"
+mock_dps_target["cs"] = (
+    "HostName=mydps.azure-devices-provisioning.net;"
+    "SharedAccessKeyName=name;SharedAccessKey=value"
+)
+mock_dps_target["entity"] = "mydps.azure-devices-provisioning.net"
 mock_dps_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["policy"] = "provisioningserviceowner"
@@ -82,6 +86,29 @@ mock_symmetric_key_attestation = {
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pycollect_makeitem(collector, name, obj):
+    from azure.cli.testsdk import LiveScenarioTest
+
+    # Pytest instantiates unittest classes during collection, before skip handling.
+    # Live scenario constructors can provision resources even in a unit-only run.
+    patterns = collector.config.getini("python_files")
+    unit_only = (
+        collector.config.getoption("keyword").strip() == "_unit.py"
+        or (patterns and all(pattern.endswith("_unit.py") for pattern in patterns))
+        or (collector.config.args and all(
+            str(arg).split("::", maxsplit=1)[0].endswith("_unit.py") for arg in collector.config.args
+        ))
+    )
+    if (
+        unit_only
+        and inspect.isclass(obj)
+        and issubclass(obj, LiveScenarioTest)
+    ):
+        return []
+    return None
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +128,14 @@ def generate_cs(
 ):
     result = generic_cs_template.format(hub, policy, key)
     return result.lower() if lower_case else result
+
+
+@pytest.fixture(autouse=True)
+def integration_auth_defaults(request, monkeypatch):
+    if request.node.path.name.endswith("_int.py"):
+        # Knack preserves configured-default option hyphens in environment names.
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE", "login")
 
 
 @pytest.fixture(autouse=True)
@@ -459,9 +494,62 @@ def fixture_dt_client(mocker, fixture_cmd):
 
 def pytest_addoption(parser):
     parser.addoption("--api-version", action="store", default=None)
+    parser.addoption(
+        "--integration-progress-interval", type=int, default=0,
+        help="Emit credential-free integration phase progress every N seconds (0 disables).",
+    )
+    parser.addoption(
+        "--integration-results-dir", default=None,
+        help="Persist metadata-only integration outcomes and incomplete/failure evidence after every phase.",
+    )
+
+
+def pytest_configure(config):
+    from azext_iot.tests._integration_progress import IntegrationProgress
+
+    interval = config.getoption("integration_progress_interval")
+    if interval < 0:
+        raise pytest.UsageError("--integration-progress-interval must be nonnegative.")
+    results_dir = config.getoption("integration_results_dir")
+    config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
+    config.pluginmanager.register(
+        IntegrationProgress(config, interval, results_dir=results_dir), "iot-integration-progress",
+    )
+
+
+class ImmediateIntegrationReports:
+    """Keep integration failures visible even if cancellation prevents the final summary."""
+
+    def __init__(self, config):
+        self.config = config
+
+    def pytest_runtest_logreport(self, report):
+        if (
+            hasattr(self.config, "workerinput")
+            or not report.nodeid.partition("::")[0].endswith("_int.py")
+            or report.outcome not in ("failed", "rerun")
+        ):
+            return
+        reporter = self.config.pluginmanager.getplugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_sep("=", f"Immediate {report.outcome} ({report.when}): {report.nodeid}")
+            reporter.write_line(report.longreprtext)
+            reporter.flush()
 
 
 # DPS Fixtures
+@pytest.fixture()
+def dps_service_client_generic_errors(
+    service_client_generic_errors, fixture_gdcs, fixture_dps_sas, patch_certificate_open
+):
+    yield service_client_generic_errors
+    assert service_client_generic_errors.calls
+    assert all(
+        call.request.url.startswith("https://{}/".format(mock_dps_target["entity"]))
+        for call in service_client_generic_errors.calls
+    )
+
+
 @pytest.fixture()
 def fixture_gdcs(mocker):
     gdcs = mocker.patch(path_gdcs)

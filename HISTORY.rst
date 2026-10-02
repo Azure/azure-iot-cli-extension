@@ -3,6 +3,38 @@
 Release History
 ===============
 
+1.0.0 (Unreleased)
+++++++++++++++++++
+
+**API compatibility**
+
+* Regenerated seven modeless synchronous SDK packages: Device Registry/CMS, IoT Hub management, DPS management, and both DPS data-plane clients use ``2026-11-01``. The IoT Hub service/device data-plane clients intentionally use ``2026-11-01-preview``.
+* Ported the supported command implementations, adapters, and tests from ``release/1.0.0-preview``. Public Azure ARM is the default management endpoint; trusted explicit endpoint overrides remain available.
+* Preserved the Hub data-plane adapter's request/response, query, messaging, and file-upload compatibility around freshly generated SDK code.
+* Updated dependency floors to match the generated SDK contracts: ``azure-core>=1.37.0``, ``azure-mgmt-core>=1.6.0``, ``isodate>=0.6.1``, and ``typing-extensions>=4.6.0``.
+
+**Device Registry and certificate management**
+
+* Added the GA namespace identity, certificate authority, certificate policy, registry-device CRUD/wait, and Hub/DPS namespace-link command surfaces.
+* Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
+* Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
+* ADR groups/jobs/job runs, reports, registry-device authentication/attribute/capability child commands, and ADR Software Updates are excluded because their operations are absent from these GA APIs. Existing Hub jobs, DPS enrollment groups, and ``iot du`` remain available.
+
+**DPS and release behavior**
+
+* Retained enrollment, registration-state, certificate issuance, and operation-status recovery commands against the GA DPS APIs.
+* Marked the selected ADR/CMS, device-registration, and linked-Hub management features as stable. Unrelated existing preview features and the intentional Hub data-plane preview API remain distinct.
+* Repaired the generated modeless LRO callback defect outside generated files while preserving healthy callbacks, void DELETE results, and the original poller interface.
+* Set the extension package version to ``1.0.0`` and removed extension-wide preview metadata. This branch is preparation only: deployment readiness and live release qualification remain separate approval gates.
+
+**Device Update bug fixes**
+
+* ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs.
+
+**Test infrastructure**
+
+* Reused the updated preview release's concurrent owned Hub/DPS phase controllers, ADR worker grouping, fixture readiness fixes, and strict workflow result gates. GA-specific API and command-scope adaptations remain; live qualification is still deferred.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 

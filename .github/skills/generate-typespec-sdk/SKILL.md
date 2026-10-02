@@ -34,7 +34,7 @@ Known control-plane mappings:
 | Service | Source directory | Entrypoint | Namespace | Client | Destination |
 | --- | --- | --- | --- | --- | --- |
 | IoT Hub | `specification/iothub/resource-manager/Microsoft.Devices/IoTHub` | `client.tsp` | `azext_iot.sdk.iothub.mgmt` | `IotHubClient` | `azext_iot/sdk/iothub/mgmt` |
-| DPS | `specification/deviceprovisioningservices/resource-manager/Microsoft.Devices/ProvisioningService` | `client.tsp` | `azext_iot.sdk.dps.mgmt` | `IotDpsClient` | `azext_iot/sdk/dps/mgmt` |
+| DPS | `specification/deviceprovisioningservices/resource-manager/Microsoft.Devices/DeviceProvisioningServices` | `client.tsp` | `azext_iot.sdk.dps.mgmt` | `IotDpsClient` | `azext_iot/sdk/dps/mgmt` |
 
 Do not guess data-plane mappings. Ask for explicit source directory, entrypoint, namespace, client, and destination.
 
@@ -168,6 +168,7 @@ Before touching the extension repository, assert:
 - the expected namespace directory exists;
 - the expected client class is exported by the package;
 - no `models/` directory exists;
+- `types.py` containing `TypedDict` and `Literal` annotations is allowed in modeless output;
 - no `aio/` directory exists;
 - operation methods use synchronous definitions;
 - generated Python files compile;
@@ -191,6 +192,7 @@ Compare the generated directory with the existing destination before replacement
 - operation method additions, removals, and signature changes;
 - default API-version and endpoint/base-URL changes;
 - generated package version changes;
+- runtime dependency minimums from generated `pyproject.toml` compared with extension `setup.py`;
 - imports and extension call sites that may become incompatible.
 
 Pay particular attention to:
@@ -203,6 +205,8 @@ Pay particular attention to:
 
 This report does not block replacement when generation checks pass, but compatibility warnings must be prominent.
 Do not edit call sites automatically.
+Report dependency increases for the separate compatibility task as well; copying only the namespace
+does not remove the generated SDK's runtime requirements.
 
 ## 7. Replace automatically with rollback
 
