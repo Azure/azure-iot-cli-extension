@@ -31,6 +31,10 @@ Release History
 
 * ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs.
 
+**Test infrastructure**
+
+* Reused the updated preview release's concurrent owned Hub/DPS phase controllers, ADR worker grouping, fixture readiness fixes, and strict workflow result gates. GA-specific API and command-scope adaptations remain; live qualification is still deferred.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 

@@ -45,6 +45,12 @@ _OWNED_LINK_TYPES = {
 }
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
+_AUTHORIZATION_BACKOFFS = (30, 60, 120)
+_FRESH_DPS_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_LINK_INITIATE_REJECTED = re.compile(
+    r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
+    r"Verify the endpoint configuration, then resubmit the request\."
+)
 
 
 class _Deadline:
@@ -270,22 +276,47 @@ def _read_authorization_failure(endpoint):
     return error.get("code") != "LinkInitiateFailed" and error.get("message") in messages
 
 
-def _authorization_failure(namespace, endpoint, binding):
+def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
+    """Match ADR's generic DPS linkInitiate envelope only while fresh grants can still propagate."""
+    if (
+        binding.kind != "dps"
+        or submitted_at is None
+        or now is None
+        or now - submitted_at > _FRESH_DPS_GRANT_WINDOW
+    ):
+        return False
+    error = endpoint.get("linkingError") or {}
+    message = error.get("message")
+    match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
+    return bool(
+        endpoint.get("linkingState") == "Failed"
+        and error.get("code") == "LinkInitiateFailed"
+        and not set(error) - {"code", "message"}
+        and match
+        and match["service"] == "DPS"
+    )
+
+
+def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, now=None):
     """Keep the legacy read shape; share the production linkInitiate classifier."""
     properties = namespace["properties"]
     if namespace.get("error") or properties.get("error"):
-        return False
+        return None
     # Only the canonical structured linkingError may authorize the new retry.
     # Conflicting/alternate error envelopes must not be hidden by a matching one.
     error = endpoint.get("linkingError") or {}
     if error.get("code") != "LinkInitiateFailed":
-        return _read_authorization_failure(endpoint)
+        return "read" if _read_authorization_failure(endpoint) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
         or (endpoint.get("provisioningStatus") or {}).get("error")
     ):
-        return False
-    return binding.authorized_failure(endpoint)
+        return None
+    if binding.authorized_failure(endpoint):
+        return "bound-link-initiate"
+    if _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
+        return "fresh-dps-generic"
+    return None
 
 
 def link_hub_with_readiness(
@@ -350,6 +381,7 @@ def link_with_readiness(
         },
     )
     budget.call(scenario.cmd, command + " --no-wait")
+    submitted_at = budget.clock()
     expected = _endpoint_settings(expected)
     progressed = True  # The initial add is never replayed.
     retries = 0
@@ -387,10 +419,17 @@ def link_with_readiness(
             retry_at = None
         elif any(_link_state(other) in _ACTIVE_STATES for other in others):
             retry_at = None
-        elif ns_state == "Failed" and state == "Failed" and _authorization_failure(namespace, endpoint, binding):
-            if progressed:
+        elif ns_state == "Failed" and state == "Failed":
+            recovery_reason = _authorization_failure(
+                namespace, endpoint, binding, submitted_at=submitted_at, now=budget.clock(),
+            )
+            if recovery_reason and progressed:
                 if retry_at is None:
-                    retry_at = budget.clock() + min(10 * (retries + 1), 30)
+                    if recovery_reason == "fresh-dps-generic":
+                        delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
+                    else:
+                        delay = min(10 * (retries + 1), 30)
+                    retry_at = budget.clock() + delay
                 if budget.clock() >= retry_at:
                     recovery = failed_link_recovery_commands({
                         "id": namespace["id"],
@@ -401,6 +440,8 @@ def link_with_readiness(
                     retries += 1
                     progressed = False
                     retry_at = None
+            elif not recovery_reason:
+                raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:
             raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
         budget.pause(10)

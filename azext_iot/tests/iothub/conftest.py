@@ -121,9 +121,18 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             )
 
 
+def _owned_regular_phase(manifest, suite, phase):
+    """Accept non-SAS shards and their focused-debug aliases (HubControl/regular, HubData/entra)."""
+    try:
+        expanded = manifest.expanded_phases(suite, phase)
+    except (TypeError, ValueError):
+        return False
+    return all(manifest.auth_phase(name) == "regular" for name in expanded)
+
+
 def _dynamic_hub_was_unused(request):
     import requests
-    from azext_iot.tests import _focused_live, _hub_ownership as ownership
+    from azext_iot.tests import _focused_live, _hub_ownership as ownership, _hub_suite_manifest as manifest
     from azext_iot.tests._hub_suite_plugin import PhaseReceipt
 
     runtime = request.config.pluginmanager.get_plugin("hub-suite-receipt")
@@ -135,7 +144,7 @@ def _dynamic_hub_was_unused(request):
         return False
     observer = getattr(runtime, "observer", None)
     if (not isinstance(runtime, PhaseReceipt) or not isinstance(observer, ownership.Observer)
-            or (suite, phase) not in (("HubControl", "regular"), ("HubData", "entra"))
+            or not _owned_regular_phase(manifest, suite, phase)
             or not run_id or not owner_path or not receipt_path
             or not Path(owner_path).is_absolute() or not Path(receipt_path).is_absolute()
             or observer.path != Path(owner_path) or runtime.path != Path(receipt_path)

@@ -9,6 +9,12 @@ import pytest
 CANARY_ARM = "https://centraluseuap.management.azure.com"
 PUBLIC_ARM = "https://management.azure.com"
 
+
+@pytest.fixture(autouse=True)
+def default_arm_endpoint(monkeypatch):
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+
+
 CLOUD_CONFIGS = [
     {
         "id": "public",
@@ -294,11 +300,14 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
 
 
 @pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
-def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_profile, mocked_response, cloud_config):
+def test_dps_request_uses_canary_endpoint_and_preserves_api_version(
+    mocker, monkeypatch, cli_profile, mocked_response, cloud_config
+):
     from urllib.parse import parse_qs, urlsplit
     from azure.core.credentials import AccessToken
     from azext_iot._factory import iot_service_provisioning_factory
 
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", CANARY_ARM)
     credential = mocker.Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("test-token", 4102444800)
     cli_profile.return_value.get_login_credentials.return_value = (credential, "test-sub-id", "tenant")

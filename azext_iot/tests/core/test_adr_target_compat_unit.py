@@ -40,7 +40,7 @@ TARGETS = [
 @pytest.mark.parametrize("adr", [False, True], ids=["general", "adr"])
 @pytest.mark.parametrize("subscription", [None, "target-sub"])
 def test_native_preview_management_wire_contract(
-    mocker, mocked_response, cloud, target, adr, subscription,
+    mocker, monkeypatch, mocked_response, cloud, target, adr, subscription,
 ):
     kind, group, resource_type, name_arg, general_factory, adr_factory, default_api, adr_api = target
     cli_ctx = _build_cli_ctx(mocker, cloud)
@@ -48,6 +48,7 @@ def test_native_preview_management_wire_contract(
     credential.get_token.return_value = AccessToken("test-token", 4102444800)
     get_credential = mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
     selected_sub = subscription or "test-sub-id"
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
     endpoint = PUBLIC_ARM
     resource_id = (
         f"/subscriptions/{selected_sub}/resourceGroups/rg/providers/"

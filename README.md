@@ -47,6 +47,12 @@ Please refer to the official `az iot` reference on [Microsoft Docs](https://lear
     - Update: `az extension update --name azure-iot`
     - Remove: `az extension remove --name azure-iot`
 
+The extension installer resolves native dependencies for the Python runtime used by
+that `az` executable. If multiple Azure CLI installations are present, install and run
+the extension with the same executable, or give each installation a separate
+`AZURE_EXTENSION_DIR`. Do not share one extension directory between Azure CLI
+installations that use different Python versions.
+
 Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) if you run into any issues or the [Alternative Installation Methods](docs/alt-install-methods.md) if you'd like to install from a GitHub release or local source.
 
 ## Usage

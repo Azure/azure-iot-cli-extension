@@ -46,6 +46,10 @@ ENDPOINT_REJECTION_NODE = (
 )
 
 
+def regular_phase(phase):
+    return phase == "regular" or (isinstance(phase, str) and phase.startswith("regular-"))
+
+
 def planned_root(resource_id):
     """Naming contracts from iothub/__init__, conftest and the state regressions."""
     parts = resource_id.casefold().split("/")
@@ -478,6 +482,7 @@ class Arm:
         self.session.send = self.session.send
         self.deadline = None
         self.read_failed = False
+        self.main_thread_dispatch = None
 
     def _read(self, operation):
         from azext_iot.tests._dps_phase_runner import PhaseError, bounded_read_call
@@ -515,7 +520,11 @@ class Arm:
         if method == "GET":
             return self._read(request)
         if threading.current_thread() is not threading.main_thread():
-            raise OwnershipError("Controller DELETE requires the main thread")
+            # Concurrent controllers marshal the timer-bounded mutation to the main thread.
+            dispatch = getattr(self, "main_thread_dispatch", None)
+            if dispatch is None:
+                raise OwnershipError("Controller DELETE requires the main thread")
+            return dispatch(lambda: self.request(method, resource_id, api))
         with bounded_read(self.deadline):
             return request(lambda: None)
 
@@ -704,7 +713,7 @@ class Observer:
         """
         props = body.get("properties", {})
         template = props.get("template", {})
-        if (self.data["phase"] != "regular" or not scope_id(resource_id)
+        if (not regular_phase(self.data["phase"]) or not scope_id(resource_id)
                 or len(resource_id.split("/")) != 9 or "/microsoft.resources/deployments/" not in resource_id
                 or set(body) - {"properties", "tags", "location"}
                 or set(props) - {"template", "parameters", "mode", "validationLevel"}

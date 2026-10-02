@@ -123,6 +123,28 @@ def test_live_policy_async_operation_wrapper_requires_policy_code(inner, observe
         assert caught.value is error
 
 
+@pytest.mark.parametrize("message,observed", [
+    ("Parent certificate authority '12345678-1234-4234-9234-123456789abc' already has an active certificate policy.", True),
+    ("Parent certificate authority 'not-a-guid' already has an active certificate policy.", False),
+    ("Parent certificate authority '12345678-1234-4234-9234-123456789abc' has active certificate policy.", False),
+    ("Authorization failed for parent certificate authority '12345678-1234-4234-9234-123456789abc'.", False),
+])
+def test_live_policy_async_active_policy_message_requires_guid_and_exact_contract(message, observed, caplog):
+    from azext_iot.tests.adr.test_adr_certificate_authority_int import TestADRCertificateAuthorityLifecycle
+
+    error = HttpResponseError(f"(AsyncOperationFailed) {message}")
+    error.status_code = 200
+    error.error = Mock(code="AsyncOperationFailed")
+    command = Mock(side_effect=error)
+    if observed:
+        TestADRCertificateAuthorityLifecycle._observe_additional_policy(command)
+        assert "rejection observed" in caplog.text
+    else:
+        with pytest.raises(HttpResponseError) as caught:
+            TestADRCertificateAuthorityLifecycle._observe_additional_policy(command)
+        assert caught.value is error
+
+
 def _set_parent_ca(fixture_ca_policy_provider, ca_type="ICA"):
     fixture_ca_policy_provider.client.certificate_authorities.get.return_value = {
         "properties": {"certificateAuthorityType": ca_type}

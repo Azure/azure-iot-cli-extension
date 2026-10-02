@@ -185,10 +185,11 @@ def test_current_sdk_wire_shapes(
         assert not request.body
 
 
-def test_current_factory_contract(offline_cli):
+def test_current_factory_contract(offline_cli, monkeypatch):
     from azext_iot._factory import adr_service_factory
     from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
     client = adr_service_factory(offline_cli)
     assert isinstance(client, DeviceRegistryMgmtClient)
     assert client._config.api_version == "2026-11-01"

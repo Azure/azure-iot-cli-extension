@@ -35,6 +35,8 @@ def evaluate_dps_phases(result_dir, region=None, endpoint=None):
         if (receipt["schema"] != 1 or receipt["status"] != "passed"
                 or [phase["name"] for phase in phases] != list(MANIFEST["PHASE_NAMES"])):
             raise ValueError("incomplete/failed DPS phase summary")
+        if receipt.get("coverage", {}).get("status") == "failed":
+            raise ValueError("DPS phase coverage was not combined successfully")
         baseline = {resource["id"].lower() for resource in receipt["baseline"]["resources"]}
         if len(baseline) != len(receipt["baseline"]["resources"]):
             raise ValueError("ambiguous baseline ownership inventory")

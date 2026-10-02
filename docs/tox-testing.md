@@ -81,3 +81,94 @@ In order to list all recognized environments, you can type `tox -av`, which will
 
 ![image](https://user-images.githubusercontent.com/13545962/217683727-1ec36d2c-e055-4677-a5a9-8f87cdcc987b.png)
 
+## Integration workflow topology
+
+`int_test.yml` runs a direct service × Python × region matrix after setup and unit
+tests succeed. Every selected combination, including ADU, is independently eligible
+to run, with `fail-fast: false`, no parallelism cap and no workflow/job concurrency
+lock. Job names and result/coverage artifacts identify the service, Python and region.
+The result gate checks the complete selected matrix independently of coverage reporting.
+
+Owned Hub/DPS controllers run independent phases concurrently; ADR uses four
+`loadgroup` workers by default. Controllers do not reserve slots or enforce subscription quota
+admission. Inventory and exact-ID reads still establish ownership, detect
+collisions, reconcile known resources and verify cleanup; they are not quota
+count gates. Azure provisioning errors, including quota rejections, fail the run.
+The existing canary scope, identities/RBAC, quarantine and ownership checks still apply.
+Overlapping runs and additional Python/region combinations can consume resources
+concurrently; the former bounded-cohort reservation does not apply.
+
+DPS phases use independent resources, with failed cleanup retained in the report.
+Cleanup and
+ownership checks still apply to each phase, and full qualification still requires
+every test and cleanup to pass. Cancellation and insufficient remaining runtime
+still stop scheduling. Leftover resources can consume quota; subsequent Azure
+provisioning failures are reported normally.
+
+HubControl runs its four shards concurrently, each capped at 90 minutes plus
+15 minutes for controller cleanup and 5 minutes for admission. GitHub and Azure
+DevOps jobs allow 140 minutes (HubData: 120), including 15 minutes for external
+setup/reporting. Individual test timeouts are unchanged except for two 30-minute
+markers that also budget module-scoped setup/teardown:
+`test_iot_cosmos_endpoint_lifecycle` and
+`test_export_import_migrate_missing_hubs_error`. Per-test timeouts are failure
+guards, not expected durations, so a shard's ceilings may sum past its runtime cap.
+
+Every selected service runs its full branch-specific suite. GitHub dispatch and
+reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
+capacity-limit input; the release caller does not supply a quota override either.
+Both ADR Microsoft CA revocation cases run using newly created, test-owned CAs.
+Pre-existing resources are rejected before creation, and the certificate action
+tracker independently enforces exact ownership before any mutation.
+Unrelated optional external/preprovisioned fixtures retain their safety controls:
+selecting the full suite never authorizes mutation of external credentials.
+The live suite does not require a pre-provisioned failed DPS link. Deterministic
+unit tests retain coverage of failed-link recovery and identity-preserving updates.
+Local focused-debug controls remain available and cannot qualify a full suite.
+
+## ADR live-test budgets
+
+The GA branch includes namespace, certificate-authority/policy, registry-device,
+and Hub/DPS link scenarios. Software Updates, groups, jobs and reports are not in
+the selected GA API and are not included in its worker groups or expected coverage.
+The workers preserve the release branch's grouping mechanism, adapted to the
+16 supported scenarios.
+
+The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
+The root integration matrix applies this budget directly to each ADR service job.
+The job ceiling does not extend per-operation provisioning waits.
+
+The release branch's conservative job ceiling is retained; it is not a measured
+GA runtime. Live qualification remains deferred until the GA APIs are deployed.
+`azext_iot_adr_workers` controls the worker count; each group remains serial.
+
+Owned no-wait Hub/DPS link fixtures use the native CLI's **600-second** readiness
+default. A local run exhausted the former 240-second bound while an accepted
+recovery was still in progress, not after a terminal service rejection. The same
+monotonic deadline covers the initial snapshot, calls, backoff and polling;
+accepted work is not replayed. The source's narrowly classified fresh-DPS-grant
+and Hub identity-rotation propagation cases have bounded recovery; unrelated
+invalid-request failures remain non-retryable.
+The three-add lifecycle reserves **45 minutes** (15 minutes plus three 10-minute
+windows), without increasing native CLI defaults.
+
+360 minutes is practical headroom, **not a guarantee of full coverage or success**.
+All case maxima combined exceed one hosted job. A cancellation must be reported
+as incomplete, with failures/skips and unstarted cases preserved; backend failures
+must not be skipped, suppressed, or converted to successful coverage.
+
+`ADR-int` writes `test-result/integration-outcomes.json` and `failures.txt` after
+collection, each case start and each setup/call/teardown report. These files are
+atomically replaced and flushed before returning from the hook, so a killed job
+retains failed, active/incomplete and unstarted cases without requiring pytest's
+final summary or JUnit shutdown. `session_finished: false` is not a passing run.
+Skips remain explicitly skipped, not passed coverage. The GitHub always-run result
+step preserves these files rather than replacing them with a final-summary scrape.
+
+The opt-in `--integration-results-dir` supports serial pytest and xdist, with the
+controller writing the aggregate receipts. It does not change other services'
+reporting. Receipts include only code addresses,
+per-selection case numbers, phase/outcome enums and numeric durations: parameter
+values, errors, captured logs and skip reasons are never persisted. Repeated
+parameter cases have distinct numbers even when their sanitized addresses match.
+These are test-execution receipts, **not proof that Azure resources were cleaned up**.

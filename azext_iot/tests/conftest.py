@@ -500,7 +500,7 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--integration-results-dir", default=None,
-        help="Persist metadata-only serial integration outcomes and incomplete/failure evidence after every phase.",
+        help="Persist metadata-only integration outcomes and incomplete/failure evidence after every phase.",
     )
 
 
@@ -511,8 +511,6 @@ def pytest_configure(config):
     if interval < 0:
         raise pytest.UsageError("--integration-progress-interval must be nonnegative.")
     results_dir = config.getoption("integration_results_dir")
-    if results_dir and config.getoption("numprocesses", default=0):
-        raise pytest.UsageError("--integration-results-dir requires serial pytest (-n 0).")
     config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
     config.pluginmanager.register(
         IntegrationProgress(config, interval, results_dir=results_dir), "iot-integration-progress",

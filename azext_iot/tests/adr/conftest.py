@@ -4,9 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 from typing import Optional
 from unittest.mock import MagicMock, Mock, create_autospec, patch
 
@@ -53,6 +55,52 @@ OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_ca_auth_profile_name",
 )
 
+_ADR_XDIST_GROUPS = {
+    "adr-g1-namespace": {
+        "test_namespace_crud_lifecycle",
+        "test_namespace_list_by_resource_group",
+        "test_namespace_list_by_subscription",
+    },
+    "adr-g2-ca": {
+        "test_microsoft_revocation",
+        "test_microsoft_revocation_no_wait",
+        "test_external_activation_recipe",
+        "test_external_activation_no_wait",
+    },
+    "adr-g3-link-lifecycle": {
+        "test_adr_link_lifecycle",
+        "test_adr_link_sequential_add",
+        "test_adr_certificate_authority_lifecycle",
+        "test_adr_link_validation_negatives",
+    },
+    "adr-g4-mixed-delete": {
+        "test_adr_link_hub_dps_delete",
+        "test_registry_device_lifecycle",
+        "test_namespace_uami_idempotent_assign_and_partial_remove",
+        "test_namespace_identity_assign_remove_show",
+        "test_adr_validation_negatives",
+    },
+}
+_ADR_GROUP_ORDER = {group: index for index, group in enumerate(_ADR_XDIST_GROUPS)}
+_ADR_TEST_GROUP = {test: group for group, tests in _ADR_XDIST_GROUPS.items() for test in tests}
+_ADR_LONG_TEST_ORDER = {
+    "test_namespace_crud_lifecycle": 0,
+    "test_microsoft_revocation": 0,
+    "test_adr_link_lifecycle": 0,
+    "test_adr_link_hub_dps_delete": 1,
+}
+
+
+def _is_adr_integration_item(item):
+    item_path = Path(str(item.path)).resolve()
+    adr_directory = Path(__file__).resolve().parent
+    return item_path.name.endswith("_int.py") and adr_directory in item_path.parents
+
+
+def _adr_xdist_group(nodeid):
+    test_name = nodeid.split("[")[0].rsplit("::", 1)[-1]
+    return _ADR_TEST_GROUP.get(test_name, "adr-g4-mixed-delete")
+
 
 def _run_preflight_command(command):
     try:
@@ -77,6 +125,31 @@ def _run_preflight_command(command):
     return result.stdout.strip()
 
 
+@contextmanager
+def _preflight_profile_lock():
+    """Serialize xdist workers' Azure CLI profile writes; readers never see a truncated profile."""
+    try:
+        import fcntl
+    except ImportError:  # Non-POSIX local runs stay serial.
+        yield
+        return
+    path = Path(tempfile.gettempdir()) / "azext-iot-adr-preflight.lock"
+    with open(path, "a", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def _select_preflight_subscription():
+    show = ["az", "account", "show", "--query", "id", "-o", "tsv"]
+    with _preflight_profile_lock():
+        subscription_id = _run_preflight_command(show)
+        # CI already selects it; rewriting azureProfile.json races sibling workers' CLI reads.
+        if (subscription_id or "").casefold() != TEST_SUBSCRIPTION.casefold():
+            _run_preflight_command(["az", "account", "set", "--subscription", TEST_SUBSCRIPTION])
+            subscription_id = _run_preflight_command(show)
+    return subscription_id
+
+
 def run_adr_integration_preflight(config):
     """Run mandatory checks and report optional ADR fixture availability."""
     if os.getenv("AZURE_TEST_RUN_LIVE", "").lower() not in {
@@ -94,12 +167,7 @@ def run_adr_integration_preflight(config):
             "ADR test REST requests and production clients must use the same ARM endpoint."
         )
 
-    _run_preflight_command(
-        ["az", "account", "set", "--subscription", TEST_SUBSCRIPTION]
-    )
-    subscription_id = _run_preflight_command(
-        ["az", "account", "show", "--query", "id", "-o", "tsv"]
-    )
+    subscription_id = _select_preflight_subscription()
     if not subscription_id:
         raise pytest.UsageError(
             "ADR integration preflight returned an empty subscription ID."
@@ -196,6 +264,10 @@ def adr_integration_preflight(request):
     run_adr_integration_preflight(request.config)
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "xdist_group(name): group ADR integration tests for xdist loadgroup")
+
+
 def pytest_runtest_logreport(report):
     """In pretty mode, emit PASSED/FAILED via _log so colors work."""
     if not _pretty_log_enabled():
@@ -216,6 +288,23 @@ def pytest_runtest_logreport(report):
                     short_reason = f" -- {line[:200]}"
                     break
         _log("_fail", "%s%s", test_name, short_reason)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Assign balanced xdist load groups and collect longest ADR groups first."""
+    if not any(_is_adr_integration_item(item) for item in items):
+        return
+    grouped = []
+    for index, item in enumerate(items):
+        if not _is_adr_integration_item(item):
+            grouped.append((999, index, item.nodeid, item))
+            continue
+        group = _adr_xdist_group(item.nodeid)
+        item.add_marker(pytest.mark.xdist_group(group))
+        test_name = item.nodeid.split("[")[0].rsplit("::", 1)[-1]
+        grouped.append((_ADR_GROUP_ORDER[group], _ADR_LONG_TEST_ORDER.get(test_name, 50), item.nodeid, item))
+    grouped.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
+    items[:] = [item for _, _, _, item in grouped]
 
 
 @pytest.fixture(autouse=True)

@@ -163,13 +163,14 @@ class _HubIdentityCommandsLoader(MainCommandsLoader):
 
 
 @pytest.fixture
-def identity_update_cli(mocker):
+def identity_update_cli(mocker, monkeypatch):
     """Run the native invoker, discovery, generic update and SDK against offline HTTP only."""
     from azure.core.credentials import AzureKeyCredential
     from azext_iot import _factory
     from azext_iot.iothub.providers.discovery import IotHubDiscovery
     from azext_iot.operations import hub
 
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
     subscription = "00000000-0000-0000-0000-000000000001"
     credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
     mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
