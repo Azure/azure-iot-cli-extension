@@ -314,7 +314,7 @@ def test_dps_request_uses_canary_endpoint_and_preserves_api_version(
     mocked_response.add(
         method="GET",
         url=(
-            f"{PUBLIC_ARM}/subscriptions/test-sub-id/resourceGroups/rg"
+            f"{CANARY_ARM}/subscriptions/test-sub-id/resourceGroups/rg"
             "/providers/Microsoft.Devices/provisioningServices/test-dps"
         ),
         json={"name": "test-dps"},

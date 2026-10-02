@@ -993,7 +993,7 @@ def native_hub(phase, mocker):
 def test_actual_show_namecheck_is_untyped_but_native_get_preserves_absence(phase, native_hub, mocker):
     from azext_iot.core import custom
     mocker.patch.object(custom, "_ensure_resource_group_existence", return_value=True)
-    root = "https://management.azure.com"
+    root = "https://centraluseuap.management.azure.com"
     availability = root + f"/subscriptions/{phase.subscription}/providers/Microsoft.Devices/checkNameAvailability"
     with responses.RequestsMock() as wire:
         wire.add("POST", availability, json={"nameAvailable": True}, status=200)
@@ -1011,7 +1011,7 @@ def test_actual_show_namecheck_is_untyped_but_native_get_preserves_absence(phase
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 500, 502])
 def test_native_hub_read_only_accepts_http_404(phase, native_hub, status):
     with responses.RequestsMock() as wire:
-        wire.add("GET", "https://management.azure.com" + phase.ids["hub"],
+        wire.add("GET", "https://centraluseuap.management.azure.com" + phase.ids["hub"],
                  json={"error": {"code": "SyntheticFailure"}}, status=status)
         # Disable read retries in this synthetic failure proof, not in production.
         native_hub._config.retry_policy.total_retries = 0
@@ -1186,8 +1186,8 @@ def test_native_preflight_reaches_one_recorded_write_after_all_fresh404s(phase, 
     phase.command.side_effect = first_write
     scenario = SimpleNamespace(_testMethodName="test_device_upload_file")
     with responses.RequestsMock() as wire:
-        for resource_id in phase.ids.values():
-            root = "https://management.azure.com"
+        for kind, resource_id in phase.ids.items():
+            root = "https://centraluseuap.management.azure.com" if kind == "hub" else "https://management.azure.com"
             wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
         wire.add_callback("PUT", "https://management.azure.com" + phase.ids["storage"], callback=accepted)
         with pytest.raises(RuntimeError, match="proof stops"):
@@ -1233,7 +1233,7 @@ def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(
     monkeypatch.setattr(phase, "command", partial(subject.HubSasPhase.command, phase))
     with responses.RequestsMock() as wire:
         for kind, resource_id in phase.ids.items():
-            root = "https://management.azure.com"
+            root = "https://centraluseuap.management.azure.com" if kind == "hub" else "https://management.azure.com"
             resource = {"id": resource_id, "tags": {"runUid": subject.UID}, "properties": {}}
             wire.add("GET", root + resource_id, json=resource, status=200)
             wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
@@ -1276,7 +1276,7 @@ def test_native_storage_deleting_wire_state_prevents_repeat_delete(phase, native
 
 def test_native_hub_delete_submits_once_without_polling_and_then_reads(phase, native_hub):
     phase.install()
-    root = "https://management.azure.com"
+    root = "https://centraluseuap.management.azure.com"
     hub = {"id": phase.ids["hub"], "tags": {"runUid": subject.UID}, "properties": {}}
     with responses.RequestsMock() as wire:
         wire.add("GET", root + phase.ids["hub"], json=hub, status=200)
@@ -1371,7 +1371,7 @@ def test_native_device_cleanup_factory_and_oauth_use_scoped_original_context(pha
         "sku": {"name": "S1", "tier": "Standard", "capacity": 1},
     }
     with responses.RequestsMock() as wire:
-        wire.add("GET", "https://management.azure.com" + phase.ids["hub"],
+        wire.add("GET", "https://centraluseuap.management.azure.com" + phase.ids["hub"],
                  json=target, status=200)
         wire.add("DELETE", "https://hub.azure-devices.net/devices/owned-device", status=204)
         provider = DeviceIdentityProvider(
@@ -1437,7 +1437,7 @@ def test_real_shared_cleanup_helper_uses_b_at_factory_and_profile_boundaries(pha
         "sku": {"name": "S1", "tier": "Standard", "capacity": 1},
     }
     with responses.RequestsMock() as wire:
-        wire.add("GET", "https://management.azure.com" + phase.ids["hub"], json=target, status=200)
+        wire.add("GET", "https://centraluseuap.management.azure.com" + phase.ids["hub"], json=target, status=200)
         wire.add("GET", "https://hub.azure-devices.net/devices", json=[{"deviceId": "owned-device"}], status=200)
         wire.add("DELETE", "https://hub.azure-devices.net/devices/owned-device", status=204)
         wire.add("GET", "https://hub.azure-devices.net/devices", json=[], status=200)
