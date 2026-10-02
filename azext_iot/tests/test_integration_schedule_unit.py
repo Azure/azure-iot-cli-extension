@@ -42,7 +42,7 @@ gh() {
     printf 'gh %s\n' "$*" >&2
     if [ "$1" = "api" ]; then
         if [ "$TEST_GH_QUERY_EXIT" != "0" ]; then return "$TEST_GH_QUERY_EXIT"; fi
-        if [[ "$*" == *"status=$TEST_GH_BUSY_STATUS&"* ]]; then
+        if [[ "$*" == *"workflows/$TEST_GH_BUSY_WORKFLOW/runs?status=$TEST_GH_BUSY_STATUS&"* ]]; then
             printf '1\n'
         else
             printf '0\n'
@@ -89,6 +89,7 @@ def _run_schedule(workflow, date="2026-09-24", trigger=RELEASE_SCHEDULE, **overr
         "TEST_YEAR_DAY": instant.strftime("%j"),
         "TEST_DATE": date,
         "TEST_GH_QUERY_EXIT": "0",
+        "TEST_GH_BUSY_WORKFLOW": "int_test.yml",
         "TEST_GH_BUSY_STATUS": "none",
         "TEST_ADO_QUERY_EXIT": "0",
         "TEST_ADO_BUSY_STATUS": "none",
@@ -107,6 +108,11 @@ def _run_schedule(workflow, date="2026-09-24", trigger=RELEASE_SCHEDULE, **overr
         timeout=15,
         check=False,
     )
+
+
+def _release_region(date):
+    epoch_day = (datetime.fromisoformat(date) - datetime(1970, 1, 1)).days
+    return ("australiaeast", "centralus")[epoch_day % 2]
 
 
 def _dispatches(result):
@@ -136,11 +142,12 @@ def test_release_integration_dispatch(schedule_workflow):
         "--repo", REPOSITORY,
         "--ref", "release/1.0.0-preview",
         "-f", "python-versions=3.13",
-        "-f", "regions=australiaeast,centralus",
+        "-f", f"regions={_release_region('2026-09-24')}",
         "-f", "arm-endpoint=public",
         "-f", "resource-group=cli-int-test-rg",
         "-f", "subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1",
     ]]
+    assert "workflows/release_workflow.yml/runs?status=in_progress&" in result.stderr
     assert "--pipeline-ids 109 147" in result.stderr
     assert "starts_with(finishTime || '', '2026-09-24')" in result.stderr
 
@@ -151,22 +158,35 @@ def test_release_integration_dispatch(schedule_workflow):
     "2026-12-31", "2027-01-01", "2027-01-02",
     "2028-02-28", "2028-02-29", "2028-03-01",
 ])
-def test_release_schedule_preserves_alternate_days(schedule_workflow, date):
+def test_release_schedule_runs_daily_and_alternates_regions(schedule_workflow, date):
     result = _run_schedule(schedule_workflow, date=date)
-    epoch_day = (datetime.fromisoformat(date) - datetime(1970, 1, 1)).days
     assert result.returncode == 0, result.stderr
-    assert len(_dispatches(result)) == (1 if epoch_day % 2 == 0 else 0)
-    if epoch_day % 2:
-        assert result.stderr == ""
+    dispatches = _dispatches(result)
+    assert len(dispatches) == 1
+    assert f"regions={_release_region(date)}" in dispatches[0]
 
 
-@pytest.mark.parametrize("status", ["requested", "queued", "pending", "in_progress", "waiting"])
-def test_release_skips_active_github_integrations(schedule_workflow, status):
-    result = _run_schedule(schedule_workflow, TEST_GH_BUSY_STATUS=status)
+def test_release_regions_cover_both_regions_on_consecutive_days():
+    assert {_release_region("2026-10-01"), _release_region("2026-10-02")} == {"australiaeast", "centralus"}
+
+
+@pytest.mark.parametrize("workflow,status", [
+    *[("int_test.yml", status) for status in ["requested", "queued", "pending", "in_progress", "waiting"]],
+    *[("release_workflow.yml", status) for status in ["requested", "queued", "pending", "in_progress"]],
+])
+def test_release_skips_active_github_integrations(schedule_workflow, workflow, status):
+    result = _run_schedule(schedule_workflow, TEST_GH_BUSY_WORKFLOW=workflow, TEST_GH_BUSY_STATUS=status)
     assert result.returncode == 0, result.stderr
     assert not _dispatches(result)
-    assert "GitHub integration runs are" in result.stdout
+    assert f"GitHub {workflow} runs are {status}" in result.stdout
     assert "az " not in result.stderr
+
+
+def test_release_approval_wait_does_not_block_dispatch(schedule_workflow):
+    result = _run_schedule(schedule_workflow, TEST_GH_BUSY_WORKFLOW="release_workflow.yml", TEST_GH_BUSY_STATUS="waiting")
+    assert result.returncode == 0, result.stderr
+    assert len(_dispatches(result)) == 1
+    assert "workflows/release_workflow.yml/runs?status=waiting&" not in result.stderr
 
 
 @pytest.mark.parametrize("status", ["inProgress", "notStarted", "cancelling", "postponed"])

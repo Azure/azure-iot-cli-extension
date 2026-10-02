@@ -6,7 +6,7 @@ on:
         # preview: once per day on weekdays; dev: once per week on Saturday.
         - cron: "17 8 * * 1-5" # Weekdays 12:17 AM PT (08:17 UTC) → preview
         - cron: "17 8 * * 6" # Saturday 12:17 AM PT (08:17 UTC) → dev
-        # Release: alternate UTC days, after the 13:00 UTC shared-resource cleanup.
+        # Release: daily after the 13:00 UTC shared-resource cleanup; region alternates by UTC day.
         - cron: "17 14 * * *"
     workflow_dispatch:
 
@@ -31,21 +31,26 @@ jobs:
                   set -euo pipefail
 
                   if [ "$TRIGGER_SCHEDULE" = "17 14 * * *" ]; then
-                    # Epoch-day parity preserves the cadence across month/year boundaries.
+                    # Epoch-day parity preserves the region alternation across month/year boundaries.
+                    release_regions=("australiaeast" "centralus")
                     utc_day=$(( $(date -u +%s) / 86400 ))
-                    if (( utc_day % 2 != 0 )); then
-                      echo "Skipping release integration tests on this alternate UTC day."
-                      exit 0
-                    fi
+                    release_region="${release_regions[$(( utc_day % ${#release_regions[@]} ))]}"
 
-                    for status in requested queued pending in_progress waiting; do
-                      active_runs=$(gh api \
-                        "repos/$GH_REPO/actions/workflows/int_test.yml/runs?status=$status&per_page=1" \
-                        --jq '.total_count')
-                      if [ "$active_runs" != "0" ]; then
-                        echo "Skipping release integration tests: GitHub integration runs are $status."
-                        exit 0
-                      fi
+                    # Release runs call int_test.yml as a reusable workflow, so their runs are listed under
+                    # release_workflow.yml. A release paused at approval (waiting) has finished its tests.
+                    for check in \
+                      "int_test.yml:requested queued pending in_progress waiting" \
+                      "release_workflow.yml:requested queued pending in_progress"; do
+                      workflow="${check%%:*}"
+                      for status in ${check#*:}; do
+                        active_runs=$(gh api \
+                          "repos/$GH_REPO/actions/workflows/$workflow/runs?status=$status&per_page=1" \
+                          --jq '.total_count')
+                        if [ "$active_runs" != "0" ]; then
+                          echo "Skipping release integration tests: GitHub $workflow runs are $status."
+                          exit 0
+                        fi
+                      done
                     done
 
                     if [ -z "$AZURE_DEVOPS_EXT_PAT" ]; then
@@ -72,12 +77,12 @@ jobs:
                       exit 0
                     fi
 
-                    echo "Dispatching release/1.0.0-preview: Python 3.13, Regions australiaeast,centralus"
+                    echo "Dispatching release/1.0.0-preview: Python 3.13, Region $release_region"
                     gh workflow run int_test.yml \
                       --repo "$GH_REPO" \
                       --ref release/1.0.0-preview \
                       -f python-versions=3.13 \
-                      -f regions=australiaeast,centralus \
+                      -f regions="$release_region" \
                       -f arm-endpoint=public \
                       -f resource-group=cli-int-test-rg \
                       -f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1
