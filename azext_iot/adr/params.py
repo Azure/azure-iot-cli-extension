@@ -219,7 +219,7 @@ def load_adr_arguments(self, _):
             "validity_days",
             options_list=["--validity-days", "--vd"],
             type=int,
-            help="Leaf certificate validity period in days. Must be between 7 and "
+            help="Leaf certificate validity period in days. Must be between 1 and "
                  "90 days, inclusive.",
         )
         context.argument(
@@ -233,7 +233,7 @@ def load_adr_arguments(self, _):
             options_list=["--validity-days", "--vd"],
             type=int,
             help="Updated leaf certificate validity period in days. Must be between "
-                 "7 and 90 days, inclusive.",
+                 "1 and 90 days, inclusive.",
         )
 
     with self.argument_context("iot adr ns device") as context:
