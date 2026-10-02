@@ -21,6 +21,7 @@ import requests
 from azure.cli.core._profile import Profile
 from azure.cli.core.azclierror import RequiredArgumentMissingError, ResourceNotFoundError
 
+from azext_iot import _factory
 from azext_iot.tests import _hub_ownership as ownership, _hub_phase_runner as runner
 from azext_iot.tests.test_hub_ownership_transport_unit import Wire, Credential, HUB, create_hub
 
@@ -375,7 +376,9 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
     create_hub(wire)
     wire.resources[HUB].update(sku={"tier": "Standard"}, resourcegroup=ownership.GROUP)
     wire.resources[HUB]["properties"]["hostName"] = "offline.azure-devices.net"
-    client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM, polling_interval=0)
+    client = _factory._configure_iot_hub_modeless_lro_polling(
+        IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM, polling_interval=0)
+    )
     monkeypatch.setattr(discovery, "iot_hub_service_factory", lambda _ctx: client)
     monkeypatch.setattr(discovery, "get_subscription_id", lambda _ctx: ownership.SUBSCRIPTION)
     monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
@@ -478,7 +481,9 @@ def test_real_hub_delete_poll_success_still_requires_exact_root_absence(transpor
         return original(request)
 
     monkeypatch.setattr(wire, "handle", handle)
-    client = IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM, polling_interval=0)
+    client = _factory._configure_iot_hub_modeless_lro_polling(
+        IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM, polling_interval=0)
+    )
     client.iot_hub_resource.begin_delete(ownership.GROUP, HUB.rsplit("/", 1)[1]).result(timeout=3)
     mutation = observer.data["resources"][HUB]["mutations"][-1]
     assert mutation["status"] == 202 and mutation["pollingSucceeded"]
