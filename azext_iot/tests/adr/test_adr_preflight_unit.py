@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,6 +75,49 @@ def test_preflight_ignores_cross_module_focused_runner_parameter_ids(mocker, for
     preflight.assert_not_called()
 
 
+def test_adr_xdist_groups_split_long_delete_cases_and_sort_long_groups_first():
+    base = Path(subject.__file__).resolve().parent
+    names = [
+        "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
+        "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_su_delete",
+        "test_adr_update_instance_int.py::TestADRUpdateInstanceLifecycle::test_update_instance_lifecycle",
+        "test_adr_link_int.py::TestADRLinkLifecycle::test_adr_link_lifecycle",
+    ]
+    items = []
+    for nodeid in names:
+        item = SimpleNamespace(path=base / nodeid.split("::", 1)[0], nodeid=nodeid, markers=[])
+        item.add_marker = item.markers.append
+        items.append(item)
+
+    subject.pytest_collection_modifyitems(Mock(), items)
+
+    ordered = [item.nodeid.rsplit("::", 1)[-1] for item in items]
+    assert ordered == [
+        "test_update_instance_lifecycle",
+        "test_adr_link_su_delete",
+        "test_adr_link_lifecycle",
+        "test_adr_link_hub_dps_delete",
+    ]
+    groups = {item.nodeid.rsplit("::", 1)[-1]: item.markers[0].args[0] for item in items}
+    assert groups["test_adr_link_su_delete"] != groups["test_adr_link_hub_dps_delete"]
+
+
+def test_adr_xdist_groups_map_every_integration_test_exactly_once():
+    # The fallback group silently absorbs unmapped tests and would erode the time balance.
+    base = Path(subject.__file__).resolve().parent
+    collected = []
+    for path in sorted(base.rglob("*_int.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        collected.extend(
+            node.name for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        )
+    mapped = [test for tests in subject._ADR_XDIST_GROUPS.values() for test in tests]
+    assert len(collected) == len(set(collected))
+    assert len(mapped) == len(set(mapped))
+    assert sorted(mapped) == sorted(collected)
+
+
 @pytest.mark.parametrize("live", [None, "", "false", "0"])
 def test_selected_adr_integration_fixture_preserves_mandatory_live_guard(mocker, monkeypatch, live):
     if live is None:
@@ -135,7 +179,6 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
         subject,
         "_run_preflight_command",
         side_effect=[
-            "",
             "00000000-0000-0000-0000-000000000000",
             "",
             "",
@@ -151,14 +194,10 @@ def test_preflight_validates_mandatory_resources_and_reports_optional_fixtures(
         ):
             subject.run_adr_integration_preflight(config)
 
-    assert run.call_count == 7
-    assert run.call_args_list[0].args[0] == [
-        "az",
-        "account",
-        "set",
-        "--subscription",
-        "00000000-0000-0000-0000-000000000000",
-    ]
+    # Already-selected subscriptions are only read: concurrent workers never rewrite the profile.
+    assert run.call_count == 6
+    assert run.call_args_list[0].args[0] == ["az", "account", "show", "--query", "id", "-o", "tsv"]
+    assert all(call.args[0][:3] != ["az", "account", "set"] for call in run.call_args_list)
     messages = [call.args[0] for call in reporter.write_line.call_args_list]
     assert any("subscription=00000000" in message for message in messages)
     assert any("endpoint=" in message and "api=" in message for message in messages)
@@ -173,7 +212,7 @@ def test_preflight_rejects_unregistered_provider(monkeypatch):
     with patch.object(
         subject,
         "_run_preflight_command",
-        side_effect=["", subject.TEST_SUBSCRIPTION, "", "", "NotRegistered"],
+        side_effect=[subject.TEST_SUBSCRIPTION, "", "", "NotRegistered"],
     ), pytest.raises(pytest.UsageError, match="must be registered"):
         subject.run_adr_integration_preflight(config)
 
@@ -185,9 +224,34 @@ def test_preflight_rejects_unexpected_subscription(monkeypatch):
     with patch.object(
         subject,
         "_run_preflight_command",
-        side_effect=["", "different-subscription"],
-    ), pytest.raises(pytest.UsageError, match="expected"):
+        side_effect=["different-subscription", "", "different-subscription"],
+    ) as run, pytest.raises(pytest.UsageError, match="expected"):
         subject.run_adr_integration_preflight(config)
+    assert run.call_args_list[1].args[0] == ["az", "account", "set", "--subscription", subject.TEST_SUBSCRIPTION]
+
+
+def test_preflight_selects_subscription_only_when_needed_under_profile_lock(monkeypatch):
+    monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "true")
+    config, _ = _config()
+    events = []
+
+    class Lock:
+        def __enter__(self):
+            events.append("lock")
+
+        def __exit__(self, *_):
+            events.append("unlock")
+
+    def run(command):
+        events.append(" ".join(command[:3]))
+        if command[:3] == ["az", "account", "show"]:
+            return "other" if "az account set" not in events else subject.TEST_SUBSCRIPTION
+        return "Registered" if command[:3] == ["az", "provider", "show"] else ""
+
+    monkeypatch.setattr(subject, "_preflight_profile_lock", Lock)
+    monkeypatch.setattr(subject, "_run_preflight_command", run)
+    subject.run_adr_integration_preflight(config)
+    assert events[:5] == ["lock", "az account show", "az account set", "az account show", "unlock"]
 
 
 @pytest.mark.parametrize(

@@ -7,6 +7,13 @@
 import pytest
 
 CANARY_ARM = "https://centraluseuap.management.azure.com"
+PUBLIC_ARM = "https://management.azure.com"
+
+
+@pytest.fixture(autouse=True)
+def default_arm_endpoint(monkeypatch):
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+
 
 CLOUD_CONFIGS = [
     {
@@ -99,7 +106,7 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential"] is mocker.sentinel.credential
         assert call_kwargs["subscription_id"] == "test-sub"
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs[endpoint_key] == CANARY_ARM
+        assert call_kwargs[endpoint_key] == PUBLIC_ARM
         assert "user_agent_policy" in call_kwargs
         assert "http_logging_policy" in call_kwargs
 
@@ -127,7 +134,7 @@ class TestFactoryCredentialScopes:
         assert kwargs["subscription_id"] == "linked-sub"
         assert kwargs["credential"] is mocker.sentinel.credential
         assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert kwargs[endpoint_key] == CANARY_ARM
+        assert kwargs[endpoint_key] == PUBLIC_ARM
 
 
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
@@ -250,7 +257,7 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
     mocked_response.add(
         method="GET" if operation == "get" else "PUT",
         url=(
-            f"{CANARY_ARM}/subscriptions/test-sub-id"
+            f"{PUBLIC_ARM}/subscriptions/test-sub-id"
             "/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/namespace"
         ),
         json=namespace,
@@ -294,11 +301,14 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
 
 
 @pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
-def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_profile, mocked_response, cloud_config):
+def test_dps_request_uses_canary_endpoint_and_preserves_api_version(
+    mocker, monkeypatch, cli_profile, mocked_response, cloud_config
+):
     from urllib.parse import parse_qs, urlsplit
     from azure.core.credentials import AccessToken
     from azext_iot._factory import iot_service_provisioning_factory
 
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", CANARY_ARM)
     credential = mocker.Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("test-token", 4102444800)
     cli_profile.return_value.get_login_credentials.return_value = (credential, "test-sub-id", "tenant")
@@ -415,7 +425,7 @@ def test_ordinary_management_factory_routes_real_requests_without_harness_or_fal
     credential = mocker.Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-token", 4102444800)
     cli_profile.return_value.get_login_credentials.return_value = (credential, "test-sub-id", "tenant")
-    endpoint = override or CANARY_ARM
+    endpoint = override or PUBLIC_ARM
     url = f"{endpoint}/subscriptions/test-sub-id/resourceGroups/rg/providers/Microsoft.Devices/{resource_type}/target"
     body = {"name": "target", "location": region}
     mocked_response.add(

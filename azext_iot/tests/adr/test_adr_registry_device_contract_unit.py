@@ -305,14 +305,15 @@ def test_current_sdk_child_pagination(wire_client, mocked_response, fixture_cmd,
     assert mocked_response.calls[1].request.url == next_url
 
 
-def test_current_factory_contract(offline_cli):
+def test_current_factory_contract(offline_cli, monkeypatch):
     from azext_iot._factory import adr_service_factory
     from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
     client = adr_service_factory(offline_cli)
     assert isinstance(client, DeviceRegistryMgmtClient)
     assert client._config.api_version == "2026-11-02-preview"
-    assert client._config.base_url == "https://centraluseuap.management.azure.com"
+    assert client._config.base_url == "https://management.azure.com"
     for name in ("registry_devices", "registry_device_attributes",
                  "registry_device_authentication_profiles", "registry_device_capabilities"):
         assert callable(getattr(client, name).get)

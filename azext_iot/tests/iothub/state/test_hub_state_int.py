@@ -154,6 +154,8 @@ def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisi
 
 
 @pytest.mark.hub_infrastructure(count=0)
+# Last test of the regular-state-workflow shard, so it absorbs the module hub/storage teardown (~15-18 min).
+@pytest.mark.timeout(30 * 60, func_only=False)
 def test_export_import_migrate_missing_hubs_error():
     filename = "./somefile.json"
     hub_name = "fakehub"

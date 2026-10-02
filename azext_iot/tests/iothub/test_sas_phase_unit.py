@@ -56,6 +56,8 @@ def phase(tmp_path, monkeypatch):
     monkeypatch.setenv("AZURE_TEST_RUN_LIVE", "True")
     monkeypatch.setenv("azext_iot_hubsas_subscription", "subscription")
     monkeypatch.setenv("azext_iot_hubsas_receipt", str(tmp_path / "receipt.json"))
+    # The Hub runner pins canary ARM for centraluseuap targets.
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", "https://centraluseuap.management.azure.com")
     runtime = subject.HubSasPhase(configuration(), "hub", "storage", "rg", "centraluseuap")
     monkeypatch.setattr(runtime, "command", Mock())
     yield runtime
@@ -429,7 +431,8 @@ def test_unfinished_background_prevents_resource_cleanup(phase):
     with pytest.raises(subject.HubSasError, match="must not be deleted"):
         phase.cleanup()
     phase.command.assert_not_called()
-    assert 0 <= thread.join.call_args.args[0] <= 90
+    # Windows monotonic() float arithmetic can leave the remaining budget a hair above 90.
+    assert 0 <= thread.join.call_args.args[0] <= 90 + 1e-6
 
 
 def test_background_workers_share_one_drain_budget(monkeypatch):

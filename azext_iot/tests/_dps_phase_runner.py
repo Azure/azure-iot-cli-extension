@@ -7,6 +7,7 @@
 """Linux-only regular -> service-SAS -> local-auth-toggle DPS orchestration with ownership/cleanup reporting."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
@@ -17,11 +18,12 @@ import re
 import runpy
 import select
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
-from threading import Event, Thread, current_thread, main_thread
+from threading import Event, Lock, Thread, current_thread, main_thread
 import time
 from urllib.parse import urlsplit, parse_qs
 from uuid import UUID, uuid4
@@ -35,7 +37,21 @@ PHASES = tuple(
     (phase["name"], phase["runtime_minutes"] * 60, phase["cleanup_minutes"] * 60)
     for phase in DPS_CI_BUDGET["phases"]
 )
-RUNNER_SECONDS = (DPS_CI_BUDGET["job_timeout_minutes"] - DPS_CI_BUDGET["setup_minutes"]) * 60
+
+
+def controller_seconds(budget, phases=None):
+    selected = tuple(phases or (
+        (phase["name"], phase["runtime_minutes"] * 60, phase["cleanup_minutes"] * 60)
+        for phase in budget["phases"]
+    ))
+    totals = [runtime + cleanup for _, runtime, cleanup in selected] or [0]
+    combine = max if budget.get("concurrent_phases") else sum
+    # ARM verification runs on the main thread (signal-bounded reads), one fresh window per phase.
+    verification = sum(cleanup for _, _, cleanup in selected) if budget.get("serial_cleanup_verification") else 0
+    return combine(totals) + verification + budget["reserve_minutes"] * 60
+
+
+RUNNER_SECONDS = controller_seconds(DPS_CI_BUDGET)
 READ_SECONDS = 60
 MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
@@ -536,8 +552,27 @@ def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     }
 
 
+def combine_coverage(coverage_files, destination=None, *, run_process=subprocess.run):
+    """Append every launched phase database; a missing database fails closed."""
+    expected = [str(path) for path in coverage_files]
+    files = [path for path in expected if Path(path).is_file()]
+    missing = [path for path in expected if path not in files]
+    destination = str(Path(destination or ROOT / ".coverage").resolve())
+    if not files:
+        return {"status": "failed", "reason": "No phase coverage files were produced.", "missing": missing,
+                "destination": destination}
+    result = run_process(
+        [sys.executable, "-m", "coverage", "combine", "--append", "--keep", "--data-file", destination, *files],
+        cwd=str(ROOT), capture_output=True, text=True, timeout=300, check=False,
+    )
+    return {
+        "status": "passed" if result.returncode == 0 and not missing else "failed",
+        "files": files, "missing": missing, "destination": destination, "exit_code": result.returncode,
+    }
+
+
 def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *,
-        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None):
+        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None, combine=combine_coverage):
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
     target = TARGETS["target"](region, endpoint)
     TARGETS["public_scope"](subscription, group, **target)
@@ -556,8 +591,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
     summary_path = output.parent / "dps-phases.json"
     if summary_path.exists():
         raise PhaseError("A DPS phase summary already exists; refusing to overwrite it.")
-    reserve = RUNNER_SECONDS - sum(runtime + cleanup for _, runtime, cleanup in PHASES)
-    runner_seconds = sum(runtime + cleanup for _, runtime, cleanup in phases) + reserve if debug else RUNNER_SECONDS
+    runner_seconds = controller_seconds(DPS_CI_BUDGET, phases)
     deadline = clock() + runner_seconds
     reader.deadline = deadline
     summary = {
@@ -567,7 +601,13 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     **FOCUSED["provenance"](debug)} for name, _, _ in phases],
         **FOCUSED["provenance"](debug),
     }
-    write_json(summary_path, summary)
+    summary_lock = Lock()
+
+    def persist_summary():
+        with summary_lock:
+            write_json(summary_path, summary)
+
+    persist_summary()
     cancel = Event()
     heartbeat_stop = Event()
 
@@ -586,11 +626,12 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         if "azext_iot_dps_coverage_file" in os.environ or any(os.environ.get(name) for name in (
             "azext_iot_dps_test_phase", "azext_iot_dps_run_uid", "azext_iot_dps_phase_receipts",
             "azext_iot_dps_junit", "azext_iot_dps_interrupt_timeout",
-            "azext_iot_dps_workers",
+            "azext_iot_dps_workers", "azext_iot_dps_install_token",
+            "azext_iot_tox_log_dir", "azext_iot_tox_tmp_dir",
             FOCUSED["ENV"], FOCUSED["DPS_ARGS_ENV"],
         )):
             raise PhaseError(
-                "The serial runner owns phase/UID/receipt/JUnit/coverage/cleanup options; unset conflicting overrides."
+                "The DPS runner owns phase/UID/receipt/JUnit/coverage/cleanup options; unset conflicting overrides."
             )
         if debug and any(os.environ.get(name) for name in (
             "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
@@ -600,27 +641,24 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         baseline = reader.inventory()
         baseline_ids = set(inventory_ids(baseline))
         summary["baseline"] = {"resources": baseline, "at": utc()}
-        write_json(summary_path, summary)
-        with tempfile.TemporaryDirectory(prefix="dps-phases-private-") as private:
+        persist_summary()
+        # Raw JUnit can hold captured output; keep it outside the uploaded artifact tree.
+        private = Path(tempfile.mkdtemp(prefix="dps-phases-private-"))
+        install_token = uuid4().hex
+        planned = []
+        previous_cwd = Path.cwd()
+        try:
             for index, (name, runtime, cleanup) in enumerate(phases):
                 result = summary["phases"][index]
                 if cancel.is_set() or clock() + runtime + cleanup + READ_SECONDS > deadline:
-                    result["reason"] = "Cancelled or insufficient remaining runtime/cleanup budget"
-                    break
-                if index:
-                    prior = summary["phases"][index - 1]
-                    if not prior.get("cleanup", {}).get("complete"):
-                        result["continued_after_unproven_cleanup"] = prior["name"]
-                        print(
-                            f"[DPS phases] WARNING: {prior['name']} cleanup was not proven; "
-                            f"continuing {name} with independent resources. The run remains failed.",
-                            flush=True,
-                        )
+                    result["reason"] = "Cancelled or insufficient runner runtime/cleanup budget at launch"
+                    continue
                 folder = output / name
                 receipts = folder / "receipts"
                 receipts.mkdir(parents=True)
                 uid = uuid4().hex
-                raw_junit = Path(private) / f"{name}.xml"
+                raw_junit = private / f"{name}.xml"
+                coverage_file = folder / ".coverage"
                 environment = dict(os.environ, azext_iot_dps_test_phase=name, azext_iot_dps_run_uid=uid,
                                    azext_iot_dps_phase_receipts=str(receipts.resolve()),
                                    azext_iot_dps_test_subscription=subscription,
@@ -631,12 +669,15 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_adr_location=region, azext_iot_adr_arm_endpoint=target["endpoint"],
                                    azext_iot_adr_arm_resource="https://management.azure.com",
                                    azext_iot_dps_workers="0" if debug or name == "local-auth-toggle" else "7",
-                                   azext_iot_dps_junit=str(raw_junit))
+                                   azext_iot_dps_junit=str(raw_junit),
+                                   azext_iot_dps_coverage_file=str(coverage_file.resolve()),
+                                   azext_iot_dps_install_token=install_token,
+                                   # tox empties these per run; concurrent phases need their own.
+                                   # Kept private because tox execute logs record the environment.
+                                   azext_iot_tox_log_dir=str(private / name / "tox-log"),
+                                   azext_iot_tox_tmp_dir=str(private / name / "tox-tmp"))
                 if debug:
                     environment[FOCUSED["ENV"]] = json.dumps(debug)
-                    # DPS-int maps only this controller-managed value through tox;
-                    # full phases retain checkout-wide .coverage aggregation.
-                    environment["azext_iot_dps_coverage_file"] = str((folder / ".coverage").resolve())
                     # These args follow tox's base 300s dump option. Only debug
                     # disables periodic stacks; pytest/phase/cleanup deadlines stay.
                     environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join([
@@ -649,69 +690,118 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)
                 result.pop("reason", None)
-                write_json(summary_path, summary)
-                print(f"[DPS phases] START {name}; runtime={runtime}s cleanup={cleanup}s", flush=True)
-                cwd = Path.cwd()
-                try:
-                    os.chdir(ROOT)
-                    execution = execute(
-                        [sys.executable, "-m", "tox", "r", "-e", "DPS-int", "--skip-pkg-install"],
-                        environment, folder / "output.log", runtime, cleanup, cancel.is_set,
-                    )
-                finally:
-                    os.chdir(cwd)
-                result.update({key: value for key, value in execution.items() if key != "cleanup_deadline"})
-                try:
-                    selected = selection_count(receipts, name, debug=debug)
-                    result["results"] = safe_junit(raw_junit, folder / "junit.xml", name, selected, debug=debug)
-                    result["results"]["selected"] = selected
-                    if debug:
-                        stages = json.loads((receipts / "pytest.json").read_text(encoding="utf-8"))
-                        errors = runpy.run_path(str(ROOT / "azext_iot/tests/_hub_phase_runner.py"))["phase_errors"](
-                            stages, debug["requestedNodes"], "DPS", name, uid, debug=debug,
-                        )
-                        result["results"]["stage_errors"] = errors
-                        result["results"]["valid"] = result["results"]["valid"] and not errors
-                except (OSError, ValueError, KeyError, TypeError, AttributeError, PhaseError):
-                    result["results"] = {"valid": False, "reason": "Missing/invalid collection or JUnit results"}
-                try:
-                    records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
-                    reader.deadline = min(execution["cleanup_deadline"], deadline)
-                    result["cleanup"] = verify_cleanup(
-                        reader, records, uid, reader.deadline, clock=clock,
-                    )
-                    result["cleanup"]["owned_ids"] = [record["id"] for record in records]
-                    result["cleanup"]["absent_ids"] = (
-                        result["cleanup"]["owned_ids"] if result["cleanup"]["complete"] else []
-                    )
-                except Exception as error:  # Never print an ARM/authentication exception body.
-                    result["cleanup"] = {
-                        "complete": False, "error_type": type(error).__name__,
-                        "reason": str(error) if isinstance(error, PhaseError) else "Cleanup verification failed",
-                        "ownership_receipts": str(receipts.relative_to(output)),
-                        "remaining": [{"id": resource_id, "state": "verification incomplete"}
-                                      for resource_id in recorded_ids(receipts)],
-                    }
-                finally:
-                    reader.deadline = deadline
-                counts = result["results"]
-                result["status"] = "passed" if (
-                    result["exit_code"] == 0 and not result["timed_out"] and not result["interrupted"]
-                    and counts.get("valid") and counts.get("passed", 0) > 0
-                    and not counts.get("failures") and not counts.get("errors") and not counts.get("skipped")
-                    and result["cleanup"].get("complete")
-                ) else "failed"
-                result["finished_at"] = utc()
-                write_json(folder / "result.json", result)
-                write_json(summary_path, summary)
-                print(f"[DPS phases] END {name}: {result['status']}", flush=True)
-        summary["status"] = "passed" if all(p["status"] == "passed" for p in summary["phases"]) else "failed"
+                planned.append({
+                    "index": index, "name": name, "runtime": runtime, "cleanup": cleanup,
+                    "folder": folder, "receipts": receipts, "uid": uid, "raw_junit": raw_junit,
+                    "environment": environment, "coverage_file": coverage_file,
+                })
+            persist_summary()
+
+            def launch(phase):
+                print(
+                    f"[DPS phases] START {phase['name']}; "
+                    f"runtime={phase['runtime']}s cleanup={phase['cleanup']}s",
+                    flush=True,
+                )
+                return execute(
+                    [sys.executable, "-m", "tox", "r", "-e", "DPS-int", "--skip-pkg-install"],
+                    phase["environment"], phase["folder"] / "output.log",
+                    phase["runtime"], phase["cleanup"], cancel.is_set,
+                )
+
+            if planned:
+                # child() inherits the process cwd; set it once, not per thread, and restore in finally.
+                os.chdir(ROOT)
+                with ThreadPoolExecutor(max_workers=len(planned), thread_name_prefix="dps-phase") as pool:
+                    futures = {}
+                    for phase in planned:
+                        future = pool.submit(launch, phase)
+                        futures[future] = phase
+                    for future in as_completed(futures):
+                        phase = futures[future]
+                        result = summary["phases"][phase["index"]]
+                        try:
+                            execution = future.result()
+                        except Exception as error:  # Preserve failed evidence without a raw traceback.
+                            execution = {
+                                "exit_code": 1, "timed_out": False, "interrupted": cancel.is_set(),
+                                "cleanup_deadline": min(deadline, clock()),
+                            }
+                            result["execution_error"] = (
+                                str(error) if isinstance(error, PhaseError) else type(error).__name__
+                            )
+                        result.update({key: value for key, value in execution.items() if key != "cleanup_deadline"})
+                        name = phase["name"]
+                        folder = phase["folder"]
+                        receipts = phase["receipts"]
+                        uid = phase["uid"]
+                        try:
+                            selected = selection_count(receipts, name, debug=debug)
+                            result["results"] = safe_junit(
+                                phase["raw_junit"], folder / "junit.xml", name, selected, debug=debug,
+                            )
+                            result["results"]["selected"] = selected
+                            if debug:
+                                stages = json.loads((receipts / "pytest.json").read_text(encoding="utf-8"))
+                                errors = runpy.run_path(
+                                    str(ROOT / "azext_iot/tests/_hub_phase_runner.py")
+                                )["phase_errors"](
+                                    stages, debug["requestedNodes"], "DPS", name, uid, debug=debug,
+                                )
+                                result["results"]["stage_errors"] = errors
+                                result["results"]["valid"] = result["results"]["valid"] and not errors
+                        except (OSError, ValueError, KeyError, TypeError, AttributeError, PhaseError):
+                            result["results"] = {"valid": False, "reason": "Missing/invalid collection or JUnit results"}
+                        try:
+                            records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
+                            # Serial verification: a sibling's slow cleanup must not consume this phase's window.
+                            reader.deadline = min(deadline, clock() + phase["cleanup"])
+                            result["cleanup"] = verify_cleanup(
+                                reader, records, uid, reader.deadline, clock=clock,
+                            )
+                            result["cleanup"]["owned_ids"] = [record["id"] for record in records]
+                            result["cleanup"]["absent_ids"] = (
+                                result["cleanup"]["owned_ids"] if result["cleanup"]["complete"] else []
+                            )
+                        except Exception as error:  # Never print an ARM/authentication exception body.
+                            result["cleanup"] = {
+                                "complete": False, "error_type": type(error).__name__,
+                                "reason": str(error) if isinstance(error, PhaseError) else "Cleanup verification failed",
+                                "ownership_receipts": str(receipts.relative_to(output)),
+                                "remaining": [{"id": resource_id, "state": "verification incomplete"}
+                                              for resource_id in recorded_ids(receipts)],
+                            }
+                        finally:
+                            reader.deadline = deadline
+                        counts = result["results"]
+                        result["status"] = "passed" if (
+                            result["exit_code"] == 0 and not result["timed_out"] and not result["interrupted"]
+                            and counts.get("valid") and counts.get("passed", 0) > 0
+                            and not counts.get("failures") and not counts.get("errors") and not counts.get("skipped")
+                            and result["cleanup"].get("complete")
+                        ) else "failed"
+                        result["finished_at"] = utc()
+                        write_json(folder / "result.json", result)
+                        persist_summary()
+                        print(f"[DPS phases] END {name}: {result['status']}", flush=True)
+            if not debug:
+                summary["coverage"] = combine([phase["coverage_file"] for phase in planned])
+            summary["status"] = "passed" if all(p["status"] == "passed" for p in summary["phases"]) else "failed"
+            if summary.get("coverage", {}).get("status") == "failed":
+                summary["status"] = "failed"
+        finally:
+            os.chdir(previous_cwd)
+            shutil.rmtree(private, ignore_errors=True)
     except Exception as error:  # Preserve a failed result without a credential-bearing traceback.
         summary["error"] = {
             "type": type(error).__name__,
             "message": str(error) if isinstance(error, PhaseError) else "Diagnostic omitted to protect credentials",
         }
     finally:
+        # A signal during serialized verification/combine must not leave a green summary.
+        summary["cancelled"] = cancel.is_set()
+        if summary["cancelled"]:
+            summary["status"] = "failed"
         if debug:
             summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
         summary["finished_at"] = utc()
