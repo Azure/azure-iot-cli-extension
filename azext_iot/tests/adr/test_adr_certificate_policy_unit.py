@@ -407,14 +407,15 @@ def test_update_ca_policy_rejects_invalid_validity_before_mutation(
     fixture_ca_policy_provider.client.certificate_policies.get.assert_not_called()
 
 
-def test_update_ca_policy_tags_and_validity(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_update_ca_policy_tags_and_validity(fixture_ca_policy_provider, mock_poller, validity_days):
     fixture_ca_policy_provider.client.certificate_policies.begin_update.return_value = mock_poller(Mock())
     fixture_ca_policy_provider.client.certificate_policies.get.return_value = {"name": "cp"}
 
     fixture_ca_policy_provider.update(
         certificate_policy_name="cp", certificate_authority_name="ca",
         namespace_name="ns", resource_group_name="rg",
-        tags={"env": "test"}, validity_days=90,
+        tags={"env": "test"}, validity_days=validity_days,
     )
 
     properties = fixture_ca_policy_provider.client.certificate_policies.begin_update.call_args[1]["properties"]
@@ -422,7 +423,7 @@ def test_update_ca_policy_tags_and_validity(fixture_ca_policy_provider, mock_pol
         "tags": {"env": "test"},
         "properties": {
             "certificate": {
-                "validityPeriodInDays": 90,
+                "validityPeriodInDays": validity_days,
             }
         },
     }
@@ -478,7 +479,8 @@ def test_delete_ca_policy(fixture_ca_policy_provider, mock_poller):
 # ==================== --no-wait + guards + tags ====================
 
 
-def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller, validity_days):
     """With --no-wait, create returns the poller without waiting."""
     poller = mock_poller({"name": "cp"})
     _set_parent_ca(fixture_ca_policy_provider)
@@ -487,11 +489,13 @@ def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, moc
 
     result = fixture_ca_policy_provider.create(
         certificate_policy_name="cp", certificate_authority_name="ca",
-        namespace_name="ns", resource_group_name="rg", validity_days=10, no_wait=True,
+        namespace_name="ns", resource_group_name="rg", validity_days=validity_days, no_wait=True,
     )
 
     assert result is poller
     poller.result.assert_not_called()
+    resource = fixture_ca_policy_provider.client.certificate_policies.begin_create_or_replace.call_args[1]["resource"]
+    assert resource["properties"]["certificate"]["validityPeriodInDays"] == validity_days
 
 
 def test_update_ca_policy_requires_a_field(fixture_ca_policy_provider):
@@ -576,19 +580,26 @@ def test_update_ca_policy_with_tags(fixture_ca_policy_provider, mock_poller):
     assert properties["tags"] == {"env": "prod"}
 
 
-def test_update_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [None, 1, 6, 90])
+def test_update_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller, validity_days):
     """With --no-wait, update returns the poller without waiting or re-fetching."""
     poller = mock_poller(Mock())
     fixture_ca_policy_provider.client.certificate_policies.begin_update.return_value = poller
 
     result = fixture_ca_policy_provider.update(
         certificate_policy_name="cp", certificate_authority_name="ca",
-        namespace_name="ns", resource_group_name="rg", tags={"env": "test"}, no_wait=True,
+        namespace_name="ns", resource_group_name="rg", tags={"env": "test"},
+        validity_days=validity_days, no_wait=True,
     )
 
     assert result is poller
     poller.result.assert_not_called()
     fixture_ca_policy_provider.client.certificate_policies.get.assert_not_called()
+    expected = {"tags": {"env": "test"}}
+    if validity_days is not None:
+        expected["properties"] = {"certificate": {"validityPeriodInDays": validity_days}}
+    properties = fixture_ca_policy_provider.client.certificate_policies.begin_update.call_args[1]["properties"]
+    assert properties == expected
 
 
 def test_delete_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):

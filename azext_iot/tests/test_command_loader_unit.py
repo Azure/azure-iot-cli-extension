@@ -504,6 +504,19 @@ def test_certificate_policy_validity_days_parser(management_command_parser, acti
     assert parsed.validity_days == validity_days
 
 
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("option", ["--validity-days", "--vd"])
+@pytest.mark.parametrize("validity_days", ["1.5", "invalid"])
+def test_certificate_policy_parser_rejects_noninteger_validity(management_command_parser, action, option, validity_days):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args([
+            "iot", "adr", "ns", "ca", "policy", action,
+            *_NAMESPACE_ARGUMENTS, "--name", "policy", "--ca-name", "ica",
+            option, validity_days,
+        ])
+    assert error.value.code == 2
+
+
 def test_namespace_device_command_names(command_table):
     assert sum(name.startswith("iot adr ") for name in command_table) == 112
     assert {

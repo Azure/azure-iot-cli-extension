@@ -107,6 +107,17 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 "to update the certificate policy.",
             )
 
+        for action in ("create", "update"):
+            for validity_days in (-1, 0, 91):
+                with timed_step(f"ca policy {action} ❯ {validity_days}-day validity rejected"):
+                    self._assert_argument_error(
+                        f"iot adr ns ca policy {action} -n mypolicy --ca myca --ns {ns} -g {rg} "
+                        f"--validity-days {validity_days}",
+                        InvalidArgumentValueError,
+                        "--validity-days must be between 1 and 90 days, inclusive. "
+                        f"Received {validity_days}.",
+                    )
+
         # --- Namespace resources: empty updates are rejected client-side ---
         with timed_step("namespace update ❯ nothing-to-update rejected"):
             self._assert_argument_error(
