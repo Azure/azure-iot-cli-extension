@@ -18,6 +18,7 @@ from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 
 import azext_iot.iothub.commands_topic_group as subject
+from azext_iot.common.arm import hub_description_for_write
 
 logging.disable(logging.CRITICAL)
 
@@ -54,6 +55,18 @@ def fixture_topic_group_ops(mocker):
             "/subscriptions/test-sub/resourceGroups/"
             f"{hub_rg}/providers/Microsoft.Devices/IotHubs/{hub_name}"
         ),
+        "identity": {
+            "type": "SystemAssigned, UserAssigned",
+            "principalId": "system-principal",
+            "tenantId": "tenant",
+            "userAssignedIdentities": {
+                "/subscriptions/test-sub/resourceGroups/test-rg/providers/"
+                "Microsoft.ManagedIdentity/userAssignedIdentities/test-mi": {
+                    "clientId": "client",
+                    "principalId": "user-principal",
+                }
+            },
+        },
         "properties": {
             "connectionProfile": "mqttv5",
             "mqttV5Settings": {
@@ -76,7 +89,7 @@ def _assert_hub_write(client, hub_mock, resource_group_name=hub_rg):
     client.begin_create_or_update.assert_called_once_with(
         resource_group_name=resource_group_name,
         resource_name=hub_name,
-        iot_hub_description=hub_mock,
+        iot_hub_description=hub_description_for_write(hub_mock),
         etag="test-etag",
         match_condition=MatchConditions.IfNotModified,
     )

@@ -119,6 +119,15 @@ def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
     return device_hostname or hub["properties"]["hostName"]
 
 
+def _validate_direct_dps_link_hub_profile(hub):
+    connection_profile = (hub.get("properties") or {}).get("connectionProfile")
+    if is_mqtt_v5_profile(connection_profile):
+        raise InvalidArgumentValueError(
+            "IoT Hubs using the MqttV5 connection profile cannot be linked directly to DPS. "
+            "Use 'az iot adr ns link add' to link the DPS and IoT Hub through a Device Registry namespace."
+        )
+
+
 def _ensure_linked_hub_hostnames(linked_hubs):
     for entry in linked_hubs or []:
         if not entry.get("hostName") and entry.get("name"):
@@ -488,6 +497,7 @@ def iot_dps_linked_hub_create(
 
         hub_client = iot_hub_service_factory(cmd.cli_ctx)
         hub = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)
+        _validate_direct_dps_link_hub_profile(hub)
         host_name = _resolve_linked_hub_hostname(hub, hostname_type)
 
         # Validate MI is enabled on DPS
@@ -521,6 +531,7 @@ def iot_dps_linked_hub_create(
         if not connection_string:
             hub_client = iot_hub_service_factory(cmd.cli_ctx)
             hub = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)
+            _validate_direct_dps_link_hub_profile(hub)
             host_name = _resolve_linked_hub_hostname(hub, hostname_type)
             location = location or hub["location"]
             # Build connection string with resolved hostname
@@ -546,9 +557,16 @@ def iot_dps_linked_hub_create(
 
                 hub_client = iot_hub_service_factory(cmd.cli_ctx)
                 try:
-                    location = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)["location"]
+                    hub = iot_hub_get(
+                        cmd,
+                        hub_client,
+                        hub_name=hub_name,
+                        resource_group_name=hub_resource_group,
+                    )
                 except CLIError:
                     raise RequiredArgumentMissingError("Please provide the IoT Hub location.")
+                _validate_direct_dps_link_hub_profile(hub)
+                location = hub["location"]
 
         resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
         dps = iot_dps_get(client, dps_name, resource_group_name)
