@@ -328,9 +328,10 @@ def test_concurrent_mutations_are_not_overwritten(mocker, mutation):
         h.get_hook = lambda: change() if h.patches else None
     else:
         h.clock.on_sleep = change
-    with pytest.raises(AzureResponseError, match="changed"):
+    with pytest.raises(AzureResponseError, match="changed") as caught:
         h.run()
     assert len(h.patches) == 1
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
 
 
 @pytest.mark.parametrize("phase", ["submit", "get", "wait"])
@@ -490,6 +491,39 @@ def test_get_failure_after_backoff_preserves_original_service_error(mocker):
     with pytest.raises(HttpResponseError) as caught:
         h.run()
     assert caught.value is error
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
+    assert len(h.patches) == 1
+
+
+@pytest.mark.parametrize("stop,expected", [
+    ("reverted", "inbound identity or settings changed"),
+    ("still-active", "timed out"),
+    ("other-endpoint", "Another namespace endpoint"),
+    ("extra-error", "additional service error"),
+])
+def test_later_stop_after_service_failure_preserves_original_service_error(mocker, stop, expected):
+    h = Harness(mocker, "hub")
+
+    def observe():
+        if not h.patches:
+            return
+        endpoint = h.namespace["properties"]["messaging"]["endpoints"]["hub"]
+        if stop == "reverted":
+            endpoint.update(linkingState="Succeeded", inboundCallerIdentity={"type": "UserAssigned",
+                                                                             "userAssignedIdentity": UAMI_ID})
+            endpoint.pop("linkingError", None)
+        elif stop == "still-active":
+            endpoint["linkingState"] = "Updating"
+            h.namespace["properties"]["provisioningState"] = "Updating"
+        elif stop == "other-endpoint":
+            h.namespace["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"] = "Failed"
+        else:
+            h.namespace["properties"]["error"] = {"code": "Other", "message": "unrelated"}
+
+    h.get_hook = observe
+    with pytest.raises((AzureResponseError, ADRResourceStateError), match=expected) as caught:
+        h.run(timeout_sec=60)
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
     assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
     assert len(h.patches) == 1
 
