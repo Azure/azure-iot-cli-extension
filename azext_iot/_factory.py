@@ -8,6 +8,7 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
+from functools import wraps
 import ssl
 from urllib.parse import urlsplit
 
@@ -28,6 +29,8 @@ from azext_iot.dps.services.auth import get_dps_sas_auth_header
 ensure_azure_namespace_path()
 
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
+from azure.mgmt.core.polling.arm_polling import ARMPolling
+
 _ADR_CANARY_ARM_ENDPOINT = "https://centraluseuap.management.azure.com"
 _ADR_IOT_HUB_API_VERSION = "2026-10-01-preview"
 _ADR_DPS_API_VERSION = "2026-06-01-preview"
@@ -100,17 +103,64 @@ def _iot_hub_management_client(
     credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
-    return IotHubClient(
-        credential=get_cli_credential(
-            cli_ctx, subscription_id=subscription_id
-        ),
-        subscription_id=subscription_id,
-        base_url=base_url,
-        **kwargs,
-        credential_scopes=credential_scopes,
-        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
-        http_logging_policy=_get_default_logging_policy(),
+    return _configure_iot_hub_modeless_lro_polling(
+        IotHubClient(
+            credential=get_cli_credential(
+                cli_ctx, subscription_id=subscription_id
+            ),
+            subscription_id=subscription_id,
+            base_url=base_url,
+            **kwargs,
+            credential_scopes=credential_scopes,
+            user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+            http_logging_policy=_get_default_logging_policy(),
+        )
     )
+
+
+# TODO: Remove after https://github.com/microsoft/typespec/issues/11966 is fixed
+# and the IoT Hub SDK is regenerated.
+# This temporary workaround intentionally covers only the default ARM polling path used by extension call sites.
+class _ModelessJsonARMPolling(ARMPolling):
+    """Deserialize modeless ARM LRO results without the generated callback."""
+
+    def __init__(self, result_callback=None, **kwargs):
+        self._result_callback = result_callback
+        super().__init__(**kwargs)
+
+    def initialize(self, client, initial_response, _):
+        super().initialize(client, initial_response, self._deserialize_response)
+
+    def _deserialize_response(self, pipeline_response):
+        response = pipeline_response.http_response
+        deserialized = response.json() if response.content else None
+        if self._result_callback:
+            return self._result_callback(pipeline_response, deserialized, {})
+        return deserialized
+
+
+def _wrap_modeless_lro_operation(operation_group, operation_name):
+    operation = getattr(operation_group, operation_name)
+
+    @wraps(operation)
+    def wrapped(*args, **kwargs):
+        if kwargs.get("polling", True) is True:
+            kwargs["polling"] = _ModelessJsonARMPolling(
+                timeout=kwargs.get("polling_interval", operation_group._config.polling_interval),
+                path_format_arguments={"endpoint": operation_group._config.base_url},
+                result_callback=kwargs.get("cls"),
+            )
+        return operation(*args, **kwargs)
+
+    setattr(operation_group, operation_name, wrapped)
+
+
+def _configure_iot_hub_modeless_lro_polling(client):
+    _wrap_modeless_lro_operation(client.private_endpoint_connections, "begin_update")
+    _wrap_modeless_lro_operation(client.private_endpoint_connections, "begin_delete")
+    _wrap_modeless_lro_operation(client.iot_hub_resource, "begin_create_or_update")
+    _wrap_modeless_lro_operation(client.iot_hub_resource, "begin_delete")
+    return client
 
 
 def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):

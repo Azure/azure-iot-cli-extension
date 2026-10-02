@@ -66,8 +66,8 @@ def test_native_preview_management_wire_contract(
         operations = getattr(client, group)
         arguments = {"resource_group_name": "rg", name_arg: kind}
         assert operations.get(**arguments) == response
-        # Preview's native DELETE callbacks work without the generated-SDK repair.
-        assert operations.begin_delete(**arguments, polling=False).result() is None
+        # Hub modeless LROs use the factory's generated-SDK repair; DPS remains native.
+        assert operations.begin_delete(**arguments).result() is None
         assert client._config.api_version == (adr_api if adr else default_api)
     assert [call.request.method for call in mocked_response.calls] == ["GET", "DELETE"]
     for call in mocked_response.calls:
