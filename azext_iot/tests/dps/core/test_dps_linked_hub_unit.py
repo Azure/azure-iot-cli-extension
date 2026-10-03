@@ -137,8 +137,9 @@ class TestLinkedHubCreateValidation:
                 connection_string="HostName=hub.service.azure-devices.net;SharedAccessKeyName=x;SharedAccessKey=y"
             )
 
+    @pytest.mark.parametrize("location", [None, "eastus2euap"])
     def test_mqtt5_hub_rejected_when_connection_string_requires_discovery(
-        self, fixture_cmd, mock_deps, mocker
+        self, fixture_cmd, mock_deps, mocker, location
     ):
         from azext_iot.core.custom import iot_dps_linked_hub_create
 
@@ -159,6 +160,7 @@ class TestLinkedHubCreateValidation:
                     "HostName=hub.device.azure-devices.net;"
                     "SharedAccessKeyName=x;SharedAccessKey=y"
                 ),
+                location=location,
             )
 
         mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
