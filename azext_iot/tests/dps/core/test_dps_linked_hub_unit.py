@@ -137,6 +137,68 @@ class TestLinkedHubCreateValidation:
                 connection_string="HostName=hub.service.azure-devices.net;SharedAccessKeyName=x;SharedAccessKey=y"
             )
 
+    @pytest.mark.parametrize("location", [None, "eastus2euap"])
+    def test_mqtt5_hub_rejected_when_connection_string_requires_discovery(
+        self, fixture_cmd, mock_deps, mocker, location
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "properties": {"connectionProfile": "mqttv5"},
+            "location": "eastus2euap",
+        })
+
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="cannot be linked directly to DPS",
+        ):
+            iot_dps_linked_hub_create(
+                cmd=fixture_cmd,
+                client=mock_deps,
+                dps_name="dps",
+                connection_string=(
+                    "HostName=hub.device.azure-devices.net;"
+                    "SharedAccessKeyName=x;SharedAccessKey=y"
+                ),
+                location=location,
+            )
+
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
+
+    @pytest.mark.parametrize("authentication_type", [None, "SystemAssigned"])
+    def test_mqtt5_hub_rejected_before_dps_write(
+        self, fixture_cmd, mock_deps, mocker, authentication_type
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            ),
+            "properties": {
+                "connectionProfile": "mqttv5",
+                "deviceHostName": "hub.device.azure-devices.net",
+                "serviceHostName": "hub.service.azure-devices.net",
+            },
+            "location": "eastus2euap",
+        })
+
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="cannot be linked directly to DPS",
+        ):
+            iot_dps_linked_hub_create(
+                cmd=fixture_cmd,
+                client=mock_deps,
+                dps_name="dps",
+                hub_name="hub",
+                resource_group_name="test-rg",
+                authentication_type=authentication_type,
+            )
+
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
+
     def test_mi_system_assigned_not_enabled(self, fixture_cmd, mock_deps, mocker):
         from azext_iot.core.custom import iot_dps_linked_hub_create
         mocker.patch("azext_iot.core.custom.iot_dps_get", return_value={
