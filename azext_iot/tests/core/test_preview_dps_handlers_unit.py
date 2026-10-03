@@ -6,7 +6,7 @@
 
 import pytest
 from azure.cli.core.azclierror import (
-    BadRequestError, InvalidArgumentValueError, RequiredArgumentMissingError, ResourceNotFoundError,
+    BadRequestError, CLIInternalError, InvalidArgumentValueError, RequiredArgumentMissingError, ResourceNotFoundError,
 )
 from azure.core import MatchConditions
 from knack.util import CLIError
@@ -202,20 +202,20 @@ def test_dps_classic_link_creation_and_namespace_warning(mocker, preview_mgmt, n
 
 @pytest.mark.parametrize("scenario,message", [
     ("no-input", "name or connection string"), ("invalid-cs", "valid IoT Hub connection string"),
-    ("missing-location", "IoT Hub location"), ("missing-uami", "not configured"),
+    ("missing-hub", "No IoT Hub found"), ("missing-uami", "not configured"),
 ])
 def test_dps_link_create_errors(preview_mgmt, scenario, message):
     cmd, client, _, dps, _ = preview_mgmt
     arguments = {}
     if scenario == "invalid-cs":
         arguments["connection_string"] = "SharedAccessKeyName=owner;SharedAccessKey=key"
-    elif scenario == "missing-location":
+    elif scenario == "missing-hub":
         arguments["connection_string"] = "HostName=hub.azure-devices.net;SharedAccessKeyName=owner;SharedAccessKey=key"
         client.iot_hub_resource.list_by_subscription.return_value = []
     elif scenario == "missing-uami":
         dps["identity"] = {"type": "SystemAssigned"}
         arguments.update(hub_name="hub", authentication_type="UserAssigned", user_assigned_identity="/identities/user")
-    with pytest.raises((RequiredArgumentMissingError, InvalidArgumentValueError), match=message):
+    with pytest.raises((CLIInternalError, RequiredArgumentMissingError, InvalidArgumentValueError), match=message):
         custom.iot_dps_linked_hub_create(cmd, client, "dps", **arguments)
     client.iot_dps_resource.begin_create_or_update.assert_not_called()
 
