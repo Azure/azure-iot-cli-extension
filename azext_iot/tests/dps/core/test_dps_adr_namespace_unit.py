@@ -486,8 +486,6 @@ def test_classic_linked_hub_create_runs_namespace_warning(mocker):
         return_value="rg",
     )
     mocker.patch("azext_iot.core.custom.iot_dps_get", return_value=dps)
-    mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
-    mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={"properties": {}})
     warning = mocker.patch("azext_iot.core.custom._warn_namespace_linked_dps")
     client = MagicMock()
 

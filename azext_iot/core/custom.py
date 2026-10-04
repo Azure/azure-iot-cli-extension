@@ -7,6 +7,7 @@
 # TODO: tighten the broad lint disables above
 # flake8: noqa
 import json
+import re
 from copy import deepcopy
 from datetime import timedelta
 from enum import Enum
@@ -545,29 +546,20 @@ def iot_dps_linked_hub_create(
                     "Service hostname is not supported for DPS hub linking. "
                     "Use a connection string with device or classic hostname."
                 )
-            parsed_cs = {
-                key.casefold(): value
-                for key, value in (validate_key_value_pairs(connection_string) or {}).items()
-            }
-            host_name = parsed_cs.get("hostname")
-            if not host_name:
-                raise InvalidArgumentValueError("Please provide a valid IoT Hub connection string.")
-            connection_string_hub_name = host_name.split(".", 1)[0]
-            if hub_name and hub_name.casefold() != connection_string_hub_name.casefold():
-                raise InvalidArgumentValueError(
-                    "--hub-name must match the Hub name in --connection-string."
-                )
-            hub_name = connection_string_hub_name
+            parsed_cs = validate_key_value_pairs(connection_string)
+            host_name = parsed_cs.get("HostName")
+            if not location:
+                if not hub_name:
+                    try:
+                        hub_name = re.search(r"hostname=(.[^\;\.]+)?", connection_string, re.IGNORECASE).group(1)
+                    except AttributeError:
+                        raise InvalidArgumentValueError("Please provide a valid IoT Hub connection string.")
 
-            hub_client = iot_hub_service_factory(cmd.cli_ctx)
-            hub = iot_hub_get(
-                cmd,
-                hub_client,
-                hub_name=hub_name,
-                resource_group_name=hub_resource_group,
-            )
-            _validate_direct_dps_link_hub_profile(hub)
-            location = location or hub["location"]
+                hub_client = iot_hub_service_factory(cmd.cli_ctx)
+                try:
+                    location = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)["location"]
+                except CLIError:
+                    raise RequiredArgumentMissingError("Please provide the IoT Hub location.")
 
         resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
         dps = iot_dps_get(client, dps_name, resource_group_name)

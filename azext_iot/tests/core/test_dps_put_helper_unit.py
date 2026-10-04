@@ -87,8 +87,6 @@ def test_dps_policy_delete_uses_shared_put_for_wait(cmd, mocker, lro):
 def test_dps_linked_hub_create_uses_shared_put_for_wait(cmd, mocker, lro):
     dps = {"location": "eastus", "sku": {"capacity": 1}, "properties": {"iotHubs": []}}
     client = _client(mocker, dps)
-    mocker.patch.object(custom, "iot_hub_service_factory")
-    mocker.patch.object(custom, "iot_hub_get", return_value={"properties": {}})
 
     assert custom.iot_dps_linked_hub_create(
         cmd,
