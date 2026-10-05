@@ -2,16 +2,23 @@
 
 ## Compatibility
 
-Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
+The `1.0.0b2` preview requires Azure CLI `2.73.0` or later, using Python `3.10`
+or later. Use `az --version` to check both the CLI version and its Python runtime.
+These requirements apply on Windows, Linux, and macOS.
 
-In all cases your CLI needs to be at least `v2.0.70`.
+If the installed extension is older than expected, check it with
+`az extension show --name azure-iot --query version --output tsv`. Name-based
+installation only selects versions in the extension index. For a preview that is
+not yet indexed, follow the [wheel installation instructions](alt-install-methods.md).
 
-| CLI Install Method  | NOT compatible with |
-| ------------- | ------------- |
-| Windows via MSI  | v2.0.34 to v2.0.38  |
-| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |
+## Historical Linux installation issue
 
-## Problem
+The example below describes an older Ubuntu 16.04 installation, not a recommended
+platform for this preview. Use the current
+[Azure CLI installation instructions](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+for supported platforms.
+
+### Problem
 
 After installing Azure CLI in my supported Linux environment, I try to install the extension via `az extension add --name azure-iot` but I get an error that looks like:
 
@@ -19,7 +26,7 @@ After installing Azure CLI in my supported Linux environment, I try to install t
 - ImportError: libffi.so.5: cannot open shared object file: No such file or directory
 ```
 
-## Solution
+### Solution
 
 Make sure you install the right distribution of Azure CLI that is compatible with your platform.
 

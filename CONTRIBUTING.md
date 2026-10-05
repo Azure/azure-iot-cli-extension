@@ -2,7 +2,7 @@
 
 ## Dev Setup
 
-1. Get Python 3: https://www.python.org/downloads/
+1. Get Python 3.10 or later: https://www.python.org/downloads/
 
 ### Required Repositories
 
@@ -76,6 +76,20 @@ az iot central app -h
 ```
 
 If this works, then you should now be able to make changes to the extension and have them reflected immediately in your az cli.
+
+## Preparing a release
+
+Set the extension version in `azext_iot/constants.py`; `setup.py` reads that value
+for the wheel, and the release workflow derives its `v<version>` tag from the
+wheel. Generated SDK version constants are independent of the extension version.
+Add a new entry to `HISTORY.rst` and update the README and installation examples
+without attributing new fixes to an older release.
+
+Use a new version for changes after publication, even if the previous GitHub
+release was deleted. Do not reuse or move a published release tag. Run the release
+workflow from the intended release branch and verify the tested commit, wheel
+version, and draft tag before publishing. Publishing the GitHub release and adding
+the version to the Azure CLI extension index are separate steps.
 
 ## Unit and Integration Testing
 
