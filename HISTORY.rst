@@ -3,6 +3,21 @@
 Release History
 ===============
 
+0.31.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Minimum supported Azure CLI core version bumped from 2.67.0 to 2.73.0.
+
+* Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
+
+**IoT Hub Device Provisioning Service (DPS) updates**
+
+* Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
+
+* Updated the DPS control plane SDK to API version ``2026-08-31``.
+
 0.30.0
 +++++++++++++++
 

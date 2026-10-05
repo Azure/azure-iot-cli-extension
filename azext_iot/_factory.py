@@ -23,6 +23,8 @@ __all__ = [
     "CloudError",
     "iot_hub_service_factory",
     "iot_service_provisioning_factory",
+    "iot_dps_resource_factory",
+    "resource_service_factory",
 ]
 
 
@@ -60,6 +62,32 @@ def iot_service_provisioning_factory(cli_ctx, *_):
     from azure.cli.core.profiles import ResourceType
 
     return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
+
+
+def iot_dps_resource_factory(cli_ctx, *_):
+    """
+    Factory for the provisioning service control plane client backed by the vendored SDK.
+
+    Args:
+        cli_ctx (knack.cli.CLI): CLI context.
+        *_ : all other args ignored.
+
+    Returns:
+        service_client (IotDpsClient): control plane resource for
+            working with IoT Hub Device Provisioning Service.
+    """
+    from azure.cli.core.commands.client_factory import get_mgmt_service_client
+
+    from azext_iot.sdk.dps.mgmt import IotDpsClient
+
+    return get_mgmt_service_client(cli_ctx, IotDpsClient)
+
+
+def resource_service_factory(cli_ctx, **_):
+    from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    from azure.cli.core.profiles import ResourceType
+
+    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_RESOURCE_RESOURCES)
 
 
 class SdkResolver(object):
