@@ -231,8 +231,14 @@ each service remain serialized. ADR/ADU cleanup inventory is scoped to ARM resou
 roots touched by that test process (including its pytest workers), so another
 service's active resources are not mistaken for leaks. Fixture teardown failures
 and leftover new resources touched by the process still fail qualification.
-Admission rejects other active ADO project builds and active GitHub integration
-runs, and rejects budgets that
+Admission allows concurrent non-live merge CI from ADO definition **11**, revision
+**15**, for `Azure/azure-iot-cli-extension`: its `.azure-devops/merge.yml` disables
+integration tests. This is an explicit audited exception, not a pipeline-name
+heuristic. Re-audit the exception if that YAML/template gains live steps or the
+ADO definition changes; unrecognized definitions/revisions remain blocked.
+Other active ADO builds (including cleanup, nightly and integration runs) are
+rejected with their build IDs, pipeline names and definition revisions. Active
+GitHub integration runs are still rejected, as are budgets that
 overlap the daily 13:00–14:00 UTC cleanup exclusion window. This is a conservative
 preflight, not an atomic lock with GitHub or a subscription quota reservation.
 Coordinate/disable competing GitHub dispatches and cleanup before live rehearsal;

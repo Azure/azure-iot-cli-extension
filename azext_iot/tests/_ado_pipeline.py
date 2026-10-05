@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
 TARGET = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+# Pipeline 11 revision 15 uses .azure-devops/merge.yml with integration tests disabled.
+NON_LIVE_ADO_DEFINITIONS = {(11, 15)}
 
 
 def plan(services, versions, regions, endpoint, diagnostic=False):
@@ -77,8 +79,25 @@ def admission(minutes, now=None):
         runs = response.json()["value"]
         if response.headers.get("x-ms-continuationtoken"):
             raise RuntimeError("Too many active builds to prove live-run admission.")
-    if any(str(run["id"]) != os.environ["BUILD_BUILDID"] for run in runs):
-        raise ValueError("Another ADO project build is active; live resource isolation is unproven.")
+    blockers = []
+    for run in runs:
+        if str(run["id"]) == os.environ["BUILD_BUILDID"]:
+            continue
+        definition = run.get("definition") or {}
+        repository = run.get("repository") or {}
+        if ((definition.get("id"), definition.get("revision")) in NON_LIVE_ADO_DEFINITIONS
+                and repository.get("type") == "GitHub"
+                and repository.get("id") == "Azure/azure-iot-cli-extension"):
+            continue
+        blockers.append(
+            f"build {run['id']} ({definition.get('name', 'unknown pipeline')}; "
+            f"definition {definition.get('id', 'unknown')}, revision {definition.get('revision', 'unknown')})"
+        )
+    if blockers:
+        raise ValueError(
+            "Other active ADO builds may use shared test resources: " + "; ".join(blockers)
+            + ". Only audited non-live pipeline revisions are exempt; live resource isolation is unproven."
+        )
     with requests.get(
         "https://api.github.com/repos/Azure/azure-iot-cli-extension/actions/workflows/int_test.yml/runs",
         params={"status": "in_progress", "per_page": 1}, timeout=(10, 30), allow_redirects=False,
