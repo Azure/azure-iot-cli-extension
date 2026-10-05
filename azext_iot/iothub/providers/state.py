@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import errno
 import json
 import os
 import tempfile
@@ -58,6 +59,30 @@ def _endpoint_resource_name(endpoint_uri: str) -> str:
     return (urlparse(endpoint_uri).hostname or "").split(".")[0]
 
 
+def _state_file_destination(state_file: str) -> str:
+    separators = tuple(separator for separator in (os.sep, os.altsep) if separator)
+    if state_file.endswith(separators):
+        raise IsADirectoryError(errno.EISDIR, "State file path must name a file", state_file)
+    try:
+        os.stat(state_file)
+    except FileNotFoundError:
+        pass  # A new filename is allowed, but its parents must resolve below.
+
+    destination = state_file
+    seen_links = set()
+    while True:
+        directory, filename = os.path.split(destination)
+        directory = os.path.realpath(directory or ".", strict=True)
+        destination = os.path.join(directory, filename)
+        if not os.path.islink(destination):
+            return destination
+        if destination in seen_links:
+            raise OSError(errno.ELOOP, "Symbolic link loop in state file path", state_file)
+        seen_links.add(destination)
+        target = os.readlink(destination)
+        destination = target if os.path.isabs(target) else os.path.join(directory, target)
+
+
 def _write_state_file(hub_state: dict, state_file: str):
     """Write regular files atomically and retain streaming writes to other destinations.
 
@@ -69,11 +94,11 @@ def _write_state_file(hub_state: dict, state_file: str):
             json.dump(hub_state, stream, indent=4, sort_keys=True)
         return
 
-    destination = os.path.realpath(state_file)
+    destination = _state_file_destination(state_file)
     directory = os.path.dirname(destination) or "."
 
     file_descriptor, temp_path = tempfile.mkstemp(
-        prefix=os.path.basename(destination) + ".", suffix=".partial", dir=directory
+        prefix="iot-hub-state-", suffix=".partial", dir=directory
     )
     try:
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:

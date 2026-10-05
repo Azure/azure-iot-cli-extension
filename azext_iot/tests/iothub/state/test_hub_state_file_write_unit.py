@@ -127,6 +127,93 @@ def test_save_state_success(provider, tmp_path, mocker):
     fallback.assert_not_called()
 
 
+@pytest.mark.parametrize("path_form", ["trailing-separator", "dot", "missing-parent", "file-parent"])
+def test_invalid_path_cannot_bypass_overwrite_confirmation(provider, tmp_path, path_form):
+    state_file = tmp_path / "state.json"
+    state_file.write_text("previous good state", encoding="utf-8")
+    paths = {
+        "trailing-separator": str(state_file) + os.sep,
+        "dot": str(state_file) + os.sep + ".",
+        "missing-parent": str(tmp_path / "missing" / ".." / "state.json"),
+        "file-parent": str(state_file) + os.sep + ".." + os.sep + "state.json",
+    }
+
+    with pytest.raises(FileOperationError):
+        provider.save_state(paths[path_form], hub_aspects=["devices"])
+
+    assert state_file.read_text(encoding="utf-8") == "previous good state"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
+@pytest.mark.parametrize("target", ["missing/../state.json", "state.json/../state.json", "state.json/"])
+def test_invalid_symlink_target_cannot_overwrite_another_file(provider, tmp_path, target):
+    state_file = tmp_path / "state.json"
+    state_file.write_text("previous good state", encoding="utf-8")
+    link = tmp_path / "link.json"
+    link.symlink_to(target)
+
+    with pytest.raises(FileOperationError):
+        provider.save_state(str(link), hub_aspects=["devices"])
+
+    assert state_file.read_text(encoding="utf-8") == "previous good state"
+    assert link.is_symlink()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX filename-length regression")
+def test_long_valid_basename_is_written(tmp_path):
+    state_file = tmp_path / ("s" * 250)
+    state_file.write_text("previous good state", encoding="utf-8")
+
+    subject._write_state_file({"new": "state"}, str(state_file))
+
+    assert json.loads(state_file.read_text(encoding="utf-8")) == {"new": "state"}
+    assert list(tmp_path.iterdir()) == [state_file]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
+def test_dangling_symlink_with_valid_parent_creates_target(tmp_path):
+    target = tmp_path / "new.json"
+    link = tmp_path / "link.json"
+    link.symlink_to(target)
+
+    subject._write_state_file({"new": "state"}, str(link))
+
+    assert json.loads(target.read_text(encoding="utf-8")) == {"new": "state"}
+    assert link.is_symlink()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
+def test_relative_dangling_symlink_chain_creates_target(tmp_path):
+    directory = tmp_path / "subdirectory"
+    directory.mkdir()
+    target = directory / "new.json"
+    indirect_link = tmp_path / "indirect.json"
+    indirect_link.symlink_to("subdirectory/new.json")
+    link = tmp_path / "link.json"
+    link.symlink_to("indirect.json")
+
+    subject._write_state_file({"new": "state"}, str(link))
+
+    assert json.loads(target.read_text(encoding="utf-8")) == {"new": "state"}
+    assert link.is_symlink()
+    assert indirect_link.is_symlink()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
+def test_symlink_cycle_fails_without_replacing_links(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.symlink_to("second.json")
+    second.symlink_to("first.json")
+
+    with pytest.raises(OSError):
+        subject._write_state_file({"new": "state"}, str(first))
+
+    assert first.is_symlink()
+    assert second.is_symlink()
+    assert set(tmp_path.iterdir()) == {first, second}
+
+
 @pytest.mark.parametrize("missing_parent", [False, True])
 def test_save_state_reports_recovered_data(provider, tmp_path, mocker, missing_parent):
     state_file = tmp_path / "missing" / "state.json" if missing_parent else tmp_path / "state.json"
