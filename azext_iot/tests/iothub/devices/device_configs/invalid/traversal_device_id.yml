@@ -2,6 +2,7 @@ configVersion: "1.0"
 iotHub:
   authenticationMethod: symmetricKey
 edgeConfiguration:
+  defaultEdgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.4"
   templateConfigPath: "./device_configs/device_config.toml"
 
 edgeDevices:

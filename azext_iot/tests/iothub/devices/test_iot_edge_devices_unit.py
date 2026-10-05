@@ -385,12 +385,6 @@ class TestHierarchyCreateFailures:
                 "device_configs/invalid/missing_device_id.yml",
                 InvalidArgumentValueError,
             ),
-            # path traversal in device ID
-            (
-                None,
-                "device_configs/invalid/traversal_device_id.yml",
-                InvalidArgumentValueError,
-            ),
             # devices AND config
             (
                 [
@@ -426,6 +420,23 @@ class TestHierarchyCreateFailures:
                 config_file="device_configs/nested_edge_config.yml",
                 clean=False,
                 visualize=False
+            )
+
+    @pytest.mark.parametrize(
+        "devices, config",
+        [
+            ([["id=../evil"]], None),
+            (None, "device_configs/invalid/traversal_device_id.yml"),
+        ],
+    )
+    def test_edge_devices_reject_traversal_ids(
+        self, fixture_ghcs, set_cwd, patch_create_edge_root_cert, devices, config
+    ):
+        with pytest.raises(InvalidArgumentValueError, match="Device Id .* contains invalid characters"):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd,
+                devices=devices,
+                config_file=config,
             )
 
 
@@ -1257,7 +1268,7 @@ class TestEdgeDeviceIdValidation:
             "device-1.edge",
             "dev+ice%1#2*3?4!5(6)7,8:9=0@$'",
             # '$', '(' and ')' are legal IoT Hub device Id characters and are accepted here;
-            # neutralizing them in the generated install.sh is tracked separately
+            # script rendering is tracked in Azure/azure-iot-cli-extension#913
             "device$(whoami)",
             "d" * 128,
         ],
@@ -1289,6 +1300,22 @@ class TestEdgeDeviceIdValidation:
     def test_invalid_device_ids(self, device_id):
         with pytest.raises(InvalidArgumentValueError):
             validate_edge_device_id(device_id)
+
+    @pytest.mark.parametrize("device_id", ["device\x1b[31m", "device\nERROR: spoofed", "\x1b" * 129])
+    def test_rejected_device_ids_are_rendered_inertly(self, device_id):
+        with pytest.raises(InvalidArgumentValueError) as error:
+            validate_edge_device_id(device_id)
+
+        assert "\x1b" not in str(error.value)
+        assert "\n" not in str(error.value)
+        assert ascii(device_id) in str(error.value)
+
+    def test_nested_config_rejects_traversal_id(self, set_cwd, patch_create_edge_root_cert):
+        content = process_yaml_arg("device_configs/invalid/traversal_device_id.yml")
+        content["edgeDevices"] = [{"deviceId": "parent", "children": content["edgeDevices"]}]
+
+        with pytest.raises(InvalidArgumentValueError, match="Device Id .* contains invalid characters"):
+            process_edge_devices_config_file_content(content=content, config_path=".")
 
     @pytest.mark.parametrize(
         "device_id",

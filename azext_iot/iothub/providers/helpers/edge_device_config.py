@@ -257,11 +257,11 @@ def validate_edge_device_id(device_id: str) -> str:
         )
     if len(device_id) > MAX_DEVICE_ID_LEN:
         raise InvalidArgumentValueError(
-            f"Device Id '{device_id}' is invalid, it must be at most {MAX_DEVICE_ID_LEN} characters long."
+            f"Device Id {ascii(device_id)} is invalid, it must be at most {MAX_DEVICE_ID_LEN} characters long."
         )
     if not DEVICE_ID_ALLOWED_PATTERN.fullmatch(device_id):
         raise InvalidArgumentValueError(
-            f"Device Id '{device_id}' contains invalid characters. Device Ids may only contain "
+            f"Device Id {ascii(device_id)} contains invalid characters. Device Ids may only contain "
             "alphanumeric characters and the following symbols: - . + % _ # * ? ! ( ) , : = @ $ '"
         )
     # '.' is a legal device Id character, so relative traversal segments must be rejected explicitly.
