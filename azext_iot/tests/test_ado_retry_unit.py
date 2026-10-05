@@ -199,17 +199,19 @@ def test_ado_federation_uses_job_and_service_connection_without_github_token(moc
     get.assert_not_called()
 
 
-def test_yaml_exposes_manual_only_services_and_non_live_default():
+def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     entry_text = (ROOT / ".azure-devops/integration_tests.yml").read_text()
     entry = yaml.safe_load(entry_text)
     parameters = {value["name"]: value for value in entry["parameters"]}
-    assert parameters["mode"]["default"] == "Dry run"
+    assert entry["trigger"] == entry["pr"] == "none"
+    assert parameters["mode"]["default"] == "Integration tests"
     assert parameters["mode"]["values"] == ["Dry run", "Integration tests"]
     assert len(entry["stages"]) == 2
     assert entry["stages"][0]["stage"] == "Plan"
     assert [job["job"] for job in entry["stages"][0]["jobs"]] == ["Plan"]
     assert "${{ if eq(parameters.mode, 'Integration tests') }}" in entry["stages"][1]
-    assert parameters["services"]["values"] == list(retry.SERVICES)
+    assert parameters["services"]["default"] == ["DPS/Hub/ADR/ADU"]
+    assert parameters["services"]["values"] == ["DPS/Hub/ADR/ADU", *retry.SERVICES]
     assert parameters["pythonVersions"]["type"] == "stringList"
     text = (ROOT / ".azure-devops/templates/integration-service.yml").read_text()
     assert "RetrySelfTest" not in entry_text + text
@@ -223,6 +225,31 @@ def test_yaml_exposes_manual_only_services_and_non_live_default():
     assert "diagnostic" not in {value["name"] for value in template["parameters"]}
     live = next(step for step in steps if step.get("task") == "AzureCLI@2")
     assert live["env"]["PYTHONPATH"] == "$(Build.SourcesDirectory)"
+
+
+def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
+    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    services = next(value for value in entry["variables"] if value.get("name") == "servicesCsv")
+    assert services == {
+        "name": "servicesCsv",
+        "${{ if containsValue(parameters.services, 'DPS/Hub/ADR/ADU') }}": {"value": ",".join(retry.SERVICES)},
+        "${{ else }}": {"value": "${{ join(',', parameters.services) }}"},
+    }
+    plan = next(step for step in entry["stages"][0]["jobs"][0]["steps"] if "bash" in step)
+    assert plan["env"]["SERVICES"] == "${{ replace(variables.servicesCsv, ',', ' ') }}"
+    integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
+    nonempty = "${{ if ne(variables.servicesCsv, '') }}"
+    each = "${{ each service in split(variables.servicesCsv, ',') }}"
+    stages = next(value[nonempty] for value in integration if nonempty in value)
+    assert stages == [{each: [{
+        "template": "templates/integration-service.yml",
+        "parameters": {
+            "service": "${{ service }}", "pythonVersions": "${{ parameters.pythonVersions }}",
+            "regions": "${{ split(parameters.regions, ',') }}",
+        },
+    }]}]
+    gate = next(value for value in integration if value.get("stage") == "Qualify")
+    assert gate["dependsOn"] == ["Plan", "Build", "Lint", "Unit", {nonempty: [{each: ["${{ service }}"]}]}]
 
 
 @pytest.mark.parametrize("step_name", ["install", "live"])
@@ -291,9 +318,7 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert publish["inputs"]["failTaskOnMissingResultsFile"] is True
     assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)"
                for step in stages["Unit"]["jobs"][1]["steps"])
-    assert stages["Qualify"]["dependsOn"] == [
-        "Plan", "Build", "Lint", "Unit", {"${{ each service in parameters.services }}": ["${{ service }}"]},
-    ]
+    assert stages["Qualify"]["dependsOn"][:4] == ["Plan", "Build", "Lint", "Unit"]
     assert "condition" not in stages["Qualify"]
 
 

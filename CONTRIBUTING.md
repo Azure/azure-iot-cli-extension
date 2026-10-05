@@ -148,15 +148,20 @@ dispatch or the Azure DevOps centraluseuap pipeline.
 
 On `release/1.0.0-preview`, **Azure IoT CLI - Integration Tests** uses
 `.azure-devops/integration_tests.yml`. Choose the branch first, then a run mode.
-**Dry run** is the safe default: it validates the selected services, Python
-versions, regions and ARM endpoint without Azure login or resource creation.
-**Integration tests** runs separate **Build**, **Lint** and **Unit tests** stages
-after planning. Each has its own job and can run in parallel after the plan
+**Integration tests** is the default. Select **Dry run** explicitly to validate
+the selected services, Python versions, regions and ARM endpoint without Azure
+login or resource creation. **Integration tests** runs separate **Build**, **Lint**
+and **Unit tests** stages after planning. Each has its own job and can run in parallel after the plan
 passes. The selected DPS, HubControl, HubData, ADU and ADR integration stages wait
 for all three to succeed, then run in parallel as separate manual-retry targets. **Qualify**
 then checks the complete matrix and publishes combined coverage. Central, Digital Twins and the
 old cross-service smoke stage are not part of this pipeline. Regions accept
 comma-separated public-region identifiers; canary requires `centraluseuap`.
+
+The default service selection is the **DPS/Hub/ADR/ADU** preset, which runs DPS,
+both HubControl and HubData, ADU and ADR. Clear the preset to select individual
+services instead. Selecting it alongside individual services still runs each of
+the five suites once, without duplicate stages or results.
 
 The **Unit** stage runs four serial pytest jobs concurrently, followed by a
 **UnitGate** job. Each job collects the complete unit suite and then selects a

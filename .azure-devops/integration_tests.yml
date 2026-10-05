@@ -9,13 +9,13 @@ parameters:
   - name: mode
     displayName: Run mode
     type: string
-    default: Dry run
+    default: Integration tests
     values: [Dry run, Integration tests]
   - name: services
     displayName: Services
     type: stringList
-    default: [DPS, HubControl, HubData, ADU, ADR]
-    values: [DPS, HubControl, HubData, ADU, ADR]
+    default: [DPS/Hub/ADR/ADU]
+    values: [DPS/Hub/ADR/ADU, DPS, HubControl, HubData, ADU, ADR]
   - name: pythonVersions
     displayName: Python versions
     type: stringList
@@ -33,6 +33,11 @@ parameters:
 
 variables:
   - group: aziotcli_test_primary
+  - name: servicesCsv
+    ${{ if containsValue(parameters.services, 'DPS/Hub/ADR/ADU') }}:
+      value: DPS,HubControl,HubData,ADU,ADR
+    ${{ else }}:
+      value: ${{ join(',', parameters.services) }}
   - name: endpoint
     ${{ if eq(parameters.armEndpoint, 'public') }}:
       value: https://management.azure.com
@@ -59,7 +64,7 @@ stages:
               cat plan.json
             displayName: Validate exact matrix before Azure access
             env:
-              SERVICES: ${{ join(' ', parameters.services) }}
+              SERVICES: ${{ replace(variables.servicesCsv, ',', ' ') }}
               VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
               REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
               ENDPOINT: $(endpoint)
@@ -162,12 +167,13 @@ stages:
               - publish: unit-coverage
                 artifact: integration-unit-coverage-$(System.JobAttempt)
 
-      - ${{ each service in parameters.services }}:
-          - template: templates/integration-service.yml
-            parameters:
-              service: ${{ service }}
-              pythonVersions: ${{ parameters.pythonVersions }}
-              regions: ${{ split(parameters.regions, ',') }}
+      - ${{ if ne(variables.servicesCsv, '') }}:
+          - ${{ each service in split(variables.servicesCsv, ',') }}:
+              - template: templates/integration-service.yml
+                parameters:
+                  service: ${{ service }}
+                  pythonVersions: ${{ parameters.pythonVersions }}
+                  regions: ${{ split(parameters.regions, ',') }}
       - stage: Qualify
         displayName: Verify all expected cases and publish coverage
         dependsOn:
@@ -175,8 +181,9 @@ stages:
           - Build
           - Lint
           - Unit
-          - ${{ each service in parameters.services }}:
-              - ${{ service }}
+          - ${{ if ne(variables.servicesCsv, '') }}:
+              - ${{ each service in split(variables.servicesCsv, ',') }}:
+                  - ${{ service }}
         jobs:
           - job: Gate
             steps:
