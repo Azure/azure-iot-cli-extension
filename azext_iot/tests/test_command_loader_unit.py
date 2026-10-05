@@ -40,10 +40,13 @@ _NAMESPACE_ARGUMENTS = [
     "resource-group",
 ]
 _DEVICE_PARSER_CASES = {
-    "iot adr ns device create": ["--name", "device", "--location", "centraluseuap"],
+    "iot adr ns device create": [
+        "--name", "device", "--location", "centraluseuap",
+        "--device-type-ref", "/models/one",
+    ],
     "iot adr ns device show": ["--name", "device"],
     "iot adr ns device list": [],
-    "iot adr ns device update": ["--name", "device", "--manufacturer", "Contoso"],
+    "iot adr ns device update": ["--name", "device", "--remove-device-type-ref"],
     "iot adr ns device delete": ["--name", "device"],
     "iot adr ns device wait": ["--name", "device", "--exists"],
     "iot adr ns device auth list": ["--device-name", "device"],
@@ -491,7 +494,7 @@ def test_namespace_device_command_parser(command_table, management_command_parse
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 112
+    assert sum(name.startswith("iot adr ") for name in command_table) == 125
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)

@@ -70,6 +70,7 @@ class RegistryDeviceProvider(ADRProvider):
         model: Optional[str] = None,
         hardware_revision: Optional[str] = None,
         software_revision: Optional[str] = None,
+        device_type_ref: Optional[str] = None,
         no_wait: bool = False,
     ):
         _validate_enablement_state(enablement_state)
@@ -84,6 +85,8 @@ class RegistryDeviceProvider(ADRProvider):
         for property_name, value in optional_properties:
             if value is not None:
                 properties[property_name] = value
+        if device_type_ref is not None:
+            properties["deviceTypeRefs"] = [device_type_ref]
 
         resource = {
             "location": self._resolve_location(
@@ -193,9 +196,15 @@ class RegistryDeviceProvider(ADRProvider):
         model: Optional[str] = None,
         hardware_revision: Optional[str] = None,
         software_revision: Optional[str] = None,
+        device_type_ref: Optional[str] = None,
+        remove_device_type_ref: bool = False,
         no_wait: bool = False,
     ):
         _validate_enablement_state(enablement_state)
+        if device_type_ref is not None and remove_device_type_ref:
+            raise MutuallyExclusiveArgumentError(
+                "Specify only one of --device-type-ref and --remove-device-type-ref."
+            )
         inner_properties = {}
         optional_properties = (
             ("enablementState", enablement_state),
@@ -207,6 +216,10 @@ class RegistryDeviceProvider(ADRProvider):
         for property_name, value in optional_properties:
             if value is not None:
                 inner_properties[property_name] = value
+        if device_type_ref is not None:
+            inner_properties["deviceTypeRefs"] = [device_type_ref]
+        elif remove_device_type_ref:
+            inner_properties["deviceTypeRefs"] = []
 
         properties = {}
         if inner_properties:
@@ -216,7 +229,8 @@ class RegistryDeviceProvider(ADRProvider):
         if not properties:
             raise RequiredArgumentMissingError(
                 "Nothing to update. Provide --enablement-state, --manufacturer, --model, "
-                "--hardware-revision, --software-revision, or --tags."
+                "--hardware-revision, --software-revision, --device-type-ref, "
+                "--remove-device-type-ref, or --tags."
             )
 
         poller = self.client.registry_devices.begin_update(
