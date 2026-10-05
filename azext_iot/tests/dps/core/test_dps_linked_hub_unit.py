@@ -137,6 +137,24 @@ class TestLinkedHubCreateValidation:
                 connection_string="HostName=hub.service.azure-devices.net;SharedAccessKeyName=x;SharedAccessKey=y"
             )
 
+    @pytest.mark.parametrize("authentication_type", [None, "SystemAssigned", "UserAssigned"])
+    def test_mqtt5_hub_rejected_before_dps_write(
+        self, fixture_cmd, mock_deps, mocker, authentication_type
+    ):
+        from azext_iot.core.custom import iot_dps_linked_hub_create
+
+        mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "properties": {"connectionProfile": "mqttv5"},
+        })
+        with pytest.raises(InvalidArgumentValueError, match="MQTT v5.*cannot be linked directly"):
+            iot_dps_linked_hub_create(
+                cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="hub",
+                authentication_type=authentication_type,
+                user_assigned_identity="/identities/test" if authentication_type == "UserAssigned" else None,
+            )
+
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
+
     def test_mi_system_assigned_not_enabled(self, fixture_cmd, mock_deps, mocker):
         from azext_iot.core.custom import iot_dps_linked_hub_create
         mocker.patch("azext_iot.core.custom.iot_dps_get", return_value={

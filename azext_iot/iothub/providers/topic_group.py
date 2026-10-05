@@ -11,10 +11,8 @@ from azure.cli.core.azclierror import (
     ManualInterrupt,
     ResourceNotFoundError,
 )
-from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from knack.prompting import prompt_y_n
-from msrestazure.tools import parse_resource_id
 
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.core.shared import is_mqtt_v5_profile
@@ -106,16 +104,7 @@ class TopicGroup(IoTHubProvider):
         return topic_groups
 
     def _update_hub(self):
-        resource_group_name = self.rg or parse_resource_id(
-            self.hub_resource["id"]
-        )["resource_group"]
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=resource_group_name,
-                resource_name=self.hub_resource["name"],
-                iot_hub_description=self.hub_resource,
-                etag=self.hub_resource["etag"],
-                match_condition=MatchConditions.IfNotModified,
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
