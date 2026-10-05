@@ -67,11 +67,14 @@ def _state_file_destination(state_file: str) -> str:
         os.stat(state_file)
     except FileNotFoundError:
         pass  # A new filename is allowed, but its parents must resolve below.
+    else:
+        return os.path.realpath(state_file, strict=True)
 
     destination = state_file
     seen_links = set()
     while True:
         directory, filename = os.path.split(destination)
+        os.stat(directory or ".")
         directory = os.path.realpath(directory or ".", strict=True)
         destination = os.path.join(directory, filename)
         if not os.path.islink(destination):
