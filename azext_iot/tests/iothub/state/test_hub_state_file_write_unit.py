@@ -67,6 +67,47 @@ def test_fallback_preserves_state(tmp_path):
         assert os.stat(fallback_path).st_mode & 0o777 == 0o600
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
+@pytest.mark.parametrize("write_fails", [False, True])
+def test_atomic_write_preserves_destination_symlink(tmp_path, mocker, write_fails):
+    target = tmp_path / "target.json"
+    target.write_text("previous state", encoding="utf-8")
+    link = tmp_path / "link.json"
+    link.symlink_to(target)
+    if write_fails:
+        mocker.patch.object(subject.os, "replace", side_effect=OSError("replace failed"))
+        with pytest.raises(OSError, match="replace failed"):
+            subject._write_state_file({"new": "state"}, str(link))
+        assert target.read_text(encoding="utf-8") == "previous state"
+    else:
+        subject._write_state_file({"new": "state"}, str(link))
+        assert json.loads(target.read_text(encoding="utf-8")) == {"new": "state"}
+
+    assert link.is_symlink()
+    assert set(tmp_path.iterdir()) == {target, link}
+
+
+def test_non_regular_destination_keeps_streaming_behavior(mocker):
+    create_temporary_file = mocker.patch.object(subject.tempfile, "mkstemp")
+
+    subject._write_state_file({"a": 1}, os.devnull)
+
+    create_temporary_file.assert_not_called()
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_interrupted_write_removes_incomplete_file(tmp_path, mocker, fallback):
+    mocker.patch.object(subject.json, "dump", side_effect=KeyboardInterrupt())
+
+    with pytest.raises(KeyboardInterrupt):
+        if fallback:
+            subject._write_fallback_state_file({"a": 1}, "myhub")
+        else:
+            subject._write_state_file({"a": 1}, str(tmp_path / "state.json"))
+
+    assert not list(tmp_path.iterdir())
+
+
 @pytest.mark.parametrize("operation", ["tempfile.mkstemp", "json.dump", "os.fsync"])
 def test_failed_fallback_leaves_no_partial_file(tmp_path, mocker, operation):
     mocker.patch(f"azext_iot.iothub.providers.state.{operation}", side_effect=OSError("no temp space"))

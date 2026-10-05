@@ -59,12 +59,17 @@ def _endpoint_resource_name(endpoint_uri: str) -> str:
 
 
 def _write_state_file(hub_state: dict, state_file: str):
-    """Serialize the hub state to state_file atomically.
+    """Write regular files atomically and retain streaming writes to other destinations.
 
-    The state is written to a temporary file in the destination directory and then moved into
+    Regular files are written to a temporary file in the destination directory and then moved into
     place, so an interrupted or failing write can never truncate a previously good state file.
     """
-    destination = os.path.abspath(state_file)
+    if os.path.exists(state_file) and not os.path.isfile(state_file):
+        with open(state_file, "w", encoding="utf-8") as stream:
+            json.dump(hub_state, stream, indent=4, sort_keys=True)
+        return
+
+    destination = os.path.realpath(state_file)
     directory = os.path.dirname(destination) or "."
 
     file_descriptor, temp_path = tempfile.mkstemp(
@@ -76,13 +81,12 @@ def _write_state_file(hub_state: dict, state_file: str):
             f.flush()
             os.fsync(f.fileno())
         os.replace(temp_path, destination)
-    except Exception:
+    finally:
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except OSError:
                 logger.debug("Could not remove temporary state file %s.", temp_path)
-        raise
 
 
 def _write_fallback_state_file(hub_state: dict, hub_name: Optional[str]) -> Optional[str]:
@@ -91,6 +95,7 @@ def _write_fallback_state_file(hub_state: dict, hub_name: Optional[str]) -> Opti
     Returns the path written, or None if even the fallback location is unusable.
     """
     fallback_path = None
+    written = False
     try:
         file_descriptor, fallback_path = tempfile.mkstemp(
             prefix="iot-hub-state-{}-".format(hub_name or "export"), suffix=".json"
@@ -99,15 +104,17 @@ def _write_fallback_state_file(hub_state: dict, hub_name: Optional[str]) -> Opti
             json.dump(hub_state, f, indent=4, sort_keys=True)
             f.flush()
             os.fsync(f.fileno())
+        written = True
         return fallback_path
     except (OSError, TypeError, ValueError) as fallback_error:
         logger.debug("Could not write fallback state file: %s", fallback_error)
-        if fallback_path and os.path.exists(fallback_path):
+        return None
+    finally:
+        if not written and fallback_path and os.path.exists(fallback_path):
             try:
                 os.remove(fallback_path)
             except OSError:
                 logger.debug("Could not remove incomplete fallback state file %s.", fallback_path)
-        return None
 
 
 class StateProvider(IoTHubProvider):

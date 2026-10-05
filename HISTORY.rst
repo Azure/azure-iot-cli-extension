@@ -8,7 +8,7 @@ Unreleased
 
 **IoT Hub updates**
 
-* Hardened the final write in ``az iot hub state export`` with atomic replacement. If writing a fully collected state fails, the command attempts to save it to a temporary recovery file and reports its path in an error. Failures during state collection are not recovered.
+* Hardened the final write in ``az iot hub state export`` with atomic replacement for regular files, preserving destination symlinks and streaming output to non-regular files. Regular-file output and recovery files are private to the current user (mode ``0600`` on POSIX). If writing a fully collected state fails, the command attempts a temporary recovery file and reports its path in an error. Failures during state collection are not recovered.
 
 0.31.0
 +++++++++++++++
