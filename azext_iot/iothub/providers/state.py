@@ -592,7 +592,7 @@ class StateProvider(IoTHubProvider):
                 module["authentication"] = module_identity_show["authentication"]
 
                 for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
-                    module.pop(key)
+                    module.pop(key, None)
 
                 # Fail to retrieve module twin - log and continue without module
                 try:
@@ -606,7 +606,7 @@ class StateProvider(IoTHubProvider):
                     continue
 
                 for key in IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS:
-                    module_twin.pop(key)
+                    module_twin.pop(key, None)
                 for key in ["$metadata", "$version"]:
                     module_twin["properties"]["desired"].pop(key)
                 module_twin["properties"].pop("reported")

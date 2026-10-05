@@ -16,6 +16,7 @@ import azext_iot.iothub.providers.helpers.state_strings as constants
 
 from azext_iot.tests.conftest import generate_cs
 from azext_iot.iothub.providers.state import StateProvider, _endpoint_resource_name
+from azext_iot.sdk.iothub.service.models import Module
 
 hub_name = "hubname"
 hub_rg = "hubrg"
@@ -174,6 +175,40 @@ class TestDownloadDevicesThumbprint:
         devices = provider.download_devices(target={})
 
         assert set(devices.keys()) == {"withThumbprint", "noThumbprint"}
+
+    @pytest.mark.parametrize("include_thumbprint", [False, True])
+    def test_modules_with_missing_optional_fields_are_exported(self, mocker, include_thumbprint):
+        self._patch_device_calls(mocker, [_build_device_twin()])
+        module = Module(module_id="module1", device_id="device1", managed_by="module-manager")
+        assert "connectionStateUpdatedTime" not in module.serialize()
+        assert "lastActivityTime" not in module.serialize()
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_module_list", return_value=[module]
+        )
+        authentication = {
+            "type": "sas",
+            "symmetricKey": {"primaryKey": "module-primary", "secondaryKey": "module-secondary"},
+        }
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_module_show",
+            return_value={"authentication": authentication},
+        )
+        module_twin = _build_device_twin(include_thumbprint=include_thumbprint)
+        module_twin.update({"moduleId": "module1", "etag": "module-etag", "version": 1, "tags": {"site": "factory"}})
+        module_twin["properties"]["desired"]["setting"] = "retained"
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_module_twin_show", return_value=module_twin
+        )
+
+        provider = StateProvider.__new__(StateProvider)
+        devices = provider.download_devices(target={})
+
+        assert devices["device1"]["modules"] == {
+            "module1": {
+                "identity": {"managedBy": "module-manager", "authentication": authentication},
+                "twin": {"properties": {"desired": {"setting": "retained"}}, "tags": {"site": "factory"}},
+            }
+        }
 
 
 class TestEndpointHostNameParsing:

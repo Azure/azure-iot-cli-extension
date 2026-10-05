@@ -3,6 +3,13 @@
 Release History
 ===============
 
+Unreleased
+++++++++++
+
+**IoT Hub updates**
+
+* Fixed ``az iot hub state export`` failing when device or module twins omit ``x509Thumbprint``, or module identities omit optional read-only fields. Device authentication, module authentication, and writable twin properties are preserved.
+
 0.31.0
 +++++++++++++++
 
@@ -34,8 +41,6 @@ Release History
 **IoT Hub updates**
 
 * Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
-
-* Fixed ``az iot hub state export`` failing with ``KeyError: 'x509Thumbprint'`` when a device twin does not include an ``x509Thumbprint`` property. Affected devices are now exported with an empty thumbprint pair instead of aborting the entire export.
 
 0.29.0
 +++++++++++++++
