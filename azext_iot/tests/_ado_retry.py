@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
-from urllib.parse import unquote, urlsplit
 
 STAGES = ("setup", "call", "teardown")
 SERVICES = ("DPS", "HubControl", "HubData", "ADU", "ADR")
@@ -44,37 +43,6 @@ def case_id(node):
 def assertion_failure(error):
     return (type(error) is AssertionError and error.__cause__ is None and error.__context__ is None
             and not getattr(error, "_iot_cleanup_failed", False))
-
-
-def resource_root(url, scope):
-    """Identify a top-level ARM resource without retaining query strings or credentials."""
-    parsed = urlsplit(url)
-    if parsed.hostname not in ("management.azure.com", "centraluseuap.management.azure.com"):
-        return None
-    path = unquote(parsed.path).casefold()
-    if not path.startswith("/subscriptions/"):
-        return None
-    prefix = f"/subscriptions/{scope['subscription']}/resourcegroups/{scope['resource_group']}/providers/".casefold()
-    parts = path.strip("/").split("/")
-    if (parsed.scheme != "https" or parsed.username or parsed.password or not path.startswith(prefix)
-            or len(parts) < 8 or any(part in ("", ".", "..") for part in parts)):
-        raise ValueError("ARM mutation is outside the test resource scope.")
-    if parts[5:7] == ["microsoft.resources", "deployments"]:
-        raise ValueError("Indirect ARM deployments cannot establish per-process resource inventory.")
-    return "/" + "/".join(parts[:8])
-
-
-def cleanup_inventory(before, after, receipt, scope):
-    roots = receipt.get("resourceRoots")
-    if (receipt.get("resourceScope") != scope or not isinstance(roots, list)
-            or any(not isinstance(root, str) for root in roots) or roots != sorted(set(roots))
-            or any(resource_root("https://management.azure.com" + root, scope) != root for root in roots)):
-        raise ValueError("Per-process resource observation is missing or invalid.")
-    new_resources = set(after) - set(before)
-    remaining = sorted(resource for resource in new_resources
-                       if any(resource == root or resource.startswith(root + "/") for root in roots))
-    return {"scope": scope, "observedRoots": roots, "before": before, "after": after,
-            "remaining": remaining, "complete": not remaining}
 
 
 def outcomes(receipt):

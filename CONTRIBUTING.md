@@ -233,10 +233,11 @@ Service stages have no dependencies on one another; available ADO parallel-job
 capacity and resource checks can still queue jobs. In particular, a shared
 exclusive lock can serialize otherwise-independent stages; YAML dependencies do
 not override that check, and this change does not reconfigure it. Python/region matrix legs within
-each service remain serialized. ADR/ADU cleanup inventory is scoped to ARM resource
-roots touched by that test process (including its pytest workers), so another
-service's active resources are not mistaken for leaks. Fixture teardown failures
-and leftover new resources touched by the process still fail qualification.
+each service remain serialized. Resource ownership and cleanup remain with the
+existing service fixtures and Hub/DPS phase controllers. The ADR/ADU retry plugin
+records test execution metadata only: it does not intercept HTTP requests or add
+a resource-inventory gate. Fixture-reported teardown/cleanup failures remain
+non-retryable; Hub/DPS still require their existing ownership and cleanup evidence.
 Admission still rejects active GitHub integration runs. It does not inspect other
 ADO builds or enforce a fixed cleanup-time exclusion, and there are no
 merge-pipeline/revision exceptions. The daily 13:00 UTC cleanup job is unchanged
