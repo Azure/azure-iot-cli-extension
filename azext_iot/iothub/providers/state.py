@@ -90,15 +90,23 @@ def _write_fallback_state_file(hub_state: dict, hub_name: Optional[str]) -> Opti
 
     Returns the path written, or None if even the fallback location is unusable.
     """
+    fallback_path = None
     try:
         file_descriptor, fallback_path = tempfile.mkstemp(
             prefix="iot-hub-state-{}-".format(hub_name or "export"), suffix=".json"
         )
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
             json.dump(hub_state, f, indent=4, sort_keys=True)
+            f.flush()
+            os.fsync(f.fileno())
         return fallback_path
-    except Exception as fallback_error:
+    except (OSError, TypeError, ValueError) as fallback_error:
         logger.debug("Could not write fallback state file: %s", fallback_error)
+        if fallback_path and os.path.exists(fallback_path):
+            try:
+                os.remove(fallback_path)
+            except OSError:
+                logger.debug("Could not remove incomplete fallback state file %s.", fallback_path)
         return None
 
 

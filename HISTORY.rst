@@ -3,6 +3,13 @@
 Release History
 ===============
 
+Unreleased
+++++++++++
+
+**IoT Hub updates**
+
+* Hardened the final write in ``az iot hub state export`` with atomic replacement. If writing a fully collected state fails, the command attempts to save it to a temporary recovery file and reports its path in an error. Failures during state collection are not recovered.
+
 0.31.0
 +++++++++++++++
 
@@ -34,8 +41,6 @@ Release History
 **IoT Hub updates**
 
 * Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
-
-* Fixed ``az iot hub state export`` discarding all collected state when the final write to the state file failed. The state file is now written atomically, an existing state file is no longer truncated by a failed write, and if the destination is unusable the exported data is preserved to a temporary file whose path is reported in the error.
 
 0.29.0
 +++++++++++++++
