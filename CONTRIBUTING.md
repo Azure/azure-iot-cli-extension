@@ -175,13 +175,12 @@ per-file durations can refresh the checked-in timing profile after review.
 The final integration coverage report consumes combined unit coverage, not the raw
 shard coverage files. A missing or failed unit shard/gate still blocks integration.
 
-Lint and unit jobs cache **pip downloads only**, keyed by OS, architecture, Python
-version and dependency/build configuration. Installation always runs, including
-on cache hits; no virtual environment, candidate extension, credential or test
-result is cached. The job logs expose the cache hit and size, tox setup/test
-durations, and separate ADO restore/save task timings. Compare cold and warm runs
-including cache overhead before treating caching as a performance improvement;
-it does not pin dependencies or relax integration retry fingerprints.
+Cross-job pip caching is not used: cold/warm measurements showed no net runtime
+benefit after restore overhead. Tox still reports setup/test durations, and the
+four-shard design accounts for the main speedup. Mocked Digital Twins creation
+tests use an immediate retry interval and bounded poller completion rather than
+sleeping through production polling intervals; success and failure transitions
+are still verified using the real poller.
 Four unit shards need four available parallel jobs; Build/Lint also compete for
 agents. Service stages still wait for all prechecks, not just the candidate build.
 

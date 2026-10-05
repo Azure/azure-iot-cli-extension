@@ -92,14 +92,11 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.13'
-              - template: templates/pip-cache.yml
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
                   python -m tox r -e lint -vv
                 displayName: Flake8 and pylint
-                env:
-                  PIP_CACHE_DIR: $(Pipeline.Workspace)/pip-cache
 
       - stage: Unit
         displayName: Unit tests
@@ -122,7 +119,6 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.13'
-              - template: templates/pip-cache.yml
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
@@ -134,7 +130,6 @@ stages:
                   SHARD: $(shard)
                   RESULTS: $(Build.SourcesDirectory)/unit-result
                   COVERAGE_FILE: $(Build.SourcesDirectory)/unit-result/coverage.dat
-                  PIP_CACHE_DIR: $(Pipeline.Workspace)/pip-cache
               - task: PublishTestResults@2
                 condition: succeededOrFailed()
                 inputs:

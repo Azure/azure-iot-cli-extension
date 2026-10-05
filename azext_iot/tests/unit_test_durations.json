@@ -20,7 +20,6 @@
     "azext_iot/tests/adr/test_adr_surface_retirement_unit.py": 6.82,
     "azext_iot/tests/adr/test_adr_validation_scenarios_unit.py": 9.1,
     "azext_iot/tests/digitaltwins/test_dt_model_unit.py": 2.58,
-    "azext_iot/tests/digitaltwins/test_dt_resource_unit.py": 141.17,
     "azext_iot/tests/digitaltwins/test_dt_twin_unit.py": 5.19,
     "azext_iot/tests/dps/core/test_dps_phase_lifetime_unit.py": 5.91,
     "azext_iot/tests/dps/core/test_dps_phase_runtime_unit.py": 51.31,

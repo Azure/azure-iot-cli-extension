@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Unit shard collection, artifact isolation, aggregation and cache wiring contracts."""
+"""Unit shard collection, artifact isolation, aggregation and pipeline wiring contracts."""
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -179,7 +179,7 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
     assert len(shards.read(tmp_path / "combined/timings.json")["seconds"]) == 4
 
 
-def test_pipeline_caches_downloads_only_and_keeps_four_shards_behind_unit_gate():
+def test_pipeline_keeps_four_shards_and_unit_gate_without_cross_job_cache():
     pipeline = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     stages = pipeline["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     unit = next(stage for stage in stages if stage.get("stage") == "Unit")
@@ -191,11 +191,7 @@ def test_pipeline_caches_downloads_only_and_keeps_four_shards_behind_unit_gate()
     run = next(step for step in job["steps"] if "bash" in step)
     assert "--unit-shard" in run["bash"] and "--unit-shard-output" in run["bash"]
     assert run["env"]["COVERAGE_FILE"].endswith("/coverage.dat")
-    cache = yaml.safe_load((ROOT / ".azure-devops/templates/pip-cache.yml").read_text())
-    inputs = cache["steps"][0]["inputs"]
-    assert inputs["path"] == "$(Pipeline.Workspace)/pip-cache"
-    keys = ("Agent.OS", "Agent.OSArchitecture", "pythonVersion", "dev_requirements", "setup.py", "tox.ini")
-    assert all(key in inputs["key"] for key in keys)
-    assert "restoreKeys" not in inputs
-    assert "cacheHitVar" in inputs
+    assert not (ROOT / ".azure-devops/templates/pip-cache.yml").exists()
+    assert "PIP_CACHE_DIR" not in run["env"]
+    assert "pip-cache" not in str(stages) and "Cache@2" not in str(stages)
     assert "condition" not in run
