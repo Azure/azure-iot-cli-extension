@@ -53,6 +53,11 @@ def _validate_enablement_state(enablement_state: Optional[str]) -> None:
         )
 
 
+def _validate_device_type_ref(device_type_ref: Optional[str]) -> None:
+    if device_type_ref is not None and not device_type_ref.strip():
+        raise InvalidArgumentValueError("--device-type-ref cannot be empty.")
+
+
 class RegistryDeviceProvider(ADRProvider):
     def __init__(self, cmd):
         super(RegistryDeviceProvider, self).__init__(cmd)
@@ -74,6 +79,7 @@ class RegistryDeviceProvider(ADRProvider):
         no_wait: bool = False,
     ):
         _validate_enablement_state(enablement_state)
+        _validate_device_type_ref(device_type_ref)
         properties = {"enablementState": enablement_state}
         optional_properties = (
             ("externalDeviceId", external_device_id),
@@ -205,6 +211,7 @@ class RegistryDeviceProvider(ADRProvider):
             raise MutuallyExclusiveArgumentError(
                 "Specify only one of --device-type-ref and --remove-device-type-ref."
             )
+        _validate_device_type_ref(device_type_ref)
         inner_properties = {}
         optional_properties = (
             ("enablementState", enablement_state),

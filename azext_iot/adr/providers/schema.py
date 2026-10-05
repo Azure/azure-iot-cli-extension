@@ -148,8 +148,6 @@ class SchemaRegistryProvider(ADRProvider):
         )
         if outbound_identity is not None:
             properties["outboundIdentity"] = outbound_identity
-        elif outbound_mi_system_assigned is False:
-            properties["outboundIdentity"] = None
 
         resource = {
             "location": registry_location,
