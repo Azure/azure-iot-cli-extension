@@ -20,6 +20,7 @@ from azext_iot.adr.common import (
     validate_uami_resource_id,
 )
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.common.arm import sanitize_arm_identity
 
 _VERSION_PATTERN = re.compile(r"^[0-9]{1,10}$")
 
@@ -50,6 +51,66 @@ def _resolve_outbound_identity(
         outbound_mi_user_assigned,
         sami_type=IdentityType.system_assigned.value,
         uami_type=IdentityType.user_assigned.value,
+    )
+
+
+def _reconcile_registry_identity(
+    identity: Optional[dict],
+    outbound_identity: Optional[dict],
+    *,
+    allow_attachment: bool,
+) -> Optional[dict]:
+    if outbound_identity is None:
+        return identity
+
+    identity = identity or {}
+    identity_type = identity.get("type") or ""
+    has_system_assigned = IdentityType.system_assigned.value in identity_type
+    user_assigned_identities = {
+        resource_id.rstrip("/").casefold(): resource_id
+        for resource_id in (identity.get("userAssignedIdentities") or {})
+    }
+    outbound_type = outbound_identity.get("type")
+
+    if outbound_type == IdentityType.system_assigned.value:
+        if has_system_assigned:
+            return identity
+        if not allow_attachment:
+            raise InvalidArgumentValueError(
+                "The Schema Registry outbound system-assigned identity is not "
+                "included in the requested managed identity state. Include "
+                "--system-assigned-mi or clear/change the outbound identity in "
+                "the same command."
+            )
+        return build_managed_service_identity(
+            True, list(user_assigned_identities.values())
+        )
+
+    if outbound_type == IdentityType.user_assigned.value:
+        resource_id = outbound_identity.get("userAssignedIdentity")
+        if not resource_id:
+            raise InvalidArgumentValueError(
+                "The Schema Registry outbound user-assigned identity is missing "
+                "its resource ID."
+            )
+        normalized_id = resource_id.rstrip("/").casefold()
+        if normalized_id in user_assigned_identities:
+            return identity
+        if not allow_attachment:
+            raise InvalidArgumentValueError(
+                "The Schema Registry outbound user-assigned identity is not "
+                "included in --user-assigned-mi. Include the same identity or "
+                "clear/change the outbound identity in the same command."
+            )
+        user_assigned_identities[normalized_id] = resource_id
+        return build_managed_service_identity(
+            has_system_assigned, list(user_assigned_identities.values())
+        )
+
+    raise InvalidArgumentValueError(
+        "The Schema Registry has an unsupported outbound identity type "
+        f"'{outbound_identity.get('type')}'. Change or clear it before updating "
+        "managed identities."
     )
 
 
@@ -96,8 +157,16 @@ class SchemaRegistryProvider(ADRProvider):
         }
         if tags is not None:
             resource["tags"] = tags
+        identity_options_supplied = (
+            mi_system_assigned is not None or mi_user_assigned is not None
+        )
         identity = build_managed_service_identity(
             mi_system_assigned, mi_user_assigned
+        )
+        identity = _reconcile_registry_identity(
+            identity,
+            outbound_identity,
+            allow_attachment=not identity_options_supplied,
         )
         if identity is not None:
             resource["identity"] = identity
@@ -143,10 +212,38 @@ class SchemaRegistryProvider(ADRProvider):
             patch["properties"] = properties
         if tags is not None:
             patch["tags"] = tags
+        identity_options_supplied = (
+            mi_system_assigned is not None or mi_user_assigned is not None
+        )
+        outbound_options_supplied = (
+            outbound_identity is not None
+            or outbound_mi_system_assigned is False
+        )
+        current = None
+        if identity_options_supplied != outbound_options_supplied:
+            current = self.show(schema_registry_name, resource_group_name)
+
+        current_identity = sanitize_arm_identity(
+            (current or {}).get("identity")
+        )
         identity = build_managed_service_identity(
             mi_system_assigned, mi_user_assigned
         )
-        if identity is not None:
+        if not identity_options_supplied:
+            identity = current_identity
+        final_outbound_identity = (
+            outbound_identity
+            if outbound_options_supplied
+            else ((current or {}).get("properties") or {}).get(
+                "outboundIdentity"
+            )
+        )
+        identity = _reconcile_registry_identity(
+            identity,
+            final_outbound_identity,
+            allow_attachment=not identity_options_supplied,
+        )
+        if identity_options_supplied or identity != current_identity:
             patch["identity"] = identity
         if not patch:
             raise RequiredArgumentMissingError(

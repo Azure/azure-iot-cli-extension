@@ -61,7 +61,6 @@ def test_schema_registry_create_builds_direct_contract_body():
         description="Models",
         display_name="Site A",
         tags={"env": "test"},
-        mi_system_assigned=True,
         outbound_mi_system_assigned=True,
         outbound_mi_user_assigned="   ",
     ) == result
@@ -90,6 +89,16 @@ def test_schema_registry_update_maps_patch_body():
     provider.client.schema_registries.begin_update.return_value = _completed_poller(
         result
     )
+    provider.client.schema_registries.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "server-principal",
+            "tenantId": "server-tenant",
+        },
+        "properties": {
+            "outboundIdentity": {"type": "SystemAssigned"},
+        },
+    }
 
     assert provider.update(
         schema_registry_name=REGISTRY,
@@ -97,19 +106,28 @@ def test_schema_registry_update_maps_patch_body():
         description="Updated",
         display_name="Site A",
         tags={"env": "prod"},
-        mi_system_assigned=False,
-        outbound_mi_system_assigned=False,
+        outbound_mi_user_assigned=UAMI_ID,
     ) == result
 
+    provider.client.schema_registries.get.assert_called_once_with(
+        resource_group_name=RG,
+        schema_registry_name=REGISTRY,
+    )
     provider.client.schema_registries.begin_update.assert_called_once_with(
         resource_group_name=RG,
         schema_registry_name=REGISTRY,
         properties={
-            "identity": {"type": "None"},
+            "identity": {
+                "type": "SystemAssigned,UserAssigned",
+                "userAssignedIdentities": {UAMI_ID: {}},
+            },
             "properties": {
                 "description": "Updated",
                 "displayName": "Site A",
-                "outboundIdentity": None,
+                "outboundIdentity": {
+                    "type": "UserAssigned",
+                    "userAssignedIdentity": UAMI_ID,
+                },
             },
             "tags": {"env": "prod"},
         },

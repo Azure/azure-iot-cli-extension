@@ -81,8 +81,9 @@ def _load_schema_help():
   short-summary: Create a Schema Registry backed by Azure Data Lake Storage Gen2.
   long-summary: |
     Provide the URL of an existing container in a storage account with hierarchical
-    namespace. Identity and outboundIdentity are configured only when their options
-    are supplied. The command does not create the container or grant storage access.
+    namespace. When only an outbound identity is selected, the command also attaches
+    that identity to the Schema Registry. The command does not create the container
+    or grant storage access.
   examples:
     - name: Create a Schema Registry with a system-assigned identity
       text: |
