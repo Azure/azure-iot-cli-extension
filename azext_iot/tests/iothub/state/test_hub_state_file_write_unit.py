@@ -128,7 +128,8 @@ def test_save_state_success(provider, tmp_path, mocker):
 
 
 @pytest.mark.parametrize("path_form", ["trailing-separator", "dot", "missing-parent", "file-parent"])
-def test_invalid_path_cannot_bypass_overwrite_confirmation(provider, tmp_path, path_form):
+def test_invalid_path_cannot_bypass_overwrite_confirmation(provider, tmp_path, mocker, path_form):
+    prompt = mocker.patch.object(subject, "prompt_y_n", return_value=False)
     state_file = tmp_path / "state.json"
     state_file.write_text("previous good state", encoding="utf-8")
     paths = {
@@ -142,6 +143,19 @@ def test_invalid_path_cannot_bypass_overwrite_confirmation(provider, tmp_path, p
         provider.save_state(paths[path_form], hub_aspects=["devices"])
 
     assert state_file.read_text(encoding="utf-8") == "previous good state"
+    if os.name != "nt":
+        prompt.assert_not_called()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows normalizes dot path components before filesystem access")
+def test_existing_windows_dot_path_uses_confirmed_destination(provider, tmp_path):
+    state_file = tmp_path / "state.json"
+    state_file.write_text("previous good state", encoding="utf-8")
+
+    provider.save_state(str(state_file) + os.sep + ".", hub_aspects=["devices"], replace=True)
+
+    assert json.loads(state_file.read_text(encoding="utf-8")) == provider.process_hub_to_dict.return_value
+    assert list(tmp_path.iterdir()) == [state_file]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Creating symlinks requires additional Windows privileges")
