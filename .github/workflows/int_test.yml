@@ -177,8 +177,16 @@ jobs:
 
             for py in "${PY_ARRAY[@]}"; do
               py=$(echo "$py" | xargs)
+              if [ -z "$py" ]; then
+                echo "::error::Python versions must not contain blank entries."
+                exit 1
+              fi
               for region in "${REGION_ARRAY[@]}"; do
                 region=$(echo "$region" | xargs)
+                if [ -z "$region" ]; then
+                  echo "::error::Regions must not contain blank entries."
+                  exit 1
+                fi
 
                 if [ "$first" = true ]; then first=false; else matrix="$matrix,"; fi
                 matrix="$matrix{\"service\":\"$svc\",\"tox_env\":\"$tox_env\",\"timeout\":$timeout,\"python\":\"$py\",\"region\":\"$region\"}"
@@ -188,6 +196,10 @@ jobs:
           matrix="$matrix]"
 
           job_count=$(echo "$matrix" | jq length)
+          if [ "$job_count" -eq 0 ]; then
+            echo "::error::No valid integration test combinations were generated. Check the selected services, Python versions, and regions."
+            exit 1
+          fi
           echo ""
           echo "┌──────────────────────────────────────────────────────────┐"
           title="Test Matrix: $job_count job(s)"
@@ -371,7 +383,15 @@ jobs:
             echo "### Integration matrix setup failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          if ! expected_results=$(jq -er 'if type == "array" and length > 0 then .[] | [.service, .python, .region] | @tsv else error("Expected a nonempty test matrix") end' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort) || [ -z "$expected_results" ]; then
+          if ! expected_results=$(jq -ser '
+            if length == 1 and (.[0] |
+              type == "array" and length > 0 and
+              all(.[]; type == "object" and
+                all([.service, .python, .region][]; type == "string" and test("\\S"))))
+            then .[0][] | [.service, .python, .region] | @tsv
+            else error("Expected a nonempty matrix with nonblank service, python, and region strings")
+            end
+          ' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort) || [ -z "$expected_results" ]; then
             echo "::error::Expected a valid, nonempty integration test matrix"
             echo "### Invalid integration test matrix" >> "$GITHUB_STEP_SUMMARY"
             exit 1
