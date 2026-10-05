@@ -361,9 +361,21 @@ jobs:
       - name: "Evaluate per-service results"
         env:
           TEST_JOB_RESULT: ${{ needs.int-test.result }}
+          SETUP_RESULT: ${{ needs.setup.result }}
           DOWNLOAD_RESULT: ${{ steps.download_results.outcome }}
           EXPECTED_MATRIX: ${{ needs.setup.outputs.matrix }}
         run: |
+          if [ "$SETUP_RESULT" != "success" ]; then
+            echo "::error::Integration test matrix setup did not succeed"
+            echo "### Integration matrix setup failed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! expected_results=$(jq -er 'if type == "array" and length > 0 then .[] | [.service, .python, .region] | @tsv else error("Expected a nonempty test matrix") end' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort); then
+            echo "::error::Expected a valid, nonempty integration test matrix"
+            echo "### Invalid integration test matrix" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
           if [ "$DOWNLOAD_RESULT" = "failure" ]; then
             echo "::error::Integration test result download failed; results cannot be trusted"
             echo "### Integration result download failed" >> "$GITHUB_STEP_SUMMARY"
@@ -412,7 +424,6 @@ jobs:
             exit 0
           fi
 
-          expected_results=$(jq -er 'if type == "array" and length > 0 then .[] | [.service, .python, .region] | @tsv else error("Expected a nonempty test matrix") end' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort)
           actual_results=$(printf '%s\n' "${result_keys[@]}" | LC_ALL=C sort)
           if [ "$actual_results" != "$expected_results" ]; then
             echo "::error::Missing, duplicate, or unexpected integration test result artifacts"
