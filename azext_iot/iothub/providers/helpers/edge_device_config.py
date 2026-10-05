@@ -259,7 +259,7 @@ def validate_edge_device_id(device_id: str) -> str:
         raise InvalidArgumentValueError(
             f"Device Id '{device_id}' is invalid, it must be at most {MAX_DEVICE_ID_LEN} characters long."
         )
-    if not DEVICE_ID_ALLOWED_PATTERN.match(device_id):
+    if not DEVICE_ID_ALLOWED_PATTERN.fullmatch(device_id):
         raise InvalidArgumentValueError(
             f"Device Id '{device_id}' contains invalid characters. Device Ids may only contain "
             "alphanumeric characters and the following symbols: - . + % _ # * ? ! ( ) , : = @ $ '"

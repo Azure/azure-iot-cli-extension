@@ -3,6 +3,13 @@
 Release History
 ===============
 
+Unreleased
+++++++++++
+
+**IoT Hub updates**
+
+* Fixed ``az iot edge devices create`` accepting unsafe device Ids from ``--cfg`` or ``--device`` as file system path segments. Device Id validation and bundle path containment checks now run before device-specific filesystem operations.
+
 0.31.0
 +++++++++++++++
 
@@ -32,8 +39,6 @@ Release History
 * Fixed ``az iot du`` storage access to support newer ``azure-mgmt-storage`` releases (v25+) when retrieving storage account keys.
 
 **IoT Hub updates**
-
-* Fixed ``az iot edge devices create`` where a device Id supplied via ``--cfg`` or ``--device`` was used unvalidated as a file system path segment, allowing a malicious configuration file to remove or write files outside of the ``--out`` directory. Device Ids are now validated before use.
 
 * Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
 

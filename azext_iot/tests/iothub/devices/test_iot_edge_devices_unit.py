@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from os import getcwd
+from os import getcwd, name as os_name
 from pathlib import PurePath
 from unittest.mock import call
 import pytest
@@ -1281,6 +1281,8 @@ class TestEdgeDeviceIdValidation:
             'device"; rm -rf /; #',
             "device`whoami`",
             "device with spaces",
+            "device\n",
+            "device\r\n",
             "d" * 129,
         ],
     )
@@ -1290,7 +1292,12 @@ class TestEdgeDeviceIdValidation:
 
     @pytest.mark.parametrize(
         "device_id",
-        ["..", "../escape", "/absolute", "C:/Windows"],
+        [
+            "..",
+            "../escape",
+            "/absolute",
+            pytest.param("C:/Windows", marks=pytest.mark.skipif(os_name != "nt", reason="Windows absolute path")),
+        ],
     )
     def test_bundle_directory_traversal_blocked(self, device_id):
         with pytest.raises(InvalidArgumentValueError):
