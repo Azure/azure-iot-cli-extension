@@ -8,6 +8,10 @@ Unreleased
 
 **IoT Hub updates**
 
+* Fixed ``az iot hub state export`` failing when device or module twins omit ``x509Thumbprint``, or module identities omit optional read-only fields. Device authentication, module authentication, and writable twin properties are preserved.
+
+* Hardened the final write in ``az iot hub state export`` with atomic replacement for regular files, preserving destination symlinks and streaming output to non-regular files. Regular-file output and recovery files are private to the current user (mode ``0600`` on POSIX). If writing a fully collected state fails, the command attempts a temporary recovery file and reports its path in an error. Failures during state collection are not recovered.
+
 * Fixed ``az iot edge devices create`` accepting unsafe device Ids from ``--cfg`` or ``--device`` as file system path segments. Device Id validation and bundle path containment checks now run before device-specific filesystem operations.
 
 0.31.0
