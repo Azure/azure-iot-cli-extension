@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -17,6 +18,7 @@ import yaml
 def gate_steps():
     workflow_path = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "int_test.yml"
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    assert workflow["jobs"]["int-test-gate"]["needs"] == ["setup", "int-test"]
     return workflow["jobs"]["int-test-gate"]["steps"]
 
 
@@ -28,32 +30,38 @@ def test_download_outcome_is_exposed_to_gate(gate_steps):
     assert evaluate["env"] == {
         "TEST_JOB_RESULT": "${{ needs.int-test.result }}",
         "DOWNLOAD_RESULT": "${{ steps.download_results.outcome }}",
+        "EXPECTED_MATRIX": "${{ needs.setup.outputs.matrix }}",
     }
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="The integration gate runs on Ubuntu")
 @pytest.mark.parametrize(
-    "job_result, download_result, statuses, expected_code",
+    "job_result, download_result, expected_services, results, expected_code",
     [
-        ("success", "success", ["success"], 0),
-        ("failure", "success", ["failure"], 1),
-        ("failure", "success", ["success", "failure"], 0),
-        ("skipped", "skipped", [], 0),
-        ("success", "success", [], 1),
-        ("failure", "success", [], 1),
-        ("success", "failure", ["success"], 1),
-        ("failure", "failure", [], 1),
+        ("success", "success", ["Hub"], [("Hub", "success")], 0),
+        ("failure", "success", ["Hub"], [("Hub", "failure")], 1),
+        ("failure", "success", ["Hub", "Hub"], [("Hub", "success"), ("Hub", "failure")], 0),
+        ("skipped", "skipped", [], [], 0),
+        ("success", "success", ["Hub"], [], 1),
+        ("failure", "success", ["Hub"], [], 1),
+        ("success", "failure", ["Hub"], [("Hub", "success")], 1),
+        ("failure", "failure", ["Hub"], [], 1),
+        ("success", "success", ["Hub", "DPS"], [("Hub", "success")], 1),
+        ("success", "success", ["Hub", "DPS"], [("Hub", "success"), ("Hub", "success")], 1),
+        ("success", "success", ["Hub", "DPS"], [("Hub", "success"), ("Other", "success")], 1),
     ],
 )
-def test_integration_gate_outcomes(gate_steps, tmp_path, job_result, download_result, statuses, expected_code):
-    for index, status in enumerate(statuses):
+def test_integration_gate_outcomes(
+    gate_steps, tmp_path, job_result, download_result, expected_services, results, expected_code
+):
+    for index, (service, status) in enumerate(results):
         result_dir = tmp_path / "test-results" / f"test-result-{index}"
         result_dir.mkdir(parents=True)
         for name, value in {
-            "service": "Hub",
+            "service": service,
             "status": status,
             "python": "3.10",
-            "region": "westus",
+            "region": f"region-{index}",
             "failures": "",
         }.items():
             (result_dir / f"{name}.txt").write_text(value, encoding="utf-8")
@@ -61,6 +69,10 @@ def test_integration_gate_outcomes(gate_steps, tmp_path, job_result, download_re
         **os.environ,
         "TEST_JOB_RESULT": job_result,
         "DOWNLOAD_RESULT": download_result,
+        "EXPECTED_MATRIX": json.dumps([
+            {"service": service, "python": "3.10", "region": f"region-{index}"}
+            for index, service in enumerate(expected_services)
+        ]),
         "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.txt"),
     }
 
