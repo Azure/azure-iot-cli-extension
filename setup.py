@@ -43,8 +43,8 @@ if not PACKAGE_NAME:
 # and azure-eventhub for telemetry monitoring.
 
 DEPENDENCIES = [
-    "azure-core>=1.24.0,<2.0.0",
-    "azure-mgmt-core>=1.3.0,<2.0.0",
+    "azure-core>=1.31.0,<2.0.0",
+    "azure-mgmt-core>=1.5.0,<2.0.0",
     "azure-identity>=1.6.1,<1.18.0",
     "azure-storage-blob>=12.14.0,<13.0.0",
     "msrest>=0.6.21",
