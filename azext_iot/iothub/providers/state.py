@@ -639,9 +639,10 @@ class StateProvider(IoTHubProvider):
             # authority authenticated devices), so fall back to an empty thumbprint pair
             authentication = {
                 "type": device_twin.pop("authenticationType"),
-                "x509Thumbprint": device_twin.pop("x509Thumbprint", None) or {
+                "x509Thumbprint": {
                     "primaryThumbprint": None,
                     "secondaryThumbprint": None,
+                    **(device_twin.pop("x509Thumbprint", None) or {}),
                 }
             }
             if authentication["type"] == DeviceAuthApiType.sas.value:
