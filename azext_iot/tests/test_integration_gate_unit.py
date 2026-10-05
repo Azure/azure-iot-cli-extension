@@ -30,6 +30,7 @@ def gate_steps():
 def test_download_outcome_is_exposed_to_gate(gate_steps):
     download = gate_steps["download"]
     evaluate = gate_steps["evaluate"]
+    assert evaluate["shell"] == "bash"
     assert download["id"] == "download_results"
     assert download["if"] == "${{ needs.int-test.result != 'skipped' }}"
     assert download["continue-on-error"] is True
@@ -42,8 +43,29 @@ def test_download_outcome_is_exposed_to_gate(gate_steps):
         assert evaluate["env"][key] == value
 
 
-@pytest.mark.skipif(sys.platform != "linux", reason="The integration gate runs on Ubuntu")
-@pytest.mark.skipif(not which("bash") or not which("jq"), reason="The integration gate requires bash and jq")
+@pytest.fixture()
+def evaluate_gate(gate_steps, tmp_path):
+    if sys.platform != "linux":
+        pytest.skip("The integration gate runs on Ubuntu")
+    if not which("bash") or not which("jq"):
+        pytest.skip("The integration gate requires bash and jq")
+    script = tmp_path / "gate.sh"
+    script.write_text(gate_steps["evaluate"]["run"], encoding="utf-8")
+
+    def evaluate(env):
+        return subprocess.run(
+            ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", str(script)],
+            cwd=tmp_path,
+            env={**os.environ, "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.txt"), **env},
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+
+    return evaluate
+
+
 @pytest.mark.parametrize(
     "setup_result, job_result, download_result, expected_services, results, expected_code",
     [
@@ -64,7 +86,7 @@ def test_download_outcome_is_exposed_to_gate(gate_steps):
     ],
 )
 def test_integration_gate_outcomes(
-    gate_steps, tmp_path, setup_result, job_result, download_result, expected_services, results, expected_code
+    evaluate_gate, tmp_path, setup_result, job_result, download_result, expected_services, results, expected_code
 ):
     for index, (service, status) in enumerate(results):
         result_dir = tmp_path / "test-results" / f"test-result-{index}"
@@ -78,7 +100,6 @@ def test_integration_gate_outcomes(
         }.items():
             (result_dir / f"{name}.txt").write_text(value, encoding="utf-8")
     env = {
-        **os.environ,
         "TEST_JOB_RESULT": job_result,
         "SETUP_RESULT": setup_result,
         "DOWNLOAD_RESULT": download_result,
@@ -86,17 +107,21 @@ def test_integration_gate_outcomes(
             {"service": service, "python": "3.10", "region": f"region-{index}"}
             for index, service in enumerate(expected_services)
         ]),
-        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.txt"),
     }
 
-    result = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", gate_steps["evaluate"]["run"]],
-        cwd=tmp_path,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False,
-    )
+    result = evaluate_gate(env)
 
     assert result.returncode == expected_code, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("matrix", ["", " ", "not-json", "null", "{}", "[]"])
+def test_integration_gate_rejects_invalid_matrix(evaluate_gate, matrix):
+    result = evaluate_gate({
+        "SETUP_RESULT": "success",
+        "TEST_JOB_RESULT": "skipped",
+        "DOWNLOAD_RESULT": "skipped",
+        "EXPECTED_MATRIX": matrix,
+    })
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "Expected a valid, nonempty integration test matrix" in result.stdout

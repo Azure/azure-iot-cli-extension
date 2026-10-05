@@ -359,6 +359,7 @@ jobs:
           path: ./test-results
 
       - name: "Evaluate per-service results"
+        shell: bash
         env:
           TEST_JOB_RESULT: ${{ needs.int-test.result }}
           SETUP_RESULT: ${{ needs.setup.result }}
@@ -370,7 +371,7 @@ jobs:
             echo "### Integration matrix setup failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          if ! expected_results=$(jq -er 'if type == "array" and length > 0 then .[] | [.service, .python, .region] | @tsv else error("Expected a nonempty test matrix") end' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort); then
+          if ! expected_results=$(jq -er 'if type == "array" and length > 0 then .[] | [.service, .python, .region] | @tsv else error("Expected a nonempty test matrix") end' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort) || [ -z "$expected_results" ]; then
             echo "::error::Expected a valid, nonempty integration test matrix"
             echo "### Invalid integration test matrix" >> "$GITHUB_STEP_SUMMARY"
             exit 1
