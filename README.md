@@ -9,6 +9,8 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
+- 🆕 **`1.0.0b2` Preview** fixes ADR certificate policy validity (1 through 90 days) and preserves the original service failure when namespace-link recovery stops. See [HISTORY.rst](HISTORY.rst) for details.
+
 - 🆕 **`1.0.0b1` Preview** provides 112 `az iot adr` commands and adds the Hub/DPS SDK and command upgrades: modeless management, Fabric routing, certificate-reference enrollment, and REST device registration with certificate issuance and operation-status lookup. Hub management uses `2026-10-01-preview`, DPS management uses `2026-06-01-preview`, DPS service/device REST uses `2026-11-02-preview`, and Hub service/device REST uses `2026-11-01-preview`. **Preview APIs support the Azure public cloud only; Hub, DPS, and ADR management requests use public ARM by default. Set `AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` to use the Central US EUAP (canary) ARM endpoint.** ADR provides Registry Device CRUD/auth/attributes/capabilities, certificate authorities and policies, groups, jobs, reports, Software Updates, and canonical namespace links (`az iot adr ns link hub|dps|su`). Link add/update validate the target and create missing service role assignments when you can create role assignments. To unlink, delete the linked resource first, then run `link hub|dps|su remove`; it removes only the namespace endpoint and does not wait. AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
@@ -41,7 +43,7 @@ Please refer to the official `az iot` reference on [Microsoft Docs](https://lear
 ## Installation
 
 1. Install the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-    - You must have at least `v2.59.0` for the latest versions of `azure-iot`, which you can verify with `az --version`
+    - This preview requires Azure CLI `2.73.0` or later and Python `3.10` or later in the CLI's runtime. Verify both with `az --version`.
 1. Add, Update or Remove the IoT extension with the following commands:
     - Add preview: `az extension add --name azure-iot --allow-preview`
     - Update preview: `az extension update --name azure-iot --allow-preview`
