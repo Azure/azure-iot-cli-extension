@@ -148,7 +148,15 @@ def test_real_controller_cli_rejects_before_test_or_azure_imports(tmp_path, suit
 
 
 def _damage(receipt, expected, defect):
-    if defect == "missing-stage":
+    if defect == "assertion":
+        receipt["reports"][expected[0]]["call"] = ["failed"]
+        receipt["retryableFailures"] = {expected[0]: True}
+        receipt["exitstatus"] = 1
+        receipt["errors"] = [
+            "phase incomplete or pytest failed",
+            "required node did not pass exactly once with successful teardown: " + expected[0],
+        ]
+    elif defect == "missing-stage":
         del receipt["reports"][expected[0]]["teardown"]
     elif defect == "duplicate-stage":
         receipt["reports"][expected[0]]["call"].append("passed")
@@ -162,7 +170,7 @@ def _damage(receipt, expected, defect):
         receipt["reports"] = list(expected)
 
 
-def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, reader=None):
+def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, reader=None, attempt_id=None):
     chosen = nodes(suite, phase) if whole else nodes(suite, phase)[-1:]
     full_execute, calls = execute_factory()
     captured = []
@@ -184,7 +192,7 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         path = Path(env["AZEXT_IOT_HUB_OWNERSHIP"])
         evidence = hub.read_json(path)
         if phase == "sas":
-            evidence.update(passed=expected, **focused.provenance(debug))
+            evidence.update(passed=expected[1:] if defect == "assertion" else expected, **focused.provenance(debug))
         elif defect == "observer":
             evidence["violations"] = ["Observed resource no longer belongs to this phase"]
         elif defect == "uncertain":
@@ -192,6 +200,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         ownership.write(path, evidence)
         if defect in ("timed_out", "interrupted"):
             result[defect] = True
+        if defect == "assertion":
+            result["exit_code"] = 1
         return result
 
     output = tmp_path / "hub-phases"
@@ -200,7 +210,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         patch.setattr(hub.signal, "signal", lambda *_: None)
         result = hub.run(suite, ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, output,
                          arm=reader or HubReader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=None if attempt_id else phase, debug_nodes=None if attempt_id else chosen,
+                         attempt_selection=focused.attempt(suite, phase, chosen, attempt_id) if attempt_id else None)
     return result, hub.read_json(output / "hub-phases.json"), output, calls, captured
 
 
@@ -245,7 +256,7 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, attempt_id=None):
     if chosen is None:
         chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
@@ -276,6 +287,9 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         for case in list(tree.getroot()):
             if dps.MANIFEST["junit_nodeid"](case) not in short:
                 tree.getroot().remove(case)
+        if defect == "assertion":
+            ET.SubElement(list(tree.getroot())[0], "failure", message="offline assertion")
+            result["exit_code"] = 1
         tree.write(env["azext_iot_dps_junit"])
         receipt = plugin.PhaseReceipt("DPS", phase, expected, directory / "pytest.json", env["azext_iot_dps_run_uid"],
                                       debug=debug)
@@ -299,8 +313,46 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=None if attempt_id else phase, debug_nodes=None if attempt_id else chosen,
+                         attempt_selection=focused.attempt("DPS", phase, chosen, attempt_id) if attempt_id else None)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
+
+
+@pytest.mark.parametrize("suite,phase", [
+    ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
+    ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
+])
+@pytest.mark.parametrize("defect", [None, "assertion"])
+def test_ado_attempts_retain_owned_execution_but_never_qualify_as_debug_or_full(
+    tmp_path, monkeypatch, suite, phase, defect,
+):
+    from azext_iot.tests import _ado_pipeline
+    if suite == "DPS":
+        result, summary, _ = run_dps(tmp_path, monkeypatch, phase, defect=defect, attempt_id="a" * 64)
+        selected = focused.attempt(suite, phase, nodes(suite, phase)[:1], "a" * 64)
+        receipt = _ado_pipeline.dps_evidence(tmp_path, selected, {
+            "subscription": SUB, "resource_group": GROUP, "region": "centraluseuap",
+            "endpoint": "https://centraluseuap.management.azure.com",
+        })
+        assert receipt["exitstatus"] == int(defect is not None)
+        assert GATE["evaluate_dps_phases"](tmp_path)
+    else:
+        result, summary, output, *_ = run_hub(
+            tmp_path, monkeypatch, suite, phase, defect=defect, attempt_id="a" * 64,
+        )
+        assert hub.evaluate_hub_phases(output, attempt=True, allow_failures=True)["passed"]
+        assert not hub.evaluate_hub_phases(output)["passed"]
+        assert not hub.evaluate_hub_phases(output, debug=True)["passed"]
+    assert result == int(defect is not None)
+    assert summary["mode"] == "attempt" and summary["qualifiesFullSuite"] is False
+
+
+@pytest.mark.parametrize("defect", ["missing-stage", "skip", "uncertain", "timed_out"])
+def test_ado_assertion_tolerance_does_not_relax_owned_cleanup(tmp_path, monkeypatch, defect):
+    _, _, output, *_ = run_hub(
+        tmp_path, monkeypatch, "HubControl", "regular", defect=defect, attempt_id="a" * 64,
+    )
+    assert not hub.evaluate_hub_phases(output, attempt=True, allow_failures=True)["passed"]
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])

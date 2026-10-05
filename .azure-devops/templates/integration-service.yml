@@ -1,0 +1,134 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: service
+    type: string
+  - name: pythonVersions
+    type: object
+  - name: regions
+    type: object
+  - name: services
+    type: object
+  - name: diagnostic
+    type: boolean
+    default: false
+
+stages:
+  - stage: ${{ parameters.service }}
+    displayName: ${{ parameters.service }} (rerun to retry failed cases)
+    dependsOn:
+      - Prepare
+      - ${{ if and(containsValue(parameters.services, 'DPS'), containsValue(split('HubControl,HubData,ADU,ADR', ','), parameters.service)) }}:
+          - DPS
+      - ${{ if and(containsValue(parameters.services, 'HubControl'), containsValue(split('HubData,ADU,ADR', ','), parameters.service)) }}:
+          - HubControl
+      - ${{ if and(containsValue(parameters.services, 'HubData'), containsValue(split('ADU,ADR', ','), parameters.service)) }}:
+          - HubData
+      - ${{ if and(containsValue(parameters.services, 'ADU'), eq(parameters.service, 'ADR')) }}:
+          - ADU
+    condition: and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'))
+    jobs:
+      - job: Tests
+        timeoutInMinutes: 360
+        cancelTimeoutInMinutes: 15
+        strategy:
+          maxParallel: 1
+          matrix:
+            ${{ each python in parameters.pythonVersions }}:
+              ${{ each region in parameters.regions }}:
+                ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
+                  python: ${{ python }}
+                  region: ${{ region }}
+        steps:
+          - checkout: self
+            clean: true
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(python)
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              targetPath: $(Pipeline.Workspace)/history
+          - bash: |
+              set -euo pipefail
+              python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
+              python azext_iot/tests/_ado_pipeline.py candidate --history "$HISTORY" --output candidate
+              az extension add --source candidate/*.whl -y
+              if [ "$SERVICE" = DPS ]; then
+                python -m tox r -e DPS-int --notest
+                export azext_iot_candidate_wheel="$(realpath candidate/*.whl)"
+                extension=$(.tox/DPS-int/bin/python -c \
+                  'import sysconfig; print(sysconfig.get_path("purelib") + "/azure-cli-extensions/azure-iot")')
+                .tox/DPS-int/bin/python azext_iot/tests/_locked_install.py "$extension"
+              fi
+            displayName: Install candidate and prepare test environment
+            env:
+              HISTORY: $(Pipeline.Workspace)/history
+              PYTHONPATH: $(Build.SourcesDirectory)
+              SERVICE: ${{ parameters.service }}
+              AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+          - ${{ if eq(parameters.diagnostic, true) }}:
+              - bash: |
+                  set -euo pipefail
+                  python azext_iot/tests/_ado_pipeline.py run --service RetrySelfTest \
+                    --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
+                    --wheel candidate --history "$HISTORY" --output attempt --diagnostic
+                displayName: Offline deliberate failure and manual-retry proof
+                env:
+                  TEST_PYTHON: $(python)
+                  TEST_REGION: $(region)
+                  TEST_ENDPOINT: $(endpoint)
+                  HISTORY: $(Pipeline.Workspace)/history
+                  PYTHONPATH: $(Build.SourcesDirectory)
+                  azext_iot_testrg: offline-retry-selftest
+          - ${{ else }}:
+              - task: AzureCLI@2
+                displayName: Run service or retry its remaining failed cases
+                inputs:
+                  azureSubscription: $(AzureServiceConnection)
+                  addSpnToEnvironment: true
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
+                    python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
+                      --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
+                      --wheel candidate --history "$HISTORY" --output attempt
+                env:
+                  SERVICE: ${{ parameters.service }}
+                  TEST_PYTHON: $(python)
+                  TEST_REGION: $(region)
+                  TEST_ENDPOINT: $(endpoint)
+                  HISTORY: $(Pipeline.Workspace)/history
+                  PYTHONPATH: $(Build.SourcesDirectory)
+                  AZEXT_IOT_CI_AUTH: ado
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                  TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+                  AZURE_TEST_RUN_LIVE: 'True'
+                  PYTHONUNBUFFERED: '1'
+                  azext_iot_testrg: cli-int-test-rg
+                  azext_iot_testhub_location: $(region)
+                  azext_iot_test_arm_endpoint: $(endpoint)
+                  AZURE_IOT_ADR_ARM_ENDPOINT: $(endpoint)
+                  AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
+                  AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
+                  azext_iot_hub_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+                  azext_iot_adr_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+                  azext_iot_adr_resource_group: cli-int-test-rg
+                  azext_iot_adr_location: $(region)
+                  azext_iot_adr_arm_endpoint: $(endpoint)
+                  azext_iot_adr_arm_resource: https://management.azure.com
+          - publish: attempt
+            condition: succeededOrFailed()
+            artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            displayName: Publish effective results (original attempts remain in artifacts)
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: attempt/final.xml
+              testRunTitle: ${{ parameters.service }} Python $(python) $(region) attempt $(System.JobAttempt)
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: true

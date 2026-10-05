@@ -1,173 +1,155 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
-pr: none
 trigger: none
+pr: none
+name: integration-$(Date:yyyyMMdd).$(Rev:r)
+lockBehavior: sequential
 
 parameters:
-  - name: variableGroup
+  - name: mode
+    displayName: Run mode (self-test never qualifies a release)
     type: string
-    default: "aziotcli_test_primary"
-  - name: testAgentVmImage
+    default: Plan only
+    values: [Plan only, Integration tests, Retry self-test]
+  - name: services
+    displayName: Services
+    type: stringList
+    default: [DPS, HubControl, HubData, ADU, ADR]
+    values: [DPS, HubControl, HubData, ADU, ADR]
+  - name: pythonVersions
+    displayName: Python versions
+    type: stringList
+    default: ['3.13']
+    values: ['3.10', '3.11', '3.12', '3.13']
+  - name: regions
+    displayName: Azure regions (comma-separated, without spaces)
     type: string
-    default: "ubuntu-24.04"
-    values:
-      - "ubuntu-24.04"
-      - "ubuntu-latest"
-  - name: windowsAgentVmImage
+    default: australiaeast
+  - name: armEndpoint
+    displayName: ARM routing (canary requires centraluseuap)
     type: string
-    default: "windows-2025"
-  - name: pythonVersion
-    displayName: "Python version for building wheels, KPIs"
-    type: string
-    default: "3.13"
-    values:
-      - "3.10"
-      - "3.11"
-      - "3.12"
-      - "3.13"
-  - name: pythonVersionsTestingMatrix
-    type: object
-    default: >
-      {
-        Python310:
-        {
-          python: '3.10'
-        },
-        Python311:
-        {
-          python: '3.11'
-        },
-        Python312:
-        {
-          python: '3.12'
-        },
-        Python313:
-        {
-          python: '3.13'
-        }
-      }
-  - name: stageForPublish
-    type: boolean
-    default: false
-  - name: "testCentral"
-    type: boolean
-    default: true
-  - name: "testADT"
-    type: boolean
-    default: true
-  - name: "testDPS"
-    type: boolean
-    default: true
-  - name: "testHub"
-    type: boolean
-    default: true
-  - name: "testADU"
-    type: boolean
-    default: true
-  - name: "testADR"
-    type: boolean
-    default: true
-  - name: "azureCLIVersion"
-    type: string
-    default: "released"
-    values:
-      - min
-      - released
-      - msi
+    default: public
+    values: [public, canary]
+
 variables:
-  - group: ${{ parameters.variableGroup }}
+  - group: aziotcli_test_primary
+  - name: endpoint
+    ${{ if eq(parameters.armEndpoint, 'public') }}:
+      value: https://management.azure.com
+    ${{ else }}:
+      value: https://centraluseuap.management.azure.com
+
+pool:
+  vmImage: ubuntu-24.04
 
 stages:
-  - stage: "build"
-    displayName: "Build and Publish Artifacts"
+  - stage: Prepare
+    displayName: Plan, lint, unit tests and candidate wheel
     jobs:
-      - job: "Build_Publish_Azure_IoT_CLI_Extension"
-        pool:
-          vmImage: ubuntu-latest
+      - job: Plan
         steps:
-          - template: templates/setup-python.yml
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.13'
+          - bash: |
+              set -euo pipefail
+              args=()
+              if [ "$MODE" = "Retry self-test" ]; then args+=(--diagnostic); fi
+              python azext_iot/tests/_ado_pipeline.py plan \
+                --services $SERVICES --versions $VERSIONS --regions $REGIONS \
+                --endpoint "$ENDPOINT" "${args[@]}" > plan.json
+              cat plan.json
+            displayName: Validate exact matrix before Azure access
+            env:
+              MODE: ${{ parameters.mode }}
+              SERVICES: ${{ join(' ', parameters.services) }}
+              VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
+              REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
+              ENDPOINT: $(endpoint)
+          - publish: plan.json
+            artifact: integration-plan-$(System.JobAttempt)
+      - ${{ if ne(parameters.mode, 'Plan only') }}:
+          - job: Build
+            dependsOn: Plan
+            timeoutInMinutes: 40
+            steps:
+              - template: templates/setup-python.yml
+                parameters:
+                  pythonVersion: '3.13'
+              - bash: python -m build --wheel
+                displayName: Build the immutable test candidate
+              - publish: dist
+                artifact: integration-wheel-$(System.JobAttempt)
+          - job: Unit
+            dependsOn: Plan
+            timeoutInMinutes: 25
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.13'
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install tox
+                  python -m tox r -vv
+                displayName: Flake8, pylint and unit tests
+              - task: PublishTestResults@2
+                condition: succeededOrFailed()
+                inputs:
+                  testResultsFormat: JUnit
+                  testResultsFiles: junit/test-iotext-unit.xml
+                  failTaskOnFailedTests: true
+                  failTaskOnMissingResultsFile: true
+              - publish: .coverage
+                condition: succeededOrFailed()
+                artifact: integration-unit-coverage-$(System.JobAttempt)
+
+  - ${{ if eq(parameters.mode, 'Integration tests') }}:
+      - ${{ each service in parameters.services }}:
+          - template: templates/integration-service.yml
             parameters:
-              pythonVersion: ${{ parameters.pythonVersion }}
-          - template: templates/build-publish-azure-iot-cli-extension.yml
+              service: ${{ service }}
+              pythonVersions: ${{ parameters.pythonVersions }}
+              regions: ${{ split(parameters.regions, ',') }}
+              services: ${{ parameters.services }}
+  - ${{ if eq(parameters.mode, 'Retry self-test') }}:
+      - template: templates/integration-service.yml
+        parameters:
+          service: RetrySelfTest
+          pythonVersions: ${{ parameters.pythonVersions }}
+          regions: ${{ split(parameters.regions, ',') }}
+          services: []
+          diagnostic: true
 
-      - job: "Build_Publish_Azure_CLI_Test_SDK"
-        pool:
-          vmImage: ${{ parameters.testAgentVmImage }}
-
-        steps:
-          - template: templates/setup-python.yml
-            parameters:
-              pythonVersion: ${{ parameters.pythonVersion }}
-          - template: templates/build-publish-azure-cli-test-sdk.yml
-
-      - job: "recordVersion"
-        displayName: "Install and verify version"
+  - ${{ if ne(parameters.mode, 'Plan only') }}:
+      - stage: Qualify
+        displayName: Verify all expected cases and publish coverage
         dependsOn:
-          [
-            Build_Publish_Azure_IoT_CLI_Extension,
-            Build_Publish_Azure_CLI_Test_SDK,
-          ]
-        steps:
-          - template: templates/setup-dev-test-env.yml
-            parameters:
-              pythonVersion: ${{ parameters.pythonVersion }}
-
-          - template: templates/install-and-record-version.yml
-
-  - stage: "test"
-    displayName: "Run tests"
-    dependsOn: build
-    variables:
-      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
-    condition: succeeded()
-    pool:
-      ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-        vmImage: ${{ parameters.windowsAgentVmImage }}
-      ${{ else }}:
-        vmImage: ${{ parameters.testAgentVmImage }}
-    jobs:
-      - template: templates/trigger-tests.yml
-        parameters:
-          azureCLIVersion: ${{ parameters.azureCLIVersion }}
-          testADT: ${{ parameters.testADT }}
-          testCentral: ${{ parameters.testCentral }}
-          testDPS: ${{ parameters.testDPS }}
-          testHub: ${{ parameters.testHub }}
-          testADU: ${{ parameters.testADU }}
-          testADR: ${{ parameters.testADR }}
-          maxParallelADT: 2
-          maxParallelDPS: 2
-          maxParallelADU: 4
-          maxParallelADR: 2
-      - job: "evaluateCmdTable"
-        displayName: "Evaluate Command Table"
-        pool:
-          vmImage: ${{ parameters.testAgentVmImage }}
-        steps:
-          - template: templates/evaluate-command-table.yml
-  - stage: "smokeTest"
-    displayName: "Run smoke tests"
-    dependsOn: test
-    variables:
-      pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
-    condition: succeeded()
-    pool:
-      ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-        vmImage: ${{ parameters.windowsAgentVmImage }}
-      ${{ else }}:
-        vmImage: ${{ parameters.testAgentVmImage }}
-    jobs:
-      - template: templates/smoke-tests.yml
-        parameters:
-          azureCLIVersion: ${{ parameters.azureCLIVersion }}
-
-  - stage: "kpi"
-    displayName: "Build KPIs"
-    dependsOn: [build, test]
-    jobs:
-      - job: "calculateCodeCoverage"
-        displayName: "Calculate distributed code coverage"
-        steps:
-          - template: templates/calculate-code-coverage.yml
-            parameters:
-              pythonVersion: ${{ parameters.pythonVersion }}
+          - Prepare
+          - ${{ if eq(parameters.mode, 'Retry self-test') }}:
+              - RetrySelfTest
+          - ${{ else }}:
+              - ${{ each service in parameters.services }}:
+                  - ${{ service }}
+        jobs:
+          - job: Gate
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.13'
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  buildType: current
+                  targetPath: $(Pipeline.Workspace)/qualification
+              - bash: |
+                  set -euo pipefail
+                  python azext_iot/tests/_ado_pipeline.py gate --history "$HISTORY"
+                  python -m pip install coverage
+                  python azext_iot/tests/_ado_pipeline.py coverage --history "$HISTORY"
+                env:
+                  HISTORY: $(Pipeline.Workspace)/qualification
+              - task: PublishCodeCoverageResults@2
+                inputs:
+                  summaryFileLocation: coverage.xml
+                  failIfCoverageEmpty: true
+              - publish: htmlcov
+                artifact: integration-coverage-$(System.JobAttempt)

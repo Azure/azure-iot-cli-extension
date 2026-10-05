@@ -118,10 +118,9 @@ def test_ado_callers_do_not_supply_the_canary_owned_controller_contract():
     call = dps["steps"][0]
     assert call["parameters"]["serviceConnection"] == "$(AzureServiceConnection)"
     assert call["parameters"]["path"] == "azext_iot/tests/dps"
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
-    test_stage = next(stage for stage in entry["stages"] if stage["stage"] == "test")
-    assert any("msi" in condition for condition in test_stage["pool"])
-    assert test_stage["jobs"][0]["parameters"]["maxParallelDPS"] == 2
+    entry = (ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8")
+    assert "templates/trigger-tests.yml" not in entry
+    assert "templates/integration-service.yml" in entry
 
 
 def _execute(tmp_path, overrides=None, exit_code=0):

@@ -78,17 +78,33 @@ def runner_seconds(suite, budgets):
     return sum(runtime + cleanup_seconds(suite, phase) for phase, runtime in budgets) + reserve
 
 
-def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
+def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None, allow_failures=False):
     errors = []
+    expected_errors = []
+    if allow_failures and receipt.get("exitstatus") == 1:
+        expected_errors = ["phase incomplete or pytest failed"]
+        expected_errors.extend(
+            "required node did not pass exactly once with successful teardown: " + node
+            for node in expected if receipt.get("reports", {}).get(node, {}).get("call") == ["failed"]
+        )
     if (receipt.get("schemaVersion") != 1 or receipt.get("suite") != suite or receipt.get("phase") != phase
             or receipt.get("runId") != run_id or receipt.get("finished") is not True
-            or receipt.get("exitstatus") != 0 or receipt.get("errors")
+            or receipt.get("exitstatus") not in ((0, 1) if allow_failures else (0,))
+            or receipt.get("errors") != expected_errors
             or receipt.get("expected") != expected or receipt.get("collected") != expected
             or len(set(expected)) != len(expected) or not FOCUSED["matches"](receipt, debug)):
         errors.append("phase identity, completion or exact collection failed")
     reports = receipt.get("reports", {})
+    if allow_failures and any(
+        stages.get("call") == ["failed"] and receipt.get("retryableFailures", {}).get(node) is not True
+        for node, stages in reports.items()
+    ):
+        errors.append("failed calls are not positively classified as retryable assertions")
     if set(reports) != set(expected) or any(
-        reports.get(node) != {stage: ["passed"] for stage in ("setup", "call", "teardown")} for node in expected
+        set(reports.get(node, {})) != {"setup", "call", "teardown"}
+        or reports[node].get("setup") != ["passed"] or reports[node].get("teardown") != ["passed"]
+        or reports[node].get("call") not in ((["passed"], ["failed"]) if allow_failures else (["passed"],))
+        for node in expected
     ):
         errors.append("every required node must pass once including setup/teardown; skips forbidden")
     return errors
@@ -97,8 +113,8 @@ def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
 def write_junit(receipt, expected, path):
     """Publish only manifest identities and outcomes, never captured output or tracebacks."""
     suite = ET.Element("testsuite", name="hub-" + receipt["phase"], tests=str(len(expected)))
-    if receipt.get("mode") == "debug":
-        suite.set("mode", "debug")
+    if receipt.get("mode") in ("debug", "attempt"):
+        suite.set("mode", receipt["mode"])
     failures = 0
     for node in expected:
         module, _, name = node.rpartition("::")
@@ -163,7 +179,7 @@ def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=Non
     return errors
 
 
-def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
+def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, attempt=False, allow_failures=False):
     """Pure JSON gate, no pytest/Azure imports. Return {passed: bool, errors: list}.
 
     Load with runpy.run_path(path) to bypass Azure-dependent package __init__ files.
@@ -171,12 +187,18 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
     """
     errors = []
     try:
+        if allow_failures and not attempt:
+            raise ValueError("Only ADO attempt evaluation may classify assertion failures as retryable.")
         output = Path(result_dir)
         summary = read_json(output / "hub-phases.json")
         suite = summary["suite"]
-        requested = summary.get("debug", {})
+        requested = summary.get("attemptSelection" if attempt else "debug", {})
         request = FOCUSED["select"](suite, requested.get("phase"), requested.get("requestedNodes")) if debug else {}
-        if debug and (not isinstance(request, dict) or request != requested):
+        if attempt:
+            request = FOCUSED["attempt"](suite, requested.get("phase"), requested.get("requestedNodes"),
+                                         requested.get("attempt"))
+        mode = "attempt" if attempt else "debug"
+        if (debug or attempt) and (not isinstance(request, dict) or request != requested):
             raise ValueError("Invalid debug provenance")
         names = (request["phase"],) if request else selection()["phases"](suite)
         results = summary["phases"]
@@ -187,9 +209,12 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
         if (summary.get("schemaVersion") != 1
                 or (summary.get("subscription"), summary.get("resourceGroup"), summary.get("region"),
                     summary.get("endpoint")) != (owned["SUBSCRIPTION"], owned["GROUP"], owned["REGION"], owned["ARM"])
-                or summary.get("status") != ("debug-passed" if debug else "passed")
+                or summary.get("status") not in (
+                    (mode + "-passed", mode + "-failed") if attempt and allow_failures
+                    else ((mode + "-passed" if debug or attempt else "passed"),))
                 or not FOCUSED["matches"](summary, request) or summary.get("cancelled") is not False
-                or summary.get("finished") is not True or [p["name"] for p in results] != list(names)):
+                or summary.get("finished") is not True or summary.get("errorType")
+                or [p["name"] for p in results] != list(names)):
             errors.append("incomplete, cancelled, duplicate or missing phase execution")
         if len({p["runId"] for p in results}) != len(results) or any(not p["runId"] for p in results):
             errors.append("missing/duplicate phase run identity")
@@ -200,21 +225,32 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
                 errors.append("unexpected phase")
                 continue
             expected = request["requestedNodes"] if request else list(selection()["nodes"](suite, name))
-            errors.extend(phase_errors(read_json(output / name / "pytest.json"), expected, suite, name, run_id,
-                                       debug=request))
+            receipt = read_json(output / name / "pytest.json")
+            errors.extend(phase_errors(receipt, expected, suite, name, run_id,
+                                       debug=request, allow_failures=allow_failures))
             junit = ET.parse(output / name / "junit.xml").getroot()
             cases = list(junit.iter("testcase"))
             if ([case.get("classname", "") + "::" + case.get("name", "") for case in cases] != expected
-                    or any(list(case) for case in cases) or junit.get("mode", "full") != ("debug" if debug else "full")):
+                    or any(list(case) for case in cases) and not allow_failures
+                    or junit.get("mode", "full") != (mode if debug or attempt else "full")):
                 errors.append("missing or unsuccessful sanitized JUnit coverage")
-            if (result.get("status") != "passed" or result.get("exit_code") != 0
+            if allow_failures and any(
+                [child.tag for child in case] != (
+                    ["error"] if receipt.get("reports", {}).get(node, {}).get("call") == ["failed"] else []
+                ) for case, node in zip(cases, expected)
+            ):
+                errors.append("JUnit outcomes disagree with phase receipts")
+            if (result.get("status") not in (("passed", "failed") if allow_failures else ("passed",))
+                    or result.get("exit_code") != receipt.get("exitstatus")
                     or result.get("timed_out") is not False or result.get("interrupted") is not False
+                    or result.get("errorType")
                     or not FOCUSED["matches"](result, request)):
                 errors.append("phase execution failed")
             cleanup = read_json(output / name / "cleanup.json")
             evidence = read_json(output / name / "ownership.json")
             if name == "sas":
-                errors.extend(sas_errors(evidence, expected, debug=request, **target))
+                passed = [node for node in expected if receipt.get("reports", {}).get(node, {}).get("call") == ["passed"]]
+                errors.extend(sas_errors(evidence, passed if allow_failures else expected, debug=request, **target))
                 ids = sorted(value.casefold() for value in evidence["ids"].values())
                 if result.get("sasRunUid") != evidence.get("runUid"):
                     errors.append("SAS receipt identity mismatch")
@@ -376,8 +412,15 @@ def combine_coverage(output, phase_names, destination=None, *, run_process=subpr
 
 
 def run(suite, subscription, group, region, output, arm=None, execute=None, base=None, *,
-        debug_phase=None, debug_nodes=None, endpoint=None):
+        debug_phase=None, debug_nodes=None, endpoint=None, attempt_selection=None):
     debug = FOCUSED["select"](suite, debug_phase, debug_nodes)
+    if attempt_selection:
+        if debug:
+            raise ValueError("Debug and ADO attempt selection cannot be combined.")
+        debug = FOCUSED["attempt"](suite, attempt_selection["phase"], attempt_selection["requestedNodes"],
+                                   attempt_selection["attempt"])
+        if debug != attempt_selection:
+            raise ValueError("Attempt selection does not match this checkout.")
     sys.path.insert(0, str(ROOT))
     from azext_iot.tests._dps_phase_runner import child, require_linux, write_json
     require_linux()
@@ -549,13 +592,17 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         summary["errorType"] = type(error).__name__
     finally:
         if debug:
-            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
+            mode = "attempt" if attempt_selection else "debug"
+            summary["status"] = mode + ("-passed" if summary["status"] == "passed" else "-failed")
         summary["cancelled"] = cancel.is_set()
         summary["finished"] = True
         save_summary()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
-    return 0 if evaluate_hub_phases(output, debug=bool(debug), **target)["passed"] else 1
+    result = evaluate_hub_phases(
+        output, debug=bool(debug) and not attempt_selection, attempt=bool(attempt_selection), **target,
+    )
+    return 0 if result["passed"] else 1
 
 
 def main():

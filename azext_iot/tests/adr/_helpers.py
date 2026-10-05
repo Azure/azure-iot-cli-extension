@@ -33,6 +33,7 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+from azext_iot.tests._ado_retry import InfrastructureFailure
 
 
 ROLE_PROPAGATION_DELAY = 30
@@ -98,6 +99,7 @@ class CleanupLedger:
         self._completed.add(label)
 
     def cleanup(self) -> list:
+        primary_error = sys.exc_info()[1]
         failures = []
         pending = []
         while self._actions:
@@ -106,7 +108,7 @@ class CleanupLedger:
             try:
                 unresolved = [dependency for dependency in dependencies if dependency not in self._completed]
                 if unresolved:
-                    raise AssertionError(
+                    raise InfrastructureFailure(
                         f"Dependent cleanup has not completed: {', '.join(unresolved)}"
                     )
                 cleanup()
@@ -118,15 +120,19 @@ class CleanupLedger:
                 self._completed.add(label)
                 _log(LogKind.RESULT, "Cleanup completed for %s", label)
         self._actions.extend(reversed(pending))
+        if failures and primary_error is not None:
+            primary_error._iot_cleanup_failed = True  # pylint: disable=protected-access
         return failures
 
     def __exit__(self, exception_type, _exception, _traceback):
         failures = self.cleanup()
+        if failures and _exception is not None:
+            _exception._iot_cleanup_failed = True  # pylint: disable=protected-access
         if failures and exception_type is None:
             detail = ", ".join(
                 f"{label}: {error}" for label, error in failures
             )
-            raise AssertionError(f"ADR cleanup failed: {detail}")
+            raise InfrastructureFailure(f"ADR cleanup failed: {detail}")
         return False
 
 
@@ -246,7 +252,7 @@ def resource_is_absent(test, show_command: str, *, description: str = "resource"
     except SystemExit as error:
         if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
             return True
-        raise AssertionError(f"{description} lookup exited with code {error.code}") from error
+        raise InfrastructureFailure(f"{description} lookup exited with code {error.code}") from error
     except (HttpResponseError, CloudError, CLIError) as error:
         if not is_resource_not_found_error(error, ambient_context=ambient_context):
             raise
@@ -305,7 +311,7 @@ def wait_for_condition(
                 return value
             if is_terminal_failure and is_terminal_failure(value):
                 detail = describe(value) if describe else type(value).__name__
-                raise AssertionError(
+                raise InfrastructureFailure(
                     f"{description} reached a terminal failure after "
                     f"{attempts} attempt(s) ({detail})."
                 )
@@ -326,7 +332,7 @@ def wait_for_condition(
                 detail = f"last observation: {observation}"
             else:
                 detail = "no observation"
-            raise AssertionError(
+            raise InfrastructureFailure(
                 f"Timed out waiting for {description} after {attempts} "
                 f"attempt(s) ({detail})."
             )
@@ -418,7 +424,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         if kind not in self._RESOURCE_COMMANDS:
             raise ValueError(f"Unsupported test-owned resource kind: {kind}")
         if not self._resource_is_absent(kind, name, resource_group):
-            raise AssertionError(f"Refusing to overwrite existing {kind} '{name}' in '{resource_group}'.")
+            raise InfrastructureFailure(f"Refusing to overwrite existing {kind} '{name}' in '{resource_group}'.")
         if not hasattr(self, "_owned_resources"):
             self._owned_resources = {}
         self._owned_resources[(kind, name, resource_group)] = None
@@ -551,7 +557,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         except SystemExit as error:
             if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
                 return
-            raise AssertionError(f"{kind} delete exited with code {error.code}") from error
+            raise InfrastructureFailure(f"{kind} delete exited with code {error.code}") from error
         except (HttpResponseError, CloudError, CLIError) as error:
             if not is_resource_not_found_error(error, ambient_context=ambient_context):
                 raise
@@ -584,4 +590,4 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         failures = ledger.cleanup()
         if failures and sys.exc_info()[0] is None:
             detail = ", ".join(f"{label}: {error}" for label, error in failures)
-            raise AssertionError(f"ADR cleanup failed: {detail}") from failures[0][1]
+            raise InfrastructureFailure(f"ADR cleanup failed: {detail}") from failures[0][1]

@@ -35,6 +35,7 @@ from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_ident
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
+from azext_iot.tests._ado_retry import InfrastructureFailure
 
 
 LINK_READINESS_TIMEOUT = _ADR_LRO_TIMEOUT_SECONDS
@@ -65,7 +66,7 @@ class _Deadline:
 
     def check(self):
         if self.clock() >= self.end:
-            raise AssertionError(f"Timed out waiting for {self.description}: {self.observation}")
+            raise InfrastructureFailure(f"Timed out waiting for {self.description}: {self.observation}")
 
     def call(self, callback, *args):
         self.check()
@@ -405,7 +406,7 @@ def link_with_readiness(
             if (other_section, name) != (section, endpoint_name)
         ]
         if any(_link_state(other) in {"Failed", "Canceled", "Cancelled"} for other in others):
-            raise AssertionError("Non-recoverable failure on another namespace endpoint")
+            raise InfrastructureFailure("Non-recoverable failure on another namespace endpoint")
         if endpoint:
             assert _endpoint_settings(endpoint) == expected, (
                 f"{label} endpoint target, identity or provisioning settings changed"
@@ -440,7 +441,7 @@ def link_with_readiness(
                     progressed = False
                     retry_at = None
             elif not recovery_reason:
-                raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
+                raise InfrastructureFailure(f"Non-recoverable {label} link failure: {budget.observation}")
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:
-            raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
+            raise InfrastructureFailure(f"Non-recoverable {label} link failure: {budget.observation}")
         budget.pause(10)

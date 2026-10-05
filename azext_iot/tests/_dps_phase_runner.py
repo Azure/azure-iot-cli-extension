@@ -414,7 +414,7 @@ def safe_junit(raw, destination, phase, selected, *, debug=None):
     identities = []
     output = ET.Element("testsuite", name=f"dps-{phase}")
     if debug:
-        output.set("mode", "debug")
+        output.set("mode", "attempt" if "attempt" in debug else "debug")
     for case in cases:
         identity = MANIFEST["junit_nodeid"](case)
         known = identity in expected
@@ -572,8 +572,16 @@ def combine_coverage(coverage_files, destination=None, *, run_process=subprocess
 
 
 def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *,
-        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None, combine=combine_coverage):
+        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None, combine=combine_coverage,
+        attempt_selection=None):
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
+    if attempt_selection:
+        if debug:
+            raise ValueError("Debug and ADO attempt selection cannot be combined.")
+        debug = FOCUSED["attempt"]("DPS", attempt_selection["phase"], attempt_selection["requestedNodes"],
+                                   attempt_selection["attempt"])
+        if debug != attempt_selection:
+            raise ValueError("Attempt selection does not match this checkout.")
     target = TARGETS["target"](region, endpoint)
     TARGETS["public_scope"](subscription, group, **target)
     if getattr(reader, "target", target) != target:
@@ -803,7 +811,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         if summary["cancelled"]:
             summary["status"] = "failed"
         if debug:
-            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
+            mode = "attempt" if attempt_selection else "debug"
+            summary["status"] = mode + ("-passed" if summary["status"] == "passed" else "-failed")
         summary["finished_at"] = utc()
         summary["arm_reads"] = getattr(reader, "reads", [])
         write_json(summary_path, summary)
@@ -811,7 +820,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         thread.join(timeout=1)
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
-    return 0 if summary["status"] == ("debug-passed" if debug else "passed") else 1
+    success = ("attempt-passed" if attempt_selection else "debug-passed") if debug else "passed"
+    return 0 if summary["status"] == success else 1
 
 
 def main():

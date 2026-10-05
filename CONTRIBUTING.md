@@ -144,6 +144,74 @@ canary ARM is opt-in through
 exercised only by an explicit `arm-endpoint=canary` / `regions=centraluseuap`
 dispatch or the Azure DevOps centraluseuap pipeline.
 
+#### Azure DevOps integration pipeline 147
+
+On `release/1.0.0-preview`, **Azure IoT CLI - Integration Tests** uses
+`.azure-devops/integration_tests.yml`. Choose the branch first, then a run mode.
+**Plan only** is the safe default: it validates the selected services, Python
+versions, regions and ARM endpoint without Azure login or resource creation.
+**Integration tests** builds one candidate wheel, runs lint/unit checks and the
+selected DPS, HubControl, HubData, ADU and ADR combinations, then qualifies the
+complete matrix and publishes combined coverage. Central, Digital Twins and the
+old cross-service smoke stage are not part of this pipeline. Regions accept
+comma-separated public-region identifiers; canary requires `centraluseuap`.
+
+There are **no automatic test retries**. When a service fails solely with eligible
+assertions in test call phases, use Azure DevOps **Rerun failed jobs** on its failed service stage in the
+**same run**. There is no test-name input. The runner downloads that run's attempt
+artifacts and selects only the still-failing cases for that service/Python/region
+combination. Already-passing cases and phases are retained, not rerun. Owned Hub
+and DPS phases provision fresh independent fixtures; ADR/ADU recollect the same
+suite and rebuild their fixture dependencies for the selected cases. The original
+failures remain in immutable attempt artifacts and test runs; effective results
+and the summary identify cases that passed on manual retry. Rerun the downstream
+**Qualify** stage if Azure DevOps does not automatically schedule it after recovery.
+Historical failed test runs are not deleted even when the build becomes green.
+
+The gate requires every planned combination and exact enabled-case coverage across
+a contiguous native-job-attempt chain. It verifies commit, original wheel, dependency
+fingerprint, target, phase provenance and raw artifact hashes. Changed or missing
+artifacts/dependencies, setup/teardown failures, skipped cases, cancellations,
+auth-refresh failure, non-assertion exceptions and unproven cleanup fail closed: repair the cause and start
+a **new full run**, rather than trying to recover them with a passing test.
+Focused debug receipts and diagnostic mode never qualify release coverage.
+Checked-in unconditional `pytest.mark.skip` exclusions are recorded separately,
+must remain identical across attempts, and appear as skipped rather than passed
+in the effective report. Unexpected runtime skips remain disqualifying. An
+assertion wrapping an underlying exception is not retryable; no exception messages
+or credentials are stored in failure classification metadata. A missing native
+attempt (including installation/login failure before receipts exist) blocks later
+recovery, even when an earlier attempt's artifacts are available.
+
+For a safe UI rehearsal, select **Retry self-test** with one Python/region.
+It creates no Azure resources and needs no Azure login. Its first service attempt
+deliberately fails one of three parameterized cases. Rerunning that failed stage
+executes only that case; the final gate checks the recovery chain and labels it
+**NOT release qualification**. This mode still builds the candidate and runs the
+offline lint/unit preparation jobs.
+
+Before enabling live use, the pipeline owner must authorize the existing
+`aziotcli-sp-prime` connection and `aziotcli_test_primary` variable group for 147,
+allow its build identity to read current-run artifacts/builds and request the
+connection's job-scoped OIDC token, and configure an **exclusive lock check** on
+the shared variable group (the YAML uses sequential lock behavior). Keep access
+restricted; do not grant every pipeline access. WIF renewal updates CLI credential
+caches without rewriting the account profile.
+
+Service stages and matrix legs are serialized. Admission rejects other active
+ADO project builds and active GitHub integration runs, and rejects budgets that
+overlap the daily 13:00–14:00 UTC cleanup exclusion window. This is a conservative
+preflight, not an atomic lock with GitHub or a subscription quota reservation.
+Coordinate/disable competing GitHub dispatches and cleanup before live rehearsal;
+ADU also creates IoT Hubs. Keep original artifacts until all retries and final
+qualification finish.
+
+This branch-only change does **not** switch pipeline 147's default branch, migrate
+GitHub schedules/release callers, change service connections, or remove any FIC.
+Validate the Azure DevOps self-test and a controlled live run before cutover; port
+the pipeline separately to other branches and retire GitHub FICs only after every
+Azure-dependent GitHub caller has migrated.
+
 Scheduled integration tests are configured separately in
 `.github/workflows/int_test_schedule.yml` on the default branch (`dev`), not the
 release branch. Release-build settings do not change scheduled regions or cadence.
