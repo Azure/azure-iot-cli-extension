@@ -92,11 +92,14 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.13'
+              - template: templates/pip-cache.yml
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
                   python -m tox r -e lint -vv
                 displayName: Flake8 and pylint
+                env:
+                  PIP_CACHE_DIR: $(Pipeline.Workspace)/pip-cache
 
       - stage: Unit
         displayName: Unit tests
@@ -104,24 +107,64 @@ stages:
         jobs:
           - job: Unit
             timeoutInMinutes: 25
+            strategy:
+              maxParallel: 4
+              matrix:
+                shard1:
+                  shard: 1
+                shard2:
+                  shard: 2
+                shard3:
+                  shard: 3
+                shard4:
+                  shard: 4
             steps:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.13'
+              - template: templates/pip-cache.yml
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
-                  python -m tox r -e clean,python-azcur-unit,report -vv
-                displayName: Unit tests and coverage
+                  python -m tox r -e python-azcur-unit -vv -- \
+                    -p azext_iot.tests._unit_shard_plugin --unit-shard "$SHARD" \
+                    --unit-shard-output "$RESULTS" --junitxml "$RESULTS/junit.xml"
+                displayName: Run balanced serial unit shard (tox reports setup and test timings)
+                env:
+                  SHARD: $(shard)
+                  RESULTS: $(Build.SourcesDirectory)/unit-result
+                  COVERAGE_FILE: $(Build.SourcesDirectory)/unit-result/coverage.dat
+                  PIP_CACHE_DIR: $(Pipeline.Workspace)/pip-cache
               - task: PublishTestResults@2
                 condition: succeededOrFailed()
                 inputs:
                   testResultsFormat: JUnit
-                  testResultsFiles: junit/test-iotext-unit.xml
+                  testResultsFiles: unit-result/junit.xml
+                  testRunTitle: Unit shard $(shard) attempt $(System.JobAttempt)
                   failTaskOnFailedTests: true
                   failTaskOnMissingResultsFile: true
-              - publish: .coverage
+              - publish: unit-result
                 condition: succeededOrFailed()
+                artifact: unit-shard-$(shard)-$(System.JobAttempt)
+          - job: UnitGate
+            displayName: Verify complete unit collection and merge coverage
+            dependsOn: Unit
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.13'
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  buildType: current
+                  itemPattern: unit-shard-*/**
+                  targetPath: $(Pipeline.Workspace)/unit-history
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install coverage
+                  python azext_iot/tests/_unit_shards.py \
+                    --history "$(Pipeline.Workspace)/unit-history" --output unit-coverage
+                displayName: Require all four shards and combine verified coverage
+              - publish: unit-coverage
                 artifact: integration-unit-coverage-$(System.JobAttempt)
 
       - ${{ each service in parameters.services }}:

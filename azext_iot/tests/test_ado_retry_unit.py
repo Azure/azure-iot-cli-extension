@@ -216,7 +216,7 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert list(stages) == ["Build", "Lint", "Unit", "Qualify"]
     for name in ("Build", "Lint", "Unit"):
         assert stages[name]["dependsOn"] == "Plan"
-        assert [job["job"] for job in stages[name]["jobs"]] == [name]
+        assert [job["job"] for job in stages[name]["jobs"]] == ([name, "UnitGate"] if name == "Unit" else [name])
     build_steps = stages["Build"]["jobs"][0]["steps"]
     assert any(step.get("artifact") == "integration-wheel-$(System.JobAttempt)" for step in build_steps)
     lint = next(step["bash"] for step in stages["Lint"]["jobs"][0]["steps"] if "bash" in step)
@@ -224,12 +224,13 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     unit = next(step["bash"] for step in unit_steps if "bash" in step)
     assert "python -m tox r -e lint -vv" in lint
     assert "python-azcur-unit" not in lint
-    assert "python -m tox r -e clean,python-azcur-unit,report -vv" in unit
+    assert "python -m tox r -e python-azcur-unit -vv" in unit
     assert "lint" not in unit
     publish = next(step for step in unit_steps if step.get("task") == "PublishTestResults@2")
     assert publish["inputs"]["failTaskOnFailedTests"] is True
     assert publish["inputs"]["failTaskOnMissingResultsFile"] is True
-    assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)" for step in unit_steps)
+    assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)"
+               for step in stages["Unit"]["jobs"][1]["steps"])
     assert stages["Qualify"]["dependsOn"] == [
         "Plan", "Build", "Lint", "Unit", {"${{ each service in parameters.services }}": ["${{ service }}"]},
     ]

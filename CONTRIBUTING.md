@@ -158,6 +158,33 @@ then checks the complete matrix and publishes combined coverage. Central, Digita
 old cross-service smoke stage are not part of this pipeline. Regions accept
 comma-separated public-region identifiers; canary requires `centraluseuap`.
 
+The **Unit** stage runs four serial pytest jobs concurrently, followed by a
+**UnitGate** job. Each job collects the complete unit suite and then selects a
+deterministic file partition balanced by `azext_iot/tests/unit_test_durations.json`.
+Unlisted/new files receive the default weight; the timing profile never excludes
+tests. The gate requires identical full inventories, every case in exactly one
+partition, successful execution and intact JUnit/coverage artifacts from all four
+jobs. Randomized parameter values are represented by source function and parameter
+position, avoiding xdist collection mismatches without dropping parameter cases.
+Skipped unit tests retain normal pytest semantics and remain visible in JUnit.
+
+Each unit attempt publishes `unit-shard-<number>-<attempt>`. UnitGate uses the
+latest artifact for each shard (never an older artifact if the latest is incomplete)
+and publishes combined coverage, shard durations and `timings.json`. These measured
+per-file durations can refresh the checked-in timing profile after review.
+The final integration coverage report consumes combined unit coverage, not the raw
+shard coverage files. A missing or failed unit shard/gate still blocks integration.
+
+Lint and unit jobs cache **pip downloads only**, keyed by OS, architecture, Python
+version and dependency/build configuration. Installation always runs, including
+on cache hits; no virtual environment, candidate extension, credential or test
+result is cached. The job logs expose the cache hit and size, tox setup/test
+durations, and separate ADO restore/save task timings. Compare cold and warm runs
+including cache overhead before treating caching as a performance improvement;
+it does not pin dependencies or relax integration retry fingerprints.
+Four unit shards need four available parallel jobs; Build/Lint also compete for
+agents. Service stages still wait for all prechecks, not just the candidate build.
+
 There are **no automatic test retries**. When a service fails solely with eligible
 assertions in test call phases, use Azure DevOps **Rerun failed jobs** on its failed service stage in the
 **same run**. There is no test-name input. The runner downloads that run's attempt
