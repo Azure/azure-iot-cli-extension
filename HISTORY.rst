@@ -3,6 +3,14 @@
 Release History
 ===============
 
+1.0.0b2 (Preview)
++++++++++++++++++
+
+**ADR bug fixes**
+
+* Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
+* Namespace link add/update preserve the original service failure as the exception cause when recovery stops on a later state-validation error or timeout, unless the stopping error already has an exception cause or context.
+
 1.0.0b1 (Preview)
 +++++++++++++++++
 
@@ -34,7 +42,7 @@ Release History
 * Expanded ``az iot adr`` to 112 commands for namespaces, Registry Devices, certificate authorities and policies, groups, jobs and runs, namespace links, reports, and Software Updates. ADR and Update Instance management use ``2026-11-02-preview``.
 * ADR commands wait for completion by default; use ``--no-wait`` to return after submission and the matching ``wait`` command to track completion.
 * Added namespace identity show/assign/remove, legacy-asset migration, and update-compliance report generate/latest. Removing the namespace system-assigned identity is blocked while a DPS link exists.
-* Added certificate authority and policy management, including external ICA activation with ECC CSR-signing guidance and revoke-and-rotate. Policy validity can be 1 through 90 days.
+* Added certificate authority and policy management, including external ICA activation with ECC CSR-signing guidance and revoke-and-rotate. Policy validity can be 7 through 90 days.
 * Added ``az iot adr ns device`` (Registry Device) CRUD, wait, authentication, attributes, and capabilities. Symmetric keys are shown only by ``auth show-keys``.
 * Added group member list/count/refresh, ``SoftwareUpdate`` and ``OnboardingUpdate`` jobs, and job-run list/results/summary/cancel/delete.
 * Added Update Instance lifecycle and identity management, software-update import/stage/list/show/delete/hash/wait, file and device-class discovery, and v5 manifest initialization. Staging streams artifacts to Azure Storage instead of loading them into memory.

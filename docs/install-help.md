@@ -2,14 +2,9 @@
 
 ## Compatibility
 
-Before installation ensure that your Azure CLI version meets the following criteria. The criteria differs based on OS and method of installation. Use `az --version` to determine the CLI version.
-
-In all cases your CLI needs to be at least `v2.0.70`.
-
-| CLI Install Method  | NOT compatible with |
-| ------------- | ------------- |
-| Windows via MSI  | v2.0.34 to v2.0.38  |
-| Windows via PIP, Linux or macOS  | v2.0.34 to v2.0.36  |
+The current preview requires Azure CLI `2.73.0` or later, using Python `3.10` or
+later. Use `az --version` to check both the CLI version and its Python runtime.
+These requirements apply on Windows, Linux, and macOS.
 
 ## Problem
 
