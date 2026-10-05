@@ -430,7 +430,7 @@ class TestHierarchyCreateFailures:
         ],
     )
     def test_edge_devices_reject_traversal_ids(
-        self, fixture_ghcs, set_cwd, patch_create_edge_root_cert, devices, config
+        self, fixture_cmd, fixture_ghcs, set_cwd, patch_create_edge_root_cert, devices, config
     ):
         with pytest.raises(InvalidArgumentValueError, match="Device Id .* contains invalid characters"):
             subject.iot_edge_devices_create(
