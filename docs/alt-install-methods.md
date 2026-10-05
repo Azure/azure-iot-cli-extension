@@ -19,11 +19,13 @@ Navigate to the project's [releases in GitHub](https://github.com/Azure/azure-io
 
 The argument for the source parameter is either the URL path of the released extension package (ends with `.whl`) or the local path to the downloaded release package.
 
-`az extension add --source <local file path to release.whl OR  url for release.whl>`
+`az extension add --source <local file path to release.whl OR url for release.whl> --upgrade`
 
-For example, to install version 0.3.2
+For example, replace `X.Y.Z` with the version of a published release:
 
-`az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v0.3.2/azure_cli_iot_ext-0.3.2-py2.py3-none-any.whl'`
+```bash
+az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/vX.Y.Z/azure_iot-X.Y.Z-py3-none-any.whl' --upgrade
+```
 
 ## From local source method
 
