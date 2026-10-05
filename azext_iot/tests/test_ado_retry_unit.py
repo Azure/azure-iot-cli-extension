@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from string import Template
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -297,6 +298,50 @@ def test_yaml_exposes_manual_only_services_and_non_live_default():
     assert "diagnostic" not in {value["name"] for value in template["parameters"]}
     live = next(step for step in steps if step.get("task") == "AzureCLI@2")
     assert live["env"]["PYTHONPATH"] == "$(Build.SourcesDirectory)"
+
+
+@pytest.mark.parametrize("step_name", ["install", "live"])
+def test_standalone_runners_and_children_inherit_candidate_dependencies(tmp_path, step_name):
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    install = next(step["bash"] for step in steps if "bash" in step)
+    live = next(step["inputs"]["inlineScript"] for step in steps if step.get("task") == "AzureCLI@2")
+    export = 'export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"'
+    assert export in install and export in live
+    probe = '"from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"'
+    assert install.index(export) < install.index("python -c " + probe)
+    assert 'PYTHONPATH="$PYTHONPATH:$extension" .tox/DPS-int/bin/python -c' in install
+    assert live.index(export) < live.index("python azext_iot/tests/_ado_pipeline.py run")
+
+    checkout = tmp_path / "checkout"
+    extension_root = tmp_path / "extensions"
+    dependency_dir = extension_root / "azure-iot"
+    checkout.mkdir()
+    dependency_dir.mkdir(parents=True)
+    (checkout / "ado_runtime_probe.py").write_text("ORIGIN = 'checkout'\n", encoding="utf-8")
+    (dependency_dir / "ado_runtime_probe.py").write_text("ORIGIN = 'candidate'\n", encoding="utf-8")
+    (dependency_dir / "ado_runtime_dependency.py").write_text("AVAILABLE = True\n", encoding="utf-8")
+    script = install if step_name == "install" else live
+    assignment = next(line.strip() for line in script.splitlines() if line.strip().startswith("export PYTHONPATH="))
+    parts = assignment.split("=", 1)[1].strip('"').split(":")
+    pythonpath = os.pathsep.join(Template(part).substitute(
+        PYTHONPATH=str(checkout), AZURE_EXTENSION_DIR=str(extension_root),
+    ) for part in parts)
+    environment = dict(os.environ, PYTHONPATH=pythonpath, PYTHONNOUSERSITE="1")
+    check = (
+        "import ado_runtime_probe, ado_runtime_dependency;"
+        "assert ado_runtime_probe.ORIGIN == 'checkout';"
+        "assert ado_runtime_dependency.AVAILABLE"
+    )
+    command = [
+        sys.executable, "-S", "-c", check + ";import subprocess,sys;"
+        f"subprocess.run([sys.executable,'-S','-c',{check!r}],check=True)",
+    ]
+    result = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    environment["PYTHONPATH"] = str(checkout)
+    missing = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, check=False)
+    assert missing.returncode != 0 and "ModuleNotFoundError" in missing.stderr
 
 
 def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():

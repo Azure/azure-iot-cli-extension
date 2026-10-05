@@ -184,6 +184,12 @@ are still verified using the real poller.
 Four unit shards need four available parallel jobs; Build/Lint also compete for
 agents. Service stages still wait for all prechecks, not just the candidate build.
 
+Service setup checks controller imports before Azure login, including the separate
+DPS tox interpreter. Standalone runners inherit the checkout followed by their
+installed candidate's dependency directory on `PYTHONPATH`; Azure CLI's extension
+installation alone does not expose those dependencies to ordinary Python children.
+The live task adds that path inside its script, after the task's initial Azure login.
+
 There are **no automatic test retries**. When a service fails solely with eligible
 assertions in test call phases, use Azure DevOps **Rerun failed jobs** on its failed service stage in the
 **same run**. There is no test-name input. The runner downloads that run's attempt

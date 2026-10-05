@@ -51,7 +51,11 @@ stages:
                 extension=$(.tox/DPS-int/bin/python -c \
                   'import sysconfig; print(sysconfig.get_path("purelib") + "/azure-cli-extensions/azure-iot")')
                 .tox/DPS-int/bin/python azext_iot/tests/_locked_install.py "$extension"
+                PYTHONPATH="$PYTHONPATH:$extension" .tox/DPS-int/bin/python -c \
+                  "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
               fi
+              export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
+              python -c "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
             displayName: Install candidate and prepare test environment
             env:
               HISTORY: $(Pipeline.Workspace)/history
@@ -68,6 +72,7 @@ stages:
               inlineScript: |
                 set -euo pipefail
                 export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
+                export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
                 python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
                   --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
                   --wheel candidate --history "$HISTORY" --output attempt
