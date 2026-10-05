@@ -161,6 +161,24 @@ class TestDownloadDevicesThumbprint:
         thumbprint = devices["device1"]["identity"]["authentication"]["x509Thumbprint"]
         assert thumbprint == {"primaryThumbprint": "AAAA", "secondaryThumbprint": "BBBB"}
 
+    @pytest.mark.parametrize(
+        "thumbprint, expected",
+        [
+            (None, {"primaryThumbprint": None, "secondaryThumbprint": None}),
+            ({}, {"primaryThumbprint": None, "secondaryThumbprint": None}),
+            ({"primaryThumbprint": "AAAA"}, {"primaryThumbprint": "AAAA", "secondaryThumbprint": None}),
+            ({"secondaryThumbprint": "BBBB"}, {"primaryThumbprint": None, "secondaryThumbprint": "BBBB"}),
+        ],
+    )
+    def test_partial_thumbprints_keep_import_compatible_shape(self, mocker, thumbprint, expected):
+        twin = _build_device_twin()
+        twin["x509Thumbprint"] = thumbprint
+        self._patch_device_calls(mocker, [twin])
+
+        devices = StateProvider.__new__(StateProvider).download_devices(target={})
+
+        assert devices["device1"]["identity"]["authentication"]["x509Thumbprint"] == expected
+
     def test_mixed_devices_all_exported(self, mocker):
         # one bad device must not abort the export of the rest
         self._patch_device_calls(
