@@ -101,6 +101,7 @@ def load_adr_commands(self, _):
         cmd_group.command(
             "delete", "adr_schema_delete", confirmation=True, supports_no_wait=True
         )
+        cmd_group.wait_command("wait", getter_name="adr_schema_show")
 
     with self.command_group(
         "iot adr schema registry", command_type=adr_schema_ops, is_preview=True
@@ -119,6 +120,7 @@ def load_adr_commands(self, _):
             confirmation=True,
             supports_no_wait=True,
         )
+        cmd_group.wait_command("wait", getter_name="adr_schema_registry_show")
 
     with self.command_group(
         "iot adr schema version", command_type=adr_schema_ops, is_preview=True
@@ -132,6 +134,7 @@ def load_adr_commands(self, _):
             confirmation=True,
             supports_no_wait=True,
         )
+        cmd_group.wait_command("wait", getter_name="adr_schema_version_show")
 
     # Namespace commands
     with self.command_group(

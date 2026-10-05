@@ -63,6 +63,7 @@ def test_schema_registry_create_builds_direct_contract_body():
         tags={"env": "test"},
         mi_system_assigned=True,
         outbound_mi_system_assigned=True,
+        outbound_mi_user_assigned="   ",
     ) == result
 
     provider.client.schema_registries.begin_create_or_replace.assert_called_once_with(

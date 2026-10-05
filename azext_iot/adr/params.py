@@ -82,7 +82,7 @@ def load_adr_arguments(self, _):
         )
         context.argument(
             "storage_account_container_url",
-            options_list=["--storage-account-container-url"],
+            options_list=["--storage-account-container-url", "--container-url"],
             help="URL of the existing Azure Data Lake Storage Gen2 container "
                  "used to store Schema Version content.",
         )
@@ -148,7 +148,7 @@ def load_adr_arguments(self, _):
             )
             context.argument(
                 "outbound_mi_system_assigned",
-                options_list=["--outbound-system-assigned-mi"],
+                options_list=["--outbound-system-assigned-mi", "--omi-sa"],
                 arg_group="Outbound Identity",
                 arg_type=get_three_state_flag(),
                 help="Use the Schema Registry system-assigned identity for outbound calls. "
@@ -156,7 +156,7 @@ def load_adr_arguments(self, _):
             )
             context.argument(
                 "outbound_mi_user_assigned",
-                options_list=["--outbound-user-assigned-mi"],
+                options_list=["--outbound-user-assigned-mi", "--omi-ua"],
                 arg_group="Outbound Identity",
                 help="User-assigned managed identity resource ID used for outbound calls.",
             )

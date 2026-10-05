@@ -494,7 +494,7 @@ def test_namespace_device_command_parser(command_table, management_command_parse
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 125
+    assert sum(name.startswith("iot adr ") for name in command_table) == 128
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)

@@ -58,6 +58,16 @@ def _load_schema_help():
     - name: Delete a Schema
       text: az iot adr schema delete -n smart-lamp --registry site-a -g MyRG --yes
   """
+    helps["iot adr schema wait"] = """
+  type: command
+  short-summary: Wait for a Schema operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --deleted, --exists, or --custom.
+  examples:
+    - name: Wait for a Schema to be deleted
+      text: az iot adr schema wait -n smart-lamp --registry site-a -g MyRG --deleted
+  """
     helps["iot adr schema registry"] = """
   type: group
   short-summary: Manage Schema Registries.
@@ -113,6 +123,16 @@ def _load_schema_help():
     - name: Delete a Schema Registry
       text: az iot adr schema registry delete -n site-a -g MyRG --yes
   """
+    helps["iot adr schema registry wait"] = """
+  type: command
+  short-summary: Wait for a Schema Registry operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --created, --updated, --deleted, or --exists.
+  examples:
+    - name: Wait for a Schema Registry to be created
+      text: az iot adr schema registry wait -n site-a -g MyRG --created
+  """
     helps["iot adr schema version"] = """
   type: group
   short-summary: Manage Schema Versions.
@@ -155,6 +175,18 @@ def _load_schema_help():
       text: |
         az iot adr schema version delete --registry site-a --schema smart-lamp \\
           --version 2 -g MyRG --yes
+  """
+    helps["iot adr schema version wait"] = """
+  type: command
+  short-summary: Wait for a Schema Version operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --deleted, --exists, or --custom.
+  examples:
+    - name: Wait for a Schema Version to be deleted
+      text: |
+        az iot adr schema version wait --registry site-a --schema smart-lamp \\
+          --version 2 -g MyRG --deleted
   """
 
 
@@ -336,11 +368,6 @@ def load_adr_help():
     ] = """
   type: group
   short-summary: Manage Azure Device Registry (ADR) resources.
-  long-summary: |
-    Preview APIs support the Azure public cloud only. ADR management clients default to
-    https://centraluseuap.management.azure.com. Set
-    AZURE_IOT_ADR_ARM_ENDPOINT=https://management.azure.com to use public ARM for ADR
-    namespaces, Update Instances, and link-target management requests.
   """
 
     helps[

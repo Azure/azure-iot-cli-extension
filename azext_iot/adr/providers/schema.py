@@ -36,12 +36,14 @@ def _resolve_outbound_identity(
     outbound_mi_system_assigned: Optional[bool],
     outbound_mi_user_assigned: Optional[str],
 ) -> Optional[dict]:
+    if outbound_mi_user_assigned is not None and not outbound_mi_user_assigned.strip():
+        outbound_mi_user_assigned = None
     if outbound_mi_system_assigned and outbound_mi_user_assigned:
         raise MutuallyExclusiveArgumentError(
             "Specify only one of --outbound-system-assigned-mi and "
             "--outbound-user-assigned-mi."
         )
-    if outbound_mi_user_assigned is not None:
+    if outbound_mi_user_assigned:
         validate_uami_resource_id(outbound_mi_user_assigned)
     return build_mi_body(
         outbound_mi_system_assigned,
