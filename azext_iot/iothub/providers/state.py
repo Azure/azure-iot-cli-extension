@@ -610,9 +610,14 @@ class StateProvider(IoTHubProvider):
 
             # create the device identity from the device twin
             # primary and secondary keys show up in the "show" output but not in the "list" output
+            # x509Thumbprint is not always present on the twin (for example sas or certificate
+            # authority authenticated devices), so fall back to an empty thumbprint pair
             authentication = {
                 "type": device_twin.pop("authenticationType"),
-                "x509Thumbprint": device_twin.pop("x509Thumbprint")
+                "x509Thumbprint": device_twin.pop("x509Thumbprint", None) or {
+                    "primaryThumbprint": None,
+                    "secondaryThumbprint": None,
+                }
             }
             if authentication["type"] == DeviceAuthApiType.sas.value:
                 # Cannot retrieve the sas key for some reason - throw out the device
@@ -654,7 +659,7 @@ class StateProvider(IoTHubProvider):
                 module["authentication"] = module_identity_show["authentication"]
 
                 for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
-                    module.pop(key)
+                    module.pop(key, None)
 
                 # Fail to retrieve module twin - log and continue without module
                 try:
@@ -668,7 +673,7 @@ class StateProvider(IoTHubProvider):
                     continue
 
                 for key in IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS:
-                    module_twin.pop(key)
+                    module_twin.pop(key, None)
                 for key in ["$metadata", "$version"]:
                     module_twin["properties"]["desired"].pop(key)
                 module_twin["properties"].pop("reported")
