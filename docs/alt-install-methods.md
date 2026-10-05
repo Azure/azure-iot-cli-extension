@@ -6,16 +6,6 @@ Install the extension from the official Microsoft Azure CLI Extension Index
 
 `az extension add --name azure-iot`
 
-To install or update to an indexed preview, use:
-
-```bash
-az extension add --name azure-iot --allow-preview --upgrade
-```
-
-This command only selects versions available in the extension index. Publishing a
-GitHub release does not automatically add that version to the index. For
-`1.0.0b2`, use the wheel method below until its index entry is available.
-
 ### Tips
 
 - You can use `az extension list-available` to see all available extensions on the index
@@ -31,31 +21,16 @@ The argument for the source parameter is either the URL path of the released ext
 
 `az extension add --source <local file path to release.whl OR url for release.whl> --upgrade`
 
-For example, after the `1.0.0b2` GitHub release is published, install its wheel:
+For example, replace `X.Y.Z` with the version of a published release:
 
 ```bash
-az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/v1.0.0b2/azure_iot-1.0.0b2-py3-none-any.whl' --upgrade
+az extension add --source 'https://github.com/Azure/azure-iot-cli-extension/releases/download/vX.Y.Z/azure_iot-X.Y.Z-py3-none-any.whl' --upgrade
 ```
-
-The public URL is not available while the release is a draft. To test a draft,
-download its wheel using an account with access and pass the local file path to
-`--source`. Use `az extension show --name azure-iot --query version --output tsv`
-to confirm the installed version is `1.0.0b2`.
 
 ## From local source method
 
-You can create a wheel package locally from source to be used in Azure CLI. Use
-Python `3.10` or later and check out the branch or commit you intend to build.
+You can create a wheel package locally from source to be used in Azure CLI.
 
-From the extension root, install the build frontend and build the package:
+To build the wheel locally, ensure you have the Python `wheel` package installed i.e. `pip install wheel`. Then run `python -m build` where the current directory is the extension root. The wheel (with .whl suffix) will be generated and available in the `dist` folder.
 
-```bash
-python -m pip install build
-python -m build
-```
-
-For this `1.0.0b2` source, install the generated wheel:
-
-```bash
-az extension add --source ./dist/azure_iot-1.0.0b2-py3-none-any.whl --upgrade
-```
+Then, follow the local package installation method.
