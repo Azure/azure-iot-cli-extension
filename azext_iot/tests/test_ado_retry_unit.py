@@ -184,24 +184,68 @@ def test_ado_federation_uses_job_and_service_connection_without_github_token(moc
 
 
 def test_yaml_exposes_manual_only_services_and_non_live_default():
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    entry_text = (ROOT / ".azure-devops/integration_tests.yml").read_text()
+    entry = yaml.safe_load(entry_text)
     parameters = {value["name"]: value for value in entry["parameters"]}
     assert parameters["mode"]["default"] == "Dry run"
-    assert parameters["mode"]["values"] == ["Dry run", "Integration tests", "Retry self-test"]
-    non_dry_run = "${{ if ne(parameters.mode, 'Dry run') }}"
-    assert non_dry_run in entry["stages"][0]["jobs"][1]
-    assert non_dry_run in entry["stages"][-1]
+    assert parameters["mode"]["values"] == ["Dry run", "Integration tests"]
+    assert len(entry["stages"]) == 2
+    assert entry["stages"][0]["stage"] == "Plan"
+    assert [job["job"] for job in entry["stages"][0]["jobs"]] == ["Plan"]
+    assert "${{ if eq(parameters.mode, 'Integration tests') }}" in entry["stages"][1]
     assert parameters["services"]["values"] == list(retry.SERVICES)
     assert parameters["pythonVersions"]["type"] == "stringList"
     text = (ROOT / ".azure-devops/templates/integration-service.yml").read_text()
+    assert "RetrySelfTest" not in entry_text + text
+    assert "--diagnostic" not in entry_text + text
     assert "continueOnError" not in text and "retryCountOnTaskFailure" not in text
     assert "System.JobAttempt" in text and "failTaskOnMissingResultsFile: true" in text
     assert "indexOf(" not in (ROOT / ".azure-devops/integration_tests.yml").read_text()
     assert "smoke-tests.yml" not in (ROOT / ".azure-devops/integration_tests.yml").read_text()
     template = yaml.safe_load(text)
     steps = template["stages"][0]["jobs"][0]["steps"]
-    live = next(step["${{ else }}"][0] for step in steps if "${{ else }}" in step)
+    assert "diagnostic" not in {value["name"] for value in template["parameters"]}
+    live = next(step for step in steps if step.get("task") == "AzureCLI@2")
     assert live["env"]["PYTHONPATH"] == "$(Build.SourcesDirectory)"
+
+
+def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
+    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
+    stages = {stage["stage"]: stage for stage in integration if "stage" in stage}
+    assert list(stages) == ["Build", "Lint", "Unit", "Qualify"]
+    for name in ("Build", "Lint", "Unit"):
+        assert stages[name]["dependsOn"] == "Plan"
+        assert [job["job"] for job in stages[name]["jobs"]] == [name]
+    build_steps = stages["Build"]["jobs"][0]["steps"]
+    assert any(step.get("artifact") == "integration-wheel-$(System.JobAttempt)" for step in build_steps)
+    lint = next(step["bash"] for step in stages["Lint"]["jobs"][0]["steps"] if "bash" in step)
+    unit_steps = stages["Unit"]["jobs"][0]["steps"]
+    unit = next(step["bash"] for step in unit_steps if "bash" in step)
+    assert "python -m tox r -e lint -vv" in lint
+    assert "python-azcur-unit" not in lint
+    assert "python -m tox r -e clean,python-azcur-unit,report -vv" in unit
+    assert "lint" not in unit
+    publish = next(step for step in unit_steps if step.get("task") == "PublishTestResults@2")
+    assert publish["inputs"]["failTaskOnFailedTests"] is True
+    assert publish["inputs"]["failTaskOnMissingResultsFile"] is True
+    assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)" for step in unit_steps)
+    assert stages["Qualify"]["dependsOn"] == [
+        "Plan", "Build", "Lint", "Unit", {"${{ each service in parameters.services }}": ["${{ service }}"]},
+    ]
+    assert "condition" not in stages["Qualify"]
+
+
+def test_service_stages_require_all_prechecks_but_remain_independent_retry_targets():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
+    stage, = template["stages"]
+    assert stage["stage"] == "${{ parameters.service }}"
+    assert stage["dependsOn"][:3] == ["Build", "Lint", "Unit"]
+    assert " ".join(stage["condition"].split()) == (
+        "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
+        "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
+    )
+    assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="ADO controller uses Linux process groups")

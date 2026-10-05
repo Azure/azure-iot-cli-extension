@@ -7,10 +7,10 @@ lockBehavior: sequential
 
 parameters:
   - name: mode
-    displayName: Run mode (self-test never qualifies a release)
+    displayName: Run mode
     type: string
     default: Dry run
-    values: [Dry run, Integration tests, Retry self-test]
+    values: [Dry run, Integration tests]
   - name: services
     displayName: Services
     type: stringList
@@ -43,8 +43,8 @@ pool:
   vmImage: ubuntu-24.04
 
 stages:
-  - stage: Prepare
-    displayName: Plan, lint, unit tests and candidate wheel
+  - stage: Plan
+    displayName: Validate execution plan
     jobs:
       - job: Plan
         steps:
@@ -53,24 +53,25 @@ stages:
               versionSpec: '3.13'
           - bash: |
               set -euo pipefail
-              args=()
-              if [ "$MODE" = "Retry self-test" ]; then args+=(--diagnostic); fi
               python azext_iot/tests/_ado_pipeline.py plan \
                 --services $SERVICES --versions $VERSIONS --regions $REGIONS \
-                --endpoint "$ENDPOINT" "${args[@]}" > plan.json
+                --endpoint "$ENDPOINT" > plan.json
               cat plan.json
             displayName: Validate exact matrix before Azure access
             env:
-              MODE: ${{ parameters.mode }}
               SERVICES: ${{ join(' ', parameters.services) }}
               VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
               REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
               ENDPOINT: $(endpoint)
           - publish: plan.json
             artifact: integration-plan-$(System.JobAttempt)
-      - ${{ if ne(parameters.mode, 'Dry run') }}:
+
+  - ${{ if eq(parameters.mode, 'Integration tests') }}:
+      - stage: Build
+        displayName: Build candidate wheel
+        dependsOn: Plan
+        jobs:
           - job: Build
-            dependsOn: Plan
             timeoutInMinutes: 40
             steps:
               - template: templates/setup-python.yml
@@ -80,8 +81,12 @@ stages:
                 displayName: Build the immutable test candidate
               - publish: dist
                 artifact: integration-wheel-$(System.JobAttempt)
-          - job: Unit
-            dependsOn: Plan
+
+      - stage: Lint
+        displayName: Lint
+        dependsOn: Plan
+        jobs:
+          - job: Lint
             timeoutInMinutes: 25
             steps:
               - task: UsePythonVersion@0
@@ -90,8 +95,24 @@ stages:
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
-                  python -m tox r -vv
-                displayName: Flake8, pylint and unit tests
+                  python -m tox r -e lint -vv
+                displayName: Flake8 and pylint
+
+      - stage: Unit
+        displayName: Unit tests
+        dependsOn: Plan
+        jobs:
+          - job: Unit
+            timeoutInMinutes: 25
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.13'
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install tox
+                  python -m tox r -e clean,python-azcur-unit,report -vv
+                displayName: Unit tests and coverage
               - task: PublishTestResults@2
                 condition: succeededOrFailed()
                 inputs:
@@ -103,7 +124,6 @@ stages:
                 condition: succeededOrFailed()
                 artifact: integration-unit-coverage-$(System.JobAttempt)
 
-  - ${{ if eq(parameters.mode, 'Integration tests') }}:
       - ${{ each service in parameters.services }}:
           - template: templates/integration-service.yml
             parameters:
@@ -111,25 +131,15 @@ stages:
               pythonVersions: ${{ parameters.pythonVersions }}
               regions: ${{ split(parameters.regions, ',') }}
               services: ${{ parameters.services }}
-  - ${{ if eq(parameters.mode, 'Retry self-test') }}:
-      - template: templates/integration-service.yml
-        parameters:
-          service: RetrySelfTest
-          pythonVersions: ${{ parameters.pythonVersions }}
-          regions: ${{ split(parameters.regions, ',') }}
-          services: []
-          diagnostic: true
-
-  - ${{ if ne(parameters.mode, 'Dry run') }}:
       - stage: Qualify
         displayName: Verify all expected cases and publish coverage
         dependsOn:
-          - Prepare
-          - ${{ if eq(parameters.mode, 'Retry self-test') }}:
-              - RetrySelfTest
-          - ${{ else }}:
-              - ${{ each service in parameters.services }}:
-                  - ${{ service }}
+          - Plan
+          - Build
+          - Lint
+          - Unit
+          - ${{ each service in parameters.services }}:
+              - ${{ service }}
         jobs:
           - job: Gate
             steps:

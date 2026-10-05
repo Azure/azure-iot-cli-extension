@@ -9,15 +9,14 @@ parameters:
     type: object
   - name: services
     type: object
-  - name: diagnostic
-    type: boolean
-    default: false
 
 stages:
   - stage: ${{ parameters.service }}
-    displayName: ${{ parameters.service }} (rerun to retry failed cases)
+    displayName: ${{ parameters.service }} integration tests (rerun to retry failed cases)
     dependsOn:
-      - Prepare
+      - Build
+      - Lint
+      - Unit
       - ${{ if and(containsValue(parameters.services, 'DPS'), containsValue(split('HubControl,HubData,ADU,ADR', ','), parameters.service)) }}:
           - DPS
       - ${{ if and(containsValue(parameters.services, 'HubControl'), containsValue(split('HubData,ADU,ADR', ','), parameters.service)) }}:
@@ -26,7 +25,9 @@ stages:
           - HubData
       - ${{ if and(containsValue(parameters.services, 'ADU'), eq(parameters.service, 'ADR')) }}:
           - ADU
-    condition: and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'))
+    condition: |
+      and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
+          eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
     jobs:
       - job: Tests
         timeoutInMinutes: 360
@@ -67,59 +68,44 @@ stages:
               PYTHONPATH: $(Build.SourcesDirectory)
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
-          - ${{ if eq(parameters.diagnostic, true) }}:
-              - bash: |
-                  set -euo pipefail
-                  python azext_iot/tests/_ado_pipeline.py run --service RetrySelfTest \
-                    --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
-                    --wheel candidate --history "$HISTORY" --output attempt --diagnostic
-                displayName: Offline deliberate failure and manual-retry proof
-                env:
-                  TEST_PYTHON: $(python)
-                  TEST_REGION: $(region)
-                  TEST_ENDPOINT: $(endpoint)
-                  HISTORY: $(Pipeline.Workspace)/history
-                  PYTHONPATH: $(Build.SourcesDirectory)
-                  azext_iot_testrg: offline-retry-selftest
-          - ${{ else }}:
-              - task: AzureCLI@2
-                displayName: Run service or retry its remaining failed cases
-                inputs:
-                  azureSubscription: $(AzureServiceConnection)
-                  addSpnToEnvironment: true
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  inlineScript: |
-                    set -euo pipefail
-                    export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
-                    python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
-                      --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
-                      --wheel candidate --history "$HISTORY" --output attempt
-                env:
-                  SERVICE: ${{ parameters.service }}
-                  TEST_PYTHON: $(python)
-                  TEST_REGION: $(region)
-                  TEST_ENDPOINT: $(endpoint)
-                  HISTORY: $(Pipeline.Workspace)/history
-                  PYTHONPATH: $(Build.SourcesDirectory)
-                  AZEXT_IOT_CI_AUTH: ado
-                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-                  TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
-                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
-                  AZURE_TEST_RUN_LIVE: 'True'
-                  PYTHONUNBUFFERED: '1'
-                  azext_iot_testrg: cli-int-test-rg
-                  azext_iot_testhub_location: $(region)
-                  azext_iot_test_arm_endpoint: $(endpoint)
-                  AZURE_IOT_ADR_ARM_ENDPOINT: $(endpoint)
-                  AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
-                  AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
-                  azext_iot_hub_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
-                  azext_iot_adr_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
-                  azext_iot_adr_resource_group: cli-int-test-rg
-                  azext_iot_adr_location: $(region)
-                  azext_iot_adr_arm_endpoint: $(endpoint)
-                  azext_iot_adr_arm_resource: https://management.azure.com
+          - task: AzureCLI@2
+            displayName: Run service or retry its remaining failed cases
+            inputs:
+              azureSubscription: $(AzureServiceConnection)
+              addSpnToEnvironment: true
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
+                python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
+                  --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
+                  --wheel candidate --history "$HISTORY" --output attempt
+            env:
+              SERVICE: ${{ parameters.service }}
+              TEST_PYTHON: $(python)
+              TEST_REGION: $(region)
+              TEST_ENDPOINT: $(endpoint)
+              HISTORY: $(Pipeline.Workspace)/history
+              PYTHONPATH: $(Build.SourcesDirectory)
+              AZEXT_IOT_CI_AUTH: ado
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
+              AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+              AZURE_TEST_RUN_LIVE: 'True'
+              PYTHONUNBUFFERED: '1'
+              azext_iot_testrg: cli-int-test-rg
+              azext_iot_testhub_location: $(region)
+              azext_iot_test_arm_endpoint: $(endpoint)
+              AZURE_IOT_ADR_ARM_ENDPOINT: $(endpoint)
+              AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
+              AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
+              azext_iot_hub_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+              azext_iot_adr_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+              azext_iot_adr_resource_group: cli-int-test-rg
+              azext_iot_adr_location: $(region)
+              azext_iot_adr_arm_endpoint: $(endpoint)
+              azext_iot_adr_arm_resource: https://management.azure.com
           - publish: attempt
             condition: succeededOrFailed()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)

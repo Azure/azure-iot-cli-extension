@@ -150,9 +150,11 @@ On `release/1.0.0-preview`, **Azure IoT CLI - Integration Tests** uses
 `.azure-devops/integration_tests.yml`. Choose the branch first, then a run mode.
 **Dry run** is the safe default: it validates the selected services, Python
 versions, regions and ARM endpoint without Azure login or resource creation.
-**Integration tests** builds one candidate wheel, runs lint/unit checks and the
-selected DPS, HubControl, HubData, ADU and ADR combinations, then qualifies the
-complete matrix and publishes combined coverage. Central, Digital Twins and the
+**Integration tests** runs separate **Build**, **Lint** and **Unit tests** stages
+after planning. Each has its own job and can run independently after the plan
+passes. The selected DPS, HubControl, HubData, ADU and ADR integration stages wait
+for all three to succeed and remain separate manual-retry targets. **Qualify**
+then checks the complete matrix and publishes combined coverage. Central, Digital Twins and the
 old cross-service smoke stage are not part of this pipeline. Regions accept
 comma-separated public-region identifiers; canary requires `centraluseuap`.
 
@@ -183,12 +185,9 @@ or credentials are stored in failure classification metadata. A missing native
 attempt (including installation/login failure before receipts exist) blocks later
 recovery, even when an earlier attempt's artifacts are available.
 
-For a safe UI rehearsal, select **Retry self-test** with one Python/region.
-It creates no Azure resources and needs no Azure login. Its first service attempt
-deliberately fails one of three parameterized cases. Rerunning that failed stage
-executes only that case; the final gate checks the recovery chain and labels it
-**NOT release qualification**. This mode still builds the candidate and runs the
-offline lint/unit preparation jobs.
+The ADO run form exposes only **Dry run** and **Integration tests**. The
+deliberate-failure diagnostic remains an offline unit regression in
+`test_ado_retry_unit.py`, not a selectable pipeline mode.
 
 Before enabling live use, the pipeline owner must authorize the existing
 `aziotcli-sp-prime` connection and `aziotcli_test_primary` variable group for 147,
@@ -208,7 +207,7 @@ qualification finish.
 
 This branch-only change does **not** switch pipeline 147's default branch, migrate
 GitHub schedules/release callers, change service connections, or remove any FIC.
-Validate the Azure DevOps self-test and a controlled live run before cutover; port
+Validate a controlled live run before cutover; port
 the pipeline separately to other branches and retire GitHub FICs only after every
 Azure-dependent GitHub caller has migrated.
 
