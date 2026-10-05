@@ -130,7 +130,6 @@ stages:
               service: ${{ service }}
               pythonVersions: ${{ parameters.pythonVersions }}
               regions: ${{ split(parameters.regions, ',') }}
-              services: ${{ parameters.services }}
       - stage: Qualify
         displayName: Verify all expected cases and publish coverage
         dependsOn:

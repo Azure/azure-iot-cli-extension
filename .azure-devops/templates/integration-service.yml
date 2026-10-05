@@ -7,8 +7,6 @@ parameters:
     type: object
   - name: regions
     type: object
-  - name: services
-    type: object
 
 stages:
   - stage: ${{ parameters.service }}
@@ -17,14 +15,6 @@ stages:
       - Build
       - Lint
       - Unit
-      - ${{ if and(containsValue(parameters.services, 'DPS'), containsValue(split('HubControl,HubData,ADU,ADR', ','), parameters.service)) }}:
-          - DPS
-      - ${{ if and(containsValue(parameters.services, 'HubControl'), containsValue(split('HubData,ADU,ADR', ','), parameters.service)) }}:
-          - HubControl
-      - ${{ if and(containsValue(parameters.services, 'HubData'), containsValue(split('ADU,ADR', ','), parameters.service)) }}:
-          - HubData
-      - ${{ if and(containsValue(parameters.services, 'ADU'), eq(parameters.service, 'ADR')) }}:
-          - ADU
     condition: |
       and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
           eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))

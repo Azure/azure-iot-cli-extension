@@ -274,10 +274,12 @@ def phase(selection_file, output):
     else:
         diagnostic = service == "RetrySelfTest"
         before = [] if diagnostic else inventory()
+        scope = {key: ctx[key] for key in ("subscription", "resource_group")}
         env = dict(os.environ, azext_iot_ado_receipt=str(folder / "pytest.json"),
                    azext_iot_ado_expected=json.dumps(value["expected"]),
                    azext_iot_ado_selected=json.dumps(nodes),
                    azext_iot_ado_diagnostic_attempt=str(value["sequence"]),
+                   azext_iot_ado_resource_scope=json.dumps(None if diagnostic else scope),
                    COVERAGE_FILE=str(folder / ".coverage"))
         directory = ("azext_iot/tests/ado_diagnostic.py" if diagnostic else BUDGETS[service]["test_dir"])
         command = [sys.executable, "-m", "pytest", directory, "-vv", "-c", str(ROOT / "setup.cfg"),
@@ -292,8 +294,13 @@ def phase(selection_file, output):
         if execution["timed_out"] or execution["interrupted"]:
             raise ValueError("Timed out/interrupted execution cannot qualify.")
         receipt = RETRY["read"](folder / "pytest.json")
-        if execution["exit_code"] != receipt["exitstatus"] or not diagnostic and set(inventory()) - set(before):
-            raise ValueError("Execution or resource cleanup is unproven.")
+        if execution["exit_code"] != receipt["exitstatus"]:
+            raise ValueError("Execution status disagrees with test evidence.")
+        if not diagnostic:
+            cleanup = RETRY["cleanup_inventory"](before, inventory(), receipt, scope)
+            RETRY["write"](folder / "cleanup.json", cleanup)
+            if not cleanup["complete"]:
+                raise ValueError("Test-process resource cleanup is unproven.")
         expected = receipt["expected"]
     RETRY["outcomes"](receipt)
     RETRY["write"](folder / "phase.json", {

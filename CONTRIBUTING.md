@@ -151,9 +151,9 @@ On `release/1.0.0-preview`, **Azure IoT CLI - Integration Tests** uses
 **Dry run** is the safe default: it validates the selected services, Python
 versions, regions and ARM endpoint without Azure login or resource creation.
 **Integration tests** runs separate **Build**, **Lint** and **Unit tests** stages
-after planning. Each has its own job and can run independently after the plan
+after planning. Each has its own job and can run in parallel after the plan
 passes. The selected DPS, HubControl, HubData, ADU and ADR integration stages wait
-for all three to succeed and remain separate manual-retry targets. **Qualify**
+for all three to succeed, then run in parallel as separate manual-retry targets. **Qualify**
 then checks the complete matrix and publishes combined coverage. Central, Digital Twins and the
 old cross-service smoke stage are not part of this pipeline. Regions accept
 comma-separated public-region identifiers; canary requires `centraluseuap`.
@@ -197,8 +197,16 @@ the shared variable group (the YAML uses sequential lock behavior). Keep access
 restricted; do not grant every pipeline access. WIF renewal updates CLI credential
 caches without rewriting the account profile.
 
-Service stages and matrix legs are serialized. Admission rejects other active
-ADO project builds and active GitHub integration runs, and rejects budgets that
+Service stages have no dependencies on one another; available ADO parallel-job
+capacity and resource checks can still queue jobs. In particular, a shared
+exclusive lock can serialize otherwise-independent stages; YAML dependencies do
+not override that check, and this change does not reconfigure it. Python/region matrix legs within
+each service remain serialized. ADR/ADU cleanup inventory is scoped to ARM resource
+roots touched by that test process (including its pytest workers), so another
+service's active resources are not mistaken for leaks. Fixture teardown failures
+and leftover new resources touched by the process still fail qualification.
+Admission rejects other active ADO project builds and active GitHub integration
+runs, and rejects budgets that
 overlap the daily 13:00–14:00 UTC cleanup exclusion window. This is a conservative
 preflight, not an atomic lock with GitHub or a subscription quota reservation.
 Coordinate/disable competing GitHub dispatches and cleanup before live rehearsal;

@@ -240,12 +240,150 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]
     assert stage["stage"] == "${{ parameters.service }}"
-    assert stage["dependsOn"][:3] == ["Build", "Lint", "Unit"]
+    assert stage["dependsOn"] == ["Build", "Lint", "Unit"]
     assert " ".join(stage["condition"].split()) == (
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )
     assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
+
+
+@pytest.mark.parametrize("leak", [False, True])
+def test_parallel_inventory_ignores_peer_resources_but_rejects_own_leaks(leak):
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    prefix = f"/subscriptions/{scope['subscription']}/resourcegroups/{scope['resource_group']}/providers/"
+    baseline = prefix + "microsoft.storage/storageaccounts/existing"
+    own = prefix + "microsoft.devices/iothubs/owned"
+    peer = prefix + "microsoft.devices/iothubs/peer"
+    value = {"resourceScope": scope, "resourceRoots": sorted([baseline, own])}
+    after = [baseline, peer] + ([own] if leak else [])
+    check = retry.cleanup_inventory([baseline], after, value, scope)
+    assert check["complete"] is not leak
+    assert check["remaining"] == ([own] if leak else [])
+
+
+@pytest.mark.parametrize("defect", ["missing", "scope", "duplicate", "foreign", "child", "malformed"])
+def test_resource_inventory_requires_canonical_process_observation(defect):
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    root = (f"/subscriptions/{scope['subscription']}/resourcegroups/{scope['resource_group']}"
+            "/providers/microsoft.devices/iothubs/a")
+    value = {"resourceScope": scope, "resourceRoots": [root]}
+    if defect == "missing":
+        del value["resourceRoots"]
+    elif defect == "scope":
+        value["resourceScope"] = {}
+    elif defect == "duplicate":
+        value["resourceRoots"].append(root)
+    elif defect == "foreign":
+        value["resourceRoots"] = [root.replace(scope["resource_group"], "foreign")]
+    elif defect == "child":
+        value["resourceRoots"] = [root + "/devices/child"]
+    else:
+        value["resourceRoots"] = [None]
+    with pytest.raises(ValueError):
+        retry.cleanup_inventory([], [], value, scope)
+
+
+def test_observed_arm_ids_never_include_secrets_or_allow_indirect_deployments():
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    root = (f"/subscriptions/{scope['subscription']}/resourceGroups/{scope['resource_group']}"
+            "/providers/Microsoft.Devices/IotHubs/a")
+    assert retry.resource_root(
+        "https://centraluseuap.management.azure.com" + root + "/listKeys?api-version=1&sig=secret", scope,
+    ) == root.casefold()
+    assert retry.resource_root("https://a.azure-devices.net/devices/b?sig=secret", scope) is None
+    for url in (
+        "https://user:secret@management.azure.com" + root,
+        "https://management.azure.com" + root.replace("Microsoft.Devices/IotHubs", "Microsoft.Resources/deployments"),
+        "https://management.azure.com" + root.replace(scope["resource_group"], "foreign"),
+    ):
+        with pytest.raises(ValueError):
+            retry.resource_root(url, scope)
+
+
+def test_worker_missing_resource_observation_cannot_qualify(tmp_path, monkeypatch):
+    from azext_iot.tests._ado_retry_plugin import Receipt
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    monkeypatch.setenv("azext_iot_ado_resource_scope", json.dumps(scope))
+    value = Receipt(tmp_path / "receipt.json")
+    node = SimpleNamespace(workeroutput={"ado_expected": ["case"], "ado_excluded": []})
+    with pytest.raises(pytest.UsageError, match="resource observation"):
+        value.pytest_testnodedown(node, None)
+    assert not retry.read(value.path)["finished"]
+
+
+@pytest.mark.parametrize("service", ["ADR", "ADU"])
+@pytest.mark.parametrize("leak", [False, True])
+def test_generic_phase_uses_process_scoped_cleanup_not_whole_resource_group(tmp_path, mocker, service, leak):
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    prefix = f"/subscriptions/{scope['subscription']}/resourcegroups/{scope['resource_group']}/providers/"
+    own = prefix + "microsoft.devices/iothubs/owned"
+    peer = prefix + "microsoft.devices/iothubs/peer"
+    output = tmp_path / "phase"
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {
+        "context": dict(CONTEXT, service=service), "phase": "tests", "nodes": [],
+        "expected": [], "sequence": 1,
+    })
+    mocker.patch.object(pipeline, "inventory", side_effect=[[], [peer] + ([own] if leak else [])])
+
+    def execute(_command, env, *_args):
+        assert json.loads(env["azext_iot_ado_resource_scope"]) == scope
+        value = receipt({"case": "passed"})
+        value.update(expected=["case"], resourceScope=scope, resourceRoots=[own])
+        retry.write(env["azext_iot_ado_receipt"], value)
+        return {"exit_code": 0, "timed_out": False, "interrupted": False}
+
+    mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
+    if leak:
+        with pytest.raises(ValueError, match="cleanup"):
+            pipeline.phase(selection, output)
+        assert not (output / "phase.json").exists()
+    else:
+        pipeline.phase(selection, output)
+        assert retry.read(output / "phase.json")["safe"]
+    cleanup = retry.read(output / "cleanup.json")
+    assert cleanup["complete"] is not leak
+    assert cleanup["remaining"] == ([own] if leak else [])
+
+
+@pytest.mark.parametrize("workers", ["0", "2"])
+def test_real_plugin_collects_resource_roots_from_all_test_processes(tmp_path, workers):
+    scope = {key: CONTEXT[key] for key in ("subscription", "resource_group")}
+    prefix = (f"/subscriptions/{scope['subscription']}/resourceGroups/{scope['resource_group']}"
+              "/providers/Microsoft.Devices/IotHubs/")
+    for name in ("one", "two"):
+        action = f"requests.put('https://management.azure.com{prefix}{name}?sig=private-secret')"
+        transport = "raise requests.ConnectionError('ambiguous PUT')" if name == "two" else "return requests.Response()"
+        invocation = (f"    with pytest.raises(requests.ConnectionError):\n        {action}\n" if name == "two" else
+                      f"    {action}\n    requests.get('https://management.azure.com{prefix}peer')\n")
+        (tmp_path / f"test_{name}.py").write_text(
+            "import requests, pytest\n"
+            "def test_resource(monkeypatch):\n"
+            "    def send(*args, **kwargs):\n"
+            f"        {transport}\n"
+            "    monkeypatch.setattr(requests.adapters.HTTPAdapter, 'send', send)\n"
+            "    original=requests.Session.send\n"
+            "    def tracker(session, request, **kwargs):\n"
+            "        return original(session, request, **kwargs)\n"
+            "    monkeypatch.setattr(requests.Session, 'send', tracker)\n"
+            f"{invocation}",
+            encoding="utf-8",
+        )
+    path = tmp_path / "receipt.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", str(tmp_path), "-q", "-n", workers, "--dist=loadfile",
+         "-p", "azext_iot.tests._ado_retry_plugin"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False,
+        env=dict(os.environ, azext_iot_ado_receipt=str(path), azext_iot_ado_resource_scope=json.dumps(scope),
+                 PYTEST_ADDOPTS="", PYTHONPATH=os.pathsep.join(dict.fromkeys([str(ROOT), *map(os.path.abspath, sys.path)]))),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    value = retry.read(path)
+    assert value["resourceScope"] == scope
+    assert value["resourceRoots"] == [(prefix + name).casefold() for name in ("one", "two")]
+    assert "private-secret" not in path.read_text()
+    assert len(retry.outcomes(value)) == 2
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="ADO controller uses Linux process groups")

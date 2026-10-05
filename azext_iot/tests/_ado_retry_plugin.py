@@ -9,10 +9,11 @@
 import json
 import os
 from pathlib import Path
+from threading import Lock
 
 import pytest
 
-from azext_iot.tests._ado_retry import assertion_failure, case_id
+from azext_iot.tests._ado_retry import assertion_failure, case_id, resource_root
 
 
 def pytest_configure(config):
@@ -21,7 +22,10 @@ def pytest_configure(config):
         raise pytest.UsageError("ADO retry plugin requires an explicit receipt path.")
     if config.getoption("reruns", 0):
         raise pytest.UsageError("Automatic test retries are disabled in pipeline 147.")
-    config.pluginmanager.register(Receipt(Path(path)), "ado-retry-receipt")
+    receipt = Receipt(Path(path))
+    config.pluginmanager.register(receipt, "ado-retry-receipt")
+    if receipt.data["resourceScope"] is not None:
+        receipt.observe_resources(config)
 
 
 class Receipt:
@@ -30,7 +34,10 @@ class Receipt:
         self.data = {
             "finished": False, "exitstatus": None, "expected": [], "collected": [], "reports": {},
             "excluded": [], "retryableFailures": {},
+            "resourceScope": json.loads(os.environ.get("azext_iot_ado_resource_scope", "null")),
+            "resourceRoots": [],
         }
+        self.resource_lock = Lock()
         self.expected = json.loads(os.environ.get("azext_iot_ado_expected", "[]"))
         self.selected = json.loads(os.environ.get("azext_iot_ado_selected", "[]"))
         self.worker = os.getenv("PYTEST_XDIST_WORKER")
@@ -38,6 +45,21 @@ class Receipt:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("x", encoding="utf-8") as stream:
                 json.dump(self.data, stream)
+
+    def observe_resources(self, config):
+        import requests
+        original = requests.Session.send
+
+        def send(session, request, **kwargs):
+            if request.method.upper() in ("PUT", "PATCH", "POST", "DELETE"):
+                root = resource_root(request.url, self.data["resourceScope"])
+                if root:
+                    with self.resource_lock:
+                        self.data["resourceRoots"] = sorted(set(self.data["resourceRoots"]) | {root})
+            return original(session, request, **kwargs)
+
+        requests.Session.send = send
+        config.add_cleanup(lambda: setattr(requests.Session, "send", original))
 
     def save(self):
         if not self.worker:
@@ -82,6 +104,10 @@ class Receipt:
         if self.data["excluded"] and self.data["excluded"] != excluded:
             raise pytest.UsageError("Worker committed skip exclusions disagree.")
         self.data["excluded"] = excluded
+        if self.data["resourceScope"] is not None:
+            if node.workeroutput.get("ado_resource_scope") != self.data["resourceScope"]:
+                raise pytest.UsageError("Worker resource observation is missing or has a different scope.")
+            self.data["resourceRoots"] = sorted(set(self.data["resourceRoots"]) | set(node.workeroutput["ado_resource_roots"]))
         self.save()
 
     @pytest.hookimpl(hookwrapper=True)
@@ -105,6 +131,8 @@ class Receipt:
         if self.worker:
             session.config.workeroutput["ado_expected"] = self.data["expected"]
             session.config.workeroutput["ado_excluded"] = self.data["excluded"]
+            session.config.workeroutput["ado_resource_scope"] = self.data["resourceScope"]
+            session.config.workeroutput["ado_resource_roots"] = self.data["resourceRoots"]
         outcome = yield
         self.data["finished"] = outcome.excinfo is None
         self.data["exitstatus"] = int(session.exitstatus)
