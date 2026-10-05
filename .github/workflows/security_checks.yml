@@ -25,10 +25,10 @@ jobs:
       security-events: write
       contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Install dotnet, used by MSDO
-    - uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
       with:
         dotnet-version: |
           5.0.x
@@ -36,7 +36,7 @@ jobs:
 
       # Run analyzers
     - name: Run Microsoft Security DevOps Analysis
-      uses: microsoft/security-devops-action@v1
+      uses: microsoft/security-devops-action@5b26a185ff02cf7c100778adeff0ebbf704ca144 # v1
       id: msdo
       env:
         # file path to analyze
@@ -45,13 +45,13 @@ jobs:
 
       # Upload alerts to the Security tab
     - name: Upload alerts to Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3.37.9
       with:
         sarif_file: ${{ steps.msdo.outputs.sarifFile }}
 
       # Upload alerts file as a workflow artifact
     - name: Upload alerts artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:  
         name: alerts
         path: ${{ steps.msdo.outputs.sarifFile }}

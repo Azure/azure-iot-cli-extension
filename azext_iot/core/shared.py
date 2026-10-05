@@ -4,6 +4,15 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .help import patch_core_help
+"""
+shared: Define shared data types(enums).
 
-patch_core_help()
+"""
+
+from enum import Enum
+
+
+class IotDpsSku(Enum):
+    """DPS SKU name."""
+
+    S1 = "S1"
