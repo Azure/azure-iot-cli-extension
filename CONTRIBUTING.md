@@ -148,7 +148,7 @@ dispatch or the Azure DevOps centraluseuap pipeline.
 
 On `release/1.0.0-preview`, **Azure IoT CLI - Integration Tests** uses
 `.azure-devops/integration_tests.yml`. Choose the branch first, then a run mode.
-**Plan only** is the safe default: it validates the selected services, Python
+**Dry run** is the safe default: it validates the selected services, Python
 versions, regions and ARM endpoint without Azure login or resource creation.
 **Integration tests** builds one candidate wheel, runs lint/unit checks and the
 selected DPS, HubControl, HubData, ADU and ADR combinations, then qualifies the

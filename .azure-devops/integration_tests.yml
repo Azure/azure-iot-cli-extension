@@ -9,8 +9,8 @@ parameters:
   - name: mode
     displayName: Run mode (self-test never qualifies a release)
     type: string
-    default: Plan only
-    values: [Plan only, Integration tests, Retry self-test]
+    default: Dry run
+    values: [Dry run, Integration tests, Retry self-test]
   - name: services
     displayName: Services
     type: stringList
@@ -68,7 +68,7 @@ stages:
               ENDPOINT: $(endpoint)
           - publish: plan.json
             artifact: integration-plan-$(System.JobAttempt)
-      - ${{ if ne(parameters.mode, 'Plan only') }}:
+      - ${{ if ne(parameters.mode, 'Dry run') }}:
           - job: Build
             dependsOn: Plan
             timeoutInMinutes: 40
@@ -120,7 +120,7 @@ stages:
           services: []
           diagnostic: true
 
-  - ${{ if ne(parameters.mode, 'Plan only') }}:
+  - ${{ if ne(parameters.mode, 'Dry run') }}:
       - stage: Qualify
         displayName: Verify all expected cases and publish coverage
         dependsOn:

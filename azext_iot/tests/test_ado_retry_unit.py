@@ -186,7 +186,11 @@ def test_ado_federation_uses_job_and_service_connection_without_github_token(moc
 def test_yaml_exposes_manual_only_services_and_non_live_default():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     parameters = {value["name"]: value for value in entry["parameters"]}
-    assert parameters["mode"]["default"] == "Plan only"
+    assert parameters["mode"]["default"] == "Dry run"
+    assert parameters["mode"]["values"] == ["Dry run", "Integration tests", "Retry self-test"]
+    non_dry_run = "${{ if ne(parameters.mode, 'Dry run') }}"
+    assert non_dry_run in entry["stages"][0]["jobs"][1]
+    assert non_dry_run in entry["stages"][-1]
     assert parameters["services"]["values"] == list(retry.SERVICES)
     assert parameters["pythonVersions"]["type"] == "stringList"
     text = (ROOT / ".azure-devops/templates/integration-service.yml").read_text()
