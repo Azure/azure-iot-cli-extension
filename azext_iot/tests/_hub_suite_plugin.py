@@ -77,7 +77,7 @@ def pytest_load_initial_conftests(early_config, parser, args):
         raise pytest.UsageError(str(error)) from error
     validate_args(early_config, expected, early=True)
     auth_phase = os.getenv("azext_iot_hub_auth_phase", "regular")
-    if auth_phase != ("local-auth" if phase == "sas" else "regular"):
+    if auth_phase != manifest.auth_phase(phase):
         raise pytest.UsageError("Hub selection/auth phase mismatch; use a fresh process for each phase.")
     receipt, run_id = os.getenv("AZEXT_IOT_HUB_RECEIPT"), os.getenv("AZEXT_IOT_HUB_RUN_ID")
     if not receipt or not run_id:

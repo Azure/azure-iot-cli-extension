@@ -142,6 +142,7 @@ def management_command_parser():
     names = [
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
+        "iot adr ns ca policy create", "iot adr ns ca policy update",
     ]
     loader.command_table = {
         name: loader.command_table[name]
@@ -175,13 +176,14 @@ class _HubIdentityCommandsLoader(MainCommandsLoader):
 
 
 @pytest.fixture
-def identity_update_cli(mocker):
+def identity_update_cli(mocker, monkeypatch):
     """Run the native invoker, discovery, generic update and SDK against offline HTTP only."""
     from azure.core.credentials import AzureKeyCredential
     from azext_iot import _factory
     from azext_iot.iothub.providers.discovery import IotHubDiscovery
     from azext_iot.operations import hub
 
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
     subscription = "00000000-0000-0000-0000-000000000001"
     credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
     mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
@@ -249,7 +251,7 @@ def identity_update_cli(mocker):
     with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
         for method in ("GET", "POST", "PUT"):
             network.add_callback(
-                method, re.compile(r"https://(?:hub\.unit\.invalid|centraluseuap\.management\.azure\.com)/.*"),
+                method, re.compile(r"https://(?:hub\.unit\.invalid|management\.azure\.com)/.*"),
                 callback=respond, content_type="application/json",
             )
         yield state
@@ -489,6 +491,31 @@ def test_namespace_device_command_parser(command_table, management_command_parse
     assert parsed.resource_group_name == "resource-group"
     if command_name != "iot adr ns device list":
         assert parsed.registry_device_name == "device"
+
+
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("option", ["--validity-days", "--vd"])
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_certificate_policy_validity_days_parser(management_command_parser, action, option, validity_days):
+    parsed = management_command_parser.parse_args([
+        "iot", "adr", "ns", "ca", "policy", action,
+        *_NAMESPACE_ARGUMENTS, "--name", "policy", "--ca-name", "ica",
+        option, str(validity_days),
+    ])
+    assert parsed.validity_days == validity_days
+
+
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("option", ["--validity-days", "--vd"])
+@pytest.mark.parametrize("validity_days", ["1.5", "invalid"])
+def test_certificate_policy_parser_rejects_noninteger_validity(management_command_parser, action, option, validity_days):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args([
+            "iot", "adr", "ns", "ca", "policy", action,
+            *_NAMESPACE_ARGUMENTS, "--name", "policy", "--ca-name", "ica",
+            option, validity_days,
+        ])
+    assert error.value.code == 2
 
 
 def test_namespace_device_command_names(command_table):

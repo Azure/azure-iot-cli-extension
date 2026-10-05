@@ -46,8 +46,8 @@ def _matrix(tmp_path, **overrides):
     workflow = _workflows()[0]
     step = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
     env = dict(
-        os.environ, INPUT_SERVICES="auto", INPUT_PYTHON_VERSIONS="3.13", INPUT_REGIONS="centraluseuap",
-        INPUT_ARM_ENDPOINT="auto",
+        os.environ, INPUT_SERVICES="auto", INPUT_PYTHON_VERSIONS="3.13", INPUT_REGIONS="australiaeast",
+        INPUT_ARM_ENDPOINT="public",
         RESOURCE_GROUP="cli-int-test-rg", TEST_SUBSCRIPTION_ID=SUBSCRIPTION,
         GITHUB_OUTPUT=str(tmp_path / "outputs"), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"),
         **{"INPUT_TEST_" + name: "false" for name in ("DPS", "HUB_CONTROL", "HUB_DATA", "ADU", "ADR")},
@@ -63,8 +63,8 @@ def _matrix(tmp_path, **overrides):
 
 @POSIX_WORKFLOW
 @pytest.mark.parametrize("region,mode", [
-    ("centraluseuap", "auto"), ("australiaeast", "auto"), ("westeurope", "auto"),
-    ("futurepublicregion", "auto"), ("westus3", "public"),
+    ("australiaeast", "public"), ("westeurope", "public"),
+    ("futurepublicregion", "public"), ("westus3", "public"),
     ("centraluseuap", "public"), ("centraluseuap", "canary"),
 ])
 def test_full_requested_services_use_explicit_region_endpoint_pair_without_adu(tmp_path, region, mode):
@@ -75,7 +75,7 @@ def test_full_requested_services_use_explicit_region_endpoint_pair_without_adu(t
     rows = json.loads(outputs["matrix"])
     assert {row["service"] for row in rows} == {"ADR", "DPS", "HubControl", "HubData"}
     endpoint = ("https://centraluseuap.management.azure.com"
-                if mode == "canary" or (mode == "auto" and region == "centraluseuap") else "https://management.azure.com")
+                if mode == "canary" else "https://management.azure.com")
     assert all(row["arm_endpoint"] == endpoint and row["region"] == region for row in rows)
 
 
@@ -91,6 +91,7 @@ def test_public_matrix_rejects_unauthorized_scope(tmp_path, service, scope):
 @pytest.mark.parametrize("mode,regions", [
     ("canary", "westeurope"), ("canary", "centraluseuap,australiaeast"),
     ("https://management.azure.com.invalid", "westeurope"), ("unknown", "centraluseuap"),
+    ("auto", "centraluseuap"), ("auto", "australiaeast"),
 ])
 def test_matrix_rejects_untrusted_selector_or_canary_region_mismatch(tmp_path, mode, regions):
     result, outputs = _matrix(tmp_path, INPUT_SERVICES="DPS", INPUT_ARM_ENDPOINT=mode, INPUT_REGIONS=regions)
@@ -143,9 +144,10 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
         for name in ("resource-group", "subscription-id", "python-versions", "regions"):
             assert declared[name]["type"] == "string" and declared[name]["required"] is False
         assert declared["resource-group"]["default"] == "cli-int-test-rg"
-        assert declared["regions"]["default"] == "centraluseuap"
+        assert declared["regions"]["default"] == "australiaeast"
         assert declared["python-versions"]["default"] == "3.13"
-        assert declared["arm-endpoint"]["default"] == "auto"
+        assert declared["arm-endpoint"]["default"] == "public"
+    assert public["run-name"] == "Integration Tests (${{ inputs.regions || 'australiaeast' }})"
     assert public["permissions"] == {"contents": "read", "id-token": "write"}
     assert public["env"] == {
         "RESOURCE_GROUP": "${{ inputs['resource-group'] || 'cli-int-test-rg' }}",
@@ -160,7 +162,7 @@ def test_public_inputs_remain_typed_with_oidc_and_shared_scope_environment():
     dispatch = triggers["workflow_dispatch"]["inputs"]
     assert dispatch["subscription-id"]["default"] == SUBSCRIPTION
     assert dispatch["arm-endpoint"]["type"] == "choice"
-    assert dispatch["arm-endpoint"]["options"] == ["auto", "public", "canary"]
+    assert dispatch["arm-endpoint"]["options"] == ["public", "canary"]
     for service in SERVICES:
         assert dispatch[f"test{service}"]["type"] == "boolean"
         assert dispatch[f"test{service}"]["default"] is True
@@ -308,14 +310,22 @@ def test_ci_budget_source_covers_matrix_and_controller_arithmetic():
     assert set(budgets) == set(SERVICES)
     for service, config in budgets.items():
         assert config["tox_env"] == service + "-int"
+        assert isinstance(config.get("concurrent_phases", False), bool)
+        # Concurrent controllers run every phase at once, so only the slowest phase bounds the job.
+        combine = max if config.get("concurrent_phases") else sum
+        assert isinstance(config.get("serial_cleanup_verification", False), bool)
+        verification = (
+            sum(phase["cleanup_minutes"] for phase in config["phases"])
+            if config.get("serial_cleanup_verification") else 0
+        )
         controller = (
-            sum((phase["runtime_minutes"] + phase["cleanup_minutes"]) for phase in config["phases"])
-            + config["reserve_minutes"]
+            combine([phase["runtime_minutes"] + phase["cleanup_minutes"] for phase in config["phases"]] or [0])
+            + verification + config["reserve_minutes"]
         )
         assert controller + config["setup_minutes"] <= config["job_timeout_minutes"]
     assert {
         service: budgets[service]["job_timeout_minutes"] for service in ("DPS", "HubControl", "HubData", "ADU", "ADR")
-    } == {"DPS": 150, "HubControl": 275, "HubData": 360, "ADU": 200, "ADR": 360}
+    } == {"DPS": 100, "HubControl": 140, "HubData": 120, "ADU": 150, "ADR": 360}
 
 
 @POSIX_WORKFLOW

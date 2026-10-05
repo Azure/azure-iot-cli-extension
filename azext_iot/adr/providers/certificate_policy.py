@@ -20,7 +20,7 @@ from azext_iot.adr.common import (
 from azext_iot.adr.providers.base import ADRProvider
 
 
-_MIN_VALIDITY_DAYS = 7
+_MIN_VALIDITY_DAYS = 1
 _MAX_VALIDITY_DAYS = 90
 
 

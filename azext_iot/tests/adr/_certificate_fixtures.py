@@ -20,6 +20,11 @@ NOW = datetime(2026, 9, 16, tzinfo=timezone.utc)
 
 
 _POLICY_REJECTION_CODES = ("policyrejected", "certificatepolicylimitexceeded", "activecaalreadyassigned")
+_ACTIVE_POLICY_REJECTION = re.compile(
+    r"Parent certificate authority '[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}' "
+    r"already has an active certificate policy\.",
+    re.IGNORECASE,
+)
 
 
 def is_expected_policy_rejection(error):
@@ -61,6 +66,8 @@ def is_expected_policy_rejection(error):
     if any(code not in _POLICY_REJECTION_CODES + ("asyncoperationfailed",) for code in codes):
         return False
     if re.search(r"\b(?:PolicyRejected|CertificatePolicyLimitExceeded|ActiveCaAlreadyAssigned)\b", text, re.IGNORECASE):
+        return True
+    if "asyncoperationfailed" in codes and _ACTIVE_POLICY_REJECTION.search(text):
         return True
     return (
         not any(status in (400, 409) for status in statuses)

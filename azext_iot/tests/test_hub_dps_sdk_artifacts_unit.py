@@ -25,7 +25,7 @@ def test_generated_client_contract(namespace, client_name, version, kwargs, mock
     path = Path(package.__file__).parent
     assert not (path / "models").exists()
     assert not (path / "aio").exists()
-    if namespace == "dps.service":
+    if namespace in ("iothub.mgmt", "dps.service"):
         assert not (path / "types.py").exists()
     if namespace != "dps.device":
         kwargs["credential"] = AzureKeyCredential("test-token") if namespace == "dps.service" else mocker.Mock()

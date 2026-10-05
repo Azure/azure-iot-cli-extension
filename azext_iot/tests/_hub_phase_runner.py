@@ -4,20 +4,21 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Serial Hub controller. Gate from stdlib-only checkout via runpy.run_path(__file__).
+"""Hub phase controller. Gate from stdlib-only checkout via runpy.run_path(__file__).
 
-Budgets come from ci_budgets.json. Current values are 260m/345m
-controller ceilings for HubControl/HubData plus 15m external setup.
-Control includes margin for the observed late state teardown and final TLS cases.
-Cleanup is a shared child-unwind/parent-verification budget, never an extra grace.
+Budgets come from ci_budgets.json. Concurrent suites use max(phase runtime
++ cleanup) plus reserve, while still preserving one receipt folder per phase.
+Cleanup is a child-unwind/parent-verification budget, never an extra grace.
 """
 
 import argparse
 import json
 import os
 from pathlib import Path
+import queue
 import runpy
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -27,8 +28,19 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 CI_BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 HUB_CI_BUDGETS = {name: CI_BUDGETS[name] for name in ("HubControl", "HubData")}
+
+
 BUDGETS = {
     suite: tuple((phase["name"], phase["runtime_minutes"] * 60) for phase in budget["phases"])
+    for suite, budget in HUB_CI_BUDGETS.items()
+}
+# Legacy debug phase names cover all of their concurrent shards.
+ALIAS_BUDGETS = {
+    "HubControl": {"regular": max(seconds for _, seconds in BUDGETS["HubControl"])},
+    "HubData": {"entra": max(seconds for name, seconds in BUDGETS["HubData"] if name.startswith("entra-"))},
+}
+CLEANUPS = {
+    suite: {phase["name"]: phase["cleanup_minutes"] * 60 for phase in budget["phases"]}
     for suite, budget in HUB_CI_BUDGETS.items()
 }
 CLEANUP = HUB_CI_BUDGETS["HubControl"]["phases"][0]["cleanup_minutes"] * 60
@@ -49,6 +61,21 @@ def helper(region="centraluseuap", endpoint=None):
 
 def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def cleanup_seconds(suite, phase):
+    return CLEANUPS[suite].get(phase, CLEANUP)
+
+
+def reserve_seconds(suite):
+    return HUB_CI_BUDGETS[suite]["reserve_minutes"] * 60
+
+
+def runner_seconds(suite, budgets):
+    reserve = reserve_seconds(suite)
+    if HUB_CI_BUDGETS[suite].get("concurrent_phases"):
+        return max(runtime + cleanup_seconds(suite, phase) for phase, runtime in budgets) + reserve
+    return sum(runtime + cleanup_seconds(suite, phase) for phase, runtime in budgets) + reserve
 
 
 def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
@@ -240,15 +267,16 @@ def environment(base, suite, phase, folder, run_id, subscription, group, *, debu
         AZEXT_IOT_HUB_SUITE=suite, AZEXT_IOT_HUB_PHASE=phase, AZEXT_IOT_HUB_RUN_ID=run_id,
         AZEXT_IOT_HUB_RECEIPT=str(folder / "pytest.json"),
         AZEXT_IOT_HUB_OWNERSHIP=str(folder / "ownership.json"),
-        azext_iot_hub_auth_phase="local-auth" if phase == "sas" else "regular",
+        azext_iot_hub_auth_phase=selection()["auth_phase"](phase),
         azext_iot_hubsas_subscription=subscription, azext_iot_hubsas_receipt=str(folder / "ownership.json"),
     )
+    if debug:
+        result["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
     result["AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE"] = "login"
     if debug:
         result[FOCUSED["ENV"]] = json.dumps(debug)
         # Debug evidence is fresh and phase-local, never appended to a checkout's
         # possibly incompatible (statement/branch) or concurrently written database.
-        result["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
     return result
 
 
@@ -323,6 +351,30 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
     return result
 
 
+def combine_coverage(output, phase_names, destination=None, *, run_process=subprocess.run):
+    """Append every phase database to the caller's coverage file; any missing phase fails closed."""
+    expected = [output / name / ".coverage" for name in phase_names]
+    files = [path for path in expected if path.exists()]
+    destination = Path(destination or ROOT / ".coverage").resolve()
+    result = {
+        "combined": False, "status": "failed", "files": [path.relative_to(output).as_posix() for path in files],
+        "missing": [path.relative_to(output).as_posix() for path in expected if not path.exists()],
+        "destination": str(destination), "exitCode": None,
+    }
+    if files:
+        completed = run_process(
+            [sys.executable, "-m", "coverage", "combine", "--append", "--keep", *(str(path) for path in files)],
+            cwd=ROOT, env={**os.environ, "COVERAGE_FILE": str(destination)},
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120, check=False,
+        )
+        result["exitCode"] = completed.returncode
+        result["combined"] = completed.returncode == 0
+        if completed.returncode:
+            result["outputTail"] = completed.stdout[-1000:]
+    result["status"] = "passed" if result["combined"] and not result["missing"] else "failed"
+    return result
+
+
 def run(suite, subscription, group, region, output, arm=None, execute=None, base=None, *,
         debug_phase=None, debug_nodes=None, endpoint=None):
     debug = FOCUSED["select"](suite, debug_phase, debug_nodes)
@@ -335,57 +387,113 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         raise ValueError("Controller is restricted to the authorized integration scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
+    # Children use phase-local databases; the combined result goes where the caller publishes it.
+    coverage_destination = Path(base.pop("COVERAGE_FILE", None) or ROOT / ".coverage").resolve()
     budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
+    if debug and not budgets:
+        expanded = selection()["expanded_phases"](suite, debug["phase"])
+        runtime = max(runtime for name, runtime in BUDGETS[suite] if name in expanded)
+        budgets = ((debug["phase"], runtime),)
     environment(base, suite, budgets[0][0], output, "preflight", subscription, group, debug=debug, **target)
     output.mkdir(parents=True, exist_ok=False)
     cancel = threading.Event()
     previous = {sig: signal.signal(sig, lambda *_: cancel.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
+    summary_lock = threading.Lock()
     summary = {
         "schemaVersion": 1, "suite": suite, "status": "failed", "cancelled": False, "finished": False,
         "subscription": subscription, "resourceGroup": group, "region": region, "endpoint": owned["ARM"],
-        "runnerSeconds": sum(runtime + CLEANUP for _, runtime in budgets) + RESERVE,
+        "runnerSeconds": runner_seconds(suite, budgets),
         "phases": [{"name": name, "status": "blocked", "runId": uuid4().hex,
                     **FOCUSED["provenance"](debug)} for name, _ in budgets],
         **FOCUSED["provenance"](debug),
     }
     summary_path = output / "hub-phases.json"
-    write_json(summary_path, summary)
+
+    def save_summary():
+        with summary_lock:
+            write_json(summary_path, summary)
+
+    save_summary()
     deadline = time.monotonic() + summary["runnerSeconds"]
     try:
-        arm = arm or owned["Arm"]()
+        def phase_arm():
+            if arm is None:
+                return owned["Arm"]()
+            return arm() if callable(arm) else arm
+
+        mutations = queue.Queue()
+
+        def main_thread_dispatch(operation):
+            box, done = {}, threading.Event()
+            mutations.put((operation, box, done))
+            done.wait()
+            if "error" in box:
+                raise box["error"]
+            return box["value"]
+
+        phase_arms = []
         for result, (phase, runtime) in zip(summary["phases"], budgets):
-            if cancel.is_set():
-                break
-            arm.deadline = min(deadline, time.monotonic() + RESERVE)
+            cleanup_budget = cleanup_seconds(suite, phase)
+            current = phase_arm()
+            current.main_thread_dispatch = main_thread_dispatch
+            current.deadline = min(deadline, time.monotonic() + reserve_seconds(suite))
             # Retain subscription inventory for ownership/collision evidence, not quota admission.
-            result["inventoryIds"] = arm.inventory()
-            if time.monotonic() + runtime + CLEANUP > deadline:
-                break
+            result["inventoryIds"] = current.inventory()
+            if time.monotonic() + runtime + cleanup_budget > deadline:
+                result["reason"] = "Insufficient remaining runtime/cleanup budget"
+                phase_arms.append(None)
+                continue
+            phase_arms.append(current)
+        save_summary()
+
+        def run_phase(index):
+            result = summary["phases"][index]
+            phase, runtime = budgets[index]
+            cleanup_budget = cleanup_seconds(suite, phase)
+            current = phase_arms[index]
+            if current is None or cancel.is_set():
+                with summary_lock:
+                    result.setdefault("reason", "Cancelled before launch")
+                    write_json(summary_path, summary)
+                return
             folder = output / phase
             folder.mkdir()
             env = environment(base, suite, phase, folder, result["runId"], subscription, group, debug=debug, **target)
-            result.update(status="running", runtimeSeconds=runtime, cleanupSeconds=CLEANUP)
-            write_json(summary_path, summary)
+            if phase in CLEANUPS[suite]:
+                env["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
+            with summary_lock:
+                result.update(status="running", runtimeSeconds=runtime, cleanupSeconds=cleanup_budget)
+                write_json(summary_path, summary)
             # pytest node args are repository-relative; retain every inherited dependency path.
-            cwd = Path.cwd()
             try:
-                os.chdir(ROOT)
-                execution = (execute or child)(command(suite, phase, debug=debug, folder=folder), env, folder / "output.log",
-                                               runtime, CLEANUP, cancel.is_set)
-            finally:
-                os.chdir(cwd)
-            result.update({k: v for k, v in execution.items() if k != "cleanup_deadline"})
+                execution = (execute or child)(
+                    command(suite, phase, debug=debug, folder=folder), env, folder / "output.log",
+                    runtime, cleanup_budget, cancel.is_set,
+                )
+            except Exception as error:  # Never serialize credential-bearing exception messages.
+                with summary_lock:
+                    result["status"] = "failed"
+                    result["errorType"] = type(error).__name__
+                    write_json(summary_path, summary)
+                write_json(folder / "cleanup.json", {
+                    "runId": result["runId"], "complete": False, "errors": ["child execution failed"]
+                })
+                # Record only this phase; siblings own disjoint resources and deadlines.
+                return
+            with summary_lock:
+                result.update({k: v for k, v in execution.items() if k != "cleanup_deadline"})
             cleanup = {"runId": result["runId"], "complete": False, "errors": ["missing ownership evidence"]}
             try:
                 evidence = read_json(folder / "ownership.json")
                 if phase == "sas":
-                    result["sasRunUid"] = evidence["runUid"]
+                    with summary_lock:
+                        result["sasRunUid"] = evidence["runUid"]
                     errors = sas_cleanup_errors(evidence, debug=debug, **target)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
                 else:
-                    cleanup = cleanup_regular(arm, evidence, result["runId"], phase,
+                    cleanup = cleanup_regular(current, evidence, result["runId"], phase,
                                               min(deadline, execution["cleanup_deadline"]), folder / "ownership.json", **target)
                     write_json(folder / "ownership.json", evidence)
                 receipt = read_json(folder / "pytest.json")
@@ -394,19 +502,49 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
                 if phase == "sas":
                     receipt_errors.extend(sas_errors(evidence, expected, debug=debug, **target))
-                result["receiptErrors"] = receipt_errors
-                result["status"] = "passed" if (
-                    not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
-                    and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
-                ) else "failed"
+                with summary_lock:
+                    result["receiptErrors"] = receipt_errors
+                    result["status"] = "passed" if (
+                        not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
+                        and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
+                    ) else "failed"
             except Exception as error:  # Never serialize credential-bearing exception messages.
-                result["status"] = "failed"
-                result["errorType"] = type(error).__name__
+                with summary_lock:
+                    result["status"] = "failed"
+                    result["errorType"] = type(error).__name__
             write_json(folder / "cleanup.json", cleanup)
-            write_json(summary_path, summary)
-            if not cleanup["complete"] or execution["interrupted"] or execution["timed_out"]:
-                break
+            save_summary()
+            # Siblings own disjoint resources and deadlines; a failed phase must not interrupt them.
+
+        cwd = Path.cwd()
+        try:
+            os.chdir(ROOT)
+            threads = [threading.Thread(target=run_phase, args=(index,), name=f"hub-{name}", daemon=True)
+                       for index, (name, _) in enumerate(budgets)]
+            for thread in threads:
+                thread.start()
+            # Timer-bounded ARM mutations must run here; phase threads block until served.
+            while any(thread.is_alive() for thread in threads):
+                try:
+                    operation, box, done = mutations.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                try:
+                    box["value"] = operation()
+                except BaseException as error:  # pylint: disable=broad-except
+                    box["error"] = error
+                finally:
+                    done.set()
+            for thread in threads:
+                thread.join()
+        finally:
+            os.chdir(cwd)
+        # Debug evidence stays phase-local; never append to the checkout's shared database.
+        summary["coverage"] = {"skipped": "debug run"} if debug else combine_coverage(
+            output, [name for name, _ in budgets], coverage_destination)
         summary["status"] = "passed" if all(p["status"] == "passed" for p in summary["phases"]) else "failed"
+        if summary["coverage"].get("status") == "failed":
+            summary["status"] = "failed"
     except Exception as error:
         summary["errorType"] = type(error).__name__
     finally:
@@ -414,7 +552,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
             summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
         summary["cancelled"] = cancel.is_set()
         summary["finished"] = True
-        write_json(summary_path, summary)
+        save_summary()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
     return 0 if evaluate_hub_phases(output, debug=bool(debug), **target)["passed"] else 1

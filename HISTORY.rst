@@ -8,7 +8,7 @@ Release History
 
 **Known limitations**
 
-* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use the Central US EUAP (canary) ARM endpoint by default.
+* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.
 * ``az iot adr ns link hub|dps|su remove`` submits the unlink and returns without waiting; inspect the namespace with ``az iot adr ns show`` afterward.
 * Link add/update automatically create the service role assignments that the link requires when the caller can create role assignments.
 
@@ -34,7 +34,7 @@ Release History
 * Expanded ``az iot adr`` to 112 commands for namespaces, Registry Devices, certificate authorities and policies, groups, jobs and runs, namespace links, reports, and Software Updates. ADR and Update Instance management use ``2026-11-02-preview``.
 * ADR commands wait for completion by default; use ``--no-wait`` to return after submission and the matching ``wait`` command to track completion.
 * Added namespace identity show/assign/remove, legacy-asset migration, and update-compliance report generate/latest. Removing the namespace system-assigned identity is blocked while a DPS link exists.
-* Added certificate authority and policy management, including external ICA activation with ECC CSR-signing guidance and revoke-and-rotate. Policy validity can be 7 through 90 days.
+* Added certificate authority and policy management, including external ICA activation with ECC CSR-signing guidance and revoke-and-rotate. Policy validity can be 1 through 90 days.
 * Added ``az iot adr ns device`` (Registry Device) CRUD, wait, authentication, attributes, and capabilities. Symmetric keys are shown only by ``auth show-keys``.
 * Added group member list/count/refresh, ``SoftwareUpdate`` and ``OnboardingUpdate`` jobs, and job-run list/results/summary/cancel/delete.
 * Added Update Instance lifecycle and identity management, software-update import/stage/list/show/delete/hash/wait, file and device-class discovery, and v5 manifest initialization. Staging streams artifacts to Azure Storage instead of loading them into memory.

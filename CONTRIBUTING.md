@@ -128,17 +128,21 @@ ownership and verified cleanup remain mandatory.
 See [integration workflow guidance](docs/tox-testing.md#integration-workflow-topology).
 
 The GitHub integration workflow's `regions` input accepts Azure public-region
-identifiers, such as `australiaeast` or `westeurope`, without a per-region allowlist.
-With `arm-endpoint=auto`, `centraluseuap` uses canary ARM and other regions use
-`https://management.azure.com`. Select `public` or `canary` explicitly to override
-automatic endpoint selection; canary routing requires `centraluseuap`.
+identifiers, such as `australiaeast` or `westeurope`, without a per-region allowlist;
+it defaults to `australiaeast`. The `arm-endpoint` input is `public` (default,
+`https://management.azure.com`) or `canary`; canary routing requires `centraluseuap`.
 Resource location and ARM routing are passed together through the full service
 run. Public ARM is not a region-derived hostname. Unsupported API or region
 operations fail rather than falling back to canary or changing the selected tests.
 
 Release-build integration tests explicitly select `australiaeast` with public ARM
 routing for all services on Python 3.10 and 3.13, retaining the existing test
-subscription and `cli-int-test-rg` resource group.
+subscription and `cli-int-test-rg` resource group. The scheduled workflow also uses
+`australiaeast` with public ARM. Preview management commands default to public ARM;
+canary ARM is opt-in through
+`AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` and is
+exercised only by an explicit `arm-endpoint=canary` / `regions=centraluseuap`
+dispatch or the Azure DevOps centraluseuap pipeline.
 
 Scheduled integration tests are configured separately in
 `.github/workflows/int_test_schedule.yml` on the default branch (`dev`), not the

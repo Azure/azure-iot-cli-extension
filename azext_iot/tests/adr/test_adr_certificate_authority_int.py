@@ -426,22 +426,22 @@ class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
                 assert updated.get("tags", {}).get("env") == "int"
 
             # --- Step 6: Create a certificate policy under the issuing CA ---
-            with timed_step("Step 6 ❯ Create certificate policy"):
+            with timed_step("Step 6 ❯ Create one-day certificate policy"):
                 pol_cmd = (
                     f"iot adr ns ca policy create -n {policy_name} --ca-name {ica_name} "
-                    f"--ns {namespace_name} -g {rg} --validity-days 30"
+                    f"--ns {namespace_name} -g {rg} --validity-days 1"
                 )
                 _log(LogKind.CMD, "az %s", pol_cmd)
                 owned.add("policy")
                 pol = self.cmd(pol_cmd).get_output_in_json()
                 assert pol["name"] == policy_name
-                assert props(pol)["certificate"]["validityPeriodInDays"] == 30
+                assert props(pol)["certificate"]["validityPeriodInDays"] == 1
                 self.cmd(
                     f"iot adr ns ca policy wait -n {policy_name} "
                     f"--ca-name {ica_name} --ns {namespace_name} -g {rg} "
                     "--created"
                 )
-                _log(LogKind.OK, "Policy '%s' created with 30-day validity", policy_name)
+                _log(LogKind.OK, "Policy '%s' created with one-day validity", policy_name)
 
             def policy_cmd(action):
                 cmd = (
@@ -455,8 +455,10 @@ class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
             with timed_step("Step 7 ❯ Show & list certificate policies"):
                 shown_pol = policy_cmd(f"show -n {policy_name}").get_output_in_json()
                 assert shown_pol["name"] == policy_name
+                assert props(shown_pol)["certificate"]["validityPeriodInDays"] == 1
                 policies = policy_cmd("list").get_output_in_json()
-                assert policy_name in [p["name"] for p in policies]
+                listed_policy = next(p for p in policies if p["name"] == policy_name)
+                assert props(listed_policy)["certificate"]["validityPeriodInDays"] == 1
 
             # --- Step 8: Update policy tags ---
             with timed_step("Step 8 ❯ Update certificate policy tags"):
@@ -464,6 +466,18 @@ class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
                     f"update -n {policy_name} --tags env=updated"
                 ).get_output_in_json()
                 assert updated_pol.get("tags", {}).get("env") == "updated"
+                assert props(updated_pol)["certificate"]["validityPeriodInDays"] == 1
+
+            for validity_days in (6, 90, 1):
+                with timed_step(f"Update certificate policy validity to {validity_days} days"):
+                    updated_pol = policy_cmd(
+                        f"update -n {policy_name} --vd {validity_days}"
+                    ).get_output_in_json()
+                    assert props(updated_pol)["certificate"]["validityPeriodInDays"] == validity_days
+                    assert updated_pol.get("tags", {}).get("env") == "updated"
+                    shown_pol = policy_cmd(f"show -n {policy_name}").get_output_in_json()
+                    assert props(shown_pol)["certificate"]["validityPeriodInDays"] == validity_days
+                    assert shown_pol.get("tags", {}).get("env") == "updated"
 
             owned.add("additional-policy")
             self._observe_additional_policy(policy_cmd)

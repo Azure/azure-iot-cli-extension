@@ -41,6 +41,13 @@ def finish_cleanup(request):
     next(cleanup)
 
 
+# Concurrent controller shards run with their own phase names; each must still qualify teardown.
+SHARD_PHASES = tuple(
+    (suite, phase, False) for suite in manifest.SUITES for phase in manifest.phases(suite)
+    if manifest.auth_phase(phase) == "regular"
+)
+
+
 @pytest.fixture
 def owned_phase(tmp_path, monkeypatch, request):
     suite, phase, debug = getattr(request, "param", ("HubControl", "regular", True))
@@ -127,7 +134,7 @@ def owned_phase(tmp_path, monkeypatch, request):
 
 @pytest.mark.parametrize("owned_phase", [
     ("HubControl", "regular", True), ("HubControl", "regular", False), ("HubData", "entra", True),
-    ("HubData", "entra", False),
+    ("HubData", "entra", False), *SHARD_PHASES,
 ], indirect=True)
 @pytest.mark.parametrize("foreign", [False, True])
 @pytest.mark.parametrize("other_fixture", [False, True])
@@ -158,7 +165,7 @@ def test_unused_shared_hub_never_reads_or_deletes_even_a_foreign_same_named_hub(
 
 @pytest.mark.parametrize("owned_phase", [
     ("HubControl", "regular", True), ("HubControl", "regular", False),
-    ("HubData", "entra", True), ("HubData", "entra", False),
+    ("HubData", "entra", True), ("HubData", "entra", False), *SHARD_PHASES,
 ], indirect=True)
 @pytest.mark.parametrize("status", [201, 202])
 def test_used_shared_hub_keeps_verified_cleanup_and_acknowledgement_reconciliation(owned_phase, status):

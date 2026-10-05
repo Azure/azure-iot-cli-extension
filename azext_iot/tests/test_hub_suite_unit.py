@@ -35,14 +35,22 @@ def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path)
         44 if preview else 42,
         8 if preview else 6,
     )
+    control_shards = [manifest.nodes("HubControl", phase) for phase in manifest.phases("HubControl")]
+    entra_shards = [manifest.nodes("HubData", phase) for phase in manifest.HUB_DATA_ENTRA_PHASES]
+    assert set(node for shard in control_shards for node in shard) == set(control)
+    assert set(node for shard in entra_shards for node in shard) == set(entra)
+    assert [len(shard) for shard in control_shards] == [6, 15 if preview else 14, 5, 3]
+    assert [len(shard) for shard in entra_shards] == [7, 37 if preview else 35]
     assert len(set(entra) & set(sas)) == (2 if preview else 0)
     assert not set(control) & (set(entra) | set(sas))
     exceptions = {case.node for case in cases if case.exclusion}
     assert set(control) | set(entra) | set(sas) | exceptions == set(manifest.inventory())
     assert len(exceptions) == (3 if preview else 2)
     assert all(case.group and case.protocol and case.auth and case.dependencies for case in cases)
-    assert manifest.phases("HubData") == ("entra", "sas")
-    assert manifest.phases("HubControl") == ("regular",)
+    assert manifest.phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert manifest.phases("HubControl") == (
+        "regular-state-workflow", "regular-state-schemes-cert", "regular-endpoints-a", "regular-endpoints-b",
+    )
     assert json.loads(json.dumps(manifest.manifest("HubData", "entra")))["expected"] == list(entra)
 
 
@@ -313,7 +321,7 @@ class Proof:
         print("EXACT_EXPANDED=" + json.dumps(list(expected)))
 sys.exit(pytest.main([
     "-c", "setup.cfg", "--rootdir", str(manifest.ROOT), "--confcutdir", str(manifest.ROOT),
-    "--collect-only", "-q", "-o", "addopts=", "-o", "log_cli=false", *expected,
+    "--collect-only", "-q", "-p", "xdist.plugin", "-o", "addopts=", "-o", "log_cli=false", *expected,
 ], plugins=[Proof()]))
 '''
     env = dict(
