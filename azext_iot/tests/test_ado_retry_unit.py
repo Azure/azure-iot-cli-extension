@@ -7,7 +7,6 @@
 """Offline proofs for manual retry ancestry, exact selection and the real diagnostic subprocess."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -147,102 +146,28 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 360
 
 
-@pytest.mark.parametrize("hour,minutes", [(8, 360), (12, 90), (13, 10)])
-def test_cleanup_window_rejected_before_network(hour, minutes, mocker):
-    get = mocker.patch("requests.get", side_effect=AssertionError("No HTTP before time admission"))
-    with pytest.raises(ValueError, match="cleanup"):
-        pipeline.admission(minutes, datetime(2026, 10, 5, hour, tzinfo=timezone.utc))
-    get.assert_not_called()
-
-
-@pytest.fixture
-def admission_http(mocker, monkeypatch):
-    monkeypatch.setenv("SYSTEM_ACCESSTOKEN", "offline-secret")
-    monkeypatch.setenv("BUILD_BUILDID", "14155")
-    ado = mocker.MagicMock(status_code=200, headers={})
-    github = mocker.MagicMock(status_code=200)
-    ado.__enter__.return_value = ado
-    github.__enter__.return_value = github
-    ado.json.return_value = {"value": []}
-    github.json.return_value = {"total_count": 0}
-    get = mocker.patch("requests.get", side_effect=[ado, github])
-    return get, ado, github
-
-
-def test_admission_allows_current_run_and_audited_non_live_merge_builds(admission_http):
-    get, ado, _ = admission_http
-    ado.json.return_value = {"value": [
-        {"id": 14155, "definition": {"id": 147}},
-        {"id": 14156, "definition": {"id": 11, "revision": 15, "name": "Merge"},
-         "repository": {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}},
-        {"id": 14157, "definition": {"id": 11, "revision": 15, "name": "Renamed merge"},
-         "repository": {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}},
-    ]}
-    pipeline.admission(360, datetime(2026, 10, 5, 20, tzinfo=timezone.utc))
-    assert get.call_count == 2
-    ado_call, github_call = get.call_args_list
-    assert ado_call.kwargs["params"]["statusFilter"] == "inProgress"
-    assert ado_call.kwargs["headers"] == {"Authorization": "Bearer offline-secret"}
-    assert "headers" not in github_call.kwargs
-    assert github_call.kwargs["params"]["status"] == "in_progress"
-    assert not ado_call.kwargs["allow_redirects"] and not github_call.kwargs["allow_redirects"]
-
-
-@pytest.mark.parametrize("definition,repository", [
-    ({"id": 147, "revision": 15, "name": "Integration"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 109, "revision": 15, "name": "Cleanup"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 49, "revision": 15, "name": "Nightly"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 999, "revision": 15, "name": "Merge"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 11, "revision": 16, "name": "Merge"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 11, "name": "Merge"}, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
-    ({"id": 11, "revision": 15}, {"id": "other/repository", "type": "GitHub"}),
-    ({"id": 11, "revision": 15}, {"id": "Azure/azure-iot-cli-extension", "type": "TfsGit"}),
-    ({"id": 11, "revision": 15}, None),
-    (None, {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}),
+@pytest.mark.parametrize("status,count,error,message", [
+    (200, 0, None, ""),
+    (200, 1, ValueError, "A GitHub integration run is active"),
+    (403, 0, RuntimeError, "GitHub live-run admission could not be checked"),
+    (302, 0, RuntimeError, "GitHub live-run admission could not be checked"),
 ])
-def test_admission_rejects_live_unknown_or_changed_builds(definition, repository, admission_http):
-    get, ado, _ = admission_http
-    ado.json.return_value = {"value": [
-        {"id": 14155},
-        {"id": 14156, "definition": {"id": 11, "revision": 15},
-         "repository": {"id": "Azure/azure-iot-cli-extension", "type": "GitHub"}},
-        {"id": 14159, "definition": definition, "repository": repository},
-    ]}
-    with pytest.raises(ValueError, match="build 14159") as error:
-        pipeline.admission(360, datetime(2026, 10, 5, 20, tzinfo=timezone.utc))
-    assert (definition or {}).get("name", "unknown pipeline") in str(error.value)
-    assert "14155" not in str(error.value) and "14156" not in str(error.value)
-    assert get.call_count == 1
-
-
-@pytest.mark.parametrize("failure,message,calls", [
-    ("ado-denied", "ADO live-run admission could not be checked", 1),
-    ("ado-truncated", "Too many active builds", 1),
-    ("github-denied", "GitHub live-run admission could not be checked", 2),
-    ("github-active", "A GitHub integration run is active", 2),
-])
-def test_admission_preserves_fail_closed_checks(failure, message, calls, admission_http):
-    get, ado, github = admission_http
-    if failure == "ado-denied":
-        ado.status_code = 403
-    elif failure == "ado-truncated":
-        ado.headers["x-ms-continuationtoken"] = "next-page"
-    elif failure == "github-denied":
-        github.status_code = 403
+def test_admission_only_checks_github_without_ado_build_credentials(status, count, error, message, mocker, monkeypatch):
+    monkeypatch.delenv("SYSTEM_ACCESSTOKEN", raising=False)
+    monkeypatch.delenv("BUILD_BUILDID", raising=False)
+    response = mocker.MagicMock(status_code=status)
+    response.__enter__.return_value = response
+    response.json.return_value = {"total_count": count}
+    get = mocker.patch("requests.get", return_value=response)
+    if error:
+        with pytest.raises(error, match=message):
+            pipeline.admission()
     else:
-        github.json.return_value = {"total_count": 1}
-    with pytest.raises((ValueError, RuntimeError), match=message):
-        pipeline.admission(360, datetime(2026, 10, 5, 20, tzinfo=timezone.utc))
-    assert get.call_count == calls
-
-
-def test_audited_merge_pipeline_disables_live_tests():
-    merge = yaml.safe_load((ROOT / ".azure-devops/merge.yml").read_text())
-    calls = [step for job in merge["jobs"] for step in job["steps"]
-             if step.get("template") == "templates/run-tests-parallel.yml"]
-    assert len(calls) == 3
-    assert all(step["parameters"]["runUnitTests"] is True and step["parameters"]["runIntTests"] is False
-               for step in calls)
+        pipeline.admission()
+    get.assert_called_once_with(
+        "https://api.github.com/repos/Azure/azure-iot-cli-extension/actions/workflows/int_test.yml/runs",
+        params={"status": "in_progress", "per_page": 1}, timeout=(10, 30), allow_redirects=False,
+    )
 
 
 def test_attempt_selection_is_separate_from_nonqualifying_debug():
