@@ -109,6 +109,44 @@ Execute the following command to run the IoT Hub unit tests:
 
 `pytest azext_iot/tests/iothub/ -k "_unit.py"`
 
+#### Parallel CI unit tests
+
+The GitHub integration workflow runs lint and four unit-test shards in parallel
+on Linux/Python 3.13. Each shard uses serial pytest, collects the complete unit
+inventory, and executes a deterministic file partition balanced by
+`azext_iot/tests/unit_test_durations.json`. New files receive the default duration
+weight and are always included. Random parameter values are represented by source
+function and parameter position; no parameter cases are dropped to work around
+xdist collection mismatches.
+
+The `unit-test` gate requires all four shards and lint to succeed, verifies that
+every collected case executed exactly once with normal pytest skip semantics,
+checks JUnit/coverage artifact hashes, and combines coverage. Missing, failed or
+inconsistent evidence blocks integration. Each attempt publishes
+`unit-shard-<number>-<attempt>`; the gate uses the latest artifact for each shard,
+never an older artifact when the latest is incomplete. GitHub reruns can retain
+successful shards from earlier attempts of the same run and commit.
+
+`coverage-unit` contains only verified, combined unit coverage for the existing
+integration coverage report. `unit-summary-<attempt>` contains the completeness
+summary and measured per-file `timings.json`; review those measurements before
+updating the checked-in duration profile.
+
+The shared pytest plugin and aggregator are CI-neutral. Adapters provide
+`UNIT_RUN_ID`, `UNIT_COMMIT`, and `UNIT_ATTEMPT`, plus a unique
+`--unit-shard-output` directory and `COVERAGE_FILE` ending in `coverage.dat`.
+Run a shard with `tox r -e python-azcur-unit -- -p azext_iot.tests._unit_shard_plugin
+--unit-shard 1 --unit-shard-output <output> --junitxml <output>/junit.xml`, then
+aggregate all four artifact directories with
+`python azext_iot/tests/_unit_shards.py --history <artifacts> --output <combined>`.
+
+GitHub retains its existing pip-download caching; environments and test results
+are not cached. Four shards need four available parallel jobs.
+The separate tox OS/Python matrix remains unchanged rather than expanding
+every combination into four jobs. All unit entrypoints benefit from mocked
+Digital Twins LRO tests using immediate retry intervals and bounded real-poller
+completion instead of production-length sleeps.
+
 ### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.

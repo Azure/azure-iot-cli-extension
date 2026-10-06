@@ -9,7 +9,6 @@ import pytest
 import responses
 import json
 import azext_iot.digitaltwins.providers.resource
-from time import sleep
 from azext_iot.digitaltwins import commands_resource as subject
 from azext_iot.tests.digitaltwins.dt_helpers import generate_generic_id
 from msrestazure.azure_exceptions import CloudError
@@ -70,6 +69,7 @@ class TestTwinCreateInstance(object):
             body=provisioning,
             status=201,
             headers={
+                "Retry-After": "0",
                 "Azure-AsyncOperation":
                     "https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
                     "locations/xxx/operationResults/operationkey"
@@ -92,14 +92,15 @@ class TestTwinCreateInstance(object):
 
     def test_create_instance_with_retry(self, fixture_cmd, mocker, service_client_with_retry):
         mocker.patch.object(azext_iot.digitaltwins.providers.generic, "ADT_CREATE_RETRY_AFTER", 0.0001)
-        subject.create_instance(
+        result = subject.create_instance(
             cmd=fixture_cmd,
             name=name,
             resource_group_name=resource_group_name,
             location=location
         )
-        while len(service_client_with_retry.calls) == 1:
-            sleep(10)
+        result.result(timeout=10)
+        assert result.done()
+        assert result.status() == "Succeeded"
         check_request = service_client_with_retry.calls[1].request
         assert "operationkey" in check_request.url
 
@@ -120,6 +121,7 @@ class TestTwinCreateInstance(object):
             body=provisioning,
             status=201,
             headers={
+                "Retry-After": "0",
                 "Azure-AsyncOperation":
                     "https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
                     "locations/xxx/operationResults/operationkey"
@@ -148,18 +150,13 @@ class TestTwinCreateInstance(object):
             resource_group_name=resource_group_name,
             location=location
         )
-        while len(service_client_with_failed_retry.calls) == 1:
-            sleep(10)
+        with pytest.raises(CloudError):
+            result.result(timeout=10)
+        assert result.done()
         check_request = service_client_with_failed_retry.calls[1].request
         assert "operationkey" in check_request.url
 
         # The LRO poller calls once more for some reason
         assert len(service_client_with_failed_retry.calls) >= 2
         assert service_client_with_failed_retry.calls[1].response.content.decode("utf-8") == failed
-        # Sleep to give time for the poller
-        sleep(1)
-
-        # The poller.result will have the error
         assert result.status() == "Failed"
-        with pytest.raises(CloudError):
-            result.result()
