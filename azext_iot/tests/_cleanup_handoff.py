@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from time import time_ns
+from time import perf_counter_ns, time_ns
 from uuid import uuid4
 
 ENV = "azext_iot_cleanup_handoff"
@@ -26,7 +26,8 @@ def record(resource, status, error_type=None):
         return
     directory = Path(os.environ[ENV])
     directory.mkdir(parents=True, exist_ok=True)
-    value = {"resource": resource, "status": status, "timeNs": time_ns()}
+    # A high-resolution counter breaks wall-clock ties within an agent.
+    value = {"resource": resource, "status": status, "timeNs": time_ns(), "counterNs": perf_counter_ns()}
     if error_type:
         value["errorType"] = error_type
     with (directory / (uuid4().hex + ".json")).open("x", encoding="utf-8") as stream:
@@ -54,7 +55,8 @@ def cleanup(resource, operation, *, accepted=True):
 
 def summary(directory):
     values = [json.loads(path.read_text(encoding="utf-8")) for path in Path(directory).rglob("cleanup-receipts/*.json")]
-    latest = {value["resource"].casefold(): value for value in sorted(values, key=lambda item: item["timeNs"])}
+    ordered = sorted(values, key=lambda item: (item["timeNs"], item.get("counterNs", 0)))
+    latest = {value["resource"].casefold(): value for value in ordered}
     return [latest[key] for key in sorted(latest)]
 
 

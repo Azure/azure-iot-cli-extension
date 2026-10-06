@@ -33,6 +33,12 @@ CONTEXT = {
 }
 
 
+@pytest.fixture
+def isolated_phase_environment(monkeypatch):
+    for name in pipeline.GENERIC_PHASE_OVERRIDES:
+        monkeypatch.delenv(name, raising=False)
+
+
 def receipt(results):
     return {
         "finished": True, "exitstatus": int("failed" in results.values()), "collected": list(results),
@@ -482,6 +488,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
 
 @pytest.mark.parametrize("service", ["ADR", "ADU"])
 @pytest.mark.parametrize("teardown_failed", [False, True])
+@pytest.mark.usefixtures("isolated_phase_environment")
 def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mocker, monkeypatch, service, teardown_failed):
     monkeypatch.delenv("azext_iot_ado_resource_scope", raising=False)
     output = tmp_path / "phase"
@@ -513,6 +520,18 @@ def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mo
     assert retry.read(output / "phase.json")["cleanupMode"] == "handoff"
     inventory.assert_not_called()
     assert not (output / "cleanup.json").exists()
+
+
+@pytest.mark.parametrize("name", pipeline.GENERIC_PHASE_OVERRIDES)
+@pytest.mark.usefixtures("isolated_phase_environment")
+def test_generic_phase_still_rejects_external_fixture_and_selection_overrides(tmp_path, monkeypatch, name):
+    monkeypatch.setenv(name, "sentinel")
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {
+        "context": CONTEXT, "phase": "tests", "nodes": [], "expected": [], "sequence": 1,
+    })
+    with pytest.raises(ValueError, match="Fresh service attempts reject"):
+        pipeline.phase(selection, tmp_path / "phase")
 
 
 @pytest.mark.parametrize("workers", ["0", "2"])
@@ -554,6 +573,7 @@ def test_real_plugin_records_outcomes_without_intercepting_http(tmp_path, worker
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="ADO controller uses Linux process groups")
+@pytest.mark.usefixtures("isolated_phase_environment")
 def test_real_offline_first_failure_then_manual_exact_case_recovery(tmp_path, monkeypatch, capsys):
     wheel = tmp_path / "wheel"
     wheel.mkdir()

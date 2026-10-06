@@ -26,6 +26,11 @@ RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
 HANDOFF = runpy.run_path(str(ROOT / "azext_iot/tests/_cleanup_handoff.py"))
 TARGET = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
+GENERIC_PHASE_OVERRIDES = (
+    "azext_iot_testhub", "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_adr_update_instance_id",
+    "azext_iot_adr_update_instance_disposable", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer",
+    "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
+)
 
 
 def plan(services, versions, regions, endpoint, diagnostic=False):
@@ -278,12 +283,7 @@ def _phase(selection_file, output):
         expected = value["expected"]
     else:
         diagnostic = service == "RetrySelfTest"
-        forbidden = (
-            "azext_iot_testhub", "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_adr_update_instance_id",
-            "azext_iot_adr_update_instance_disposable", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer",
-            "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
-        )
-        if any(os.getenv(key) for key in forbidden):
+        if any(os.getenv(key) for key in GENERIC_PHASE_OVERRIDES):
             raise ValueError("Fresh service attempts reject external fixtures and pytest selection overrides.")
         env = dict(os.environ, azext_iot_ado_receipt=str(folder / "pytest.json"),
                    azext_iot_ado_expected=json.dumps(value["expected"]),

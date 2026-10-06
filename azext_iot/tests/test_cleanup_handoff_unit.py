@@ -7,6 +7,7 @@
 """Cleanup handoff must preserve ownership without polling for Azure deletion."""
 
 from copy import deepcopy
+import json
 from unittest.mock import Mock
 
 import pytest
@@ -42,6 +43,34 @@ def test_latest_cleanup_state_supersedes_pending_without_erasing_events(records)
     handoff.record("/OWNED/one", "accepted")
     assert len(list((records / "cleanup-receipts").glob("*.json"))) == 2
     assert [value["status"] for value in handoff.summary(records)] == ["accepted"]
+
+
+@pytest.mark.parametrize("first,last", [("pending", "accepted"), ("accepted", "pending")])
+def test_equal_wall_clock_cleanup_records_keep_observed_order(records, mocker, first, last):
+    mocker.patch.object(handoff, "time_ns", return_value=100)
+    mocker.patch.object(handoff, "perf_counter_ns", side_effect=[200, 201])
+    mocker.patch.object(handoff, "uuid4", side_effect=[Mock(hex="first"), Mock(hex="second")])
+    handoff.record("/owned/one", first)
+    handoff.record("/OWNED/one", last)
+    folder = records / "cleanup-receipts"
+    mocker.patch.object(handoff.Path, "rglob", return_value=[folder / "second.json", folder / "first.json"])
+    assert [value["status"] for value in handoff.summary(records)] == [last]
+
+
+def test_wall_clock_orders_cleanup_records_across_agents(records, mocker):
+    mocker.patch.object(handoff, "time_ns", side_effect=[100, 200])
+    mocker.patch.object(handoff, "perf_counter_ns", side_effect=[200, 100])
+    handoff.record("/owned/one", "accepted")
+    handoff.record("/OWNED/one", "pending")
+    assert [value["status"] for value in handoff.summary(records)] == ["pending"]
+
+
+def test_legacy_cleanup_records_without_tiebreaker_remain_readable(records):
+    folder = records / "cleanup-receipts"
+    folder.mkdir()
+    value = {"resource": "/owned/one", "status": "pending", "timeNs": 100}
+    (folder / "legacy.json").write_text(json.dumps(value), encoding="utf-8")
+    assert handoff.summary(records) == [value]
 
 
 def test_successful_submission_while_unwinding_a_test_failure_is_still_accepted(records):
