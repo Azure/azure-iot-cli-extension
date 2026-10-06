@@ -109,6 +109,44 @@ Execute the following command to run the IoT Hub unit tests:
 
 `pytest azext_iot/tests/iothub/ -k "_unit.py"`
 
+#### Parallel CI unit tests
+
+The GitHub integration workflow runs lint and four unit-test shards in parallel
+on Linux/Python 3.13. Each shard uses serial pytest, collects the complete unit
+inventory, and executes a deterministic file partition balanced by
+`azext_iot/tests/unit_test_durations.json`. New files receive the default duration
+weight and are always included. Random parameter values are represented by source
+function and parameter position; no parameter cases are dropped to work around
+xdist collection mismatches.
+
+The `unit-test` gate requires all four shards and lint to succeed, verifies that
+every collected case executed exactly once with normal pytest skip semantics,
+checks JUnit/coverage artifact hashes, and combines coverage. Missing, failed or
+inconsistent evidence blocks integration. Each attempt publishes
+`unit-shard-<number>-<attempt>`; the gate uses the latest artifact for each shard,
+never an older artifact when the latest is incomplete. GitHub reruns can retain
+successful shards from earlier attempts of the same run and commit.
+
+`coverage-unit` contains only verified, combined unit coverage for the existing
+integration coverage report. `unit-summary-<attempt>` contains the completeness
+summary and measured per-file `timings.json`; review those measurements before
+updating the checked-in duration profile.
+
+The shared pytest plugin and aggregator are CI-neutral. Adapters provide
+`UNIT_RUN_ID`, `UNIT_COMMIT`, and `UNIT_ATTEMPT`, plus a unique
+`--unit-shard-output` directory and `COVERAGE_FILE` ending in `coverage.dat`.
+Run a shard with `tox r -e python-azcur-unit -- -p azext_iot.tests._unit_shard_plugin
+--unit-shard 1 --unit-shard-output <output> --junitxml <output>/junit.xml`, then
+aggregate all four artifact directories with
+`python azext_iot/tests/_unit_shards.py --history <artifacts> --output <combined>`.
+
+GitHub retains its existing pip-download caching; environments and test results
+are not cached. Four shards need four available parallel jobs.
+The separate tox OS/Python matrix remains unchanged rather than expanding
+every combination into four jobs. All unit entrypoints benefit from mocked
+Digital Twins LRO tests using immediate retry intervals and bounded real-poller
+completion instead of production-length sleeps.
+
 ### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.
@@ -163,31 +201,19 @@ both HubControl and HubData, ADU and ADR. Clear the preset to select individual
 services instead. Selecting it alongside individual services still runs each of
 the five suites once, without duplicate stages or results.
 
-The **Unit** stage runs four serial pytest jobs concurrently, followed by a
-**UnitGate** job. Each job collects the complete unit suite and then selects a
-deterministic file partition balanced by `azext_iot/tests/unit_test_durations.json`.
-Unlisted/new files receive the default weight; the timing profile never excludes
-tests. The gate requires identical full inventories, every case in exactly one
-partition, successful execution and intact JUnit/coverage artifacts from all four
-jobs. Randomized parameter values are represented by source function and parameter
-position, avoiding xdist collection mismatches without dropping parameter cases.
-Skipped unit tests retain normal pytest semantics and remain visible in JUnit.
+The **Unit** stage uses the [shared unit runner](#parallel-ci-unit-tests), with
+four concurrent serial pytest jobs followed by **UnitGate**. Its adapter maps
+`Build.BuildId`, `Build.SourceVersion`, and `System.JobAttempt` to the shared
+run/commit/attempt inputs. Attempt artifacts are named
+`unit-shard-<number>-<System.JobAttempt>`; UnitGate publishes verified combined
+coverage and timing reports as `integration-unit-coverage-<System.JobAttempt>`.
+The final integration coverage report consumes that combined coverage, not raw
+shard files. Missing or failed prechecks still block integration.
 
-Each unit attempt publishes `unit-shard-<number>-<attempt>`. UnitGate uses the
-latest artifact for each shard (never an older artifact if the latest is incomplete)
-and publishes combined coverage, shard durations and `timings.json`. These measured
-per-file durations can refresh the checked-in timing profile after review.
-The final integration coverage report consumes combined unit coverage, not the raw
-shard coverage files. A missing or failed unit shard/gate still blocks integration.
-
-Cross-job pip caching is not used: cold/warm measurements showed no net runtime
-benefit after restore overhead. Tox still reports setup/test durations, and the
-four-shard design accounts for the main speedup. Mocked Digital Twins creation
-tests use an immediate retry interval and bounded poller completion rather than
-sleeping through production polling intervals; success and failure transitions
-are still verified using the real poller.
-Four unit shards need four available parallel jobs; Build/Lint also compete for
-agents. Service stages still wait for all prechecks, not just the candidate build.
+ADO cross-job pip caching is not used: cold/warm measurements showed no net
+runtime benefit after restore overhead. Four unit shards need four available
+parallel jobs; Build/Lint also compete for agents. Service stages wait for all
+prechecks, not just the candidate build.
 
 Service setup checks controller imports before Azure login, including the separate
 DPS tox interpreter. Standalone runners inherit the checkout followed by their

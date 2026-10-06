@@ -52,7 +52,7 @@ def partition(files, profile):
 
 
 def context():
-    return {"build": os.environ["BUILD_BUILDID"], "commit": os.environ["BUILD_SOURCEVERSION"]}
+    return {"build": os.environ["UNIT_RUN_ID"], "commit": os.environ["UNIT_COMMIT"]}
 
 
 def validate(records, expected_context, profile):

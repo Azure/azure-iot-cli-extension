@@ -133,6 +133,9 @@ stages:
                 displayName: Run balanced serial unit shard (tox reports setup and test timings)
                 env:
                   SHARD: $(shard)
+                  UNIT_RUN_ID: $(Build.BuildId)
+                  UNIT_COMMIT: $(Build.SourceVersion)
+                  UNIT_ATTEMPT: $(System.JobAttempt)
                   RESULTS: $(Build.SourcesDirectory)/unit-result
                   COVERAGE_FILE: $(Build.SourcesDirectory)/unit-result/coverage.dat
               - task: PublishTestResults@2
@@ -164,6 +167,9 @@ stages:
                   python azext_iot/tests/_unit_shards.py \
                     --history "$(Pipeline.Workspace)/unit-history" --output unit-coverage
                 displayName: Require all four shards and combine verified coverage
+                env:
+                  UNIT_RUN_ID: $(Build.BuildId)
+                  UNIT_COMMIT: $(Build.SourceVersion)
               - publish: unit-coverage
                 artifact: integration-unit-coverage-$(System.JobAttempt)
 

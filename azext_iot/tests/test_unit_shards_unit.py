@@ -131,8 +131,8 @@ def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypat
     profile = tmp_path / "profile.json"
     shards.write(profile, PROFILE)
     monkeypatch.setattr(shards, "PROFILE", profile)
-    monkeypatch.setenv("BUILD_BUILDID", CONTEXT["build"])
-    monkeypatch.setenv("BUILD_SOURCEVERSION", CONTEXT["commit"])
+    monkeypatch.setenv("UNIT_RUN_ID", CONTEXT["build"])
+    monkeypatch.setenv("UNIT_COMMIT", CONTEXT["commit"])
     run = mocker.patch.object(shards.subprocess, "run")
     shards.aggregate(tmp_path, tmp_path / "combined")
     assert shards.read(tmp_path / "combined/summary.json")["tests"] == 4
@@ -156,8 +156,8 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
 
     def execute(index):
         output = tmp_path / f"unit-shard-{index}-1"
-        env = dict(os.environ, BUILD_BUILDID=CONTEXT["build"], BUILD_SOURCEVERSION=CONTEXT["commit"],
-                   SYSTEM_JOBATTEMPT="1", COVERAGE_FILE=str(output / "coverage.dat"), PYTEST_ADDOPTS="",
+        env = dict(os.environ, UNIT_RUN_ID=CONTEXT["build"], UNIT_COMMIT=CONTEXT["commit"],
+                   UNIT_ATTEMPT="1", COVERAGE_FILE=str(output / "coverage.dat"), PYTEST_ADDOPTS="",
                    PYTHONPATH=os.pathsep.join(dict.fromkeys([str(tmp_path), str(ROOT), *map(os.path.abspath, sys.path)])))
         result = subprocess.run(
             [sys.executable, "-m", "pytest", str(directory), "-c", str(tmp_path / "pytest.ini"), "-k", "_unit.py",
@@ -172,26 +172,51 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
         values = list(pool.map(execute, range(1, 5)))
     assert shards.validate(values, CONTEXT, shards.read(shards.PROFILE)) == 8
     assert all(len(record["selected"]) == 2 for record in values)
-    monkeypatch.setenv("BUILD_BUILDID", CONTEXT["build"])
-    monkeypatch.setenv("BUILD_SOURCEVERSION", CONTEXT["commit"])
+    monkeypatch.setenv("UNIT_RUN_ID", CONTEXT["build"])
+    monkeypatch.setenv("UNIT_COMMIT", CONTEXT["commit"])
     shards.aggregate(tmp_path, tmp_path / "combined")
     assert (tmp_path / "combined/.coverage").is_file()
     assert len(shards.read(tmp_path / "combined/timings.json")["seconds"]) == 4
 
 
-def test_pipeline_keeps_four_shards_and_unit_gate_without_cross_job_cache():
-    pipeline = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
-    stages = pipeline["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
-    unit = next(stage for stage in stages if stage.get("stage") == "Unit")
-    job, gate = unit["jobs"]
-    assert job["strategy"]["maxParallel"] == 4
-    assert {value["shard"] for value in job["strategy"]["matrix"].values()} == {1, 2, 3, 4}
-    assert gate["dependsOn"] == "Unit" and "condition" not in gate
-    assert any(step.get("artifact") == "unit-shard-$(shard)-$(System.JobAttempt)" for step in job["steps"])
-    run = next(step for step in job["steps"] if "bash" in step)
-    assert "--unit-shard" in run["bash"] and "--unit-shard-output" in run["bash"]
+def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
+    jobs = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text())["jobs"]
+    lint, job, gate = (jobs[name] for name in ("lint", "unit-shards", "unit-test"))
+    assert "needs" not in lint and "needs" not in job
+    assert job["strategy"] == {"fail-fast": False, "max-parallel": 4, "matrix": {"shard": [1, 2, 3, 4]}}
+    assert gate["needs"] == ["lint", "unit-shards"]
+    for precheck in (lint, job, gate):
+        assert "if" not in precheck and "continue-on-error" not in precheck
+        assert precheck["permissions"] == {"contents": "read"}
+        assert not any(step.get("continue-on-error") for step in precheck["steps"])
+    run = next(step for step in job["steps"] if "run" in step)
+    assert "-e python-azcur-unit" in run["run"]
+    assert "--unit-shard" in run["run"] and "--unit-shard-output" in run["run"]
     assert run["env"]["COVERAGE_FILE"].endswith("/coverage.dat")
-    assert not (ROOT / ".azure-devops/templates/pip-cache.yml").exists()
-    assert "PIP_CACHE_DIR" not in run["env"]
-    assert "pip-cache" not in str(stages) and "Cache@2" not in str(stages)
-    assert "condition" not in run
+    assert run["env"]["UNIT_ATTEMPT"] == "${{ github.run_attempt }}"
+    assert "if" not in run
+    upload = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@"))
+    assert upload["if"] == "${{ always() }}"
+    assert upload["with"]["name"] == "unit-shard-${{ matrix.shard }}-${{ github.run_attempt }}"
+    assert upload["with"]["if-no-files-found"] == "error" and not upload["with"].get("overwrite")
+    download = next(step for step in gate["steps"] if step.get("uses", "").startswith("actions/download-artifact@"))
+    assert download["with"] == {"pattern": "unit-shard-*", "path": "unit-history"}
+    combine = next(step for step in gate["steps"] if "run" in step)
+    assert "_unit_shards.py --history unit-history --output unit-coverage" in combine["run"]
+    assert combine["env"] == {name: run["env"][name] for name in ("UNIT_RUN_ID", "UNIT_COMMIT")}
+    coverage = next(step for step in gate["steps"] if step.get("with", {}).get("name") == "coverage-unit")
+    assert coverage["with"]["path"] == "unit-coverage/.coverage"
+    assert coverage["with"]["include-hidden-files"] is True
+    assert coverage["with"]["if-no-files-found"] == "error" and "if" not in coverage
+    assert jobs["int-test"]["needs"] == ["setup", "unit-test"]
+    assert "needs.unit-test.result == 'success'" in jobs["int-test"]["if"]
+
+
+def test_tox_passes_ci_neutral_shard_identity_without_changing_default_unit_selection():
+    from configparser import ConfigParser
+    config = ConfigParser(interpolation=None)
+    config.read(ROOT / "tox.ini")
+    unit = config["testenv:py{thon,38,39,310,311,312,313}-az{min,cur,dev}-unit"]
+    assert {"UNIT_RUN_ID", "UNIT_COMMIT", "UNIT_ATTEMPT", "COVERAGE_FILE"} <= set(unit["passenv"].split())
+    assert 'python -m pytest -k "_unit.py" ./azext_iot/tests' in unit["commands"]
+    assert "{posargs}" in unit["commands"]

@@ -43,7 +43,7 @@ class Receipt:
         self.identities = {}
         self.data = {
             "schema": 1, "context": shards.context(), "python": platform.python_version(),
-            "shard": config.getoption("unit_shard"), "attempt": int(os.environ["SYSTEM_JOBATTEMPT"]),
+            "shard": config.getoption("unit_shard"), "attempt": int(os.environ["UNIT_ATTEMPT"]),
             "profile": shards.digest(self.profile), "inventory": [], "selected": [], "reports": {},
             "durations": {}, "finished": False, "exitstatus": None, "artifacts": {},
         }

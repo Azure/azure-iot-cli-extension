@@ -439,6 +439,30 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert "condition" not in stages["Qualify"]
 
 
+def test_pipeline_adapts_shared_four_shards_and_unit_gate_without_cross_job_cache():
+    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
+    unit = next(stage for stage in stages if stage.get("stage") == "Unit")
+    job, gate = unit["jobs"]
+    assert job["strategy"]["maxParallel"] == 4
+    assert {value["shard"] for value in job["strategy"]["matrix"].values()} == {1, 2, 3, 4}
+    assert gate["dependsOn"] == "Unit" and "condition" not in gate
+    assert any(step.get("artifact") == "unit-shard-$(shard)-$(System.JobAttempt)" for step in job["steps"])
+    run = next(step for step in job["steps"] if "bash" in step)
+    assert "--unit-shard" in run["bash"] and "--unit-shard-output" in run["bash"]
+    assert run["env"]["COVERAGE_FILE"].endswith("/coverage.dat")
+    assert run["env"]["UNIT_RUN_ID"] == "$(Build.BuildId)"
+    assert run["env"]["UNIT_COMMIT"] == "$(Build.SourceVersion)"
+    assert run["env"]["UNIT_ATTEMPT"] == "$(System.JobAttempt)"
+    combine = next(step for step in gate["steps"] if "bash" in step)
+    assert "_unit_shards.py" in combine["bash"]
+    assert combine["env"] == {name: run["env"][name] for name in ("UNIT_RUN_ID", "UNIT_COMMIT")}
+    assert not (ROOT / ".azure-devops/templates/pip-cache.yml").exists()
+    assert "PIP_CACHE_DIR" not in run["env"]
+    assert "pip-cache" not in str(stages) and "Cache@2" not in str(stages)
+    assert "condition" not in run
+
+
 def test_service_stages_require_all_prechecks_but_remain_independent_retry_targets():
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]

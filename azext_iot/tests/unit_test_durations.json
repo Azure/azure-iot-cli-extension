@@ -42,7 +42,6 @@
     "azext_iot/tests/iothub/test_preview_authorization_wire_unit.py": 3.48,
     "azext_iot/tests/iothub/test_sas_phase_unit.py": 4.03,
     "azext_iot/tests/test_ado_dps_wiring_unit.py": 2.7,
-    "azext_iot/tests/test_ado_retry_unit.py": 18.38,
     "azext_iot/tests/test_command_loader_unit.py": 35.02,
     "azext_iot/tests/test_dps_phase_runner_unit.py": 9.19,
     "azext_iot/tests/test_focused_live_runner_unit.py": 76.21,
