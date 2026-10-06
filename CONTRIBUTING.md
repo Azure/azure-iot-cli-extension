@@ -126,8 +126,9 @@ commit, but incomplete newer attempts cannot fall back to older results.
 Shard results are published as `unit-shard-<number>-<attempt>`.
 PR CI uses `tox-unit-<os>-py<version>-<number>-<attempt>` to keep each combination
 separate from the others and from integration prechecks.
-`unit-summary-<attempt>` contains the completeness summary and `timings.json`;
-use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
+Integration summaries use `unit-summary-<attempt>`; PR summaries use
+`tox-summary-<os>-py<version>-<attempt>`. Both include the completeness summary
+and `timings.json`; use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
 The shared runner accepts CI-neutral run, commit, and attempt inputs so Azure
 Pipelines can use the same implementation.
 
