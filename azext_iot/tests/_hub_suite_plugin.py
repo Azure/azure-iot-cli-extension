@@ -47,8 +47,8 @@ def result_errors(expected, collected, reports, exitstatus, finished):
     return errors
 
 
-def validate_args(config, expected, *, early=False):
-    """Reject broad/filtering/parallel invocations before integration imports."""
+def validate_args(config, expected, *, early=False, parallel=False):
+    """Reject broad/filtering invocations and parallelism outside DPS attempts."""
     arguments = config.known_args_namespace.file_or_dir if early else config.args
 
     def option(name, default=None):
@@ -58,8 +58,10 @@ def validate_args(config, expected, *, early=False):
         raise pytest.UsageError("Hub phases require exact ordered manifest node arguments before collection.")
     if any(option(name) for name in (
         "keyword", "markexpr", "deselect", "reruns", "lf", "ff", "stepwise",
-    )) or option("numprocesses") not in (None, 0):
-        raise pytest.UsageError("Hub receipt phases require serial, unfiltered execution without reruns.")
+    )) or not parallel and option("numprocesses") not in (None, 0):
+        raise pytest.UsageError(
+            "Receipt phases require unfiltered execution without reruns; this mode may require serial execution."
+        )
     if option("collectonly", False):
         raise pytest.UsageError("Collection-only is not phase qualification; use guarded offline inventory tests.")
 
@@ -109,8 +111,10 @@ def pytest_load_initial_conftests(early_config, parser, args):
 class PhaseReceipt:
     """Record only credential-free node identities and outcomes, never tracebacks."""
 
-    def __init__(self, suite, phase, expected, path, run_id, *, debug=None):
+    def __init__(self, suite, phase, expected, path, run_id, *, debug=None, parallel=False):
         self.path = path
+        self.parallel = parallel
+        self.worker = parallel and os.getenv("PYTEST_XDIST_WORKER")
         self.data = {
             "schemaVersion": 1, "suite": suite, "phase": phase, "runId": run_id,
             "expected": list(expected), "collected": [], "reports": {},
@@ -118,19 +122,22 @@ class PhaseReceipt:
             "cleanup": {"pytestTeardown": "incomplete", "resourceAbsence": "not-attested"},
             **focused.provenance(debug),
         }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Exclusive reservation: never reuse a stale successful receipt.
-        with path.open("x", encoding="utf-8") as stream:
-            json.dump(self.data, stream)
+        if not self.worker:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # Exclusive reservation: never reuse a stale successful receipt.
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(self.data, stream)
 
     def write(self):
+        if self.worker:
+            return
         temporary = self.path.with_name(self.path.name + ".tmp")
         temporary.write_text(json.dumps(self.data, indent=2), encoding="utf-8")
         temporary.replace(self.path)
 
     def pytest_configure(self, config):
         config.addinivalue_line("markers", "hub_selection: explicit Hub suite selection metadata")
-        validate_args(config, tuple(self.data["expected"]))
+        validate_args(config, tuple(self.data["expected"]), parallel=self.parallel)
 
     @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, session, config, items):
@@ -148,18 +155,35 @@ class PhaseReceipt:
                 auth=case.auth, dependencies=case.dependencies, phase=self.data["phase"],
             ))
 
+    @pytest.hookimpl(optionalhook=True)
+    def pytest_xdist_node_collection_finished(self, node, ids):
+        if list(ids) != self.data["expected"]:
+            raise pytest.UsageError("DPS worker collection differs from the exact attempt selection.")
+        self.data["collected"] = list(ids)
+        self.write()
+
+    @pytest.hookimpl(optionalhook=True)
+    def pytest_testnodedown(self, node, error):
+        receipt = getattr(node, "workeroutput", {}).get("phase_receipt", {})
+        if (error or receipt.get("finished") is not True or receipt.get("exitstatus") not in (0, 1)
+                or receipt.get("collected") != self.data["expected"]):
+            self.data.setdefault("workerErrors", []).append("DPS worker execution evidence is incomplete.")
+            self.write()
+
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
         report = (yield).get_result()
         if self.data.get("mode") == "attempt" and report.when == "call" and report.failed:
-            self.data.setdefault("retryableFailures", {})[report.nodeid] = (
-                assertion_failure(call.excinfo.value) if call.excinfo else False
-            )
+            report.user_properties.append(("ado_retryable", assertion_failure(call.excinfo.value) if call.excinfo else False))
 
     def pytest_runtest_logreport(self, report):
         stages = self.data["reports"].setdefault(report.nodeid, {})
         outcome = "xfail" if hasattr(report, "wasxfail") else report.outcome
         stages.setdefault(report.when, []).append(outcome)
+        if self.data.get("mode") == "attempt" and report.when == "call" and report.failed:
+            self.data.setdefault("retryableFailures", {})[report.nodeid] = [
+                value for name, value in report.user_properties if name == "ado_retryable"
+            ] == [True]
         self.write()
 
     def pytest_runtest_logstart(self, nodeid, location):
@@ -170,16 +194,28 @@ class PhaseReceipt:
         if getattr(self, "observer", None):
             self.observer.current_node = None
 
+    @pytest.hookimpl(hookwrapper=True, trylast=True, specname="pytest_sessionfinish")
+    def pytest_worker_sessionfinish(self, session):
+        # Finalize worker metadata before xdist's outer wrapper sends workeroutput.
+        outcome = yield
+        if self.worker:
+            session.config.workeroutput["phase_receipt"] = {
+                "finished": outcome.excinfo is None, "exitstatus": int(session.exitstatus),
+                "collected": self.data["collected"],
+            }
+
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_sessionfinish(self, session, exitstatus):
         # Outermost wrapper: account for failures/cleanup in other finish hooks.
         outcome = yield
         self.data["finished"] = outcome.excinfo is None
         self.data["exitstatus"] = int(session.exitstatus)
+        if self.worker:
+            return
         self.data["errors"] = result_errors(
             self.data["expected"], self.data["collected"], self.data["reports"],
             self.data["exitstatus"], self.data["finished"],
-        )
+        ) + self.data.get("workerErrors", [])
         teardown_ok = all(
             self.data["reports"].get(node, {}).get("teardown") == ["passed"] for node in self.data["expected"]
         )

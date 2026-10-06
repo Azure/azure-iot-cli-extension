@@ -676,7 +676,9 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    AZURE_IOT_ADR_ARM_ENDPOINT=target["endpoint"],
                                    azext_iot_adr_location=region, azext_iot_adr_arm_endpoint=target["endpoint"],
                                    azext_iot_adr_arm_resource="https://management.azure.com",
-                                   azext_iot_dps_workers="0" if debug or name == "local-auth-toggle" else "7",
+                                   azext_iot_dps_workers=(
+                                       "0" if name == "local-auth-toggle" or debug and not attempt_selection else "7"
+                                   ),
                                    azext_iot_dps_junit=str(raw_junit),
                                    azext_iot_dps_coverage_file=str(coverage_file.resolve()),
                                    azext_iot_dps_install_token=install_token,

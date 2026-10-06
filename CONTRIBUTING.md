@@ -195,6 +195,13 @@ installed candidate's dependency directory on `PYTHONPATH`; Azure CLI's extensio
 installation alone does not expose those dependencies to ordinary Python children.
 The live task adds that path inside its script, after the task's initial Azure login.
 
+ADU uses the existing service/job deadline without an additional per-test timeout.
+DPS regular and service-SAS attempts use seven workers, including exact failed-case
+retries; local-auth-toggle and explicitly requested focused debugging remain serial.
+The controller aggregates worker collection, setup/call/teardown outcomes and
+retry eligibility into one receipt. Existing phase deadlines and owned cleanup
+verification remain unchanged.
+
 There are **no automatic test retries**. When a service fails solely with eligible
 assertions in test call phases, use Azure DevOps **Rerun failed jobs** on its failed service stage in the
 **same run**. There is no test-name input. The runner downloads that run's attempt

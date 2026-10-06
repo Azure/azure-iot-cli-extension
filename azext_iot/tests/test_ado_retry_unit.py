@@ -348,7 +348,10 @@ def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mo
         pipeline.subprocess, "run", side_effect=AssertionError("Generic phases must not scan ARM inventory."),
     )
 
-    def execute(_command, env, *_args):
+    def execute(command, env, _log, runtime, cleanup):
+        assert [arg for arg in command if arg.startswith("--timeout")] == (["--timeout=900"] if service == "ADR" else [])
+        assert runtime == (pipeline.BUDGETS[service]["job_timeout_minutes"] - 20) * 60
+        assert cleanup == 600
         assert "azext_iot_ado_resource_scope" not in env
         value = receipt({"case": "passed"})
         value["expected"] = ["case"]

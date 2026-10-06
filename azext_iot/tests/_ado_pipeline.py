@@ -251,9 +251,11 @@ def phase(selection_file, output):
         directory = ("azext_iot/tests/ado_diagnostic.py" if diagnostic else BUDGETS[service]["test_dir"])
         command = [sys.executable, "-m", "pytest", directory, "-vv", "-c", str(ROOT / "setup.cfg"),
                    "-o", "addopts=", "-o", "env=", "-p", "azext_iot.tests._ado_retry_plugin",
-                   "-p", "no:rerunfailures", "--timeout=900", "--integration-progress-interval=60",
+                   "-p", "no:rerunfailures", "--integration-progress-interval=60",
                    "-o", "faulthandler_timeout=300", "--cov=azext_iot", "--cov-config=.coveragerc",
                    "--cov-report=", "--capture=fd", "-n", "0" if diagnostic else ("4" if service == "ADR" else "7")]
+        if service != "ADU":
+            command.append("--timeout=900")
         if not diagnostic:
             command += ["-k", "_int.py", "--dist=loadgroup" if service == "ADR" else "--dist=loadfile"]
         execution = dps.child(command, env, folder / "output.log",

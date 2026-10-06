@@ -461,7 +461,7 @@ def start_worker(session):
     config = receipts.settings()
     debug = focused.from_environment(os.environ, "DPS", _phase.get_phase())
     if not config or (not hasattr(session.config, "workerinput") and _phase.get_phase() != _phase.LOCAL_AUTH_TOGGLE
-                      and not debug):
+                      and (not debug or "attempt" in debug)):
         return
     require_linux()
     directory = config[0]
