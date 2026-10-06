@@ -49,9 +49,8 @@ def test_ado_hub_suite_has_a_nonempty_constrained_unset_default():
     assert set(conditions) == {"'sentinel'"}
 
 
-@pytest.mark.parametrize("caller", ["merge.yml", "templates/trigger-tests.yml"])
-def test_ado_callers_keep_explicit_owned_suites_and_unset_non_hub_defaults(caller):
-    pipeline = yaml.safe_load((ROOT / ".azure-devops" / caller).read_text(encoding="utf-8"))
+def test_ado_integration_callers_keep_explicit_owned_suites_and_unset_non_hub_defaults():
+    pipeline = yaml.safe_load((ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     calls = [
         (job["job"], step["parameters"])
         for job in pipeline["jobs"] for step in job.get("steps", [])
@@ -63,13 +62,6 @@ def test_ado_callers_keep_explicit_owned_suites_and_unset_non_hub_defaults(calle
             assert parameters["hubSuite"] == job
         else:
             assert "hubSuite" not in parameters
-        if caller == "merge.yml":
-            assert parameters["runUnitTests"] is True
-            assert parameters["runIntTests"] is False
-    if caller == "merge.yml":
-        assert {job for job, _ in calls} == {
-            "run_unit_tests_ubuntu", "run_unit_tests_macOs", "run_unit_tests_windows",
-        }
 
 
 def _script():

@@ -262,6 +262,37 @@ def test_pr_ci_does_not_duplicate_feature_branch_pushes(branch, push_enabled):
     assert any(fnmatchcase(branch, pattern) for pattern in events["push"]["branches"]) == push_enabled
 
 
+def test_ado_merge_retains_non_unit_checks_without_repeating_github_units():
+    workflow = yaml.safe_load((ROOT / ".azure-devops/merge.yml").read_text(encoding="utf-8"))
+    jobs = {job["job"]: job for job in workflow["jobs"]}
+    assert set(jobs) == {
+        "build_and_publish_azure_iot_cli_ext", "build_and_publish_azure_cli_test_sdk",
+        "run_style_check", "run_azdev_linter_on_command_table", "CredScan",
+    }
+    for job in jobs.values():
+        assert not job.get("continueOnError") and "condition" not in job
+        assert not any(
+            step.get("template", "").endswith("run-tests-parallel.yml")
+            or step.get("parameters", {}).get("runUnitTests")
+            for step in job["steps"]
+        )
+        assert set(job.get("dependsOn", [])) <= set(jobs)
+    scan, analyze = jobs["CredScan"]["steps"]
+    assert scan["task"] == "CredScan@3"
+    assert analyze["task"] == "PostAnalysis@1" and analyze["inputs"]["CredScan"] is True
+    build = yaml.safe_load(
+        (ROOT / ".azure-devops/templates/build-publish-azure-iot-cli-extension.yml").read_text(encoding="utf-8")
+    )
+    assert any("ManifestGeneratorTask@" in step.get("task", "") for step in build["steps"])
+    assert jobs["build_and_publish_azure_iot_cli_ext"]["steps"][-1]["template"] == (
+        "templates/build-publish-azure-iot-cli-extension.yml"
+    )
+    assert jobs["build_and_publish_azure_cli_test_sdk"]["steps"][-1]["template"] == (
+        "templates/build-publish-azure-cli-test-sdk.yml"
+    )
+    assert jobs["run_azdev_linter_on_command_table"]["steps"][-1]["template"] == "templates/evaluate-command-table.yml"
+
+
 def test_only_ci_pull_requests_request_the_reduced_unit_matrix():
     workflow = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))
     events = workflow.get("on", workflow.get(True))
