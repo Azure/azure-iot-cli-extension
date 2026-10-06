@@ -86,7 +86,7 @@ In order to list all recognized environments, you can type `tox -av`, which will
 `int_test.yml` runs lint and four duration-balanced serial unit shards in parallel.
 Its unit gate verifies complete, nonduplicated execution and combines coverage
 before any integration jobs are eligible. See [parallel CI unit tests](../CONTRIBUTING.md#parallel-ci-unit-tests)
-for shard artifacts, reruns and the reusable runner contract.
+for shard artifacts, reruns and timing-profile maintenance.
 
 The direct service × Python × region matrix starts after setup and the unit gate
 succeed. Every selected combination, including ADU, is independently eligible
