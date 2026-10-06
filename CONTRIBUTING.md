@@ -111,9 +111,11 @@ Execute the following command to run the IoT Hub unit tests:
 
 #### Parallel CI unit tests
 
-The GitHub integration workflow runs lint alongside four balanced unit-test
-shards on Linux/Python 3.13. Each shard uses serial pytest, not xdist. New unit
-files are included automatically; the separate tox OS/Python matrix is unchanged.
+The GitHub integration precheck uses four balanced unit-test shards on
+Linux/Python 3.13. PR CI uses the same runner across all three operating systems
+and four Python versions: four shards per combination, or 48 unit jobs, with
+lint once per combination and a coverage gate for each. Each shard uses serial
+pytest, not xdist, and new unit files are included automatically.
 Shards must use the same Python major/minor version; runner patch versions may differ.
 
 Integration starts only after lint, all shards, and the `unit-test` gate pass.
@@ -122,6 +124,8 @@ The gate checks complete, exactly-once case coverage and combines coverage into
 commit, but incomplete newer attempts cannot fall back to older results.
 
 Shard results are published as `unit-shard-<number>-<attempt>`.
+PR CI uses `tox-unit-<os>-py<version>-<number>-<attempt>` to keep each combination
+separate from the others and from integration prechecks.
 `unit-summary-<attempt>` contains the completeness summary and `timings.json`;
 use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
 The shared runner accepts CI-neutral run, commit, and attempt inputs so Azure
