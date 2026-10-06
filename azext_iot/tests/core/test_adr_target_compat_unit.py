@@ -17,7 +17,7 @@ from azext_iot.core import custom
 from azext_iot.tests.test_factory_unit import CLOUD_CONFIGS, PUBLIC_CLOUD_CONFIGS, _build_cli_ctx
 
 
-CANARY = "https://centraluseuap.management.azure.com"
+PUBLIC_ARM = "https://management.azure.com"
 NAMESPACE_ID = (
     "/subscriptions/namespace-sub/resourceGroups/ns-rg/providers/"
     "Microsoft.DeviceRegistry/namespaces/ns"
@@ -37,7 +37,7 @@ TARGETS = [
 @pytest.mark.parametrize("adr", [False, True], ids=["general", "adr"])
 @pytest.mark.parametrize("subscription", [None, "target-sub"])
 def test_native_preview_management_wire_contract(
-    mocker, mocked_response, cloud, target, adr, subscription,
+    mocker, monkeypatch, mocked_response, cloud, target, adr, subscription,
 ):
     kind, group, resource_type, name_arg, general_factory, adr_factory, default_api, adr_api = target
     cli_ctx = _build_cli_ctx(mocker, cloud)
@@ -45,7 +45,8 @@ def test_native_preview_management_wire_contract(
     credential.get_token.return_value = AccessToken("test-token", 4102444800)
     get_credential = mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
     selected_sub = subscription or "test-sub-id"
-    endpoint = CANARY
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+    endpoint = PUBLIC_ARM
     resource_id = (
         f"/subscriptions/{selected_sub}/resourceGroups/rg/providers/"
         f"Microsoft.Devices/{resource_type}/{kind}"

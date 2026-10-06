@@ -113,6 +113,56 @@ class Scenario:
         )
 
 
+def _generic_rejection(service="DPS", **extra):
+    return {
+        "code": "LinkInitiateFailed",
+        "message": (
+            f"The {service} resource rejected the link request as invalid. "
+            "Verify the endpoint configuration, then resubmit the request."
+        ),
+        **extra,
+    }
+
+
+def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
+    scenario = Scenario("dps")
+    scenario.error = _generic_rejection("DPS")
+    scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
+
+    result = scenario.run()
+
+    assert result["linkingState"] == "Succeeded"
+    assert len(scenario.writes) == 2
+    assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
+    assert scenario.write_times == [0, 30]
+    assert scenario.clock.sleeps == [10, 10, 10, 10]
+
+
+@pytest.mark.parametrize("mutation", ["hub-service", "extra-detail", "stale-grant", "hub-link"])
+def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation):
+    scenario = Scenario("hub" if mutation == "hub-link" else "dps")
+    scenario.error = _generic_rejection("Hub" if mutation == "hub-service" else "DPS")
+    if mutation == "extra-detail":
+        scenario.error["details"] = [{"code": "IH400315"}]
+    if mutation == "stale-grant":
+        scenario.states = ["Failed"] * 100
+        original = scenario.command
+        advanced = [False]
+
+        def command(text):
+            if text == "iot adr ns show -n ns -g rg" and scenario.writes and not advanced[0]:
+                scenario.clock.now += readiness._FRESH_DPS_GRANT_WINDOW + 1
+                advanced[0] = True
+            return original(text)
+
+        scenario.cmd.side_effect = command
+
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+
+    assert len(scenario.writes) == 1
+
+
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 @pytest.mark.parametrize("outbound", ["system", "user"])
 def test_observed_denial_recovers_only_exact_original_outbound_identity(mocker, kind, outbound):
@@ -187,6 +237,11 @@ def test_unbound_and_invalid_denials_fail_without_recovery(kind, mutation):
                 endpoint["status"] = {"status": "Failed", "error": endpoint.pop("linkingError")}
             return body
         scenario.transform = transform
+    if mutation == "invalid-request" and kind == "dps":
+        scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
+        scenario.run()
+        assert len(scenario.writes) == 2
+        return
     with pytest.raises(AssertionError, match="Non-recoverable"):
         scenario.run()
     assert len(scenario.writes) == 1 and not scenario.clock.sleeps

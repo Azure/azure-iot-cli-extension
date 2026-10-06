@@ -415,9 +415,7 @@ def test_load_adr_arguments():
         "iot adr ns ca policy update",
     ):
         validity_help = arguments[command]["validity_days"]["help"]
-        assert "7" in validity_help
-        assert "90" in validity_help
-        assert "inclusive" in validity_help
+        assert "between 1 and 90 days, inclusive" in validity_help
     assert {
         "mi_system_assigned",
         "mi_user_assigned",
@@ -710,7 +708,9 @@ def test_help_surface_matches_2026_commands_and_su_type():
     policy_create_help = " ".join(
         helps["iot adr ns ca policy create"].split()
     )
-    assert "between 7 and 90 days" in policy_create_help
+    for action in ("create", "update"):
+        policy_help = " ".join(helps[f"iot adr ns ca policy {action}"].split())
+        assert "between 1 and 90 days, inclusive" in policy_help
     assert "below 30" not in policy_create_help
     assert "Central US EUAP" not in policy_create_help
     assert "--validity-days 30" in helps["iot adr ns ca policy create"]

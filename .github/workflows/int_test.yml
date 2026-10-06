@@ -1,6 +1,5 @@
 name: Integration Tests
-run-name: >-
-  Integration Tests (${{ inputs['test-services'] || 'auto' }} | ${{ inputs.regions || 'centraluseuap' }})
+run-name: "Integration Tests (${{ inputs.regions || 'australiaeast' }})"
 
 on:
   # Reusable workflow trigger — called programmatically by other workflows (e.g. release_workflow.yml)
@@ -20,12 +19,12 @@ on:
         description: "Azure regions (comma-separated)"
         type: string
         required: false
-        default: "centraluseuap"
+        default: "australiaeast"
       arm-endpoint:
-        description: "ARM routing: auto (canary for centraluseuap, public otherwise), public, or canary"
+        description: "ARM routing: public or canary (canary requires centraluseuap)"
         type: string
         required: false
-        default: "auto"
+        default: "public"
       resource-group:
         description: "Resource group for test resources"
         type: string
@@ -75,14 +74,13 @@ on:
         description: "Azure regions (comma-separated)"
         type: string
         required: false
-        default: "centraluseuap"
+        default: "australiaeast"
       arm-endpoint:
         description: "ARM routing (canary requires centraluseuap)"
         type: choice
         required: false
-        default: "auto"
+        default: "public"
         options:
-          - auto
           - public
           - canary
       resource-group:
@@ -123,8 +121,8 @@ jobs:
         env:
           INPUT_SERVICES: ${{ inputs['test-services'] }}
           INPUT_PYTHON_VERSIONS: ${{ inputs['python-versions'] || '3.13' }}
-          INPUT_REGIONS: ${{ inputs.regions || 'centraluseuap' }}
-          INPUT_ARM_ENDPOINT: ${{ inputs['arm-endpoint'] || 'auto' }}
+          INPUT_REGIONS: ${{ inputs.regions || 'australiaeast' }}
+          INPUT_ARM_ENDPOINT: ${{ inputs['arm-endpoint'] || 'public' }}
           INPUT_TEST_DPS: ${{ inputs.testDPS }}
           INPUT_TEST_HUB_CONTROL: ${{ inputs.testHubControl }}
           INPUT_TEST_HUB_DATA: ${{ inputs.testHubData }}
@@ -180,9 +178,9 @@ jobs:
           python_versions="$INPUT_PYTHON_VERSIONS"
           regions="$INPUT_REGIONS"
           case "$INPUT_ARM_ENDPOINT" in
-            auto|public|canary) ;;
+            public|canary) ;;
             *)
-              echo "::error::arm-endpoint must be auto, public, or canary."
+              echo "::error::arm-endpoint must be public or canary."
               exit 1
               ;;
           esac
@@ -232,7 +230,7 @@ jobs:
                   exit 1
                 fi
                 arm_endpoint="https://management.azure.com"
-                if [[ "$INPUT_ARM_ENDPOINT" = canary || ( "$INPUT_ARM_ENDPOINT" = auto && "$region" = centraluseuap ) ]]; then
+                if [ "$INPUT_ARM_ENDPOINT" = canary ]; then
                   if [ "$region" != centraluseuap ]; then
                     echo "::error::Canary ARM requires region centraluseuap."
                     exit 1

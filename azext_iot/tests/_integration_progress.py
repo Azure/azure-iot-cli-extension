@@ -64,6 +64,11 @@ class IntegrationProgress:
         if self._results is not None:
             self._results.select(item.nodeid for item in session.items if self._is_integration(item.nodeid))
 
+    @pytest.hookimpl(optionalhook=True)
+    def pytest_xdist_node_collection_finished(self, node, ids):
+        if self._results is not None:
+            self._results.select(nodeid for nodeid in ids if self._is_integration(nodeid))
+
     def pytest_runtest_logstart(self, nodeid):
         if self._results is not None and self._is_integration(nodeid):
             self._results.start(nodeid)

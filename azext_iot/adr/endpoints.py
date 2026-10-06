@@ -16,8 +16,8 @@ PUBLIC_ARM_ENDPOINT = "https://management.azure.com"
 
 
 def get_adr_arm_endpoint():
-    """Keep canary by default; never infer an ARM host from a resource location."""
-    endpoint = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT", CANARY_ARM_ENDPOINT).rstrip("/").lower()
+    """Use public ARM by default; canary is opt-in and never inferred from a resource location."""
+    endpoint = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT", PUBLIC_ARM_ENDPOINT).rstrip("/").lower()
     if endpoint not in {CANARY_ARM_ENDPOINT, PUBLIC_ARM_ENDPOINT}:
         raise InvalidArgumentValueError(
             "AZURE_IOT_ADR_ARM_ENDPOINT must be https://management.azure.com "

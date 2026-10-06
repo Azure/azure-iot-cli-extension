@@ -711,7 +711,10 @@ def test_delete_waits_and_supports_no_wait(update_instance_provider):
     second_poller.result.assert_not_called()
 
 
-def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
+def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint(monkeypatch):
+    monkeypatch.setenv(
+        "AZURE_IOT_ADR_ARM_ENDPOINT", "https://centraluseuap.management.azure.com"
+    )
     cli_ctx = Mock()
     cli_ctx.cloud.endpoints.active_directory = "https://login.microsoftonline.com"
     cli_ctx.cloud.endpoints.active_directory_resource_id = (

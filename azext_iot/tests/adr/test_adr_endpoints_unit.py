@@ -42,7 +42,7 @@ def cli_ctx(mocker):
 
 
 @pytest.mark.parametrize("value,expected", [
-    (None, CANARY_ARM_ENDPOINT),
+    (None, PUBLIC_ARM_ENDPOINT),
     (CANARY_ARM_ENDPOINT, CANARY_ARM_ENDPOINT),
     (PUBLIC_ARM_ENDPOINT, PUBLIC_ARM_ENDPOINT),
     ("HTTPS://MANAGEMENT.AZURE.COM/", PUBLIC_ARM_ENDPOINT),
@@ -140,11 +140,12 @@ def test_public_preflight_surfaces_unsupported_api_without_canary_retry(monkeypa
     monkeypatch.setattr(integration, "TEST_LOCATION", "australiaeast")
     run = mocker.patch.object(integration.subprocess, "run", side_effect=[
         mocker.Mock(returncode=0, stdout=value)
-        for value in ("", integration.TEST_SUBSCRIPTION, "", "", "Registered", "Registered")
+        for value in (integration.TEST_SUBSCRIPTION, "", "", "Registered", "Registered")
     ] + [mocker.Mock(returncode=1, stderr="InvalidApiVersionParameter", stdout="")])
     with pytest.raises(pytest.UsageError, match="InvalidApiVersionParameter"):
         integration.run_adr_integration_preflight(mocker.Mock())
-    assert run.call_count == 7
+    # account show matches CI's selection, so no profile-writing account set.
+    assert run.call_count == 6
     command = run.call_args.args[0]
     assert command[command.index("--url") + 1] == (
         f"{PUBLIC_ARM_ENDPOINT}/subscriptions/{integration.TEST_SUBSCRIPTION}"

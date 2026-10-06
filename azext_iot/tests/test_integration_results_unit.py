@@ -155,6 +155,25 @@ def test_receipts_work_without_terminal_reporter_or_heartbeat(tmp_path, mocker):
     plugin.pytest_unconfigure()
 
 
+def test_xdist_worker_collection_selects_cases_but_controller_writes_reports(tmp_path, mocker):
+    config = SimpleNamespace(pluginmanager=mocker.Mock())
+    config.pluginmanager.getplugin.return_value = None
+    plugin = IntegrationProgress(config, 0, results_dir=tmp_path)
+    plugin.pytest_sessionstart()
+    plugin.pytest_collection_finish(SimpleNamespace(items=[]))
+    plugin.pytest_xdist_node_collection_finished(mocker.Mock(), [NODE, "test_sample_unit.py::test_unit"])
+    for phase in ("setup", "call", "teardown"):
+        plugin.pytest_runtest_logreport(SimpleNamespace(nodeid=NODE, when=phase, outcome="passed", duration=0))
+    manager = pytest.PytestPluginManager()
+    manager.register(plugin)
+    manager.hook.pytest_sessionfinish(session=None, exitstatus=0)
+
+    receipt = _read(tmp_path)
+    assert receipt["selected"] == 1
+    assert receipt["cases"][0]["status"] == "passed"
+    assert receipt["session_finished"]
+
+
 @pytest.mark.parametrize("cleanup_fails", [False, True])
 def test_terminal_receipt_waits_for_session_cleanup_hooks(tmp_path, mocker, cleanup_fails):
     plugin = IntegrationProgress(SimpleNamespace(pluginmanager=mocker.Mock()), 0, results_dir=tmp_path)
@@ -185,14 +204,16 @@ def test_terminal_receipt_waits_for_session_cleanup_hooks(tmp_path, mocker, clea
     assert bool(failures) == cleanup_fails and SECRET not in failures
 
 
-def test_incremental_option_rejects_parallel_writers_before_starting_pytest(mocker):
+def test_incremental_option_allows_xdist_controller_writer(mocker):
     from azext_iot.tests.conftest import pytest_configure
 
     options = {"integration_progress_interval": 0, "integration_results_dir": "results", "numprocesses": 2}
     config = SimpleNamespace(getoption=lambda name, **_: options[name], pluginmanager=mocker.Mock())
-    with pytest.raises(pytest.UsageError, match="requires serial"):
-        pytest_configure(config)
-    config.pluginmanager.register.assert_not_called()
+
+    pytest_configure(config)
+
+    registered = [call.args[0] for call in config.pluginmanager.register.call_args_list]
+    assert any(isinstance(plugin, IntegrationProgress) for plugin in registered)
 
 
 def _record_step():
@@ -267,7 +288,12 @@ def test_actual_workflow_record_step_preserves_incremental_adr_evidence(tmp_path
 def test_only_adr_tox_enables_incremental_serial_receipts():
     text = (ROOT / "tox.ini").read_text()
     enabled = [line.strip() for line in text.splitlines() if "--integration-results-dir" in line]
-    assert enabled == ["ADR:    -n 0 -p no:rerunfailures --integration-results-dir={toxinidir}/test-result \\"]
+    expected = (
+        "ADR:    --dist=loadgroup -n {env:azext_iot_adr_workers:4} -p no:rerunfailures "
+        "--integration-results-dir={toxinidir}/test-result "
+        + "\\"
+    )
+    assert enabled == [expected]
     assert _record_step()["if"] == "${{ always() }}"
 
 

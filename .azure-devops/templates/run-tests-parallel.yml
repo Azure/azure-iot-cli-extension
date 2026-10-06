@@ -114,6 +114,9 @@ steps:
             azext_iot_testhub_location: ${{ parameters.hubRegion }}
         ${{ else }}:
           continueOnError: true
+          # The product defaults to public ARM; these legacy suites target centraluseuap resources.
+          env:
+            AZURE_IOT_ADR_ARM_ENDPOINT: https://centraluseuap.management.azure.com
         displayName: "${{ parameters.name }} integration tests"
         inputs:
           azureSubscription: ${{ parameters.serviceConnection }}

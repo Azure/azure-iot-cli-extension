@@ -3,12 +3,20 @@
 Release History
 ===============
 
+1.0.0b2 (Preview)
++++++++++++++++++
+
+**ADR bug fixes**
+
+* Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
+* Namespace link add/update preserve the original service failure as the exception cause when recovery stops on a later state-validation error or timeout, unless the stopping error already has an exception cause or context.
+
 1.0.0b1 (Preview)
 +++++++++++++++++
 
 **Known limitations**
 
-* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use the Central US EUAP (canary) ARM endpoint by default.
+* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.
 * ``az iot adr ns link hub|dps|su remove`` submits the unlink and returns without waiting; inspect the namespace with ``az iot adr ns show`` afterward.
 * Link add/update automatically create the service role assignments that the link requires when the caller can create role assignments.
 

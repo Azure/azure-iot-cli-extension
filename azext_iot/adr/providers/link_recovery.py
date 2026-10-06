@@ -469,10 +469,16 @@ class LinkRecovery:
                         pending_submission = True
                         continue
                 self.budget.pause(self.budget.interval)
-        except (CLIError, HttpResponseError):
+        except (CLIError, HttpResponseError) as error:
             logger.warning(
                 "Link '%s' did not complete. Inspect its current state/error with 'iot adr ns link %s show'. "
                 "For a persisted Failed endpoint, verify access and use 'iot adr ns link %s update' with its existing "
                 "identity and settings, not link add. No rollback was attempted.", self.name, self.kind, self.kind,
             )
+            # Any later stop (changed/malformed state, other endpoint, timeout) keeps the service failure as its cause.
+            if (
+                original_error is not None and error is not original_error
+                and error.__cause__ is None and error.__context__ is None
+            ):
+                raise error from original_error
             raise

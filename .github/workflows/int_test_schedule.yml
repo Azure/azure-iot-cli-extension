@@ -36,12 +36,12 @@ jobs:
                     branch="preview"
                   fi
 
-                  # Rotate Python only. Owned Hub phases require the authorized canary scope.
+                  # Rotate Python only. Region and public ARM match the owned release scope.
                   py_versions=("3.10" "3.11" "3.12" "3.13")
                   day_of_year=$(date -u +"%j")
                   py_idx=$(( day_of_year % ${#py_versions[@]} ))
                   python_ver="${py_versions[$py_idx]}"
-                  region="centraluseuap"
+                  region="australiaeast"
 
                   echo "Dispatching to $branch: Python $python_ver, Region $region"
                   gh workflow run int_test.yml \

@@ -24,7 +24,7 @@ from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import assign_role_assignment, invoke_checked
+from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, invoke_checked
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -49,6 +49,12 @@ settings = DynamoSettings(
 ENTITY_RG = settings.env.azext_iot_testrg
 ENTITY_LOCATION = settings.env.azext_iot_dps_test_location or "westus"
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
+# Polling usually returns in seconds; the deadline stays well above the old fixed 60s wait
+# plus a full confirmation streak so a slow propagation is never worse than before.
+ROLE_PROPAGATION_TIMEOUT_SECONDS = 300
+ROLE_PROPAGATION_POLL_SECONDS = 5
+DATA_PLANE_READY_CONFIRMATIONS = 3
+DPS_IDENTITY_SETTLE_SECONDS = 60
 
 # DPS instance strategy (timestamp + run-tag + age-based GC)
 # ----------------------------------------------------------
@@ -140,6 +146,54 @@ def _assign_fixture_role(**kwargs):
     return assign_role_assignment(**kwargs)
 
 
+def _wait_for_readiness(description, check, confirmations=1):
+    deadline = time() + ROLE_PROPAGATION_TIMEOUT_SECONDS
+    streak = 0
+    while True:
+        try:
+            streak = streak + 1 if check() else 0
+        except Exception:  # Polling deliberately hides transient authorization propagation bodies.
+            streak = 0
+        if streak >= confirmations:
+            return
+        remaining = deadline - time()
+        if remaining <= 0:
+            raise CLIInternalError(
+                f"{description} was not ready after {ROLE_PROPAGATION_TIMEOUT_SECONDS} seconds."
+            )
+        sleep(min(ROLE_PROPAGATION_POLL_SECONDS, remaining))
+
+
+def _wait_for_current_user_data_plane(role: str, scope: str):
+    parsed = parse_resource_id(scope)
+    name = parsed.get("name")
+    if role == DPS_USER_ROLE and name:
+        command = f"iot dps enrollment list --dps-name {name} -g {ENTITY_RG} --auth-type login"
+    elif role == HUB_USER_ROLE and name:
+        command = f"iot hub device-identity list -n {name} -g {ENTITY_RG} --auth-type login"
+    else:
+        return
+    _wait_for_readiness(
+        f"{role} data-plane authorization for '{name}'",
+        lambda: cli.invoke(command, capture_stderr=True).success(),
+        # One success may come from an already-refreshed front end; require a short stable streak.
+        confirmations=DATA_PLANE_READY_CONFIRMATIONS,
+    )
+
+
+def _wait_for_assignment_visibility(role: str, scope: str, principal_id: str):
+    principal = principal_id.lower()
+
+    def visible():
+        assignments = get_role_assignments(
+            scope=scope, role=role, assignee_object_id=principal_id,
+            fill_role_definition_name=False, fill_principal_name=False,
+        )
+        return any((assignment.get("principalId") or "").lower() == principal for assignment in assignments)
+
+    _wait_for_readiness(f"{role} assignment for principal '{principal_id}'", visible)
+
+
 def _assign_current_user_role(role: str, scope: str):
     account = cli.invoke("account show").as_json()
     user = account["user"]
@@ -152,9 +206,9 @@ def _assign_current_user_role(role: str, scope: str):
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES
     )
     # ARM role-assignment visibility is not data-plane readiness. Login is the
-    # first service-auth phase, including for env-pinned resources, so retain
-    # the bounded propagation wait AFTER ensuring the caller's data role.
-    sleep(60)
+    # first service-auth phase, including for env-pinned resources, so poll a
+    # harmless data-plane read instead of sleeping a fixed minute.
+    _wait_for_current_user_data_plane(role, scope)
 
 
 # IoT DPS fixtures
@@ -473,7 +527,9 @@ def _enable_dps_hub_identity(dps_name: str, iot_hub: Dict) -> None:
     # The DPS managed identity has a separate Hub data-role grant and must
     # settle before device provisioning. Caller-role propagation is handled
     # by _assign_current_user_role; device attestation is still key/X.509.
-    sleep(60)
+    # ARM visibility cannot prove the DPS identity's Hub data-plane access, so still settle.
+    _wait_for_assignment_visibility(HUB_USER_ROLE, iot_hub["hub"]["id"], principal_id)
+    sleep(DPS_IDENTITY_SETTLE_SECONDS)
 
 
 def _link_hub(dps_name: str, iot_hub: Dict) -> str:
