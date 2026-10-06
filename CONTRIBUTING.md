@@ -120,6 +120,10 @@ Shards must use the same Python major/minor version; runner patch versions may d
 PR aggregate gates retain the `test / Unit test <python> - <os>` names required
 by branch rules and fail if any shard or lint run fails.
 
+Feature-branch updates run GitHub CI through `pull_request`, without a duplicate
+push-triggered matrix. Push CI remains enabled for `dev`, `preview`,
+`1.1.0-preview`, `release/**`, and tags; manual dispatch is unchanged.
+
 Integration starts only after lint, all shards, and the `unit-test` gate pass.
 The gate checks complete, exactly-once case coverage and combines coverage into
 `coverage-unit`. Native reruns can reuse successful shards from the same run and

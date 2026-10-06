@@ -8,6 +8,13 @@ concurrency:
 on:
   pull_request:
   push:
+    branches:
+      - dev
+      - preview
+      - 1.1.0-preview
+      - "release/**"
+    tags:
+      - "**"
   workflow_dispatch:
 jobs:
   build:
