@@ -9,8 +9,11 @@
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from fnmatch import fnmatchcase
+from itertools import product
+import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -259,10 +262,63 @@ def test_pr_ci_does_not_duplicate_feature_branch_pushes(branch, push_enabled):
     assert any(fnmatchcase(branch, pattern) for pattern in events["push"]["branches"]) == push_enabled
 
 
-def test_pr_ci_shards_every_os_python_combination_without_mixing_artifacts():
+def test_only_ci_pull_requests_request_the_reduced_unit_matrix():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))
+    events = workflow.get("on", workflow.get(True))
+    option = events["workflow_call"]["inputs"]["pr-matrix"]
+    assert option["type"] == "boolean" and option["default"] is False and option["required"] is False
+    assert "pr-matrix" not in events["workflow_dispatch"]["inputs"]
+    callers = {
+        (path.name, name): job
+        for path in (ROOT / ".github/workflows").glob("*.yml")
+        for name, job in yaml.safe_load(path.read_text(encoding="utf-8")).get("jobs", {}).items()
+        if job.get("uses") == "./.github/workflows/tox.yml"
+    }
+    assert ("release_workflow.yml", "unit-test") in callers
+    for key, job in callers.items():
+        if key == ("ci_workflow.yml", "test"):
+            assert job["with"]["pr-matrix"] == "${{ github.event_name == 'pull_request' }}"
+        else:
+            assert job.get("with", {}).get("pr-matrix", False) is False
+
+
+@pytest.mark.parametrize("pr_matrix", [False, True])
+def test_unit_and_gate_matrices_cover_exact_combinations(pr_matrix):
+    jobs = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))["jobs"]
+    expected_pairs = {
+        ("ubuntu-24.04", "3.10"), ("ubuntu-24.04", "3.13"),
+        ("windows-2025", "3.13"), ("macos-15-intel", "3.13"),
+    } if pr_matrix else set(product(
+        ("ubuntu-24.04", "windows-2025", "macos-15-intel"), ("3.10", "3.11", "3.12", "3.13")
+    ))
+    for name in ("tox", "unit-gate"):
+        matrix = jobs[name]["strategy"]["matrix"]
+        expression = re.fullmatch(
+            r"\$\{\{ fromJSON\(inputs\.pr-matrix && '([^']+)' \|\| '([^']+)'\) \}\}",
+            matrix["exclude"],
+        )
+        assert expression is not None
+        exclusions = json.loads(expression.group(1 if pr_matrix else 2))
+        axes = {key: values for key, values in matrix.items() if key != "exclude"}
+        expanded = [dict(zip(axes, values)) for values in product(*axes.values())]
+        selected = [
+            item for item in expanded
+            if not any(all(item[key] == value for key, value in exclusion.items()) for exclusion in exclusions)
+        ]
+        actual = {(item["os"], item["py"], item.get("shard")) for item in selected}
+        expected_shards = [1, 2, 3, 4] if name == "tox" else [None]
+        assert actual == {
+            (os_name, python, shard)
+            for os_name, python in expected_pairs for shard in expected_shards
+        }
+        assert len(selected) == len(actual) == (4 if pr_matrix else 12) * len(expected_shards)
+
+
+def test_ci_shards_selected_os_python_combinations_without_mixing_artifacts():
     caller = yaml.safe_load((ROOT / ".github/workflows/ci_workflow.yml").read_text(encoding="utf-8"))["jobs"]["test"]
     assert caller["uses"] == "./.github/workflows/tox.yml"
     assert caller.get("name", "test") == "test"
+    assert caller["with"]["pr-matrix"] == "${{ github.event_name == 'pull_request' }}"
     assert caller.get("with", {}).get("continue-on-error", False) is False
     jobs = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))["jobs"]
     unit, gate = jobs["tox"], jobs["unit-gate"]
@@ -271,6 +327,7 @@ def test_pr_ci_shards_every_os_python_combination_without_mixing_artifacts():
     matrix = {
         "os": ["ubuntu-24.04", "windows-2025", "macos-15-intel"],
         "py": ["3.13", "3.12", "3.11", "3.10"],
+        "exclude": unit["strategy"]["matrix"]["exclude"],
     }
     assert unit["strategy"] == {"fail-fast": False, "matrix": dict(matrix, shard=[1, 2, 3, 4])}
     assert gate["strategy"] == {"fail-fast": False, "matrix": matrix}

@@ -2,6 +2,11 @@ name: Tox tests
 on:
   workflow_call:
     inputs:
+      pr-matrix:
+        description: Test Python 3.13 on every OS and Python 3.10 on Ubuntu only
+        type: boolean
+        required: false
+        default: false
       continue-on-error:
         type: boolean
         required: false
@@ -35,6 +40,7 @@ jobs:
           - "3.11"
           - "3.10"
         shard: [1, 2, 3, 4]
+        exclude: ${{ fromJSON(inputs.pr-matrix && '[{"py":"3.12"},{"py":"3.11"},{"os":"windows-2025","py":"3.10"},{"os":"macos-15-intel","py":"3.10"}]' || '[]') }}
     steps:
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -91,6 +97,7 @@ jobs:
           - "3.12"
           - "3.11"
           - "3.10"
+        exclude: ${{ fromJSON(inputs.pr-matrix && '[{"py":"3.12"},{"py":"3.11"},{"os":"windows-2025","py":"3.10"},{"os":"macos-15-intel","py":"3.10"}]' || '[]') }}
     steps:
       - name: Require successful unit shards and lint
         if: ${{ needs.tox.result != 'success' }}

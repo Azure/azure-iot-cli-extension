@@ -112,10 +112,14 @@ Execute the following command to run the IoT Hub unit tests:
 #### Parallel CI unit tests
 
 The GitHub integration precheck uses four balanced unit-test shards on
-Linux/Python 3.13. PR CI uses the same runner across all three operating systems
-and four Python versions: four shards per combination, or 48 unit jobs, with
-lint once per combination and a coverage gate for each. Each shard uses serial
-pytest, not xdist, and new unit files are included automatically.
+Linux/Python 3.13. PR CI uses the same runner on Python 3.13 across Ubuntu,
+Windows, and macOS, plus Python 3.10 on Ubuntu: four combinations and 16 unit jobs.
+Branch/tag pushes, manual runs, and release workflows retain all three operating
+systems and Python 3.10-3.13: twelve combinations and 48 unit jobs. The reusable
+workflow defaults to the full matrix; only the CI caller's `pull_request` event
+enables `pr-matrix`. Each combination runs all unit tests across four shards,
+with lint once per combination and a coverage gate for each. Each shard uses
+serial pytest, not xdist, and new unit files are included automatically.
 Shards must use the same Python major/minor version; runner patch versions may differ.
 PR aggregate gates retain the `test / Unit test <python> - <os>` names required
 by branch rules and fail if any shard or lint run fails.
