@@ -93,10 +93,10 @@ def validate(records, expected_context, profile):
     return len(inventory)
 
 
-def aggregate(history, output):
+def aggregate(history, output, prefix="unit-shard"):
     latest = {}
-    for folder in Path(history).glob("unit-shard-*"):
-        match = re.fullmatch(r"unit-shard-([1-4])-([1-9][0-9]*)", folder.name)
+    for folder in Path(history).glob(f"{prefix}-*"):
+        match = re.fullmatch(rf"{re.escape(prefix)}-([1-4])-([1-9][0-9]*)", folder.name)
         if not match or not folder.is_dir():
             raise ValueError("Unexpected unit-shard artifact.")
         shard, attempt = map(int, match.groups())
@@ -133,5 +133,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--history", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--prefix", default="unit-shard")
     args = parser.parse_args()
-    aggregate(args.history, args.output)
+    aggregate(args.history, args.output, args.prefix)

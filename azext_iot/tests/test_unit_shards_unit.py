@@ -106,9 +106,9 @@ def test_unit_gate_preserves_standard_pytest_skip_semantics():
     assert shards.validate(values, CONTEXT, PROFILE) == 4
 
 
-def make_artifacts(root):
+def make_artifacts(root, prefix="unit-shard"):
     for record in records():
-        folder = root / f"unit-shard-{record['shard']}-1"
+        folder = root / f"{prefix}-{record['shard']}-1"
         folder.mkdir()
         for name in shards.ARTIFACTS:
             (folder / name).write_bytes(b"offline artifact")
@@ -116,30 +116,33 @@ def make_artifacts(root):
         shards.write(folder / "receipt.json", record)
 
 
+@pytest.mark.parametrize("prefix", ["unit-shard", "tox-unit-windows-2025-py3.13"])
 @pytest.mark.parametrize("defect", ["missing", "changed", "empty-newer-attempt", "wrong-attempt", "extra-shard"])
-def test_artifact_gate_never_falls_back_to_older_or_unverified_results(tmp_path, defect):
-    make_artifacts(tmp_path)
-    folder = tmp_path / "unit-shard-1-1"
+def test_artifact_gate_never_falls_back_to_older_or_unverified_results(tmp_path, defect, prefix):
+    make_artifacts(tmp_path, prefix)
+    folder = tmp_path / f"{prefix}-1-1"
     if defect == "missing":
         (folder / "coverage.dat").unlink()
     elif defect == "changed":
         (folder / "junit.xml").write_text("changed")
     elif defect == "empty-newer-attempt":
-        (tmp_path / "unit-shard-1-2").mkdir()
+        (tmp_path / f"{prefix}-1-2").mkdir()
     elif defect == "wrong-attempt":
-        folder.rename(tmp_path / "unit-shard-1-2")
+        folder.rename(tmp_path / f"{prefix}-1-2")
     else:
-        (tmp_path / "unit-shard-5-1").mkdir()
+        (tmp_path / f"{prefix}-5-1").mkdir()
     with pytest.raises((ValueError, FileNotFoundError)):
-        shards.aggregate(tmp_path, tmp_path / "combined")
+        shards.aggregate(tmp_path, tmp_path / "combined", prefix)
     assert not (tmp_path / "combined").exists()
 
 
-def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypatch, mocker):
-    make_artifacts(tmp_path)
-    folder = tmp_path / "unit-shard-1-1"
-    folder.rename(tmp_path / "unit-shard-1-2")
-    folder = tmp_path / "unit-shard-1-2"
+@pytest.mark.parametrize("prefix", ["unit-shard", "tox-unit-windows-2025-py3.13"])
+def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypatch, mocker, prefix):
+    make_artifacts(tmp_path, prefix)
+    make_artifacts(tmp_path, "tox-unit-macos-15-intel-py3.12")
+    folder = tmp_path / f"{prefix}-1-1"
+    folder.rename(tmp_path / f"{prefix}-1-2")
+    folder = tmp_path / f"{prefix}-1-2"
     record = shards.read(folder / "receipt.json")
     record["attempt"] = 2
     record["python"] = "3.13.16"
@@ -150,15 +153,16 @@ def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypat
     monkeypatch.setenv("UNIT_RUN_ID", CONTEXT["build"])
     monkeypatch.setenv("UNIT_COMMIT", CONTEXT["commit"])
     run = mocker.patch.object(shards.subprocess, "run")
-    shards.aggregate(tmp_path, tmp_path / "combined")
+    shards.aggregate(tmp_path, tmp_path / "combined", prefix)
     summary = shards.read(tmp_path / "combined/summary.json")
     assert summary["tests"] == 4
     assert [record["python"] for record in summary["shards"]] == ["3.13.16", "3.13.0", "3.13.0", "3.13.0"]
     assert len([arg for arg in run.call_args.args[0] if arg.endswith("coverage.dat")]) == 4
-    assert "unit-shard-1-2" in run.call_args.args[0][5]
+    assert f"{prefix}-1-2" in run.call_args.args[0][5]
 
 
-def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_path, monkeypatch):
+@pytest.mark.parametrize("prefix", ["unit-shard", "tox-unit-windows-2025-py3.13"])
+def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_path, monkeypatch, prefix):
     directory = tmp_path / "azext_iot/tests"
     directory.mkdir(parents=True)
     (tmp_path / "pytest.ini").write_text("[pytest]\njunit_family=xunit1\n", encoding="utf-8")
@@ -173,7 +177,7 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
         )
 
     def execute(index):
-        output = tmp_path / f"unit-shard-{index}-1"
+        output = tmp_path / f"{prefix}-{index}-1"
         env = dict(os.environ, UNIT_RUN_ID=CONTEXT["build"], UNIT_COMMIT=CONTEXT["commit"],
                    UNIT_ATTEMPT="1", COVERAGE_FILE=str(output / "coverage.dat"), PYTEST_ADDOPTS="",
                    PYTHONPATH=os.pathsep.join(dict.fromkeys([str(tmp_path), str(ROOT), *map(os.path.abspath, sys.path)])))
@@ -192,13 +196,13 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
     assert all(len(record["selected"]) == 2 for record in values)
     monkeypatch.setenv("UNIT_RUN_ID", CONTEXT["build"])
     monkeypatch.setenv("UNIT_COMMIT", CONTEXT["commit"])
-    shards.aggregate(tmp_path, tmp_path / "combined")
+    shards.aggregate(tmp_path, tmp_path / "combined", prefix)
     assert (tmp_path / "combined/.coverage").is_file()
     assert len(shards.read(tmp_path / "combined/timings.json")["seconds"]) == 4
 
 
 def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text())["jobs"]
+    jobs = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))["jobs"]
     lint, job, gate = (jobs[name] for name in ("lint", "unit-shards", "unit-test"))
     assert "needs" not in lint and "needs" not in job
     assert job["strategy"] == {"fail-fast": False, "max-parallel": 4, "matrix": {"shard": [1, 2, 3, 4]}}
@@ -228,6 +232,55 @@ def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
     assert coverage["with"]["if-no-files-found"] == "error" and "if" not in coverage
     assert jobs["int-test"]["needs"] == ["setup", "unit-test"]
     assert "needs.unit-test.result == 'success'" in jobs["int-test"]["if"]
+
+
+def test_pr_ci_shards_every_os_python_combination_without_mixing_artifacts():
+    caller = yaml.safe_load((ROOT / ".github/workflows/ci_workflow.yml").read_text(encoding="utf-8"))["jobs"]["test"]
+    assert caller["uses"] == "./.github/workflows/tox.yml"
+    assert caller.get("name", "test") == "test"
+    assert caller.get("with", {}).get("continue-on-error", False) is False
+    jobs = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))["jobs"]
+    unit, gate = jobs["tox"], jobs["unit-gate"]
+    assert gate["name"] == "Unit test ${{ matrix.py }} - ${{ matrix.os }}"
+    assert unit["name"] == gate["name"] + " (shard ${{ matrix.shard }}/4)"
+    matrix = {
+        "os": ["ubuntu-24.04", "windows-2025", "macos-15-intel"],
+        "py": ["3.13", "3.12", "3.11", "3.10"],
+    }
+    assert unit["strategy"] == {"fail-fast": False, "matrix": dict(matrix, shard=[1, 2, 3, 4])}
+    assert gate["strategy"] == {"fail-fast": False, "matrix": matrix}
+    assert gate["needs"] == "tox" and gate["if"] == "${{ always() }}"
+    guard = gate["steps"][0]
+    assert guard["name"] == "Require successful unit shards and lint"
+    assert guard["if"] == "${{ needs.tox.result != 'success' }}"
+    assert guard["run"].strip().endswith("exit 1") and "::error::" in guard["run"]
+    assert "continue-on-error" not in guard
+    for job in (unit, gate):
+        assert job["runs-on"] == "${{ matrix.os }}"
+        assert job["continue-on-error"] == "${{ inputs.continue-on-error }}"
+    run = next(step for step in unit["steps"] if step.get("name") == "Run test suite")
+    assert "-e python-azcur-unit --skip-pkg-install --" in run["run"]
+    assert "--unit-shard ${{ matrix.shard }}" in run["run"]
+    assert run["env"]["UNIT_ATTEMPT"] == "${{ github.run_attempt }}"
+    assert ":tox:${{ matrix.os }}:py${{ matrix.py }}" in run["env"]["UNIT_RUN_ID"]
+    lint = next(step for step in unit["steps"] if step.get("name") == "Run lint once per OS and Python")
+    assert lint["if"] == "${{ matrix.shard == 1 }}" and "-e lint" in lint["run"]
+    upload = next(step for step in unit["steps"] if step.get("name") == "Upload unit shard evidence")
+    prefix = "tox-unit-${{ matrix.os }}-py${{ matrix.py }}"
+    assert upload["with"]["name"] == prefix + "-${{ matrix.shard }}-${{ github.run_attempt }}"
+    assert upload["if"] == "${{ always() }}" and upload["with"]["if-no-files-found"] == "error"
+    assert not upload["with"].get("overwrite")
+    download = next(step for step in gate["steps"] if step.get("uses", "").startswith("actions/download-artifact@"))
+    assert download["with"] == {"pattern": prefix + "-*", "path": "unit-history"}
+    combine = next(step for step in gate["steps"] if "_unit_shards.py" in step.get("run", ""))
+    assert "--prefix " + prefix in combine["run"]
+    assert combine["env"] == {name: run["env"][name] for name in ("UNIT_RUN_ID", "UNIT_COMMIT")}
+    report = next(step for step in gate["steps"] if step.get("name") == "Generate coverage reports")
+    assert report["env"]["COVERAGE_FILE"].endswith("/unit-coverage/.coverage")
+    assert all(f"coverage {kind}" in report["run"] for kind in ("report", "html", "json"))
+    coverage = next(step for step in gate["steps"] if step.get("with", {}).get("name") == "code-coverage")
+    assert coverage["if"] == "${{ matrix.os == 'ubuntu-24.04' && matrix.py == '3.13' }}"
+    assert coverage["with"]["path"] == "htmlcov/"
 
 
 def test_tox_passes_ci_neutral_shard_identity_without_changing_default_unit_selection():
