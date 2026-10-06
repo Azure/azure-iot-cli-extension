@@ -1,0 +1,73 @@
+name: "[auto] Index compatibility"
+permissions: {}
+on:
+  workflow_call:
+
+jobs:
+  index-compatibility:
+    name: Index compatibility
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AZURE_CORE_COLLECT_TELEMETRY: "no"
+      PYTHONNOUSERSITE: "1"
+      PYTHONPATH: ""
+    steps:
+      - name: Initialize isolated paths
+        shell: bash
+        run: |
+          echo "COMPAT_ROOT=$RUNNER_TEMP/index-compatibility" >> "$GITHUB_ENV"
+          echo "AZURE_CONFIG_DIR=$RUNNER_TEMP/index-compatibility/azure-config" >> "$GITHUB_ENV"
+          echo "AZDEV_CONFIG_DIR=$RUNNER_TEMP/index-compatibility/azdev-config" >> "$GITHUB_ENV"
+          echo "AZURE_EXTENSION_DIR=$RUNNER_TEMP/index-compatibility/extensions" >> "$GITHUB_ENV"
+          echo "AZURE_EXTENSION_DEV_SOURCES=$RUNNER_TEMP/index-compatibility/azure-cli-extensions" >> "$GITHUB_ENV"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: azure-iot-cli-ext
+          path: ${{ env.COMPAT_ROOT }}/wheels
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Check candidate against index CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$COMPAT_ROOT/reports" "$COMPAT_ROOT/run"
+          {
+            unset PYTHONHOME
+            python -m venv "$COMPAT_ROOT/venv"
+            source "$COMPAT_ROOT/venv/bin/activate"
+            cd "$COMPAT_ROOT/run"
+            git clone --quiet --depth 1 --single-branch -b dev https://github.com/Azure/azure-cli.git "$COMPAT_ROOT/azure-cli"
+            git clone --quiet --depth 1 --single-branch -b main https://github.com/Azure/azure-cli-extensions.git "$COMPAT_ROOT/azure-cli-extensions"
+            python -m pip install --upgrade pip
+            python -m pip install azdev==0.2.13 build wheel
+            azdev setup -c "$COMPAT_ROOT/azure-cli" -r "$COMPAT_ROOT/azure-cli-extensions" --debug
+            python "$GITHUB_WORKSPACE/source/scripts/check_index_compatibility.py" --work-dir "$COMPAT_ROOT"
+          } 2>&1 | tee "$COMPAT_ROOT/reports/setup.log"
+      - name: Publish compatibility summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$COMPAT_ROOT/reports"
+          if [ ! -f "$COMPAT_ROOT/reports/summary.md" ]; then
+            printf '%s\n' '# Index compatibility' \
+              '**Incomplete:** setup, artifact download, or checker execution did not complete. See the job logs.' \
+              'This advisory check does not replace the required linter or gate release approval.' \
+              > "$COMPAT_ROOT/reports/summary.md"
+            echo "::error::Index compatibility did not complete; inspect the job logs."
+          fi
+          cat "$COMPAT_ROOT/reports/summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: index-compatibility
+          path: ${{ env.COMPAT_ROOT }}/reports/
+          if-no-files-found: error
+          retention-days: 14
