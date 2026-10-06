@@ -74,8 +74,9 @@ jobs:
         run: python -m tox r -e lint -vv
 
   unit-gate:
-    name: Unit gate ${{ matrix.py }} - ${{ matrix.os }}
+    name: Unit test ${{ matrix.py }} - ${{ matrix.os }}
     needs: tox
+    if: ${{ always() }}
     continue-on-error: ${{ inputs.continue-on-error }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -91,6 +92,11 @@ jobs:
           - "3.11"
           - "3.10"
     steps:
+      - name: Require successful unit shards and lint
+        if: ${{ needs.tox.result != 'success' }}
+        run: |
+          echo "::error::Unit shards or lint did not succeed (${{ needs.tox.result }})."
+          exit 1
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:

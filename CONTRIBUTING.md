@@ -117,6 +117,8 @@ and four Python versions: four shards per combination, or 48 unit jobs, with
 lint once per combination and a coverage gate for each. Each shard uses serial
 pytest, not xdist, and new unit files are included automatically.
 Shards must use the same Python major/minor version; runner patch versions may differ.
+PR aggregate gates retain the `test / Unit test <python> - <os>` names required
+by branch rules and fail if any shard or lint run fails.
 
 Integration starts only after lint, all shards, and the `unit-test` gate pass.
 The gate checks complete, exactly-once case coverage and combines coverage into

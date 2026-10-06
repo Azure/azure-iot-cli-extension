@@ -235,15 +235,26 @@ def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
 
 
 def test_pr_ci_shards_every_os_python_combination_without_mixing_artifacts():
+    caller = yaml.safe_load((ROOT / ".github/workflows/ci_workflow.yml").read_text(encoding="utf-8"))["jobs"]["test"]
+    assert caller["uses"] == "./.github/workflows/tox.yml"
+    assert caller.get("name", "test") == "test"
+    assert caller.get("with", {}).get("continue-on-error", False) is False
     jobs = yaml.safe_load((ROOT / ".github/workflows/tox.yml").read_text(encoding="utf-8"))["jobs"]
     unit, gate = jobs["tox"], jobs["unit-gate"]
+    assert gate["name"] == "Unit test ${{ matrix.py }} - ${{ matrix.os }}"
+    assert unit["name"] == gate["name"] + " (shard ${{ matrix.shard }}/4)"
     matrix = {
         "os": ["ubuntu-24.04", "windows-2025", "macos-15-intel"],
         "py": ["3.13", "3.12", "3.11", "3.10"],
     }
     assert unit["strategy"] == {"fail-fast": False, "matrix": dict(matrix, shard=[1, 2, 3, 4])}
     assert gate["strategy"] == {"fail-fast": False, "matrix": matrix}
-    assert gate["needs"] == "tox" and "if" not in gate
+    assert gate["needs"] == "tox" and gate["if"] == "${{ always() }}"
+    guard = gate["steps"][0]
+    assert guard["name"] == "Require successful unit shards and lint"
+    assert guard["if"] == "${{ needs.tox.result != 'success' }}"
+    assert guard["run"].strip().endswith("exit 1") and "::error::" in guard["run"]
+    assert "continue-on-error" not in guard
     for job in (unit, gate):
         assert job["runs-on"] == "${{ matrix.os }}"
         assert job["continue-on-error"] == "${{ inputs.continue-on-error }}"
