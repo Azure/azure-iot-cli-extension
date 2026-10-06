@@ -21,6 +21,8 @@ jobs:
     uses: ./.github/workflows/ci_build.yml
   test:
     uses: ./.github/workflows/tox.yml
+    with:
+      pr-matrix: ${{ github.event_name == 'pull_request' }}
   linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
