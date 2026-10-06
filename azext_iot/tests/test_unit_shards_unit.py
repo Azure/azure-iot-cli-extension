@@ -8,6 +8,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from fnmatch import fnmatchcase
 import os
 from pathlib import Path
 import subprocess
@@ -232,6 +233,30 @@ def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
     assert coverage["with"]["if-no-files-found"] == "error" and "if" not in coverage
     assert jobs["int-test"]["needs"] == ["setup", "unit-test"]
     assert "needs.unit-test.result == 'success'" in jobs["int-test"]["if"]
+
+
+@pytest.mark.parametrize("branch,push_enabled", [
+    ("dev", True),
+    ("preview", True),
+    ("1.1.0-preview", True),
+    ("release/1.0.0-preview", True),
+    ("release/1.1.0-preview", True),
+    ("release/future-preview", True),
+    ("users/hangyiwang/unit-test-parallelism", False),
+    ("users/hangyiwang/ado147-integration-parity-retries", False),
+    ("dependabot/github_actions/update", False),
+    ("fix/example", False),
+])
+def test_pr_ci_does_not_duplicate_feature_branch_pushes(branch, push_enabled):
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci_workflow.yml").read_text(encoding="utf-8"))
+    # PyYAML's YAML 1.1 parser also recognizes unquoted "on" as True.
+    events = workflow.get("on", workflow.get(True))
+    assert events == {
+        "pull_request": None,
+        "push": {"branches": ["dev", "preview", "1.1.0-preview", "release/**"], "tags": ["**"]},
+        "workflow_dispatch": None,
+    }
+    assert any(fnmatchcase(branch, pattern) for pattern in events["push"]["branches"]) == push_enabled
 
 
 def test_pr_ci_shards_every_os_python_combination_without_mixing_artifacts():
