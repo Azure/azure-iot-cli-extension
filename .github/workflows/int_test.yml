@@ -277,8 +277,10 @@ jobs:
           echo "|---------|--------|--------|--------------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "$matrix" | jq -r '.[] | "| \(.service) | \(.python) | \(.region) | \(.arm_endpoint) | \(.timeout) min |"' >> $GITHUB_STEP_SUMMARY
 
-  unit-test:
-    name: "Linter and unit tests"
+  lint:
+    name: "Linter"
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -289,23 +291,104 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.13"
-          cache: "pip" # Cache pip downloads to avoid re-downloading packages across runs
+          cache: "pip"
 
-      - name: "Setup test suite"
+      - name: "Run linter"
         run: |
           python -m pip install tox
-          tox r -vv --notest
+          python -m tox r -e lint -vv
 
-      - name: "Run linter and unit tests"
-        run: tox r --skip-pkg-install
+  unit-shards:
+    name: "Unit tests (shard ${{ matrix.shard }}/4)"
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: "Checkout source"
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: "Setup Python 3.13"
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: "Run balanced serial unit shard"
+        env:
+          SHARD: ${{ matrix.shard }}
+          UNIT_RUN_ID: "github:${{ github.repository }}:${{ github.run_id }}"
+          UNIT_COMMIT: ${{ github.sha }}
+          UNIT_ATTEMPT: ${{ github.run_attempt }}
+          RESULTS: ${{ github.workspace }}/unit-result
+          COVERAGE_FILE: ${{ github.workspace }}/unit-result/coverage.dat
+        run: |
+          python -m pip install tox
+          python -m tox r -e python-azcur-unit -vv -- \
+            -p azext_iot.tests._unit_shard_plugin --unit-shard "$SHARD" \
+            --unit-shard-output "$RESULTS" --junitxml "$RESULTS/junit.xml"
+
+      - name: "Upload unit shard evidence"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: unit-shard-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: unit-result/
+          if-no-files-found: error
+          retention-days: 30
+
+  unit-test:
+    name: "Linter and unit test gate"
+    needs: [lint, unit-shards]
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout source"
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: "Setup Python 3.13"
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+
+      - name: "Download unit shard evidence"
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: unit-shard-*
+          path: unit-history
+
+      - name: "Require complete unit coverage and combine results"
+        env:
+          UNIT_RUN_ID: "github:${{ github.repository }}:${{ github.run_id }}"
+          UNIT_COMMIT: ${{ github.sha }}
+        run: |
+          python -m pip install coverage
+          python azext_iot/tests/_unit_shards.py --history unit-history --output unit-coverage
+
+      - name: "Upload unit timing and completeness reports"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: unit-summary-${{ github.run_attempt }}
+          path: |
+            unit-coverage/summary.json
+            unit-coverage/timings.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: "Upload coverage report"
-        if: ${{ always() }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: coverage-unit
           overwrite: true
-          path: ./.coverage
+          path: unit-coverage/.coverage
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: 30
 
