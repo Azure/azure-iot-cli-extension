@@ -55,9 +55,18 @@ def context():
     return {"build": os.environ["UNIT_RUN_ID"], "commit": os.environ["UNIT_COMMIT"]}
 
 
+def python_series(version):
+    match = re.fullmatch(r"([0-9]+\.[0-9]+)\.[0-9]+", version) if isinstance(version, str) else None
+    if match is None:
+        raise ValueError("Unit shard Python version must have a major, minor and patch number.")
+    return match.group(1)
+
+
 def validate(records, expected_context, profile):
     if len(records) != COUNT or {r["shard"] for r in records} != set(range(1, COUNT + 1)):
         raise ValueError("Exactly four distinct unit shards are required.")
+    if len({python_series(record["python"]) for record in records}) != 1:
+        raise ValueError("Unit shards must use the same Python major/minor version.")
     inventory = records[0]["inventory"]
     if not inventory or inventory != sorted(set(inventory)):
         raise ValueError("Full unit collection is empty or duplicated.")
@@ -66,7 +75,7 @@ def validate(records, expected_context, profile):
     for record in records:
         expected = [node for node in inventory if node.split("::", 1)[0] in plan[record["shard"] - 1]]
         if (record.get("schema") != 1 or record["context"] != expected_context
-                or record["python"] != records[0]["python"] or record["profile"] != digest(profile)
+                or record["profile"] != digest(profile)
                 or record["inventory"] != inventory or record["selected"] != expected
                 or record["finished"] is not True or record["exitstatus"] != 0
                 or set(record["reports"]) != set(expected)):
@@ -115,7 +124,7 @@ def aggregate(history, output):
     write(output / "summary.json", {
         "context": context(), "tests": count,
         "shards": [{"shard": r["shard"], "attempt": r["attempt"], "tests": len(r["selected"]),
-                    "seconds": r["seconds"]} for r in records],
+                    "seconds": r["seconds"], "python": r["python"]} for r in records],
     })
     print(f"Verified all {count} unit cases exactly once across four shards; coverage combined.")
 

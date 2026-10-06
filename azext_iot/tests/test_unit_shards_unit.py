@@ -84,6 +84,21 @@ def test_aggregate_rejects_incomplete_or_inconsistent_unit_execution(defect):
         shards.validate(values, CONTEXT, PROFILE)
 
 
+def test_unit_gate_accepts_different_patch_releases_within_the_requested_python_series():
+    values = records()
+    for record, version in zip(values, ["3.13.15", "3.13.15", "3.13.16", "3.13.15"]):
+        record["python"] = version
+    assert shards.validate(values, CONTEXT, PROFILE) == 4
+
+
+@pytest.mark.parametrize("version", ["3.12.16", "3.14.0", "4.13.0", "3.13", "3.13.bad", "3.13.16rc1", "", None])
+def test_unit_gate_rejects_other_python_series_and_malformed_versions(version):
+    values = records()
+    values[2]["python"] = version
+    with pytest.raises(ValueError, match="Python"):
+        shards.validate(values, CONTEXT, PROFILE)
+
+
 def test_unit_gate_preserves_standard_pytest_skip_semantics():
     values = records()
     node = values[0]["selected"][0]
@@ -127,6 +142,7 @@ def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypat
     folder = tmp_path / "unit-shard-1-2"
     record = shards.read(folder / "receipt.json")
     record["attempt"] = 2
+    record["python"] = "3.13.16"
     shards.write(folder / "receipt.json", record)
     profile = tmp_path / "profile.json"
     shards.write(profile, PROFILE)
@@ -135,7 +151,9 @@ def test_latest_successful_native_unit_attempt_is_aggregated(tmp_path, monkeypat
     monkeypatch.setenv("UNIT_COMMIT", CONTEXT["commit"])
     run = mocker.patch.object(shards.subprocess, "run")
     shards.aggregate(tmp_path, tmp_path / "combined")
-    assert shards.read(tmp_path / "combined/summary.json")["tests"] == 4
+    summary = shards.read(tmp_path / "combined/summary.json")
+    assert summary["tests"] == 4
+    assert [record["python"] for record in summary["shards"]] == ["3.13.16", "3.13.0", "3.13.0", "3.13.0"]
     assert len([arg for arg in run.call_args.args[0] if arg.endswith("coverage.dat")]) == 4
     assert "unit-shard-1-2" in run.call_args.args[0][5]
 
