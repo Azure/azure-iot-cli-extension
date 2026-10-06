@@ -114,6 +114,7 @@ Execute the following command to run the IoT Hub unit tests:
 The GitHub integration workflow runs lint alongside four balanced unit-test
 shards on Linux/Python 3.13. Each shard uses serial pytest, not xdist. New unit
 files are included automatically; the separate tox OS/Python matrix is unchanged.
+Shards must use the same Python major/minor version; runner patch versions may differ.
 
 Integration starts only after lint, all shards, and the `unit-test` gate pass.
 The gate checks complete, exactly-once case coverage and combines coverage into
