@@ -16,12 +16,16 @@ STAGES = ("setup", "call", "teardown")
 SERVICES = ("DPS", "HubControl", "HubData", "ADU", "ADR")
 
 
+class IntegrityError(ValueError):
+    """Changed immutable identity or artifacts cannot be recovered in the same run."""
+
+
 class InfrastructureFailure(AssertionError):
     """Preserve existing assertion handling for service readiness failures."""
 
 
 class CleanupFailure(InfrastructureFailure):
-    """A call-phase cleanup failure needs independent resource-absence proof."""
+    """A call-phase cleanup failure requires full-service recovery."""
 
     _iot_cleanup_failed = True
 
@@ -69,7 +73,7 @@ def fixture_failure(receipt):
 
 def outcomes(receipt, *, allow_fixture_failures=False):
     if receipt.get("finished") is not True or receipt.get("exitstatus") not in (0, 1):
-        raise ValueError("Missing terminal pytest execution; start a new run after fixing infrastructure.")
+        raise ValueError("Missing terminal pytest execution; full-service recovery is required.")
     if receipt.get("workerErrors"):
         raise ValueError("Worker execution or collection evidence is incomplete.")
     selected, reports = receipt["collected"], receipt["reports"]
@@ -88,7 +92,7 @@ def outcomes(receipt, *, allow_fixture_failures=False):
             raise ValueError("Failed call classification is missing.")
         result[node] = "failed" if ["failed"] in stages.values() else "passed"
     if fixture_failure(receipt) and not allow_fixture_failures:
-        raise ValueError("Setup/teardown or call-phase cleanup failed without independent cleanup proof; start a new run.")
+        raise ValueError("Setup/teardown or call-phase cleanup failed; full-service recovery is required.")
     if receipt["exitstatus"] != (1 if "failed" in result.values() else 0):
         raise ValueError("Pytest exit status disagrees with case evidence.")
     return result
@@ -110,87 +114,130 @@ def validate_context(context):
             raise ValueError("Artifact/dependency identity is invalid.")
 
 
-def evaluate(history, context):
-    """Validate the entire chain; a later pass cannot erase an unsafe earlier attempt."""
+def _evaluate(history, context):
+    """Keep immutable history while requiring a full service after incomplete execution."""
     validate_context(context)
     previous = None
     expected = {}
     effective = {}
     recovered = set()
-    remaining = {}
+    full_required = not history
+    native_attempt = 0
     for index, attempt in enumerate(history, 1):
-        if attempt.get("schema") != 2:
+        if attempt.get("schema") != 3:
             raise ValueError("Unsupported attempt format; start a new run with the updated runner.")
         if attempt.get("context") != context:
             changed = sorted(key for key in context if attempt.get("context", {}).get(key) != context[key])
             raise ValueError("Attempt identity changed: " + ", ".join(changed) + ". Start a new run.")
-        if (attempt.get("sequence") != index
-                or attempt.get("parent") != (digest(previous) if previous else None)
-                or attempt.get("nativeAttempt") != index):
+        native = attempt.get("nativeAttempt")
+        if (attempt.get("sequence") != index or type(native) is not int or native <= native_attempt
+                or attempt.get("parent") != (digest(previous) if previous else None)):
             raise ValueError("Attempt ancestry is missing or changed; start a new run.")
-        if attempt.get("executionErrors") != []:
-            raise ValueError("Prior attempt did not complete safely; see its rejection report and start a new run: "
-                             + "; ".join(attempt.get("executionErrors") or ["Execution evidence is missing."]))
+        missing = list(range(native_attempt + 1, native))
+        if attempt.get("missingAttempts", []) != missing:
+            raise ValueError("Missing native attempts were not explicitly recorded.")
+        mode = attempt.get("mode")
+        if mode not in ("full", "cases", "reuse") or (
+                (index == 1 or full_required or missing) and mode != "full"):
+            raise ValueError("Incomplete execution or missing attempts require a full-service retry.")
+        native_attempt = native
         phases = attempt["phases"]
-        if attempt.get("reused") is True:
-            if index == 1 or phases or any("failed" in values.values() for values in effective.values()):
+        execution_errors = attempt.get("executionErrors")
+        if not isinstance(execution_errors, list):
+            raise ValueError("Attempt execution status is missing.")
+        if mode == "reuse":
+            if execution_errors or not effective or phases or any("failed" in values.values() for values in effective.values()):
                 raise ValueError("Only fully passing evidence may be reused without test execution.")
             previous = attempt
             continue
-        if not phases:
-            raise ValueError("Attempt has no phase evidence.")
-        if index == 1:
-            expected = {phase: tuple(value["expected"]) for phase, value in phases.items()}
-            if any(not nodes or len(set(nodes)) != len(nodes) for nodes in expected.values()):
-                raise ValueError("Empty or duplicate original collection.")
-        elif set(phases) != {phase for phase, values in effective.items() if "failed" in values.values()}:
+        if execution_errors or not phases:
+            full_required = True
+            previous = attempt
+            continue
+        collection = {phase: tuple(value["expected"]) for phase, value in phases.items()}
+        if any(not nodes or len(set(nodes)) != len(nodes) for nodes in collection.values()):
+            raise ValueError("Empty or duplicate original collection.")
+        if mode == "full" and expected and collection != expected:
+            raise ValueError("Full-service retry collection changed.")
+        if mode == "cases" and set(phases) != {
+                phase for phase, values in effective.items() if "failed" in values.values()}:
             raise ValueError("Retry must cover exactly the remaining failed phases.")
+        next_effective = {} if mode == "full" else {phase: dict(values) for phase, values in effective.items()}
+        full_required = False
         for phase, value in phases.items():
-            if phase not in expected or tuple(value["expected"]) != expected[phase] or value["safe"] is not True:
-                raise ValueError("Collection changed or phase cleanup is unproven.")
+            if value["safe"] is not True:
+                raise ValueError("Phase isolation or execution identity is unproven.")
+            if mode == "cases" and (phase not in expected or collection[phase] != expected[phase]):
+                raise ValueError("Retry collection changed.")
             excluded = value.get("excluded", [])
-            if (excluded != history[0]["phases"][phase].get("excluded", [])
-                    or len(set(excluded)) != len(excluded) or set(excluded).intersection(expected[phase])):
+            original = next((item["phases"][phase] for item in history[:index]
+                             if phase in item["phases"] and not item.get("executionErrors")), value)
+            if (excluded != original.get("excluded", []) or len(set(excluded)) != len(excluded)
+                    or set(excluded).intersection(collection[phase])):
                 raise ValueError("Committed skip exclusions changed or overlap enabled coverage.")
-            selected = set(expected[phase]) if index == 1 else set(remaining[phase])
-            allow_fixture_failures = (
-                context["service"] in ("DPS", "HubControl", "HubData") and value.get("cleanupVerified") is True
-            )
-            results = outcomes(value["receipt"], allow_fixture_failures=allow_fixture_failures)
+            selected = (set(collection[phase]) if mode == "full" else
+                        {node for node, status in effective[phase].items() if status == "failed"})
+            try:
+                results = outcomes(value["receipt"], allow_fixture_failures=True)
+            except ValueError:
+                full_required = True
+                continue
             if set(results) != selected:
-                raise ValueError("Retry did not execute exactly the required failed cases or fixture phase.")
+                raise ValueError("Retry did not execute exactly the required cases.")
+            full_required = full_required or fixture_failure(value["receipt"])
             if index > 1:
                 recovered.update((phase, node) for node, status in results.items()
-                                 if status == "passed" and effective[phase][node] == "failed")
+                                 if status == "passed" and effective.get(phase, {}).get(node) == "failed")
                 recovered.difference_update((phase, node) for node, status in results.items() if status == "failed")
-            effective.setdefault(phase, {}).update(results)
-            remaining[phase] = (list(expected[phase]) if fixture_failure(value["receipt"]) else
-                                [node for node, status in effective[phase].items() if status == "failed"])
+            next_effective.setdefault(phase, {}).update(results)
+        if mode == "full":
+            expected = collection
+        effective = next_effective
         previous = attempt
-    return expected, effective, recovered
+    return expected, effective, recovered, full_required
+
+
+def evaluate(history, context):
+    return _evaluate(history, context)[:3]
+
+
+def recovery_plan(history, context):
+    expected, effective, _, full_required = _evaluate(history, context)
+    if not history or full_required:
+        return {"mode": "full", "phases": {phase: list(nodes) for phase, nodes in expected.items()}}
+    phases = {phase: [node for node, status in cases.items() if status == "failed"]
+              for phase, cases in effective.items() if "failed" in cases.values()}
+    return {"mode": "cases" if phases else "reuse", "phases": phases}
 
 
 def pending(history, context):
-    _, effective, _ = evaluate(history, context)
-    latest = {phase: value for attempt in history for phase, value in attempt["phases"].items()}
-    return {
-        phase: (list(latest[phase]["expected"]) if fixture_failure(latest[phase]["receipt"]) else
-                [node for node, status in cases.items() if status == "failed"])
-        for phase, cases in effective.items() if "failed" in cases.values()
-    }
+    plan = recovery_plan(history, context)
+    return plan["phases"] or ({"tests": []} if plan["mode"] == "full" else {})
 
 
 def load_history(directory, context):
+    for path in Path(directory).rglob("rejection.json"):
+        rejected = read(path)
+        identity = rejected.get("identity", {})
+        if not rejected.get("recoverable") and (
+                not identity or all(identity.get(key) == context[key] for key in ("service", "python", "region"))):
+            raise IntegrityError("An immutable identity/artifact check failed; start a new run.")
     paths = sorted(Path(directory).rglob("attempt.json"))
     relevant = []
     for path in paths:
         record = read(path)
         candidate = record.get("context", {})
         if all(candidate.get(key) == context[key] for key in ("service", "python", "region")):
-            verify_artifacts(path, record)
+            try:
+                verify_artifacts(path, record)
+            except (ValueError, OSError, KeyError) as error:
+                raise IntegrityError("Original attempt artifacts are missing or changed.") from error
             relevant.append(record)
     relevant.sort(key=lambda value: value["sequence"])
-    evaluate(relevant, context)
+    try:
+        evaluate(relevant, context)
+    except ValueError as error:
+        raise IntegrityError(str(error)) from error
     return relevant
 
 
@@ -217,7 +264,7 @@ def verify_artifacts(path, record):
 
 
 def junit(history, context, path):
-    _, effective, recovered = evaluate(history, context)
+    _, effective, recovered, full_required = _evaluate(history, context)
     suite = ET.Element("testsuite", name=context["service"])
     failures = 0
     for phase, cases in effective.items():
@@ -228,14 +275,20 @@ def junit(history, context, path):
                 ET.SubElement(case, "failure", message="Unresolved test failure; see immutable attempt artifacts.")
             elif (phase, node) in recovered:
                 ET.SubElement(case, "system-out").text = "Passed on manual retry; initial failure remains in attempt history."
+    if full_required:
+        failures += 1
+        case = ET.SubElement(suite, "testcase", classname="pipeline", name="Full-service recovery required")
+        ET.SubElement(case, "error", message="Incomplete execution or fixture failure; rerun the affected service.")
     excluded = 0
-    for phase, value in history[0]["phases"].items():
+    latest = {phase: value for attempt in history for phase, value in attempt["phases"].items()}
+    for phase, value in latest.items():
         for node in value.get("excluded", []):
             excluded += 1
             case = ET.SubElement(suite, "testcase", classname=phase, name=node)
             ET.SubElement(case, "skipped", message="Committed unconditional skip; not counted as passed coverage.")
-    suite.set("tests", str(sum(map(len, effective.values())) + excluded))
+    suite.set("tests", str(sum(map(len, effective.values())) + excluded + int(full_required)))
     suite.set("skipped", str(excluded))
-    suite.set("failures", str(failures))
+    suite.set("failures", str(failures - int(full_required)))
+    suite.set("errors", str(int(full_required)))
     ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
     return failures

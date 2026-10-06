@@ -199,8 +199,8 @@ ADU uses the existing service/job deadline without an additional per-test timeou
 DPS regular and service-SAS attempts use seven workers, including exact failed-case
 retries; local-auth-toggle and explicitly requested focused debugging remain serial.
 The controller aggregates worker collection, setup/call/teardown outcomes and
-retry eligibility into one receipt. Existing phase deadlines and owned cleanup
-verification remain unchanged.
+retry eligibility into one receipt. Existing test/job and process-shutdown limits
+remain in place; ADO cleanup does not add a deletion-completion polling budget.
 
 There are **no automatic test retries**. For completed test-call failures with
 successful setup/teardown, use Azure DevOps **Rerun failed jobs** on the failed service stage in the
@@ -208,11 +208,12 @@ successful setup/teardown, use Azure DevOps **Rerun failed jobs** on the failed 
 not the exception type, proves recovery. There is no test-name input. The runner downloads
 that run's attempt artifacts and selects only the still-failing cases for that
 service/Python/region combination. Already-passing cases and phases are retained.
-For Hub/DPS setup, teardown, or call-phase cleanup failures, the existing controller must
-independently prove ownership and complete resource absence before recovery is permitted.
-The next manual attempt then reruns the **whole affected phase** with fresh fixtures,
-including its previously passing cases, because a shared fixture failed. Other phases
-are not rerun. Any new failure in that phase remains unresolved. Owned Hub
+When exact-case selection is unsafe or unavailable (including setup/teardown failures,
+incomplete collection, worker crashes, timeouts, or installation/login failures), the
+next manual attempt reruns the **entire affected service/Python/region combination**
+with fresh fixtures, including all of its authentication phases and previously passing
+cases. Other services are not rerun. A full-service retry replaces that service's effective
+results, so a newly failing case cannot be hidden by an earlier pass. Owned Hub
 and DPS phases provision fresh independent fixtures; ADR/ADU recollect the same
 suite and rebuild their fixture dependencies for the selected cases. The original
 failures remain in immutable attempt artifacts and test runs; effective results
@@ -221,25 +222,37 @@ and the summary identify cases that passed on manual retry. Rerun the downstream
 Historical failed test runs are not deleted even when the build becomes green.
 
 The gate requires every planned combination and exact enabled-case coverage across
-a contiguous native-job-attempt chain. It verifies commit, original wheel, dependency
-fingerprint, target, phase provenance and raw artifact hashes. Changed or missing
-artifacts/dependencies, incomplete stages/worker termination, unexpected skipped cases,
-cancellations, auth-refresh failure and unproven cleanup fail closed: repair the cause and start
-a **new full run**, rather than trying to recover them with a passing test.
+an immutable attempt chain. It verifies commit, original wheel, dependency fingerprint,
+target, phase provenance and raw artifact hashes. Changed identities, dependencies,
+or recorded raw artifacts still require a **new run**. Missing native attempts are
+explicitly recorded and force full-service execution; they cannot reuse an earlier pass.
+Incomplete execution, runtime skips, cancellation and auth-refresh failures remain
+failing until a later full-service attempt completes successfully. Old workers must
+terminate before their controller exits; a manual retry starts a new job and fixture cohort.
 Focused debug receipts and diagnostic mode never qualify release coverage.
 Checked-in unconditional `pytest.mark.skip` exclusions are recorded separately,
 must remain identical across attempts, and appear as skipped rather than passed
 in the effective report. Unexpected runtime skips remain disqualifying. A
-call failure carrying a cleanup-failure marker (including a wrapped exception) requires
-independent cleanup proof, not just successful pytest teardown. No exception messages
-or credentials are stored in failure classification metadata. A missing native
-attempt (including installation/login failure before receipts exist) blocks later
-recovery, even when an earlier attempt's artifacts are available.
+call failure carrying a cleanup-failure marker (including a wrapped exception) forces
+full-service recovery, not just an exact-case retry. No exception messages or credentials
+are stored in failure classification metadata.
 Rejected attempts publish a specific rejection summary and a failing orchestration result,
 not successful test coverage or misleading missing-file errors. Completed sibling phase
-receipts are retained even when another phase cannot qualify. The final gate rejects
-any incomplete/rejected attempt; it cannot silently reuse an older passing result.
+receipts are retained even when another phase cannot qualify. Recoverable incomplete-job
+reports require a later full-service attempt; immutable-identity rejections remain fatal.
 Runs pinned to the previous attempt format must start a new run to use the updated policy.
+
+ADO cleanup uses a separate submission ledger. Cleanup-only helpers submit deletion once
+where ownership is established and stop waiting after Azure accepts it. `accepted` and
+`deleting` are **not** claims of resource absence. Rejected submissions and dependencies
+that cannot yet be deleted remain visible as `failed` or `pending`, with exact resource IDs
+in `cleanup-status.json` and the original phase/ownership receipts. These leftovers need
+later operational cleanup: no independent cleanup job or automatic janitor is launched.
+Pending resources can still consume quota; a fresh retry does not bypass provisioning failures.
+CSR namespace/DPS/Hub dependencies remain retained when RegistryDevice or namespace
+cleanup is unresolved. Cleanup status does not qualify test coverage or prevent a fresh,
+isolated retry. Actual deletion assertions inside test cases are unchanged, as are
+the existing non-ADO cleanup-completion requirements.
 
 The ADO run form exposes only **Dry run** and **Integration tests**. The
 deliberate-failure diagnostic remains an offline unit regression in

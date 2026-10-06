@@ -13,6 +13,7 @@ import sys
 import time
 from typing import Callable, Dict, Optional, TypeVar
 
+from azure.cli.core import AzCli
 from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
 from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import (
@@ -31,7 +32,8 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
     _log,
     timed_step,
 )
-from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
+from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION, TEST_SUBSCRIPTION
+from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests.settings import HUB_TEST_LOCATION
 from azext_iot.tests._ado_retry import CleanupFailure, InfrastructureFailure
 
@@ -118,7 +120,9 @@ class CleanupLedger:
                 _log(LogKind.WARN, "Cleanup failed for %s: %s", label, error)
             else:
                 self._completed.add(label)
-                _log(LogKind.RESULT, "Cleanup completed for %s", label)
+                message = ("Cleanup callback finished for %s; see submission status"
+                           if handoff.enabled() else "Cleanup completed for %s")
+                _log(LogKind.RESULT, message, label)
         self._actions.extend(reversed(pending))
         if failures and primary_error is not None:
             primary_error._iot_cleanup_failed = True  # pylint: disable=protected-access
@@ -411,6 +415,8 @@ def wait_for_listed_resource(
 class ADRFullInfraHelper(RoleAssignmentHelper):
     """Setup and teardown for tests linking an ADR namespace to an IoT Hub."""
 
+    cli_ctx: AzCli  # Provided by the live scenario through the MRO.
+
     _RESOURCE_COMMANDS = {
         "namespace": "iot adr ns",
         "dps": "iot dps",
@@ -572,7 +578,41 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         self._cleanup_owned_resources(resources)
 
     def _cleanup_owned_resource(self, resource):
+        if handoff.enabled():
+            kind, name, group = resource
+            resource_type = {
+                "namespace": "Microsoft.DeviceRegistry/namespaces",
+                "dps": "Microsoft.Devices/provisioningServices", "hub": "Microsoft.Devices/IotHubs",
+                "su": "Microsoft.DeviceUpdate/updateInstances", "identity": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            }[kind]
+            resource_id = f"/subscriptions/{TEST_SUBSCRIPTION}/resourceGroups/{group}/providers/{resource_type}/{name}"
+            handoff.cleanup(resource_id, lambda: self._handoff_owned_resource(resource, resource_id), accepted=False)
+            return
         self._delete_owned_resource(*resource)
+        self._owned_resources.pop(resource, None)
+
+    def _handoff_owned_resource(self, resource, resource_id):
+        from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
+
+        kind, name, group = resource
+        if self._resource_is_absent(kind, name, group):
+            handoff.record(resource_id, "absent")
+        else:
+            with handoff.submission(resource_id):
+                if kind == "hub":
+                    with iot_hub_service_factory(self.cli_ctx, subscription_id=TEST_SUBSCRIPTION) as hub_client:
+                        hub_client.iot_hub_resource.begin_delete(
+                            resource_group_name=group, resource_name=name, polling=False, retry_total=0,
+                        )
+                elif kind == "dps":
+                    with iot_service_provisioning_factory(self.cli_ctx, subscription_id=TEST_SUBSCRIPTION) as dps_client:
+                        dps_client.iot_dps_resource.begin_delete(
+                            resource_group_name=group, provisioning_service_name=name, polling=False, retry_total=0,
+                        )
+                else:
+                    arguments = f"-n {shlex.quote(name)} -g {shlex.quote(group)}"
+                    options = " --yes --no-wait" if kind in ("namespace", "su") else ""
+                    self.cmd(f"{self._RESOURCE_COMMANDS[kind]} delete {arguments}{options}")
         self._owned_resources.pop(resource, None)
 
     def _cleanup_owned_resources(self, resources):

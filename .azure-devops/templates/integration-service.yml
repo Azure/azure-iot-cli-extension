@@ -63,7 +63,7 @@ stages:
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
           - task: AzureCLI@2
-            displayName: Run service or recover failed cases and fixture phases
+            displayName: Retry failed cases or rerun the full service with fresh fixtures
             inputs:
               azureSubscription: $(AzureServiceConnection)
               addSpnToEnvironment: true
@@ -104,6 +104,10 @@ stages:
           - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
             condition: succeededOrFailed()
             displayName: Report incomplete execution before publishing
+            env:
+              SERVICE: ${{ parameters.service }}
+              TEST_PYTHON: $(python)
+              TEST_REGION: $(region)
           - publish: attempt
             condition: succeededOrFailed()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)

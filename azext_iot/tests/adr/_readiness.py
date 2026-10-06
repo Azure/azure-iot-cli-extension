@@ -192,7 +192,34 @@ def delete_test_namespace(
     CLI's exit-code wrapper loses it during exception unwinding. The same exact
     GET/URI/404 checks apply; an exit code alone never establishes absence.
     """
+    from azext_iot.tests import _cleanup_handoff as handoff
+    from azext_iot.tests.adr.conftest import TEST_SUBSCRIPTION
+
     scope = shlex.join(["--namespace", namespace_name, "-g", resource_group])
+    if handoff.enabled():
+        resource_id = (f"/subscriptions/{TEST_SUBSCRIPTION}/resourceGroups/{resource_group}"
+                       f"/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}")
+
+        def submit():
+            namespace = _get_resource(scenario, f"iot adr ns show {scope}", namespace_getter)
+            if namespace is None:
+                handoff.record(resource_id, "absent")
+                return
+            if namespace.get("id", "").casefold() != resource_id.casefold():
+                raise AssertionError("Cleanup namespace ID does not match the owned scope.")
+            for kind, names in (("job", jobs), ("group", groups)):
+                for name in names:
+                    if _get_resource(scenario, f"iot adr ns {kind} show {scope} -n {shlex.quote(name)}") is not None:
+                        handoff.record(resource_id, "pending", "ChildDeletionPending")
+                        return
+            if (namespace.get("properties") or {}).get("provisioningState") == "Deleting":
+                handoff.record(resource_id, "deleting")
+                return
+            with handoff.submission(resource_id):
+                scenario.cmd(f"iot adr ns delete {scope} -y --no-wait")
+
+        handoff.cleanup(resource_id, submit, accepted=False)
+        return
     budget = _Deadline(timeout, clock, sleeper, "owned namespace cleanup")
     accepted = False
     rejected = None

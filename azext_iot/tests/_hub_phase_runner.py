@@ -48,6 +48,7 @@ RESERVE = HUB_CI_BUDGETS["HubControl"]["reserve_minutes"] * 60
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
+HANDOFF = runpy.run_path(str(ROOT / "azext_iot/tests/_cleanup_handoff.py"))
 
 
 def selection():
@@ -133,15 +134,15 @@ def write_junit(receipt, expected, path):
     os.chmod(path, 0o600)
 
 
-def sas_errors(data, expected, *, debug=None, region="centraluseuap", endpoint=None):
+def sas_errors(data, expected, *, debug=None, region="centraluseuap", endpoint=None, handoff=False):
     """Validate existing SAS evidence without changing its membership/receipt format."""
-    errors = sas_cleanup_errors(data, debug=debug, region=region, endpoint=endpoint)
+    errors = sas_cleanup_errors(data, debug=debug, region=region, endpoint=endpoint, handoff=handoff)
     if sorted(data.get("passed", [])) != sorted(expected):
         errors.append("SAS required cases did not pass")
     return errors
 
 
-def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=None):
+def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=None, handoff=False):
     """Validate owned resource absence independently of test outcomes."""
     owned = helper(region, endpoint)
     errors = []
@@ -152,8 +153,8 @@ def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=Non
             or set(ids) != {"hub", "storage", "container", "role"}
             or not all(owned["scope_id"](value) for value in ids.values())
             or len(set(value.casefold() for value in ids.values())) != 4
-            or sorted(data.get("absent", [])) != sorted(ids)
-            or data.get("cleanupFailures") != {} or not FOCUSED["matches"](data, debug)):
+            or not handoff and (sorted(data.get("absent", [])) != sorted(ids) or data.get("cleanupFailures") != {})
+            or not FOCUSED["matches"](data, debug)):
         errors.append("invalid SAS ownership or cleanup")
     if ids:
         prefix = f"/subscriptions/{owned['SUBSCRIPTION']}/resourceGroups/{owned['GROUP']}/providers/"
@@ -176,13 +177,15 @@ def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=Non
            or m.split(" ", 1)[-1] not in allowed for m in mutations):
         errors.append("SAS mutation outside exact owned manifest")
     if not required.issubset(mutations) or any(
-        not isinstance(status, int) or not 200 <= status < 300 for status in statuses.values()
+        not isinstance(status, int) or not 200 <= status < 300
+        for mutation, status in statuses.items() if not handoff or not mutation.startswith("DELETE ")
     ):
         errors.append("SAS creation/mutation not confirmed")
     return errors
 
 
-def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, attempt=False, allow_failures=False):
+def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, attempt=False, allow_failures=False,
+                        handoff=False):
     """Pure JSON gate, no pytest/Azure imports. Return {passed: bool, errors: list}.
 
     Load with runpy.run_path(path) to bypass Azure-dependent package __init__ files.
@@ -190,7 +193,7 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, 
     """
     errors = []
     try:
-        if allow_failures and not attempt:
+        if (allow_failures or handoff) and not attempt:
             raise ValueError("Only ADO attempt evaluation may accept failed test stages with verified cleanup.")
         output = Path(result_dir)
         summary = read_json(output / "hub-phases.json")
@@ -255,19 +258,21 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, 
             evidence = read_json(output / name / "ownership.json")
             if name == "sas":
                 passed = [node for node in expected if receipt.get("reports", {}).get(node, {}).get("call") == ["passed"]]
-                errors.extend(sas_errors(evidence, passed if allow_failures else expected, debug=request, **target))
+                errors.extend(sas_errors(evidence, passed if allow_failures else expected, debug=request,
+                                         handoff=handoff, **target))
                 ids = sorted(value.casefold() for value in evidence["ids"].values())
                 if result.get("sasRunUid") != evidence.get("runUid"):
                     errors.append("SAS receipt identity mismatch")
             else:
-                errors.extend(owned["ownership_errors"](evidence, run_id, name))
+                errors.extend(owned["ownership_errors"](evidence, run_id, name, allow_pending_cleanup=handoff))
                 ids = sorted(evidence["resources"])
                 children = sorted(owned["descendants"](evidence))
-                if (cleanup.get("descendantIds") != children or cleanup.get("absentDescendantIds") != children):
+                if not handoff and (cleanup.get("descendantIds") != children or cleanup.get("absentDescendantIds") != children):
                     errors.append("owned descendant resource absence not proven")
-            if (cleanup.get("runId") != run_id or cleanup.get("complete") is not True
-                    or cleanup.get("ownedIds") != ids or cleanup.get("absentIds") != ids
-                    or cleanup.get("errors") != []):
+            if (cleanup.get("runId") != run_id or cleanup.get("ownedIds") != ids
+                    or handoff and cleanup.get("mode") != "handoff"
+                    or not handoff and (cleanup.get("complete") is not True
+                                        or cleanup.get("absentIds") != ids or cleanup.get("errors") != [])):
                 errors.append("owned resource absence not proven")
             if known_ids.intersection(ids):
                 errors.append("authentication phases reused resources")
@@ -335,22 +340,30 @@ def command(suite, phase, *, debug=None, folder=None):
     ]
 
 
-def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="centraluseuap", endpoint=None):
+def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="centraluseuap", endpoint=None, handoff=False):
     owned = helper(region, endpoint)
     arm.deadline = deadline
     # Only structurally valid receipts may authorize even reconciliation reads.
-    errors = owned["ownership_errors"](evidence, run_id, phase)
-    if errors and set(errors) <= {"unresolved mutation; no replay permitted", "unreconciled asynchronous acceptance"}:
+    errors = owned["ownership_errors"](evidence, run_id, phase, allow_pending_cleanup=handoff)
+    if not handoff and errors and set(errors) <= {
+        "unresolved mutation; no replay permitted", "unreconciled asynchronous acceptance",
+    }:
         owned["reconcile"](arm, evidence, deadline, lambda: owned["write"](path, evidence))
         errors = owned["ownership_errors"](evidence, run_id, phase)
     ids = sorted(evidence.get("resources", {}))
     result = {"runId": run_id, "ownedIds": ids, "absentIds": [], "errors": errors, "complete": False,
               "descendantIds": [], "absentDescendantIds": []}
+    if handoff:
+        result["mode"] = "handoff"
     # Never replay a possibly accepted mutation, even when the latest GET is 404.
     if errors:
+        if handoff:
+            for resource_id in ids:
+                HANDOFF["record"](resource_id, "pending", "OwnershipUnresolved")
         return result
     arm.deadline = deadline
-    for resource_id in ids:
+
+    def cleanup_one(resource_id):
         record = evidence["resources"][resource_id]
         api = record["apiVersion"]
         status, resource = arm.request("GET", resource_id, api)
@@ -359,8 +372,17 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
             or resource.get("tags", {}).get(owned["OWNER_TAG"]) != run_id
         ):
             result["errors"].append("Cleanup target ownership changed; no delete permitted")
-            continue
+            if handoff:
+                HANDOFF["record"](resource_id, "failed", "OwnershipChanged")
+            return
         deleted = any(m["method"] == "DELETE" and m["id"] == resource_id for m in record["mutations"])
+        if handoff and (status == 404 or deleted):
+            if status == 404:
+                result["absentIds"].append(resource_id)
+            accepted = any(m["method"] == "DELETE" and m["id"] == resource_id and m["status"] in (200, 202, 204)
+                           for m in record["mutations"])
+            HANDOFF["record"](resource_id, "absent" if status == 404 else "accepted" if accepted else "pending")
+            return
         if status != 404 and not deleted:
             # Persist intent BEFORE sending; a crash/timeout never permits a second DELETE.
             record["mutations"].append({"method": "DELETE", "id": resource_id, "apiVersion": api, "status": None})
@@ -372,7 +394,12 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
             owned["write"](path, evidence)
             if status not in (200, 202, 204, 404):
                 result["errors"].append("Cleanup delete failed; no replay permitted")
-                continue
+                if handoff:
+                    HANDOFF["record"](resource_id, "failed", "DeleteRejected")
+                return
+            if handoff:
+                HANDOFF["record"](resource_id, "absent" if status == 404 else "accepted")
+                return
         while time.monotonic() < deadline:
             status, _ = arm.request("GET", resource_id, api)
             if status == 404:
@@ -381,8 +408,15 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
                 result["absentIds"].append(resource_id)
                 break
             time.sleep(min(5, max(0, deadline - time.monotonic())))
+    for resource_id in ids:
+        if handoff:
+            HANDOFF["cleanup"](resource_id, lambda resource_id=resource_id: cleanup_one(resource_id), accepted=False)
+        else:
+            cleanup_one(resource_id)
     children = owned["descendants"](evidence)
     result["descendantIds"] = sorted(children)
+    if handoff:
+        return result
     for resource_id in sorted(children):
         status, _ = arm.request("GET", resource_id, children[resource_id])
         if status == 404:
@@ -435,6 +469,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         raise ValueError("Controller is restricted to the authorized integration scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
+    handoff = bool(attempt_selection and HANDOFF["enabled"]())
     # Children use phase-local databases; the combined result goes where the caller publishes it.
     coverage_destination = Path(base.pop("COVERAGE_FILE", None) or ROOT / ".coverage").resolve()
     budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
@@ -536,24 +571,28 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 if phase == "sas":
                     with summary_lock:
                         result["sasRunUid"] = evidence["runUid"]
-                    errors = sas_cleanup_errors(evidence, debug=debug, **target)
+                    errors = sas_cleanup_errors(evidence, debug=debug, handoff=handoff, **target)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
+                    if handoff:
+                        cleanup.update(mode="handoff", complete=False,
+                                       absentIds=sorted(evidence["ids"][key].casefold() for key in evidence["absent"]))
                 else:
                     cleanup = cleanup_regular(current, evidence, result["runId"], phase,
-                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json", **target)
+                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json",
+                                              handoff=handoff, **target)
                     write_json(folder / "ownership.json", evidence)
                 receipt = read_json(folder / "pytest.json")
                 expected = debug["requestedNodes"] if debug else list(selection()["nodes"](suite, phase))
                 write_junit(receipt, expected, folder / "junit.xml")
                 receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
                 if phase == "sas":
-                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug, **target))
+                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug, handoff=handoff, **target))
                 with summary_lock:
                     result["receiptErrors"] = receipt_errors
                     result["status"] = "passed" if (
-                        not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
+                        not receipt_errors and (cleanup["complete"] or handoff) and execution["exit_code"] == 0
                         and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
                     ) else "failed"
             except Exception as error:  # Never serialize credential-bearing exception messages.

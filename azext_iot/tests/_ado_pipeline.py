@@ -23,6 +23,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
+HANDOFF = runpy.run_path(str(ROOT / "azext_iot/tests/_cleanup_handoff.py"))
 TARGET = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
 BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 
@@ -112,8 +113,9 @@ def candidate(directory, output):
 
 
 def gate(directory):
-    if list(Path(directory).rglob("rejection.json")):
-        raise ValueError("An attempt was rejected or incomplete; see its rejection report and start a new run.")
+    rejections = [RETRY["read"](path) for path in Path(directory).rglob("rejection.json")]
+    if any(not value.get("recoverable") for value in rejections):
+        raise ValueError("An immutable identity/artifact check failed; start a new run.")
     plans = sorted(Path(directory).glob("integration-plan-*/plan.json"))
     if not plans or any(RETRY["read"](path) != RETRY["read"](plans[0]) for path in plans):
         raise ValueError("Missing or changed execution plan.")
@@ -121,6 +123,9 @@ def gate(directory):
     paths = list(Path(directory).rglob("attempt.json"))
     records = [RETRY["read"](path) for path in paths]
     keys = {(value["service"], value["python"], value["region"]) for value in expected}
+    if any(tuple(value.get("identity", {}).get(key) for key in ("service", "python", "region")) not in keys
+           or type(value["identity"].get("nativeAttempt")) is not int for value in rejections):
+        raise ValueError("Incomplete-job identity is missing or outside the execution plan.")
     if {(value["context"]["service"], value["context"]["python"], value["context"]["region"])
             for value in records} != keys:
         raise ValueError("Missing or unexpected service combinations.")
@@ -146,6 +151,12 @@ def gate(directory):
             raise ValueError("Original phase selection does not cover the authoritative service manifest.")
         if RETRY["pending"](history, ctx):
             raise ValueError("Unresolved failures remain.")
+        for rejected in rejections:
+            identity = rejected.get("identity", {})
+            if all(identity.get(key) == config[key] for key in ("service", "python", "region")) and not any(
+                    attempt["mode"] == "full" and attempt["nativeAttempt"] > identity["nativeAttempt"]
+                    for attempt in history):
+                raise ValueError("An incomplete job still needs a full-service recovery.")
     diagnostic = any(value["context"]["diagnostic"] == "true" for value in records)
     print("Diagnostic retry proof passed; NOT release qualification." if diagnostic
           else "Every expected service combination passed; manual retry history is retained.")
@@ -214,15 +225,31 @@ def dps_evidence(folder, selection, ctx):
                                ctx["resource_group"], baseline, region=ctx["region"], endpoint=ctx["endpoint"])
     ids = [record["id"] for record in records]
     cleanup = result["cleanup"]
-    if (cleanup.get("complete") is not True or cleanup.get("remaining") != []
-            or set(cleanup["owned_ids"]) != set(ids) or set(cleanup["absent_ids"]) != set(ids)
-            or any(not record["creation_resolved"] for record in records)
-            or {value.casefold() for value in ids}.intersection(cleanup["inventory_ids"])):
+    if cleanup.get("mode") == "handoff":
+        if set(cleanup["owned_ids"]) != set(ids):
+            raise ValueError("DPS cleanup handoff does not match the owned cohort.")
+    elif (cleanup.get("complete") is not True or cleanup.get("remaining") != []
+          or set(cleanup["owned_ids"]) != set(ids) or set(cleanup["absent_ids"]) != set(ids)
+          or any(not record["creation_resolved"] for record in records)
+          or {value.casefold() for value in ids}.intersection(cleanup["inventory_ids"])):
         raise ValueError("DPS ownership/resource absence is unproven.")
     return receipt
 
 
 def phase(selection_file, output):
+    name = "azext_iot_cleanup_handoff"
+    previous = os.environ.get(name)
+    os.environ[name] = str(Path(output).resolve() / "cleanup-receipts")
+    try:
+        return _phase(selection_file, output)
+    finally:
+        if previous is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = previous
+
+
+def _phase(selection_file, output):
     """Each controller needs its own main thread, signal handlers and resource cohort."""
     from azext_iot.tests import _focused_live as focused
     from azext_iot.tests import _dps_phase_runner as dps
@@ -244,13 +271,20 @@ def phase(selection_file, output):
         else:
             hub.run(service, ctx["subscription"], ctx["resource_group"], ctx["region"], folder / "hub-phases",
                     endpoint=ctx["endpoint"], attempt_selection=chosen)
-            check = hub.evaluate_hub_phases(folder / "hub-phases", attempt=True, allow_failures=True, **target)
+            check = hub.evaluate_hub_phases(folder / "hub-phases", attempt=True, allow_failures=True, handoff=True, **target)
             if not check["passed"]:
                 raise ValueError("Hub ownership/execution evidence is invalid: " + "; ".join(check["errors"]))
             receipt = RETRY["read"](folder / "hub-phases" / name / "pytest.json")
         expected = value["expected"]
     else:
         diagnostic = service == "RetrySelfTest"
+        forbidden = (
+            "azext_iot_testhub", "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_adr_update_instance_id",
+            "azext_iot_adr_update_instance_disposable", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer",
+            "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
+        )
+        if any(os.getenv(key) for key in forbidden):
+            raise ValueError("Fresh service attempts reject external fixtures and pytest selection overrides.")
         env = dict(os.environ, azext_iot_ado_receipt=str(folder / "pytest.json"),
                    azext_iot_ado_expected=json.dumps(value["expected"]),
                    azext_iot_ado_selected=json.dumps(nodes),
@@ -274,11 +308,10 @@ def phase(selection_file, output):
         if execution["exit_code"] != receipt["exitstatus"]:
             raise ValueError("Execution status disagrees with test evidence.")
         expected = receipt["expected"]
-    cleanup_verified = service in ("DPS", "HubControl", "HubData")
-    RETRY["outcomes"](receipt, allow_fixture_failures=cleanup_verified)
+    RETRY["outcomes"](receipt, allow_fixture_failures=True)
     RETRY["write"](folder / "phase.json", {
         "expected": expected, "receipt": receipt, "safe": True, "excluded": receipt.get("excluded", []),
-        "cleanupVerified": cleanup_verified,
+        "cleanupMode": "handoff",
     })
 
 
@@ -289,25 +322,48 @@ def run(args):
         return run_attempt(args, output)
     except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
         detail = str(error) if isinstance(error, ValueError) else type(error).__name__
-        reject(output, detail)
+        reject(output, detail, recoverable=not isinstance(error, RETRY["IntegrityError"]),
+               service=args.service, python=args.python, region=args.region)
         raise
 
 
-def reject(output, reason):
+def reject(output, reason, *, recoverable=False, service=None, python=None, region=None):
     """Publish an explicit orchestration error, never successful test coverage."""
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    RETRY["write"](output / "rejection.json", {"reason": reason, "qualifies": False})
+    RETRY["write"](output / "rejection.json", {
+        "reason": reason, "qualifies": False, "recoverable": recoverable,
+        "identity": {
+            "service": service or os.getenv("SERVICE"), "python": python or os.getenv("TEST_PYTHON"),
+            "region": region or os.getenv("TEST_REGION"), "nativeAttempt": int(os.getenv("SYSTEM_JOBATTEMPT", "1")),
+        },
+    })
     suite = ET.Element("testsuite", name="Attempt rejected", tests="1", failures="0", errors="1")
     case = ET.SubElement(suite, "testcase", classname="pipeline", name="Attempt execution evidence")
     ET.SubElement(case, "error", message=reason)
     ET.ElementTree(suite).write(output / "final.xml", encoding="utf-8", xml_declaration=True)
+    action = ("Manually rerun the affected service with fresh fixtures." if recoverable
+              else "Start a new run after correcting the immutable identity/artifact problem.")
     (output / "summary.md").write_text(
         f"## Attempt rejected\n\n{reason}\n\nNo successful recovery was recorded. "
-        "See the original attempt artifacts and task logs. Start a new run after correcting the cause.\n",
+        f"See the original attempt artifacts and task logs. {action}\n" + cleanup_report(output),
         encoding="utf-8",
     )
     print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
+
+
+def cleanup_report(output):
+    path = output / "cleanup-status.json"
+    cleanup = RETRY["read"](path) if path.exists() else HANDOFF["summary"](output)
+    if not cleanup:
+        return ""
+    if not path.exists():
+        RETRY["write"](path, cleanup)
+    text = "\nCleanup is reported separately. Accepted deletion is not proof of resource absence.\n"
+    for status in ("accepted", "deleting", "absent", "pending", "failed"):
+        text += f"- Cleanup {status}: {sum(item['status'] == status for item in cleanup)}\n"
+    return text + ("\nExact IDs and submission failures are in `cleanup-status.json`; "
+                   "pending leftovers need operational cleanup.\n")
 
 
 def run_attempt(args, output):
@@ -315,17 +371,26 @@ def run_attempt(args, output):
     ctx = context(args.service, args.python, args.region, args.endpoint, args.wheel, args.diagnostic)
     history = RETRY["load_history"](args.history, ctx)
     native_attempt = int(os.environ["SYSTEM_JOBATTEMPT"])
-    if native_attempt != len(history) + 1:
-        raise ValueError("An intervening native job attempt is missing; start a new full run.")
+    last_native = history[-1]["nativeAttempt"] if history else 0
+    if native_attempt <= last_native:
+        raise RETRY["IntegrityError"]("Native job attempt is not newer than the immutable history.")
+    missing = list(range(last_native + 1, native_attempt))
     prior_expected, _, _ = RETRY["evaluate"](history, ctx)
-    remaining = RETRY["pending"](history, ctx) if history else owned_nodes(args.service) or {"tests": []}
+    plan = RETRY["recovery_plan"](history, ctx)
+    rejections = [RETRY["read"](path) for path in Path(args.history).rglob("rejection.json")]
+    if missing or any(
+            all(value.get("identity", {}).get(key) == ctx[key] for key in ("service", "python", "region"))
+            and value["identity"]["nativeAttempt"] >= last_native for value in rejections):
+        plan["mode"] = "full"
+    remaining = ((owned_nodes(args.service) or {"tests": []}) if plan["mode"] == "full" else plan["phases"])
     record = {
-        "schema": 2, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
+        "schema": 3, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
+        "mode": plan["mode"], "missingAttempts": missing,
         "parent": RETRY["digest"](history[-1]) if history else None,
         "executionErrors": ["Execution did not complete."], "phases": {},
     }
-    if history and not remaining:
-        record.update(executionErrors=[], reused=True)
+    if plan["mode"] == "reuse":
+        record.update(executionErrors=[])
         RETRY["write"](output / "reuse.json", {"parent": record["parent"], "nativeAttempt": native_attempt})
         record["evidence"] = RETRY["evidence"](output)
         RETRY["write"](output / "attempt.json", record)
@@ -334,15 +399,15 @@ def run_attempt(args, output):
         print("Already passed; retaining original evidence without executing tests.")
         return 0
     if history:
-        print("Manual recovery selection (cases per phase): "
+        print(f"Manual recovery mode: {plan['mode']}; selection (cases per phase): "
               + json.dumps({name: len(nodes) for name, nodes in remaining.items()}), flush=True)
-    if not args.diagnostic:
-        admission()
     os.environ["azext_iot_candidate_wheel"] = str(next(Path(args.wheel).rglob("*.whl")).resolve())
     cancel = Event()
     previous = {sig: signal.signal(sig, lambda *_: cancel.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     auth = None
     try:
+        if not args.diagnostic:
+            admission()
         if not args.diagnostic:
             command = [sys.executable, str(ROOT / "azext_iot/tests/_refresh_ci_auth.py")]
             subprocess.run(command, check=True, timeout=180)
@@ -363,7 +428,9 @@ def run_attempt(args, output):
             minutes = 10 if args.diagnostic else BUDGETS[args.service]["job_timeout_minutes"]
             result = dps.child(
                 [sys.executable, str(Path(__file__)), "phase", "--selection", str(selection),
-                 "--output", str(output / name)], dict(os.environ), output / f"{name}.log", minutes * 60, 120,
+                 "--output", str(output / name)],
+                dict(os.environ, SERVICE=ctx["service"], TEST_PYTHON=ctx["python"], TEST_REGION=ctx["region"]),
+                output / f"{name}.log", minutes * 60, 120,
                 lambda: cancel.is_set() or auth is not None and auth.poll() is not None,
             )
             if result["exit_code"] or result["timed_out"] or result["interrupted"]:
@@ -396,7 +463,7 @@ def run_attempt(args, output):
                 raise ValueError("Credential refresh failed.")
             auth = None
         if cancel.is_set():
-            raise ValueError("Attempt was cancelled; start a new run.")
+            raise ValueError("Attempt was cancelled; full-service recovery is required.")
         record["executionErrors"] = []
     finally:
         try:
@@ -407,6 +474,10 @@ def run_attempt(args, output):
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
+            RETRY["write"](output / "execution.json", {
+                "mode": record["mode"], "nativeAttempt": native_attempt, "executionErrors": record["executionErrors"],
+            })
+            cleanup_report(output)
             record["evidence"] = RETRY["evidence"](output)
             RETRY["write"](output / "attempt.json", record)
     history.append(record)
@@ -414,7 +485,8 @@ def run_attempt(args, output):
     _, effective, recovered = RETRY["evaluate"](history, ctx)
     summary = (f"## {args.service}: {'Failed' if failures else 'Passed'}\n\n"
                f"{sum(map(len, effective.values()))} required cases; {failures} unresolved; "
-               f"{len(recovered)} passed on manual retry. Diagnostic: {ctx['diagnostic']}.\n")
+               f"{len(recovered)} passed on manual retry. Mode: {plan['mode']}. Diagnostic: {ctx['diagnostic']}.\n")
+    summary += cleanup_report(output)
     (output / "summary.md").write_text(summary, encoding="utf-8")
     print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
     return 1 if failures else 0
@@ -446,7 +518,8 @@ def main():
     args = parser.parse_args()
     if args.command == "report-incomplete":
         if not (Path(args.output) / "final.xml").is_file():
-            reject(args.output, "No terminal report was produced; installation, login or execution did not complete.")
+            reject(args.output, "No terminal report was produced; installation, login or execution did not complete.",
+                   recoverable=True)
             return 1
         return 0
     if args.command == "plan":
@@ -457,7 +530,7 @@ def main():
             phase(args.selection, args.output)
         except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
             detail = str(error) if isinstance(error, ValueError) else type(error).__name__
-            reject(args.output, detail)
+            reject(args.output, detail, recoverable=True)
             raise
         return 0
     if args.command in ("gate", "coverage", "candidate"):

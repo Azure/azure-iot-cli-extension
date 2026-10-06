@@ -27,6 +27,7 @@ from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests._dps_phase_runner import Redactor
 from azext_iot.tests import _focused_live as focused
+from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests._integration_target import public_scope, target
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
@@ -496,6 +497,19 @@ class HubSasPhase:
         self.tasks.finish()
         if not self.sent:
             return
+        if handoff.enabled():
+            for kind in ("role", "hub", "storage", "container"):
+                resource_id = self.ids[kind]
+                result = handoff.cleanup(
+                    resource_id, lambda kind=kind: self.cleanup_one(kind, float("inf")), accepted=False,
+                )
+                if result is not None:
+                    status = self.statuses.get("DELETE " + resource_id.casefold())
+                    state = ("absent" if kind in self.absent else "deleting" if resource_id.casefold() in self.deleting
+                             else "accepted" if status in (200, 202, 204) else "pending")
+                    handoff.record(resource_id, state)
+            self.write_receipt()
+            return
         deadline = monotonic() + timeout
         self.cleanup_deadline = deadline
         pending = ["role", "hub", "storage", "container"]
@@ -617,7 +631,7 @@ class HubSasPhase:
     def check_results(self, session):
         required = {"PUT " + resource_id.casefold() for resource_id in self.ids.values()}
         if (
-            self.bad_report or self.passed != set(self.expected) or self.absent != set(self.ids)
+            self.bad_report or self.passed != set(self.expected) or not handoff.enabled() and self.absent != set(self.ids)
             or not required.issubset(self.sent)
         ):
             session.exitstatus = pytest.ExitCode.TESTS_FAILED

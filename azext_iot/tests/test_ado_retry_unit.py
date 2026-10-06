@@ -44,7 +44,8 @@ def receipt(results):
 
 def attempt(results, previous=None):
     return {
-        "schema": 2, "context": CONTEXT.copy(), "sequence": previous["sequence"] + 1 if previous else 1,
+        "schema": 3, "context": CONTEXT.copy(), "sequence": previous["sequence"] + 1 if previous else 1,
+        "mode": "full" if previous is None or set(results) == {"a", "b", "c"} else "cases",
         "nativeAttempt": previous["nativeAttempt"] + 1 if previous else 1,
         "parent": retry.digest(previous) if previous else None, "executionErrors": [],
         "phases": {"tests": {"expected": ["a", "b", "c"], "safe": True, "receipt": receipt(results)}},
@@ -108,8 +109,11 @@ def test_bad_evidence_never_recovers_a_run(defect):
         second["parent"] = retry.digest(first)
     elif defect == "exclusions":
         phase["excluded"] = ["new"]
-    with pytest.raises(ValueError):
-        retry.evaluate([first, second], CONTEXT)
+    if defect in ("missing", "skip", "setup", "teardown", "incomplete", "auth", "duplicate-stage", "exit-code"):
+        assert retry.recovery_plan([first, second], CONTEXT)["mode"] == "full"
+    else:
+        with pytest.raises(ValueError):
+            retry.evaluate([first, second], CONTEXT)
 
 
 def test_failed_retry_stays_failed_and_incomplete_first_attempt_cannot_be_erased():
@@ -125,7 +129,7 @@ def test_failed_retry_stays_failed_and_incomplete_first_attempt_cannot_be_erased
 @pytest.mark.parametrize("service", retry.SERVICES)
 @pytest.mark.parametrize("failure", ["call", "setup", "teardown", "call-cleanup"])
 @pytest.mark.parametrize("cleanup_verified", [False, True])
-def test_cross_service_retry_scope_requires_existing_cleanup_proof(service, failure, cleanup_verified):
+def test_cross_service_retry_scope_is_independent_of_cleanup_completion(service, failure, cleanup_verified):
     first = attempt({"a": "passed", "b": "failed", "c": "passed"})
     first["context"]["service"] = service
     ctx = first["context"]
@@ -139,11 +143,8 @@ def test_cross_service_retry_scope_requires_existing_cleanup_proof(service, fail
         report.update(call=["passed"], teardown=["failed"])
     elif failure == "call-cleanup":
         phase["receipt"]["retryableFailures"]["b"] = False
-    if failure != "call" and (service in ("ADR", "ADU") or not cleanup_verified):
-        with pytest.raises(ValueError, match="cleanup proof"):
-            retry.pending([first], ctx)
-        return
     selected = ["b"] if failure == "call" else ["a", "b", "c"]
+    assert retry.recovery_plan([first], ctx)["mode"] == ("cases" if failure == "call" else "full")
     assert retry.pending([first], ctx) == {"tests": selected}
     second = attempt(dict.fromkeys(selected, "passed"), first)
     second["context"] = ctx.copy()
@@ -151,7 +152,7 @@ def test_cross_service_retry_scope_requires_existing_cleanup_proof(service, fail
     assert retry.evaluate([first, second], ctx)[2] == {("tests", "b")}
     if failure != "call":
         second["phases"]["tests"]["receipt"] = receipt({"b": "passed"})
-        with pytest.raises(ValueError, match="fixture phase"):
+        with pytest.raises(ValueError, match="exactly"):
             retry.evaluate([first, second], ctx)
 
 
@@ -170,6 +171,41 @@ def test_phase_retry_new_failure_is_not_hidden_by_retained_passing_results():
     assert not retry.pending([first, second, third], first["context"])
 
 
+@pytest.mark.parametrize("service", retry.SERVICES)
+@pytest.mark.parametrize("failure", ["setup", "worker-crash", "timeout", "empty-collection", "before-collection"])
+def test_incomplete_execution_requires_full_service_including_passing_phases(service, failure):
+    first = attempt({"a": "passed", "b": "failed", "c": "passed"})
+    first["context"]["service"] = service
+    ctx = first["context"]
+    first["phases"]["passing-phase"] = deepcopy(attempt(dict.fromkeys(("a", "b", "c"), "passed"))["phases"]["tests"])
+    value = first["phases"]["tests"]["receipt"]
+    if failure == "setup":
+        value["reports"]["b"] = {"setup": ["failed"], "teardown": ["passed"]}
+    elif failure == "worker-crash":
+        value["workerErrors"] = ["worker terminated"]
+    elif failure == "timeout":
+        first["executionErrors"] = ["test process timed out and was terminated"]
+    elif failure == "empty-collection":
+        value.update(collected=[], reports={})
+    else:
+        first.update(phases={}, executionErrors=["login failed"])
+    assert retry.recovery_plan([first], ctx)["mode"] == "full"
+    second = attempt(dict.fromkeys(("a", "b", "c"), "passed"), first)
+    second["context"] = ctx.copy()
+    second["phases"]["passing-phase"] = deepcopy(second["phases"]["tests"])
+    assert not retry.pending([first, second], ctx)
+    second["phases"]["passing-phase"]["receipt"] = receipt({"a": "passed", "b": "failed", "c": "passed"})
+    assert retry.pending([first, second], ctx) == {"passing-phase": ["b"]}
+
+
+def test_reuse_cannot_hide_new_execution_errors():
+    first = attempt(dict.fromkeys(("a", "b", "c"), "passed"))
+    second = attempt({}, first)
+    second.update(mode="reuse", phases={}, executionErrors=["authentication failed"])
+    with pytest.raises(ValueError, match="fully passing"):
+        retry.evaluate([first, second], CONTEXT)
+
+
 def test_identity_rejection_identifies_changed_field_without_values():
     first = attempt({"a": "passed", "b": "failed", "c": "passed"})
     first["context"]["dependencies"] = "private-dependency-data"
@@ -180,7 +216,7 @@ def test_identity_rejection_identifies_changed_field_without_values():
 
 def test_rejected_attempt_cannot_be_ignored_by_final_gate(tmp_path):
     pipeline.reject(tmp_path / "attempt", "Prior teardown is unproven.")
-    with pytest.raises(ValueError, match="rejected or incomplete"):
+    with pytest.raises(ValueError, match="immutable identity"):
         pipeline.gate(tmp_path)
 
 
@@ -448,13 +484,9 @@ def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mo
         return {"exit_code": value["exitstatus"], "timed_out": False, "interrupted": False}
 
     mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
-    if teardown_failed:
-        with pytest.raises(ValueError, match="teardown"):
-            pipeline.phase(selection, output)
-        assert not (output / "phase.json").exists()
-    else:
-        pipeline.phase(selection, output)
-        assert retry.read(output / "phase.json")["safe"]
+    pipeline.phase(selection, output)
+    assert retry.read(output / "phase.json")["safe"]
+    assert retry.read(output / "phase.json")["cleanupMode"] == "handoff"
     inventory.assert_not_called()
     assert not (output / "cleanup.json").exists()
 
@@ -546,8 +578,21 @@ def test_real_offline_first_failure_then_manual_exact_case_recovery(tmp_path, mo
     third = subprocess.run(command + ["--output", str(history / "third")], env=environment,
                            cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
     assert third.returncode == 0, third.stdout + third.stderr
-    assert retry.read(history / "third/attempt.json")["reused"]
+    assert retry.read(history / "third/attempt.json")["mode"] == "reuse"
     assert not (history / "third/tests").exists()
+    pipeline.gate(history)
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "4")
+    pipeline.reject(history / "fourth", "login did not complete", recoverable=True,
+                    service="RetrySelfTest", python="3.13", region="australiaeast")
+    with pytest.raises(ValueError, match="full-service recovery"):
+        pipeline.gate(history)
+    environment["SYSTEM_JOBATTEMPT"] = "5"
+    fifth = subprocess.run(command + ["--output", str(history / "fifth")], env=environment,
+                           cwd=ROOT, capture_output=True, text=True, timeout=120, check=False)
+    assert fifth.returncode == 0, fifth.stdout + fifth.stderr
+    full = retry.read(history / "fifth/attempt.json")
+    assert full["mode"] == "full" and full["missingAttempts"] == [4]
+    assert len(full["phases"]["tests"]["receipt"]["collected"]) == 3
     pipeline.gate(history)
 
 
@@ -588,20 +633,34 @@ def test_raw_artifacts_are_required_and_immutable(tmp_path, changed):
         retry.verify_artifacts(tmp_path / "attempt.json", record)
 
 
-def test_missing_intermediate_native_attempt_rejects_before_execution(tmp_path, monkeypatch, mocker):
+def test_missing_intermediate_native_attempt_forces_full_service(tmp_path, monkeypatch, mocker):
     first = attempt({"a": "passed", "b": "failed", "c": "passed"})
-    mocker.patch.object(pipeline, "context", return_value=CONTEXT)
+    ctx = dict(CONTEXT, service="RetrySelfTest", diagnostic="true")
+    first["context"] = ctx
+    mocker.patch.object(pipeline, "context", return_value=ctx)
     monkeypatch.setitem(pipeline.RETRY, "load_history", lambda *_: [first])
     monkeypatch.setenv("SYSTEM_JOBATTEMPT", "3")
     args = SimpleNamespace(
-        service="ADR", python="3.13", region="australiaeast", endpoint=CONTEXT["endpoint"],
-        wheel=tmp_path, diagnostic=False, history=tmp_path, output=tmp_path / "must-not-exist",
+        service="RetrySelfTest", python="3.13", region="australiaeast", endpoint=CONTEXT["endpoint"],
+        wheel=tmp_path, diagnostic=True, history=tmp_path / "history", output=tmp_path / "attempt",
     )
-    with pytest.raises(ValueError, match="native job attempt"):
-        pipeline.run(args)
-    assert retry.read(args.output / "rejection.json")["qualifies"] is False
-    assert "native job attempt" in (args.output / "final.xml").read_text()
-    assert not (args.output / "attempt.json").exists()
+    (tmp_path / "candidate.whl").write_bytes(b"offline")
+
+    def execute(command, _env, _log, *_args):
+        selection = retry.read(command[command.index("--selection") + 1])
+        assert selection["nodes"] == []
+        assert selection["expected"] == ["a", "b", "c"]
+        folder = Path(command[command.index("--output") + 1])
+        retry.write(folder / "phase.json", {
+            "expected": ["a", "b", "c"], "safe": True, "receipt": receipt(dict.fromkeys(("a", "b", "c"), "passed")),
+        })
+        return {"exit_code": 0, "timed_out": False, "interrupted": False}
+
+    mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
+    assert pipeline.run(args) == 0
+    record = retry.read(args.output / "attempt.json")
+    assert record["mode"] == "full" and record["missingAttempts"] == [2]
+    assert not retry.pending([first, record], ctx)
 
 
 def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, monkeypatch, mocker):
@@ -634,6 +693,39 @@ def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, 
     retry.verify_artifacts(args.output / "attempt.json", record)
     assert (args.output / "rejection.json").is_file()
     assert (args.output / "final.xml").is_file()
+
+
+def test_full_fallback_dispatches_every_service_phase(tmp_path, monkeypatch, mocker):
+    ctx = dict(CONTEXT, service="RetrySelfTest", diagnostic="true")
+    first = attempt({"a": "passed", "b": "failed", "c": "passed"})
+    first["context"] = ctx
+    first["phases"]["tests"]["receipt"]["reports"]["b"] = {"setup": ["failed"], "teardown": ["passed"]}
+    first["phases"]["passing-phase"] = deepcopy(attempt(dict.fromkeys(("a", "b", "c"), "passed"))["phases"]["tests"])
+    manifests = dict.fromkeys(first["phases"], ["a", "b", "c"])
+    mocker.patch.object(pipeline, "context", return_value=ctx)
+    mocker.patch.object(pipeline, "owned_nodes", return_value=manifests)
+    monkeypatch.setitem(pipeline.RETRY, "load_history", lambda *_: [first])
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
+    (tmp_path / "candidate.whl").write_bytes(b"offline")
+    args = SimpleNamespace(
+        service="RetrySelfTest", python="3.13", region="australiaeast", endpoint=ctx["endpoint"],
+        wheel=tmp_path, diagnostic=True, history=tmp_path / "history", output=tmp_path / "attempt",
+    )
+
+    def execute(command, _env, _log, *_args):
+        selection = retry.read(command[command.index("--selection") + 1])
+        assert selection["nodes"] == ["a", "b", "c"]
+        folder = Path(command[command.index("--output") + 1])
+        retry.write(folder / "phase.json", {
+            "expected": ["a", "b", "c"], "safe": True, "receipt": receipt(dict.fromkeys(("a", "b", "c"), "passed")),
+        })
+        return {"exit_code": 0, "timed_out": False, "interrupted": False}
+
+    child = mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
+    assert pipeline.run(args) == 0
+    assert child.call_count == 2
+    record = retry.read(args.output / "attempt.json")
+    assert record["mode"] == "full" and set(record["phases"]) == set(manifests)
 
 
 @pytest.mark.parametrize("primary_failure", [False, True])

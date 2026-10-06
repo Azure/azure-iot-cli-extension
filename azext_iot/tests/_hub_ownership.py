@@ -401,7 +401,7 @@ def write(path, data):
     temporary.replace(path)
 
 
-def ownership_errors(data, run_id, phase):
+def ownership_errors(data, run_id, phase, *, allow_pending_cleanup=False):
     errors = []
     if not TARGETS["matches"](data, {"region": REGION, "endpoint": ARM}):
         errors.append("ownership target mismatch")
@@ -429,16 +429,23 @@ def ownership_errors(data, run_id, phase):
                 or record.get("before") != 404 or not record.get("apiVersion")
                 or not record.get("attempted") or record.get("ownerTag") != run_id):
             errors.append("invalid pre-create evidence")
-        if (record.get("uncertain") or not record.get("resolved")
-                or any(mutation_uncertain(record, m) for m in record.get("mutations", []))):
-            errors.append("unresolved mutation; no replay permitted")
+
+        def pending_cleanup(mutation):
+            return (allow_pending_cleanup and record.get("resolved") and mutation.get("method") == "DELETE"
+                    and (mutation.get("status") in (200, 202, 204, 404) or uncertain_delete(record, mutation))
+                    and not mutation.get("responseError") and not mutation.get("pollingFailed"))
+
         mutations = record.get("mutations", [])
+        if (not record.get("resolved")
+                or record.get("uncertain") and not any(pending_cleanup(m) for m in mutations)
+                or any(mutation_uncertain(record, m) and not pending_cleanup(m) for m in mutations)):
+            errors.append("unresolved mutation; no replay permitted")
         if not mutations or mutations[0].get("method") != "PUT":
             errors.append("missing initial mutation")
         if any(m.get("status") not in (200, 201, 202, 204, 404)
                and not expected_rejection(m) and not uncertain_delete(record, m) for m in mutations):
             errors.append("missing/failed mutation response")
-        if any(pending_mutation(m) for m in mutations):
+        if any(pending_mutation(m) and not pending_cleanup(m) for m in mutations):
             errors.append("unreconciled asynchronous acceptance")
         for mutation in mutations:
             target = mutation.get("id", "")

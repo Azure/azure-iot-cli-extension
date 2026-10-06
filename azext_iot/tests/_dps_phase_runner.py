@@ -769,9 +769,24 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                             records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
                             # Serial verification: a sibling's slow cleanup must not consume this phase's window.
                             reader.deadline = min(deadline, clock() + phase["cleanup"])
-                            result["cleanup"] = verify_cleanup(
-                                reader, records, uid, reader.deadline, clock=clock,
-                            )
+                            from azext_iot.tests import _cleanup_handoff as handoff
+                            if attempt_selection and handoff.enabled():
+                                result["cleanup"] = {
+                                    "mode": "handoff", "complete": False,
+                                    "remaining": [{"id": record["id"], "state": "see cleanup submission receipts"}
+                                                  for record in records],
+                                }
+                                submitted = {
+                                    json.loads(path.read_text(encoding="utf-8"))["resource"]
+                                    for path in Path(os.environ[handoff.ENV]).glob("*.json")
+                                }
+                                for record in records:
+                                    if record["id"] not in submitted:
+                                        handoff.record(record["id"], "pending", "NoCleanupSubmission")
+                            else:
+                                result["cleanup"] = verify_cleanup(
+                                    reader, records, uid, reader.deadline, clock=clock,
+                                )
                             result["cleanup"]["owned_ids"] = [record["id"] for record in records]
                             result["cleanup"]["absent_ids"] = (
                                 result["cleanup"]["owned_ids"] if result["cleanup"]["complete"] else []
@@ -791,7 +806,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                             result["exit_code"] == 0 and not result["timed_out"] and not result["interrupted"]
                             and counts.get("valid") and counts.get("passed", 0) > 0
                             and not counts.get("failures") and not counts.get("errors") and not counts.get("skipped")
-                            and result["cleanup"].get("complete")
+                            and (result["cleanup"].get("complete") or result["cleanup"].get("mode") == "handoff")
                         ) else "failed"
                         result["finished_at"] = utc()
                         write_json(folder / "result.json", result)
