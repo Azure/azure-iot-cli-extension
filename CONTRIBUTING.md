@@ -202,11 +202,17 @@ The controller aggregates worker collection, setup/call/teardown outcomes and
 retry eligibility into one receipt. Existing phase deadlines and owned cleanup
 verification remain unchanged.
 
-There are **no automatic test retries**. When a service fails solely with eligible
-assertions in test call phases, use Azure DevOps **Rerun failed jobs** on its failed service stage in the
-**same run**. There is no test-name input. The runner downloads that run's attempt
-artifacts and selects only the still-failing cases for that service/Python/region
-combination. Already-passing cases and phases are retained, not rerun. Owned Hub
+There are **no automatic test retries**. For completed test-call failures with
+successful setup/teardown, use Azure DevOps **Rerun failed jobs** on the failed service stage in the
+**same run**. Assertions and service/transport exceptions are eligible; passing a later attempt,
+not the exception type, proves recovery. There is no test-name input. The runner downloads
+that run's attempt artifacts and selects only the still-failing cases for that
+service/Python/region combination. Already-passing cases and phases are retained.
+For Hub/DPS setup, teardown, or call-phase cleanup failures, the existing controller must
+independently prove ownership and complete resource absence before recovery is permitted.
+The next manual attempt then reruns the **whole affected phase** with fresh fixtures,
+including its previously passing cases, because a shared fixture failed. Other phases
+are not rerun. Any new failure in that phase remains unresolved. Owned Hub
 and DPS phases provision fresh independent fixtures; ADR/ADU recollect the same
 suite and rebuild their fixture dependencies for the selected cases. The original
 failures remain in immutable attempt artifacts and test runs; effective results
@@ -217,17 +223,23 @@ Historical failed test runs are not deleted even when the build becomes green.
 The gate requires every planned combination and exact enabled-case coverage across
 a contiguous native-job-attempt chain. It verifies commit, original wheel, dependency
 fingerprint, target, phase provenance and raw artifact hashes. Changed or missing
-artifacts/dependencies, setup/teardown failures, skipped cases, cancellations,
-auth-refresh failure, non-assertion exceptions and unproven cleanup fail closed: repair the cause and start
+artifacts/dependencies, incomplete stages/worker termination, unexpected skipped cases,
+cancellations, auth-refresh failure and unproven cleanup fail closed: repair the cause and start
 a **new full run**, rather than trying to recover them with a passing test.
 Focused debug receipts and diagnostic mode never qualify release coverage.
 Checked-in unconditional `pytest.mark.skip` exclusions are recorded separately,
 must remain identical across attempts, and appear as skipped rather than passed
-in the effective report. Unexpected runtime skips remain disqualifying. An
-assertion wrapping an underlying exception is not retryable; no exception messages
+in the effective report. Unexpected runtime skips remain disqualifying. A
+call failure carrying a cleanup-failure marker (including a wrapped exception) requires
+independent cleanup proof, not just successful pytest teardown. No exception messages
 or credentials are stored in failure classification metadata. A missing native
 attempt (including installation/login failure before receipts exist) blocks later
 recovery, even when an earlier attempt's artifacts are available.
+Rejected attempts publish a specific rejection summary and a failing orchestration result,
+not successful test coverage or misleading missing-file errors. Completed sibling phase
+receipts are retained even when another phase cannot qualify. The final gate rejects
+any incomplete/rejected attempt; it cannot silently reuse an older passing result.
+Runs pinned to the previous attempt format must start a new run to use the updated policy.
 
 The ADO run form exposes only **Dry run** and **Integration tests**. The
 deliberate-failure diagnostic remains an offline unit regression in
@@ -248,8 +260,9 @@ not override that check, and this change does not reconfigure it. Python/region 
 each service remain serialized. Resource ownership and cleanup remain with the
 existing service fixtures and Hub/DPS phase controllers. The ADR/ADU retry plugin
 records test execution metadata only: it does not intercept HTTP requests or add
-a resource-inventory gate. Fixture-reported teardown/cleanup failures remain
-non-retryable; Hub/DPS still require their existing ownership and cleanup evidence.
+a resource-inventory gate. ADR/ADU fixture-reported setup/teardown/cleanup failures
+remain non-retryable without independent cleanup proof; Hub/DPS require their
+existing ownership and cleanup evidence before rerunning an affected phase.
 Admission still rejects active GitHub integration runs. It does not inspect other
 ADO builds or enforce a fixed cleanup-time exclusion, and there are no
 merge-pipeline/revision exceptions. The daily 13:00 UTC cleanup job is unchanged

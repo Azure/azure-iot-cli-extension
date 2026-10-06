@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from azext_iot.tests._ado_retry import assertion_failure, case_id
+from azext_iot.tests._ado_retry import retryable_failure, case_id
 
 
 def pytest_configure(config):
@@ -35,6 +35,7 @@ class Receipt:
         self.expected = json.loads(os.environ.get("azext_iot_ado_expected", "[]"))
         self.selected = json.loads(os.environ.get("azext_iot_ado_selected", "[]"))
         self.worker = os.getenv("PYTEST_XDIST_WORKER")
+        self.worker_collection = None
         if not self.worker:
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("x", encoding="utf-8") as stream:
@@ -75,38 +76,51 @@ class Receipt:
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error):
-        expected = node.workeroutput.get("ado_expected", [])
-        if error or not expected or self.data["expected"] and self.data["expected"] != expected:
-            raise pytest.UsageError("Worker collection evidence is missing or inconsistent.")
-        self.data["expected"] = expected
-        excluded = node.workeroutput["ado_excluded"]
-        if self.data["excluded"] and self.data["excluded"] != excluded:
-            raise pytest.UsageError("Worker committed skip exclusions disagree.")
-        self.data["excluded"] = excluded
+        value = getattr(node, "workeroutput", {}).get("ado_receipt", {})
+        collection = (value.get("expected"), value.get("excluded"))
+        if (error or value.get("finished") is not True or value.get("exitstatus") not in (0, 1)
+                or not collection[0] or not isinstance(collection[1], list)
+                or self.worker_collection is not None and self.worker_collection != collection
+                or value.get("collected") != self.data["collected"]):
+            self.data.setdefault("workerErrors", []).append("Worker execution or collection evidence is incomplete.")
+        else:
+            self.worker_collection = collection
+            self.data["expected"], self.data["excluded"] = collection
         self.save()
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
         report = (yield).get_result()
         if report.when == "call" and report.failed:
-            report.user_properties.append(("ado_retryable", assertion_failure(call.excinfo.value) if call.excinfo else False))
+            if call.excinfo:
+                report.user_properties.append(("ado_retryable", retryable_failure(call.excinfo.value)))
 
     def pytest_runtest_logreport(self, report):
         key = case_id(report.nodeid)
         outcome = "xfail" if hasattr(report, "wasxfail") else report.outcome
         self.data["reports"].setdefault(key, {}).setdefault(report.when, []).append(outcome)
         if report.when == "call" and report.failed:
-            self.data["retryableFailures"][key] = [
-                value for name, value in report.user_properties if name == "ado_retryable"
-            ] == [True]
+            classifications = [value for name, value in report.user_properties if name == "ado_retryable"]
+            self.data["retryableFailures"][key] = classifications[0] if len(classifications) == 1 else None
         self.save()
+
+    @pytest.hookimpl(hookwrapper=True, trylast=True, specname="pytest_sessionfinish")
+    def pytest_worker_sessionfinish(self, session):
+        outcome = yield
+        if self.worker:
+            session.config.workeroutput["ado_receipt"] = {
+                key: self.data[key] for key in ("expected", "excluded", "collected")
+            }
+            session.config.workeroutput["ado_receipt"].update(
+                finished=outcome.excinfo is None, exitstatus=int(session.exitstatus),
+            )
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_sessionfinish(self, session, exitstatus):
-        if self.worker:
-            session.config.workeroutput["ado_expected"] = self.data["expected"]
-            session.config.workeroutput["ado_excluded"] = self.data["excluded"]
         outcome = yield
         self.data["finished"] = outcome.excinfo is None
         self.data["exitstatus"] = int(session.exitstatus)
+        if self.data.get("workerErrors") and not session.exitstatus:
+            session.exitstatus = pytest.ExitCode.TESTS_FAILED
+            self.data["exitstatus"] = int(session.exitstatus)
         self.save()

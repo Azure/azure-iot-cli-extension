@@ -17,7 +17,13 @@ SERVICES = ("DPS", "HubControl", "HubData", "ADU", "ADR")
 
 
 class InfrastructureFailure(AssertionError):
-    """Preserve existing assertion handling without permitting targeted recovery."""
+    """Preserve existing assertion handling for service readiness failures."""
+
+
+class CleanupFailure(InfrastructureFailure):
+    """A call-phase cleanup failure needs independent resource-absence proof."""
+
+    _iot_cleanup_failed = True
 
 
 def digest(value):
@@ -40,26 +46,49 @@ def case_id(node):
     return hashlib.sha256(node.encode()).hexdigest()
 
 
-def assertion_failure(error):
-    return (type(error) is AssertionError and error.__cause__ is None and error.__context__ is None
-            and not getattr(error, "_iot_cleanup_failed", False))
+def retryable_failure(error):
+    pending_errors, seen = [error], set()
+    while pending_errors:
+        current = pending_errors.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        if getattr(current, "_iot_cleanup_failed", False):
+            return False
+        pending_errors.extend((current.__cause__, current.__context__))
+    return True
 
 
-def outcomes(receipt):
+def fixture_failure(receipt):
+    return any(
+        stages.get("setup") != ["passed"] or stages.get("teardown") != ["passed"]
+        or stages.get("call") == ["failed"] and receipt.get("retryableFailures", {}).get(node) is False
+        for node, stages in receipt["reports"].items()
+    )
+
+
+def outcomes(receipt, *, allow_fixture_failures=False):
     if receipt.get("finished") is not True or receipt.get("exitstatus") not in (0, 1):
-        raise ValueError("Missing terminal pytest execution; rerun the full diagnostic after fixing infrastructure.")
+        raise ValueError("Missing terminal pytest execution; start a new run after fixing infrastructure.")
+    if receipt.get("workerErrors"):
+        raise ValueError("Worker execution or collection evidence is incomplete.")
     selected, reports = receipt["collected"], receipt["reports"]
     if not selected or len(set(selected)) != len(selected) or set(reports) != set(selected):
         raise ValueError("Missing, duplicate or unexpected test evidence.")
     result = {}
     for node in selected:
         stages = reports[node]
-        if (set(stages) != set(STAGES) or stages["setup"] != ["passed"] or stages["teardown"] != ["passed"]
-                or stages["call"] not in (["passed"], ["failed"])):
-            raise ValueError("Setup, teardown, skipped or incomplete cases cannot be recovered by targeted retry.")
-        result[node] = stages["call"][0]
-        if result[node] == "failed" and receipt.get("retryableFailures", {}).get(node) is not True:
-            raise ValueError("Unclassified/authentication/infrastructure failure cannot be recovered by targeted retry.")
+        setup_failed = stages.get("setup") == ["failed"]
+        if (set(stages) != ({"setup", "teardown"} if setup_failed else set(STAGES))
+                or stages.get("setup") not in (["passed"], ["failed"])
+                or stages.get("teardown") not in (["passed"], ["failed"])
+                or not setup_failed and stages.get("call") not in (["passed"], ["failed"])):
+            raise ValueError("Skipped, duplicate or incomplete test stages cannot qualify a retry.")
+        if stages.get("call") == ["failed"] and type(receipt.get("retryableFailures", {}).get(node)) is not bool:
+            raise ValueError("Failed call classification is missing.")
+        result[node] = "failed" if ["failed"] in stages.values() else "passed"
+    if fixture_failure(receipt) and not allow_fixture_failures:
+        raise ValueError("Setup/teardown or call-phase cleanup failed without independent cleanup proof; start a new run.")
     if receipt["exitstatus"] != (1 if "failed" in result.values() else 0):
         raise ValueError("Pytest exit status disagrees with case evidence.")
     return result
@@ -88,11 +117,20 @@ def evaluate(history, context):
     expected = {}
     effective = {}
     recovered = set()
+    remaining = {}
     for index, attempt in enumerate(history, 1):
-        if (attempt.get("schema") != 1 or attempt.get("context") != context or attempt.get("sequence") != index
+        if attempt.get("schema") != 2:
+            raise ValueError("Unsupported attempt format; start a new run with the updated runner.")
+        if attempt.get("context") != context:
+            changed = sorted(key for key in context if attempt.get("context", {}).get(key) != context[key])
+            raise ValueError("Attempt identity changed: " + ", ".join(changed) + ". Start a new run.")
+        if (attempt.get("sequence") != index
                 or attempt.get("parent") != (digest(previous) if previous else None)
-                or attempt.get("nativeAttempt") != index or attempt.get("healthy") is not True):
-            raise ValueError("Attempt identity, ancestry, infrastructure or cleanup evidence is invalid.")
+                or attempt.get("nativeAttempt") != index):
+            raise ValueError("Attempt ancestry is missing or changed; start a new run.")
+        if attempt.get("executionErrors") != []:
+            raise ValueError("Prior attempt did not complete safely; see its rejection report and start a new run: "
+                             + "; ".join(attempt.get("executionErrors") or ["Execution evidence is missing."]))
         phases = attempt["phases"]
         if attempt.get("reused") is True:
             if index == 1 or phases or any("failed" in values.values() for values in effective.values()):
@@ -114,22 +152,32 @@ def evaluate(history, context):
             if (excluded != history[0]["phases"][phase].get("excluded", [])
                     or len(set(excluded)) != len(excluded) or set(excluded).intersection(expected[phase])):
                 raise ValueError("Committed skip exclusions changed or overlap enabled coverage.")
-            selected = (set(expected[phase]) if index == 1 else
-                        {node for node, status in effective[phase].items() if status == "failed"})
-            results = outcomes(value["receipt"])
+            selected = set(expected[phase]) if index == 1 else set(remaining[phase])
+            allow_fixture_failures = (
+                context["service"] in ("DPS", "HubControl", "HubData") and value.get("cleanupVerified") is True
+            )
+            results = outcomes(value["receipt"], allow_fixture_failures=allow_fixture_failures)
             if set(results) != selected:
-                raise ValueError("Retry executed something other than the exact failed cases.")
+                raise ValueError("Retry did not execute exactly the required failed cases or fixture phase.")
             if index > 1:
-                recovered.update((phase, node) for node, status in results.items() if status == "passed")
+                recovered.update((phase, node) for node, status in results.items()
+                                 if status == "passed" and effective[phase][node] == "failed")
+                recovered.difference_update((phase, node) for node, status in results.items() if status == "failed")
             effective.setdefault(phase, {}).update(results)
+            remaining[phase] = (list(expected[phase]) if fixture_failure(value["receipt"]) else
+                                [node for node, status in effective[phase].items() if status == "failed"])
         previous = attempt
     return expected, effective, recovered
 
 
 def pending(history, context):
     _, effective, _ = evaluate(history, context)
-    return {phase: [node for node, status in cases.items() if status == "failed"]
-            for phase, cases in effective.items() if "failed" in cases.values()}
+    latest = {phase: value for attempt in history for phase, value in attempt["phases"].items()}
+    return {
+        phase: (list(latest[phase]["expected"]) if fixture_failure(latest[phase]["receipt"]) else
+                [node for node, status in cases.items() if status == "failed"])
+        for phase, cases in effective.items() if "failed" in cases.values()
+    }
 
 
 def load_history(directory, context):

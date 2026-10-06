@@ -47,6 +47,7 @@ CLEANUP = HUB_CI_BUDGETS["HubControl"]["phases"][0]["cleanup_minutes"] * 60
 RESERVE = HUB_CI_BUDGETS["HubControl"]["reserve_minutes"] * 60
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
+RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
 
 
 def selection():
@@ -85,7 +86,9 @@ def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None, allow_f
         expected_errors = ["phase incomplete or pytest failed"]
         expected_errors.extend(
             "required node did not pass exactly once with successful teardown: " + node
-            for node in expected if receipt.get("reports", {}).get(node, {}).get("call") == ["failed"]
+            for node in expected if receipt.get("reports", {}).get(node) != {
+                stage: ["passed"] for stage in ("setup", "call", "teardown")
+            }
         )
     if (receipt.get("schemaVersion") != 1 or receipt.get("suite") != suite or receipt.get("phase") != phase
             or receipt.get("runId") != run_id or receipt.get("finished") is not True
@@ -95,12 +98,12 @@ def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None, allow_f
             or len(set(expected)) != len(expected) or not FOCUSED["matches"](receipt, debug)):
         errors.append("phase identity, completion or exact collection failed")
     reports = receipt.get("reports", {})
-    if allow_failures and any(
-        stages.get("call") == ["failed"] and receipt.get("retryableFailures", {}).get(node) is not True
-        for node, stages in reports.items()
-    ):
-        errors.append("failed calls are not positively classified as retryable assertions")
-    if set(reports) != set(expected) or any(
+    if allow_failures:
+        try:
+            RETRY["outcomes"](receipt, allow_fixture_failures=True)
+        except ValueError as error:
+            errors.append(str(error))
+    elif set(reports) != set(expected) or any(
         set(reports.get(node, {})) != {"setup", "call", "teardown"}
         or reports[node].get("setup") != ["passed"] or reports[node].get("teardown") != ["passed"]
         or reports[node].get("call") not in ((["passed"], ["failed"]) if allow_failures else (["passed"],))
@@ -188,7 +191,7 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, 
     errors = []
     try:
         if allow_failures and not attempt:
-            raise ValueError("Only ADO attempt evaluation may classify assertion failures as retryable.")
+            raise ValueError("Only ADO attempt evaluation may accept failed test stages with verified cleanup.")
         output = Path(result_dir)
         summary = read_json(output / "hub-phases.json")
         suite = summary["suite"]
@@ -236,7 +239,9 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, 
                 errors.append("missing or unsuccessful sanitized JUnit coverage")
             if allow_failures and any(
                 [child.tag for child in case] != (
-                    ["error"] if receipt.get("reports", {}).get(node, {}).get("call") == ["failed"] else []
+                    [] if receipt.get("reports", {}).get(node) == {
+                        stage: ["passed"] for stage in ("setup", "call", "teardown")
+                    } else ["error"]
                 ) for case, node in zip(cases, expected)
             ):
                 errors.append("JUnit outcomes disagree with phase receipts")

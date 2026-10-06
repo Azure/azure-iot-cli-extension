@@ -24,7 +24,7 @@ import pytest
 
 from azext_iot.tests import _hub_suite_manifest as manifest
 from azext_iot.tests import _focused_live as focused
-from azext_iot.tests._ado_retry import assertion_failure
+from azext_iot.tests._ado_retry import retryable_failure
 
 
 def result_errors(expected, collected, reports, exitstatus, finished):
@@ -174,16 +174,18 @@ class PhaseReceipt:
     def pytest_runtest_makereport(self, item, call):
         report = (yield).get_result()
         if self.data.get("mode") == "attempt" and report.when == "call" and report.failed:
-            report.user_properties.append(("ado_retryable", assertion_failure(call.excinfo.value) if call.excinfo else False))
+            if call.excinfo:
+                report.user_properties.append(("ado_retryable", retryable_failure(call.excinfo.value)))
 
     def pytest_runtest_logreport(self, report):
         stages = self.data["reports"].setdefault(report.nodeid, {})
         outcome = "xfail" if hasattr(report, "wasxfail") else report.outcome
         stages.setdefault(report.when, []).append(outcome)
         if self.data.get("mode") == "attempt" and report.when == "call" and report.failed:
-            self.data.setdefault("retryableFailures", {})[report.nodeid] = [
-                value for name, value in report.user_properties if name == "ado_retryable"
-            ] == [True]
+            classifications = [value for name, value in report.user_properties if name == "ado_retryable"]
+            self.data.setdefault("retryableFailures", {})[report.nodeid] = (
+                classifications[0] if len(classifications) == 1 else None
+            )
         self.write()
 
     def pytest_runtest_logstart(self, nodeid, location):

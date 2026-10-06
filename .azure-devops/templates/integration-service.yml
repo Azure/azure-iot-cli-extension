@@ -10,7 +10,7 @@ parameters:
 
 stages:
   - stage: ${{ parameters.service }}
-    displayName: ${{ parameters.service }} integration tests (rerun to retry failed cases)
+    displayName: ${{ parameters.service }} integration tests (manual recovery)
     dependsOn:
       - Build
       - Lint
@@ -63,7 +63,7 @@ stages:
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
           - task: AzureCLI@2
-            displayName: Run service or retry its remaining failed cases
+            displayName: Run service or recover failed cases and fixture phases
             inputs:
               azureSubscription: $(AzureServiceConnection)
               addSpnToEnvironment: true
@@ -101,6 +101,9 @@ stages:
               azext_iot_adr_location: $(region)
               azext_iot_adr_arm_endpoint: $(endpoint)
               azext_iot_adr_arm_resource: https://management.azure.com
+          - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
+            condition: succeededOrFailed()
+            displayName: Report incomplete execution before publishing
           - publish: attempt
             condition: succeededOrFailed()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)

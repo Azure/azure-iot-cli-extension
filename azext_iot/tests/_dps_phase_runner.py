@@ -426,9 +426,12 @@ def safe_junit(raw, destination, phase, selected, *, debug=None):
             duration = "0"
         clean_case = ET.SubElement(output, "testcase", name=name, classname=classname, time=duration)
         outcome = next((kind for kind in ("error", "failure", "skipped") if case.find(kind) is not None), None)
+        issues = ([child.tag for child in case if child.tag in ("error", "failure", "skipped")]
+                  if debug and "attempt" in debug else [outcome] if outcome else [])
         if outcome:
             counts[{"error": "errors", "failure": "failures", "skipped": "skipped"}[outcome]] += 1
-            ET.SubElement(clean_case, outcome, message="Diagnostic omitted; consult the redacted phase log.")
+            for issue in issues:
+                ET.SubElement(clean_case, issue, message="Diagnostic omitted; consult the redacted phase log.")
         else:
             counts["passed"] += 1
     for key in ("tests", "failures", "errors", "skipped"):

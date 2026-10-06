@@ -7,7 +7,7 @@
 """Pipeline 147 planning, phase execution, and immutable manual-attempt aggregation."""
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed, ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -19,6 +19,7 @@ import subprocess
 import sys
 from threading import Event
 import time
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
@@ -111,6 +112,8 @@ def candidate(directory, output):
 
 
 def gate(directory):
+    if list(Path(directory).rglob("rejection.json")):
+        raise ValueError("An attempt was rejected or incomplete; see its rejection report and start a new run.")
     plans = sorted(Path(directory).glob("integration-plan-*/plan.json"))
     if not plans or any(RETRY["read"](path) != RETRY["read"](plans[0]) for path in plans):
         raise ValueError("Missing or changed execution plan.")
@@ -190,17 +193,22 @@ def dps_evidence(folder, selection, ctx):
     if errors:
         raise ValueError("DPS execution/teardown is unproven: " + "; ".join(errors))
     selected = dps["selection_count"](directory / "receipts", phase, debug=selection)
-    import xml.etree.ElementTree as ET
     cases = list(ET.parse(directory / "junit.xml").getroot().iter("testcase"))
-    outcomes = RETRY["outcomes"](receipt)
+    outcomes = RETRY["outcomes"](receipt, allow_fixture_failures=True)
     actual = {}
     for case in cases:
         node = "azext_iot/tests/dps/" + dps["MANIFEST"]["junit_nodeid"](case)
-        if node in actual or [child.tag for child in case] not in ([], ["failure"]):
-            raise ValueError("DPS JUnit contains duplicate, skipped or unsafe cases.")
-        actual[node] = "failed" if list(case) else "passed"
-    if selected != len(outcomes) or actual != outcomes:
+        actual.setdefault(node, []).append([child.tag for child in case])
+    if selected != len(outcomes) or set(actual) != set(outcomes):
         raise ValueError("DPS collection/JUnit disagrees with phase evidence.")
+    for node, stages in receipt["reports"].items():
+        expected_tags = ["failure" if stage == "call" else "error"
+                         for stage, status in stages.items() if status == ["failed"]]
+        entries = actual[node]
+        if (sorted(tag for entry in entries for tag in entry) != sorted(expected_tags)
+                or not expected_tags and len(entries) != 1
+                or expected_tags and any(not entry for entry in entries)):
+            raise ValueError("DPS JUnit contains duplicate, skipped or inconsistent test stages.")
     baseline = {resource["id"].casefold() for resource in summary["baseline"]["resources"]}
     records = dps["ownership"](directory / "receipts", phase, result["run_uid"], ctx["subscription"],
                                ctx["resource_group"], baseline, region=ctx["region"], endpoint=ctx["endpoint"])
@@ -266,29 +274,58 @@ def phase(selection_file, output):
         if execution["exit_code"] != receipt["exitstatus"]:
             raise ValueError("Execution status disagrees with test evidence.")
         expected = receipt["expected"]
-    RETRY["outcomes"](receipt)
+    cleanup_verified = service in ("DPS", "HubControl", "HubData")
+    RETRY["outcomes"](receipt, allow_fixture_failures=cleanup_verified)
     RETRY["write"](folder / "phase.json", {
         "expected": expected, "receipt": receipt, "safe": True, "excluded": receipt.get("excluded", []),
+        "cleanupVerified": cleanup_verified,
     })
 
 
 def run(args):
+    output = Path(args.output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    try:
+        return run_attempt(args, output)
+    except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
+        detail = str(error) if isinstance(error, ValueError) else type(error).__name__
+        reject(output, detail)
+        raise
+
+
+def reject(output, reason):
+    """Publish an explicit orchestration error, never successful test coverage."""
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    RETRY["write"](output / "rejection.json", {"reason": reason, "qualifies": False})
+    suite = ET.Element("testsuite", name="Attempt rejected", tests="1", failures="0", errors="1")
+    case = ET.SubElement(suite, "testcase", classname="pipeline", name="Attempt execution evidence")
+    ET.SubElement(case, "error", message=reason)
+    ET.ElementTree(suite).write(output / "final.xml", encoding="utf-8", xml_declaration=True)
+    (output / "summary.md").write_text(
+        f"## Attempt rejected\n\n{reason}\n\nNo successful recovery was recorded. "
+        "See the original attempt artifacts and task logs. Start a new run after correcting the cause.\n",
+        encoding="utf-8",
+    )
+    print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
+
+
+def run_attempt(args, output):
     from azext_iot.tests import _dps_phase_runner as dps
     ctx = context(args.service, args.python, args.region, args.endpoint, args.wheel, args.diagnostic)
     history = RETRY["load_history"](args.history, ctx)
     native_attempt = int(os.environ["SYSTEM_JOBATTEMPT"])
     if native_attempt != len(history) + 1:
         raise ValueError("An intervening native job attempt is missing; start a new full run.")
-    output = Path(args.output).resolve()
-    output.mkdir(parents=True, exist_ok=False)
     prior_expected, _, _ = RETRY["evaluate"](history, ctx)
     remaining = RETRY["pending"](history, ctx) if history else owned_nodes(args.service) or {"tests": []}
     record = {
-        "schema": 1, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
-        "parent": RETRY["digest"](history[-1]) if history else None, "healthy": False, "phases": {},
+        "schema": 2, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
+        "parent": RETRY["digest"](history[-1]) if history else None,
+        "executionErrors": ["Execution did not complete."], "phases": {},
     }
     if history and not remaining:
-        record.update(healthy=True, reused=True)
+        record.update(executionErrors=[], reused=True)
         RETRY["write"](output / "reuse.json", {"parent": record["parent"], "nativeAttempt": native_attempt})
         record["evidence"] = RETRY["evidence"](output)
         RETRY["write"](output / "attempt.json", record)
@@ -296,6 +333,9 @@ def run(args):
         RETRY["junit"](history, ctx, output / "final.xml")
         print("Already passed; retaining original evidence without executing tests.")
         return 0
+    if history:
+        print("Manual recovery selection (cases per phase): "
+              + json.dumps({name: len(nodes) for name, nodes in remaining.items()}), flush=True)
     if not args.diagnostic:
         admission()
     os.environ["azext_iot_candidate_wheel"] = str(next(Path(args.wheel).rglob("*.whl")).resolve())
@@ -327,12 +367,27 @@ def run(args):
                 lambda: cancel.is_set() or auth is not None and auth.poll() is not None,
             )
             if result["exit_code"] or result["timed_out"] or result["interrupted"]:
-                raise ValueError(f"{name}: execution/cleanup evidence incomplete. See redacted attempt logs.")
+                rejection = output / name / "rejection.json"
+                if rejection.is_file():
+                    raise ValueError(RETRY["read"](rejection)["reason"])
+                raise ValueError("Execution/cleanup evidence incomplete. See redacted phase logs.")
             return name, RETRY["read"](output / name / "phase.json")
 
+        errors = []
         with ThreadPoolExecutor(max_workers=len(remaining)) as pool:
-            for name, value in pool.map(execute, remaining.items()):
-                record["phases"][name] = value
+            futures = {pool.submit(execute, item): item[0] for item in remaining.items()}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    _, value = future.result()
+                    record["phases"][name] = value
+                except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
+                    detail = str(error) if isinstance(error, ValueError) else type(error).__name__
+                    errors.append(f"{name}: {detail}")
+        record["phases"] = {name: record["phases"][name] for name in remaining if name in record["phases"]}
+        if errors:
+            record["executionErrors"] = sorted(errors)
+            raise ValueError("; ".join(sorted(errors)))
         if auth is not None:
             if auth.poll() is not None:
                 raise ValueError("Credential refresher stopped unexpectedly.")
@@ -340,7 +395,9 @@ def run(args):
             if auth.wait(timeout=180):
                 raise ValueError("Credential refresh failed.")
             auth = None
-        record["healthy"] = not cancel.is_set()
+        if cancel.is_set():
+            raise ValueError("Attempt was cancelled; start a new run.")
+        record["executionErrors"] = []
     finally:
         try:
             if auth is not None:
@@ -379,17 +436,29 @@ def main():
     phase_parser = commands.add_parser("phase")
     phase_parser.add_argument("--selection", required=True)
     phase_parser.add_argument("--output", required=True)
+    rejection = commands.add_parser("report-incomplete")
+    rejection.add_argument("--output", required=True)
     for name in ("gate", "coverage", "candidate"):
         subparser = commands.add_parser(name)
         subparser.add_argument("--history", required=True)
         if name == "candidate":
             subparser.add_argument("--output", required=True)
     args = parser.parse_args()
+    if args.command == "report-incomplete":
+        if not (Path(args.output) / "final.xml").is_file():
+            reject(args.output, "No terminal report was produced; installation, login or execution did not complete.")
+            return 1
+        return 0
     if args.command == "plan":
         print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic), indent=2))
         return 0
     if args.command == "phase":
-        phase(args.selection, args.output)
+        try:
+            phase(args.selection, args.output)
+        except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
+            detail = str(error) if isinstance(error, ValueError) else type(error).__name__
+            reject(args.output, detail)
+            raise
         return 0
     if args.command in ("gate", "coverage", "candidate"):
         if args.command == "candidate":

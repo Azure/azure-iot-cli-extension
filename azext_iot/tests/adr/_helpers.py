@@ -33,7 +33,7 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
 from azext_iot.tests.settings import HUB_TEST_LOCATION
-from azext_iot.tests._ado_retry import InfrastructureFailure
+from azext_iot.tests._ado_retry import CleanupFailure, InfrastructureFailure
 
 
 ROLE_PROPAGATION_DELAY = 30
@@ -132,7 +132,7 @@ class CleanupLedger:
             detail = ", ".join(
                 f"{label}: {error}" for label, error in failures
             )
-            raise InfrastructureFailure(f"ADR cleanup failed: {detail}")
+            raise CleanupFailure(f"ADR cleanup failed: {detail}")
         return False
 
 
@@ -590,4 +590,4 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         failures = ledger.cleanup()
         if failures and sys.exc_info()[0] is None:
             detail = ", ".join(f"{label}: {error}" for label, error in failures)
-            raise InfrastructureFailure(f"ADR cleanup failed: {detail}") from failures[0][1]
+            raise CleanupFailure(f"ADR cleanup failed: {detail}") from failures[0][1]

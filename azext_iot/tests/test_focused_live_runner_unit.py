@@ -148,9 +148,16 @@ def test_real_controller_cli_rejects_before_test_or_azure_imports(tmp_path, suit
 
 
 def _damage(receipt, expected, defect):
-    if defect == "assertion":
-        receipt["reports"][expected[0]]["call"] = ["failed"]
-        receipt["retryableFailures"] = {expected[0]: True}
+    if defect in ("assertion", "setup-failed", "teardown-failed", "call-teardown", "setup-teardown", "cleanup-call"):
+        report = receipt["reports"][expected[0]]
+        if defect in ("assertion", "call-teardown", "cleanup-call"):
+            report["call"] = ["failed"]
+            receipt["retryableFailures"] = {expected[0]: defect != "cleanup-call"}
+        if defect in ("setup-failed", "setup-teardown"):
+            report["setup"] = ["failed"]
+            del report["call"]
+        if defect in ("teardown-failed", "call-teardown", "setup-teardown"):
+            report["teardown"] = ["failed"]
         receipt["exitstatus"] = 1
         receipt["errors"] = [
             "phase incomplete or pytest failed",
@@ -192,7 +199,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         path = Path(env["AZEXT_IOT_HUB_OWNERSHIP"])
         evidence = hub.read_json(path)
         if phase == "sas":
-            evidence.update(passed=expected[1:] if defect == "assertion" else expected, **focused.provenance(debug))
+            evidence.update(passed=[node for node in expected if receipt["reports"][node].get("call") == ["passed"]],
+                            **focused.provenance(debug))
         elif defect == "observer":
             evidence["violations"] = ["Observed resource no longer belongs to this phase"]
         elif defect == "uncertain":
@@ -200,8 +208,7 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         ownership.write(path, evidence)
         if defect in ("timed_out", "interrupted"):
             result[defect] = True
-        if defect == "assertion":
-            result["exit_code"] = 1
+        result["exit_code"] = receipt["exitstatus"]
         return result
 
     output = tmp_path / "hub-phases"
@@ -287,16 +294,20 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         for case in list(tree.getroot()):
             if dps.MANIFEST["junit_nodeid"](case) not in short:
                 tree.getroot().remove(case)
-        if defect == "assertion":
-            ET.SubElement(list(tree.getroot())[0], "failure", message="offline assertion")
-            result["exit_code"] = 1
-        tree.write(env["azext_iot_dps_junit"])
         receipt = plugin.PhaseReceipt("DPS", phase, expected, directory / "pytest.json", env["azext_iot_dps_run_uid"],
                                       debug=debug)
         receipt.data.update(collected=expected[:], finished=True, exitstatus=0, errors=[],
                             reports={node: {stage: ["passed"] for stage in ("setup", "call", "teardown")}
                                      for node in expected})
         _damage(receipt.data, expected, defect)
+        result["exit_code"] = receipt.data["exitstatus"]
+        for stage, status in receipt.data["reports"][expected[0]].items():
+            if status == ["failed"]:
+                case = list(tree.getroot())[0]
+                if defect == "call-teardown" and stage == "teardown":
+                    case = ET.SubElement(tree.getroot(), "testcase", **case.attrib)
+                ET.SubElement(case, "failure" if stage == "call" else "error", message="offline failure")
+        tree.write(env["azext_iot_dps_junit"])
         receipt.write()
         if defect == "uncertain":
             for path in directory.glob("created-*.json"):
@@ -322,7 +333,9 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
     ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
 ])
-@pytest.mark.parametrize("defect", [None, "assertion"])
+@pytest.mark.parametrize("defect", [
+    None, "assertion", "setup-failed", "teardown-failed", "call-teardown", "setup-teardown", "cleanup-call",
+])
 @pytest.mark.parametrize("whole", [False, True])
 def test_ado_attempts_retain_owned_execution_but_never_qualify_as_debug_or_full(
     tmp_path, monkeypatch, suite, phase, defect, whole,
@@ -348,7 +361,7 @@ def test_ado_attempts_retain_owned_execution_but_never_qualify_as_debug_or_full(
     assert summary["mode"] == "attempt" and summary["qualifiesFullSuite"] is False
 
 
-@pytest.mark.parametrize("defect", ["missing-stage", "skip", "uncertain", "timed_out"])
+@pytest.mark.parametrize("defect", ["missing-stage", "skip", "uncertain", "timed_out", "interrupted"])
 def test_ado_assertion_tolerance_does_not_relax_owned_cleanup(tmp_path, monkeypatch, defect):
     _, _, output, *_ = run_hub(
         tmp_path, monkeypatch, "HubControl", "regular", defect=defect, attempt_id="a" * 64,
@@ -909,7 +922,8 @@ sys.exit(pytest.main([
 
 @pytest.mark.parametrize("outcome,workers", [
     ("passed", 7), ("passed", 2), ("assertion", 2), ("infrastructure", 2), ("skipped", 2),
-    ("teardown-failed", 2), ("worker-exit", 2), ("sessionfinish-failed", 2),
+    ("setup-failed", 2), ("teardown-failed", 2), ("call-teardown-failed", 2),
+    ("worker-exit", 2), ("sessionfinish-failed", 2),
 ])
 def test_real_dps_attempt_aggregates_parallel_workers_and_preserves_retry_eligibility(tmp_path, outcome, workers):
     requested = [
@@ -924,15 +938,17 @@ def test_real_dps_attempt_aggregates_parallel_workers_and_preserves_retry_eligib
             "import os\nfrom pathlib import Path\nimport pytest\n"
             "@pytest.fixture\n"
             "def resource():\n"
+            f"    if {index} and os.environ['PROOF_OUTCOME'] == 'setup-failed':\n"
+            "        raise RuntimeError('offline setup failure')\n"
             "    yield\n"
-            f"    if {index} and os.environ['PROOF_OUTCOME'] == 'teardown-failed':\n"
+            f"    if {index} and os.environ['PROOF_OUTCOME'] in ('teardown-failed', 'call-teardown-failed'):\n"
             "        raise AssertionError('offline teardown failure')\n"
             f"def {function}(resource):\n"
             f"    Path('worker-{index}').write_text(os.environ['PYTEST_XDIST_WORKER'])\n"
             f"    if not {index}:\n"
             "        return\n"
             "    outcome = os.environ['PROOF_OUTCOME']\n"
-            "    if outcome == 'assertion':\n"
+            "    if outcome in ('assertion', 'call-teardown-failed'):\n"
             "        assert False, 'offline test assertion'\n"
             "    if outcome == 'infrastructure':\n"
             "        raise RuntimeError('offline infrastructure error')\n"
@@ -976,10 +992,12 @@ def test_real_dps_attempt_aggregates_parallel_workers_and_preserves_retry_eligib
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "-p", "xdist.plugin", "-p", "azext_iot.tests._focused_live_plugin",
              "-c", "pytest.ini", "--rootdir", ".", "--confcutdir", ".", "-n", str(workers), "--dist=loadfile",
-             "--max-worker-restart=0", "-q", *selection["requestedNodes"]],
+             "--max-worker-restart=0", "--junitxml=" + str(folder / "raw.xml"), "-q", *selection["requestedNodes"]],
             cwd=tmp_path, env=environment, capture_output=True, text=True, check=False, timeout=60,
         )
         value = hub.read_json(folder / "pytest.json")
+        if (folder / "raw.xml").exists():
+            dps.safe_junit(folder / "raw.xml", folder / "junit.xml", "regular", len(selected), debug=selection)
         assert value["collected"] == value["expected"] == selection["requestedNodes"], result.stdout + result.stderr
         assert value["mode"] == "attempt" and value["qualifiesFullSuite"] is False
         return result, value
@@ -993,13 +1011,26 @@ def test_real_dps_attempt_aggregates_parallel_workers_and_preserves_retry_eligib
             assert result.returncode == 1, result.stdout + result.stderr
         return
     assert receipt["finished"] is True
-    assert len({(tmp_path / f"worker-{index}").read_text() for index in range(2)}) == 2
+    if outcome != "setup-failed":
+        assert len({(tmp_path / f"worker-{index}").read_text() for index in range(2)}) == 2
     assert receipt["reports"][requested[0]] == {stage: ["passed"] for stage in ("setup", "call", "teardown")}
-    if outcome in ("assertion", "infrastructure"):
-        assert receipt["retryableFailures"] == {requested[1]: outcome == "assertion"}
+    if outcome in ("assertion", "infrastructure", "call-teardown-failed"):
+        assert receipt["retryableFailures"] == {requested[1]: True}
     else:
         assert not receipt.get("retryableFailures")
-    if outcome == "assertion":
+    from azext_iot.tests import _ado_retry as retry
+    if outcome != "skipped":
+        statuses = retry.outcomes(receipt, allow_fixture_failures=True)
+        assert statuses[requested[1]] == ("passed" if outcome == "passed" else "failed")
+        assert retry.fixture_failure(receipt) == (outcome in ("setup-failed", "teardown-failed", "call-teardown-failed"))
+        junit_cases = list(ET.parse(tmp_path / "first/junit.xml").getroot().iter("testcase"))
+        tags = sorted(child.tag for case in junit_cases for child in case)
+        expected_tags = {
+            "passed": [], "assertion": ["failure"], "infrastructure": ["failure"],
+            "setup-failed": ["error"], "teardown-failed": ["error"], "call-teardown-failed": ["error", "failure"],
+        }
+        assert tags == expected_tags[outcome]
+    if outcome in ("assertion", "infrastructure"):
         result, recovered = execute([requested[1]], "retry", "passed")
         assert result.returncode == 0, result.stdout + result.stderr
         assert not recovered["errors"]
