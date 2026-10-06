@@ -20,6 +20,10 @@ def patch_core_help():
         ] += """
   - name: Create a Standard IoT Hub with a system-assigned identity for later namespace linking.
     text: az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi
+  - name: Create an IoT Hub with the MQTT 5 connection profile.
+    text: >
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --unit 1
+        --connection-profile MqttV5 --yes
 """
 
     # add DPS create examples for ADR properties

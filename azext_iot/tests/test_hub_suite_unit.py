@@ -26,16 +26,20 @@ def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path)
     monkeypatch.chdir(tmp_path)
     cases = manifest.contract()
     preview = any(case.capability == "preview" for case in cases)
-    assert len(cases) == (81 if preview else 78)
+    assert len(cases) == (82 if preview else 78)
     control = manifest.nodes("HubControl", "regular")
     entra = manifest.nodes("HubData", "entra")
     sas = manifest.nodes("HubData", "sas")
-    assert (len(control), len(entra), len(sas)) == (28, 44 if preview else 42, 8 if preview else 6)
+    assert (len(control), len(entra), len(sas)) == (
+        29 if preview else 28,
+        44 if preview else 42,
+        8 if preview else 6,
+    )
     control_shards = [manifest.nodes("HubControl", phase) for phase in manifest.phases("HubControl")]
     entra_shards = [manifest.nodes("HubData", phase) for phase in manifest.HUB_DATA_ENTRA_PHASES]
     assert set(node for shard in control_shards for node in shard) == set(control)
     assert set(node for shard in entra_shards for node in shard) == set(entra)
-    assert [len(shard) for shard in control_shards] == [6, 14, 5, 3]
+    assert [len(shard) for shard in control_shards] == [6, 15 if preview else 14, 5, 3]
     assert [len(shard) for shard in entra_shards] == [7, 37 if preview else 35]
     assert len(set(entra) & set(sas)) == (2 if preview else 0)
     assert not set(control) & (set(entra) | set(sas))
@@ -105,7 +109,7 @@ def _checkout(tmp_path, capability="base"):
 
 def test_child_capability_is_not_optional_file_existence(tmp_path):
     root = _checkout(tmp_path, "preview")
-    assert len(manifest.contract(root)) == 81
+    assert len(manifest.contract(root)) == 82
     assert len(manifest.nodes("HubData", "entra", root)) == 44
     assert len(manifest.nodes("HubData", "sas", root)) == 8
     with pytest.raises(ValueError, match="not enabled"):

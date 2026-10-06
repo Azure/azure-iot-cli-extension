@@ -90,6 +90,8 @@ CASES = (
             **_with(_PROTOCOL, auth=("service:login", "device:x509"), dependencies=("hub", "local-certificates"))),
     *_cases("core/test_iothub_certificate_int", "TestIoTHubCertificates",
             "test_hub_certificate_lifecycle_int", **_CONTROL),
+    *_cases("core/test_iot_hub_mqtt5_int", "", "test_mqtt5_profile_and_topic_group_lifecycle",
+            capability="preview", **_CONTROL),
     *_cases("core/test_iothub_discovery_int", "TestIoTHubDiscovery",
             "test_iothub_discovery test_iothub_discovery_lists test_iothub_target_lists", **_POLICY),
     *_cases("core/test_iothub_discovery_int", "TestIoTHubDiscovery", "test_iothub_targets",
@@ -187,6 +189,8 @@ SHARDS = {
         "regular-state-schemes-cert": (
             "azext_iot/tests/iothub/core/test_iothub_certificate_int.py::"
             "TestIoTHubCertificates::test_hub_certificate_lifecycle_int",
+            "azext_iot/tests/iothub/core/test_iot_hub_mqtt5_int.py::"
+            "test_mqtt5_profile_and_topic_group_lifecycle",
             "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
             "TestIoTHubDiscovery::test_iothub_discovery",
             "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
