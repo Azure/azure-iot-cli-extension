@@ -103,6 +103,21 @@ class IotHubSku(Enum):
     B3 = "B3"
 
 
+class IotHubConnectionProfile(Enum):
+    """The connection profile used by an IoT Hub."""
+
+    CLASSIC = "Classic"
+    MQTT_V5 = "MqttV5"
+
+
+def is_mqtt_v5_profile(connection_profile):
+    return (
+        isinstance(connection_profile, str)
+        and connection_profile.casefold()
+        == IotHubConnectionProfile.MQTT_V5.value.casefold()
+    )
+
+
 class IotDpsSku(Enum):
     """DPS SKU name."""
 

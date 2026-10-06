@@ -18,6 +18,7 @@ from azure.cli.core.azclierror import (
     BadRequestError,
     CLIInternalError,
     InvalidArgumentValueError,
+    ManualInterrupt,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
@@ -28,6 +29,7 @@ from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from azure.core.polling import PollingMethod
 from knack.log import get_logger
+from knack.prompting import prompt_y_n
 from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
@@ -53,6 +55,7 @@ from azext_iot.core.shared import (
     IotHubSku,
     ManagedServiceIdentityType,
     RenewKeyType,
+    is_mqtt_v5_profile,
 )
 from azext_iot.core._validators import validate_dps_capacity_update, validate_dps_unit
 from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
@@ -62,6 +65,9 @@ logger = get_logger(__name__)
 # Identity types
 SYSTEM_ASSIGNED = 'SystemAssigned'
 NONE_IDENTITY = 'None'
+MQTT_V5_CREATE_CONFIRMATION = (
+    "The MqttV5 connection profile is permanent and cannot be changed after the IoT Hub is created. Continue?"
+)
 
 
 def _drop_none_create_values(value):
@@ -111,6 +117,15 @@ def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
         )
     # "auto" or "device" with available deviceHostName
     return device_hostname or hub["properties"]["hostName"]
+
+
+def _validate_direct_dps_link_hub_profile(hub):
+    connection_profile = (hub.get("properties") or {}).get("connectionProfile")
+    if is_mqtt_v5_profile(connection_profile):
+        raise InvalidArgumentValueError(
+            "IoT Hubs using the MQTT v5 connection profile cannot be linked directly to DPS. "
+            "Use 'az iot adr ns link add' to link the DPS and IoT Hub through a Device Registry namespace."
+        )
 
 
 def _ensure_linked_hub_hostnames(linked_hubs):
@@ -482,6 +497,7 @@ def iot_dps_linked_hub_create(
 
         hub_client = iot_hub_service_factory(cmd.cli_ctx)
         hub = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)
+        _validate_direct_dps_link_hub_profile(hub)
         host_name = _resolve_linked_hub_hostname(hub, hostname_type)
 
         # Validate MI is enabled on DPS
@@ -515,6 +531,7 @@ def iot_dps_linked_hub_create(
         if not connection_string:
             hub_client = iot_hub_service_factory(cmd.cli_ctx)
             hub = iot_hub_get(cmd, hub_client, hub_name=hub_name, resource_group_name=hub_resource_group)
+            _validate_direct_dps_link_hub_profile(hub)
             host_name = _resolve_linked_hub_hostname(hub, hostname_type)
             location = location or hub["location"]
             # Build connection string with resolved hostname
@@ -987,6 +1004,8 @@ def iot_hub_create(
     location=None,
     sku=None,
     unit=None,
+    connection_profile: Optional[str] = None,
+    yes: bool = False,
     partition_count=None,
     retention_day=None,
     c2d_ttl=None,
@@ -1091,6 +1110,13 @@ def iot_hub_create(
             "to enable it. Check command help (-h) for more information on this property's usage and implications."
         )
 
+    if (
+        is_mqtt_v5_profile(connection_profile)
+        and not yes
+        and not prompt_y_n(msg=MQTT_V5_CREATE_CONFIRMATION, default='n')
+    ):
+        raise ManualInterrupt("Operation was aborted because MQTT 5 profile creation was not confirmed.")
+
     if is_new:
         hub_description = {
             "location": location,
@@ -1127,13 +1153,18 @@ def iot_hub_create(
                 "disableDeviceSAS": disable_device_sas,
                 "disableModuleSAS": disable_module_sas,
                 "enableFileUploadNotifications": False if enable_fileupload_notifications is None else enable_fileupload_notifications,
+                "connectionProfile": connection_profile,
             },
             "tags": tags,
         }
+        if is_mqtt_v5_profile(connection_profile):
+            hub_description["properties"]["routing"] = {"endpoints": {}}
     else:
         hub_description = _hub_description_for_write(existing_hub)
         hub_description["location"] = location
         properties = hub_description.setdefault("properties", {})
+        if connection_profile is not None:
+            properties["connectionProfile"] = connection_profile
         sku_body = hub_description.setdefault("sku", {})
         if sku is not None:
             sku_body["name"] = sku
