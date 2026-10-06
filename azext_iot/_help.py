@@ -26,7 +26,9 @@ helps[
 ] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
-    long-summary: Preview APIs support the Azure public cloud only; management requests use public ARM by default. Set AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com to use canary ARM.
+    long-summary: |
+                  Preview APIs support the Azure public cloud only; management requests use public ARM by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to use canary ARM.
 """
 
 helps[
@@ -1054,7 +1056,9 @@ helps[
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
-    long-summary: Preview APIs support the Azure public cloud only; management requests use public ARM by default. Set AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com to use canary ARM.
+    long-summary: |
+                  Preview APIs support the Azure public cloud only; management requests use public ARM by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to use canary ARM.
 """
 
 helps[
