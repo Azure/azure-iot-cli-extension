@@ -137,6 +137,46 @@ Execute the following command to run the IoT Hub unit tests:
 
 `pytest azext_iot/tests/iothub/ -k "_unit.py"`
 
+#### Parallel CI unit tests
+
+The GitHub integration precheck uses four balanced unit-test shards on
+Linux/Python 3.13. PR CI uses the same runner on Python 3.13 across Ubuntu,
+Windows, and macOS, plus Python 3.10 on Ubuntu: four combinations and 16 unit jobs.
+GitHub branch/tag pushes, manual runs, and release workflows retain all three operating
+systems and Python 3.10-3.13: twelve combinations and 48 unit jobs. The reusable
+workflow defaults to the full matrix; only the CI caller's `pull_request` event
+enables `pr-matrix`. Each combination runs all unit tests across four shards,
+with lint once per combination and a coverage gate for each. Each shard uses
+serial pytest, not xdist, and new unit files are included automatically.
+Shards must use the same Python major/minor version; runner patch versions may differ.
+PR aggregate gates retain the `test / Unit test <python> - <os>` names required
+by branch rules and fail if any shard or lint run fails.
+
+Feature-branch updates run GitHub CI through `pull_request`, without a duplicate
+push-triggered matrix. Push CI remains enabled for `dev`, `preview`,
+`1.1.0-preview`, `release/**`, and tags; manual dispatch is unchanged.
+
+Azure Pipelines Merge (pipeline 11) no longer repeats the unit suite. It retains
+wheel and software-manifest generation, the Azure CLI test SDK build, style and
+command-table lint, and Credential Scan. The four GitHub PR combinations are
+the PR unit gate; the former additional ADO unit combinations and tests against
+the unreleased CLI test SDK are no longer part of Merge validation. Full-matrix
+GitHub runs and other integration/unit pipelines are unchanged.
+
+Integration starts only after lint, all shards, and the `unit-test` gate pass.
+The gate checks complete, exactly-once case coverage and combines coverage into
+`coverage-unit`. Native reruns can reuse successful shards from the same run and
+commit, but incomplete newer attempts cannot fall back to older results.
+
+Shard results are published as `unit-shard-<number>-<attempt>`.
+PR CI uses `tox-unit-<os>-py<version>-<number>-<attempt>` to keep each combination
+separate from the others and from integration prechecks.
+Integration summaries use `unit-summary-<attempt>`; PR summaries use
+`tox-summary-<os>-py<version>-<attempt>`. Both include the completeness summary
+and `timings.json`; use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
+The shared runner accepts CI-neutral run, commit, and attempt inputs so Azure
+Pipelines can use the same implementation.
+
 ### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.

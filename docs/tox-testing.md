@@ -83,8 +83,13 @@ In order to list all recognized environments, you can type `tox -av`, which will
 
 ## Integration workflow topology
 
-`int_test.yml` runs a direct service × Python × region matrix after setup and unit
-tests succeed. Every selected combination, including ADU, is independently eligible
+`int_test.yml` runs lint and four duration-balanced serial unit shards in parallel.
+Its unit gate verifies complete, nonduplicated execution and combines coverage
+before any integration jobs are eligible. See [parallel CI unit tests](../CONTRIBUTING.md#parallel-ci-unit-tests)
+for shard artifacts, reruns and timing-profile maintenance.
+
+The direct service × Python × region matrix starts after setup and the unit gate
+succeed. Every selected combination, including ADU, is independently eligible
 to run, with `fail-fast: false`, no parallelism cap and no workflow/job concurrency
 lock. Job names and result/coverage artifacts identify the service, Python and region.
 The result gate checks the complete selected matrix independently of coverage reporting.
