@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from os import getcwd
+from os import getcwd, name as os_name
 from pathlib import PurePath
 from unittest.mock import call
 import pytest
@@ -34,7 +34,9 @@ from azext_iot.iothub.providers.helpers.edge_device_config import (
     process_edge_devices_config_file_content,
     create_edge_device_config,
     try_parse_valid_deployment_config,
+    validate_edge_device_id,
 )
+from azext_iot.iothub.providers.device_identity import _resolve_device_bundle_directory
 from azext_iot.iothub.common import (
     EdgeContainerAuth,
     EdgeDevicesConfig,
@@ -418,6 +420,23 @@ class TestHierarchyCreateFailures:
                 config_file="device_configs/nested_edge_config.yml",
                 clean=False,
                 visualize=False
+            )
+
+    @pytest.mark.parametrize(
+        "devices, config",
+        [
+            ([["id=../evil"]], None),
+            (None, "device_configs/invalid/traversal_device_id.yml"),
+        ],
+    )
+    def test_edge_devices_reject_traversal_ids(
+        self, fixture_cmd, fixture_ghcs, set_cwd, patch_create_edge_root_cert, devices, config
+    ):
+        with pytest.raises(InvalidArgumentValueError, match="Device Id .* contains invalid characters"):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd,
+                devices=devices,
+                config_file=config,
             )
 
 
@@ -1239,6 +1258,83 @@ class TestEdgeHierarchyConfigFunctions:
         )
 
         assert script_content == "\n".join(segments)
+
+
+class TestEdgeDeviceIdValidation:
+    @pytest.mark.parametrize(
+        "device_id",
+        [
+            "device_1",
+            "device-1.edge",
+            "dev+ice%1#2*3?4!5(6)7,8:9=0@$'",
+            # '$', '(' and ')' are legal IoT Hub device Id characters and are accepted here;
+            # script rendering is tracked in Azure/azure-iot-cli-extension#913
+            "device$(whoami)",
+            "d" * 128,
+        ],
+    )
+    def test_valid_device_ids(self, device_id):
+        assert validate_edge_device_id(device_id) == device_id
+
+    @pytest.mark.parametrize(
+        "device_id",
+        [
+            None,
+            "",
+            "..",
+            ".",
+            "../evil",
+            "..\\evil",
+            "sub/device",
+            "sub\\device",
+            "/absolute/device",
+            "C:/Windows/Temp",
+            'device"; rm -rf /; #',
+            "device`whoami`",
+            "device with spaces",
+            "device\n",
+            "device\r\n",
+            "d" * 129,
+        ],
+    )
+    def test_invalid_device_ids(self, device_id):
+        with pytest.raises(InvalidArgumentValueError):
+            validate_edge_device_id(device_id)
+
+    @pytest.mark.parametrize("device_id", ["device\x1b[31m", "device\nERROR: spoofed", "\x1b" * 129])
+    def test_rejected_device_ids_are_rendered_inertly(self, device_id):
+        with pytest.raises(InvalidArgumentValueError) as error:
+            validate_edge_device_id(device_id)
+
+        assert "\x1b" not in str(error.value)
+        assert "\n" not in str(error.value)
+        assert ascii(device_id) in str(error.value)
+
+    def test_nested_config_rejects_traversal_id(self, set_cwd, patch_create_edge_root_cert):
+        content = process_yaml_arg("device_configs/invalid/traversal_device_id.yml")
+        content["edgeDevices"] = [{"deviceId": "parent", "children": content["edgeDevices"]}]
+
+        with pytest.raises(InvalidArgumentValueError, match="Device Id .* contains invalid characters"):
+            process_edge_devices_config_file_content(content=content, config_path=".")
+
+    @pytest.mark.parametrize(
+        "device_id",
+        [
+            "..",
+            "../escape",
+            "/absolute",
+            pytest.param("C:/Windows", marks=pytest.mark.skipif(os_name != "nt", reason="Windows absolute path")),
+        ],
+    )
+    def test_bundle_directory_traversal_blocked(self, device_id):
+        with pytest.raises(InvalidArgumentValueError):
+            _resolve_device_bundle_directory(PurePath(test_path).joinpath("bundle"), device_id)
+
+    def test_bundle_directory_contained(self):
+        bundle_root = PurePath(test_path).joinpath("bundle")
+        assert _resolve_device_bundle_directory(bundle_root, "device_1") == bundle_root.joinpath(
+            "device_1"
+        )
 
 
 class TestDevicesDelete:
