@@ -245,6 +245,40 @@ runtime benefit after restore overhead. Four unit shards need four available
 parallel jobs; Build/Lint also compete for agents. Service stages wait for all
 prechecks, not just the candidate build.
 
+`releaseBuildId` is a number, default **0**: the Build job keeps its existing source
+wheel build unchanged. For **Integration tests**, a positive integer instead selects
+the `release-candidate` artifact from that exact release build in the **same ADO
+project**. No wheel is rebuilt, and pipeline 147 does not publish a release. Dry run
+still only validates the execution plan; it does not fetch a candidate.
+
+External candidates require the operator to set **`ReleasePipelineId`** in the
+existing `aziotcli_test_primary` variable group to the trusted release pipeline's
+positive decimal definition ID. There is deliberately no default or trust of all
+definitions; missing, unresolved or noninteger values fail closed. Grant pipeline
+147's project-scoped **Build Service** identity only the build/artifact read access
+needed on that producer definition (ADO **View builds**, plus **View build pipeline**
+if required for definition visibility). Keep project-scoped job authorization and
+explicit pipeline authorization for the variable group; do not grant all pipelines
+access, collection-wide permissions, queue/edit permissions or a PAT. Metadata is
+read using the job's `System.AccessToken`; the native `DownloadPipelineArtifact@2`
+task downloads only the validated build's named artifact, never a supplied URL.
+
+The producer may be **inProgress** while waiting for 147, or completed successfully;
+failed, canceled and partially successful builds are rejected. Its definition,
+build, project, GitHub repository and automation commit must match the metadata.
+The artifact must contain exactly one wheel, `candidate.json` and `SBOM.zip`.
+Manifest schema 1 identifies repository `Azure/azure-iot-cli-extension`,
+`sourceBranch`, `sourceCommit`, `producer: {definition, build, commit}` (IDs as
+decimal strings), and `wheel: {file, sha256, version}`. The source branch/commit must
+exactly match this integration checkout; the producer commit is the parent build's
+`sourceVersion` and may be a different automation commit. Wheel basename, SHA256,
+distribution `azure-iot` and version metadata are checked before the original bytes,
+manifest and SBOM are republished as `integration-wheel-$(System.JobAttempt)`.
+Existing controllers, immutable-wheel checks and manual retry ancestry are unchanged.
+Retain the parent artifact until child qualification/retries finish. When coordinating
+the two pipelines, do not hold an exclusive resource lock in the parent while waiting
+for a child that needs that same lock.
+
 Service setup checks controller imports before Azure login, including the separate
 DPS tox interpreter. Standalone runners inherit the checkout followed by their
 installed candidate's dependency directory on `PYTHONPATH`; Azure CLI's extension

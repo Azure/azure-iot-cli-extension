@@ -30,6 +30,10 @@ parameters:
     type: string
     default: public
     values: [public, canary]
+  - name: releaseBuildId
+    displayName: Release candidate build ID (0 builds from source)
+    type: number
+    default: 0
 
 variables:
   - group: aziotcli_test_primary
@@ -79,13 +83,45 @@ stages:
           - job: Build
             timeoutInMinutes: 40
             steps:
-              - template: templates/setup-python.yml
-                parameters:
-                  pythonVersion: '3.13'
-              - bash: python -m build --wheel
-                displayName: Build the immutable test candidate
-              - publish: dist
-                artifact: integration-wheel-$(System.JobAttempt)
+              - ${{ if eq(parameters.releaseBuildId, 0) }}:
+                  - template: templates/setup-python.yml
+                    parameters:
+                      pythonVersion: '3.13'
+                  - bash: python -m build --wheel
+                    displayName: Build the immutable test candidate
+                  - publish: dist
+                    artifact: integration-wheel-$(System.JobAttempt)
+              - ${{ if ne(parameters.releaseBuildId, 0) }}:
+                  - task: UsePythonVersion@0
+                    inputs:
+                      versionSpec: '3.13'
+                  - bash: python azext_iot/tests/_release_candidate.py parent --metadata "$PARENT_METADATA"
+                    displayName: Validate trusted release producer before download
+                    env:
+                      RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
+                      RELEASE_PIPELINE_ID: $(ReleasePipelineId)
+                      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                      PARENT_METADATA: $(Agent.TempDirectory)/release-parent-$(System.JobAttempt).json
+                  - task: DownloadPipelineArtifact@2
+                    inputs:
+                      buildType: specific
+                      project: $(System.TeamProjectId)
+                      definition: $(ReleasePipelineId)
+                      buildVersionToDownload: specific
+                      pipelineId: ${{ parameters.releaseBuildId }}
+                      artifactName: release-candidate
+                      targetPath: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
+                  - bash: |
+                      python azext_iot/tests/_release_candidate.py verify \
+                        --metadata "$PARENT_METADATA" --candidate "$CANDIDATE"
+                    displayName: Verify candidate provenance, wheel bytes and distribution
+                    env:
+                      RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
+                      RELEASE_PIPELINE_ID: $(ReleasePipelineId)
+                      PARENT_METADATA: $(Agent.TempDirectory)/release-parent-$(System.JobAttempt).json
+                      CANDIDATE: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
+                  - publish: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
+                    artifact: integration-wheel-$(System.JobAttempt)
 
       - stage: Lint
         displayName: Lint

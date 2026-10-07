@@ -428,7 +428,9 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
         assert stages[name]["dependsOn"] == "Plan"
         assert [job["job"] for job in stages[name]["jobs"]] == ([name, "UnitGate"] if name == "Unit" else [name])
     build_steps = stages["Build"]["jobs"][0]["steps"]
-    assert any(step.get("artifact") == "integration-wheel-$(System.JobAttempt)" for step in build_steps)
+    for branch in build_steps:
+        assert any(step.get("artifact") == "integration-wheel-$(System.JobAttempt)"
+                   for step in next(iter(branch.values())))
     lint = next(step["bash"] for step in stages["Lint"]["jobs"][0]["steps"] if "bash" in step)
     unit_steps = stages["Unit"]["jobs"][0]["steps"]
     unit = next(step["bash"] for step in unit_steps if "bash" in step)
