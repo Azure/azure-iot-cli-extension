@@ -77,6 +77,34 @@ az iot central app -h
 
 If this works, then you should now be able to make changes to the extension and have them reflected immediately in your az cli.
 
+## Index-compatible lint
+
+PR CI and the release workflow run a separate **Index compatibility** job on the
+same `azure-iot-cli-ext` wheel artifact as the existing linter. It uses a clean
+environment, Azure CLI `dev`, and the merged extension-index `main` configuration.
+It does not register this repository as an extension source or copy our local
+exclusions into the installed wheel. The existing required linter is unchanged.
+
+HIGH findings, setup errors, and an empty command selection make this advisory
+check red. MEDIUM-only findings produce warnings with a green check, matching
+azdev's exit policy. Keep `index-compatibility / Index compatibility` **non-required**
+in branch protection/rulesets. Do not mask failures with `continue-on-error`.
+The release approval and drafting jobs do not depend on this advisory job; the
+overall workflow can therefore be red even when the release path succeeds.
+
+Review the completed report before approving a release, especially pending
+upstream exemption PRs. A local-only exclusion is informational, not proof that
+an exemption is justified. Fix actual command/help defects; request narrowly
+scoped upstream exemptions only when the rule does not fit the command's contract.
+Unmerged upstream PRs are never used to declare compatibility.
+
+The job summary and `index-compatibility` artifact contain HIGH/MEDIUM findings,
+local-only exclusions, raw logs, exclusion snapshots, wheel hash, and resolved
+source/CLI/index commits and tool versions. The workflow currently mirrors
+index CI's Python 3.14 and azdev 0.2.13 setup; toolchain drift fails explicitly
+instead of silently claiming parity. Use **CI Build and Test**'s manual dispatch
+to rerun it on a branch without starting a release or accessing Azure resources.
+
 ## Unit and Integration Testing
 
 Tests are organized into folders by resource in `azext_iot\tests\`:

@@ -26,3 +26,6 @@ jobs:
   linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
+  index-compatibility:
+    needs: [build]
+    uses: ./.github/workflows/index_compatibility.yml
