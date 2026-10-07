@@ -87,7 +87,7 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             azext_iot/tests
@@ -177,8 +177,16 @@ jobs:
 
             for py in "${PY_ARRAY[@]}"; do
               py=$(echo "$py" | xargs)
+              if [ -z "$py" ]; then
+                echo "::error::Python versions must not contain blank entries."
+                exit 1
+              fi
               for region in "${REGION_ARRAY[@]}"; do
                 region=$(echo "$region" | xargs)
+                if [ -z "$region" ]; then
+                  echo "::error::Regions must not contain blank entries."
+                  exit 1
+                fi
 
                 if [ "$first" = true ]; then first=false; else matrix="$matrix,"; fi
                 matrix="$matrix{\"service\":\"$svc\",\"tox_env\":\"$tox_env\",\"timeout\":$timeout,\"python\":\"$py\",\"region\":\"$region\"}"
@@ -188,6 +196,10 @@ jobs:
           matrix="$matrix]"
 
           job_count=$(echo "$matrix" | jq length)
+          if [ "$job_count" -eq 0 ]; then
+            echo "::error::No valid integration test combinations were generated. Check the selected services, Python versions, and regions."
+            exit 1
+          fi
           echo ""
           echo "┌──────────────────────────────────────────────────────────┐"
           title="Test Matrix: $job_count job(s)"
@@ -211,10 +223,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: "Setup Python 3.13"
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
           cache: "pip" # Cache pip downloads to avoid re-downloading packages across runs
@@ -229,7 +241,7 @@ jobs:
 
       - name: "Upload coverage report"
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-unit
           path: ./.coverage
@@ -249,10 +261,10 @@ jobs:
         config: ${{ fromJson(needs.setup.outputs.matrix || '[]') }}
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: "Setup Python ${{ matrix.config.python }}"
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ matrix.config.python }}"
           cache: "pip" # Saves ~30-60s per matrix job by caching pip downloads
@@ -276,7 +288,7 @@ jobs:
           tox r -vv -e ${{ matrix.config.tox_env }} --notest
 
       - name: "Az CLI login"
-        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -328,7 +340,7 @@ jobs:
 
       - name: "Upload test result"
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-result-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
           path: test-result/
@@ -336,7 +348,7 @@ jobs:
 
       - name: "Upload coverage artifact"
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
           path: ./.coverage
@@ -345,25 +357,59 @@ jobs:
 
   int-test-gate:
     name: "Integration test gate"
-    needs: [int-test]
+    needs: [setup, int-test]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: "Download all test results"
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        id: download_results
+        if: ${{ needs.int-test.result != 'skipped' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         continue-on-error: true
         with:
           pattern: test-result-*
           path: ./test-results
 
       - name: "Evaluate per-service results"
+        shell: bash
+        env:
+          TEST_JOB_RESULT: ${{ needs.int-test.result }}
+          SETUP_RESULT: ${{ needs.setup.result }}
+          DOWNLOAD_RESULT: ${{ steps.download_results.outcome }}
+          EXPECTED_MATRIX: ${{ needs.setup.outputs.matrix }}
         run: |
+          if [ "$SETUP_RESULT" != "success" ]; then
+            echo "::error::Integration test matrix setup did not succeed"
+            echo "### Integration matrix setup failed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! expected_results=$(jq -ser '
+            if length == 1 and (.[0] |
+              type == "array" and length > 0 and
+              all(.[]; type == "object" and
+                all([.service, .python, .region][]; type == "string" and test("\\S"))))
+            then .[0][] | [.service, .python, .region] | @tsv
+            else error("Expected a nonempty matrix with nonblank service, python, and region strings")
+            end
+          ' <<< "$EXPECTED_MATRIX" | LC_ALL=C sort) || [ -z "$expected_results" ]; then
+            echo "::error::Expected a valid, nonempty integration test matrix"
+            echo "### Invalid integration test matrix" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [ "$DOWNLOAD_RESULT" = "failure" ]; then
+            echo "::error::Integration test result download failed; results cannot be trusted"
+            echo "### Integration result download failed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
           echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
           echo "| Service | Python | Region | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|--------|--------|--------|" >> $GITHUB_STEP_SUMMARY
 
           gate_pass=true
           result_count=0
+          result_keys=()
           declare -A service_pass
           declare -A service_fail
 
@@ -373,6 +419,7 @@ jobs:
             status=$(cat "$result_dir/status.txt")
             python=$(cat "$result_dir/python.txt")
             region=$(cat "$result_dir/region.txt")
+            result_keys+=("$service"$'\t'"$python"$'\t'"$region")
             icon=$( [ "$status" = "success" ] && echo "✅" || echo "❌" )
             echo "| $service | $python | $region | $icon $status |" >> $GITHUB_STEP_SUMMARY
 
@@ -385,12 +432,24 @@ jobs:
           done
 
           if [ "$result_count" -eq 0 ]; then
+            if [ "$TEST_JOB_RESULT" != "skipped" ]; then
+              echo "::error::Integration tests ran but no result artifacts were found"
+              echo "### Missing integration test results" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
             echo "::notice::No integration test results found — all jobs were skipped or cancelled"
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### ⏭️ Integration tests were skipped" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "No test results were produced. This is expected when a prerequisite job (e.g. linter or unit tests) failed." >> $GITHUB_STEP_SUMMARY
             exit 0
+          fi
+
+          actual_results=$(printf '%s\n' "${result_keys[@]}" | LC_ALL=C sort)
+          if [ "$actual_results" != "$expected_results" ]; then
+            echo "::error::Missing, duplicate, or unexpected integration test result artifacts"
+            echo "### Integration results do not match the test matrix" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
           # Show failed test details
@@ -443,10 +502,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout source"
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: "Download all coverage artifacts"
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: coverage-*
           path: ./coverage_parts
@@ -475,7 +534,7 @@ jobs:
           fi
 
       - name: "Upload combined coverage artifact"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: combined-coverage
           path: ./htmlcov
