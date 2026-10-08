@@ -16,6 +16,7 @@ from copy import deepcopy
 from io import StringIO
 import json
 import re
+import shlex
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -77,6 +78,16 @@ _SU_ID = (
     "/subscriptions/su-sub/resourceGroups/su-rg/providers/"
     "Microsoft.DeviceUpdate/updateInstances/su"
 )
+_WORKFLOW_PARSER_CASES = {
+    "iot adr ns check": ["-n", "namespace", "-g", "resource-group", "--no-input", "--plain"],
+    "iot adr ns setup": [
+        "-n", "namespace", "-g", "resource-group", "--no-input", "--plain",
+        "--plan-only", "--yes", "--namespace-outbound-identity", "system-assigned",
+        "--dps", "endpoint=dps", f"resource-id={_DPS_ID}", "identity=system-assigned",
+        "--hub", "endpoint=hub", f"resource-id={_HUB_ID}", "identity=system-assigned",
+        "--su", "endpoint=su", f"resource-id={_SU_ID}", "create-if-missing=true",
+    ],
+}
 _LINK_PARSER_CASES = {
     "iot adr ns link add": [
         *_NAMESPACE_ARGUMENTS,
@@ -140,6 +151,8 @@ def management_command_parser():
     loader.load_command_table(None)
     names = [
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
+        *_WORKFLOW_PARSER_CASES,
+        "iot adr ns create", "iot adr ns update",
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
         "iot adr ns ca policy create", "iot adr ns ca policy update",
     ]
@@ -161,6 +174,44 @@ def management_command_parser():
     parser = AzCliCommandParser(cli_ctx=cli_ctx)
     parser.load_command_table(loader)
     return parser
+
+
+@pytest.mark.parametrize("identity", ["SystemAssigned", "UserAssigned"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_workflow_export_commands_parse_and_pin_reviewed_subscription(management_command_parser, tmp_path, identity, existing):
+    from unittest.mock import MagicMock
+    from azext_iot.adr.workflows.input import write_script_file
+    from azext_iot.adr.workflows.models import EndpointSpec, SetupRequest
+    from azext_iot.adr.workflows.namespace import NamespaceWorkflow
+
+    services = MagicMock()
+    services.show_namespace.return_value = {
+        "id": "/subscriptions/reviewed-sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns",
+        "properties": {"provisioningState": "Succeeded"},
+    } if existing else None
+    services.resolve_resource.return_value = {"properties": {}}
+    uami = "/subscriptions/reviewed-sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uami"
+    request = SetupRequest(
+        "namespace", "resource-group", location="australiaeast", subscription_id="reviewed-sub",
+        tags={"purpose": "reviewed plan"},
+        outbound_identity_type=identity, outbound_user_assigned_identity=uami if identity == "UserAssigned" else None,
+        dps=EndpointSpec("dps", "dps", _DPS_ID, "system-assigned"),
+        hubs=(EndpointSpec("hub", "hub", _HUB_ID, "system-assigned"),),
+        software_updates=EndpointSpec("software-updates", "su", _SU_ID, "system-assigned"),
+    )
+    _, items = NamespaceWorkflow(services).plan_setup(request)
+    commands = [item.command for item in items if item.command]
+    assert len(commands) >= 4
+    for command in commands:
+        arguments = shlex.split(command)
+        assert arguments.pop(0) == "az"
+        parsed = management_command_parser.parse_args(arguments)
+        assert parsed._subscription == "reviewed-sub"
+        assert "--outbound-mi-system-assigned" not in arguments
+        assert "--outbound-mi-user-assigned" not in arguments
+    script = tmp_path / "setup.sh"
+    write_script_file(str(script), commands)
+    assert all(command in script.read_text(encoding="utf-8") for command in commands)
 
 
 class _HubIdentityCommandsLoader(MainCommandsLoader):
@@ -518,7 +569,7 @@ def test_certificate_policy_parser_rejects_noninteger_validity(management_comman
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 112
+    assert sum(name.startswith("iot adr ") for name in command_table) == 114
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)
@@ -538,6 +589,8 @@ def test_command_table_loads(command_table):
         "iot hub device-identity create",
         "iot device registration create",
         "iot device registration operation-status",
+        "iot adr ns setup",
+        "iot adr ns check",
         "iot adr ns su software-update operation-status list",
         "iot adr ns su software-update catalog provider list",
         "iot adr ns su software-update catalog name list",
@@ -701,6 +754,30 @@ def test_all_link_commands_parse_one_global_subscription_without_collision(
     ]
     assert len(subscription_actions) == 1
     assert subscription_actions[0].dest == "_subscription"
+
+
+@pytest.mark.parametrize("command_name", sorted(_WORKFLOW_PARSER_CASES))
+def test_workflow_commands_parse_with_global_subscription(mocker, management_command_parser, command_name):
+    mocker.patch(
+        "azure.cli.core._profile.Profile.load_cached_subscriptions",
+        return_value=[{"id": "namespace-sub", "name": "namespace-subscription"}],
+    )
+    parsed = management_command_parser.parse_args([
+        *command_name.split(), *_WORKFLOW_PARSER_CASES[command_name],
+        "--subscription", "namespace-sub",
+    ])
+    assert parsed.namespace_name == "namespace"
+    assert parsed.resource_group_name == "resource-group"
+    assert parsed.no_input is True
+    assert parsed.plain is True
+    assert parsed._subscription == "namespace-sub"  # pylint: disable=protected-access
+    if command_name.endswith("setup"):
+        assert parsed.plan_only is True
+        assert parsed.yes is True
+        assert parsed.namespace_outbound_identity == "system-assigned"
+        assert parsed.dps == ["endpoint=dps", f"resource-id={_DPS_ID}", "identity=system-assigned"]
+        assert parsed.hubs == [["endpoint=hub", f"resource-id={_HUB_ID}", "identity=system-assigned"]]
+        assert parsed.software_updates == ["endpoint=su", f"resource-id={_SU_ID}", "create-if-missing=true"]
 
 
 def test_link_command_parser_leaves_subscription_for_current_account_default(

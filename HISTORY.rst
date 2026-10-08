@@ -14,6 +14,14 @@ Release History
 1.0.0b1 (Preview)
 +++++++++++++++++
 
+**Namespace workflows**
+
+* Added ``az iot adr ns setup`` for guided or scripted namespace creation/adoption, DPS-first Hub linking, optional Software Updates, plan review, script export, and setup receipts.
+* Added ``az iot adr ns check`` for read-only namespace, link, identity, and service-role diagnostics.
+* Workflows reuse the release link providers for validation, scoped RBAC, mutation recovery, and propagation handling.
+* Exported commands use the current identity flags and explicitly select the reviewed subscription. Target and identity reads follow their ARM resource IDs, including existing cross-subscription links.
+* Setup can link an existing cross-subscription Update Instance, but rejects creating a missing one there during input/plan validation, before namespace writes.
+
 **Known limitations**
 
 * Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.

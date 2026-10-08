@@ -26,6 +26,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.deviceupdate.command_map import load_deviceupdate_commands
         from azext_iot.core.command_map import load_core_commands
         from azext_iot.adr.command_map import load_adr_commands
+        from azext_iot.adr.workflows.command_map import load_adr_workflow_commands
 
         load_command_table(self, args)
         load_deviceupdate_commands(self, args)
@@ -36,6 +37,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
 
         load_core_commands(self, args)
         load_adr_commands(self, args)
+        load_adr_workflow_commands(self, args)
 
         return self.command_table
 
@@ -48,6 +50,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.deviceupdate.params import load_deviceupdate_arguments
         from azext_iot.core.params import load_core_arguments
         from azext_iot.adr.params import load_adr_arguments
+        from azext_iot.adr.workflows.params import load_adr_workflow_arguments
 
         load_arguments(self, command)
         load_iothub_arguments(self, command)
@@ -58,6 +61,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
 
         load_core_arguments(self, command)
         load_adr_arguments(self, command)
+        load_adr_workflow_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader
