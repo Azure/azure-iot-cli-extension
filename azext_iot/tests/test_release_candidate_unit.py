@@ -223,6 +223,28 @@ def test_extra_files_and_nested_wheels_are_rejected(parent, environment, artifac
         release.verify_candidate(directory, parent, environment)
 
 
+def test_governed_artifact_metadata_is_preserved(parent, environment, artifact):
+    directory, _ = artifact
+    metadata = directory / "_manifest/spdx_2.2/manifest.spdx.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text('{"spdxVersion": "SPDX-2.2"}', encoding="utf-8")
+    release.verify_candidate(directory, parent, environment)
+    assert metadata.is_file()
+    (metadata.parent / WHEEL).write_bytes(b"extra wheel")
+    with pytest.raises(release.ProvenanceError, match="unsafe governed metadata"):
+        release.verify_candidate(directory, parent, environment)
+
+
+def test_governed_artifact_metadata_rejects_symlinks(parent, environment, artifact):
+    directory, _ = artifact
+    try:
+        (directory / "_manifest").symlink_to(directory.parent, target_is_directory=True)
+    except OSError:
+        pytest.skip("Symlinks are unavailable on this platform.")
+    with pytest.raises(release.ProvenanceError, match="unsafe governed metadata"):
+        release.verify_candidate(directory, parent, environment)
+
+
 @pytest.mark.parametrize("name", ["candidate.json", "SBOM.zip", WHEEL])
 def test_symlinks_are_rejected(parent, environment, artifact, name):
     directory, _ = artifact

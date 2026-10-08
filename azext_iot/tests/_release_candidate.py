@@ -190,7 +190,12 @@ def verify_candidate(directory, parent, env):
     wheel = object_value(manifest.get("wheel"))
     filename = wheel.get("file")
     require(matches(r"azure_iot-[A-Za-z0-9_.+!-]+\.whl", filename), "Candidate wheel filename must be a safe basename.")
-    files = list(directory.iterdir())
+    governance = directory / "_manifest"
+    if governance.exists() or governance.is_symlink():
+        require(governance.is_dir() and not governance.is_symlink() and all(
+            not path.is_symlink() and path.suffix.lower() != ".whl" and (path.is_file() or path.is_dir())
+            for path in governance.rglob("*")), "Candidate artifact has unsafe governed metadata.")
+    files = [path for path in directory.iterdir() if path.name != "_manifest"]
     require({path.name for path in files} == {filename, "candidate.json", "SBOM.zip"}
             and all(path.is_file() and not path.is_symlink() for path in files),
             "Candidate artifact must contain only one wheel, candidate.json and SBOM.zip as regular files.")

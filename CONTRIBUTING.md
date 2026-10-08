@@ -267,6 +267,8 @@ The producer may be **inProgress** while waiting for 147, or completed successfu
 failed, canceled and partially successful builds are rejected. Its definition,
 build, project, GitHub repository and automation commit must match the metadata.
 The artifact must contain exactly one wheel, `candidate.json` and `SBOM.zip`.
+An optional `_manifest/` directory added by governed artifact publication is
+preserved; it cannot contain symlinks, special files, or additional wheels.
 Manifest schema 1 identifies repository `Azure/azure-iot-cli-extension`,
 `sourceBranch`, `sourceCommit`, `producer: {definition, build, commit}` (IDs as
 decimal strings), and `wheel: {file, sha256, version}`. The source branch/commit must
