@@ -88,6 +88,9 @@ def test_all_restored_commands_are_preview(offline_cli):
     ("create --location centraluseuap --ext-id external --enablement-state Disabled --tags x=y",
      {"resource": {"location": "centraluseuap", "tags": {"x": "y"},
                    "properties": {"externalDeviceId": "external", "enablementState": "Disabled"}}}),
+    ("create --location centraluseuap --device-type-ref /models/one",
+     {"resource": {"location": "centraluseuap",
+                   "properties": {"enablementState": "Enabled", "deviceTypeRefs": ["/models/one"]}}}),
     ("update --manufacturer '' --tags", {"properties": {"properties": {"manufacturer": ""}, "tags": {}}}),
     ("delete --yes", {}),
 ])
@@ -112,6 +115,8 @@ def test_global_parser_mutations(offline_cli, mocker, operation, expected, no_wa
     ("show", RequiredArgumentMissingError),
     ("show -n device --external-device-id external", MutuallyExclusiveArgumentError),
     ("update -n device", RequiredArgumentMissingError),
+    ("update -n device --device-type-ref /models/one --remove-device-type-ref",
+     MutuallyExclusiveArgumentError),
     ("attribute create --rdn device -n attr --properties null", InvalidArgumentValueError),
     ("attribute create --rdn device -n attr --properties false", InvalidArgumentValueError),
 ])

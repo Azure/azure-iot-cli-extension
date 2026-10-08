@@ -33,6 +33,10 @@ RG = "test-rg"
 NS = "test-namespace"
 DEVICE = "test-registry-device"
 PROFILE = "default"
+THING_MODEL_ID = (
+    "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/"
+    "schemaRegistries/registry/schemas/model/schemaVersions/01"
+)
 
 
 def _completed_poller(result):
@@ -66,6 +70,7 @@ def test_create_builds_exact_camel_case_body_and_waits(registry_device_provider)
         model="X100",
         hardware_revision="2.0",
         software_revision="3.1",
+        device_type_ref=THING_MODEL_ID,
     )
 
     assert result == expected
@@ -84,6 +89,7 @@ def test_create_builds_exact_camel_case_body_and_waits(registry_device_provider)
                 "model": "X100",
                 "hardwareRevision": "2.0",
                 "softwareRevision": "3.1",
+                "deviceTypeRefs": [THING_MODEL_ID],
             },
         },
     )
@@ -248,6 +254,7 @@ def test_update_builds_exact_body_for_all_writable_fields_and_waits(
         model="X200",
         hardware_revision="2.1",
         software_revision="4.0",
+        device_type_ref=THING_MODEL_ID,
     )
 
     assert result == expected
@@ -264,6 +271,7 @@ def test_update_builds_exact_body_for_all_writable_fields_and_waits(
                 "model": "X200",
                 "hardwareRevision": "2.1",
                 "softwareRevision": "4.0",
+                "deviceTypeRefs": [THING_MODEL_ID],
             },
         },
     )
@@ -306,6 +314,43 @@ def test_update_rejects_empty_patch(registry_device_provider):
         )
 
     registry_device_provider.client.registry_devices.begin_update.assert_not_called()
+
+
+def test_update_preserves_device_type_ref_when_option_is_omitted(registry_device_provider):
+    registry_device_provider.client.registry_devices.begin_update.return_value = (
+        _completed_poller({})
+    )
+
+    registry_device_provider.update(
+        registry_device_name=DEVICE,
+        namespace_name=NS,
+        resource_group_name=RG,
+        manufacturer="Contoso",
+    )
+
+    body = registry_device_provider.client.registry_devices.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body == {"properties": {"manufacturer": "Contoso"}}
+    assert "deviceTypeRefs" not in body["properties"]
+
+
+def test_update_removes_device_type_ref(registry_device_provider):
+    registry_device_provider.client.registry_devices.begin_update.return_value = (
+        _completed_poller({})
+    )
+
+    registry_device_provider.update(
+        registry_device_name=DEVICE,
+        namespace_name=NS,
+        resource_group_name=RG,
+        remove_device_type_ref=True,
+    )
+
+    body = registry_device_provider.client.registry_devices.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body == {"properties": {"deviceTypeRefs": []}}
 
 
 @pytest.mark.parametrize("operation", ["create", "update"])
@@ -654,6 +699,7 @@ COMMAND_CASES = [
             "model": "X100",
             "hardware_revision": "2.0",
             "software_revision": "3.0",
+            "device_type_ref": THING_MODEL_ID,
             "no_wait": True,
         },
     ),
@@ -684,6 +730,8 @@ COMMAND_CASES = [
             "model": "X200",
             "hardware_revision": "2.1",
             "software_revision": "4.0",
+            "device_type_ref": THING_MODEL_ID,
+            "remove_device_type_ref": False,
             "no_wait": True,
         },
     ),

@@ -372,6 +372,9 @@ def ca_pki(monkeypatch):
 # regeneration that renames or removes one of these methods fails a unit test.
 _SPECCED_OPERATION_GROUPS = (
     "namespaces",
+    "schema_registries",
+    "schemas",
+    "schema_versions",
     "registry_devices",
     "registry_device_authentication_profiles",
     "registry_device_attributes",
