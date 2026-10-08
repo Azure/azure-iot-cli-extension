@@ -117,24 +117,16 @@ def checkout(destination, resolving=False):
         if environment("RELEASE_MODE") == "Release":
             automation_allowed()
     source_branch = branch(environment("RELEASE_SOURCE_BRANCH"))
-    source_commit = os.environ.get("RELEASE_SOURCE_COMMIT", "").strip()
-    if source_commit:
-        commit(source_commit)
-    if not resolving and not source_commit:
-        raise ValueError("Downstream jobs must consume the resolved source commit.")
+    source_commit = None if resolving else commit(environment("RELEASE_SOURCE_COMMIT"))
     if destination.exists():
         raise ValueError("The source destination must be a new, isolated directory.")
     subprocess.run(["git", "init", "--quiet", str(destination)], check=True)
     subprocess.run(["git", "remote", "add", "origin", f"https://github.com/{REPOSITORY}.git"],
                    cwd=destination, check=True)
-    fetch = ["git", "fetch", "--quiet", "--filter=blob:none", "origin"]
-    if not resolving:
-        fetch.append("--depth=1")
+    fetch = ["git", "fetch", "--quiet", "--filter=blob:none", "--depth=1", "origin"]
     subprocess.run(fetch + [source_branch if resolving else source_commit], cwd=destination, check=True)
     tip = commit(command(["git", "rev-parse", "FETCH_HEAD"], destination))
     selected = source_commit or tip
-    if resolving:
-        subprocess.run(["git", "merge-base", "--is-ancestor", selected, tip], cwd=destination, check=True)
     subprocess.run(["git", "checkout", "--quiet", "--detach", selected], cwd=destination, check=True)
     if command(["git", "rev-parse", "HEAD"], destination) != selected:
         raise ValueError("Source checkout did not match the resolved commit.")

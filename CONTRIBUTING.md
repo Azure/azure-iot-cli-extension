@@ -225,9 +225,9 @@ For all resources, if the environmental variable is not provided, a new instance
 
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
 definition on reviewed `dev`; `sourceBranch` independently selects `dev`,
-`preview`, or `release/1.1.0-preview`. An optional full `sourceCommit` must be an
-ancestor of that branch. The branch tip is otherwise resolved once. Every job
-uses that same source commit, while receipts also record the separate automation
+`preview`, or `release/1.1.0-preview`. The Resolve stage captures that branch's
+latest commit once; no commit-SHA input is required. Every job uses that same
+source commit even if the branch advances, while receipts also record the separate automation
 commit. Selected source branches must first receive the pipeline 147 migration
 (including `releaseBuildId`), `scripts/select-openssl.sh`, and the existing
 `scripts/check_index_compatibility.py`.

@@ -15,10 +15,6 @@ parameters:
     type: string
     default: release/1.1.0-preview
     values: [dev, preview, release/1.1.0-preview]
-  - name: sourceCommit
-    displayName: Full commit SHA (empty resolves the branch tip once)
-    type: string
-    default: ""
 
 pool:
   vmImage: ubuntu-24.04
@@ -46,7 +42,6 @@ stages:
                 displayName: Resolve and verify the immutable source
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_SOURCE_COMMIT: ${{ parameters.sourceCommit }}
                   RELEASE_PIP_FEED_URL: $(ReleasePipFeedUrl)
                   RELEASE_MODE: ${{ parameters.mode }}
 

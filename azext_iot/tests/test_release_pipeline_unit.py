@@ -103,6 +103,58 @@ def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys):
     release.github.assert_not_called()
 
 
+def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(candidate, tmp_path, monkeypatch, capsys):
+    repository = tmp_path / "source-repository"
+    release.subprocess.run(["git", "init", "--quiet", "--initial-branch=release/1.1.0-preview", str(repository)],
+                           check=True)
+    for relative in (
+        ".azure-devops/templates/integration-service.yml", ".azure-devops/integration_tests.yml",
+        "azext_iot/tests/_ado_pipeline.py", "scripts/check_index_compatibility.py", "scripts/select-openssl.sh",
+    ):
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("releaseBuildId\n", encoding="utf-8")
+    release.subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    commit_command = ["git", "-c", "user.name=Release Test", "-c", "user.email=release-test@example.invalid",
+                      "commit", "--quiet", "-m",
+                      "Test release source\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"]
+    release.subprocess.run(commit_command, cwd=repository, check=True)
+    initial = release.command(["git", "rev-parse", "HEAD"], repository)
+    original_run = release.subprocess.run
+    fetches = []
+
+    def local_run(args, **kwargs):
+        if args[:4] == ["git", "remote", "add", "origin"]:
+            args = args[:4] + [repository.as_uri()]
+        if args[:2] == ["git", "fetch"]:
+            fetches.append(args[-1])
+        return original_run(args, **kwargs)
+
+    monkeypatch.setattr(release.subprocess, "run", local_run)
+    monkeypatch.setenv("RELEASE_SOURCE_COMMIT", "no-longer-a-source-override")
+    resolved = release.checkout(tmp_path / "resolve", resolving=True)
+    assert resolved == initial
+    assert f"##vso[task.setvariable variable=commit;isOutput=true]{initial}" in capsys.readouterr().out
+
+    changed = repository / "scripts/select-openssl.sh"
+    changed.write_text("new branch tip\n", encoding="utf-8")
+    release.subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    release.subprocess.run(commit_command, cwd=repository, check=True)
+    assert release.command(["git", "rev-parse", "HEAD"], repository) != resolved
+
+    monkeypatch.setenv("RELEASE_SOURCE_COMMIT", resolved)
+    downstream = tmp_path / "downstream"
+    assert release.checkout(downstream) == resolved
+    assert (downstream / "scripts/select-openssl.sh").read_text(encoding="utf-8") == "releaseBuildId\n"
+    assert fetches == ["refs/heads/release/1.1.0-preview", resolved]
+
+
+def test_downstream_checkout_requires_internal_resolved_commit(candidate, tmp_path, monkeypatch):
+    monkeypatch.delenv("RELEASE_SOURCE_COMMIT")
+    with pytest.raises(ValueError, match="RELEASE_SOURCE_COMMIT"):
+        release.checkout(tmp_path / "downstream")
+
+
 def test_valid_candidate_keeps_distinct_automation_and_source(candidate):
     directory, value = candidate
     assert release.verify_candidate(directory) == value
@@ -597,6 +649,8 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert pipeline["trigger"] == "none"
     assert pipeline["pr"] == "none"
     assert pipeline["parameters"][0]["default"] == "Plan"
+    assert {parameter["name"] for parameter in pipeline["parameters"]} == {"mode", "sourceBranch"}
+    assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
         "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration", "Publish", "IndexPR",
     }
