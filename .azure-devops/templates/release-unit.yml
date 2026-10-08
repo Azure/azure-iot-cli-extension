@@ -1,0 +1,59 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: sourceBranch
+    type: string
+  - name: platform
+    type: string
+    values: [Linux, Windows, MacOS]
+
+jobs:
+  - job: Unit${{ parameters.platform }}
+    timeoutInMinutes: 90
+    strategy:
+      matrix:
+        Python310: {python: "3.10"}
+        Python311: {python: "3.11"}
+        Python312: {python: "3.12"}
+        Python313: {python: "3.13"}
+    ${{ if eq(parameters.platform, 'Linux') }}:
+      pool:
+        name: OneBranchPipelinesV2
+        host: linux
+        os: linux
+    ${{ if eq(parameters.platform, 'Windows') }}:
+      pool:
+        name: OneBranchPipelinesV2
+        host: windows
+        os: windows
+      container: windows_release
+    ${{ if eq(parameters.platform, 'MacOS') }}:
+      pool:
+        name: Azure Pipelines
+        image: macOS-15
+        os: macOS
+    steps:
+      - template: release-source.yml
+        parameters:
+          sourceBranch: ${{ parameters.sourceBranch }}
+          pythonVersion: $(python)
+      - ${{ if eq(parameters.platform, 'MacOS') }}:
+          - bash: |
+              source scripts/select-openssl.sh
+              echo "##vso[task.prependpath]$openssl_bin"
+            displayName: Select capability-checked OpenSSL 3 on macOS
+            workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: python -m pip install tox
+      - script: tox run -vv --notest
+        workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: tox run --skip-pkg-install
+        displayName: Run existing clean, lint, serial unit and coverage environments
+        workingDirectory: $(Agent.TempDirectory)/release-source
+      - task: PublishTestResults@2
+        condition: always()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: $(Agent.TempDirectory)/release-source/junit/test-iotext-unit.xml
+          testRunTitle: ${{ parameters.platform }} Python $(python)
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true

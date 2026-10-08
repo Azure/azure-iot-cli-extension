@@ -260,7 +260,13 @@ def verify_candidate(directory):
     wheel = value["wheel"]
     if not re.fullmatch(r"azure_iot-[A-Za-z0-9_.+!-]+\.whl", wheel["file"]):
         raise ValueError("Unsafe candidate wheel name.")
-    files = list(directory.iterdir())
+    governance = directory / "_manifest"
+    if governance.exists() or governance.is_symlink():
+        if (governance.is_symlink() or not governance.is_dir() or any(
+                path.is_symlink() or path.suffix.lower() == ".whl" or not (path.is_file() or path.is_dir())
+                for path in governance.rglob("*"))):
+            raise ValueError("Unsafe governed artifact metadata.")
+    files = [path for path in directory.iterdir() if path.name != "_manifest"]
     if (directory.is_symlink() or {path.name for path in files} != {wheel["file"], "candidate.json", "SBOM.zip"}
             or any(path.is_symlink() or not path.is_file() for path in files)):
         raise ValueError("Expected only the three declared candidate assets as regular files.")
@@ -648,7 +654,7 @@ def main():
     if args.operation == "plan":
         print(json.dumps({
             "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")),
-            "mode": "Plan only; no qualification, Azure access, release, tag, or index PR is performed.",
+            "mode": "Plan only; governed onboarding; no qualification, release, tag, or index PR.",
             "integrationPipeline": 147, "unitMatrix": "Python 3.10-3.13 on Ubuntu, Windows and macOS",
         }, indent=2))
     elif args.operation in ("resolve", "checkout"):

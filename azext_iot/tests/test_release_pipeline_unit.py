@@ -197,6 +197,27 @@ def test_candidate_extra_file_rejected(candidate):
         release.verify_candidate(directory)
 
 
+def test_candidate_accepts_governed_metadata_but_rejects_additional_wheels(candidate):
+    directory, value = candidate
+    metadata = directory / "_manifest/spdx_2.2/manifest.spdx.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text('{"spdxVersion": "SPDX-2.2"}', encoding="utf-8")
+    assert release.verify_candidate(directory) == value
+    (metadata.parent / value["wheel"]["file"]).write_bytes(b"extra wheel")
+    with pytest.raises(ValueError, match="Unsafe governed"):
+        release.verify_candidate(directory)
+
+
+def test_candidate_rejects_governed_metadata_symlinks(candidate):
+    directory, _ = candidate
+    try:
+        (directory / "_manifest").symlink_to(directory.parent, target_is_directory=True)
+    except OSError:
+        pytest.skip("Symlinks are unavailable on this platform.")
+    with pytest.raises(ValueError, match="Unsafe governed"):
+        release.verify_candidate(directory)
+
+
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(candidate, tmp_path, monkeypatch):
     directory, value = candidate
     source = tmp_path / "source"
@@ -638,8 +659,9 @@ def test_api_does_not_retry_writes_or_follow_redirects(monkeypatch):
 
 def all_stages():
     pipeline = yaml.safe_load((ROOT / ".azure-devops/release.yml").read_text(encoding="utf-8"))
-    stages = [pipeline["stages"][0]]
-    for group in pipeline["stages"][1:]:
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-stages.yml").read_text(encoding="utf-8"))
+    stages = [template["stages"][0]]
+    for group in template["stages"][1:]:
         stages.extend(next(iter(group.values())))
     return pipeline, {stage["stage"]: stage for stage in stages}
 
@@ -652,9 +674,9 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert {parameter["name"] for parameter in pipeline["parameters"]} == {"mode", "sourceBranch"}
     assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
-        "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration", "Publish", "IndexPR",
+        "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration", "Publish",
     }
-    text = (ROOT / ".azure-devops/release.yml").read_text(encoding="utf-8")
+    text = json.dumps(stages)
     assert "continueOnError" not in text
     assert "azure/login" not in text
     assert "ADO_PAT" not in text
@@ -662,16 +684,18 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
 
 def test_yaml_preserves_all_twelve_unit_style_combinations():
     _, stages = all_stages()
-    matrix = stages["Unit"]["jobs"][0]["strategy"]["matrix"]
-    assert {(leg["image"], leg["python"]) for leg in matrix.values()} == {
-        (image, version) for image in ("ubuntu-24.04", "windows-2025", "macOS-15")
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
+    matrix = template["jobs"][0]["strategy"]["matrix"]
+    assert {(job["parameters"]["platform"], leg["python"])
+            for job in stages["Unit"]["jobs"] for leg in matrix.values()} == {
+        (image, version) for image in ("Linux", "Windows", "MacOS")
         for version in ("3.10", "3.11", "3.12", "3.13")
     }
-    steps = stages["Unit"]["jobs"][0]["steps"]
+    steps = template["jobs"][0]["steps"]
     assert any(step.get("script") == "tox run --skip-pkg-install" for step in steps)
 
 
-@pytest.mark.parametrize("name", ["Integration", "Publish", "IndexPR"])
+@pytest.mark.parametrize("name", ["Integration", "Publish"])
 def test_yaml_requires_every_dependency_to_succeed_not_skip_or_partial(name):
     _, stages = all_stages()
     stage = stages[name]
@@ -682,8 +706,9 @@ def test_yaml_requires_every_dependency_to_succeed_not_skip_or_partial(name):
 
 def test_yaml_exact_candidate_and_narrow_credential_mapping():
     _, stages = all_stages()
-    build = stages["Build"]["jobs"][0]["steps"]
-    assert build[-1]["artifact"] == "release-candidate"
+    outputs = stages["Build"]["jobs"][0]["templateContext"]["outputs"]
+    assert {output["artifact"] for output in outputs} == {"release-candidate", "release-tooling"}
+    assert all(output["output"] == "pipelineArtifact" and output.get("isProduction", True) for output in outputs)
     security = stages["Security"]["jobs"][0]["steps"]
     assert any("git checkout --detach" in step.get("pwsh", "") for step in security)
     scanner = next(step for step in security if step.get("task") == "MicrosoftSecurityDevOps@1")
@@ -693,8 +718,35 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
     assert download["inputs"]["pipelineId"] == "$(integrationBuildId)"
     assert download["inputs"]["definition"] == "147"
     for name, stage in stages.items():
-        if name not in ("Publish", "IndexPR"):
+        if name != "Publish":
             assert "ReleaseGitHubToken" not in json.dumps(stage)
     assert "refs/heads/dev" in stages["Publish"]["condition"]
-    for name in ("Publish", "IndexPR"):
-        assert stages[name]["variables"][0] == {"group": "aziotcli_release_publish"}
+    assert stages["Publish"]["variables"][0] == {"group": "aziotcli_release_publish"}
+
+
+def test_yaml_extends_official_template_without_governance_bypasses():
+    pipeline, stages = all_stages()
+    assert pipeline["resources"]["repositories"] == [{
+        "repository": "governedTemplates", "type": "git",
+        "name": "1ESPipelineTemplates/1ESPipelineTemplates", "ref": "refs/tags/stable",
+    }]
+    assert pipeline["extends"]["template"] == "v1/1ES.Official.PipelineTemplate.yml@governedTemplates"
+    assert "featureFlags" not in pipeline["extends"]["parameters"]
+    assert "breakGlass" not in json.dumps(stages)
+    assert "publish" not in {
+        key for stage in stages.values() for job in stage["jobs"] for step in job.get("steps", []) for key in step
+    }
+
+
+def test_production_publication_consumes_scanned_artifacts_without_source_checkout():
+    _, stages = all_stages()
+    job = stages["Publish"]["jobs"][0]
+    context = job["templateContext"]
+    assert context["type"] == "releaseJob"
+    assert context["isProduction"] is True
+    assert {item["artifactName"] for item in context["inputs"]} == {"release-candidate", "release-tooling"}
+    assert "outputs" not in context
+    assert [step["checkout"] for step in job["steps"] if "checkout" in step] == ["none"]
+    scripts = [step["script"] for step in job["steps"] if "script" in step]
+    assert 'release-tooling/release_pipeline.py" publish' in scripts[-2]
+    assert 'release-tooling/release_pipeline.py" index' in scripts[-1]

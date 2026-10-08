@@ -224,6 +224,15 @@ For all resources, if the environmental variable is not provided, a new instance
 ### Azure Pipelines release automation
 
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
+on `1ES.Official.PipelineTemplate.yml` from the stable
+`1ESPipelineTemplates/1ESPipelineTemplates` resource. This is the governed core
+used by OneBranch, consumed directly because its macOS support preserves the
+full release matrix. Linux and Windows use the existing `OneBranchPipelinesV2`
+managed pool with approved Ubuntu 22.04 and Windows Server 2022 containers;
+macOS uses the supported hosted `macOS-15` pool. These replace the previous
+ungoverned Ubuntu 24.04/Windows 2025 agents without dropping any Python/OS combinations.
+
+Keep the pipeline
 definition on reviewed `dev`; `sourceBranch` independently selects `dev`,
 `preview`, or `release/1.1.0-preview`. The Resolve stage captures that branch's
 latest commit once; no commit-SHA input is required. Every job uses that same
@@ -234,7 +243,7 @@ commit. Selected source branches must first receive the pipeline 147 migration
 
 | Mode | Behavior |
 | --- | --- |
-| `Plan` (default) | Offline onboarding plan only. No Azure access, live tests, wheel, tag, release, or index PR. |
+| `Plan` (default) | Governed onboarding and source-policy checks only. No live integration, release wheel, tag, release, or index PR. Managed agents/scanners may access their required services. |
 | `Validate` | Build and SBOM; full 12-way Python 3.10-3.13 / Ubuntu, Windows, Intel macOS unit and style matrix; security; command-table lint; required index compatibility; live pipeline 147 qualification. No publication. |
 | `Release` | The same mandatory gates, then public GitHub release and an index PR. Automation must run from upstream `dev`. |
 
@@ -284,16 +293,17 @@ organization-mandated secret-scanning control.
    Script conditions are defense in depth, not a security boundary against
    someone who can edit pipeline YAML. Feature-branch development uses `Plan` or
    `Validate` **without publishing-group authorization**.
-6. Install/authorize the Microsoft Security DevOps ADO extension and approve the
-   agent pools. Hosted integration waiting needs a job entitlement covering the
-   configured six-hour budget; otherwise select an approved pool with sufficient
-   runtime. This ordinary YAML is **not a verified OneBranch/1ES governed
-   template**. Obtain the applicable production classification, required template,
-   security controls and service-connection approvals before production use.
-   Mandatory organizational approvals are not bypassed.
+6. Authorize this definition to read the shared 1ES template repository and use
+   the managed pool; install/authorize the Microsoft Security DevOps extension.
+   Keep the production classification, audited governance, template security
+   checks, and service-connection approvals intact. The integration waiter needs
+   the configured six-hour job budget. Mandatory organizational approvals are
+   not bypassed; do not use breakglass or disable drift management to onboard.
 
 The release builds exactly one `release-candidate` artifact containing a wheel,
-`candidate.json`, and `SBOM.zip`. The SBOM retains runtime-only dependency
+`candidate.json`, and `SBOM.zip`, plus the `_manifest/` metadata that official 1ES
+adds during managed artifact publication. Candidate verification preserves that
+metadata while rejecting symlinks and additional wheels. The SBOM retains runtime-only dependency
 collection and the Windows-specific IoT device dependency; the SBOM executable
 is version- and SHA-256-pinned. Pipeline 147 receives `releaseBuildId`, validates
 the trusted producer/source/digest, and installs the same wheel rather than
@@ -310,7 +320,10 @@ uncertain queue response can still require operator inspection: check pipeline
 147 and cleanup ownership before starting another run. Do not rebuild or replace
 an already-published candidate artifact within the same release run.
 
-Publication first stages a draft, verifies both uploaded asset digests, pins
+Production publication is a checkout-free `releaseJob` with managed inputs for
+the scanned `release-candidate` and `release-tooling` artifacts. Release tooling
+comes from the same reviewed automation revision as the candidate producer.
+The job first stages a draft, verifies both uploaded asset digests, pins
 `v<normalized wheel version>` to the qualified source commit, then makes the
 release public automatically. Pre-release wheel versions set GitHub's prerelease
 flag. Existing mismatched tags/assets are never moved or overwritten. An
@@ -322,8 +335,11 @@ appends the candidate without removing prior versions. The helper verifies the
 version/URL/hash and that no other index entries changed, writes only the
 approved fork, and creates or reuses the version-specific PR against
 `Azure/azure-cli-extensions:main`. It never merges or approves that PR. A failure
-here leaves the GitHub release public: retry the index stage, not a rebuild or
-replacement release. Conflicting existing index branches require manual review.
+here leaves the GitHub release public: retry the Publish job, which reuses the
+identical public release before retrying index submission, not the Build stage.
+Release/index URLs remain in the job's logs and GitHub state rather than
+new artifacts emitted by a production release job. Conflicting existing index
+branches require manual review.
 
 This pipeline is additive: it does not disable existing GitHub workflows,
 change schedules, or remove FICs. Cut those consumers over only after an
