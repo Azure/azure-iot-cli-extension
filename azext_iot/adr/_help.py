@@ -5,11 +5,190 @@
 # --------------------------------------------------------------------------------------------
 
 """
-Help documentation for Azure Device Registry (ADR) namespace commands.
+Help documentation for Azure Device Registry (ADR) commands.
 """
 
 from knack.help_files import helps
 from azext_iot.adr.rbac import format_role_requirements
+
+
+def _load_schema_help():
+    helps["iot adr schema"] = """
+  type: group
+  short-summary: Manage schemas and their versions in a Schema Registry.
+  long-summary: |
+    A Schema stores information such as the document type and format. Each Schema
+    Version stores one Message Schema, Thing Model, or Thing Description document.
+    When another resource asks for a schema or model reference, use the full resource
+    ID of a specific Schema Version.
+  """
+    helps["iot adr schema create"] = """
+  type: command
+  short-summary: Create a Schema.
+  long-summary: |
+    Creates Schema metadata. Use 'schema version create' to create a version and
+    provide its schemaContent value.
+  examples:
+    - name: Create a Thing Model Schema
+      text: |
+        az iot adr schema create -n smart-lamp -g MyRG --registry site-a \\
+          --schema-type ThingModel --format JsonLD/1.1
+  """
+    helps["iot adr schema show"] = """
+  type: command
+  short-summary: Show a Schema.
+  long-summary: |
+    Shows the Schema type, format, and other properties. Use 'schema version show'
+    to retrieve the document stored in a version.
+  examples:
+    - name: Show a Schema
+      text: az iot adr schema show -n smart-lamp --registry site-a -g MyRG
+  """
+    helps["iot adr schema list"] = """
+  type: command
+  short-summary: List Schemas in a Schema Registry.
+  examples:
+    - name: List Schemas
+      text: az iot adr schema list --registry site-a -g MyRG
+  """
+    helps["iot adr schema delete"] = """
+  type: command
+  short-summary: Delete a Schema.
+  examples:
+    - name: Delete a Schema
+      text: az iot adr schema delete -n smart-lamp --registry site-a -g MyRG --yes
+  """
+    helps["iot adr schema wait"] = """
+  type: command
+  short-summary: Wait for a Schema operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --deleted, --exists, or --custom.
+  examples:
+    - name: Wait for a Schema to be deleted
+      text: az iot adr schema wait -n smart-lamp --registry site-a -g MyRG --deleted
+  """
+    helps["iot adr schema registry"] = """
+  type: group
+  short-summary: Manage Schema Registries.
+  long-summary: |
+    A Schema Registry stores Schema Version content in an Azure Data Lake Storage
+    Gen2 container. It is a separate Azure resource and does not belong to a
+    Device Registry namespace.
+  """
+    helps["iot adr schema registry create"] = """
+  type: command
+  short-summary: Create a Schema Registry backed by Azure Data Lake Storage Gen2.
+  long-summary: |
+    Provide the URL of an existing container in a storage account with hierarchical
+    namespace. When only an outbound identity is selected, the command also attaches
+    that identity to the Schema Registry. The command does not create the container
+    or grant storage access.
+  examples:
+    - name: Create a Schema Registry with a system-assigned identity
+      text: |
+        az iot adr schema registry create -n site-a -g MyRG \\
+          --registry-namespace site-a \\
+          --storage-account-container-url https://mystorage.blob.core.windows.net/schemas \\
+          --system-assigned-mi
+  """
+    helps["iot adr schema registry update"] = """
+  type: command
+  short-summary: Update writable Schema Registry properties.
+  examples:
+    - name: Update the display name and tags
+      text: |
+        az iot adr schema registry update -n site-a -g MyRG \\
+          --display-name "Site A" --tags environment=test
+  """
+    helps["iot adr schema registry show"] = """
+  type: command
+  short-summary: Show a Schema Registry.
+  examples:
+    - name: Show a Schema Registry
+      text: az iot adr schema registry show -n site-a -g MyRG
+  """
+    helps["iot adr schema registry list"] = """
+  type: command
+  short-summary: List Schema Registries.
+  examples:
+    - name: List Schema Registries in a resource group
+      text: az iot adr schema registry list -g MyRG
+    - name: List Schema Registries in the subscription
+      text: az iot adr schema registry list
+  """
+    helps["iot adr schema registry delete"] = """
+  type: command
+  short-summary: Delete a Schema Registry.
+  examples:
+    - name: Delete a Schema Registry
+      text: az iot adr schema registry delete -n site-a -g MyRG --yes
+  """
+    helps["iot adr schema registry wait"] = """
+  type: command
+  short-summary: Wait for a Schema Registry operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --created, --updated, --deleted, or --exists.
+  examples:
+    - name: Wait for a Schema Registry to be created
+      text: az iot adr schema registry wait -n site-a -g MyRG --created
+  """
+    helps["iot adr schema version"] = """
+  type: group
+  short-summary: Manage Schema Versions.
+  long-summary: |
+    A version name must contain 1 to 10 digits.
+  """
+    helps["iot adr schema version create"] = """
+  type: command
+  short-summary: Create a Schema Version.
+  long-summary: |
+    The --schema-content value is sent directly to properties.schemaContent.
+    After a version is created, its schemaContent cannot be changed.
+  examples:
+    - name: Create a Message Schema version
+      text: |
+        az iot adr schema version create --registry site-a --schema telemetry \\
+          --version 1 --schema-content '{"type":"object"}' -g MyRG
+  """
+    helps["iot adr schema version show"] = """
+  type: command
+  short-summary: Show a Schema Version and its content.
+  examples:
+    - name: Get the resource ID for a Thing Model version
+      text: |
+        THING_MODEL_ID=$(az iot adr schema version show --registry site-a \\
+          --schema smart-lamp --version 1 -g MyRG --query id -o tsv)
+  """
+    helps["iot adr schema version list"] = """
+  type: command
+  short-summary: List Schema Versions.
+  examples:
+    - name: List all versions of a Schema
+      text: az iot adr schema version list --registry site-a --schema smart-lamp -g MyRG
+  """
+    helps["iot adr schema version delete"] = """
+  type: command
+  short-summary: Delete a Schema Version.
+  examples:
+    - name: Delete version 2
+      text: |
+        az iot adr schema version delete --registry site-a --schema smart-lamp \\
+          --version 2 -g MyRG --yes
+  """
+    helps["iot adr schema version wait"] = """
+  type: command
+  short-summary: Wait for a Schema Version operation to finish.
+  long-summary: |
+    Use after starting an operation with --no-wait. Specify a condition such as
+    --deleted, --exists, or --custom.
+  examples:
+    - name: Wait for a Schema Version to be deleted
+      text: |
+        az iot adr schema version wait --registry site-a --schema smart-lamp \\
+          --version 2 -g MyRG --deleted
+  """
 
 
 def _load_registry_device_help():
@@ -183,17 +362,13 @@ def _load_registry_device_help():
 
 
 def load_adr_help():
+    _load_schema_help()
     _load_registry_device_help()
     helps[
         "iot adr"
     ] = """
   type: group
   short-summary: Manage Azure Device Registry (ADR) resources.
-  long-summary: |
-    Preview APIs support the Azure public cloud only. ADR management clients default to
-    https://centraluseuap.management.azure.com. Set
-    AZURE_IOT_ADR_ARM_ENDPOINT=https://management.azure.com to use public ARM for ADR
-    namespaces, Update Instances, and link-target management requests.
   """
 
     helps[

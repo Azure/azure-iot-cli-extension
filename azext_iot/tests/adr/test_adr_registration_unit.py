@@ -16,6 +16,7 @@ from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
     adr_link_ops,
     adr_link_wait_ops,
+    adr_schema_ops,
     load_adr_commands,
 )
 from azext_iot.adr.params import load_adr_arguments
@@ -42,8 +43,8 @@ class _CommandGroup:
     def show_command(self, name, operation, **kwargs):
         self._record("show", name, operation, **kwargs)
 
-    def wait_command(self, name, operation, **kwargs):
-        self._record("wait", name, operation, **kwargs)
+    def wait_command(self, name, getter_name="get", **kwargs):
+        self._record("wait", name, getter_name, **kwargs)
 
 
 class _CommandLoader:
@@ -185,6 +186,22 @@ def test_2026_command_surface_is_registered():
         "iot adr ns job schedule",
         "iot adr ns job run delete",
         "iot adr ns job run summary",
+        "iot adr schema create",
+        "iot adr schema show",
+        "iot adr schema list",
+        "iot adr schema delete",
+        "iot adr schema wait",
+        "iot adr schema registry create",
+        "iot adr schema registry update",
+        "iot adr schema registry show",
+        "iot adr schema registry list",
+        "iot adr schema registry delete",
+        "iot adr schema registry wait",
+        "iot adr schema version create",
+        "iot adr schema version show",
+        "iot adr schema version list",
+        "iot adr schema version delete",
+        "iot adr schema version wait",
     }
     assert expected_commands <= set(commands)
     # There is no Jobs_Schedule API; `job schedule` drives JobRuns_CreateOrReplace.
@@ -207,7 +224,22 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 112
+    assert len(commands) == 128
+    assert commands["iot adr schema registry create"] == (
+        "command",
+        "adr_schema_registry_create",
+        {"supports_no_wait": True},
+    )
+    assert commands["iot adr schema registry update"] == (
+        "command",
+        "adr_schema_registry_update",
+        {"supports_no_wait": True},
+    )
+    assert commands["iot adr schema version delete"] == (
+        "command",
+        "adr_schema_version_delete",
+        {"confirmation": True, "supports_no_wait": True},
+    )
     for endpoint in ("hub", "dps", "su"):
         assert commands[f"iot adr ns link {endpoint} remove"] == (
             "command", f"adr_link_{endpoint}_remove", {"confirmation": True},
@@ -219,6 +251,14 @@ def test_2026_command_surface_is_registered():
         "adr_namespace_migrate",
         {"supports_no_wait": True},
     )
+    standard_wait_operations = {
+        "iot adr schema wait": "adr_schema_show",
+        "iot adr schema registry wait": "adr_schema_registry_show",
+        "iot adr schema version wait": "adr_schema_version_show",
+    }
+    for command, operation in standard_wait_operations.items():
+        assert commands[command] == ("wait", operation, {})
+
     expected_wait_operations = {
         "iot adr ns wait": "adr_namespace_wait",
         "iot adr ns ca wait": "adr_ca_wait",
@@ -330,19 +370,65 @@ def test_unsupported_command_surfaces_are_not_registered():
         assert command not in commands
 
 
-def test_all_adr_namespace_command_groups_are_preview():
+def test_all_adr_command_groups_are_preview():
     loader = _CommandLoader()
     load_adr_commands(loader, None)
 
     assert loader.groups
-    assert all(name.startswith("iot adr ns") for name, _ in loader.groups)
+    assert all(name.startswith("iot adr") for name, _ in loader.groups)
     assert all(options.get("is_preview") is True for _, options in loader.groups)
+    assert dict(loader.groups)["iot adr schema"]["command_type"] is adr_schema_ops
 
 
 def test_load_adr_arguments():
     loader = _ArgumentLoader()
     load_adr_arguments(loader, None)
     arguments = loader.records
+
+    assert {
+        "schema_name",
+        "schema_registry_name",
+        "schema_format",
+        "schema_type",
+    } <= set(arguments["iot adr schema"])
+    assert "arg_type" not in arguments["iot adr schema"]["schema_format"]
+    assert "arg_type" not in arguments["iot adr schema"]["schema_type"]
+    assert {
+        "schema_registry_name",
+        "registry_namespace",
+        "storage_account_container_url",
+    } <= set(arguments["iot adr schema registry"])
+    for command in (
+        "iot adr schema registry create",
+        "iot adr schema registry update",
+    ):
+        assert {
+            "mi_system_assigned",
+            "mi_user_assigned",
+            "outbound_mi_system_assigned",
+            "outbound_mi_user_assigned",
+        } <= set(arguments[command])
+    assert {
+        "storage_account_resource_id",
+        "storage_container_name",
+        "skip_role_assignment",
+        "custom_role_id",
+    }.isdisjoint(arguments["iot adr schema registry"])
+    assert {
+        "version_name",
+        "schema_name",
+        "schema_registry_name",
+        "schema_content",
+    } <= set(arguments["iot adr schema version"])
+    assert arguments["iot adr schema version"]["version_name"]["options_list"] == [
+        "--version"
+    ]
+    assert arguments["iot adr schema version"]["schema_content"]["options_list"] == [
+        "--schema-content"
+    ]
+    assert arguments["iot adr schema registry"]["storage_account_container_url"][
+        "options_list"
+    ] == ["--storage-account-container-url", "--container-url"]
 
     assert {"page_size", "skip_token"} <= set(
         arguments["iot adr ns group list-members"]
@@ -550,7 +636,12 @@ def test_every_adr_identity_option_has_canonical_and_compact_names():
     arguments = loader.records
 
     cases = []
-    for command in ("iot adr ns create", "iot adr ns update"):
+    for command in (
+        "iot adr ns create",
+        "iot adr ns update",
+        "iot adr schema registry create",
+        "iot adr schema registry update",
+    ):
         cases.extend(
             [
                 (
