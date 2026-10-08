@@ -85,9 +85,12 @@ def validate_parent(value, env):
         definition_project = object_value(actual_definition["project"]).get("id")
         require(matches(GUID, definition_project) and definition_project.lower() == project.lower(),
                 "Producer definition project mismatch.")
+    repository_name = repository.get("name")
     require(repository.get("type") == "GitHub"
-            and all(isinstance(repository.get(key), str) and repository[key].lower() == REPOSITORY.lower()
-                    for key in ("id", "name")), "Producer repository mismatch.")
+            and isinstance(repository.get("id"), str) and repository["id"].lower() == REPOSITORY.lower()
+            and (repository_name is None
+                 or (isinstance(repository_name, str) and repository_name.lower() == REPOSITORY.lower())),
+            "Producer repository mismatch.")
     require(matches(COMMIT, value.get("sourceVersion")), "Producer automation commit is invalid.")
     require((value.get("status") == "inProgress" and value.get("result") in (None, "none"))
             or (value.get("status") == "completed" and value.get("result") == "succeeded"),
@@ -96,7 +99,7 @@ def validate_parent(value, env):
     return {
         "id": value["id"], "definition": {"id": actual_definition["id"]},
         "project": {"id": actual_project["id"]},
-        "repository": {key: repository[key] for key in ("id", "name", "type")},
+        "repository": {"id": repository["id"], "name": repository_name, "type": repository["type"]},
         "sourceVersion": value["sourceVersion"], "status": value["status"], "result": value.get("result"),
     }
 

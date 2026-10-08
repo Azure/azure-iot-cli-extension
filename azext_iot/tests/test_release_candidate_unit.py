@@ -152,6 +152,8 @@ def test_valid_parent_and_candidate_do_not_require_completed_parent_or_identical
     ("project.id", "99999999-2222-3333-4444-555555555555", "project"),
     ("definition.project.id", None, "project"),
     ("repository.name", "other/repository", "repository"), ("repository.id", "other/repository", "repository"),
+    ("repository.name", "", "repository"), ("repository.name", False, "repository"),
+    ("repository.id", None, "repository"), ("repository.type", "github", "repository"),
     ("repository.type", "TfsGit", "repository"), ("sourceVersion", "not-a-commit", "commit"),
     ("status", "cancelling", "in progress"), ("status", "notStarted", "in progress"),
     ("status", "completed", "in progress"), ("result", "failed", "in progress"),
@@ -278,6 +280,27 @@ def mock_rest(monkeypatch, parent):
     factory = Mock(return_value=opener)
     monkeypatch.setattr(release, "build_opener", factory)
     return factory, opener
+
+
+@pytest.mark.parametrize("optional_name", [{}, {"name": None}], ids=["rest-omitted-name", "sdk-null-name"])
+def test_actual_ado_github_repository_shape_without_name(monkeypatch, parent, environment, artifact, optional_name):
+    # GitHub Build.repository from ADO REST omits name; the SDK renders it as null.
+    parent["repository"] = {
+        "checkoutSubmodules": False, "clean": None, "id": release.REPOSITORY, "type": "GitHub",
+        "url": "https://github.com:443/Azure/azure-iot-cli-extension", **optional_name,
+    }
+    mock_rest(monkeypatch, parent)
+    retained = release.fetch_parent(environment)
+    assert retained["repository"] == {"id": release.REPOSITORY, "name": None, "type": "GitHub"}
+    retained = json.loads(json.dumps(retained))
+    assert release.validate_parent(retained, environment) == retained
+    directory, manifest = artifact
+    manifest["sbom"] = {"file": "SBOM.zip", "sha256": hashlib.sha256((directory / "SBOM.zip").read_bytes()).hexdigest()}
+    write_manifest(directory, manifest)
+    original = {path.name: path.read_bytes() for path in directory.iterdir()}
+    assert set(original) == {WHEEL, "candidate.json", "SBOM.zip"}
+    release.verify_candidate(directory, retained, environment)
+    assert {path.name: path.read_bytes() for path in directory.iterdir()} == original
 
 
 def test_authenticated_metadata_request_is_project_scoped_no_redirects_and_sanitized(
