@@ -8,14 +8,12 @@
 
 import json
 import shlex
-import time
 
 import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
-    ROLE_PROPAGATION_DELAY,
     is_retryable_resource_error,
     resource_is_absent,
     wait_for_condition,
@@ -43,6 +41,24 @@ def _storage_rbac_pending(error):
 
 def _schema_version_pending(error):
     return _storage_rbac_pending(error) or is_retryable_resource_error(error)
+
+
+def _create_schema_version_with_retry(
+    test,
+    command,
+    expected_name,
+    description,
+):
+    version = wait_for_condition(
+        lambda: test.cmd(command).get_output_in_json(),
+        lambda _: True,
+        description=description,
+        timeout=600,
+        interval=30,
+        is_retryable_error=_storage_rbac_pending,
+    )
+    assert version["name"] == expected_name
+    return version
 
 
 def _quote_scenario_argument(value):
@@ -250,7 +266,6 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
                 "--role 'Storage Blob Data Contributor' "
                 f"--scope {shlex.quote(container['id'])}"
             )
-            time.sleep(ROLE_PROPAGATION_DELAY)
 
             assert resource_is_absent(self, thing_show)
             cleanup.register(
@@ -270,18 +285,14 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
             ).get_output_in_json()
             assert thing["properties"]["schemaType"] == "ThingModel"
             assert thing["properties"]["format"] == "JsonLD/1.1"
-            wait_for_condition(
-                lambda: self.cmd(
-                    "iot adr schema version create "
-                    f"--registry {registry_name} --schema {thing_schema} --version 1 "
-                    f"--schema-content {_quote_scenario_argument(thing_v1_content)} "
-                    f"-g {TEST_RG}"
-                ).get_output_in_json(),
-                lambda version: version.get("name") == "1",
+            _create_schema_version_with_retry(
+                self,
+                "iot adr schema version create "
+                f"--registry {registry_name} --schema {thing_schema} --version 1 "
+                f"--schema-content {_quote_scenario_argument(thing_v1_content)} "
+                f"-g {TEST_RG}",
+                expected_name="1",
                 description="Thing Model version 1 creation",
-                timeout=180,
-                interval=15,
-                is_retryable_error=_storage_rbac_pending,
             )
             shown_thing = self.cmd(thing_show).get_output_in_json()
             assert shown_thing["id"].casefold() == thing["id"].casefold()
@@ -306,11 +317,14 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
                     self, thing_v2_show, thing_v2_delete
                 ),
             )
-            self.cmd(
+            _create_schema_version_with_retry(
+                self,
                 "iot adr schema version create "
                 f"--registry {registry_name} --schema {thing_schema} --version 02 "
                 f"--schema-content {_quote_scenario_argument(thing_v2_content)} "
-                f"-g {TEST_RG}"
+                f"-g {TEST_RG}",
+                expected_name="02",
+                description="Thing Model version 02 creation",
             )
             thing_v2 = wait_for_condition(
                 lambda: self.cmd(thing_v2_show).get_output_in_json(),
@@ -346,11 +360,14 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
             ).get_output_in_json()
             assert message["properties"]["schemaType"] == "MessageSchema"
             assert message["properties"]["format"] == "JsonSchema/draft-07"
-            self.cmd(
+            _create_schema_version_with_retry(
+                self,
                 "iot adr schema version create "
                 f"--registry {registry_name} --schema {message_schema} --version 1 "
                 f"--schema-content {_quote_scenario_argument(message_content)} "
-                f"-g {TEST_RG}"
+                f"-g {TEST_RG}",
+                expected_name="1",
+                description="Message Schema version 1 creation",
             )
             message_v1 = wait_for_condition(
                 lambda: self.cmd(message_v1_show).get_output_in_json(),
