@@ -32,7 +32,7 @@ extends:
         os: windows
     stages:
       - stage: FeedAccess
-        displayName: Verify service-connection access to the selected Python feed
+        displayName: Verify Build Service access to the selected Python feed
         jobs:
           - job: FeedAccess
             timeoutInMinutes: 15
@@ -43,13 +43,12 @@ extends:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: "3.13"
-              - task: AzureCLI@2
-                displayName: Download build tooling from the feed without installing or publishing
+              - task: PipAuthenticate@1
+                displayName: Authenticate the pipeline Build Service to the project feed
                 inputs:
-                  azureSubscription: aziotcli-sp-prime
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  visibleAzLogin: false
-                  inlineScript: python scripts/release_feed_probe.py
+                  artifactFeeds: aziotcli/pip
+                  onlyAddExtraIndex: false
+              - script: python scripts/release_feed_probe.py
+                displayName: Download build tooling from the feed without installing or publishing
                 env:
                   RELEASE_PIP_FEED_URL: https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/

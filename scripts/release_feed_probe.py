@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Read-only package download probe under an AzureCLI service-connection login."""
+"""Download-only package probe using the pipeline's native feed authentication."""
 
 import json
 import os
@@ -13,39 +13,31 @@ import re
 import subprocess
 import sys
 import tempfile
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
-ADO_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798"
 PACKAGES = ("build", "wheel", "setuptools", "packaging")
 
 
 def main():
     if os.environ.get("RELEASE_PIP_FEED_URL") != FEED:
         raise RuntimeError("The diagnostic requires the explicitly selected Azure Artifacts feed.")
-    identity = subprocess.run(
-        ["az", "account", "show", "--query", "user.type", "--output", "tsv", "--only-show-errors"],
-        capture_output=True, text=True, timeout=60, check=False,
-    )
-    if identity.returncode or identity.stdout.strip() != "servicePrincipal":
-        raise RuntimeError("Expected the AzureCLI service-connection principal, not a user login.")
-    response = subprocess.run(
-        ["az", "account", "get-access-token", "--resource", ADO_RESOURCE,
-         "--query", "accessToken", "--output", "tsv", "--only-show-errors"],
-        capture_output=True, text=True, timeout=60, check=False,
-    )
-    if response.returncode:
-        codes = sorted(set(re.findall(r"AADSTS[0-9]+", response.stderr)))
-        raise RuntimeError(f"Azure DevOps token acquisition failed; Entra error codes: {codes}.")
-    token = response.stdout.strip()
-    if not token or any(character.isspace() for character in token):
-        raise RuntimeError("Azure CLI did not return a valid single-line access token.")
+    authenticated = os.environ.get("PIP_INDEX_URL", "")
+    try:
+        index = urlsplit(authenticated)
+        port = index.port
+    except ValueError:
+        raise RuntimeError("PipAuthenticate did not provide a valid authenticated index URL.") from None
     feed = urlsplit(FEED)
+    if (index.scheme != feed.scheme or index.hostname != feed.hostname
+            or index.path.rstrip("/") != feed.path.rstrip("/")
+            or not index.username or not index.password or port not in (None, 443)
+            or index.query or index.fragment or any(character.isspace() for character in authenticated)):
+        raise RuntimeError("PipAuthenticate must provide credentials for exactly the selected feed.")
     environment = {key: value for key, value in os.environ.items() if not key.startswith("PIP_")}
     environment.update(
-        PIP_INDEX_URL=urlunsplit((feed.scheme, f"build:{quote(token, safe='')}@{feed.netloc}",
-                                 feed.path, "", "")),
+        PIP_INDEX_URL=authenticated,
         PIP_CONFIG_FILE=os.devnull,
         PIP_EXTRA_INDEX_URL="",
         PIP_KEYRING_PROVIDER="disabled",
@@ -79,8 +71,7 @@ def main():
         print(json.dumps({
             "result": "succeeded",
             "feed": FEED,
-            "identity": "AzureCLI service-connection principal",
-            "tokenAudience": ADO_RESOURCE,
+            "identity": "Pipeline Build Service via PipAuthenticate",
             "packages": wheels,
             "publicIndexFallback": False,
             "installedOrPublished": False,
