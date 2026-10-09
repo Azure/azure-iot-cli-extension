@@ -152,9 +152,10 @@ def verify_wheel(path, wheel):
     try:
         with zipfile.ZipFile(path) as archive:
             entries = archive.infolist()
-            names = [entry.filename for entry in entries]
+            # ZipInfo.filename normalizes Windows separators and truncates at NUL bytes.
+            names = [entry.orig_filename for entry in entries]
             require(len(names) == len(set(names)) and all(
-                safe_archive_path(entry.filename) and not stat.S_ISLNK(entry.external_attr >> 16)
+                safe_archive_path(entry.orig_filename) and not stat.S_ISLNK(entry.external_attr >> 16)
                 for entry in entries), "Wheel contains unsafe or duplicate archive paths.")
             metadata = [name for name in names if name.endswith(".dist-info/METADATA")]
             require(metadata == [f"azure_iot-{version}.dist-info/METADATA"],

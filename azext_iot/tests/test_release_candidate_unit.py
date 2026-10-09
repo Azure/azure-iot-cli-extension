@@ -60,7 +60,10 @@ def write_wheel(directory, metadata=None, metadata_path=None, extra=None):
         archive.writestr("azure_iot-1.1.0b1.dist-info/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n")
         archive.writestr("azext_iot/__init__.py", "# offline wheel fixture\n")
         if extra:
-            archive.writestr(*extra)
+            member = zipfile.ZipInfo()
+            # Preserve deliberately unsafe names instead of normalizing them on Windows.
+            member.filename = extra[0]
+            archive.writestr(member, extra[1])
 
 
 def write_manifest(directory, manifest):
@@ -266,6 +269,7 @@ def test_tampered_wheel_bytes(parent, environment, artifact):
         release.verify_candidate(directory, parent, environment)
 
 
+@pytest.mark.parametrize("archive_separator", ["/", "\\"], ids=["posix", "windows"])
 @pytest.mark.parametrize("metadata,metadata_path,extra,reason", [
     ("Name: other\nVersion: 1.1.0b1\n", None, None, "distribution"),
     ("Name: azure-iot\nVersion: 1.2.0\n", None, None, "version"),
@@ -275,11 +279,16 @@ def test_tampered_wheel_bytes(parent, environment, artifact):
     (None, None, ("../unsafe.py", ""), "unsafe"),
     (None, None, ("/absolute.py", ""), "unsafe"),
     (None, None, ("dir\\unsafe.py", ""), "unsafe"),
+    (None, None, ("dir/unsafe\x00.py", ""), "unsafe"),
 ])
 def test_matching_hash_does_not_bypass_wheel_validation(
-        parent, environment, artifact, metadata, metadata_path, extra, reason):
+        monkeypatch, parent, environment, artifact, archive_separator, metadata, metadata_path, extra, reason):
+    monkeypatch.setattr(zipfile.os, "sep", archive_separator)
     directory, manifest = artifact
     write_wheel(directory, metadata, metadata_path, extra)
+    if extra:
+        with zipfile.ZipFile(directory / WHEEL) as archive:
+            assert extra[0] in [member.orig_filename for member in archive.infolist()]
     manifest["wheel"]["sha256"] = hashlib.sha256((directory / WHEEL).read_bytes()).hexdigest()
     write_manifest(directory, manifest)
     with pytest.raises(release.ProvenanceError, match=reason):

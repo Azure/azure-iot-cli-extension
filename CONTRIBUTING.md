@@ -276,6 +276,8 @@ exactly match this integration checkout; the producer commit is the parent build
 `sourceVersion` and may be a different automation commit. Wheel basename, SHA256,
 distribution `azure-iot` and version metadata are checked before the original bytes,
 manifest and SBOM are republished as `integration-wheel-$(System.JobAttempt)`.
+Raw ZIP member names are checked for unsafe paths and duplicates, independent of
+platform-specific normalization.
 Existing controllers, immutable-wheel checks and manual retry ancestry are unchanged.
 Retain the parent artifact until child qualification/retries finish. When coordinating
 the two pipelines, do not hold an exclusive resource lock in the parent while waiting
