@@ -6,6 +6,8 @@
 
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands import CliCommandType
+from azure.cli.core.commands.command_operation import WaitCommandOperation
+from knack.util import CLIError
 from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 
@@ -16,6 +18,20 @@ iotdps_ops = CliCommandType(operations_tmpl="azext_iot.operations.dps#{}")
 class IoTExtCommandsLoader(AzCommandsLoader):
     def __init__(self, cli_ctx=None):
         super(IoTExtCommandsLoader, self).__init__(cli_ctx=cli_ctx)
+
+    def add_cli_command(self, name, command_operation, **kwargs):
+        if isinstance(command_operation, WaitCommandOperation):
+            original_handler = command_operation.handler
+
+            def wait_handler(command_args):
+                result = original_handler(command_args)
+                # Some CLI core versions return a timeout exception as successful output.
+                if isinstance(result, CLIError):
+                    raise result
+                return result
+
+            command_operation.handler = wait_handler
+        return super().add_cli_command(name, command_operation, **kwargs)
 
     def load_command_table(self, args):
         from azext_iot.commands import load_command_table

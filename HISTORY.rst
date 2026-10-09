@@ -6,6 +6,10 @@ Release History
 1.0.0b2 (Preview)
 +++++++++++++++++
 
+**Wait command bug fixes**
+
+* Generic wait commands now fail with a nonzero exit code and the timeout message when their condition is not met, instead of returning successful empty JSON on affected Azure CLI versions. This covers Digital Twins and Device Update waits without changing their conditions or polling behavior.
+
 **ADR bug fixes**
 
 * Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.

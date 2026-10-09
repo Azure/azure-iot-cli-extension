@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from knack.util import CLIError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.deviceupdate.conftest import (
     ACCOUNT_RG,
@@ -15,6 +16,21 @@ from typing import Dict
 
 
 cli = EmbeddedCLI()
+
+
+@pytest.mark.adu_infrastructure(location="eastus2euap")
+def test_account_wait_timeout(provisioned_accounts: Dict[str, dict]):
+    account_name = next(iter(provisioned_accounts["accounts"]))
+    command = f"iot du account wait -n {account_name} -g {ACCOUNT_RG} --timeout 1 --interval 1"
+    for condition in ("--deleted", "--custom 'name == `\"never-matches\"`'"):
+        result = cli.invoke(f"{command} {condition}", capture_stderr=False)
+        assert not result.success(), "An unmet wait condition must not succeed."
+        assert isinstance(result.get_error(), CLIError)
+        assert "Wait operation timed-out after 1 seconds" in str(result.get_error())
+        assert result.output == ""
+
+    assert cli.invoke(f"{command} --exists").success()
+    assert cli.invoke(f"{command} --created").success()
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", count=2, delete=False)
