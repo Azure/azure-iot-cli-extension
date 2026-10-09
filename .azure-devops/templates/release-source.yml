@@ -1,0 +1,21 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: sourceBranch
+    type: string
+  - name: pythonVersion
+    type: string
+    default: "3.13"
+
+steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+  - script: python scripts/release_pipeline.py checkout --source "$(Agent.TempDirectory)/release-source"
+    displayName: Check out the exact qualified source, separate from pipeline code
+    env:
+      RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+      RELEASE_SOURCE_COMMIT: $(sourceCommit)

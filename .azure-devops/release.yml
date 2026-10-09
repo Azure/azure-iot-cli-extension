@@ -1,0 +1,42 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+trigger: none
+pr: none
+name: release-$(Date:yyyyMMdd).$(Rev:r)
+
+parameters:
+  - name: mode
+    displayName: Plan checks governance; Validate runs live tests; Release also publishes
+    type: string
+    default: Plan
+    values: [Plan, Validate, Release]
+  - name: sourceBranch
+    displayName: Protected branch containing the candidate and pipeline 147 migration
+    type: string
+    default: release/1.1.0-preview
+    values: [dev, preview, release/1.1.0-preview]
+
+resources:
+  repositories:
+    - repository: governedTemplates
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/stable
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@governedTemplates
+  parameters:
+    pool:
+      name: iotupx-1espt-release-probe
+      image: iotupx-1espt-ubuntu2404
+      os: linux
+    sdl:
+      sourceAnalysisPool:
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-windows2025
+        os: windows
+    stages:
+      - template: templates/release-stages.yml
+        parameters:
+          mode: ${{ parameters.mode }}
+          sourceBranch: ${{ parameters.sourceBranch }}

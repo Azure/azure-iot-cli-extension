@@ -221,6 +221,138 @@ For all resources, if the environmental variable is not provided, a new instance
 | `job_display_name`	| IoT Hub, DPS, and Central Tagging	| Job Display Name populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|
 | `job_id`	| IoT Hub, DPS, and Central Tagging	| Job Id populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|
 
+### Azure Pipelines release automation
+
+`.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
+on `1ES.Official.PipelineTemplate.yml` from the stable
+`1ESPipelineTemplates/1ESPipelineTemplates` resource. This is the governed core
+consumed directly for this public GitHub repository; do not route it through
+the OneBranch-only pool. Linux and Windows use `iotupx-1espt-release-probe`
+with the explicitly selected `iotupx-1espt-ubuntu2404` and
+`iotupx-1espt-windows2025` managed images. Both are Gen2 images with the required
+1ES PT prerequisites installed. SDL source analysis uses the Windows image,
+even when the build uses Linux. macOS retains the documented hosted `macOS-15`
+configuration; no Python/OS combinations are removed.
+
+The isolated pool is scoped to `aziotcli`, authorized only for pipeline 161,
+and configured for at most two stateless agents with no warm-agent buffer.
+Plan has passed on its Linux and Windows images; this does not qualify the
+full release matrix, integration run, or publication path. Keep the existing
+shared pool's images, defaults, and warm-agent allocation unchanged.
+
+Keep the pipeline
+definition on reviewed `dev`; `sourceBranch` independently selects `dev`,
+`preview`, or `release/1.1.0-preview`. The Resolve stage captures that branch's
+latest commit once; no commit-SHA input is required. Every job uses that same
+source commit even if the branch advances, while receipts also record the separate automation
+commit. Selected source branches must first receive the pipeline 147 migration
+(including `releaseBuildId`), `scripts/select-openssl.sh`, and the existing
+`scripts/check_index_compatibility.py`.
+
+| Mode | Behavior |
+| --- | --- |
+| `Plan` (default) | Governed onboarding and source-policy checks only. No live integration, release wheel, tag, release, or index PR. Managed agents/scanners may access their required services. |
+| `Validate` | Build and SBOM; full 12-way Python 3.10-3.13 / Ubuntu, Windows, Intel macOS unit and style matrix; security; command-table lint; required index compatibility; live pipeline 147 qualification. No publication. |
+| `Release` | The same mandatory gates, then public GitHub release and an index PR. Automation must run from upstream `dev`. |
+
+There is no skip-integration, continue-on-error, or manual GitHub `production`
+approval step in this path. Failed, canceled, partially successful and skipped
+dependencies cannot qualify publication. Index compatibility retains upstream's
+MEDIUM-warning policy, but HIGH findings, tool failures and incomplete checks are
+blocking. MSDO replaces the existing GitHub security task, not a separate
+organization-mandated secret-scanning control.
+
+**Operator setup (not performed by the YAML):**
+
+1. Create the ADO definition with this YAML. During StartRight onboarding, keep
+   any definition temporarily pointing at unrelated YAML disabled; correct the
+   branch/path before running. Use `Plan` for the first run. `Validate` is a real,
+   resource-creating integration run, not a dry run.
+2. Configure non-queue-overridable `ReleaseAzureServiceConnection` and
+   `ReleasePipFeedUrl` pipeline variables. The former names an approved ADO Azure
+   service connection, preferably workload-identity federation. Its principal
+   must read the **same corporate package feed** used by the existing release.
+   The latter is that feed's HTTPS URL without credentials (`/simple/` is
+   normalized). The build obtains an ARM-audience token inside `AzureCLI@2`,
+   passes authenticated pip configuration only to build/SBOM child processes,
+   and never emits the token or persists it in an artifact. Do not enable
+   credential/debug tracing. Feed access is separate from integration-resource
+   access; do not assume the existing test identity has it.
+3. Set `ReleasePipelineId` in pipeline 147's `aziotcli_test_primary` group to this
+   new definition's numeric ID. Grant the project Build Service **Queue builds**,
+   **View builds**, **View build pipeline** and **Stop builds** on 147 as needed;
+   grant 147 read access to the producer build/artifacts. Restrict permissions to
+   these pipelines. Same-project orchestration uses `System.AccessToken`, not an
+   ADO PAT. Do not hold a parent exclusive lock while waiting for a child that
+   needs that lock.
+4. Create the protected variable group `aziotcli_release_publish`, authorized
+   only for the reviewed release definition. Set secret `ReleaseGitHubToken`
+   to an organization-approved automation credential and `IndexForkRepository`
+   to its existing `owner/azure-cli-extensions` fork. Grant only the necessary
+   upstream IoT **Contents write**, fork **Contents write**, and index
+   **Pull requests write** access. The GitHub checkout connection alone does not
+   provide these capabilities. Credential policy, renewal, and expiry must cover
+   publication after the potentially long qualification; this YAML does not
+   mint or renew GitHub App tokens. Never provision a personal token as a
+   shortcut around organizational policy.
+5. Apply ADO branch-control checks on the publishing group and protect `dev` and
+   all allowed source branches. Restrict editing/queuing the release definition
+   and changing its variables, service connections, and group authorization.
+   Script conditions are defense in depth, not a security boundary against
+   someone who can edit pipeline YAML. Feature-branch development uses `Plan` or
+   `Validate` **without publishing-group authorization**.
+6. Authorize this definition to read the shared 1ES template repository and use
+   the managed pool; install/authorize the Microsoft Security DevOps extension.
+   Keep the production classification, audited governance, template security
+   checks, and service-connection approvals intact. The integration waiter needs
+   the configured six-hour job budget. Mandatory organizational approvals are
+   not bypassed; do not use breakglass or disable drift management to onboard.
+
+The release builds exactly one `release-candidate` artifact containing a wheel,
+`candidate.json`, and `SBOM.zip`, plus the `_manifest/` metadata that official 1ES
+adds during managed artifact publication. Candidate verification preserves that
+metadata while rejecting symlinks and additional wheels. The SBOM retains runtime-only dependency
+collection and the Windows-specific IoT device dependency; the SBOM executable
+is version- and SHA-256-pinned. Pipeline 147 receives `releaseBuildId`, validates
+the trusted producer/source/digest, and installs the same wheel rather than
+rebuilding it. The parent requests all DPS/Hub/ADR/ADU services on Python 3.10
+and 3.13, public ARM, `australiaeast`, requires the child to succeed, and verifies
+the retained child candidate artifact.
+
+Retain producer and child artifacts through qualification/recovery. A retried
+integration waiter looks for the uniquely owned child; it will not blindly
+queue another cohort. A failed child must be recovered through 147's existing
+recovery procedure, or a new release run started after cleanup/admission checks.
+Cancellation requests target only that release's child. Agent loss or an
+uncertain queue response can still require operator inspection: check pipeline
+147 and cleanup ownership before starting another run. Do not rebuild or replace
+an already-published candidate artifact within the same release run.
+
+Production publication is a checkout-free `releaseJob` with managed inputs for
+the scanned `release-candidate` and `release-tooling` artifacts. Release tooling
+comes from the same reviewed automation revision as the candidate producer.
+The job first stages a draft, verifies both uploaded asset digests, pins
+`v<normalized wheel version>` to the qualified source commit, then makes the
+release public automatically. Pre-release wheel versions set GitHub's prerelease
+flag. Existing mismatched tags/assets are never moved or overwritten. An
+identical public release is reused. **Public release already distributes the
+wheel**; index-team approval only gates its addition to the CLI index.
+
+After publication, the official `azdev extension update-index <wheel URL>` tool
+appends the candidate without removing prior versions. The helper verifies the
+version/URL/hash and that no other index entries changed, writes only the
+approved fork, and creates or reuses the version-specific PR against
+`Azure/azure-cli-extensions:main`. It never merges or approves that PR. A failure
+here leaves the GitHub release public: retry the Publish job, which reuses the
+identical public release before retrying index submission, not the Build stage.
+Release/index URLs remain in the job's logs and GitHub state rather than
+new artifacts emitted by a production release job. Conflicting existing index
+branches require manual review.
+
+This pipeline is additive: it does not disable existing GitHub workflows,
+change schedules, or remove FICs. Cut those consumers over only after an
+authorized end-to-end ADO validation and release rehearsal.
+
 ### IoT Digital Twins
 
 IoT Digital Twins test for creation of larger ontologies require ontology submodules to be cloned.
