@@ -7,9 +7,12 @@
 import json
 import os
 
+from contextlib import contextmanager
+from functools import wraps
 from inspect import getsourcefile
 from time import monotonic, sleep
-from uuid import uuid4
+from types import SimpleNamespace
+from unittest.mock import patch
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -17,6 +20,7 @@ from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
 from typing import Optional, TypeVar, List
+from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
 
 ensure_azure_namespace_path()
 
@@ -41,9 +45,7 @@ TAG_ENV_VAR = [
 CERT_ENDING = "-cert.pem"
 KEY_ENDING = "-key.pem"
 DATAPLANE_AUTH_TYPES = [
-    AuthenticationTypeDataplane.key.value,
     AuthenticationTypeDataplane.login.value,
-    "cstring",
 ]
 
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
@@ -54,6 +56,13 @@ TEST_PIPELINE_ID = "{} {} {}".format(
     settings.env.job_id
 ).strip()
 USE_TAGS = str(settings.env.use_tags).lower() == "true"
+
+
+def invoke_checked(cli: EmbeddedCLI, command: str, *, description: str) -> EmbeddedCLI:
+    result = cli.invoke(command, capture_stderr=True)
+    if not result.success():
+        raise CLIInternalError(f"{description} failed with exit code {result.error_code}.")
+    return result
 
 
 def load_json(filename):
@@ -108,6 +117,7 @@ def create_storage_account(
     rg: str,
     resource_name: str,
     create_account: bool = True,
+    location: Optional[str] = None,
 ) -> str:
     """
     Create a storage account (if needed) and container and return storage connection string.
@@ -124,11 +134,13 @@ def create_storage_account(
                 break
 
         if not target_storage:
-            cmd(
-                "storage account create -n {} -g {} --allow-shared-key-access true --tags iot_resource={}".format(
-                    account_name, rg, resource_name
-                )
+            create_command = (
+                f"storage account create -n {account_name} -g {rg} "
+                f"--allow-shared-key-access true --tags iot_resource={resource_name}"
             )
+            if location:
+                create_command += f" --location {location}"
+            cmd(create_command)
 
     storage_cstring = cmd(
         "storage account show-connection-string -n {} -g {}".format(
@@ -155,11 +167,10 @@ def tags_to_dict(tags: str) -> dict:
     return result
 
 
-def get_closest_marker(request: SubRequest) -> Mark:
-    for item in request.session.items:
-        if item.get_closest_marker("hub_infrastructure"):
-            return item.get_closest_marker("hub_infrastructure")
-    return request.node.get_closest_marker("hub_infrastructure")
+def get_closest_marker(request: SubRequest) -> Optional[Mark]:
+    # For cached fixtures request.node is the scope node, not the test which
+    # initializes the fixture. Pytest retains that consumer in _pyfuncitem.
+    return request._pyfuncitem.get_closest_marker("hub_infrastructure")  # pylint: disable=protected-access
 
 
 def get_agent_public_ip():
@@ -171,10 +182,45 @@ def get_agent_public_ip():
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
 
 
+def role_assignment_create_command(role, scope, assignee=None, *, assignee_object_id=None, assignee_principal_type=None):
+    """Keep caller aliases distinct from already-known Entra object IDs; never infer from UUID shape."""
+    if bool(assignee) == bool(assignee_object_id):
+        raise ValueError("Specify exactly one of assignee or assignee_object_id.")
+    if bool(assignee_object_id) != bool(assignee_principal_type):
+        raise ValueError("Known object IDs require assignee_principal_type; caller aliases must not specify it.")
+    target = f'--assignee "{assignee}"'
+    if assignee_object_id:
+        target = f'--assignee-object-id "{assignee_object_id}" --assignee-principal-type "{assignee_principal_type}"'
+    return f'role assignment create {target} --role "{role}" --scope "{scope}"'
+
+
+@contextmanager
+def role_assignment_create_scope(assignee_object_id=None):
+    """Avoid Graph hydration in native CLI's RoleAssignmentExists fallback for this one known-ID command."""
+    if not assignee_object_id:
+        yield
+        return
+    from azure.cli.command_modules.role import custom as role_commands
+    original = role_commands.list_role_assignments
+
+    @wraps(original)
+    def list_without_names(*args, **kwargs):
+        if kwargs.get("assignee_object_id") == assignee_object_id:
+            kwargs.update(fill_principal_name=False, fill_role_definition_name=False)
+        return original(*args, **kwargs)
+
+    with patch.object(role_commands, "list_role_assignments", list_without_names):
+        yield
+
+
 def get_role_assignments(
     scope: str,
     assignee: str = None,
     role: str = None,
+    *,
+    fill_role_definition_name: bool = True,
+    assignee_object_id: str = None,
+    fill_principal_name: bool = True,
 ) -> List[dict]:
     """
     Get rbac permissions of resource.
@@ -187,45 +233,80 @@ def get_role_assignments(
 
     if assignee:
         assignee_flag = '--assignee "{}"'.format(assignee)
+    if assignee_object_id:
+        if assignee:
+            raise ValueError("Specify only one of assignee or assignee_object_id.")
+        assignee_flag = f'--assignee-object-id "{assignee_object_id}"'
 
-    return cli.invoke(
-        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
-    ).as_json()
+    command = f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+    if not fill_role_definition_name:
+        command += " --fill-role-definition-name false"
+    if not fill_principal_name:
+        command += " --fill-principal-name false"
+    if assignee_object_id:
+        return cli.invoke(command, capture_stderr=True).as_json()
+    return cli.invoke(command).as_json()
 
 
 def assign_role_assignment(
     role: str,
     scope: str,
-    assignee: str,
+    assignee: str = None,
     max_tries=10,
     wait=10,
+    *,
+    assignee_object_id: str = None,
+    assignee_principal_type: str = None,
 ):
     """
     Assign rbac permissions to resource.
     """
-    output = None
-    tries = 0
-    principal_kpis = ["name", "principalId", "principalName"]
-    while tries < max_tries:
+    from azure.cli.core.azclierror import CLIInternalError
+
+    command = role_assignment_create_command(
+        role, scope, assignee, assignee_object_id=assignee_object_id, assignee_principal_type=assignee_principal_type,
+    )
+    principal_kpis = ["principalId"] if assignee_object_id else ["name", "principalId", "principalName"]
+    expected_principals = {assignee_object_id or assignee}
+    visibility = {"assignee_object_id": assignee_object_id, "fill_principal_name": False} if assignee_object_id else {}
+    for attempt in range(max_tries + 1):
         flat_assignment_kpis = []
-        role_assignments = get_role_assignments(scope=scope, role=role)
+        # Visibility checks do not need the CLI's additional role-definition name enumeration.
+        role_assignments = get_role_assignments(scope=scope, role=role, fill_role_definition_name=False, **visibility)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
         for role_assignment in role_assignments:
             for principal_kpi in principal_kpis:
                 if principal_kpi in role_assignment and role_assignment[principal_kpi]:
                     flat_assignment_kpis.append(role_assignment[principal_kpi])
-        if assignee in flat_assignment_kpis:
+        if expected_principals.intersection(flat_assignment_kpis):
+            return
+        if attempt == max_tries:
             break
+        if assignee_object_id and attempt:
+            # Known-ID grants create once; subsequent attempts only poll ARM visibility.
+            sleep(wait)
+            continue
         # else assign role to scope and check again
-        output = cli.invoke(
-            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
-        )
+        with role_assignment_create_scope(assignee_object_id):
+            output = cli.invoke(command, capture_stderr=True)
         if not output.success():
-            logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
-            break
+            error = output.get_error()
+            if error:
+                raise error
+            raise CLIInternalError(
+                f"Role assignment create failed for '{assignee_object_id or assignee}', role '{role}', scope '{scope}' "
+                f"(exit code {output.error_code})."
+            )
 
+        principal_id = output.as_json().get("principalId")
+        if principal_id and not assignee_object_id:
+            expected_principals.add(principal_id)
         sleep(wait)
-        tries += 1
+    attempt_kind = "verification" if assignee_object_id else "assignment"
+    raise CLIInternalError(
+        f"Role '{role}' for '{assignee_object_id or assignee}' at scope '{scope}' "
+        f"was not visible after {max_tries} {attempt_kind} attempts."
+    )
 
 
 def delete_role_assignment(
@@ -247,88 +328,94 @@ def delete_role_assignment(
 
 
 def wait_for_assertion(check, timeout=60, poll_interval=5):
+    """Poll read-back assertions, never replaying service errors or mutations."""
     deadline = monotonic() + timeout
     while True:
         try:
-            return check()
+            result = check()
+            assert monotonic() <= deadline, "Assertion check completed after its deadline."
+            return result
         except AssertionError:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise
+            sleep(min(poll_interval, remaining))
             if monotonic() >= deadline:
                 raise
-            sleep(poll_interval)
 
 
-def wait_for_iothub_query_ready(hub_name, rg, timeout=60, poll_interval=5):
-    probe_suffix = uuid4().hex[:16]
-    device_id = f"query-readiness-{probe_suffix}"
-    module_id = f"query-readiness-module-{probe_suffix}"
-    target = f"-n {hub_name} -g {rg} --auth-type key"
+def _clean_up_registry_devices(devices, timeout=60, poll_interval=2):
+    """Drain registry batches on an already-authorized cleanup target.
 
-    def invoke(command):
-        result = cli.invoke(command)
-        if not result.success():
-            raise RuntimeError(
-                f"IoT Hub query readiness command failed with exit code {result.error_code}: {result.output}"
-            )
-        return result
+    A batch limit is not proof of an empty registry. Observe after deletion,
+    without resubmitting deletes while their results become visible. All reads,
+    batches and sleeps share one finite budget; transport timeouts still apply.
+    """
+    from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
+    from msrestazure.azure_exceptions import CloudError
 
-    device_query = f"select deviceId from devices where deviceId='{device_id}'"
-    module_query = f"select moduleId from devices.modules where devices.deviceId='{device_id}'"
-
-    def assert_query_results(expected_device_ids, expected_module_ids):
-        devices = invoke(f'iot hub query -q "{device_query}" {target}').as_json()
-        modules = invoke(f'iot hub query -q "{module_query}" {target}').as_json()
-        actual_device_ids = {device["deviceId"] for device in devices}
-        actual_module_ids = {module["moduleId"] for module in modules}
-        assert actual_device_ids == expected_device_ids, (
-            f"Device query readiness mismatch for {hub_name}: "
-            f"expected {expected_device_ids}, got {actual_device_ids}"
-        )
-        assert actual_module_ids == expected_module_ids, (
-            f"Module query readiness mismatch for {hub_name}: "
-            f"expected {expected_module_ids}, got {actual_module_ids}"
-        )
-
-    invoke(f"iot hub device-identity create -d {device_id} {target}")
-    try:
-        invoke(f"iot hub module-identity create -d {device_id} -m {module_id} {target}")
-        wait_for_assertion(
-            lambda: assert_query_results({device_id}, {module_id}),
-            timeout=timeout,
-            poll_interval=poll_interval,
-        )
-    finally:
-        invoke(f"iot hub device-identity delete -d {device_id} {target}")
-
-    wait_for_assertion(
-        lambda: assert_query_results(set(), set()),
-        timeout=timeout,
-        poll_interval=poll_interval,
-    )
+    deadline = monotonic() + timeout
+    deleted = set()
+    while True:
+        if monotonic() >= deadline:
+            raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before confirming an empty registry.")
+        rows = devices.get_devices(top=1000)
+        if not isinstance(rows, list):
+            raise CLIInternalError("IoT Hub cleanup received an invalid registry listing.")
+        ids = [row.get("deviceId") if isinstance(row, dict) else getattr(row, "device_id", None) for row in rows]
+        if any(not isinstance(device_id, str) or not device_id for device_id in ids):
+            raise CLIInternalError("IoT Hub cleanup received a registry identity without a device ID.")
+        if monotonic() >= deadline:
+            raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before confirming an empty registry.")
+        if not ids:
+            return
+        pending = set(ids).difference(deleted)
+        for device_id in dict.fromkeys(ids):
+            if device_id not in pending:
+                continue
+            if monotonic() >= deadline:
+                raise CLIInternalError("IoT Hub registry cleanup deadline exhausted before deleting remaining identities.")
+            try:
+                devices.delete_identity(id=device_id, if_match="*")
+            except (ResourceNotFoundError, CloudError, HttpResponseError) as error:
+                response = getattr(error, "response", None)
+                if not (
+                    isinstance(error, (ResourceNotFoundError, CoreResourceNotFoundError))
+                    or getattr(response, "status_code", None) == 404
+                    or isinstance(error, HttpResponseError) and error.status_code == 404
+                ):
+                    raise
+            deleted.add(device_id)
+        if not pending:
+            sleep(min(poll_interval, max(0, deadline - monotonic())))
 
 
 def clean_up_iothub_device_config(
     hub_name: str,
     rg: str
 ):
-    from time import sleep
+    from azure.core.exceptions import HttpResponseError
+    from msrestazure.azure_exceptions import CloudError
+    from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
     import logging
-    from azext_iot._factory import SdkResolver
-    from azext_iot.common.shared import SdkType
-    from azext_iot.iothub.providers.discovery import IotHubDiscovery
     logger = logging.getLogger(__name__)
 
     def _list_with_retry(command, retries=3, delay=30):
         last_exc = None
         for attempt in range(retries):
             try:
-                result = cli.invoke(command)
+                result = cli.invoke(f"{command} --auth-type login")
                 if not result.success():
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
-                return result.as_json()
+                rows = result.as_json()
             except Exception as e:
                 last_exc = e
                 if attempt < retries - 1:
                     sleep(delay)
+            else:
+                if not isinstance(rows, list):
+                    raise CLIInternalError("IoT Hub cleanup received an invalid configuration listing.")
+                return rows
         logger.warning("List command failed after %d retries: %s — %s", retries, command, last_exc)
         raise last_exc
 
@@ -336,24 +423,34 @@ def clean_up_iothub_device_config(
         last_exc = None
         for attempt in range(retries):
             try:
-                result = cli.invoke(command)
+                result = cli.invoke(f"{command} --auth-type login", capture_stderr=True)
                 if not result.success():
+                    error = result.get_error()
+                    if error:
+                        raise error
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
                 return
             except Exception as e:
+                response = getattr(e, "response", None)
+                if isinstance(e, ResourceNotFoundError) or (
+                    isinstance(e, (CloudError, HttpResponseError)) and getattr(response, "status_code", None) == 404
+                ):
+                    logger.info("Cleanup target is already absent: %s", command)
+                    return
                 last_exc = e
                 if attempt < retries - 1:
                     sleep(delay)
         logger.warning("Delete command failed after %d retries: %s — %s", retries, command, last_exc)
         raise last_exc
 
-    cstring = cli.invoke(
-        f"iot hub connection-string show -n {hub_name} -g {rg} --policy-name iothubowner"
-    ).as_json()["connectionString"]
-    devices = SdkResolver(
-        IotHubDiscovery.get_target_by_cstring(cstring)
-    ).get_sdk(SdkType.service_sdk).devices
-    device_list = devices.get_devices(top=1000)
+    # Keep the caller's cleanup/ownership gates and scoped EmbeddedCLI context.
+    # In particular, never acquire an iothubowner key for local-auth-disabled hubs.
+    devices = DeviceIdentityProvider(
+        cmd=SimpleNamespace(cli_ctx=cli.az_cli),
+        hub_name=hub_name,
+        rg=rg,
+        auth_type_dataplane="login",
+    ).service_sdk.devices
 
     deployment_list = [
         c["id"] for c in _list_with_retry(
@@ -367,14 +464,7 @@ def clean_up_iothub_device_config(
         )
     ]
 
-    for device in device_list:
-        devices.delete_identity(id=device.device_id, if_match="*")
-
-    def assert_devices_deleted():
-        remaining = [device.device_id for device in devices.get_devices(top=1000)]
-        assert not remaining, f"Devices were not deleted: {remaining}"
-
-    wait_for_assertion(assert_devices_deleted, timeout=60, poll_interval=2)
+    _clean_up_registry_devices(devices)
 
     for deployment in deployment_list:
         _delete_with_retry(
@@ -391,14 +481,8 @@ def clean_up_iothub_device_config(
         )
 
     def assert_configurations_deleted():
-        assert not _list_with_retry(
-            f"iot edge deployment list -n {hub_name} -g {rg}",
-            delay=2,
-        )
-        assert not _list_with_retry(
-            f"iot hub configuration list -n {hub_name} -g {rg}",
-            delay=2,
-        )
+        assert not _list_with_retry(f"iot edge deployment list -n {hub_name} -g {rg}", delay=2)
+        assert not _list_with_retry(f"iot hub configuration list -n {hub_name} -g {rg}", delay=2)
 
     wait_for_assertion(assert_configurations_deleted, timeout=60, poll_interval=2)
 
@@ -430,7 +514,9 @@ def create_test_cert(
 
 def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     """Append the dataplane command auth type."""
-    if auth_type not in DATAPLANE_AUTH_TYPES:
+    if auth_type not in {
+        AuthenticationTypeDataplane.key.value, AuthenticationTypeDataplane.login.value, "cstring"
+    }:
         raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
 
     # cstring takes precedence

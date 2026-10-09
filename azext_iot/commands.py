@@ -42,7 +42,7 @@ def load_command_table(self, _):
             getter_name="iot_device_show",
             custom_func_type=iothub_ops,
             setter_name="iot_device_update",
-            custom_func_name="update_iot_device_custom"
+            custom_func_name="update_iot_device_custom",
         )
         cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")

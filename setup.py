@@ -43,8 +43,10 @@ if not PACKAGE_NAME:
 # and azure-eventhub for telemetry monitoring.
 
 DEPENDENCIES = [
-    "azure-core>=1.31.0,<1.40.0",
-    "azure-mgmt-core>=1.5.0,<2.0.0",
+    "azure-core>=1.37.0,<1.40.0",
+    "azure-mgmt-core>=1.6.0,<2.0.0",
+    "isodate>=0.6.1",
+    "typing-extensions>=4.6.0",
     "azure-identity>=1.6.1,<1.18.0",
     "azure-storage-blob>=12.14.0,<12.30.0",
     "msrest>=0.6.21",
@@ -66,7 +68,7 @@ DEPENDENCIES = [
 EXTRAS = {}
 
 CLASSIFIERS = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python",

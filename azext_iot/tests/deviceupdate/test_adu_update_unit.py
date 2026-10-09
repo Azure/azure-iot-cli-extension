@@ -271,6 +271,16 @@ def test_calculate_hash(tmp_path):
     assert result[0]["hash"]
 
 
+def test_calculate_hash_accepts_relative_path(tmp_path, monkeypatch):
+    target = tmp_path / "relative.bin"
+    target.write_bytes(b"relative")
+    monkeypatch.chdir(tmp_path)
+
+    result = subject.calculate_hash(file_paths=[target.name])
+
+    assert result[0]["uri"] == target.as_uri()
+
+
 # ---------------------------------------------------------------------------
 # manifest_init_v5
 # ---------------------------------------------------------------------------

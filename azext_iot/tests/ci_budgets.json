@@ -1,0 +1,99 @@
+{
+  "DPS": {
+    "test_dir": "azext_iot/tests/dps",
+    "tox_env": "DPS-int",
+    "concurrent_phases": true,
+    "serial_cleanup_verification": true,
+    "phases": [
+      {
+        "name": "regular",
+        "runtime_minutes": 35,
+        "cleanup_minutes": 10
+      },
+      {
+        "name": "service-sas",
+        "runtime_minutes": 25,
+        "cleanup_minutes": 10
+      },
+      {
+        "name": "local-auth-toggle",
+        "runtime_minutes": 15,
+        "cleanup_minutes": 5
+      }
+    ],
+    "reserve_minutes": 10,
+    "setup_minutes": 10,
+    "job_timeout_minutes": 100
+  },
+  "HubControl": {
+    "test_dir": "azext_iot/tests/iothub",
+    "tox_env": "HubControl-int",
+    "concurrent_phases": true,
+    "phases": [
+      {
+        "name": "regular-state-workflow",
+        "runtime_minutes": 90,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-state-schemes-cert",
+        "runtime_minutes": 90,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-endpoints-a",
+        "runtime_minutes": 90,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "regular-endpoints-b",
+        "runtime_minutes": 90,
+        "cleanup_minutes": 15
+      }
+    ],
+    "reserve_minutes": 5,
+    "setup_minutes": 15,
+    "job_timeout_minutes": 140
+  },
+  "HubData": {
+    "test_dir": "azext_iot/tests/iothub",
+    "tox_env": "HubData-int",
+    "concurrent_phases": true,
+    "phases": [
+      {
+        "name": "entra-state-config",
+        "runtime_minutes": 75,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "entra-devices-protocol",
+        "runtime_minutes": 75,
+        "cleanup_minutes": 15
+      },
+      {
+        "name": "sas",
+        "runtime_minutes": 45,
+        "cleanup_minutes": 15
+      }
+    ],
+    "reserve_minutes": 5,
+    "setup_minutes": 15,
+    "job_timeout_minutes": 120
+  },
+  "ADU": {
+    "test_dir": "azext_iot/tests/deviceupdate",
+    "tox_env": "ADU-int",
+    "phases": [],
+    "reserve_minutes": 0,
+    "setup_minutes": 0,
+    "job_timeout_minutes": 150
+  },
+  "ADR": {
+    "test_dir": "azext_iot/tests/adr",
+    "tox_env": "ADR-int",
+    "phases": [],
+    "reserve_minutes": 0,
+    "setup_minutes": 0,
+    "job_timeout_minutes": 360
+  }
+}

@@ -26,6 +26,10 @@ helps[
 ] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
+    long-summary: |
+                  Management requests use the active Azure cloud's ARM endpoint by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to explicitly use public-cloud canary ARM.
+                  API availability depends on the target cloud and service deployment.
 """
 
 helps[
@@ -1053,6 +1057,10 @@ helps[
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
+    long-summary: |
+                  Management requests use the active Azure cloud's ARM endpoint by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to explicitly use public-cloud canary ARM.
+                  API availability depends on the target cloud and service deployment.
 """
 
 helps[
@@ -1139,10 +1147,12 @@ helps[
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type symmetrickey --allocation-policy custom
         --webhook-url {webhook_url} --api-version {api_version}
-    - name: Create an enrollment with a custom ADR Namespace Credential Policy specified.
+    - name: Create an enrollment with a custom ADR Namespace Certificate Policy specified.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --attestation-type symmetrickey --credential-policy-name {policy_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey
+        --adr-namespace {namespace_name} --adr-ca-name {ca_name}
+        --adr-cert-policy-name {policy_name}
 """
 
 helps[
@@ -1194,10 +1204,11 @@ helps[
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
         --initial-twin-tags "{'version1':'2'}" --device-information "{'color':'red'}"
     - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
-            to use a custom ADR Namespace Credential Policy.
+            to use a custom ADR Namespace Certificate Policy.
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --credential-policy-name {my_policy}
+        --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
+        --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
 """
 
 helps[
@@ -1266,10 +1277,16 @@ helps[
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are shown by default. Use --show-keys false to hide generated or supplied
+                  keys in the response; this does not change credentials submitted to the service.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
+    - name: Create a symmetric-key enrollment group and explicitly return its generated keys.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --show-keys
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
       text: >
@@ -1301,10 +1318,12 @@ helps[
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy custom --webhook-url {webhook_url}
         --api-version {api_version}
-    - name: Create an enrollment group with a custom Device Registry Namespace Credential Policy specified.
+    - name: Create an enrollment group with a custom Device Registry Namespace Certificate Policy specified.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --allocation-policy hashed --credential-policy-name {policy_name}
+        --enrollment-id {enrollment_id} --allocation-policy hashed
+        --adr-namespace {namespace_name} --adr-ca-name {ca_name}
+        --adr-cert-policy-name {policy_name}
 """
 
 helps[
@@ -1313,6 +1332,7 @@ helps[
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are shown by default. Use --show-keys false to hide them in the response.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
@@ -1343,10 +1363,11 @@ helps[
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --primary-key {new_primary_key} --etag AAAAAAAAAAA=
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
-            to use a custom ADR Namespace Credential Policy.
+            to use a custom ADR Namespace Certificate Policy.
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --credential-policy-name {my_policy}
+        --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
+        --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
 """
 
 helps[

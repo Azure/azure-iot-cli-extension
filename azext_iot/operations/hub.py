@@ -28,6 +28,7 @@ from azext_iot.constants import (
     TRACING_ALLOWED_FOR_SKU,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azext_iot.common.arm import get_resource_group
 from azext_iot.common.shared import (
     DeviceAuthType,
     SdkType,
@@ -52,7 +53,7 @@ from azext_iot.common.utility import (
     generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
-from azext_iot.operations.generic import _execute_query
+from azext_iot.operations.generic import _execute_query, _process_top
 from typing import Optional
 import pprint
 
@@ -186,7 +187,9 @@ def _iot_device_create(
     valid_days=None,
     output_dir=None,
     device_scope=None,
+    identity_properties=None,
 ):
+    from azext_iot.iothub._payload import restore_identity_properties
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -213,6 +216,7 @@ def _iot_device_create(
             status_reason=status_reason,
             device_scope=device_scope,
         )
+        restore_identity_properties(device, identity_properties)
         output = service_sdk.devices.create_or_update_identity(
             id=device_id, device=device
         )
@@ -235,12 +239,13 @@ def _assemble_device(
     status_reason=None,
     device_scope=None,
 ):
-    from azext_iot.sdk.iothub.service.models import DeviceCapabilities, Device
+    from azext_iot.iothub._payload import make_payload
 
     auth = _assemble_auth(auth_method, pk, sk)
-    cap = DeviceCapabilities(iot_edge=edge_enabled)
+    cap = make_payload("DeviceCapabilities", iot_edge=edge_enabled)
     if is_update:
-        device = Device(
+        device = make_payload(
+            "Device",
             device_id=device_id,
             authentication=auth,
             capabilities=cap,
@@ -253,7 +258,8 @@ def _assemble_device(
         parent_scopes = []
         if device_scope:
             parent_scopes = [device_scope]
-        device = Device(
+        device = make_payload(
+            "Device",
             device_id=device_id,
             authentication=auth,
             capabilities=cap,
@@ -263,7 +269,8 @@ def _assemble_device(
         )
         return device
     else:
-        device = Device(
+        device = make_payload(
+            "Device",
             device_id=device_id,
             authentication=auth,
             capabilities=cap,
@@ -275,11 +282,7 @@ def _assemble_device(
 
 
 def _assemble_auth(auth_method, pk, sk):
-    from azext_iot.sdk.iothub.service.models import (
-        AuthenticationMechanism,
-        SymmetricKey,
-        X509Thumbprint,
-    )
+    from azext_iot.iothub._payload import make_payload
 
     auth = None
     if auth_method in [
@@ -289,8 +292,9 @@ def _assemble_auth(auth_method, pk, sk):
         if any([pk, sk]) and not all([pk, sk]):
             raise ValueError("When configuring symmetric key auth both primary and secondary keys are required.")
 
-        auth = AuthenticationMechanism(
-            symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
+        auth = make_payload(
+            "AuthenticationMechanism",
+            symmetric_key=make_payload("SymmetricKey", primary_key=pk, secondary_key=sk),
             type=DeviceAuthApiType.sas.value,
         )
     elif auth_method in [
@@ -299,8 +303,10 @@ def _assemble_auth(auth_method, pk, sk):
     ]:
         if not pk:
             raise ValueError("When configuring selfSigned auth the primary thumbprint is required.")
-        auth = AuthenticationMechanism(
-            x509_thumbprint=X509Thumbprint(
+        auth = make_payload(
+            "AuthenticationMechanism",
+            x509_thumbprint=make_payload(
+                "X509Thumbprint",
                 primary_thumbprint=pk, secondary_thumbprint=sk
             ),
             type=DeviceAuthApiType.selfSigned.value,
@@ -309,7 +315,8 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthType.x509_ca.name,
         DeviceAuthApiType.certificateAuthority.value,
     ]:
-        auth = AuthenticationMechanism(
+        auth = make_payload(
+            "AuthenticationMechanism",
             type=DeviceAuthApiType.certificateAuthority.value
         )
     else:
@@ -420,19 +427,11 @@ def iot_device_update(
         auth_type=auth_type_dataplane,
     )
 
-    auth, pk, sk = _parse_auth(parameters)
-    updated_device = _assemble_device(
-        True,
-        parameters["deviceId"],
-        auth,
-        parameters["capabilities"]["iotEdge"],
-        pk,
-        sk,
-        parameters["status"].lower(),
-        parameters.get("statusReason"),
-        parameters.get("deviceScope"),
-    )
-    updated_device.etag = etag if etag else "*"
+    from azext_iot.iothub._payload import project
+    _parse_auth(parameters)
+    updated_device = project("Device", parameters)
+    updated_device["status"] = parameters["status"].lower()
+    updated_device["etag"] = etag if etag else "*"
     return _iot_device_update(target, device_id, updated_device)
 
 
@@ -442,7 +441,7 @@ def _iot_device_update(target, device_id, device):
 
     try:
         headers = {}
-        headers["If-Match"] = '"{}"'.format(device.etag)
+        headers["If-Match"] = '"{}"'.format(device["etag"])
         return service_sdk.devices.create_or_update_identity(
             id=device_id, device=device, custom_headers=headers
         )
@@ -488,7 +487,7 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
 
     try:
         auth = _assemble_auth(auth_method, pk, sk)
-        device["authentication"] = auth
+        device["authentication"] = dict(device["authentication"], **auth)
         headers = {}
         headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         return service_sdk.devices.create_or_update_identity(
@@ -888,8 +887,10 @@ def _iot_device_module_create(
     primary_key=None,
     secondary_key=None,
     primary_thumbprint=None,
-    secondary_thumbprint=None
+    secondary_thumbprint=None,
+    identity_properties=None,
 ):
+    from azext_iot.iothub._payload import restore_identity_properties
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -901,6 +902,7 @@ def _iot_device_module_create(
             pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
             sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
         )
+        restore_identity_properties(module, identity_properties)
         return service_sdk.modules.create_or_update_identity(
             id=device_id, mid=module_id, module=module
         )
@@ -911,10 +913,10 @@ def _iot_device_module_create(
 
 
 def _assemble_module(device_id, module_id, auth_method, pk=None, sk=None):
-    from azext_iot.sdk.iothub.service.models import Module
+    from azext_iot.iothub._payload import make_payload
 
     auth = _assemble_auth(auth_method, pk, sk)
-    module = Module(module_id=module_id, device_id=device_id, authentication=auth)
+    module = make_payload("Module", module_id=module_id, device_id=device_id, authentication=auth)
     return module
 
 
@@ -954,14 +956,9 @@ def iot_device_module_update(
 
 
 def _handle_module_update_params(parameters):
-    auth, pk, sk = _parse_auth(parameters)
-    return _assemble_module(
-        device_id=parameters["deviceId"],
-        module_id=parameters["moduleId"],
-        auth_method=auth,
-        pk=pk,
-        sk=sk,
-    )
+    from azext_iot.iothub._payload import project
+    _parse_auth(parameters)
+    return project("Module", parameters)
 
 
 def _parse_auth(parameters):
@@ -975,8 +972,9 @@ def _parse_auth(parameters):
         raise InvalidArgumentValueError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
     if auth == DeviceAuthApiType.sas.value:
-        pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
-        sk = parameters["authentication"]["symmetricKey"]["secondaryKey"]
+        keys = parameters["authentication"].get("symmetricKey") or {}
+        pk = keys.get("primaryKey")
+        sk = keys.get("secondaryKey")
     elif auth == DeviceAuthApiType.selfSigned.value:
         pk = parameters["authentication"]["x509Thumbprint"]["primaryThumbprint"]
         sk = parameters["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
@@ -1064,10 +1062,6 @@ def _iot_key_regenerate_process_modules(
         modules = _iot_device_module_list(target=target, device_id=device_id, top=None)
         module_ids = []
         for module in modules:
-            # not going to question why the call the Module object - just making things
-            # easier for unit tests
-            if not isinstance(module, dict):
-                module = module.serialize()
             if module["authentication"]["type"] == DeviceAuthApiType.sas.value:
                 module_ids.append(module["moduleId"])
 
@@ -1115,15 +1109,16 @@ def _iot_key_regenerate_batch(
                 if tries == IOTHUB_THROTTLE_MAX_TRIES or e.status_code != THROTTLE_HTTP_STATUS_CODE:
                     if overall_result["rotatedKeys"]:
                         logger.warning(
-                            f"Managed to renew the following keys:\n{overall_result['rotatedKeys']}"
+                            "Managed to renew keys for %d identities before the failed batch.",
+                            len(overall_result["rotatedKeys"]),
                         )
                     handle_service_exception(e)
                 sleep(IOTHUB_THROTTLE_SLEEP_SEC)
         # combine result
-        if result.errors:
-            overall_result["errors"].extend(result.errors)
-        if result.rotated_keys:
-            overall_result["rotatedKeys"].extend(result.rotated_keys)
+        if result.get("errors"):
+            overall_result["errors"].extend(result["errors"])
+        if result.get("rotatedKeys"):
+            overall_result["rotatedKeys"].extend(result["rotatedKeys"])
     return overall_result
 
 
@@ -1361,7 +1356,7 @@ def iot_edge_set_modules(
 
 
 def _iot_edge_set_modules(target, device_id, content):
-    from azext_iot.sdk.iothub.service.models import ConfigurationContent
+    from azext_iot.iothub._payload import make_payload
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1371,7 +1366,7 @@ def _iot_edge_set_modules(target, device_id, content):
             content, config_type=ConfigType.edge
         )
 
-        content = ConfigurationContent(**processed_content)
+        content = make_payload("ConfigurationContent", **processed_content)
         service_sdk.configuration.apply_on_edge_device(id=device_id, content=content)
         return _iot_device_module_list(target, device_id)
     except CloudError as e:  # pragma: no cover
@@ -1397,11 +1392,11 @@ def iot_edge_export_modules(
 
     try:
         # Get all modules in the device
-        module_list = iot_device_module_list(cmd, device_id, hub_name_or_hostname=hub_name_or_hostname, login=login)
+        module_list = _iot_device_module_list(target=target, device_id=device_id)
         for module in module_list:
             # Get module twins using module ids
             module_twin = _iot_device_module_twin_show(
-                target=target, device_id=device_id, module_id=module.module_id)
+                target=target, device_id=device_id, module_id=module["moduleId"])
             module_twin_list.append(module_twin)
 
         # Turn module twins list into module twin configuration
@@ -1512,11 +1507,7 @@ def _iot_hub_configuration_create(
     labels=None,
     metrics=None
 ):
-    from azext_iot.sdk.iothub.service.models import (
-        Configuration,
-        ConfigurationContent,
-        ConfigurationMetrics,
-    )
+    from azext_iot.iothub._payload import make_payload
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1554,10 +1545,11 @@ def _iot_hub_configuration_create(
     elif custom_labels:
         labels = assemble_nargs_to_dict(custom_labels)
 
-    config_content = ConfigurationContent(**processed_content)
+    config_content = make_payload("ConfigurationContent", **processed_content)
 
-    config_metrics = ConfigurationMetrics(queries=metrics)
-    config = Configuration(
+    config_metrics = make_payload("ConfigurationMetrics", queries=metrics)
+    config = make_payload(
+        "Configuration",
         id=config_id,
         schema_version="2.0",
         labels=labels,
@@ -1705,7 +1697,7 @@ def iot_hub_configuration_update(
     etag=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.sdk.iothub.service.models import Configuration
+    from azext_iot.iothub._payload import make_payload
     from azext_iot.common.utility import verify_transform
 
     discovery = IotHubDiscovery(cmd)
@@ -1725,7 +1717,8 @@ def iot_hub_configuration_update(
         if parameters.get("labels"):
             verify["labels"] = dict
         verify_transform(parameters, verify)
-        config = Configuration(
+        config = make_payload(
+            "Configuration",
             id=parameters["id"],
             schema_version=parameters["schemaVersion"],
             labels=parameters["labels"],
@@ -1779,6 +1772,7 @@ def iot_hub_configuration_list(
     login=None,
     auth_type_dataplane=None,
 ):
+    top = _process_top(top=top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,
@@ -1807,6 +1801,7 @@ def iot_edge_deployment_list(
     login=None,
     auth_type_dataplane=None,
 ):
+    top = _process_top(top=top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,
@@ -2138,8 +2133,6 @@ def iot_device_method(
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
-    # Prevent msrest locking up shell
-    service_sdk.config.retry_policy.retries = 1
     try:
         if method_payload:
             method_payload = process_json_arg(
@@ -2201,8 +2194,6 @@ def iot_device_module_method(
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
-    # Prevent msrest locking up shell
-    service_sdk.config.retry_policy.retries = 1
     try:
         if method_payload:
             method_payload = process_json_arg(
@@ -2241,7 +2232,7 @@ def iot_get_sas_token(
     module_id=None,
     auth_type_dataplane=None,
     connection_string=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -2296,7 +2287,7 @@ def _validate_iot_get_sas_token_args(
         raise ArgumentUsageError(
             "You are unable to get sas token for module without device information."
         )
-    if connection_string and hostname_type != HostnameType.AUTO.value:
+    if connection_string and hostname_type not in (None, HostnameType.AUTO.value, HostnameType.CLASSIC.value):
         raise ArgumentUsageError(
             "--hostname-type is not supported with --connection-string. "
             "The SAS audience is derived from the HostName in the supplied connection string."
@@ -2317,20 +2308,20 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
 
     for parser in all_parsers:
         try:
-            parsed_cs = parser(connection_string)
+            parsed_cs = {name.lower(): value for name, value in parser(connection_string).items()}
 
-            if "SharedAccessKeyName" in parsed_cs:
-                policy = parsed_cs["SharedAccessKeyName"]
-            key = parsed_cs["SharedAccessKey"]
+            if "sharedaccesskeyname" in parsed_cs:
+                policy = parsed_cs["sharedaccesskeyname"]
+            key = parsed_cs["sharedaccesskey"]
 
             if parser == ConnectionStringParser.IotHub:
-                uri = parsed_cs["HostName"]
+                uri = parsed_cs["hostname"]
             elif parser == ConnectionStringParser.Module:
                 uri = "{}/devices/{}/modules/{}".format(
-                    parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
+                    parsed_cs["hostname"], parsed_cs["deviceid"], parsed_cs["moduleid"]
                 )
             elif parser == ConnectionStringParser.Device:
-                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+                uri = "{}/devices/{}".format(parsed_cs["hostname"], parsed_cs["deviceid"])
             else:
                 raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 
@@ -2352,7 +2343,7 @@ def _iot_build_sas_token(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
@@ -2370,6 +2361,7 @@ def _iot_build_sas_token(
         policy_name=policy_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     uri = None
     policy = None
@@ -2424,16 +2416,16 @@ def _iot_build_sas_token(
 def _resolve_sas_audience(target, hostname_type, device_id=None, login=None):
     """Resolve the SAS audience host.
 
-    Login mode lacks ARM metadata, so the host is string-transformed from the
-    CS HostName.
+    Preserve an explicitly supplied connection-string hostname by default.
+    Split hostnames are selected only when requested.
     """
     auto_tls_key = "deviceHostName" if device_id else "serviceHostName"
     if login:
+        if hostname_type is None:
+            return target["entity"]
         effective_type = hostname_type
         if effective_type == HostnameType.AUTO.value:
-            effective_type = (
-                HostnameType.DEVICE.value if device_id else HostnameType.SERVICE.value
-            )
+            return target.get(auto_tls_key) or target["entity"]
         return _transform_hostname(target["entity"], effective_type)
     return _resolve_hostname_by_type(
         target, hostname_type, auto_tls_key=auto_tls_key
@@ -2442,7 +2434,7 @@ def _resolve_sas_audience(target, hostname_type, device_id=None, login=None):
 
 def _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName"):
     classic = _transform_hostname(target["entity"], HostnameType.CLASSIC.value)
-    if hostname_type == HostnameType.CLASSIC.value:
+    if hostname_type in (None, HostnameType.CLASSIC.value):
         return classic
     if hostname_type == HostnameType.AUTO.value:
         return target.get(auto_tls_key) or classic
@@ -2496,7 +2488,7 @@ def iot_get_device_connection_string(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     if hostname_type == HostnameType.SERVICE.value:
         raise InvalidArgumentValueError(
@@ -2510,12 +2502,10 @@ def iot_get_device_connection_string(
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     device = _iot_device_show(target, device_id)
-    if login:
-        hostname_override = _transform_hostname(target["entity"], hostname_type)
-    else:
-        hostname_override = _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName")
+    hostname_override = _resolve_sas_audience(target, hostname_type, device_id=device_id, login=login)
     result["connectionString"] = _build_device_or_module_connection_string(
         device, key_type, hostname_override=hostname_override
     )
@@ -2531,7 +2521,7 @@ def iot_get_module_connection_string(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     if hostname_type == HostnameType.SERVICE.value:
         raise InvalidArgumentValueError(
@@ -2545,12 +2535,10 @@ def iot_get_module_connection_string(
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     module = _iot_device_module_show(target, device_id, module_id)
-    if login:
-        hostname_override = _transform_hostname(target["entity"], hostname_type)
-    else:
-        hostname_override = _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName")
+    hostname_override = _resolve_sas_audience(target, hostname_type, device_id=device_id, login=login)
     result["connectionString"] = _build_device_or_module_connection_string(
         module, key_type, hostname_override=hostname_override
     )
@@ -2616,33 +2604,29 @@ def _create_export_import_job_properties(
     identity: str = None,
 ):
     from azext_iot.common.shared import AuthenticationType
-    from azext_iot.sdk.iothub.service.models import (
-        JobProperties,
-        ManagedIdentity
-    )
-    job_properties = JobProperties()
+    job_properties = {}
     if job_type == JobType.exportDevices.value:
-        job_properties.exclude_keys_in_export = not include_keys
+        job_properties["excludeKeysInExport"] = not include_keys
     elif job_type == JobType.importDevices.value:
         if exists(input_blob_container_uri):
             input_blob_container_uri = read_file_content(input_blob_container_uri)
-        job_properties.input_blob_container_uri = input_blob_container_uri
+        job_properties["inputBlobContainerUri"] = input_blob_container_uri
     else:
         raise ClientRequestError(
             "Invalid job type: {}".format(job_type)
         )
-    job_properties.type = job_type
+    job_properties["type"] = job_type
 
     if exists(output_blob_container_uri):
         output_blob_container_uri = read_file_content(output_blob_container_uri)
-    job_properties.output_blob_container_uri = output_blob_container_uri
+    job_properties["outputBlobContainerUri"] = output_blob_container_uri
 
     if identity is None:
-        job_properties.storage_authentication_type = AuthenticationType.keyBased.name
+        job_properties["storageAuthenticationType"] = AuthenticationType.keyBased.name
     else:
-        job_properties.storage_authentication_type = AuthenticationType.identityBased.name
+        job_properties["storageAuthenticationType"] = AuthenticationType.identityBased.name
         if identity != "[system]":
-            job_properties.identity = ManagedIdentity(user_assigned_identity=identity)
+            job_properties["identity"] = {"userAssignedIdentity": identity}
 
     return job_properties
 
@@ -2672,14 +2656,14 @@ def iot_device_export(  # pragma: no cover
             "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
-    service_sdk = _get_service_sdk(
-        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
-    )
     export_job_properties = _create_export_import_job_properties(
         job_type=JobType.exportDevices.value,
         output_blob_container_uri=blob_container_uri,
         include_keys=include_keys,
         identity=identity
+    )
+    service_sdk = _get_service_sdk(
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
 
     try:
@@ -2719,14 +2703,14 @@ def iot_device_import(  # pragma: no cover
             "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
-    service_sdk = _get_service_sdk(
-        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
-    )
     import_job_properties = _create_export_import_job_properties(
         job_type=JobType.importDevices.value,
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
         identity=identity
+    )
+    service_sdk = _get_service_sdk(
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
 
     try:
@@ -2855,6 +2839,9 @@ def _iot_hub_monitor_events(  # pragma: no cover
         if devices_result:
             for device_result in devices_result:
                 device_ids[device_result["deviceId"]] = True
+        if not device_ids:
+            raise ResourceNotFoundError("No devices matched --device-query. Event monitoring was not started.")
+        logger.info("Device query matched %s device(s).", len(device_ids))
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -2937,7 +2924,7 @@ def iot_hub_distributed_tracing_update(
         cmd, device_id, device_twin, hub_name_or_hostname, resource_group_name
     )
     return _customize_device_tracing_output(
-        result.device_id, result.properties.desired, result.properties.reported
+        result["deviceId"], result["properties"].get("desired", {}), result["properties"].get("reported", {})
     )
 
 
@@ -2949,7 +2936,7 @@ def iot_hub_connection_string_show(
     key_type=KeyType.primary.value,
     show_all=False,
     default_eventhub=False,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=HostnameType.CLASSIC.value,
 ):
     discovery = IotHubDiscovery(cmd)
 
@@ -2960,7 +2947,15 @@ def iot_hub_connection_string_show(
 
         def conn_str_getter(hub):
             return _get_hub_connection_string(
-                cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub, hostname_type
+                cmd,
+                discovery,
+                hub,
+                policy_name,
+                key_type,
+                show_all,
+                default_eventhub,
+                hostname_type,
+                resource_group_name,
             )
 
         connection_strings = []
@@ -2976,15 +2971,25 @@ def iot_hub_connection_string_show(
                         }
                     )
                 except Exception:
+                    hub_resource_group = get_resource_group(
+                        hub,
+                        fallback=resource_group_name,
+                        resource_label="IoT Hub",
+                    )
                     logger.warning(
                         f"Warning: The IoT Hub {hub['name']} in resource group "
-                        + f"{hub['resourcegroup']} does "
+                        + f"{hub_resource_group} does "
                         + f"not have the target policy {policy_name}."
                     )
             else:
+                hub_resource_group = get_resource_group(
+                    hub,
+                    fallback=resource_group_name,
+                    resource_label="IoT Hub",
+                )
                 logger.warning(
                     f"Warning: The IoT Hub {hub['name']} in resource group "
-                    + f"{hub['resourcegroup']} is skipped "
+                    + f"{hub_resource_group} is skipped "
                     + "because the hub is not active."
                 )
         return connection_strings
@@ -2992,25 +2997,38 @@ def iot_hub_connection_string_show(
     hub = discovery.find_resource(hub_name_or_hostname, resource_group_name)
     if hub:
         conn_str = _get_hub_connection_string(
-            cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub, hostname_type
+            cmd,
+            discovery,
+            hub,
+            policy_name,
+            key_type,
+            show_all,
+            default_eventhub,
+            hostname_type,
+            resource_group_name,
         )
         return {"connectionString": conn_str if show_all else conn_str[0]}
 
 
 def _get_hub_connection_string(
     cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=HostnameType.CLASSIC.value, resource_group_name=None,
 ):
 
+    resource_group_name = get_resource_group(
+        hub,
+        fallback=resource_group_name,
+        resource_label="IoT Hub",
+    )
     policies = []
     if show_all:
         policies.extend(
-            discovery.get_policies(hub["name"], hub["resourcegroup"])
+            discovery.get_policies(hub["name"], resource_group_name)
         )
     else:
         policies.append(
             discovery.find_policy(
-                hub["name"], hub["resourcegroup"], policy_name
+                hub["name"], resource_group_name, policy_name
             )
         )
     if default_eventhub:
