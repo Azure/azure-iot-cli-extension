@@ -111,10 +111,9 @@ stages:
         jobs:
           - job: Security
             pool:
-              name: OneBranchPipelinesV2
-              host: windows
+              name: iotupx-1espt-release-probe
+              image: iotupx-1espt-windows2025
               os: windows
-            container: windows_release
             steps:
               - template: release-source.yml
                 parameters:

@@ -226,11 +226,19 @@ For all resources, if the environmental variable is not provided, a new instance
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
 on `1ES.Official.PipelineTemplate.yml` from the stable
 `1ESPipelineTemplates/1ESPipelineTemplates` resource. This is the governed core
-used by OneBranch, consumed directly because its macOS support preserves the
-full release matrix. Linux and Windows use the existing `OneBranchPipelinesV2`
-managed pool with approved Ubuntu 22.04 and Windows Server 2022 containers;
-macOS uses the supported hosted `macOS-15` pool. These replace the previous
-ungoverned Ubuntu 24.04/Windows 2025 agents without dropping any Python/OS combinations.
+consumed directly for this public GitHub repository; do not route it through
+the OneBranch-only pool. Linux and Windows use `iotupx-1espt-release-probe`
+with the explicitly selected `iotupx-1espt-ubuntu2404` and
+`iotupx-1espt-windows2025` managed images. Both are Gen2 images with the required
+1ES PT prerequisites installed. SDL source analysis uses the Windows image,
+even when the build uses Linux. macOS retains the documented hosted `macOS-15`
+configuration; no Python/OS combinations are removed.
+
+The isolated pool is scoped to `aziotcli`, authorized only for pipeline 161,
+and configured for at most two stateless agents with no warm-agent buffer.
+Plan has passed on its Linux and Windows images; this does not qualify the
+full release matrix, integration run, or publication path. Keep the existing
+shared pool's images, defaults, and warm-agent allocation unchanged.
 
 Keep the pipeline
 definition on reviewed `dev`; `sourceBranch` independently selects `dev`,

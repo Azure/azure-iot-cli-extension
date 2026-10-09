@@ -27,19 +27,14 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@governedTemplates
   parameters:
     pool:
-      name: OneBranchPipelinesV2
-      host: linux
+      name: iotupx-1espt-release-probe
+      image: iotupx-1espt-ubuntu2404
       os: linux
-    containers:
-      default_linux_container:
-        image: onebranch.azurecr.io/linux/ubuntu-2204:latest
-      windows_release:
-        image: onebranch.azurecr.io/windows/ltsc2022/vse2022:latest
     sdl:
       sourceAnalysisPool:
-        name: OneBranchPipelinesV2
-        host: linux
-        os: linux
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-windows2025
+        os: windows
     stages:
       - template: templates/release-stages.yml
         parameters:

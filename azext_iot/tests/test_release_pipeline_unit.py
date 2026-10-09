@@ -695,6 +695,40 @@ def test_yaml_preserves_all_twelve_unit_style_combinations():
     assert any(step.get("script") == "tox run --skip-pkg-install" for step in steps)
 
 
+def test_yaml_selects_compliant_images_and_windows_source_analysis():
+    pipeline, stages = all_stages()
+    linux = {
+        "name": "iotupx-1espt-release-probe", "image": "iotupx-1espt-ubuntu2404", "os": "linux",
+    }
+    windows = {
+        "name": "iotupx-1espt-release-probe", "image": "iotupx-1espt-windows2025", "os": "windows",
+    }
+    parameters = pipeline["extends"]["parameters"]
+    assert parameters["pool"] == linux
+    assert parameters["sdl"]["sourceAnalysisPool"] == windows
+    assert "containers" not in parameters
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
+    job = template["jobs"][0]
+    assert job["${{ if eq(parameters.platform, 'Linux') }}"] == {"pool": linux}
+    assert job["${{ if eq(parameters.platform, 'Windows') }}"] == {"pool": windows}
+    assert job["${{ if eq(parameters.platform, 'MacOS') }}"]["pool"] == {
+        "name": "Azure Pipelines", "image": "macOS-15", "os": "macOS",
+    }
+    assert stages["Security"]["jobs"][0]["pool"] == windows
+    assert "container" not in stages["Security"]["jobs"][0]
+
+
+def test_yaml_publication_is_excluded_unless_release_mode_is_selected():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-stages.yml").read_text(encoding="utf-8"))
+    publication = template["stages"][-1]
+    assert list(publication) == ["${{ if eq(parameters.mode, 'Release') }}"]
+    assert [stage["stage"] for stage in next(iter(publication.values()))] == ["Publish"]
+    nonpublishing = json.dumps(template["stages"][:-1])
+    assert "aziotcli_release_publish" not in nonpublishing
+    assert "ReleaseGitHubToken" not in nonpublishing
+    assert "INDEX_FORK_REPOSITORY" not in nonpublishing
+
+
 @pytest.mark.parametrize("name", ["Integration", "Publish"])
 def test_yaml_requires_every_dependency_to_succeed_not_skip_or_partial(name):
     _, stages = all_stages()

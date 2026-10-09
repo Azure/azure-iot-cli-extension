@@ -18,15 +18,14 @@ jobs:
         Python313: {python: "3.13"}
     ${{ if eq(parameters.platform, 'Linux') }}:
       pool:
-        name: OneBranchPipelinesV2
-        host: linux
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-ubuntu2404
         os: linux
     ${{ if eq(parameters.platform, 'Windows') }}:
       pool:
-        name: OneBranchPipelinesV2
-        host: windows
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-windows2025
         os: windows
-      container: windows_release
     ${{ if eq(parameters.platform, 'MacOS') }}:
       pool:
         name: Azure Pipelines
