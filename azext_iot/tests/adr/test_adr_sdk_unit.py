@@ -33,6 +33,13 @@ NAMESPACE_URL = (
     f"https://management.azure.com/subscriptions/{SUBSCRIPTION}"
     "/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/namespace"
 )
+SCHEMA_REGISTRY_URL = (
+    f"https://management.azure.com/subscriptions/{SUBSCRIPTION}"
+    "/resourceGroups/rg/providers/Microsoft.DeviceRegistry/schemaRegistries/registry"
+)
+SCHEMA_URL = f"{SCHEMA_REGISTRY_URL}/schemas/schema"
+SCHEMA_VERSION_URL = f"{SCHEMA_URL}/schemaVersions/01"
+REGISTRY_DEVICE_URL = f"{NAMESPACE_URL}/registryDevices/device"
 GENERATE_URL = f"{NAMESPACE_URL}/generateReport"
 LATEST_URL = f"{NAMESPACE_URL}/getLatestReport"
 STATUS_URL = f"{NAMESPACE_URL}/operationStatuses/report"
@@ -661,3 +668,125 @@ def test_generate_report_wire_failure_does_not_retrieve_latest(
         provider.generate("namespace", "rg", REPORT_SELECTORS[0]["reportType"])
 
     assert [call.request.method for call in mocked_response.calls] == ["POST", "GET"]
+
+
+def test_schema_semantic_model_create_wire_contract(
+    wire_client, mocked_response
+):
+    registry_body = {
+        "location": "eastus",
+        "properties": {
+            "namespace": "site-a",
+            "storageAccountContainerUrl": (
+                "https://storage.blob.core.windows.net/schemas"
+            ),
+        },
+    }
+    schema_body = {
+        "properties": {
+            "schemaType": "ThingModel",
+            "format": "JsonLD/1.1",
+        }
+    }
+    version_body = {
+        "properties": {
+            "schemaContent": '{"@type":"Lamp"}',
+        }
+    }
+    mocked_response.add(
+        "PUT",
+        SCHEMA_REGISTRY_URL,
+        json={
+            "id": SCHEMA_REGISTRY_URL,
+            "name": "registry",
+            **registry_body,
+            "properties": {
+                **registry_body["properties"],
+                "provisioningState": "Succeeded",
+            },
+        },
+    )
+    mocked_response.add(
+        "PUT",
+        SCHEMA_URL,
+        json={"id": SCHEMA_URL, "name": "schema", **schema_body},
+    )
+    mocked_response.add(
+        "PUT",
+        SCHEMA_VERSION_URL,
+        json={"id": SCHEMA_VERSION_URL, "name": "01", **version_body},
+    )
+
+    wire_client.schema_registries.begin_create_or_replace(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        resource=registry_body,
+    ).result()
+    wire_client.schemas.create_or_replace(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        schema_name="schema",
+        resource=schema_body,
+    )
+    wire_client.schema_versions.create_or_replace(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        schema_name="schema",
+        schema_version_name="01",
+        resource=version_body,
+    )
+
+    writes = [
+        call for call in mocked_response.calls if call.request.method == "PUT"
+    ]
+    assert [urlsplit(call.request.url).path for call in writes] == [
+        urlsplit(SCHEMA_REGISTRY_URL).path,
+        urlsplit(SCHEMA_URL).path,
+        urlsplit(SCHEMA_VERSION_URL).path,
+    ]
+    assert [json.loads(call.request.body) for call in writes] == [
+        registry_body,
+        schema_body,
+        version_body,
+    ]
+    for call in writes:
+        _assert_api_version(call.request)
+
+
+def test_registry_device_type_reference_wire_contract(
+    wire_client, mocked_response
+):
+    thing_model_id = f"{SCHEMA_VERSION_URL}"
+    body = {
+        "location": "eastus",
+        "properties": {
+            "enablementState": "Enabled",
+            "deviceTypeRefs": [thing_model_id],
+        },
+    }
+    mocked_response.add(
+        "PUT",
+        REGISTRY_DEVICE_URL,
+        json={
+            "id": REGISTRY_DEVICE_URL,
+            "name": "device",
+            **body,
+            "properties": {
+                **body["properties"],
+                "provisioningState": "Succeeded",
+            },
+        },
+    )
+
+    wire_client.registry_devices.begin_create_or_replace(
+        resource_group_name="rg",
+        namespace_name="namespace",
+        registry_device_name="device",
+        resource=body,
+    ).result()
+
+    request = mocked_response.calls[-1].request
+    assert request.method == "PUT"
+    assert urlsplit(request.url).path == urlsplit(REGISTRY_DEVICE_URL).path
+    assert json.loads(request.body) == body
+    _assert_api_version(request)

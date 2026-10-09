@@ -26,6 +26,7 @@ def adr_registry_device_create(
     model: Optional[str] = None,
     hardware_revision: Optional[str] = None,
     software_revision: Optional[str] = None,
+    device_type_ref: Optional[str] = None,
     no_wait: bool = False,
 ):
     provider = RegistryDeviceProvider(cmd)
@@ -41,6 +42,7 @@ def adr_registry_device_create(
         model=model,
         hardware_revision=hardware_revision,
         software_revision=software_revision,
+        device_type_ref=device_type_ref,
         no_wait=no_wait,
     )
 
@@ -86,6 +88,8 @@ def adr_registry_device_update(
     model: Optional[str] = None,
     hardware_revision: Optional[str] = None,
     software_revision: Optional[str] = None,
+    device_type_ref: Optional[str] = None,
+    remove_device_type_ref: bool = False,
     no_wait: bool = False,
 ):
     provider = RegistryDeviceProvider(cmd)
@@ -99,6 +103,8 @@ def adr_registry_device_update(
         model=model,
         hardware_revision=hardware_revision,
         software_revision=software_revision,
+        device_type_ref=device_type_ref,
+        remove_device_type_ref=remove_device_type_ref,
         no_wait=no_wait,
     )
 

@@ -51,6 +51,8 @@ SERVICE_SAS_NODEIDS = frozenset(
 REGULAR_BASE_NODEIDS = frozenset(
     f"{module}::{name}[login]" for module, names in LIFECYCLES.items() for name in names
 ) | {
+    "test_iot_dps_semantic_model_int.py::test_dps_device_type_reference_round_trip[individual]",
+    "test_iot_dps_semantic_model_int.py::test_dps_device_type_reference_round_trip[group]",
     "core/test_dps_discovery_int.py::test_dps_discovery",
     "core/test_dps_unit_capacity_int.py::test_dps_unit_capacity_owned_lifecycle",
     "core/test_dps_discovery_int.py::test_dps_targets[key]",

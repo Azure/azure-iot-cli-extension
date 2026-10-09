@@ -14,7 +14,8 @@ from urllib.parse import parse_qs, quote_plus
 import pytest
 import responses
 from azure.cli.core.azclierror import (
-    AzureResponseError, BadRequestError, InvalidArgumentValueError, RequiredArgumentMissingError,
+    AzureResponseError, BadRequestError, InvalidArgumentValueError, MutuallyExclusiveArgumentError,
+    RequiredArgumentMissingError,
 )
 
 from azext_iot._factory import SdkResolver
@@ -117,6 +118,53 @@ def test_reference_create_and_update_preserve_wire(service, group):
         None, enrollment_id="test", adr_namespace="", adr_ca_name="", credential_policy_name=""
     )
     assert not REFERENCES.keys() & json.loads(service.calls[-1].request.body).keys()
+
+
+@pytest.mark.parametrize("group", [False, True])
+def test_device_type_reference_create_wire(service, group):
+    path = "enrollmentGroups" if group else "enrollments"
+    prefix = "iot_dps_device_enrollment_group" if group else "iot_dps_device_enrollment"
+    service.put(f"https://{HOST}/{path}/test", json={})
+    args = {} if group else {"attestation_type": "symmetricKey"}
+
+    getattr(dps, prefix + "_create")(
+        None, enrollment_id="test", device_type_ref="device-types/one", **args
+    )
+
+    assert json.loads(service.calls[-1].request.body)["deviceTypeRefs"] == ["device-types/one"]
+
+
+@pytest.mark.parametrize("group", [False, True])
+@pytest.mark.parametrize(("kwargs", "expected"), [
+    ({"device_type_ref": "device-types/two"}, ["device-types/two"]),
+    ({"remove_device_type_ref": True}, []),
+])
+def test_device_type_reference_update_wire(service, group, kwargs, expected):
+    path = "enrollmentGroups" if group else "enrollments"
+    prefix = "iot_dps_device_enrollment_group" if group else "iot_dps_device_enrollment"
+    record = {
+        "attestation": {"type": "symmetricKey", "symmetricKey": {"primaryKey": KEY}},
+        "deviceTypeRefs": ["device-types/one"],
+    }
+    service.get(f"https://{HOST}/{path}/test", json=record)
+    service.post(f"https://{HOST}/{path}/test/attestationmechanism", json=record["attestation"])
+    service.put(f"https://{HOST}/{path}/test", json={})
+
+    getattr(dps, prefix + "_update")(None, enrollment_id="test", **kwargs)
+
+    assert json.loads(service.calls[-1].request.body)["deviceTypeRefs"] == expected
+
+
+@pytest.mark.parametrize(("kwargs", "error"), [
+    ({"device_type_ref": ""}, InvalidArgumentValueError),
+    (
+        {"device_type_ref": "device-types/one", "remove_device_type_ref": True},
+        MutuallyExclusiveArgumentError,
+    ),
+])
+def test_invalid_device_type_reference(kwargs, error):
+    with pytest.raises(error):
+        dps._get_device_type_refs(**kwargs)
 
 
 @pytest.mark.parametrize("supplied", [

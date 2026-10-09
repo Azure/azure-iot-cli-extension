@@ -62,6 +62,7 @@ OPTIONAL_FIXTURE_ENV_VARS = (
 _ADR_XDIST_GROUPS = {
     "adr-g1-update-instance": {
         "test_update_instance_lifecycle",
+        "test_schema_registry_models_and_device_reference_lifecycle",
         "test_update_instance_validation_negatives",
         "test_namespace_crud_lifecycle",
         "test_namespace_list_by_resource_group",
@@ -102,6 +103,7 @@ _ADR_GROUP_ORDER = {group: index for index, group in enumerate(_ADR_XDIST_GROUPS
 _ADR_TEST_GROUP = {test: group for group, tests in _ADR_XDIST_GROUPS.items() for test in tests}
 _ADR_LONG_TEST_ORDER = {
     "test_update_instance_lifecycle": 0,
+    "test_schema_registry_models_and_device_reference_lifecycle": 1,
     "test_adr_link_su_delete": 0,
     "test_adr_link_lifecycle": 0,
     "test_linked_namespace_software_update_and_reports": 0,
@@ -372,6 +374,9 @@ def ca_pki(monkeypatch):
 # regeneration that renames or removes one of these methods fails a unit test.
 _SPECCED_OPERATION_GROUPS = (
     "namespaces",
+    "schema_registries",
+    "schemas",
+    "schema_versions",
     "registry_devices",
     "registry_device_authentication_profiles",
     "registry_device_attributes",
