@@ -2232,7 +2232,7 @@ def iot_get_sas_token(
     module_id=None,
     auth_type_dataplane=None,
     connection_string=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     key_type = key_type.lower()
     policy_name = policy_name.lower()
@@ -2287,7 +2287,7 @@ def _validate_iot_get_sas_token_args(
         raise ArgumentUsageError(
             "You are unable to get sas token for module without device information."
         )
-    if connection_string and hostname_type != HostnameType.AUTO.value:
+    if connection_string and hostname_type not in (None, HostnameType.AUTO.value, HostnameType.CLASSIC.value):
         raise ArgumentUsageError(
             "--hostname-type is not supported with --connection-string. "
             "The SAS audience is derived from the HostName in the supplied connection string."
@@ -2343,7 +2343,7 @@ def _iot_build_sas_token(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
@@ -2361,6 +2361,7 @@ def _iot_build_sas_token(
         policy_name=policy_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     uri = None
     policy = None
@@ -2415,16 +2416,16 @@ def _iot_build_sas_token(
 def _resolve_sas_audience(target, hostname_type, device_id=None, login=None):
     """Resolve the SAS audience host.
 
-    Login mode lacks ARM metadata, so the host is string-transformed from the
-    CS HostName.
+    Preserve an explicitly supplied connection-string hostname by default.
+    Split hostnames are selected only when requested.
     """
     auto_tls_key = "deviceHostName" if device_id else "serviceHostName"
     if login:
+        if hostname_type is None:
+            return target["entity"]
         effective_type = hostname_type
         if effective_type == HostnameType.AUTO.value:
-            effective_type = (
-                HostnameType.DEVICE.value if device_id else HostnameType.SERVICE.value
-            )
+            return target.get(auto_tls_key) or target["entity"]
         return _transform_hostname(target["entity"], effective_type)
     return _resolve_hostname_by_type(
         target, hostname_type, auto_tls_key=auto_tls_key
@@ -2433,7 +2434,7 @@ def _resolve_sas_audience(target, hostname_type, device_id=None, login=None):
 
 def _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName"):
     classic = _transform_hostname(target["entity"], HostnameType.CLASSIC.value)
-    if hostname_type == HostnameType.CLASSIC.value:
+    if hostname_type in (None, HostnameType.CLASSIC.value):
         return classic
     if hostname_type == HostnameType.AUTO.value:
         return target.get(auto_tls_key) or classic
@@ -2487,7 +2488,7 @@ def iot_get_device_connection_string(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     if hostname_type == HostnameType.SERVICE.value:
         raise InvalidArgumentValueError(
@@ -2501,12 +2502,10 @@ def iot_get_device_connection_string(
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     device = _iot_device_show(target, device_id)
-    if login:
-        hostname_override = _transform_hostname(target["entity"], hostname_type)
-    else:
-        hostname_override = _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName")
+    hostname_override = _resolve_sas_audience(target, hostname_type, device_id=device_id, login=login)
     result["connectionString"] = _build_device_or_module_connection_string(
         device, key_type, hostname_override=hostname_override
     )
@@ -2522,7 +2521,7 @@ def iot_get_module_connection_string(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=None,
 ):
     if hostname_type == HostnameType.SERVICE.value:
         raise InvalidArgumentValueError(
@@ -2536,12 +2535,10 @@ def iot_get_module_connection_string(
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
+        hostname_type=hostname_type,
     )
     module = _iot_device_module_show(target, device_id, module_id)
-    if login:
-        hostname_override = _transform_hostname(target["entity"], hostname_type)
-    else:
-        hostname_override = _resolve_hostname_by_type(target, hostname_type, auto_tls_key="deviceHostName")
+    hostname_override = _resolve_sas_audience(target, hostname_type, device_id=device_id, login=login)
     result["connectionString"] = _build_device_or_module_connection_string(
         module, key_type, hostname_override=hostname_override
     )
@@ -2939,7 +2936,7 @@ def iot_hub_connection_string_show(
     key_type=KeyType.primary.value,
     show_all=False,
     default_eventhub=False,
-    hostname_type=HostnameType.AUTO.value,
+    hostname_type=HostnameType.CLASSIC.value,
 ):
     discovery = IotHubDiscovery(cmd)
 
@@ -3015,7 +3012,7 @@ def iot_hub_connection_string_show(
 
 def _get_hub_connection_string(
     cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub,
-    hostname_type=HostnameType.AUTO.value, resource_group_name=None,
+    hostname_type=HostnameType.CLASSIC.value, resource_group_name=None,
 ):
 
     resource_group_name = get_resource_group(

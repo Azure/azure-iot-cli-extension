@@ -58,11 +58,12 @@ class TestIoTHubDiscovery:
         assert target["policy"] == parsed_fake_login["SharedAccessKeyName"]
         assert target["primarykey"] == parsed_fake_login["SharedAccessKey"]
 
-    def test_get_target_by_hostname(self, fixture_cmd, get_mgmt_client):
+    @pytest.mark.parametrize("endpoint", ["", ".service", ".device"])
+    def test_get_target_by_hostname(self, fixture_cmd, get_mgmt_client, endpoint):
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
         fake_name = "COOLIoTHub"
-        fake_hostname = f"{fake_name}.service.azure-devices.net"
+        fake_hostname = f"{fake_name}{endpoint}.azure-devices.net"
         fake_rg = "COOLRG"
 
         target = discovery.get_target(

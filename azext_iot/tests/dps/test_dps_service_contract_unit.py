@@ -91,8 +91,6 @@ def test_reference_create_and_update_preserve_wire(service, group):
         credential_policy_name=REFERENCES["certificatePolicyName"], **args
     )
     expected = deepcopy(record)
-    if group:
-        expected["attestation"]["symmetricKey"].pop("primaryKey")
     assert created == expected
     body = json.loads(service.calls[0].request.body)
     assert body["attestation"]["symmetricKey"]["primaryKey"] == KEY

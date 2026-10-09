@@ -181,7 +181,11 @@ class TestHostnameTypeRouting:
         raise AssertionError(token["sas"])
 
     @pytest.mark.parametrize("scope, hostname_type, expected", [
-        # defaults (auto) on GWv2: hub->service, device/module->device
+        ({}, None, "mygwv2hub.azure-devices.net"),
+        ({"device_id": "d1"}, None, "mygwv2hub.azure-devices.net/devices/d1"),
+        ({"device_id": "d1", "module_id": "m1"}, None,
+         "mygwv2hub.azure-devices.net/devices/d1/modules/m1"),
+        # Explicit auto on GWv2: hub->service, device/module->device.
         ({}, "auto", "mygwv2hub.service.azure-devices.net"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.device.azure-devices.net/devices/d1"),
         ({"device_id": "d1", "module_id": "m1"}, "auto",
@@ -208,6 +212,7 @@ class TestHostnameTypeRouting:
             op(cmd=fixture_cmd, hostname_type="service", **kwargs)
 
     @pytest.mark.parametrize("hostname_type, expected_host", [
+        (None, "mygwv2hub.azure-devices.net"),
         ("auto", "mygwv2hub.device.azure-devices.net"),
         ("device", "mygwv2hub.device.azure-devices.net"),
         ("classic", "mygwv2hub.azure-devices.net"),
@@ -223,6 +228,7 @@ class TestHostnameTypeRouting:
             f"SharedAccessKey={self._DEVICE_PRIMARY}")
 
     @pytest.mark.parametrize("hostname_type, expected_host", [
+        (None, "mygwv2hub.azure-devices.net"),
         ("auto", "mygwv2hub.device.azure-devices.net"),
         ("device", "mygwv2hub.device.azure-devices.net"),
         ("classic", "mygwv2hub.azure-devices.net"),
@@ -261,7 +267,22 @@ class TestHostnameTypeRouting:
             f"HostName=mygwv2hub.device.azure-devices.net;DeviceId=d1;ModuleId=m1;"
             f"SharedAccessKey={self._DEVICE_PRIMARY}")
 
-    @pytest.mark.parametrize("hostname_type", ["device", "service", "classic"])
+    @pytest.mark.parametrize("host", ["mygwv2hub.azure-devices.net", "mygwv2hub.service.azure-devices.net"])
+    @pytest.mark.parametrize("scope", [{}, {"device_id": "d1"}, {"device_id": "d1", "module_id": "m1"}])
+    def test_default_login_preserves_supplied_hostname(self, mocker, fixture_cmd, host, scope):
+        target = dict(self.TARGET, entity=host)
+        lookup = mocker.patch("azext_iot.operations.hub.IotHubDiscovery.get_target", return_value=target)
+        expected = host + ("/devices/d1" if scope else "") + ("/modules/m1" if "module_id" in scope else "")
+        result = subject.iot_get_sas_token(cmd=fixture_cmd, login="cs", **scope)
+        assert self._sr(result) == expected
+        assert not lookup.call_args.kwargs.get("force_find_resource")
+        if scope:
+            function = subject.iot_get_module_connection_string if "module_id" in scope else (
+                subject.iot_get_device_connection_string
+            )
+            assert function(cmd=fixture_cmd, login="cs", **scope)["connectionString"].startswith(f"HostName={host};")
+
+    @pytest.mark.parametrize("hostname_type", ["device", "service"])
     def test_sas_connection_string_rejects_explicit_hostname_type(
         self, fixture_cmd, hostname_type
     ):
@@ -274,16 +295,15 @@ class TestHostnameTypeRouting:
             )
 
     @pytest.mark.parametrize("scope, hostname_type, login_host, expected", [
-        # login (offline) mode: audience comes from string-transformed CS HostName.
-        # auto defaults to scope-appropriate hostname.
+        # Auto cannot infer split endpoint support from a classic hostname.
         ({}, "auto", "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.service.azure-devices.net"),
         ({}, "auto", "mygwv2hub.azure-devices.net",
-         "mygwv2hub.service.azure-devices.net"),
+         "mygwv2hub.azure-devices.net"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.device.azure-devices.net/devices/d1"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.azure-devices.net",
-         "mygwv2hub.device.azure-devices.net/devices/d1"),
+         "mygwv2hub.azure-devices.net/devices/d1"),
         ({"device_id": "d1", "module_id": "m1"}, "auto",
          "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.device.azure-devices.net/devices/d1/modules/m1"),
@@ -303,6 +323,9 @@ class TestHostnameTypeRouting:
         target = dict(self.TARGET, entity=login_host,
                       cs=(f"HostName={login_host};SharedAccessKeyName=iothubowner;"
                           f"SharedAccessKey={key}"))
+        if ".service." not in login_host and ".device." not in login_host:
+            target.pop("serviceHostName", None)
+            target.pop("deviceHostName", None)
         mocker.patch("azext_iot.operations.hub.IotHubDiscovery.get_target",
                      return_value=target)
         token = subject.iot_get_sas_token(

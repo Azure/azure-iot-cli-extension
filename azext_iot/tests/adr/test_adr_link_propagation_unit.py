@@ -264,9 +264,10 @@ def test_concurrent_mutations_are_not_overwritten(mocker, mutation):
         h.get_hook = lambda: change() if h.patches else None
     else:
         h.clock.on_sleep = change
-    with pytest.raises(AzureResponseError, match="changed"):
+    with pytest.raises(AzureResponseError, match="changed") as caught:
         h.run()
     assert len(h.patches) == 1
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
 
 
 @pytest.mark.parametrize("phase", ["submit", "get", "wait"])
@@ -433,6 +434,56 @@ def test_get_failure_after_backoff_preserves_original_service_error(mocker):
     assert len(h.patches) == 1
 
 
+@pytest.mark.parametrize("stop,expected", [
+    ("reverted", "inbound identity or settings changed"),
+    ("still-active", "timed out"),
+    ("other-endpoint", "Another namespace endpoint"),
+    ("extra-error", "additional service error"),
+])
+def test_later_stop_after_service_failure_preserves_original_service_error(mocker, stop, expected):
+    h = Harness(mocker, "hub")
+
+    def observe():
+        if not h.patches:
+            return
+        endpoint = h.namespace["properties"]["messaging"]["endpoints"]["hub"]
+        if stop == "reverted":
+            endpoint.update(linkingState="Succeeded", inboundCallerIdentity={"type": "UserAssigned",
+                                                                             "userAssignedIdentity": UAMI_ID})
+            endpoint.pop("linkingError", None)
+        elif stop == "still-active":
+            endpoint["linkingState"] = "Updating"
+            h.namespace["properties"]["provisioningState"] = "Updating"
+        elif stop == "other-endpoint":
+            h.namespace["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"] = "Failed"
+        else:
+            h.namespace["properties"]["error"] = {"code": "Other", "message": "unrelated"}
+
+    h.get_hook = observe
+    with pytest.raises((AzureResponseError, ADRResourceStateError), match=expected) as caught:
+        h.run(timeout_sec=60)
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
+    assert len(h.patches) == 1
+
+
+def test_namespace_change_during_backoff_preserves_original_service_error(mocker):
+    h = Harness(mocker)
+    h.clock.on_sleep = lambda: h.namespace.update(tags={"concurrent": "change"})
+
+    with pytest.raises(
+        AzureResponseError, match="^Namespace changed during link recovery; no retry PATCH submitted\\.$",
+    ) as caught:
+        h.run()
+
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
+    assert "tags" not in caught.value.__cause__.body
+    assert h.namespace["tags"] == {"concurrent": "change"}
+    assert h.clock.delays == [30]
+    assert len(h.patches) == 1
+
+
 def test_slow_recovery_preflight_expires_before_assignment_reads_or_retry(mocker):
     h = Harness(mocker)
     target_reads = h.provider._get_target
@@ -494,8 +545,10 @@ def test_malformed_current_state_never_succeeds_or_retries(mocker, mutation):
                 endpoints["dps"]["linkingError"] = "AdrMiNotAuthorized"
 
     h.get_hook = corrupt
-    with pytest.raises(AzureResponseError, match="Malformed"):
+    with pytest.raises(AzureResponseError, match="Malformed") as caught:
         h.run()
+    assert isinstance(caught.value.__cause__, ADRResourceStateError)
+    assert "AdrMiNotAuthorized" in str(caught.value.__cause__)
     assert len(h.patches) == 1 and not h.clock.delays
 
 

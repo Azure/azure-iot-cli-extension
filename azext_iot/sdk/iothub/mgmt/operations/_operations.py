@@ -2063,27 +2063,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -2107,7 +2091,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -2562,27 +2545,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -2606,7 +2573,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -2882,27 +2848,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -2926,7 +2876,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -3351,27 +3300,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -3395,7 +3328,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -3822,27 +3754,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -3866,7 +3782,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -4209,27 +4124,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -4253,7 +4152,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",
@@ -4625,27 +4523,11 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             "namespaceResourceId": "str",
                             "namespaceUuid": "str"
                         },
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"
-                            ]
-                        },
                         "disableDeviceSAS": bool,
                         "disableLocalAuth": bool,
                         "disableModuleSAS": bool,
                         "enableDataResidency": bool,
                         "enableFileUploadNotifications": bool,
-                        "encryption": {
-                            "keySource": "str",
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"
-                                    },
-                                    "keyIdentifier": "str"
-                                }
-                            ]
-                        },
                         "eventHubEndpoints": {
                             "str": {
                                 "endpoint": "str",
@@ -4669,7 +4551,6 @@ class IotHubResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                                 "ipMask": "str"
                             }
                         ],
-                        "ipVersion": "str",
                         "locations": [
                             {
                                 "location": "str",

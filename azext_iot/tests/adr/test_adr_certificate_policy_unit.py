@@ -160,7 +160,8 @@ def _parent_not_found_error():
 # ==================== Create ====================
 
 
-def test_create_ca_policy(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 2, 3, 4, 5, 6, 7, 10, 90])
+def test_create_ca_policy(fixture_ca_policy_provider, mock_poller, validity_days):
     """Create sends only the GA proxy-resource properties."""
     sentinel = Mock()
     _set_parent_ca(fixture_ca_policy_provider)
@@ -171,7 +172,7 @@ def test_create_ca_policy(fixture_ca_policy_provider, mock_poller):
 
     result = fixture_ca_policy_provider.create(
         certificate_policy_name="cp", certificate_authority_name="ca",
-        namespace_name="ns", resource_group_name="rg", validity_days=10,
+        namespace_name="ns", resource_group_name="rg", validity_days=validity_days,
     )
 
     assert result == sentinel
@@ -179,7 +180,7 @@ def test_create_ca_policy(fixture_ca_policy_provider, mock_poller):
     assert call["certificate_authority_name"] == "ca"
     assert call["certificate_policy_name"] == "cp"
     resource = call["resource"]
-    assert resource["properties"]["certificate"]["validityPeriodInDays"] == 10
+    assert resource["properties"]["certificate"]["validityPeriodInDays"] == validity_days
     assert set(resource) == {"properties"}
     fixture_ca_policy_provider.client.namespaces.get.assert_not_called()
     fixture_ca_policy_provider.client.certificate_authorities.get.assert_called_once_with(
@@ -189,7 +190,7 @@ def test_create_ca_policy(fixture_ca_policy_provider, mock_poller):
     )
 
 
-@pytest.mark.parametrize("validity_days", [6, 91])
+@pytest.mark.parametrize("validity_days", [-1, 0, 91])
 def test_create_ca_policy_rejects_invalid_validity_before_mutation(
     fixture_ca_policy_provider, validity_days
 ):
@@ -203,7 +204,7 @@ def test_create_ca_policy_rejects_invalid_validity_before_mutation(
         )
 
     assert str(raised.value) == (
-        f"--validity-days must be between 7 and 90 days, inclusive. "
+        f"--validity-days must be between 1 and 90 days, inclusive. "
         f"Received {validity_days}."
     )
     fixture_ca_policy_provider.client.certificate_authorities.get.assert_not_called()
@@ -364,27 +365,28 @@ def test_update_ca_policy(fixture_ca_policy_provider, mock_poller):
     assert properties == {"properties": {"certificate": {"validityPeriodInDays": 60}}}
 
 
-def test_update_ca_policy_validity_only(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 2, 3, 4, 5, 6, 7, 60, 90])
+def test_update_ca_policy_validity_only(fixture_ca_policy_provider, mock_poller, validity_days):
     fixture_ca_policy_provider.client.certificate_policies.begin_update.return_value = mock_poller(Mock())
     fixture_ca_policy_provider.client.certificate_policies.get.return_value = {"name": "cp"}
 
     fixture_ca_policy_provider.update(
         certificate_policy_name="cp", certificate_authority_name="ca",
         namespace_name="ns", resource_group_name="rg",
-        validity_days=60,
+        validity_days=validity_days,
     )
 
     properties = fixture_ca_policy_provider.client.certificate_policies.begin_update.call_args[1]["properties"]
     assert properties == {
         "properties": {
             "certificate": {
-                "validityPeriodInDays": 60,
+                "validityPeriodInDays": validity_days,
             }
         }
     }
 
 
-@pytest.mark.parametrize("validity_days", [6, 91])
+@pytest.mark.parametrize("validity_days", [-1, 0, 91])
 def test_update_ca_policy_rejects_invalid_validity_before_mutation(
     fixture_ca_policy_provider, validity_days
 ):
@@ -398,7 +400,7 @@ def test_update_ca_policy_rejects_invalid_validity_before_mutation(
         )
 
     assert str(raised.value) == (
-        f"--validity-days must be between 7 and 90 days, inclusive. "
+        f"--validity-days must be between 1 and 90 days, inclusive. "
         f"Received {validity_days}."
     )
     fixture_ca_policy_provider.client.certificate_policies.begin_update.assert_not_called()
@@ -453,7 +455,8 @@ def test_delete_ca_policy(fixture_ca_policy_provider, mock_poller):
 # ==================== --no-wait + guards + tags ====================
 
 
-def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller, validity_days):
     """With --no-wait, create returns the poller without waiting."""
     poller = mock_poller({"name": "cp"})
     _set_parent_ca(fixture_ca_policy_provider)
@@ -462,11 +465,13 @@ def test_create_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, moc
 
     result = fixture_ca_policy_provider.create(
         certificate_policy_name="cp", certificate_authority_name="ca",
-        namespace_name="ns", resource_group_name="rg", validity_days=10, no_wait=True,
+        namespace_name="ns", resource_group_name="rg", validity_days=validity_days, no_wait=True,
     )
 
     assert result is poller
     poller.result.assert_not_called()
+    resource = fixture_ca_policy_provider.client.certificate_policies.begin_create_or_replace.call_args[1]["resource"]
+    assert resource == {"properties": {"certificate": {"validityPeriodInDays": validity_days}}}
 
 
 def test_update_ca_policy_requires_a_field(fixture_ca_policy_provider):
@@ -518,19 +523,22 @@ def test_list_ca_policy_parent_not_found(fixture_ca_policy_provider):
         )
 
 
-def test_update_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_update_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller, validity_days):
     """With --no-wait, update returns the poller without waiting or re-fetching."""
     poller = mock_poller(Mock())
     fixture_ca_policy_provider.client.certificate_policies.begin_update.return_value = poller
 
     result = fixture_ca_policy_provider.update(
         certificate_policy_name="cp", certificate_authority_name="ca",
-        namespace_name="ns", resource_group_name="rg", validity_days=60, no_wait=True,
+        namespace_name="ns", resource_group_name="rg", validity_days=validity_days, no_wait=True,
     )
 
     assert result is poller
     poller.result.assert_not_called()
     fixture_ca_policy_provider.client.certificate_policies.get.assert_not_called()
+    properties = fixture_ca_policy_provider.client.certificate_policies.begin_update.call_args[1]["properties"]
+    assert properties == {"properties": {"certificate": {"validityPeriodInDays": validity_days}}}
 
 
 def test_delete_ca_policy_no_wait_returns_poller(fixture_ca_policy_provider, mock_poller):

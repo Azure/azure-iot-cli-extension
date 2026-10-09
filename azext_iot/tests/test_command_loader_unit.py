@@ -32,7 +32,25 @@ from azext_iot.common.utility import generate_key
 
 
 _IDENTITY_UPDATE_COMMAND = "iot hub device-identity update"
+_DEVICE_CONNECTION_STRING_COMMAND = "iot hub device-identity connection-string show"
 _IDENTITY_LOGIN = "HostName=hub.unit.invalid;SharedAccessKeyName=owner;SharedAccessKey=b2ZmbGluZQ=="
+_LEGACY_DEFAULT_CASES = {
+    "iot hub generate-sas-token": (["--login", _IDENTITY_LOGIN], "hostname_type", None),
+    "iot hub connection-string show": (["-n", "hub"], "hostname_type", "classic"),
+    "iot hub device-identity connection-string show": (["-n", "hub", "-d", "device"], "hostname_type", None),
+    "iot hub module-identity connection-string show": (
+        ["-n", "hub", "-d", "device", "-m", "module"], "hostname_type", None,
+    ),
+    "iot dps linked-hub create": (
+        ["--dps-name", "dps", "--hub-name", "hub", "-g", "rg"], "hostname_type", "classic",
+    ),
+    **{
+        f"iot dps enrollment-group {action}": (
+            ["--dps-name", "dps", "--enrollment-id", "group"], "show_keys", True if action == "create" else None,
+        )
+        for action in ("create", "update", "show")
+    },
+}
 _NAMESPACE_ARGUMENTS = [
     "--namespace",
     "namespace",
@@ -48,6 +66,35 @@ _DEVICE_PARSER_CASES = {
     "iot adr ns device wait": ["--name", "device", "--exists"],
 
 
+}
+_SCHEMA_PARSER_CASES = {
+    "iot adr schema registry create": [
+        "-n", "registry", "--registry-namespace", "site-a",
+        "--container-url", "https://storage.blob.core.windows.net/schemas", "--system-assigned-mi",
+    ],
+    "iot adr schema registry update": ["-n", "registry", "--display-name", "Site A"],
+    "iot adr schema registry show": ["-n", "registry"],
+    "iot adr schema registry list": [],
+    "iot adr schema registry delete": ["-n", "registry", "--yes", "--no-wait"],
+    "iot adr schema registry wait": ["-n", "registry", "--created"],
+    "iot adr schema create": [
+        "-n", "schema", "--registry", "registry", "--schema-type", "FutureType", "--format", "FutureFormat/1.0",
+    ],
+    "iot adr schema show": ["-n", "schema", "--registry", "registry"],
+    "iot adr schema list": ["--registry", "registry"],
+    "iot adr schema delete": ["-n", "schema", "--registry", "registry", "--yes", "--no-wait"],
+    "iot adr schema wait": ["-n", "schema", "--registry", "registry", "--exists"],
+    "iot adr schema version create": [
+        "--registry", "registry", "--schema", "schema", "--version", "01", "--schema-content", '{"type":"object"}',
+    ],
+    "iot adr schema version show": ["--registry", "registry", "--schema", "schema", "--version", "01"],
+    "iot adr schema version list": ["--registry", "registry", "--schema", "schema"],
+    "iot adr schema version delete": [
+        "--registry", "registry", "--schema", "schema", "--version", "01", "--yes", "--no-wait",
+    ],
+    "iot adr schema version wait": [
+        "--registry", "registry", "--schema", "schema", "--version", "01", "--deleted",
+    ],
 }
 _ENDPOINT_ARGUMENTS = [
     "--endpoint-name",
@@ -129,7 +176,10 @@ def management_command_parser():
     loader.load_command_table(None)
     names = [
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
+        *_SCHEMA_PARSER_CASES,
+        *_LEGACY_DEFAULT_CASES,
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
+        "iot adr ns ca policy create", "iot adr ns ca policy update",
     ]
     loader.command_table = {
         name: loader.command_table[name]
@@ -157,8 +207,9 @@ class _HubIdentityCommandsLoader(MainCommandsLoader):
 
         loader = IoTExtCommandsLoader(self.cli_ctx)
         table = loader.load_command_table(args)
-        self.command_table = {_IDENTITY_UPDATE_COMMAND: table[_IDENTITY_UPDATE_COMMAND]}
-        self.cmd_to_loader_map = {_IDENTITY_UPDATE_COMMAND: [loader]}
+        names = [_IDENTITY_UPDATE_COMMAND, _DEVICE_CONNECTION_STRING_COMMAND]
+        self.command_table = {name: table[name] for name in names}
+        self.cmd_to_loader_map = {name: [loader] for name in names}
         return self.command_table
 
 
@@ -217,19 +268,19 @@ def identity_update_cli(mocker, monkeypatch):
                 "keyName": "owner", "primaryKey": policy_key, "secondaryKey": policy_key,
                 "rights": "RegistryWrite, ServiceConnect, DeviceConnect",
             }]})
-        assert urlsplit(request.url).netloc == "hub.unit.invalid"
+        assert urlsplit(request.url).netloc in ("hub.unit.invalid", "hub.service.azure-devices.net")
         assert path == "/devices/device"
-        assert "api-version=2026-11-01-preview" in request.url
+        assert "api-version=2026-11-01" in request.url
         if request.method == "PUT":
             state.resource = json.loads(request.body)
         else:
             assert request.method == "GET"
         return 200, {}, json.dumps(state.resource)
 
-    def invoke(arguments):
+    def invoke(arguments, command_name=_IDENTITY_UPDATE_COMMAND):
         output = StringIO()
         try:
-            code = cli.invoke([*_IDENTITY_UPDATE_COMMAND.split(), *arguments], out_file=output)
+            code = cli.invoke([*command_name.split(), *arguments], out_file=output)
         except SystemExit as error:
             code = error.code
         return code, cli.result, output.getvalue()
@@ -238,11 +289,33 @@ def identity_update_cli(mocker, monkeypatch):
     with responses.RequestsMock(assert_all_requests_are_fired=False) as network:
         for method in ("GET", "POST", "PUT"):
             network.add_callback(
-                method, re.compile(r"https://(?:hub\.unit\.invalid|management\.azure\.com)/.*"),
+                method, re.compile(
+                    r"https://(?:hub\.unit\.invalid|hub\.service\.azure-devices\.net|management\.azure\.com)/.*"
+                ),
                 callback=respond, content_type="application/json",
             )
         yield state
     profile_guard.assert_not_called()
+
+
+@pytest.mark.parametrize("endpoint", ["device", "service"])
+@pytest.mark.parametrize("group_args", [[], ["-g", "rg"]])
+@pytest.mark.parametrize("hostname_type", ["auto", "classic", "device"])
+def test_connection_string_invocation_keeps_split_entra_targets_arm_free(
+    identity_update_cli, endpoint, group_args, hostname_type,
+):
+    runtime = identity_update_cli
+    code, result, output = runtime.invoke([
+        "-n", f"hub.{endpoint}.azure-devices.net", "-d", "device",
+        "--auth-type", "login", "--ht", hostname_type, *group_args,
+    ], command_name=_DEVICE_CONNECTION_STRING_COMMAND)
+    assert code == 0, result.error
+    selected = "" if hostname_type == "classic" else f".{'device' if hostname_type == 'auto' else hostname_type}"
+    connection_string = json.loads(output)["connectionString"]
+    assert connection_string.startswith(f"HostName=hub{selected}.azure-devices.net;DeviceId=device;")
+    assert len(runtime.requests) == 1
+    assert urlsplit(runtime.requests[0].url).netloc == "hub.service.azure-devices.net"
+    assert runtime.requests[0].headers["Authorization"].startswith("Bearer ")
 
 
 @pytest.mark.parametrize("arguments", [[], ["--auth-type", "login"], ["-g", "rg"], ["--login", ""], ["-n", ""]])
@@ -438,6 +511,19 @@ def test_identity_update_composes_native_argument_validators(management_command_
     assert {mode2_iot_login_handler, validate_identity_update} <= set(parsed._argument_validators)
 
 
+@pytest.mark.parametrize("command_name", _LEGACY_DEFAULT_CASES)
+def test_existing_ga_defaults_survive_native_argument_loading(management_command_parser, command_name):
+    arguments, key, expected = _LEGACY_DEFAULT_CASES[command_name]
+    parsed = management_command_parser.parse_args([*command_name.split(), *arguments])
+    assert getattr(parsed, key) == expected
+
+
+@pytest.mark.parametrize("kind", ["enrollment", "enrollment-group"])
+@pytest.mark.parametrize("action", ["show", "list"])
+def test_existing_dps_commands_retain_default_table_format(command_table, kind, action):
+    assert command_table[f"iot dps {kind} {action}"].table_transformer is None
+
+
 @pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)
 @pytest.mark.parametrize("auth_type", ["key", "login"])
 def test_pnp_standard_authentication_options(management_command_parser, command_name, auth_type):
@@ -480,8 +566,78 @@ def test_namespace_device_command_parser(command_table, management_command_parse
         assert parsed.registry_device_name == "device"
 
 
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("option", ["--validity-days", "--vd"])
+@pytest.mark.parametrize("validity_days", [1, 6, 90])
+def test_certificate_policy_validity_days_parser(management_command_parser, action, option, validity_days):
+    parsed = management_command_parser.parse_args([
+        "iot", "adr", "ns", "ca", "policy", action,
+        *_NAMESPACE_ARGUMENTS, "--name", "policy", "--ca-name", "ica",
+        option, str(validity_days),
+    ])
+    assert parsed.validity_days == validity_days
+
+
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("option", ["--validity-days", "--vd"])
+@pytest.mark.parametrize("validity_days", ["1.5", "invalid"])
+def test_certificate_policy_parser_rejects_noninteger_validity(management_command_parser, action, option, validity_days):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args([
+            "iot", "adr", "ns", "ca", "policy", action,
+            *_NAMESPACE_ARGUMENTS, "--name", "policy", "--ca-name", "ica",
+            option, validity_days,
+        ])
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("command_name", _SCHEMA_PARSER_CASES)
+def test_schema_command_parser(command_table, management_command_parser, command_name):
+    assert not command_table[command_name].command_kwargs["is_preview"]
+    parsed = management_command_parser.parse_args([
+        *command_name.split(), "-g", "rg", *_SCHEMA_PARSER_CASES[command_name],
+    ])
+    assert parsed.resource_group_name == "rg"
+    if command_name != "iot adr schema registry list":
+        assert parsed.schema_registry_name == "registry"
+    if command_name.startswith("iot adr schema version") and not command_name.endswith("list"):
+        assert parsed.version_name == "01"
+    if command_name == "iot adr schema create":
+        assert parsed.schema_type == "FutureType"
+        assert parsed.schema_format == "FutureFormat/1.0"
+    if command_name == "iot adr schema version create":
+        assert parsed.schema_content == '{"type":"object"}'
+
+
+def test_schema_registry_list_subscription_scope_parser(management_command_parser):
+    parsed = management_command_parser.parse_args("iot adr schema registry list".split())
+    assert parsed.resource_group_name is None
+
+
+@pytest.mark.parametrize("option", ["--outbound-system-assigned-mi", "--omi-sa"])
+def test_schema_registry_clear_outbound_identity_parser(management_command_parser, option):
+    parsed = management_command_parser.parse_args([
+        "iot", "adr", "schema", "registry", "update", "-n", "registry", "-g", "rg", option, "false",
+    ])
+    assert parsed.outbound_mi_system_assigned is False
+    assert parsed.mi_system_assigned is None
+
+
+@pytest.mark.parametrize("command", ["iot adr schema create", "iot adr schema version create"])
+def test_schema_synchronous_create_rejects_no_wait(management_command_parser, command):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args([
+            *command.split(), "-g", "rg", *_SCHEMA_PARSER_CASES[command], "--no-wait",
+        ])
+    assert error.value.code == 2
+
+
+def test_schema_command_names(command_table):
+    assert {name for name in command_table if name.startswith("iot adr schema ")} == set(_SCHEMA_PARSER_CASES)
+
+
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 45
+    assert sum(name.startswith("iot adr ") for name in command_table) == 61
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)

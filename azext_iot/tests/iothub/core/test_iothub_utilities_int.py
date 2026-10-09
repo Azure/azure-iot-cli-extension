@@ -94,9 +94,13 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         service_hn = props.get("serviceHostName")
         is_gwv2 = bool(device_hn and service_hn)
 
-        # auto: defaults to service hostname on GWv2, classic on V1
         token = self.cmd(
             f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
+        ).get_output_in_json()
+        assert extract_sr(token) == classic_hn
+
+        token = self.cmd(
+            f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type auto",
             checks=[self.exists("sas")],
         ).get_output_in_json()
         expected_auto = service_hn if is_gwv2 else classic_hn
@@ -107,6 +111,10 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         token = self.cmd(
             f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type classic",
             checks=[self.exists("sas")],
+        ).get_output_in_json()
+        assert extract_sr(token) == classic_hn
+        token = self.cmd(
+            f"iot hub generate-sas-token --login {self.connection_string}",
         ).get_output_in_json()
         assert extract_sr(token) == classic_hn
 

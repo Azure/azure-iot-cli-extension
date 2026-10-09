@@ -22,13 +22,13 @@ class IotHubGatewayServiceAPIsConfiguration:  # pylint: disable=too-many-instanc
 
     :param credential: Credential needed for the client to connect to Azure. Required.
     :type credential: ~azure.core.credentials.AzureKeyCredential
-    :keyword api_version: Api Version. Default value is "2026-11-01-preview". Note that overriding
-     this default value may result in unsupported behavior.
+    :keyword api_version: Api Version. Default value is "2026-11-01". Note that overriding this
+     default value may result in unsupported behavior.
     :paramtype api_version: str
     """
 
     def __init__(self, credential: AzureKeyCredential, **kwargs: Any) -> None:
-        api_version: str = kwargs.pop("api_version", "2026-11-01-preview")
+        api_version: str = kwargs.pop("api_version", "2026-11-01")
 
         if credential is None:
             raise ValueError("Parameter 'credential' must not be None.")

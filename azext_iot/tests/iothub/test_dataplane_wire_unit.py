@@ -18,7 +18,7 @@ from azure.core.pipeline.transport import RequestsTransport
 from azext_iot.sdk.iothub.device import IotHubGatewayDeviceAPIs
 from azext_iot.sdk.iothub.service import IotHubGatewayServiceAPIs
 
-API = "2026-11-01-preview"
+API = "2026-11-01"
 ENDPOINT = "https://hub.unit.invalid"
 ID = {"id": "device"}
 MODULE = {"id": "device", "mid": "module"}

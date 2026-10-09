@@ -45,7 +45,7 @@ def _cleanup_linked_hub(dps_name, rg, linked_hub_name):
 
 @pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
-    """On a GWv2 hub, auto (default) should resolve to the device hostname."""
+    """On a GWv2 hub, explicit auto should resolve to the device hostname."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
 
@@ -58,7 +58,7 @@ def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, prov
         result = cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--authentication-type SystemAssigned"
+            "--hostname-type auto --authentication-type SystemAssigned"
         ).as_json()
 
         assert result, "Linked hub create should return a result"
@@ -75,7 +75,7 @@ def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, prov
 
 @pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
-    """Create linked hub with explicit classic hostname type."""
+    """Default to the classic hostname and accept an unchanged update."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
 
@@ -88,7 +88,7 @@ def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, p
         result = cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--hostname-type classic --authentication-type SystemAssigned"
+            "--authentication-type SystemAssigned"
         ).as_json()
 
         assert result, "Linked hub create should return a result"
@@ -100,6 +100,12 @@ def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, p
             "Classic hostname should not contain .device. segment"
         assert matching[0]["authenticationType"] == "SystemAssigned"
         assert not matching[0].get("connectionString")
+        unchanged = cli.invoke(
+            f"iot dps linked-hub update --dps-name {dps_name} -g {dps_rg} "
+            f"--linked-hub {classic_hostname}"
+        ).as_json()
+        assert unchanged["name"] == classic_hostname
+        assert unchanged["authenticationType"] == matching[0]["authenticationType"]
     finally:
         _cleanup_linked_hub(dps_name, dps_rg, classic_hostname)
 
@@ -168,7 +174,7 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provi
         cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--authentication-type SystemAssigned"
+            "--hostname-type auto --authentication-type SystemAssigned"
         )
 
         linked_hubs = cli.invoke(
@@ -198,7 +204,7 @@ def test_linked_hub_create_keybased_then_switch_to_mi(provisioned_iot_dps_no_hub
         cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--authentication-type KeyBased"
+            "--hostname-type auto --authentication-type KeyBased"
         )
         initial = cli.invoke(
             f"iot dps linked-hub list --dps-name {dps_name} -g {dps_rg}"

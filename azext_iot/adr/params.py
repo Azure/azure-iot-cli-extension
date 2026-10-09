@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 """
-Parameter definitions for Azure Device Registry (ADR) namespace commands.
+Parameter definitions for Azure Device Registry (ADR) commands.
 """
 
 from azure.cli.core.commands.parameters import (
@@ -25,7 +25,136 @@ from azext_iot.adr.common import (
 
 
 def load_adr_arguments(self, _):
-    """Load arguments for ADR namespace commands."""
+    """Load arguments for ADR commands."""
+
+    with self.argument_context("iot adr schema") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "schema_name",
+            options_list=["--name", "-n"],
+            help="Schema name.",
+        )
+        context.argument(
+            "schema_registry_name",
+            options_list=["--registry"],
+            help="Schema Registry name.",
+        )
+        context.argument(
+            "schema_format",
+            options_list=["--format"],
+            help="Schema format written to properties.format. Current values include "
+                 "JsonSchema/draft-07, Delta/1.0, and JsonLD/1.1.",
+        )
+        context.argument(
+            "schema_type",
+            options_list=["--schema-type"],
+            help="Schema type written to properties.schemaType. Current values include "
+                 "MessageSchema, ThingModel, and ThingDescription.",
+        )
+        context.argument(
+            "description",
+            options_list=["--description", "--desc"],
+            help="Description for the schema.",
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name for the schema.",
+        )
+        context.argument("tags", arg_type=tags_type)
+
+    with self.argument_context("iot adr schema registry") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "schema_registry_name",
+            options_list=["--name", "-n"],
+            help="Schema Registry name.",
+        )
+        context.argument(
+            "registry_namespace",
+            options_list=["--registry-namespace"],
+            help="Tenant-unique namespace for the Schema Registry.",
+        )
+        context.argument(
+            "storage_account_container_url",
+            options_list=["--storage-account-container-url", "--container-url"],
+            help="URL of the existing Azure Data Lake Storage Gen2 container "
+                 "used to store Schema Version content.",
+        )
+        context.argument("location", arg_type=get_location_type(self.cli_ctx))
+        context.argument(
+            "description",
+            options_list=["--description", "--desc"],
+            help="Description for the Schema Registry.",
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name for the Schema Registry.",
+        )
+        context.argument("tags", arg_type=tags_type)
+
+    with self.argument_context("iot adr schema version") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "schema_registry_name",
+            options_list=["--registry"],
+            help="Schema Registry name.",
+        )
+        context.argument(
+            "schema_name",
+            options_list=["--schema"],
+            help="Schema name.",
+        )
+        context.argument(
+            "version_name",
+            options_list=["--version"],
+            help="Schema Version name. Must contain 1 to 10 digits.",
+        )
+        context.argument(
+            "schema_content",
+            options_list=["--schema-content"],
+            help="Schema content string written to properties.schemaContent.",
+        )
+        context.argument(
+            "description",
+            options_list=["--description", "--desc"],
+            help="Description for the Schema Version.",
+        )
+
+    for command in (
+        "iot adr schema registry create",
+        "iot adr schema registry update",
+    ):
+        with self.argument_context(command) as context:
+            context.argument(
+                "mi_system_assigned",
+                options_list=["--system-assigned-mi"],
+                arg_group="Managed Identity",
+                arg_type=get_three_state_flag(),
+                help="Include or remove the system-assigned managed identity.",
+            )
+            context.argument(
+                "mi_user_assigned",
+                options_list=["--user-assigned-mi"],
+                arg_group="Managed Identity",
+                nargs="+",
+                help="Complete desired set of user-assigned managed identity resource IDs.",
+            )
+            context.argument(
+                "outbound_mi_system_assigned",
+                options_list=["--outbound-system-assigned-mi", "--omi-sa"],
+                arg_group="Outbound Identity",
+                arg_type=get_three_state_flag(),
+                help="Use the Schema Registry system-assigned identity for outbound calls. "
+                     "Pass false on update to clear the explicit outbound identity.",
+            )
+            context.argument(
+                "outbound_mi_user_assigned",
+                options_list=["--outbound-user-assigned-mi", "--omi-ua"],
+                arg_group="Outbound Identity",
+                help="User-assigned managed identity resource ID used for outbound calls.",
+            )
 
     wait_commands = (
         "iot adr ns wait",
@@ -197,7 +326,7 @@ def load_adr_arguments(self, _):
             "validity_days",
             options_list=["--validity-days", "--vd"],
             type=int,
-            help="Leaf certificate validity period in days. Must be between 7 and "
+            help="Leaf certificate validity period in days. Must be between 1 and "
                  "90 days, inclusive.",
         )
 
@@ -207,7 +336,7 @@ def load_adr_arguments(self, _):
             options_list=["--validity-days", "--vd"],
             type=int,
             help="Updated leaf certificate validity period in days. Must be between "
-                 "7 and 90 days, inclusive.",
+                 "1 and 90 days, inclusive.",
         )
 
     with self.argument_context("iot adr ns device") as context:

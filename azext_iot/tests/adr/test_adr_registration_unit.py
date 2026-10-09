@@ -16,6 +16,7 @@ from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
     adr_link_ops,
     adr_link_wait_ops,
+    adr_schema_ops,
     load_adr_commands,
 )
 from azext_iot.adr.params import load_adr_arguments
@@ -42,8 +43,8 @@ class _CommandGroup:
     def show_command(self, name, operation, **kwargs):
         self._record("show", name, operation, **kwargs)
 
-    def wait_command(self, name, operation, **kwargs):
-        self._record("wait", name, operation, **kwargs)
+    def wait_command(self, name, getter_name, **kwargs):
+        self._record("wait", name, getter_name, **kwargs)
 
 
 class _CommandLoader:
@@ -147,7 +148,25 @@ def test_2026_command_surface_is_registered():
     }
     assert expected_commands <= set(commands)
     assert "iot adr ns job run create" not in commands
-    assert len(commands) == 45
+    assert len(commands) == 61
+    assert commands["iot adr schema registry create"] == (
+        "command", "adr_schema_registry_create", {"supports_no_wait": True},
+    )
+    assert commands["iot adr schema registry update"] == (
+        "command", "adr_schema_registry_update", {"supports_no_wait": True},
+    )
+    for group, operation in (
+        ("iot adr schema", "adr_schema"),
+        ("iot adr schema registry", "adr_schema_registry"),
+        ("iot adr schema version", "adr_schema_version"),
+    ):
+        assert commands[f"{group} delete"] == (
+            "command", f"{operation}_delete", {"confirmation": True, "supports_no_wait": True},
+        )
+        assert commands[f"{group} wait"] == ("wait", f"{operation}_show", {})
+    for group in ("iot adr schema", "iot adr schema version"):
+        assert commands[f"{group} create"][2] == {}
+        assert f"{group} update" not in commands
     for endpoint in ("hub", "dps"):
         assert commands[f"iot adr ns link {endpoint} remove"] == (
             "command", f"adr_link_{endpoint}_remove", {"confirmation": True},
@@ -259,19 +278,46 @@ def test_unsupported_command_surfaces_are_not_registered():
         assert f"iot adr ns su instance {operation}" not in commands
 
 
-def test_all_adr_namespace_command_groups_are_ga():
+def test_all_adr_command_groups_are_ga():
     loader = _CommandLoader()
     load_adr_commands(loader, None)
 
     assert loader.groups
-    assert all(name.startswith("iot adr ns") for name, _ in loader.groups)
+    assert all(name.startswith("iot adr") for name, _ in loader.groups)
     assert all(options.get("is_preview") is False for _, options in loader.groups)
+    for group in ("iot adr schema", "iot adr schema registry", "iot adr schema version"):
+        assert dict(loader.groups)[group]["command_type"] is adr_schema_ops
 
 
 def test_load_adr_arguments():
     loader = _ArgumentLoader()
     load_adr_arguments(loader, None)
     arguments = loader.records
+
+    assert {
+        "schema_name", "schema_registry_name", "schema_format", "schema_type",
+    } <= set(arguments["iot adr schema"])
+    assert "arg_type" not in arguments["iot adr schema"]["schema_format"]
+    assert "arg_type" not in arguments["iot adr schema"]["schema_type"]
+    assert {
+        "schema_registry_name", "registry_namespace", "storage_account_container_url",
+    } <= set(arguments["iot adr schema registry"])
+    for command in ("iot adr schema registry create", "iot adr schema registry update"):
+        assert {
+            "mi_system_assigned", "mi_user_assigned",
+            "outbound_mi_system_assigned", "outbound_mi_user_assigned",
+        } <= set(arguments[command])
+    assert {
+        "storage_account_resource_id", "storage_container_name", "skip_role_assignment", "custom_role_id",
+    }.isdisjoint(arguments["iot adr schema registry"])
+    assert {
+        "version_name", "schema_name", "schema_registry_name", "schema_content",
+    } <= set(arguments["iot adr schema version"])
+    assert arguments["iot adr schema version"]["version_name"]["options_list"] == ["--version"]
+    assert arguments["iot adr schema version"]["schema_content"]["options_list"] == ["--schema-content"]
+    assert arguments["iot adr schema registry"]["storage_account_container_url"]["options_list"] == [
+        "--storage-account-container-url", "--container-url",
+    ]
 
     removed_endpoint_arguments = {
         "messaging_endpoints",
@@ -329,9 +375,7 @@ def test_load_adr_arguments():
         "iot adr ns ca policy update",
     ):
         validity_help = arguments[command]["validity_days"]["help"]
-        assert "7" in validity_help
-        assert "90" in validity_help
-        assert "inclusive" in validity_help
+        assert "between 1 and 90 days, inclusive" in validity_help
     assert not any(
         command.startswith("iot adr ns su link") for command in arguments
     )
@@ -525,10 +569,12 @@ def test_help_surface_matches_ga_commands():
     policy_create_help = " ".join(
         helps["iot adr ns ca policy create"].split()
     )
-    assert "between 7 and 90 days" in policy_create_help
     assert "below 30" not in policy_create_help
     assert "Central US EUAP" not in policy_create_help
     assert "--validity-days 30" in helps["iot adr ns ca policy create"]
+    for action in ("create", "update"):
+        policy_help = " ".join(helps[f"iot adr ns ca policy {action}"].split())
+        assert "between 1 and 90 days, inclusive" in policy_help
     assert "--validity-days 90" in helps["iot adr ns ca policy update"]
     combined_help = " ".join(helps["iot adr ns link add"].split())
     assert "before submitting a separate Hub update" in combined_help

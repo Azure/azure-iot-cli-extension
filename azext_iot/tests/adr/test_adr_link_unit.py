@@ -699,6 +699,7 @@ def test_dps_optional_inspection_preserves_real_factory_cloud_guard(
 ):
     from azext_iot.adr.providers import link
 
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", "https://management.azure.com")
     cli_ctx = fixture_link_provider.cmd.cli_ctx
     cloud = deepcopy(cloud)
     if arm_audience:

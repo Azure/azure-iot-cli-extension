@@ -139,10 +139,13 @@ class MessageRoute(IoTHubProvider):
                 input=test_all_routes_input
             )
 
-        # for all types, need to test all types one by one
+        # Probe GA sources plus any legacy sources actually used by saved routes.
         routes = []
         fallback = None
-        for type in RouteSourceType.list_valid_types():
+        source_types = dict.fromkeys(RouteSourceType.list_valid_types())
+        for route in self.hub_resource["properties"]["routing"]["routes"]:
+            source_types[route["source"].lower()] = None
+        for type in source_types:
             test_all_routes_input = {
                 "routingSource": type,
                 "message": route_message,

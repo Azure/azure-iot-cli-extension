@@ -286,6 +286,26 @@ class TestMessageRouteTest:
         result = provider.test()
         assert result["routes"][0]["properties"]["name"] == "$fallback"
 
+    @pytest.mark.parametrize("legacy_source", [None, "DigitalTwinChangeEvents", "MqttBrokerMessages"])
+    def test_automatic_source_set_is_ga_plus_existing_legacy_routes(self, fixture_route_ops, legacy_source):
+        from azext_iot.iothub.providers.message_route import MessageRoute
+
+        provider = MessageRoute(cmd=None, hub_name=hub_name, rg=hub_rg)
+        if legacy_source:
+            provider.hub_resource["properties"]["routing"]["routes"].append({"source": legacy_source})
+        provider.discovery.client.test_all_routes.return_value = {"routes": []}
+        provider.test()
+        calls = provider.discovery.client.test_all_routes.call_args_list
+        sources = {call.kwargs["input"]["routingSource"] for call in calls}
+        expected = {
+            "devicemessages", "twinchangeevents", "devicelifecycleevents",
+            "devicejoblifecycleevents", "deviceconnectionstateevents",
+        }
+        if legacy_source:
+            expected.add(legacy_source.lower())
+        assert sources == expected
+        assert len(calls) == len(expected)
+
 
 class TestMessageFallbackRoute:
     def test_show_fallback(self, fixture_route_ops):

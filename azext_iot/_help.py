@@ -26,7 +26,10 @@ helps[
 ] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
-    long-summary: These APIs support the Azure public cloud only; management requests use public ARM by default. Set AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com to use canary ARM.
+    long-summary: |
+                  Management requests use the active Azure cloud's ARM endpoint by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to explicitly use public-cloud canary ARM.
+                  API availability depends on the target cloud and service deployment.
 """
 
 helps[
@@ -1054,7 +1057,10 @@ helps[
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
-    long-summary: These APIs support the Azure public cloud only; management requests use public ARM by default. Set AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com to use canary ARM.
+    long-summary: |
+                  Management requests use the active Azure cloud's ARM endpoint by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to explicitly use public-cloud canary ARM.
+                  API availability depends on the target cloud and service deployment.
 """
 
 helps[
@@ -1271,7 +1277,7 @@ helps[
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
-                  Symmetric key values are hidden by default. Use --show-keys to include generated or supplied
+                  Symmetric key values are shown by default. Use --show-keys false to hide generated or supplied
                   keys in the response; this does not change credentials submitted to the service.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
@@ -1326,7 +1332,7 @@ helps[
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
-                  Symmetric key values are hidden by default. Use --show-keys to include them in the response.
+                  Symmetric key values are shown by default. Use --show-keys false to hide them in the response.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.

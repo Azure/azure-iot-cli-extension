@@ -352,6 +352,10 @@ class CertificateScenario:
             kind, action = "namespace", parts[3]
         name = parts[parts.index("-n") + 1] if "-n" in parts else None
         key = kind, name
+        validity_days = next(
+            (int(parts[index + 1]) for index, part in enumerate(parts) if part in ("--validity-days", "--vd")),
+            None,
+        )
         if kwargs.get("expect_failure"):
             return Mock()
         if action == "create":
@@ -360,7 +364,7 @@ class CertificateScenario:
                 error.status_code = 409
                 raise error
             properties = (
-                {"certificate": {"validityPeriodInDays": 30}}
+                {"certificate": {"validityPeriodInDays": validity_days}}
                 if kind == "policy" else
                 {"certificateAuthorityType": "Root" if name == "rootca" else "ICA"}
             )
@@ -376,9 +380,7 @@ class CertificateScenario:
         elif action == "update":
             if kind == "policy":
                 assert "--tags" not in parts
-                self.resources[key]["properties"]["certificate"]["validityPeriodInDays"] = int(
-                    parts[parts.index("--validity-days") + 1]
-                )
+                self.resources[key]["properties"]["certificate"]["validityPeriodInDays"] = validity_days
             else:
                 self.resources[key]["tags"] = {"env": "int"}
         elif action == "delete":

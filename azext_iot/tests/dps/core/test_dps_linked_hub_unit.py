@@ -59,9 +59,9 @@ class TestResolveLinkedHubHostname:
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub, "classic") == "hub.azure-devices.net"
 
-    def test_default_is_auto(self):
+    def test_default_preserves_classic_hostname(self):
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
-        assert _resolve_linked_hub_hostname(hub) == "hub.device.azure-devices.net"
+        assert _resolve_linked_hub_hostname(hub) == "hub.azure-devices.net"
         hub_v1 = {"properties": {"hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub_v1) == "hub.azure-devices.net"
 
@@ -98,7 +98,7 @@ class TestLinkedHubCreateValidation:
 
         mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
             "id": "/subscriptions/sub/resourceGroups/hub-rg/providers/Microsoft.Devices/IotHubs/hub",
-            "properties": {"deviceHostName": "hub.device.azure-devices.net"},
+            "properties": {"hostName": "hub.azure-devices.net", "deviceHostName": "hub.device.azure-devices.net"},
             "location": "centraluseuap",
         })
         policy_get = mocker.patch("azext_iot.core.custom.iot_hub_policy_get", return_value={
@@ -411,14 +411,18 @@ class TestLinkedHubUpdate:
         )
         assert existing_entries[0]["allocationWeight"] == 5
 
-    def test_no_mutation_params_errors(self, fixture_cmd, mock_deps):
-        """Identifier alone (no mutation flags) must error rather than issuing a no-op PUT
-        that could clobber concurrent changes."""
+    @pytest.mark.parametrize("legacy", [False, True])
+    def test_no_mutation_params_preserves_link(self, fixture_cmd, mock_deps, existing_entries, legacy):
+        from copy import deepcopy
         from azext_iot.core.custom import iot_dps_linked_hub_update
-        with pytest.raises(RequiredArgumentMissingError, match="at least one update parameter"):
-            iot_dps_linked_hub_update(
-                cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="myhub",
-            )
+        if legacy:
+            existing_entries[0].pop("authenticationType")
+        original = deepcopy(existing_entries)
+        iot_dps_linked_hub_update(
+            cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="myhub",
+        )
+        assert existing_entries == original
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_called_once()
 
     def test_keybased_refresh_preserves_existing_policy(self, fixture_cmd, mock_deps, existing_entries, mocker):
         """Re-fetching the key on a KeyBased link must reuse the EXISTING policy (e.g., 'service'

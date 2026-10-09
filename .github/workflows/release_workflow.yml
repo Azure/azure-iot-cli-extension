@@ -50,6 +50,11 @@ jobs:
     uses: ./.github/workflows/azdev_linter.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  index-compatibility:
+    permissions:
+      contents: read
+    needs: [build]
+    uses: ./.github/workflows/index_compatibility.yml
   int_test:
     permissions:
       contents: read

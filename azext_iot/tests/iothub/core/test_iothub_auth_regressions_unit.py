@@ -66,6 +66,13 @@ def test_classic_fqdn_with_explicit_rg_resolves_arm_metadata(mocker, prefix, rg_
     target = discovery.get_target(
         f"{prefix}MyHub.azure-devices.net", auth_type="login", **{rg_keyword: "rg"}
     )
+    find.assert_not_called()
+    assert target["entity"] == "MyHub.azure-devices.net"
+    assert "serviceHostName" not in target and "deviceHostName" not in target
+    target = discovery.get_target(
+        f"{prefix}MyHub.azure-devices.net", auth_type="login",
+        force_find_resource=True, **{rg_keyword: "rg"},
+    )
     find.assert_called_once_with(resource_name="MyHub", rg="rg")
     policies.assert_not_called()
     assert target["deviceHostName"] == resource["properties"]["deviceHostName"]
@@ -94,3 +101,44 @@ def test_connection_string_override_remains_arm_free_even_with_rg(mocker):
     target = discovery.get_target("MyHub.azure-devices.net", "rg", login=connection_string, auth_type="login")
     find.assert_not_called()
     assert target["cs"] == connection_string
+
+
+@pytest.mark.parametrize("endpoint", ["", ".service", ".device"])
+@pytest.mark.parametrize("hostname_type", [None, "classic", "auto", "device", "service"])
+@pytest.mark.parametrize("resource_group", [None, "rg"])
+def test_explicit_hostname_selection_only_discovers_missing_metadata(mocker, endpoint, hostname_type, resource_group):
+    discovery = IotHubDiscovery(mocker.Mock())
+    hostname = f"MyHub{endpoint}.azure-devices.net"
+    resource = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/MyHub",
+        "name": "MyHub", "location": "westus", "sku": {"tier": "Standard"},
+        "properties": {
+            "hostName": "MyHub.azure-devices.net",
+            "serviceHostName": "MyHub.service.azure-devices.net",
+            "deviceHostName": "MyHub.device.azure-devices.net",
+        },
+    }
+    find = mocker.patch.object(discovery, "find_resource", return_value=resource)
+    target = discovery.get_target(
+        hostname, resource_group_name=resource_group, auth_type="login", hostname_type=hostname_type,
+    )
+    requires_lookup = not endpoint and (
+        hostname_type in ("device", "service") or (hostname_type == "auto" and resource_group)
+    )
+    if requires_lookup:
+        find.assert_called_once_with(resource_name="MyHub", rg=resource_group)
+    else:
+        find.assert_not_called()
+        assert target["entity"] == hostname
+    if endpoint or requires_lookup:
+        assert target["serviceHostName"] == resource["properties"]["serviceHostName"]
+        assert target["deviceHostName"] == resource["properties"]["deviceHostName"]
+
+
+def test_explicit_forced_split_hostname_lookup_still_fetches_resource(mocker):
+    from azext_iot.common.base_discovery import BaseDiscovery
+
+    base = mocker.patch.object(BaseDiscovery, "get_target", return_value={})
+    discovery = IotHubDiscovery(mocker.Mock())
+    discovery.get_target("MyHub.service.azure-devices.net", "rg", auth_type="login", force_find_resource=True)
+    base.assert_called_once_with("MyHub", "rg", auth_type="login", force_find_resource=True)

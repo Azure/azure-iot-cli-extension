@@ -41,11 +41,12 @@ class IotHubDiscovery(BaseDiscovery):
         return kwargs
 
     def get_target(self, resource_name: str, resource_group_name: str = None, **kwargs) -> Dict[str, str]:
+        hostname_type = kwargs.pop("hostname_type", None)
         if (
             resource_name
             and not kwargs.get("login")
             and kwargs.get("auth_type") == AuthenticationTypeDataplane.login.value
-            and (resource_group_name or kwargs.get("rg") or kwargs.get("force_find_resource"))
+            and (kwargs.get("force_find_resource") or hostname_type in ("auto", "device", "service"))
         ):
             hostname = resource_name
             for prefix in ("https://", "http://"):
@@ -54,11 +55,12 @@ class IotHubDiscovery(BaseDiscovery):
                     break
             if valid_hostname(hostname) and "." in hostname:
                 service_hostname, _ = derive_iot_hub_hostnames(hostname)
-                # A classic FQDN cannot tell us whether ARM exposes GWv2 split
-                # hostnames. An explicit RG permits a targeted metadata lookup.
-                # Split FQDNs and unscoped hostname-only calls remain ARM-free.
-                if not service_hostname or kwargs.get("force_find_resource"):
+                needs_metadata = hostname_type in ("device", "service") or (
+                    hostname_type == "auto" and (resource_group_name or kwargs.get("rg"))
+                )
+                if kwargs.get("force_find_resource") or (not service_hostname and needs_metadata):
                     resource_name = hostname.split(".")[0]
+                    kwargs["force_find_resource"] = True
         return super().get_target(resource_name, resource_group_name, **kwargs)
 
     @classmethod

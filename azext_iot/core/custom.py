@@ -97,7 +97,7 @@ def _get_resource_group_from_hub(hub, fallback=None):
     return get_resource_group(hub, fallback=fallback, resource_label="IoT Hub")
 
 
-def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
+def _resolve_linked_hub_hostname(hub, hostname_type="classic"):
     """Resolve IoT Hub hostname for DPS linked hub based on hostname type."""
     if hostname_type == "classic":
         return hub["properties"]["hostName"]
@@ -454,7 +454,7 @@ def iot_dps_linked_hub_create(
     resource_group_name=None,
     authentication_type=None,
     user_assigned_identity=None,
-    hostname_type="auto",
+    hostname_type="classic",
     apply_allocation_policy=None,
     allocation_weight=None,
     no_wait=False
@@ -598,18 +598,6 @@ def iot_dps_linked_hub_update(
             "Specify either --hub-name or --linked-hub, not both."
         )
 
-    mutation_args = {
-        "--authentication-type": authentication_type,
-        "--connection-string": connection_string,
-        "--user-assigned-identity": user_assigned_identity,
-        "--allocation-weight": allocation_weight,
-        "--apply-allocation-policy": apply_allocation_policy,
-    }
-    if all(v is None for v in mutation_args.values()):
-        raise RequiredArgumentMissingError(
-            "Provide at least one update parameter: " + ", ".join(mutation_args.keys()) + "."
-        )
-
     if linked_hub and '.' not in linked_hub:
         hub_name = linked_hub
         linked_hub = None
@@ -673,7 +661,7 @@ def iot_dps_linked_hub_update(
         if authentication_type != IotHubAuthenticationType.KEY_BASED.value:
             target_entry["connectionString"] = ""
 
-    target_auth = target_entry["authenticationType"]
+    target_auth = target_entry.get("authenticationType", IotHubAuthenticationType.KEY_BASED.value)
     if connection_string and target_auth != IotHubAuthenticationType.KEY_BASED.value:
         raise MutuallyExclusiveArgumentError(
             "--connection-string only applies to KeyBased authentication. "
@@ -1123,7 +1111,7 @@ def iot_hub_create(
                 },
                 "minTlsVersion": min_tls_version,
                 "enableDataResidency": enable_data_residency,
-                "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
+                "disableLocalAuth": False if disable_local_auth is None else disable_local_auth,
                 "disableDeviceSAS": disable_device_sas,
                 "disableModuleSAS": disable_module_sas,
                 "enableFileUploadNotifications": False if enable_fileupload_notifications is None else enable_fileupload_notifications,

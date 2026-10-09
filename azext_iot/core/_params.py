@@ -153,7 +153,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('hostname_type',
                    options_list=['--hostname-type', '--ht'],
                    arg_type=get_enum_type(["auto", "device", "classic"]),
-                   default="auto",
+                   default="classic",
                    is_preview=False,
                    help="Type of IoT Hub hostname to use when linking. "
                    "'auto' uses the TLS 1.3 device hostname if available, classic otherwise. "
@@ -242,7 +242,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable '
-                        'IoT hub scoped SAS keys for authentication. Defaults to true for new Hubs; '
+                        'IoT hub scoped SAS keys for authentication. Defaults to false for new Hubs; '
                         'existing Hub settings are preserved unless specified. '
                         'Use --auth-type login for service data-plane commands.')
         c.argument('disable_device_sas', options_list=['--disable-device-sas', '--dds'],

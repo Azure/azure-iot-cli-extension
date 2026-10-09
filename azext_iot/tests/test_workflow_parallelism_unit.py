@@ -101,7 +101,7 @@ def test_matrix_rejects_untrusted_selector_or_canary_region_mismatch(tmp_path, m
 
 def test_flat_matrix_makes_all_combinations_concurrently_eligible_without_wrappers_or_locks():
     public = _workflows()[0]
-    assert set(public["jobs"]) == {"setup", "unit-test", "int-test", "int-test-gate", "combine-coverage"}
+    assert set(public["jobs"]) == {"setup", "lint", "unit-shards", "unit-test", "int-test", "int-test-gate", "combine-coverage"}
     job = public["jobs"]["int-test"]
     assert job["needs"] == ["setup", "unit-test"]
     assert job["if"] == (
@@ -115,9 +115,10 @@ def test_flat_matrix_makes_all_combinations_concurrently_eligible_without_wrappe
     }
     assert public["jobs"]["setup"]["outputs"] == {"matrix": "${{ steps.matrix.outputs.matrix }}"}
     assert "concurrency" not in public
-    for value in public["jobs"].values():
+    for name, value in public["jobs"].items():
         assert "concurrency" not in value
-        assert "max-parallel" not in value.get("strategy", {})
+        if name != "unit-shards":
+            assert "max-parallel" not in value.get("strategy", {})
         assert not value.get("continue-on-error", False)
     for name in ("int_test_bundle.yml", "int_test_cohort.yml"):
         assert not (ROOT / ".github/workflows" / name).exists()

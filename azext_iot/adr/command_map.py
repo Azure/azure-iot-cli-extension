@@ -35,6 +35,11 @@ adr_registry_device_ops = CliCommandType(
     client_factory=adr_service_factory,
 )
 
+adr_schema_ops = CliCommandType(
+    operations_tmpl="azext_iot.adr.commands_schema#{}",
+    client_factory=adr_service_factory,
+)
+
 
 adr_wait_ops = CliCommandType(
     operations_tmpl="azext_iot.adr.commands_wait#{}",
@@ -52,6 +57,50 @@ _REGISTRY_DEVICE_TABLE = (
 
 
 def load_adr_commands(self, _):
+    with self.command_group(
+        "iot adr schema", command_type=adr_schema_ops, is_preview=False
+    ) as cmd_group:
+        cmd_group.command("create", "adr_schema_create")
+        cmd_group.show_command("show", "adr_schema_show")
+        cmd_group.command("list", "adr_schema_list")
+        cmd_group.command(
+            "delete", "adr_schema_delete", confirmation=True, supports_no_wait=True
+        )
+        cmd_group.wait_command("wait", getter_name="adr_schema_show")
+
+    with self.command_group(
+        "iot adr schema registry", command_type=adr_schema_ops, is_preview=False
+    ) as cmd_group:
+        cmd_group.command(
+            "create", "adr_schema_registry_create", supports_no_wait=True
+        )
+        cmd_group.command(
+            "update", "adr_schema_registry_update", supports_no_wait=True
+        )
+        cmd_group.show_command("show", "adr_schema_registry_show")
+        cmd_group.command("list", "adr_schema_registry_list")
+        cmd_group.command(
+            "delete",
+            "adr_schema_registry_delete",
+            confirmation=True,
+            supports_no_wait=True,
+        )
+        cmd_group.wait_command("wait", getter_name="adr_schema_registry_show")
+
+    with self.command_group(
+        "iot adr schema version", command_type=adr_schema_ops, is_preview=False
+    ) as cmd_group:
+        cmd_group.command("create", "adr_schema_version_create")
+        cmd_group.show_command("show", "adr_schema_version_show")
+        cmd_group.command("list", "adr_schema_version_list")
+        cmd_group.command(
+            "delete",
+            "adr_schema_version_delete",
+            confirmation=True,
+            supports_no_wait=True,
+        )
+        cmd_group.wait_command("wait", getter_name="adr_schema_version_show")
+
     # Namespace commands
     with self.command_group(
         "iot adr ns", command_type=adr_namespace_ops, is_preview=False

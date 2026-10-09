@@ -60,8 +60,8 @@ class IotHubGatewayServiceAPIs:  # pylint: disable=too-many-instance-attributes
     :keyword endpoint: Service URL. Default value is
      "https://fully-qualified-iothubname.azure-devices.net".
     :paramtype endpoint: str
-    :keyword api_version: Api Version. Default value is "2026-11-01-preview". Note that overriding
-     this default value may result in unsupported behavior.
+    :keyword api_version: Api Version. Default value is "2026-11-01". Note that overriding this
+     default value may result in unsupported behavior.
     :paramtype api_version: str
     """
 

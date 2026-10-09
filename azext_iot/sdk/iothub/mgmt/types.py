@@ -61,6 +61,9 @@ rejected from this endpoint."""
 EventStreamAuthenticationType = Literal["identityBased"]
 """Specifies authentication type being used for connecting to the event stream account."""
 
+FallbackRouteSource = Literal["DeviceMessages"]
+"""The source to which the fallback route is applied."""
+
 GatewayVersion = Literal["V1", "V2"]
 """The IoT hub Gateway version."""
 
@@ -83,9 +86,6 @@ IotHubSkuTier = Literal["Free", "Standard", "Basic"]
 
 IpFilterActionType = Literal["Accept", "Reject"]
 """The desired action for requests captured by this rule."""
-
-IpVersion = Literal["ipv4", "ipv6", "ipv4ipv6"]
-"""This property specifies the IP Version the hub is currently utilizing."""
 
 JobStatus = Literal["unknown", "enqueued", "running", "completed", "failed", "cancelled"]
 """The status of the job."""
@@ -127,9 +127,7 @@ RoutingSource = Literal[
     "TwinChangeEvents",
     "DeviceLifecycleEvents",
     "DeviceJobLifecycleEvents",
-    "DigitalTwinChangeEvents",
     "DeviceConnectionStateEvents",
-    "MqttBrokerMessages",
 ]
 """The source that the routing rule is to be applied to, such as DeviceMessages."""
 
@@ -482,21 +480,6 @@ class DeviceRegistryLinkingProperties(TypedDict, total=False):
     """The last error encountered when linking the IoT Hub with an Azure Device Registry."""
 
 
-class EncryptionPropertiesDescription(TypedDict, total=False):
-    """The encryption properties for the IoT hub.
-
-    :ivar keySource: The source of the key.
-    :vartype keySource: str
-    :ivar keyVaultProperties: The properties of the KeyVault key.
-    :vartype keyVaultProperties: list["KeyVaultKeyProperties"]
-    """
-
-    keySource: str
-    """The source of the key."""
-    keyVaultProperties: list["KeyVaultKeyProperties"]
-    """The properties of the KeyVault key."""
-
-
 class EndpointHealthData(TypedDict, total=False):
     """The health data for an endpoint.
 
@@ -736,10 +719,8 @@ class FallbackRouteProperties(TypedDict, total=False):
      underscores, hyphens, has a maximum length of 64 characters, and must be unique.
     :vartype name: str
     :ivar source: The source to which the routing rule is to be applied to. For example,
-     DeviceMessages. Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-     "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-     "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-    :vartype source: RoutingSource
+     DeviceMessages. Required. "DeviceMessages"
+    :vartype source: FallbackRouteSource
     :ivar condition: The condition which is evaluated in order to apply the fallback route. If the
      condition is not provided it will evaluate to true by default. For grammar, See:
      `https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
@@ -755,11 +736,9 @@ class FallbackRouteProperties(TypedDict, total=False):
     name: str
     """The name of the route. The name can only include alphanumeric characters, periods, underscores,
      hyphens, has a maximum length of 64 characters, and must be unique."""
-    source: Required[RoutingSource]
+    source: Required[FallbackRouteSource]
     """The source to which the routing rule is to be applied to. For example, DeviceMessages.
-     Required. Known values are: \"Invalid\", \"DeviceMessages\", \"TwinChangeEvents\",
-     \"DeviceLifecycleEvents\", \"DeviceJobLifecycleEvents\", \"DigitalTwinChangeEvents\",
-     \"DeviceConnectionStateEvents\", and \"MqttBrokerMessages\"."""
+     Required. \"DeviceMessages\""""
     condition: str
     """The condition which is evaluated in order to apply the fallback route. If the condition is not
      provided it will evaluate to true by default. For grammar, See:
@@ -1097,21 +1076,14 @@ class IotHubProperties(TypedDict, total=False):
     :vartype cloudToDevice: "CloudToDeviceProperties"
     :ivar comments: IoT hub comments.
     :vartype comments: str
-    :ivar deviceStreams: The device streams properties of iothub.
-    :vartype deviceStreams: "IotHubPropertiesDeviceStreams"
     :ivar features: The capabilities and features enabled for the IoT hub. Known values are: "None"
      and "DeviceManagement".
     :vartype features: Capabilities
-    :ivar encryption: The encryption properties for the IoT hub.
-    :vartype encryption: "EncryptionPropertiesDescription"
     :ivar locations: Primary and secondary location for iot hub.
     :vartype locations: list["IotHubLocationDescription"]
     :ivar enableDataResidency: This property when set to true, will enable data residency, thus,
      disabling disaster recovery.
     :vartype enableDataResidency: bool
-    :ivar ipVersion: This property specifies the IP Version the hub is currently utilizing. Known
-     values are: "ipv4", "ipv6", and "ipv4ipv6".
-    :vartype ipVersion: IpVersion
     :ivar deviceRegistry: Represents properties related to the Azure Device Registry (ADR).
     :vartype deviceRegistry: "DeviceRegistry"
     :ivar iotHubDetails: Set of additional read-only properties for the IoT hub.
@@ -1175,35 +1147,17 @@ class IotHubProperties(TypedDict, total=False):
     """The IoT hub cloud-to-device messaging properties."""
     comments: str
     """IoT hub comments."""
-    deviceStreams: "IotHubPropertiesDeviceStreams"
-    """The device streams properties of iothub."""
     features: Capabilities
     """The capabilities and features enabled for the IoT hub. Known values are: \"None\" and
      \"DeviceManagement\"."""
-    encryption: "EncryptionPropertiesDescription"
-    """The encryption properties for the IoT hub."""
     locations: list["IotHubLocationDescription"]
     """Primary and secondary location for iot hub."""
     enableDataResidency: bool
     """This property when set to true, will enable data residency, thus, disabling disaster recovery."""
-    ipVersion: IpVersion
-    """This property specifies the IP Version the hub is currently utilizing. Known values are:
-     \"ipv4\", \"ipv6\", and \"ipv4ipv6\"."""
     deviceRegistry: "DeviceRegistry"
     """Represents properties related to the Azure Device Registry (ADR)."""
     iotHubDetails: "IotHubDetails"
     """Set of additional read-only properties for the IoT hub."""
-
-
-class IotHubPropertiesDeviceStreams(TypedDict, total=False):
-    """The device streams properties of iothub.
-
-    :ivar streamingEndpoints: List of Device Streams Endpoints.
-    :vartype streamingEndpoints: list[str]
-    """
-
-    streamingEndpoints: list[str]
-    """List of Device Streams Endpoints."""
 
 
 class IotHubQuotaMetricInfo(TypedDict, total=False):
@@ -1335,21 +1289,6 @@ class JobResponse(TypedDict, total=False):
     """The status message for the job."""
     parentJobId: str
     """The job identifier of the parent job, if any."""
-
-
-class KeyVaultKeyProperties(TypedDict, total=False):
-    """The properties of the KeyVault key.
-
-    :ivar keyIdentifier: The identifier of the key.
-    :vartype keyIdentifier: str
-    :ivar identity: Managed identity properties of KeyVault Key.
-    :vartype identity: "ManagedIdentity"
-    """
-
-    keyIdentifier: str
-    """The identifier of the key."""
-    identity: "ManagedIdentity"
-    """Managed identity properties of KeyVault Key."""
 
 
 class ManagedIdentity(TypedDict, total=False):
@@ -1668,8 +1607,7 @@ class RouteProperties(TypedDict, total=False):
     :vartype name: str
     :ivar source: The source that the routing rule is to be applied to, such as DeviceMessages.
      Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-     "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-     "DeviceConnectionStateEvents", and "MqttBrokerMessages".
+     "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", and "DeviceConnectionStateEvents".
     :vartype source: RoutingSource
     :ivar condition: The condition that is evaluated to apply the routing rule. If no condition is
      provided, it evaluates to true by default. For grammar, see:
@@ -1689,8 +1627,7 @@ class RouteProperties(TypedDict, total=False):
     source: Required[RoutingSource]
     """The source that the routing rule is to be applied to, such as DeviceMessages. Required. Known
      values are: \"Invalid\", \"DeviceMessages\", \"TwinChangeEvents\", \"DeviceLifecycleEvents\",
-     \"DeviceJobLifecycleEvents\", \"DigitalTwinChangeEvents\", \"DeviceConnectionStateEvents\", and
-     \"MqttBrokerMessages\"."""
+     \"DeviceJobLifecycleEvents\", and \"DeviceConnectionStateEvents\"."""
     condition: str
     """The condition that is evaluated to apply the routing rule. If no condition is provided, it
      evaluates to true by default. For grammar, see:
@@ -2330,8 +2267,8 @@ class TestAllRoutesInput(TypedDict, total=False):
     """Input for testing all routes.
 
     :ivar routingSource: Routing source. Known values are: "Invalid", "DeviceMessages",
-     "TwinChangeEvents", "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-     "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and "MqttBrokerMessages".
+     "TwinChangeEvents", "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", and
+     "DeviceConnectionStateEvents".
     :vartype routingSource: RoutingSource
     :ivar message: Routing message.
     :vartype message: "RoutingMessage"
@@ -2341,8 +2278,7 @@ class TestAllRoutesInput(TypedDict, total=False):
 
     routingSource: RoutingSource
     """Routing source. Known values are: \"Invalid\", \"DeviceMessages\", \"TwinChangeEvents\",
-     \"DeviceLifecycleEvents\", \"DeviceJobLifecycleEvents\", \"DigitalTwinChangeEvents\",
-     \"DeviceConnectionStateEvents\", and \"MqttBrokerMessages\"."""
+     \"DeviceLifecycleEvents\", \"DeviceJobLifecycleEvents\", and \"DeviceConnectionStateEvents\"."""
     message: "RoutingMessage"
     """Routing message."""
     twin: "RoutingTwin"

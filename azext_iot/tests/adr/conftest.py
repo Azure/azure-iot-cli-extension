@@ -60,6 +60,7 @@ _ADR_XDIST_GROUPS = {
         "test_namespace_crud_lifecycle",
         "test_namespace_list_by_resource_group",
         "test_namespace_list_by_subscription",
+        "test_schema_registry_and_versions_lifecycle",
     },
     "adr-g2-ca": {
         "test_microsoft_revocation",
@@ -357,6 +358,9 @@ _SPECCED_OPERATION_GROUPS = (
     "registry_devices",
     "certificate_authorities",
     "certificate_policies",
+    "schema_registries",
+    "schemas",
+    "schema_versions",
 )
 
 _REAL_ADR_CLIENT = None

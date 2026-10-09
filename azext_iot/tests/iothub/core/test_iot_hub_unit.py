@@ -66,7 +66,7 @@ def importexport_service_client_error(mocked_response, get_mgmt_client, request)
 
     mocked_response.add(
         method=responses.POST,
-        url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
+        url="https://{}/jobs/create?api-version=2026-11-01".format(hub_name),
         body=json.dumps(
             {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
         ),
@@ -86,7 +86,7 @@ class TestIoTHubDeviceIdentityExport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
+            url="https://{}/jobs/create?api-version=2026-11-01".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",
@@ -156,7 +156,7 @@ class TestIoTHubDeviceIdentityImport(object):
 
         mocked_response.add(
             method=responses.POST,
-            url="https://{}/jobs/create?api-version=2026-11-01-preview".format(hub_name),
+            url="https://{}/jobs/create?api-version=2026-11-01".format(hub_name),
             body=json.dumps(generic_job_response),
             status=200,
             content_type="application/json",

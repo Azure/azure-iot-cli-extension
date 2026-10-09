@@ -611,7 +611,7 @@ def iot_dps_device_enrollment_group_create(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
-    show_keys=False,
+    show_keys=True,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -716,7 +716,7 @@ def iot_dps_device_enrollment_group_update(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
-    show_keys=False,
+    show_keys=None,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -864,7 +864,7 @@ def iot_dps_device_enrollment_group_update(
             sdk.enrollment_group.create_or_update(
                 enrollment_id, _drop_readonly_enrollment(enrollment_record), **_etag_arguments(etag),
             ),
-            show_keys,
+            True if show_keys is None else show_keys,
         )
     except HttpResponseError as e:
         handle_enrollment_error(e, target, "update enrollment group", handle_service_exception)

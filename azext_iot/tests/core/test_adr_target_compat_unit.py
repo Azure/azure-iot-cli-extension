@@ -49,7 +49,7 @@ def test_native_preview_management_wire_contract(
     get_credential = mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
     selected_sub = subscription or "test-sub-id"
     monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
-    endpoint = PUBLIC_ARM
+    endpoint = cloud["resource_manager"]
     resource_id = (
         f"/subscriptions/{selected_sub}/resourceGroups/rg/providers/"
         f"Microsoft.Devices/{resource_type}/{kind}"

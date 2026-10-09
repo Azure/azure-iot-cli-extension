@@ -1075,7 +1075,7 @@ class TestConfigExport:
     def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/devices/{}/modules?api-version=2026-11-01-preview".format(
+            url="https://{}/devices/{}/modules?api-version=2026-11-01".format(
                 mock_target["entity"],
                 device_id
             ),
@@ -1087,7 +1087,7 @@ class TestConfigExport:
 
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2026-11-01-preview".format(
+            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2026-11-01".format(
                 mock_target["entity"],
                 device_id
             ),
@@ -1099,7 +1099,7 @@ class TestConfigExport:
 
         mocked_response.add(
             method=responses.GET,
-            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2026-11-01-preview".format(
+            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2026-11-01".format(
                 mock_target["entity"],
                 device_id
             ),

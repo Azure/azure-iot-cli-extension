@@ -198,7 +198,10 @@ class RouteSourceType(Enum):
 
     @classmethod
     def list_valid_types(cls):
-        return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
+        return [
+            source.value for source in cls
+            if source not in (cls.Invalid, cls.DigitalTwinChangeEvents)
+        ]
 
 
 class IoTHubSDKVersion(Enum):

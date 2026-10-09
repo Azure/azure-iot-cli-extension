@@ -23,6 +23,7 @@ from azure.cli.core import MainCommandsLoader
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient, operations
 from azext_iot import IoTExtCommandsLoader
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.schema import SchemaProvider, SchemaRegistryProvider
 
 
 SUBSCRIPTION = "00000000-0000-0000-0000-000000000000"
@@ -44,6 +45,12 @@ REPORT_SELECTORS = [
 ]
 CA_URL = f"{NAMESPACE_URL}/certificateAuthorities/ca"
 CA_LOCATION = f"{NAMESPACE_URL}/operationResults/ca"
+SCHEMA_REGISTRY_URL = (
+    f"https://management.azure.com/subscriptions/{SUBSCRIPTION}"
+    "/resourceGroups/rg/providers/Microsoft.DeviceRegistry/schemaRegistries/registry"
+)
+SCHEMA_URL = f"{SCHEMA_REGISTRY_URL}/schemas/schema"
+SCHEMA_VERSION_URL = f"{SCHEMA_URL}/schemaVersions/01"
 
 
 class ADRWireCommandsLoader(MainCommandsLoader):
@@ -474,6 +481,175 @@ def wire_client():
 
 def _assert_api_version(request):
     assert parse_qs(urlsplit(request.url).query) == {"api-version": [API_VERSION]}
+
+
+def test_schema_semantic_model_create_wire_contract(
+    wire_client, mocked_response
+):
+    registry_body = {
+        "location": "eastus",
+        "properties": {
+            "namespace": "site-a",
+            "storageAccountContainerUrl": (
+                "https://storage.blob.core.windows.net/schemas"
+            ),
+        },
+    }
+    schema_body = {
+        "properties": {
+            "schemaType": "ThingModel",
+            "format": "JsonLD/1.1",
+        }
+    }
+    version_body = {
+        "properties": {
+            "schemaContent": '{"@type":"Lamp"}',
+        }
+    }
+    mocked_response.add(
+        "PUT",
+        SCHEMA_REGISTRY_URL,
+        json={
+            "id": SCHEMA_REGISTRY_URL,
+            "name": "registry",
+            **registry_body,
+            "properties": {
+                **registry_body["properties"],
+                "provisioningState": "Succeeded",
+            },
+        },
+    )
+    mocked_response.add(
+        "PUT",
+        SCHEMA_URL,
+        json={"id": SCHEMA_URL, "name": "schema", **schema_body},
+    )
+    mocked_response.add(
+        "PUT",
+        SCHEMA_VERSION_URL,
+        json={"id": SCHEMA_VERSION_URL, "name": "01", **version_body},
+    )
+
+    # Exercise the GA provider's existing modeless LRO adapter rather than
+    # calling result() on the generated SDK's unadapted registry poller.
+    cmd = Mock(cli_ctx=Mock())
+    registry = SchemaRegistryProvider(cmd, client=wire_client).create(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        registry_namespace=registry_body["properties"]["namespace"],
+        storage_account_container_url=registry_body["properties"]["storageAccountContainerUrl"],
+        location=registry_body["location"],
+    )
+    assert registry["name"] == "registry"
+    provider = SchemaProvider(cmd, client=wire_client)
+    schema = provider.create(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        schema_name="schema",
+        schema_type=schema_body["properties"]["schemaType"],
+        schema_format=schema_body["properties"]["format"],
+    )
+    assert schema["name"] == "schema"
+    version = provider.create_version(
+        resource_group_name="rg",
+        schema_registry_name="registry",
+        schema_name="schema",
+        version_name="01",
+        schema_content=version_body["properties"]["schemaContent"],
+    )
+    assert version["name"] == "01"
+
+    writes = [
+        call for call in mocked_response.calls if call.request.method == "PUT"
+    ]
+    assert [urlsplit(call.request.url).path for call in writes] == [
+        urlsplit(SCHEMA_REGISTRY_URL).path,
+        urlsplit(SCHEMA_URL).path,
+        urlsplit(SCHEMA_VERSION_URL).path,
+    ]
+    assert [json.loads(call.request.body) for call in writes] == [
+        registry_body,
+        schema_body,
+        version_body,
+    ]
+    for call in writes:
+        _assert_api_version(call.request)
+
+
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("no_wait", [False, True])
+def test_schema_registry_wire_uses_ga_lro_adapter(wire_client, mocked_response, action, no_wait):
+    resource = {
+        "name": "registry", "location": "eastus",
+        "properties": {"description": "Models", "provisioningState": "Succeeded"},
+    }
+    method = "PUT" if action == "create" else "PATCH"
+    mocked_response.add(method, SCHEMA_REGISTRY_URL, json=resource)
+    provider = SchemaRegistryProvider(Mock(cli_ctx=Mock()), client=wire_client)
+    kwargs = {"description": "Models", "no_wait": no_wait}
+    if action == "create":
+        kwargs.update(
+            registry_namespace="site-a",
+            storage_account_container_url="https://storage.blob.core.windows.net/schemas",
+            location="eastus",
+        )
+    result = getattr(provider, action)("registry", "rg", **kwargs)
+    if no_wait:
+        assert isinstance(result, LROPoller)
+        result = result.result()
+    assert result == resource
+    assert len(mocked_response.calls) == 1
+    request = mocked_response.calls[0].request
+    expected = {"properties": {"description": "Models"}}
+    if action == "create":
+        expected["location"] = "eastus"
+        expected["properties"].update(
+            namespace="site-a", storageAccountContainerUrl="https://storage.blob.core.windows.net/schemas",
+        )
+    assert json.loads(request.body) == expected
+    _assert_api_version(request)
+
+
+@pytest.mark.parametrize("kind,url,args", [
+    ("registry", SCHEMA_REGISTRY_URL, ("registry", "rg")),
+    ("schema", SCHEMA_URL, ("schema", "registry", "rg")),
+    ("version", SCHEMA_VERSION_URL, ("01", "schema", "registry", "rg")),
+])
+def test_schema_show_delete_wire_contract(wire_client, mocked_response, kind, url, args):
+    resource = {"id": url, "name": args[0], "properties": {}}
+    mocked_response.add("GET", url, json=resource)
+    mocked_response.add("DELETE", url, status=204)
+    provider_type = SchemaRegistryProvider if kind == "registry" else SchemaProvider
+    provider = provider_type(Mock(cli_ctx=Mock()), client=wire_client)
+    show = provider.show_version if kind == "version" else provider.show
+    delete = provider.delete_version if kind == "version" else provider.delete
+    assert show(*args) == resource
+    assert delete(*args) is None
+    assert [call.request.method for call in mocked_response.calls] == ["GET", "DELETE"]
+    for call in mocked_response.calls:
+        _assert_api_version(call.request)
+
+
+@pytest.mark.parametrize("kind,url,args", [
+    ("registry", SCHEMA_REGISTRY_URL.rsplit("/", 1)[0], ("rg",)),
+    (
+        "registry", f"https://management.azure.com/subscriptions/{SUBSCRIPTION}/providers/"
+        "Microsoft.DeviceRegistry/schemaRegistries", (),
+    ),
+    ("schema", f"{SCHEMA_REGISTRY_URL}/schemas", ("registry", "rg")),
+    ("version", f"{SCHEMA_URL}/schemaVersions", ("schema", "registry", "rg")),
+])
+def test_schema_lists_follow_all_pages(wire_client, mocked_response, kind, url, args):
+    next_url = f"{url}?api-version={API_VERSION}&$skipToken=next"
+    mocked_response.add("GET", url, json={"value": [{"name": "first"}], "nextLink": next_url})
+    mocked_response.add("GET", next_url, json={"value": [{"name": "second"}]})
+    provider_type = SchemaRegistryProvider if kind == "registry" else SchemaProvider
+    provider = provider_type(Mock(cli_ctx=Mock()), client=wire_client)
+    operation = provider.list_versions if kind == "version" else provider.list
+    assert operation(*args) == [{"name": "first"}, {"name": "second"}]
+    assert len(mocked_response.calls) == 2
+    _assert_api_version(mocked_response.calls[0].request)
+    assert mocked_response.calls[1].request.url == next_url
 
 
 @pytest.mark.parametrize(

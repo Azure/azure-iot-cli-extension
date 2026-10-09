@@ -464,7 +464,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
         - `--hostname-type service` is rejected on CS-show
         - `--hostname-type service` is accepted on SAS (caller opts in; audience targets service endpoint).
-        - On GWv2 hubs, auto (default) resolves to the device endpoint for both CS-show and SAS.
+        - On GWv2 hubs, explicit auto resolves to the device endpoint for both CS-show and SAS.
         """
         from urllib.parse import unquote
 
@@ -504,7 +504,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         # classic
         cs_classic = self.cmd(
             f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
-            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
+            f"-n {self.host_name} -g {self.entity_rg}",
         ).get_output_in_json()["connectionString"]
         assert f"HostName={classic_hn}" in cs_classic
 
@@ -517,7 +517,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
             cs_auto = self.cmd(
                 f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
-                f"-n {self.host_name} -g {self.entity_rg}",
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type auto",
             ).get_output_in_json()["connectionString"]
             assert f"HostName={device_hn}" in cs_auto
 
@@ -547,7 +547,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
             token = self.cmd(
                 f"iot hub generate-sas-token -m {module_id} -d {device_id} "
-                f"-n {self.host_name} -g {self.entity_rg}",
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type auto",
                 checks=[self.exists("sas")],
             ).get_output_in_json()
             assert extract_sr(token) == f"{device_hn}/devices/{device_id}/modules/{module_id}"

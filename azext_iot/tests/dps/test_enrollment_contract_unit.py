@@ -45,8 +45,8 @@ def test_enrollment_group_output_rejects_unknown_representation():
 
 
 @pytest.mark.parametrize("operation", ["create", "update", "show"])
-@pytest.mark.parametrize("show_keys", [False, True])
-def test_group_output_is_opt_in_without_changing_credentials(mocker, operation, show_keys):
+@pytest.mark.parametrize("show_keys", [None, False, True])
+def test_group_output_preserves_defaults_and_explicit_key_controls(mocker, operation, show_keys):
     body = {
         "enrollmentGroupId": "group", "etag": "etag", "provisioningStatus": "enabled",
         "attestation": {"type": "symmetricKey", "symmetricKey": {
@@ -69,11 +69,13 @@ def test_group_output_is_opt_in_without_changing_credentials(mocker, operation, 
     mocker.patch.object(dps, "DPSDiscovery").return_value.get_target.return_value = {"policy": "login"}
     mocker.patch.object(dps, "SdkResolver").return_value.get_sdk.return_value = sdk
     function = getattr(dps, "iot_dps_device_enrollment_group_" + ("get" if operation == "show" else operation))
-    result = function(mocker.Mock(), "group", dps_name="dps", show_keys=show_keys)
+    arguments = {} if show_keys is None else {"show_keys": show_keys}
+    result = function(mocker.Mock(), "group", dps_name="dps", **arguments)
+    expected_keys = operation != "show" if show_keys is None else show_keys
     output = _wire(result)
     keys = output["attestation"].get("symmetricKey") or {}
-    assert keys.get("primaryKey") == ("primary-secret" if show_keys else None)
-    assert keys.get("secondaryKey") == ("secondary-secret" if show_keys else None)
+    assert keys.get("primaryKey") == ("primary-secret" if expected_keys else None)
+    assert keys.get("secondaryKey") == ("secondary-secret" if expected_keys else None)
     assert output["attestation"]["type"] == "symmetricKey"
     assert output["initialTwin"]["tags"]["array"] == ["one", "two"]
     assert _wire(response)["attestation"]["symmetricKey"] == body["attestation"]["symmetricKey"]

@@ -17,7 +17,7 @@ from msrest.service_client import ServiceClient
 
 def legacy_spy_response(request):
     """Keep historical body assertions while observing the regenerated wire request."""
-    assert parse_qs(urlsplit(request.url).query)["api-version"] == ["2026-11-01-preview"]
+    assert parse_qs(urlsplit(request.url).query)["api-version"] == ["2026-11-01"]
     data = request.body
     if isinstance(data, (str, bytes)) and data:
         data = json.loads(data)

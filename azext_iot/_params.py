@@ -356,9 +356,10 @@ def load_arguments(self, _):
             "hostname_type",
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
-            default=HostnameType.AUTO.value,
+            default=HostnameType.CLASSIC.value,
             is_preview=True,
             help="Type of hostname to use in the connection string. "
+            "Defaults to the classic hostname. "
             "'auto' uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
             "'classic' always uses the default hostname. "
             "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
@@ -374,9 +375,10 @@ def load_arguments(self, _):
                 "hostname_type",
                 options_list=["--hostname-type", "--ht"],
                 arg_type=get_enum_type(HostnameType),
-                default=HostnameType.AUTO.value,
+                default=None,
                 is_preview=True,
                 help="Type of hostname to use in the connection string. "
+                "Defaults to the supplied --login hostname, or the classic hostname otherwise. "
                 "'auto' uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
                 "'classic' always uses the default hostname. "
                 "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
@@ -388,15 +390,16 @@ def load_arguments(self, _):
             "hostname_type",
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
-            default=HostnameType.AUTO.value,
+            default=None,
             is_preview=True,
             help="Type of hostname to use as the SAS token audience. "
+            "Defaults to the supplied --login hostname, or the classic hostname otherwise. "
             "'auto' uses the device hostname for device/module-scoped tokens "
             "and the service hostname for hub-scoped tokens. "
             "'classic' always uses the default hostname. "
             "'device' uses the device hostname (errors on non-GWv2 hubs). "
             "'service' uses the service hostname (errors on non-GWv2 hubs). "
-            "This option cannot be combined with --connection-string; when "
+            "The 'device' and 'service' values cannot be combined with --connection-string; when "
             "--connection-string is supplied, the SAS audience is derived "
             "from its HostName.",
         )
@@ -1382,7 +1385,8 @@ def load_arguments(self, _):
                 "show_keys",
                 options_list=["--show-keys", "--keys"],
                 arg_type=get_three_state_flag(),
-                help="Include symmetric key values in enrollment group results. Hidden by default.",
+                help="Include symmetric key values in enrollment group results. "
+                + ("Hidden by default." if action == "show" else "Shown by default; use false to hide them."),
             )
 
     with self.argument_context("iot dps enrollment-group compute-device-key") as context:
