@@ -35,6 +35,7 @@ from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_ident
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
+from azext_iot.tests._ado_retry import InfrastructureFailure
 
 
 LINK_READINESS_TIMEOUT = _ADR_LRO_TIMEOUT_SECONDS
@@ -65,7 +66,7 @@ class _Deadline:
 
     def check(self):
         if self.clock() >= self.end:
-            raise AssertionError(f"Timed out waiting for {self.description}: {self.observation}")
+            raise InfrastructureFailure(f"Timed out waiting for {self.description}: {self.observation}")
 
     def call(self, callback, *args):
         self.check()
@@ -191,7 +192,34 @@ def delete_test_namespace(
     CLI's exit-code wrapper loses it during exception unwinding. The same exact
     GET/URI/404 checks apply; an exit code alone never establishes absence.
     """
+    from azext_iot.tests import _cleanup_handoff as handoff
+    from azext_iot.tests.adr.conftest import TEST_SUBSCRIPTION
+
     scope = shlex.join(["--namespace", namespace_name, "-g", resource_group])
+    if handoff.enabled():
+        resource_id = (f"/subscriptions/{TEST_SUBSCRIPTION}/resourceGroups/{resource_group}"
+                       f"/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}")
+
+        def submit():
+            namespace = _get_resource(scenario, f"iot adr ns show {scope}", namespace_getter)
+            if namespace is None:
+                handoff.record(resource_id, "absent")
+                return
+            if namespace.get("id", "").casefold() != resource_id.casefold():
+                raise AssertionError("Cleanup namespace ID does not match the owned scope.")
+            for kind, names in (("job", jobs), ("group", groups)):
+                for name in names:
+                    if _get_resource(scenario, f"iot adr ns {kind} show {scope} -n {shlex.quote(name)}") is not None:
+                        handoff.record(resource_id, "pending", "ChildDeletionPending")
+                        return
+            if (namespace.get("properties") or {}).get("provisioningState") == "Deleting":
+                handoff.record(resource_id, "deleting")
+                return
+            with handoff.submission(resource_id):
+                scenario.cmd(f"iot adr ns delete {scope} -y --no-wait")
+
+        handoff.cleanup(resource_id, submit, accepted=False)
+        return
     budget = _Deadline(timeout, clock, sleeper, "owned namespace cleanup")
     accepted = False
     rejected = None
@@ -405,7 +433,7 @@ def link_with_readiness(
             if (other_section, name) != (section, endpoint_name)
         ]
         if any(_link_state(other) in {"Failed", "Canceled", "Cancelled"} for other in others):
-            raise AssertionError("Non-recoverable failure on another namespace endpoint")
+            raise InfrastructureFailure("Non-recoverable failure on another namespace endpoint")
         if endpoint:
             assert _endpoint_settings(endpoint) == expected, (
                 f"{label} endpoint target, identity or provisioning settings changed"
@@ -440,7 +468,7 @@ def link_with_readiness(
                     progressed = False
                     retry_at = None
             elif not recovery_reason:
-                raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
+                raise InfrastructureFailure(f"Non-recoverable {label} link failure: {budget.observation}")
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:
-            raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
+            raise InfrastructureFailure(f"Non-recoverable {label} link failure: {budget.observation}")
         budget.pause(10)

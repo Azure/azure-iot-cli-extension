@@ -148,7 +148,22 @@ def test_real_controller_cli_rejects_before_test_or_azure_imports(tmp_path, suit
 
 
 def _damage(receipt, expected, defect):
-    if defect == "missing-stage":
+    if defect in ("assertion", "setup-failed", "teardown-failed", "call-teardown", "setup-teardown", "cleanup-call"):
+        report = receipt["reports"][expected[0]]
+        if defect in ("assertion", "call-teardown", "cleanup-call"):
+            report["call"] = ["failed"]
+            receipt["retryableFailures"] = {expected[0]: defect != "cleanup-call"}
+        if defect in ("setup-failed", "setup-teardown"):
+            report["setup"] = ["failed"]
+            del report["call"]
+        if defect in ("teardown-failed", "call-teardown", "setup-teardown"):
+            report["teardown"] = ["failed"]
+        receipt["exitstatus"] = 1
+        receipt["errors"] = [
+            "phase incomplete or pytest failed",
+            "required node did not pass exactly once with successful teardown: " + expected[0],
+        ]
+    elif defect == "missing-stage":
         del receipt["reports"][expected[0]]["teardown"]
     elif defect == "duplicate-stage":
         receipt["reports"][expected[0]]["call"].append("passed")
@@ -162,7 +177,7 @@ def _damage(receipt, expected, defect):
         receipt["reports"] = list(expected)
 
 
-def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, reader=None):
+def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, reader=None, attempt_id=None):
     chosen = nodes(suite, phase) if whole else nodes(suite, phase)[-1:]
     full_execute, calls = execute_factory()
     captured = []
@@ -184,7 +199,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         path = Path(env["AZEXT_IOT_HUB_OWNERSHIP"])
         evidence = hub.read_json(path)
         if phase == "sas":
-            evidence.update(passed=expected, **focused.provenance(debug))
+            evidence.update(passed=[node for node in expected if receipt["reports"][node].get("call") == ["passed"]],
+                            **focused.provenance(debug))
         elif defect == "observer":
             evidence["violations"] = ["Observed resource no longer belongs to this phase"]
         elif defect == "uncertain":
@@ -192,6 +208,7 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         ownership.write(path, evidence)
         if defect in ("timed_out", "interrupted"):
             result[defect] = True
+        result["exit_code"] = receipt["exitstatus"]
         return result
 
     output = tmp_path / "hub-phases"
@@ -200,7 +217,8 @@ def run_hub(tmp_path, monkeypatch, suite, phase, *, defect=None, whole=False, re
         patch.setattr(hub.signal, "signal", lambda *_: None)
         result = hub.run(suite, ownership.SUBSCRIPTION, ownership.GROUP, ownership.REGION, output,
                          arm=reader or HubReader(), execute=execute, base={"PYTHONPATH": "inherited-dependencies"},
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=None if attempt_id else phase, debug_nodes=None if attempt_id else chosen,
+                         attempt_selection=focused.attempt(suite, phase, chosen, attempt_id) if attempt_id else None)
     return result, hub.read_json(output / "hub-phases.json"), output, calls, captured
 
 
@@ -245,7 +263,7 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, attempt_id=None):
     if chosen is None:
         chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
@@ -253,7 +271,7 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     def execute(command, env, log, runtime, cleanup, cancelled):
         captured.append(env)
         assert Path.cwd() == ROOT
-        assert env["azext_iot_dps_workers"] == "0"
+        assert env["azext_iot_dps_workers"] == ("7" if attempt_id and phase != "local-auth-toggle" else "0")
         debug = json.loads(env[focused.ENV])
         expected = debug["requestedNodes"]
         assert shlex.split(env[focused.DPS_ARGS_ENV])[-len(expected):] == expected
@@ -276,13 +294,20 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         for case in list(tree.getroot()):
             if dps.MANIFEST["junit_nodeid"](case) not in short:
                 tree.getroot().remove(case)
-        tree.write(env["azext_iot_dps_junit"])
         receipt = plugin.PhaseReceipt("DPS", phase, expected, directory / "pytest.json", env["azext_iot_dps_run_uid"],
                                       debug=debug)
         receipt.data.update(collected=expected[:], finished=True, exitstatus=0, errors=[],
                             reports={node: {stage: ["passed"] for stage in ("setup", "call", "teardown")}
                                      for node in expected})
         _damage(receipt.data, expected, defect)
+        result["exit_code"] = receipt.data["exitstatus"]
+        for stage, status in receipt.data["reports"][expected[0]].items():
+            if status == ["failed"]:
+                case = list(tree.getroot())[0]
+                if defect == "call-teardown" and stage == "teardown":
+                    case = ET.SubElement(tree.getroot(), "testcase", **case.attrib)
+                ET.SubElement(case, "failure" if stage == "call" else "error", message="offline failure")
+        tree.write(env["azext_iot_dps_junit"])
         receipt.write()
         if defect == "uncertain":
             for path in directory.glob("created-*.json"):
@@ -299,8 +324,49 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
         result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
-                         debug_phase=phase, debug_nodes=chosen)
+                         debug_phase=None if attempt_id else phase, debug_nodes=None if attempt_id else chosen,
+                         attempt_selection=focused.attempt("DPS", phase, chosen, attempt_id) if attempt_id else None)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
+
+
+@pytest.mark.parametrize("suite,phase", [
+    ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
+    ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
+])
+@pytest.mark.parametrize("defect", [
+    None, "assertion", "setup-failed", "teardown-failed", "call-teardown", "setup-teardown", "cleanup-call",
+])
+@pytest.mark.parametrize("whole", [False, True])
+def test_ado_attempts_retain_owned_execution_but_never_qualify_as_debug_or_full(
+    tmp_path, monkeypatch, suite, phase, defect, whole,
+):
+    from azext_iot.tests import _ado_pipeline
+    if suite == "DPS":
+        result, summary, _ = run_dps(tmp_path, monkeypatch, phase, defect=defect, whole=whole, attempt_id="a" * 64)
+        selected = focused.attempt(suite, phase, nodes(suite, phase) if whole else nodes(suite, phase)[:1], "a" * 64)
+        receipt = _ado_pipeline.dps_evidence(tmp_path, selected, {
+            "subscription": SUB, "resource_group": GROUP, "region": "centraluseuap",
+            "endpoint": "https://centraluseuap.management.azure.com",
+        })
+        assert receipt["exitstatus"] == int(defect is not None)
+        assert GATE["evaluate_dps_phases"](tmp_path)
+    else:
+        result, summary, output, *_ = run_hub(
+            tmp_path, monkeypatch, suite, phase, defect=defect, whole=whole, attempt_id="a" * 64,
+        )
+        assert hub.evaluate_hub_phases(output, attempt=True, allow_failures=True)["passed"]
+        assert not hub.evaluate_hub_phases(output)["passed"]
+        assert not hub.evaluate_hub_phases(output, debug=True)["passed"]
+    assert result == int(defect is not None)
+    assert summary["mode"] == "attempt" and summary["qualifiesFullSuite"] is False
+
+
+@pytest.mark.parametrize("defect", ["missing-stage", "skip", "uncertain", "timed_out", "interrupted"])
+def test_ado_assertion_tolerance_does_not_relax_owned_cleanup(tmp_path, monkeypatch, defect):
+    _, _, output, *_ = run_hub(
+        tmp_path, monkeypatch, "HubControl", "regular", defect=defect, attempt_id="a" * 64,
+    )
+    assert not hub.evaluate_hub_phases(output, attempt=True, allow_failures=True)["passed"]
 
 
 @pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
@@ -508,10 +574,12 @@ def test_existing_full_dps_fake_execution_remains_portable(tmp_path, monkeypatch
         FULL_DPS_RUN.__globals__["require_linux"]()
 
 
-def test_dps_selection_and_receipts_use_same_exact_debug_subset(tmp_path, monkeypatch):
+@pytest.mark.parametrize("attempt_id", [None, "a" * 64])
+@pytest.mark.parametrize("worker", [False, True])
+def test_dps_selection_receipts_and_stop_handlers_match_execution_mode(tmp_path, monkeypatch, attempt_id, worker):
     phase = "regular"
     chosen = nodes("DPS", phase)[:1]
-    debug = focused.select("DPS", phase, chosen)
+    debug = focused.attempt("DPS", phase, chosen, attempt_id) if attempt_id else focused.select("DPS", phase, chosen)
     monkeypatch.setenv(focused.ENV, json.dumps(debug))
     monkeypatch.setenv(_phase.PHASE_ENV, phase)
     items = [
@@ -532,13 +600,19 @@ def test_dps_selection_and_receipts_use_same_exact_debug_subset(tmp_path, monkey
     assert dps.selection_count(tmp_path, phase, debug=debug) == 1
     with pytest.raises(dps.PhaseError):
         dps.selection_count(tmp_path, phase)
-    session = SimpleNamespace(config=Mock(spec=["pluginmanager", "add_cleanup"]))
+    session = SimpleNamespace(config=Mock(spec=["pluginmanager", "add_cleanup", *(["workerinput"] if worker else [])]))
     stop_signal, previous_handler = object(), object()
     signals = SimpleNamespace(Signals={"SIGUSR1": stop_signal}, signal=Mock(return_value=previous_handler))
     platform_guard = Mock()
     monkeypatch.setattr(_phase_runtime, "require_linux", platform_guard)
     monkeypatch.setattr(_phase_runtime, "signal", signals)
     _phase_runtime.start_worker(session)
+    if attempt_id and not worker:
+        platform_guard.assert_not_called()
+        signals.signal.assert_not_called()
+        session.config.pluginmanager.register.assert_not_called()
+        assert not list(tmp_path.glob("worker-*.json"))
+        return
     platform_guard.assert_called_once_with()
     worker = session.config.pluginmanager.register.call_args.args[0]
     assert isinstance(worker, _phase_runtime.WorkerStop)
@@ -844,6 +918,135 @@ sys.exit(pytest.main([
     assert receipt["collected"] == receipt["expected"] == ["test_local.py::test_requested"]
     assert receipt["finished"] is True
     assert bool(receipt["errors"]) == (outcome != "passed")
+
+
+@pytest.mark.parametrize("outcome,workers", [
+    ("passed", 7), ("passed", 2), ("assertion", 2), ("infrastructure", 2), ("skipped", 2),
+    ("setup-failed", 2), ("teardown-failed", 2), ("call-teardown-failed", 2),
+    ("worker-exit", 2), ("sessionfinish-failed", 2),
+])
+def test_real_dps_attempt_aggregates_parallel_workers_and_preserves_retry_eligibility(tmp_path, outcome, workers):
+    requested = [
+        "azext_iot/tests/dps/core/test_dps_discovery_int.py::test_dps_discovery",
+        "azext_iot/tests/dps/core/test_dps_unit_capacity_int.py::test_dps_unit_capacity_owned_lifecycle",
+    ]
+    for index, node in enumerate(requested):
+        filename, function = node.split("::")
+        path = tmp_path / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "import os\nfrom pathlib import Path\nimport pytest\n"
+            "@pytest.fixture\n"
+            "def resource():\n"
+            f"    if {index} and os.environ['PROOF_OUTCOME'] == 'setup-failed':\n"
+            "        raise RuntimeError('offline setup failure')\n"
+            "    yield\n"
+            f"    if {index} and os.environ['PROOF_OUTCOME'] in ('teardown-failed', 'call-teardown-failed'):\n"
+            "        raise AssertionError('offline teardown failure')\n"
+            f"def {function}(resource):\n"
+            f"    Path('worker-{index}').write_text(os.environ['PYTEST_XDIST_WORKER'])\n"
+            f"    if not {index}:\n"
+            "        return\n"
+            "    outcome = os.environ['PROOF_OUTCOME']\n"
+            "    if outcome in ('assertion', 'call-teardown-failed'):\n"
+            "        assert False, 'offline test assertion'\n"
+            "    if outcome == 'infrastructure':\n"
+            "        raise RuntimeError('offline infrastructure error')\n"
+            "    if outcome == 'skipped':\n"
+            "        pytest.skip('offline unavailable')\n"
+            "    if outcome == 'worker-exit':\n"
+            "        os._exit(3)\n",
+            encoding="utf-8",
+        )
+    (tmp_path / "test_unselected.py").write_text("raise AssertionError('Unexpected test import')\n", encoding="utf-8")
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "import os\n"
+        "def pytest_sessionfinish(session):\n"
+        "    if os.environ['PROOF_OUTCOME'] == 'sessionfinish-failed' and hasattr(session.config, 'workerinput'):\n"
+        "        raise RuntimeError('offline session cleanup failure')\n",
+        encoding="utf-8",
+    )
+    guard = tmp_path / "guard"
+    guard.mkdir()
+    (guard / "sitecustomize.py").write_text(
+        "import socket\n"
+        "def forbidden(*args, **kwargs):\n"
+        "    raise AssertionError('Offline xdist proof attempted network')\n"
+        "socket.socket.connect = forbidden\nsocket.socket.connect_ex = forbidden\nsocket.getaddrinfo = forbidden\n",
+        encoding="utf-8",
+    )
+
+    def execute(selected, name, defect):
+        folder = tmp_path / name
+        folder.mkdir()
+        selection = focused.attempt("DPS", "regular", selected, "a" * 64)
+        environment = dict(
+            os.environ, PYTHONPATH=os.pathsep.join(dict.fromkeys([str(guard), str(ROOT), *map(os.path.abspath, sys.path)])),
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", PYTEST_ADDOPTS="", PYTEST_PLUGINS="", PYTHONDONTWRITEBYTECODE="1",
+            azext_iot_dps_phase_receipts=str(folder), azext_iot_dps_run_uid="a" * 32,
+            azext_iot_dps_test_phase="regular", AZURE_CONFIG_DIR=str(tmp_path / "profile"),
+            AZURE_TEST_RUN_LIVE="False", PROOF_OUTCOME=defect,
+        )
+        environment[focused.ENV] = json.dumps(selection)
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "-p", "xdist.plugin", "-p", "azext_iot.tests._focused_live_plugin",
+             "-c", "pytest.ini", "--rootdir", ".", "--confcutdir", ".", "-n", str(workers), "--dist=loadfile",
+             "--max-worker-restart=0", "--junitxml=" + str(folder / "raw.xml"), "-q", *selection["requestedNodes"]],
+            cwd=tmp_path, env=environment, capture_output=True, text=True, check=False, timeout=60,
+        )
+        value = hub.read_json(folder / "pytest.json")
+        if (folder / "raw.xml").exists():
+            dps.safe_junit(folder / "raw.xml", folder / "junit.xml", "regular", len(selected), debug=selection)
+        assert value["collected"] == value["expected"] == selection["requestedNodes"], result.stdout + result.stderr
+        assert value["mode"] == "attempt" and value["qualifiesFullSuite"] is False
+        return result, value
+
+    result, receipt = execute(requested, "first", outcome)
+    assert (result.returncode == 0) == (outcome == "passed"), result.stdout + result.stderr
+    assert bool(receipt["errors"]) == (outcome != "passed")
+    if outcome in ("worker-exit", "sessionfinish-failed"):
+        assert receipt.get("workerErrors"), result.stdout + result.stderr
+        if outcome == "worker-exit":
+            assert result.returncode == 1, result.stdout + result.stderr
+        return
+    assert receipt["finished"] is True
+    if outcome != "setup-failed":
+        assert len({(tmp_path / f"worker-{index}").read_text() for index in range(2)}) == 2
+    assert receipt["reports"][requested[0]] == {stage: ["passed"] for stage in ("setup", "call", "teardown")}
+    if outcome in ("assertion", "infrastructure", "call-teardown-failed"):
+        assert receipt["retryableFailures"] == {requested[1]: True}
+    else:
+        assert not receipt.get("retryableFailures")
+    from azext_iot.tests import _ado_retry as retry
+    if outcome != "skipped":
+        statuses = retry.outcomes(receipt, allow_fixture_failures=True)
+        assert statuses[requested[1]] == ("passed" if outcome == "passed" else "failed")
+        assert retry.fixture_failure(receipt) == (outcome in ("setup-failed", "teardown-failed", "call-teardown-failed"))
+        junit_cases = list(ET.parse(tmp_path / "first/junit.xml").getroot().iter("testcase"))
+        tags = sorted(child.tag for case in junit_cases for child in case)
+        expected_tags = {
+            "passed": [], "assertion": ["failure"], "infrastructure": ["failure"],
+            "setup-failed": ["error"], "teardown-failed": ["error"], "call-teardown-failed": ["error", "failure"],
+        }
+        assert tags == expected_tags[outcome]
+    if outcome in ("assertion", "infrastructure"):
+        result, recovered = execute([requested[1]], "retry", "passed")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not recovered["errors"]
+        assert list(recovered["reports"]) == [requested[1]]
+        assert hub.read_json(tmp_path / "first/pytest.json") == receipt
+
+
+def test_parallel_receipt_rejects_changed_worker_collection(tmp_path):
+    selected = nodes("DPS", "regular")[:1]
+    receipt = plugin.PhaseReceipt(
+        "DPS", "regular", selected, tmp_path / "pytest.json", "a" * 32,
+        debug=focused.attempt("DPS", "regular", selected, "b" * 64), parallel=True,
+    )
+    with pytest.raises(pytest.UsageError, match="worker collection"):
+        receipt.pytest_xdist_node_collection_finished(None, selected * 2)
+    assert not hub.read_json(receipt.path)["finished"]
 
 
 def coverage_process(directory, module, arguments, environment):

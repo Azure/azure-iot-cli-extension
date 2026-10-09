@@ -21,6 +21,7 @@ from msrestazure.azure_exceptions import CloudError
 from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments
 from azext_iot.tests.helpers import invoke_checked  # noqa: F401 - compatibility re-export
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+from azext_iot.tests._ado_retry import InfrastructureFailure
 
 
 LOCAL_AUTH_MONITOR_REASON = (
@@ -79,7 +80,7 @@ def wait_for_query_ids(read, expected_ids, id_key=None, attempts=None, wait=10, 
             break
         sleep(min(wait, timeout - elapsed))
         elapsed = monotonic() - start
-    raise AssertionError(
+    raise InfrastructureFailure(
         f"Query visibility deadline/attempt limit exhausted after {attempt} reads, {elapsed:.1f}s "
         f"(budget {timeout:.1f}s): expected IDs {sorted(expected)}, "
         f"observed IDs {sorted(ids)}"

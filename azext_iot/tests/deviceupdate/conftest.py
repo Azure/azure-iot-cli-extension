@@ -24,6 +24,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import get_role_assignments, invoke_checked, role_assignment_create_command, tags_to_dict
 from azext_iot.tests.settings import DynamoSettings, HUB_TEST_LOCATION
+from azext_iot.tests import _cleanup_handoff as handoff
 
 logger = get_logger(__name__)
 
@@ -72,7 +73,7 @@ def generate_useridentity_id() -> str:
 def provisioned_accounts_module(request, provisioned_storage_module) -> dict:
     accounts, user_identities = _account_provisioner(request, provisioned_storage_module)
     yield accounts
-    if accounts:
+    if accounts and not handoff.enabled():
         _account_removal(request, accounts, user_identities)
 
 
@@ -80,7 +81,7 @@ def provisioned_accounts_module(request, provisioned_storage_module) -> dict:
 def provisioned_accounts(request, provisioned_storage) -> dict:
     accounts, user_identities = _account_provisioner(request, provisioned_storage)
     yield accounts
-    if accounts:
+    if accounts and not handoff.enabled():
         _account_removal(request, accounts, user_identities)
 
 
@@ -117,7 +118,12 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
     if desired_sku:
         base_create_command = base_create_command + f" --sku {desired_sku}"
 
-    base_create_command, user_identities, system_identity = _process_identity(base_create_command, desired_identity)
+    user_identities = []
+    if handoff.enabled():
+        request.addfinalizer(partial(_account_removal, request, result_accounts, user_identities))
+    base_create_command, user_identities, system_identity = _process_identity(
+        base_create_command, desired_identity, user_identities,
+    )
 
     desired_scope = None
     if system_identity and provisioned_storage:
@@ -131,6 +137,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
     count = desired_count or 1
     for _ in range(count):
         target_name = generate_account_id()
+        _record_planned_resource("Microsoft.DeviceUpdate/accounts", target_name)
         create_command = f"{base_create_command} -n {target_name}"
         create_result = cli.invoke(create_command)
         if not create_result.success():
@@ -190,6 +197,10 @@ def _account_removal(request, accounts: dict, user_identities: Optional[List[dic
     account_delete_failures = []
     for account_name in accounts["accounts"]:
         delete_command = f"iot du account delete -g {ACCOUNT_RG} -n {account_name} --no-wait -y"
+        if handoff.enabled():
+            handoff.cleanup(accounts["accounts"][account_name]["id"],
+                            lambda command=delete_command: invoke_checked(cli, command, description="Deleting ADU account"))
+            continue
         acct_delete_result = cli.invoke(delete_command)
         if not acct_delete_result.success():
             account_delete_failures.append(accounts["accounts"][account_name]["id"])
@@ -197,6 +208,10 @@ def _account_removal(request, accounts: dict, user_identities: Optional[List[dic
     user_delete_failures = []
     for user_identity in user_identities:
         delete_command = f"identity delete -g {ACCOUNT_RG} -n {user_identity['name']}"
+        if handoff.enabled():
+            handoff.cleanup(user_identity["id"],
+                            lambda command=delete_command: invoke_checked(cli, command, description="Deleting ADU identity"))
+            continue
         identity_delete_result = cli.invoke(delete_command)
         if not identity_delete_result.success():
             user_delete_failures.append(user_identity["id"])
@@ -209,8 +224,18 @@ def _account_removal(request, accounts: dict, user_identities: Optional[List[dic
         logger.error(clean_up_error)
 
 
-def _process_identity(base_command: str, identity_request: str) -> Tuple[str, List[dict], bool]:
-    user_id_result: List[dict] = []
+def _record_planned_resource(resource_type, name):
+    if handoff.enabled():
+        subscription = invoke_checked(cli, "account show", description="Resolving cleanup scope").as_json()["id"]
+        handoff.record(
+            f"/subscriptions/{subscription}/resourceGroups/{ACCOUNT_RG}/providers/{resource_type}/{name}",
+            "pending",
+        )
+
+
+def _process_identity(base_command: str, identity_request: str, user_id_result=None) -> Tuple[str, List[dict], bool]:
+    if user_id_result is None:
+        user_id_result = []
     system_processed = False
     if not identity_request:
         return base_command, user_id_result, system_processed
@@ -219,7 +244,9 @@ def _process_identity(base_command: str, identity_request: str) -> Tuple[str, Li
     for id in split_identities:
         if id in split_identities:
             if id == "user":
-                user_id_result.append(cli.invoke(f"identity create -n {generate_useridentity_id()} -g {ACCOUNT_RG}").as_json())
+                name = generate_useridentity_id()
+                _record_planned_resource("Microsoft.ManagedIdentity/userAssignedIdentities", name)
+                user_id_result.append(cli.invoke(f"identity create -n {name} -g {ACCOUNT_RG}").as_json())
             elif id == "system" and not system_processed:
                 system_processed = True
 
@@ -403,6 +430,18 @@ def _iothub_wait_for_data_role(hub_id):
 
 def _iothub_removal(hub_id_map: Dict[str, Any]):
     for target_id in hub_id_map:
+        if handoff.enabled():
+            resource = parse_resource_id(target_id)
+
+            def submit(resource=resource):
+                with iot_hub_service_factory(cli.az_cli, subscription_id=resource["subscription"]) as client:
+                    client.iot_hub_resource.begin_delete(
+                        resource_group_name=resource["resource_group"], resource_name=resource["name"],
+                        polling=False, retry_total=0,
+                    )
+
+            handoff.cleanup(target_id, submit)
+            continue
         invoke_checked(
             cli, f"iot hub delete --ids {quote(target_id)}",
             description=f"Deleting ADU dependency Hub '{target_id}'",
@@ -432,6 +471,7 @@ def _storage_provisioner(request):
         desired_instance_diagnostics_user_storage = acct_marker.kwargs.get("instance_diagnostics_user_storage", False)
         if desired_scope == "storage" or desired_instance_diagnostics_user_storage:
             target_name = generate_linked_storage_id()
+            _record_planned_resource("Microsoft.Storage/storageAccounts", target_name)
             create_result = cli.invoke(
                 f"storage account create -g {ACCOUNT_RG} -n {target_name} --allow-shared-key-access true"
             )
@@ -442,6 +482,8 @@ def _storage_provisioner(request):
 
 def _storage_removal(storage_account: dict):
     delete_result = cli.invoke(f"storage account delete -g {ACCOUNT_RG} -n {storage_account['name']} -y")
+    if handoff.enabled():
+        handoff.record(storage_account["id"], "accepted" if delete_result.success() else "failed")
     if not delete_result.success():
         logger.error(f"Failed to delete storage account resource {storage_account['name']}.")
 

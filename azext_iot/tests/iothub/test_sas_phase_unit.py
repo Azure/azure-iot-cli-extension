@@ -82,6 +82,26 @@ def test_default_is_regular(monkeypatch):
     assert not subject.enabled()
 
 
+def test_sas_handoff_stops_tasks_and_submits_each_cleanup_once(phase, tmp_path, monkeypatch):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    monkeypatch.setenv(handoff.ENV, str(tmp_path / "cleanup-receipts"))
+    phase.tasks.finish = Mock()
+    phase.sent = {"PUT " + resource_id.casefold() for resource_id in phase.ids.values()}
+
+    def cleanup_one(kind, _deadline):
+        phase.tasks.finish.assert_called_once()
+        phase.statuses["DELETE " + phase.ids[kind].casefold()] = 202
+        return False
+
+    phase.cleanup_one = Mock(side_effect=cleanup_one)
+    monkeypatch.setattr(subject, "sleep", Mock(side_effect=AssertionError("No cleanup polling")))
+    phase.cleanup()
+    assert phase.cleanup_one.call_count == 4
+    assert all(value["status"] == "accepted" for value in handoff.summary(tmp_path))
+    assert not phase.absent
+
+
 @pytest.mark.parametrize("location,endpoint,allowed", [
     ("australiaeast", "https://management.azure.com", True),
     ("australiaeast", "https://centraluseuap.management.azure.com", False),

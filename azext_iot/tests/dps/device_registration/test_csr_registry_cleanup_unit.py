@@ -68,7 +68,7 @@ def wire(tmp_path, monkeypatch, mocker):
         resource=resource, resources=resources, devices={}, calls=[], factory=factory,
         directory=tmp_path, list_body=None, get_transform=None, delete_status=202, list_status=200, get_status=200,
         collection=resources["ns"]["id"] + "/registryDevices", namespace_id=resources["ns"]["id"],
-        namespace_delete_status=204, namespace_get_status=200, namespace_get_transform=None, events=[],
+        namespace_delete_status=204, namespace_get_status=200, namespace_get_transform=None, events=[], delete_removes=True,
     )
 
     def respond(request):
@@ -96,7 +96,8 @@ def wire(tmp_path, monkeypatch, mocker):
         name = path.rsplit("/", 1)[-1]
         if request.method == "DELETE":
             if state.delete_status == 202:
-                del state.devices[name]
+                if state.delete_removes:
+                    del state.devices[name]
                 return 202, {"Azure-AsyncOperation": ARM + "/must-not-poll"}, ""
             return state.delete_status, {}, json.dumps({"error": {"code": "AuthorizationFailed"}})
         if name not in state.devices:
@@ -199,6 +200,28 @@ def test_real_sdk_resolves_external_id_to_distinct_arm_name_and_deletes_only_own
     )
     assert wire.factory.call_args.kwargs["subscription_id"] == SUB
     registry.require_registry_cleanup_resolved()
+
+
+def test_csr_handoff_retains_pending_namespace_and_targets_without_polling_or_replay(wire, monkeypatch, mocker):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    monkeypatch.setenv(handoff.ENV, str(wire.directory / "cleanup-receipts"))
+    controller(wire, mocker)
+    owner = start(wire)
+    wire.devices["arm-generated-name"] = device(wire)
+    owner.record_result(result())
+    wire.delete_removes = False
+    mocker.patch.object(registry, "wait_for_condition", side_effect=AssertionError("Cleanup must not poll"))
+    owner.cleanup()
+    assert not owner.cleanup_complete
+    csr.delete_namespace("ns")
+    for kind in ("csrdps", "csrhub"):
+        csr.fixtures._release_phase_fixture(UID, kind)
+    assert_retained(wire)
+    assert [path for method, path in wire.calls if method == "DELETE"] == [wire.collection + "/arm-generated-name"]
+    statuses = {value["resource"]: value["status"] for value in handoff.summary(wire.directory)}
+    assert all(statuses[wire.resources[name]["id"]] == "pending" for name in ("ns", "dps", "hub"))
+    assert not list(wire.directory.glob("deleted-*.json"))
 
 
 def test_arm_casing_variation_does_not_change_identity_or_external_id_matching(wire):
