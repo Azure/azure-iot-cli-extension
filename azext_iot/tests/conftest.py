@@ -11,10 +11,14 @@ import pytest
 import json
 import os
 from functools import partial
+from pathlib import Path
 from urllib3.util.retry import Retry
 
+import azext_iot
+from azext_iot.constants import VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
+from azure.cli.core.extension import DevExtension
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
@@ -134,6 +138,61 @@ def disable_cli_version_check(mocker):
         except (AttributeError, ModuleNotFoundError):
             # Older/newer azure-cli versions may not expose these symbols.
             pass
+
+
+@pytest.fixture
+def offline_cli(mocker, monkeypatch, tmp_path):
+    monkeypatch.setenv("AZURE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("AZURE_EXTENSION_DIR", str(tmp_path / "extensions"))
+    monkeypatch.setattr("azure.cli.core._config.GLOBAL_CONFIG_DIR", str(tmp_path))
+    guards = [
+        mocker.patch(target, side_effect=AssertionError("unexpected network access"))
+        for target in (
+            "requests.sessions.Session.send",
+            "socket.socket.connect",
+            "socket.create_connection",
+        )
+    ]
+    credential = mocker.Mock(spec=["get_token"])
+    credential.get_token.side_effect = AssertionError("unexpected token acquisition")
+    subscription_id = "00000000-0000-0000-0000-000000000000"
+    tenant_id = "11111111-1111-1111-1111-111111111111"
+    subscription = {
+        "id": subscription_id,
+        "name": "offline",
+        "state": "Enabled",
+        "tenantId": tenant_id,
+        "isDefault": True,
+        "environmentName": "AzureCloud",
+        "user": {"name": "offline@example.invalid", "type": "user"},
+    }
+    mocker.patch(
+        "azure.cli.core._profile.Profile.get_subscription", return_value=subscription
+    )
+    mocker.patch(
+        "azure.cli.core._profile.Profile.load_cached_subscriptions",
+        return_value=[subscription],
+    )
+    mocker.patch(
+        "azure.cli.core._profile.Profile.get_login_credentials",
+        return_value=(credential, subscription_id, tenant_id),
+    )
+    # Use the checkout's real registration, providers and SDKs, not an installed wheel.
+    assert Path(azext_iot.__file__).resolve().parent == Path(__file__).resolve().parents[1]
+    root = str(Path(azext_iot.__file__).resolve().parents[1])
+    extension = DevExtension("azure-iot", root)
+    metadata = dict(DevExtension.get_azext_metadata(root), version=VERSION)
+    mocker.patch.object(extension, "get_metadata", return_value=metadata)
+    mocker.patch("azure.cli.core.extension.get_extensions", return_value=[extension])
+    mocker.patch("azure.cli.core.extension.get_extension_path", return_value=root)
+    cli = DummyCli()
+    cli.config.set_value("extension", "use_dynamic_install", "no")
+    cli.config.set_value("core", "collect_telemetry", "no")
+    mocker.patch("azure.cli.testsdk.base.get_dummy_cli", return_value=cli)
+    yield cli
+    credential.get_token.assert_not_called()
+    for guard in guards:
+        guard.assert_not_called()
 
 
 # Sets current working directory to the directory of the executing file

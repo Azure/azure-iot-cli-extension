@@ -18,11 +18,7 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as validation_fixtures
 from azext_iot.tests.adr import _helpers, test_adr_link_int
-
-
-offline_cli = validation_fixtures.offline_cli
 
 
 def test_namespace_device_surface_and_backend_group_type_remain(offline_cli):
