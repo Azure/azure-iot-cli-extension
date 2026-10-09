@@ -2,19 +2,14 @@
 
 trigger: none
 pr: none
-name: release-pool-probe-$(Date:yyyyMMdd).$(Rev:r)
+name: release-feed-probe-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode
-    displayName: Diagnostic branch supports only the nonpublishing Plan mode
+    displayName: Diagnostic branch only checks package-feed access
     type: string
-    default: Plan
-    values: [Plan]
-  - name: sourceBranch
-    displayName: Protected branch containing the candidate and pipeline 147 migration
-    type: string
-    default: release/1.1.0-preview
-    values: [dev, preview, release/1.1.0-preview]
+    default: FeedCheck
+    values: [FeedCheck]
 
 resources:
   repositories:
@@ -36,7 +31,25 @@ extends:
         image: iotupx-1espt-windows2025
         os: windows
     stages:
-      - template: templates/release-stages.yml
-        parameters:
-          mode: Plan
-          sourceBranch: ${{ parameters.sourceBranch }}
+      - stage: FeedAccess
+        displayName: Verify service-connection access to the selected Python feed
+        jobs:
+          - job: FeedAccess
+            timeoutInMinutes: 15
+            steps:
+              - checkout: self
+                clean: true
+                persistCredentials: false
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: "3.13"
+              - task: AzureCLI@2
+                displayName: Download build tooling from the feed without installing or publishing
+                inputs:
+                  azureSubscription: aziotcli-sp-prime
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  visibleAzLogin: false
+                  inlineScript: python scripts/release_feed_probe.py
+                env:
+                  RELEASE_PIP_FEED_URL: https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/
