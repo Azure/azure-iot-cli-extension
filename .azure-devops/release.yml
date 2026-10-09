@@ -27,12 +27,14 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@governedTemplates
   parameters:
     pool:
-      name: iotupx-hosted-pool-prime
+      name: iotupx-1espt-release-probe
+      image: iotupx-1espt-ubuntu2404
       os: linux
     sdl:
       sourceAnalysisPool:
-        name: iotupx-hosted-pool-prime
-        os: linux
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-windows2025
+        os: windows
     stages:
       - template: templates/release-stages.yml
         parameters:
