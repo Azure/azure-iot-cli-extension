@@ -16,10 +16,8 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 from knack.util import CLIError
 
 from azext_iot import IoTExtCommandsLoader
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as validation_tests
 
 
-offline_cli = validation_tests.offline_cli
 WAIT_COMMANDS = {
     "dt wait": ("azext_iot.digitaltwins.commands_resource.wait_instance", ""),
     "dt endpoint wait": ("azext_iot.digitaltwins.commands_resource.wait_endpoint", "--en endpoint"),
@@ -178,6 +176,18 @@ def test_registered_wait_preserves_original_exception(mocker, raises):
     with pytest.raises(CLIError) as caught:
         loader.command_table["test wait"].handler({})
     assert caught.value is error
+
+
+def test_registered_wait_preserves_handler_metadata():
+    loader = IoTExtCommandsLoader(DummyCli())
+    operation = WaitCommandOperation(loader, "unused#get")
+    original_handler = operation.handler
+    loader.add_cli_command("test wait", operation)
+    handler = loader.command_table["test wait"].handler
+
+    assert handler.__wrapped__ == original_handler
+    assert handler.__name__ == original_handler.__name__
+    assert handler.__doc__ == original_handler.__doc__
 
 
 def test_other_loaders_and_non_wait_commands_are_unchanged(mocker):

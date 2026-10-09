@@ -21,7 +21,6 @@ from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_EN
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.topology import writable_namespace_properties
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
-from azext_iot.tests.adr.test_adr_validation_scenarios_unit import offline_cli  # noqa: F401
 
 
 KINDS = [
@@ -244,7 +243,7 @@ def test_delete_real_sdk_preserves_backend_error_without_retries(fixture_cmd, st
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-def test_delete_real_cli_returns_initial_response(offline_cli, mocker, kind, section, _endpoint_type):  # noqa: F811
+def test_delete_real_cli_returns_initial_response(offline_cli, mocker, kind, section, _endpoint_type):
     get = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=namespace())
     initial = {"properties": {"provisioningState": "Accepted"}}
     put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
@@ -259,7 +258,7 @@ def test_delete_real_cli_returns_initial_response(offline_cli, mocker, kind, sec
 
 @pytest.mark.parametrize("option", ["--no-wait", "--timeout", "--interval", "--delete-linked-resource", "--system-assigned-mi"])
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):  # noqa: F811
+def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):
     with pytest.raises(SystemExit) as raised:
         offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
                             "-g", "rg", "--yes", option, *(["10"] if option in ("--timeout", "--interval") else [])])

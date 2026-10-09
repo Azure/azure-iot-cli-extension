@@ -20,9 +20,6 @@ from azure.cli.core.parser import AzCliCommandParser
 
 from azext_iot import IoTExtCommandsLoader
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as cli_tests
-
-offline_cli = cli_tests.offline_cli
 
 
 @pytest.mark.parametrize("hub_option,dps_option", [

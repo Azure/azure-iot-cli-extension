@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from functools import wraps
+
 from azure.cli.core import AzCommandsLoader
 from azure.cli.core.commands import CliCommandType
 from azure.cli.core.commands.command_operation import WaitCommandOperation
@@ -23,6 +25,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         if isinstance(command_operation, WaitCommandOperation):
             original_handler = command_operation.handler
 
+            @wraps(original_handler)
             def wait_handler(command_args):
                 result = original_handler(command_args)
                 # Some CLI core versions return a timeout exception as successful output.

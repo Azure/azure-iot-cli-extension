@@ -3,12 +3,15 @@
 Release History
 ===============
 
-1.0.0b2 (Preview)
+1.1.0b1 (Preview)
 +++++++++++++++++
 
 **Wait command bug fixes**
 
-* Generic wait commands now fail with a nonzero exit code and the timeout message when their condition is not met, instead of returning successful empty JSON on affected Azure CLI versions. This covers Digital Twins and Device Update waits without changing their conditions or polling behavior.
+* Digital Twins and Device Update generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
+
+1.0.0b2 (Preview)
++++++++++++++++++
 
 **ADR bug fixes**
 
