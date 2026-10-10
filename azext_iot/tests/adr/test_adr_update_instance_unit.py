@@ -24,7 +24,9 @@ from azure.core.exceptions import HttpResponseError
 from azext_iot import _factory
 from azext_iot.adr.common import build_managed_service_identity
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
-from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
+from azext_iot.sdk.deviceupdate.duregistry import (
+    DeviceRegistrySoftwareUpdateMgmtClient,
+)
 from azext_iot.sdk.deviceupdate.duregistry.operations import (
     UpdateInstancesOperations,
 )
@@ -65,8 +67,7 @@ def update_instance_provider():
 
 @pytest.fixture()
 def wire_update_instance_provider():
-    """Provider backed by a real DeviceUpdateClient over a mocked transport, so
-    identity assertions run against the actual serialized PATCH request."""
+    """Use the generated management client with a mocked transport."""
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
     with patch(
@@ -74,7 +75,7 @@ def wire_update_instance_provider():
         "adr_update_instance_service_factory"
     ):
         provider = UpdateInstanceProvider(Mock(cli_ctx=Mock()))
-    with DeviceUpdateClient(
+    with DeviceRegistrySoftwareUpdateMgmtClient(
         credential, SUBSCRIPTION, polling_interval=0, retry_total=0
     ) as client:
         provider.client = client
@@ -193,70 +194,31 @@ def test_wait_uses_standard_arm_poller(update_instance_provider):
         ),
     ],
 )
-def test_all_update_instance_mutations_return_adapted_poller_for_no_wait(
+def test_all_update_instance_mutations_return_native_poller_for_no_wait(
     update_instance_provider,
     method_name,
     begin_name,
     kwargs,
 ):
     raw_poller = object()
-    adapted_poller = object()
     begin_operation = getattr(
         update_instance_provider.client.update_instances,
         begin_name,
     )
     begin_operation.return_value = raw_poller
 
-    with patch(
-        "azext_iot.adr.providers.update_instance.adapt_modeless_lro_poller",
-        return_value=adapted_poller,
-    ) as adapter:
-        result = getattr(update_instance_provider, method_name)(
-            INSTANCE,
-            RG,
-            no_wait=True,
-            **kwargs,
-        )
-
-    assert result is adapted_poller
-    begin_operation.assert_called_once()
-    adapter.assert_called_once_with(raw_poller)
-
-
-def test_every_update_instance_begin_call_is_wrapped_by_modeless_adapter():
-    import azext_iot.adr.providers.update_instance as module
-
-    tree = ast.parse(inspect.getsource(module))
-    parents = {
-        child: parent
-        for parent in ast.walk(tree)
-        for child in ast.iter_child_nodes(parent)
-    }
-    begin_calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in {"begin_create", "begin_update", "begin_delete"}
-        and isinstance(node.func.value, ast.Attribute)
-        and node.func.value.attr == "update_instances"
-    ]
-
-    assert {node.func.attr for node in begin_calls} == {
-        "begin_create",
-        "begin_update",
-        "begin_delete",
-    }
-    assert all(
-        isinstance(parents.get(node), ast.Call)
-        and isinstance(parents[node].func, ast.Name)
-        and parents[node].func.id == "adapt_modeless_lro_poller"
-        for node in begin_calls
+    result = getattr(update_instance_provider, method_name)(
+        INSTANCE,
+        RG,
+        no_wait=True,
+        **kwargs,
     )
 
+    assert result is raw_poller
+    begin_operation.assert_called_once()
 
-def test_generated_update_instance_callbacks_remain_unpatched():
-    """Keep the temporary repair at CLI call sites, outside generated SDK code."""
+
+def test_generated_update_instance_callbacks_assign_response_natively():
     tree = ast.parse(dedent(inspect.getsource(UpdateInstancesOperations)))
     operation_class = next(
         node for node in tree.body if isinstance(node, ast.ClassDef)
@@ -284,17 +246,22 @@ def test_generated_update_instance_callbacks_remain_unpatched():
             "pipeline_response"
         ]
     for operation_name in ("begin_create", "begin_update"):
-        assert any(
-            isinstance(node, ast.Name)
-            and node.id == "response"
-            and isinstance(node.ctx, ast.Load)
+        assignments = [
+            node
             for node in ast.walk(callbacks[operation_name])
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "response"
+                for target in node.targets
+            )
+        ]
+        assert any(
+            isinstance(node.value, ast.Attribute)
+            and node.value.attr == "http_response"
+            and isinstance(node.value.value, ast.Name)
+            and node.value.value.id == "pipeline_response"
+            for node in assignments
         )
-    assert not any(
-        isinstance(node, ast.Name)
-        and node.id == "adapt_modeless_lro_poller"
-        for node in ast.walk(operation_class)
-    )
 
 
 def test_create_builds_complete_resource_and_waits(update_instance_provider):
@@ -721,7 +688,8 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint(monk
         "https://management.core.windows.net/"
     )
     client_path = (
-        "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient"
+        "azext_iot.sdk.deviceupdate.duregistry."
+        "DeviceRegistrySoftwareUpdateMgmtClient"
     )
     with patch(
         "azure.cli.core.commands.client_factory.get_subscription_id",

@@ -31,9 +31,8 @@ from azure.mgmt.core.exceptions import ARMErrorFormat
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
 from .. import types as _types
-from .._configuration import DeviceUpdateClientConfiguration
+from .._configuration import DeviceRegistrySoftwareUpdateMgmtClientConfiguration
 from .._utils.serialization import Deserializer, Serializer
-from .._validation import api_version_validation
 
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, dict[str, Any]], Any]]
@@ -409,14 +408,16 @@ class Operations:  # pylint: disable=docstring-missing-param
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient`'s
+        :class:`~azext_iot.sdk.deviceupdate.duregistry.DeviceRegistrySoftwareUpdateMgmtClient`'s
         :attr:`operations` attribute.
     """
 
     def __init__(self, *args, **kwargs) -> None:
         input_args = list(args)
         self._client: PipelineClient = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config: DeviceUpdateClientConfiguration = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._config: DeviceRegistrySoftwareUpdateMgmtClientConfiguration = (
+            input_args.pop(0) if input_args else kwargs.pop("config")
+        )
         self._serialize: Serializer = input_args.pop(0) if input_args else kwargs.pop("serializer")
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
@@ -533,31 +534,20 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient`'s
+        :class:`~azext_iot.sdk.deviceupdate.duregistry.DeviceRegistrySoftwareUpdateMgmtClient`'s
         :attr:`update_instances` attribute.
     """
 
     def __init__(self, *args, **kwargs) -> None:
         input_args = list(args)
         self._client: PipelineClient = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config: DeviceUpdateClientConfiguration = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._config: DeviceRegistrySoftwareUpdateMgmtClientConfiguration = (
+            input_args.pop(0) if input_args else kwargs.pop("config")
+        )
         self._serialize: Serializer = input_args.pop(0) if input_args else kwargs.pop("serializer")
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def get(self, resource_group_name: str, update_instance_name: str, **kwargs: Any) -> _types.UpdateInstance:
         """Returns update instance details for the given update instance name.
 
@@ -673,20 +663,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
 
         return deserialized  # type: ignore
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _create_initial(
         self, resource_group_name: str, update_instance_name: str, resource: _types.UpdateInstance, **kwargs: Any
     ) -> Iterator[bytes]:
@@ -756,20 +732,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def begin_create(
         self, resource_group_name: str, update_instance_name: str, resource: _types.UpdateInstance, **kwargs: Any
     ) -> LROPoller[_types.UpdateInstance]:
@@ -891,6 +853,7 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -922,20 +885,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
             self._client, raw_result, get_long_running_output, polling_method  # type: ignore
         )
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _update_initial(
         self,
         resource_group_name: str,
@@ -1010,20 +959,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def begin_update(
         self,
         resource_group_name: str,
@@ -1129,6 +1064,7 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -1160,13 +1096,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
             self._client, raw_result, get_long_running_output, polling_method  # type: ignore
         )
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": ["api_version", "subscription_id", "resource_group_name", "update_instance_name"]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _delete_initial(self, resource_group_name: str, update_instance_name: str, **kwargs: Any) -> Iterator[bytes]:
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -1227,13 +1156,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": ["api_version", "subscription_id", "resource_group_name", "update_instance_name"]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def begin_delete(self, resource_group_name: str, update_instance_name: str, **kwargs: Any) -> LROPoller[None]:
         """Deletes an update instance.
 
@@ -1293,11 +1215,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={"2026-07-02-preview": ["api_version", "subscription_id", "resource_group_name", "accept"]},
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged["_types.UpdateInstance"]:
         """Returns list of Update Instances.
 
@@ -1434,11 +1351,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={"2026-07-02-preview": ["api_version", "subscription_id", "accept"]},
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.UpdateInstance"]:
         """Returns list of Update Instances.
 
@@ -1571,11 +1483,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={"2026-07-02-preview": ["api_version", "subscription_id", "content_type", "accept"]},
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def check_name_availability(
         self, body: _types.CheckNameAvailabilityRequest, **kwargs: Any
     ) -> _types.CheckNameAvailabilityResult:
@@ -1667,20 +1574,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _link_preflight(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkPreflightRequest, **kwargs: Any
     ) -> _types.LinkPreflightResponse:
@@ -1817,20 +1710,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
 
         return deserialized  # type: ignore
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _link_initiate_initial(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkInitiateRequest, **kwargs: Any
     ) -> Iterator[bytes]:
@@ -1901,20 +1780,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _begin_link_initiate(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkInitiateRequest, **kwargs: Any
     ) -> LROPoller[None]:
@@ -1994,20 +1859,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
             )
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _link_notify_initial(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkNotifyRequest, **kwargs: Any
     ) -> Iterator[bytes]:
@@ -2078,20 +1929,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _begin_link_notify(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkNotifyRequest, **kwargs: Any
     ) -> LROPoller[None]:
@@ -2167,20 +2004,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
             )
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _link_update_initial(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkUpdateRequest, **kwargs: Any
     ) -> Iterator[bytes]:
@@ -2251,20 +2074,6 @@ class UpdateInstancesOperations:  # pylint: disable=docstring-missing-param
         return deserialized  # type: ignore
 
     @distributed_trace
-    @api_version_validation(
-        method_added_on="2026-07-02-preview",
-        params_added_on={
-            "2026-07-02-preview": [
-                "api_version",
-                "subscription_id",
-                "resource_group_name",
-                "update_instance_name",
-                "content_type",
-                "accept",
-            ]
-        },
-        api_versions_list=["2026-07-02-preview", "2026-11-02-preview"],
-    )
     def _begin_link_update(
         self, resource_group_name: str, update_instance_name: str, body: _types.LinkUpdateRequest, **kwargs: Any
     ) -> LROPoller[None]:

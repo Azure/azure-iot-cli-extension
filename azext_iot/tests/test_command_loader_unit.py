@@ -960,7 +960,7 @@ def test_dps_valid_unit_actual_cli_to_sdk_json(dps_management_cli, unit, capacit
     assert body["sku"] == {"name": "S1", "capacity": capacity}
     assert body["location"] == "centraluseuap"
     assert body["properties"] == {}
-    assert all("api-version=2026-06-01-preview" in request.url for request in runtime.requests
+    assert all("api-version=2026-11-01" in request.url for request in runtime.requests
                if "Microsoft.Devices" in request.url)
     assert runtime.location_factory.call_count == (0 if location else 1)
 

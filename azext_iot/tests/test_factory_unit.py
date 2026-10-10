@@ -76,7 +76,11 @@ MANAGEMENT_FACTORIES = [
     ("adr_service_factory", "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient", "base_url"),
     ("adr_iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient", "base_url"),
     ("adr_iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient", "base_url"),
-    ("adr_update_instance_service_factory", "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient", "base_url"),
+    (
+        "adr_update_instance_service_factory",
+        "azext_iot.sdk.deviceupdate.duregistry.DeviceRegistrySoftwareUpdateMgmtClient",
+        "base_url",
+    ),
 ]
 
 
@@ -232,7 +236,6 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
     from urllib.parse import parse_qs, urlsplit
     from azure.cli.core.auth.credential_adaptor import CredentialAdaptor
     from azext_iot._factory import adr_service_factory
-    from azext_iot.common.arm import adapt_modeless_lro_poller
 
     import platform
     platform.processor()
@@ -275,9 +278,7 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
                     resource={"location": "centraluseuap"},
                     polling=False,
                 )
-                # This tests authentication/transport, not the current ADR
-                # generator's final-response callback defect.
-                result = adapt_modeless_lro_poller(poller).result()
+                result = poller.result()
         assert result["name"] == "namespace"
 
     spawn.assert_not_called()
@@ -326,7 +327,7 @@ def test_dps_request_uses_canary_endpoint_and_preserves_api_version(
         result = client.iot_dps_resource.get(provisioning_service_name="test-dps", resource_group_name="rg")
 
     assert result == {"name": "test-dps"}
-    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-06-01-preview"]
+    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-11-01"]
     assert credential.get_token.call_args.args == tuple(cloud_config["expected_scopes"])
 
 
@@ -401,7 +402,7 @@ ORDINARY_MANAGEMENT_OPERATIONS = [
     ("iot_hub_service_factory", "iot_hub_resource", "IotHubs",
      "resource_name", "iot_hub_description", "2026-10-01-preview"),
     ("iot_service_provisioning_factory", "iot_dps_resource", "provisioningServices",
-     "provisioning_service_name", "iot_dps_description", "2026-06-01-preview"),
+     "provisioning_service_name", "iot_dps_description", "2026-11-01"),
 ]
 
 
