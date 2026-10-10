@@ -788,6 +788,28 @@ def adr_namespace_setup(
     yes: bool = False,
     plain: bool = False,
 ):
+    if config:
+        from azext_iot.adr.workflows.configuration import load_config
+
+        config = load_config(config)
+    if (
+        sys.stdin.isatty() and sys.stderr.isatty()
+        and not (no_input or plain or yes or plan_only or _structured_output_requested(cmd))
+    ):
+        from azext_iot.adr.workflows.tui import run_setup
+
+        result = run_setup(
+            cmd, config=config, namespace_name=namespace_name,
+            resource_group_name=resource_group_name, location=location, tags=tags,
+            namespace_outbound_identity=namespace_outbound_identity,
+            dps=dps, hubs=hubs, software_updates=software_updates,
+            complete_connectivity=complete_connectivity, output_script=output_script,
+        )
+        if result:
+            _persist_receipt(result)
+            if result["state"] in {"Blocked", "Failed", "Stopped"}:
+                raise CLIError("Setup did not complete. Re-run the saved configuration to re-read and resume.")
+        return result
     interactive = (
         sys.stdin.isatty()
         and sys.stderr.isatty()
@@ -889,7 +911,7 @@ def adr_namespace_setup(
             missing_commands = [
                 item
                 for item in items
-                if item.state in {"Planned", "Manual"} and not item.command
+                if item.action != "role" and item.state in {"Planned", "Manual"} and not item.command
             ]
             if missing_commands:
                 renderer.close()

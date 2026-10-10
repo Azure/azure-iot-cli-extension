@@ -4,10 +4,20 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import contextmanager
+from copy import deepcopy
+import json
+from pathlib import Path
+import shlex
+from tempfile import TemporaryDirectory
+
 import pytest
+from knack.util import CLIError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper, CleanupLedger, resource_is_absent, wait_for_resource_absent,
+)
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -22,6 +32,30 @@ from azext_iot.tests.generators import generate_generic_id
 class TestADRNamespaceWorkflow(
     ADRFullInfraHelper, ADRLiveScenarioTest
 ):
+    @contextmanager
+    def _owned_configuration(self, resources):
+        """Claim absent resources before setup can create any of them."""
+        for prefix, arguments, _confirmation in resources:
+            show = f"{prefix} show {arguments}"
+            if not resource_is_absent(self, show):
+                raise AssertionError(f"Refusing to overwrite an existing setup resource: {show}")
+        ledger = CleanupLedger()
+
+        def remove(prefix, arguments, confirmation):
+            show = f"{prefix} show {arguments}"
+            if not resource_is_absent(self, show):
+                self.cmd(f"{prefix} delete {arguments}{confirmation}")
+                wait_for_resource_absent(self, show)
+
+        # Caller supplies child-before-parent/unlink-before-target deletion order.
+        for index, resource in reversed(list(enumerate(resources))):
+            ledger.register(
+                str(index), lambda resource=resource: remove(*resource),
+                depends_on=(str(index - 1),) if index else (),
+            )
+        with ledger:
+            yield
+
     def test_namespace_setup_tagged_plan_is_read_only(self):
         namespace_name = generate_adr_namespace_name()
         plan = self.cmd(
@@ -217,3 +251,104 @@ class TestADRNamespaceWorkflow(
             assert linked["linkingState"] == "Succeeded"
         finally:
             self.cleanup_full_infra()
+
+    def test_namespace_setup_json_managed_cms_reuse(self):
+        namespace = generate_adr_namespace_name()
+        scope = f"--ns {namespace} -g {TEST_RG}"
+        namespace_args = f"-n {namespace} -g {TEST_RG}"
+        config = {
+            "schemaVersion": 1,
+            "subscriptionId": self.get_subscription_id(),
+            "namespace": {
+                "name": namespace, "resourceGroup": TEST_RG, "location": TEST_LOCATION,
+                "outboundIdentity": {"type": "SystemAssigned"},
+            },
+            "cms": {
+                "enabled": True, "rootName": "setup-root", "intermediateName": "setup-ica",
+                "policyName": "setup-devices", "validityDays": 30,
+            },
+            "checkStatus": True,
+        }
+        resources = [
+            ("iot adr ns ca policy", f"-n setup-devices --ca-name setup-ica {scope}", " --yes"),
+            ("iot adr ns ca", f"-n setup-ica {scope}", " --yes"),
+            ("iot adr ns ca", f"-n setup-root {scope}", " --yes"),
+            ("iot adr ns", namespace_args, " --yes"),
+        ]
+        with self._owned_configuration(resources), TemporaryDirectory(prefix="adr-setup-json-") as directory:
+            path = Path(directory) / "managed.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            setup = f"iot adr ns setup --config {shlex.quote('@' + str(path))} --no-input"
+            plan = self.cmd(f"{setup} --plan-only").get_output_in_json()
+            assert plan["state"] == "Planned"
+            assert resource_is_absent(self, f"iot adr ns show {namespace_args}")
+            assert self.cmd(f"{setup} --yes").get_output_in_json()["state"] == "Succeeded"
+            issuing = self.cmd(f"iot adr ns ca show -n setup-ica {scope}").get_output_in_json()
+            assert issuing["properties"]["issuer"]["issuerType"] == "Microsoft"
+            policy_show = f"iot adr ns ca policy show -n setup-devices --ca-name setup-ica {scope}"
+            policy = self.cmd(policy_show).get_output_in_json()
+            assert policy["properties"]["certificate"]["validityPeriodInDays"] == 30
+            assert self.cmd(f"{setup} --yes").get_output_in_json()["state"] == "Succeeded"
+            assert self.cmd(policy_show).get_output_in_json()["id"] == policy["id"]
+            assert self.cmd(f"iot adr ns check {namespace_args}").get_output_in_json()["state"] == "Succeeded"
+
+            incompatible = deepcopy(config)
+            incompatible["cms"]["validityDays"] = 31
+            path.write_text(json.dumps(incompatible), encoding="utf-8")
+            blocked = self.cmd(f"{setup} --plan-only").get_output_in_json()
+            assert blocked["state"] == "Blocked"
+            assert self.cmd(policy_show).get_output_in_json()["properties"]["certificate"]["validityPeriodInDays"] == 30
+
+    def test_namespace_setup_json_creates_link_targets(self):
+        namespace = generate_adr_namespace_name()
+        dps_name = generate_dps_name()
+        hub_name = generate_hub_name()
+        namespace_args = f"-n {namespace} -g {TEST_RG}"
+        config = {
+            "schemaVersion": 1,
+            "subscriptionId": self.get_subscription_id(),
+            "namespace": {
+                "name": namespace, "resourceGroup": TEST_RG, "location": TEST_LOCATION,
+                "outboundIdentity": {"type": "SystemAssigned"},
+            },
+            "links": {
+                "dps": {"resourceName": dps_name, "identity": "system-assigned", "createIfMissing": True},
+                "hubs": [{
+                    "resourceName": hub_name, "identity": "system-assigned", "createIfMissing": True,
+                    "sku": "S1", "unit": 1,
+                }],
+            },
+            "checkStatus": True,
+        }
+        resources = [
+            ("iot adr ns", namespace_args, " --yes"),
+            ("iot dps", f"-n {dps_name} -g {TEST_RG}", ""),
+            ("iot hub", f"-n {hub_name} -g {TEST_RG}", ""),
+        ]
+        with self._owned_configuration(resources), TemporaryDirectory(prefix="adr-setup-json-") as directory:
+            path = Path(directory) / "connected.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            setup = f"iot adr ns setup --config {shlex.quote(str(path))} --no-input"
+            assert self.cmd(f"{setup} --plan-only").get_output_in_json()["state"] == "Planned"
+            for prefix, arguments, _ in resources:
+                assert resource_is_absent(self, f"{prefix} show {arguments}")
+            assert self.cmd(f"{setup} --yes").get_output_in_json()["state"] == "Succeeded"
+            hub = self.cmd(f"iot hub show -n {hub_name} -g {TEST_RG}").get_output_in_json()
+            assert hub["properties"]["disableLocalAuth"] is True
+            assert hub["location"].replace(" ", "").lower() == TEST_LOCATION.replace(" ", "").lower()
+            assert self.cmd(f"{setup} --yes").get_output_in_json()["state"] == "Succeeded"
+            assert self.cmd(f"iot adr ns check {namespace_args}").get_output_in_json()["state"] == "Succeeded"
+
+    def test_namespace_setup_json_rejects_invalid_input_before_creation(self):
+        namespace = generate_adr_namespace_name()
+        config = {"namespace": {"name": namespace, "resourceGroup": TEST_RG, "location": TEST_LOCATION}}
+        show = f"iot adr ns show -n {namespace} -g {TEST_RG}"
+        assert resource_is_absent(self, show)
+        with TemporaryDirectory(prefix="adr-invalid-setup-") as directory:
+            path = Path(directory) / "invalid.json"
+            external = dict(config, cms={"enabled": True, "issuerType": "External"})
+            for text in ("{broken", json.dumps(dict(config, unknownOption=True)), json.dumps(external)):
+                path.write_text(text, encoding="utf-8")
+                with pytest.raises(CLIError):
+                    self.cmd(f"iot adr ns setup --config {shlex.quote(str(path))} --no-input --yes")
+                assert resource_is_absent(self, show)

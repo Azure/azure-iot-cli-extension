@@ -154,3 +154,39 @@ def test_plan_only_workflow_scenario_never_claims_resources(scenario):
     assert not scenario.resources
     assert not scenario._owned_resources
     assert not scenario.deleted
+
+
+def test_json_configuration_cleanup_orders_children_before_parents(mocker):
+    fake = SimpleNamespace(cmd=mocker.Mock())
+    resources = [("policy", "-n child", " --yes"), ("ca", "-n parent", " --yes"), ("ns", "-n ns", " --yes")]
+    absent = mocker.patch.object(scenarios, "resource_is_absent", side_effect=[True, True, True, False, False, False])
+    wait = mocker.patch.object(scenarios, "wait_for_resource_absent")
+    with scenarios.TestADRNamespaceWorkflow._owned_configuration(fake, resources):
+        assert absent.call_count == 3
+    assert fake.cmd.call_args_list == [
+        mocker.call("policy delete -n child --yes"),
+        mocker.call("ca delete -n parent --yes"),
+        mocker.call("ns delete -n ns --yes"),
+    ]
+    assert wait.call_count == 3
+
+
+def test_json_configuration_never_claims_existing_resources(mocker):
+    fake = SimpleNamespace(cmd=mocker.Mock())
+    mocker.patch.object(scenarios, "resource_is_absent", side_effect=[True, False])
+    with pytest.raises(AssertionError, match="Refusing to overwrite"):
+        with scenarios.TestADRNamespaceWorkflow._owned_configuration(
+                fake, [("policy", "-n child", " --yes"), ("ns", "-n ns", " --yes")]):
+            raise AssertionError("Setup must not start")
+    fake.cmd.assert_not_called()
+
+
+def test_json_configuration_cleans_partial_creation_preserving_error(mocker):
+    fake = SimpleNamespace(cmd=mocker.Mock())
+    mocker.patch.object(scenarios, "resource_is_absent", side_effect=[True, True, True, False])
+    mocker.patch.object(scenarios, "wait_for_resource_absent")
+    with pytest.raises(RuntimeError, match="setup failed"):
+        with scenarios.TestADRNamespaceWorkflow._owned_configuration(
+                fake, [("policy", "-n child", " --yes"), ("ns", "-n ns", " --yes")]):
+            raise RuntimeError("setup failed")
+    fake.cmd.assert_called_once_with("ns delete -n ns --yes")

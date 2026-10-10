@@ -28,6 +28,7 @@ from azext_iot.adr.workflows.models import (
     WorkflowExecutionError,
     workflow_result,
 )
+from azext_iot.adr.workflows.capabilities import apply_cms, plan_cms
 from azext_iot.adr.workflows.services import (
     WorkflowServices,
     as_dict,
@@ -99,13 +100,17 @@ def _link_matches(link: Dict[str, Any], endpoint: EndpointSpec) -> bool:
     )
     identity_type = str(value_of(identity, "type") or "")
     if endpoint.identity_type == "system-assigned":
-        return identity_type == "SystemAssigned"
-    current_uami = value_of(
-        identity, "userAssignedIdentity", "user_assigned_identity"
+        matches = identity_type == "SystemAssigned"
+    else:
+        current_uami = value_of(identity, "userAssignedIdentity", "user_assigned_identity")
+        matches = identity_type == "UserAssigned" and _normalize_id(current_uami) == _normalize_id(
+            endpoint.user_assigned_identity
+        )
+    provisioning = as_dict(link.get("provisioning"))
+    return matches and all(
+        requested is None or provisioning.get(key) == requested
+        for key, requested in (("availability", endpoint.availability), ("allocationWeight", endpoint.allocation_weight))
     )
-    return identity_type == "UserAssigned" and _normalize_id(
-        current_uami
-    ) == _normalize_id(endpoint.user_assigned_identity)
 
 
 def _link_state(link: Dict[str, Any]) -> str:
@@ -299,6 +304,10 @@ class NamespaceWorkflow:
         )
 
     def plan_setup(self, request: SetupRequest) -> Tuple[Dict[str, Any], List[PlanItem]]:
+        if request.subscription_id and request.subscription_id.casefold() != self.services.subscription_id.casefold():
+            raise ArgumentUsageError(
+                "Setup subscriptionId differs from the selected subscription. Select the matching --subscription and rerun."
+            )
         items: List[PlanItem] = []
         endpoint_names = [
             endpoint.endpoint_name.casefold()
@@ -330,6 +339,9 @@ class NamespaceWorkflow:
         namespace = self.services.show_namespace(
             request.namespace_name, request.resource_group_name
         )
+        location = self.services.setup_location(request, namespace)
+        self.services.validate_setup_identity(request, namespace)
+        cms_items = plan_cms(request, namespace, self._run, self.services)
         if namespace is None:
             create_command = (
                 f"az iot adr ns create -n {_quote(request.namespace_name)} "
@@ -475,11 +487,11 @@ class NamespaceWorkflow:
                     workflow_scope=endpoint.kind,
                     handled_error=(
                         is_not_found
-                        if endpoint.kind == "software-updates"
-                        and request.create_update_instance
+                        if self._may_create(request, endpoint)
                         else None
                     ),
                 )
+                self.services.validate_setup_target(endpoint, resources[key], location)
                 resource_items.append(
                     PlanItem(
                         f"resource-{key}",
@@ -488,16 +500,16 @@ class NamespaceWorkflow:
                         STATE_SATISFIED,
                     )
                 )
-            except Exception as error:  # noqa: BLE001 - only SU may be planned
+            except Exception as error:  # noqa: BLE001 - only confirmed missing resources may be created
                 if (
-                    endpoint.kind == "software-updates"
-                    and request.create_update_instance
+                    self._may_create(request, endpoint)
                     and is_not_found(error)
                 ):
                     self._run(
-                        "Validate Update Instance creation",
-                        self.services.validate_update_instance_creation,
+                        f"Validate {endpoint.kind} creation",
+                        self.services.validate_target_creation,
                         endpoint,
+                        location,
                         workflow_scope=endpoint.kind,
                     )
                     resource_items.append(
@@ -506,6 +518,15 @@ class NamespaceWorkflow:
                             "create",
                             endpoint.resource_id,
                             STATE_PLANNED,
+                            command=(
+                                self.services.target_create_command(endpoint, location)
+                                if endpoint.kind in ("hub", "dps") else ""
+                            ),
+                            details={
+                                "location": location,
+                                **({"sku": endpoint.sku or "S1", "unit": endpoint.unit or 1}
+                                   if endpoint.kind in ("hub", "dps") else {}),
+                            },
                         )
                     )
                     continue
@@ -595,7 +616,8 @@ class NamespaceWorkflow:
                     elif link_state in {"Failed", "Canceled"}:
                         state = STATE_BLOCKED
                         message = (
-                            f"Matching endpoint is in {link_state} state."
+                            f"Matching endpoint is in {link_state} state. Inspect its linkingError "
+                            "and use the atomic link recovery/update commands before rerunning setup."
                         )
                     else:
                         state = STATE_PLANNED
@@ -604,7 +626,7 @@ class NamespaceWorkflow:
                         )
                 else:
                     state = STATE_BLOCKED
-                    message = "Endpoint name already targets another resource or identity."
+                    message = "Endpoint name already targets another resource, identity, or provisioning options."
             elif matching_name:
                 state = STATE_BLOCKED
                 message = (
@@ -647,22 +669,44 @@ class NamespaceWorkflow:
                     if endpoint.kind == "software-updates"
                     else endpoint.kind
                 )
+                roles = []
+                resource = resources.get(self._endpoint_key(endpoint))
+                target_principal = self.services.principal_for_identity(
+                    endpoint.identity_type, endpoint.user_assigned_identity, resource,
+                ) if resource else None
+                if namespace and resource and _outbound_matches(namespace, request):
+                    roles = self._roles_for(
+                        endpoint, namespace,
+                        self.services.namespace_outbound_principal(namespace),
+                        target_principal,
+                    )
                 items.append(
                     PlanItem(
                         f"roles-{self._endpoint_key(endpoint)}",
-                        "validate",
+                        "role",
                         endpoint.resource_id,
-                        STATE_SATISFIED,
+                        STATE_PLANNED,
                         (
-                            "The atomic link command validates and creates "
-                            "missing service roles before namespace mutation. "
+                            "ROLE write possible: role validation is pending. The atomic link command "
+                            "validates and creates missing service roles, including on reuse. "
                             f"Required roles: {format_role_requirements(link_type)}."
                         ),
                         dependencies=("namespace-outbound-identity",),
+                        details={
+                            "roleValidation": "pending", "roles": roles,
+                            "linkedPrincipalId": target_principal,
+                            "targetScope": endpoint.resource_id,
+                            "namespaceScope": (namespace or {}).get("id") or (
+                                f"/subscriptions/{request.subscription_id or self.services.subscription_id}"
+                                f"/resourceGroups/{request.resource_group_name}"
+                                f"/providers/Microsoft.DeviceRegistry/namespaces/{request.namespace_name}"
+                            ),
+                        },
                     )
                 )
 
         items.extend(link_items)
+        items.extend(cms_items)
         for capability in request.skipped:
             items.append(
                 PlanItem(
@@ -692,8 +736,8 @@ class NamespaceWorkflow:
                 )
             )
         for item in items:
-            if item.command and request.subscription_id:
-                item.command += f" --subscription {_quote(request.subscription_id)}"
+            if item.command:
+                item.command += f" --subscription {_quote(request.subscription_id or self.services.subscription_id)}"
         state = (
             STATE_BLOCKED
             if any(item.state == STATE_BLOCKED for item in items)
@@ -821,6 +865,7 @@ class NamespaceWorkflow:
 
         self._resolve_or_create_resources(request, namespace, items)
         self._apply_links(request, namespace, items)
+        apply_cms(request, self._run, self.services, items)
         if request.check_status:
             self._append_status_check(request, items)
         result_state = (
@@ -957,23 +1002,21 @@ class NamespaceWorkflow:
                     workflow_scope=endpoint.kind,
                     handled_error=(
                         is_not_found
-                        if endpoint.kind == "software-updates"
-                        and request.create_update_instance
+                        if self._may_create(request, endpoint)
                         else None
                     ),
                 )
                 state = STATE_SATISFIED
                 action = "reuse"
-            except Exception as error:  # noqa: BLE001 - only planned SU creation
+            except Exception as error:  # noqa: BLE001 - only planned creation
                 if not (
-                    endpoint.kind == "software-updates"
-                    and request.create_update_instance
+                    self._may_create(request, endpoint)
                     and is_not_found(error)
                 ):
                     raise
                 resource = self._run(
-                    f"Create Update Instance {endpoint.endpoint_name}",
-                    self.services.create_update_instance,
+                    f"Create {endpoint.kind} {endpoint.endpoint_name}",
+                    self.services.create_update_instance if endpoint.kind == "software-updates" else self.services.create_target,
                     endpoint,
                     request.location or namespace.get("location"),
                     workflow_scope=endpoint.kind,
@@ -991,6 +1034,10 @@ class NamespaceWorkflow:
                 )
             )
         return resources
+
+    @staticmethod
+    def _may_create(request, endpoint):
+        return endpoint.create_if_missing or (endpoint.kind == "software-updates" and request.create_update_instance)
 
     def _apply_links(
         self,
@@ -1093,6 +1140,10 @@ class NamespaceWorkflow:
     ):
         item_id = f"link-{self._endpoint_key(endpoint)}"
         current = as_dict(existing.get(endpoint.endpoint_name))
+        if current and (not _link_matches(current, endpoint) or _link_state(current) in {"Failed", "Canceled"}):
+            raise ArgumentUsageError(
+                f"Endpoint '{endpoint.endpoint_name}' changed or failed after planning. Inspect it and rerun setup."
+            )
         if current and _link_matches(current, endpoint):
             self._run(
                 f"Validate access for {endpoint.endpoint_name}",

@@ -189,6 +189,7 @@ def test_workflow_export_commands_parse_and_pin_reviewed_subscription(management
     from azext_iot.adr.workflows.namespace import NamespaceWorkflow
 
     services = MagicMock()
+    services.subscription_id = "reviewed-sub"
     services.show_namespace.return_value = {
         "id": "/subscriptions/reviewed-sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns",
         "properties": {"provisioningState": "Succeeded"},

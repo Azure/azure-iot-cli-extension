@@ -397,7 +397,9 @@ def test_cross_subscription_update_instance_creation_is_rejected_before_writes(s
     from azext_iot.adr.workflows.namespace import NamespaceWorkflow
 
     service, namespace, links, update, _ = service_fixture
-    endpoint = EndpointSpec("software-updates", "su", SU_ID.replace(SUB, "other-sub"), "system-assigned")
+    endpoint = EndpointSpec(
+        "software-updates", "su", SU_ID.replace(SUB, "11111111-1111-1111-1111-111111111111"), "system-assigned",
+    )
     namespace.show.side_effect = ResourceNotFoundError("missing")
     mocker.patch.object(service, "resolve_resource", side_effect=ResourceNotFoundError("missing"))
     request = SetupRequest(

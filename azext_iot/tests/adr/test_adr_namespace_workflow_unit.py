@@ -86,6 +86,8 @@ def _link(resource_id, state="Succeeded", identity="SystemAssigned"):
 @pytest.fixture
 def services():
     service = MagicMock()
+    service.subscription_id = SUB
+    service.setup_location.return_value = "eastus"
     service.namespace_outbound_principal.return_value = "namespace-principal"
     service.principal_for_identity.return_value = "target-principal"
     service.link_rbac.assignment_exists.return_value = True
@@ -548,7 +550,7 @@ def test_plan_setup_matching_and_conflicting_links(services):
         hubs=(_endpoint("hub", HUB_ID),),
     )
     result, items = subject.NamespaceWorkflow(services).plan_setup(request)
-    assert result["state"] == STATE_SUCCEEDED
+    assert result["state"] == STATE_PLANNED  # Reused links can still require ROLE writes.
     assert sum(item.state == STATE_SATISFIED for item in items) >= 4
 
     conflicting = _namespace(
@@ -593,13 +595,16 @@ def test_existing_link_conflicts_block_setup_without_mutation(services, kind, re
     assert link_item.message == (
         "Target resource is already linked as 'original'. Reuse that endpoint name."
         if conflict == "other-name"
-        else f"Matching endpoint is in {conflict} state."
+        else f"Matching endpoint is in {conflict} state. Inspect its linkingError "
+        "and use the atomic link recovery/update commands before rerunning setup."
     )
     assert bool(link_item.command) == (conflict == "other-name")
     with pytest.raises(ArgumentUsageError, match="Namespace setup is blocked"):
         workflow.setup(request)
     assert {call[0] for call in services.mock_calls} <= {
         "show_namespace", "resolve_resource", "dps_linked_hubs",
+        "setup_location", "validate_setup_identity", "validate_setup_target",
+        "principal_for_identity", "namespace_outbound_principal",
     }
 
 
@@ -698,11 +703,13 @@ def test_plan_setup_delegates_role_validation(services):
         dps=_endpoint("dps", DPS_ID),
     )
     result, items = subject.NamespaceWorkflow(services).plan_setup(request)
-    assert result["state"] == STATE_SUCCEEDED
+    assert result["state"] == STATE_PLANNED
     access = next(
         item for item in items if item.item_id.startswith("roles-")
     )
-    assert access.state == STATE_SATISFIED
+    assert access.state == STATE_PLANNED
+    assert access.action == "role"
+    assert access.details["roleValidation"] == "pending"
     assert "atomic link command" in access.message
     services.link_rbac.assignment_exists.assert_not_called()
 
@@ -720,7 +727,7 @@ def test_plan_setup_uses_authoritative_role_requirements(services):
         dps=_endpoint("dps", DPS_ID),
     )
     result, items = subject.NamespaceWorkflow(services).plan_setup(request)
-    assert result["state"] == STATE_SUCCEEDED
+    assert result["state"] == STATE_PLANNED
     role_index = next(
         index for index, item in enumerate(items)
         if item.item_id.startswith("roles-")
@@ -909,7 +916,7 @@ def test_update_instance_creation_is_scoped_as_mutation(services):
     create_call = next(
         call
         for call in progress.run.call_args_list
-        if call.args[0].startswith("Create Update Instance")
+        if call.args[0].startswith("Create software-updates")
     )
     assert create_call.kwargs == {
         "workflow_scope": "software-updates",

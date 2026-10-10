@@ -70,6 +70,8 @@ _ADR_XDIST_GROUPS = {
         "test_namespace_setup_tagged_plan_is_read_only",
         "test_namespace_setup_check_and_resume",
         "test_namespace_setup_links_dps",
+        "test_namespace_setup_json_managed_cms_reuse",
+        "test_namespace_setup_json_rejects_invalid_input_before_creation",
     },
     "adr-g2-su-delete-ca": {
         "test_adr_link_su_delete",
@@ -91,6 +93,7 @@ _ADR_XDIST_GROUPS = {
         "test_software_update_local_commands",
         "test_adr_link_hub_dps_delete",
         "test_namespace_setup_links_hub_after_dps",
+        "test_namespace_setup_json_creates_link_targets",
         "test_adr_job_lifecycle",
         "test_adr_onboarding_update_job_lifecycle",
         "test_adr_job_validation_negatives",

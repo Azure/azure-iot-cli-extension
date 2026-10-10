@@ -79,7 +79,7 @@ def load_adr_workflow_arguments(self, _):
         context.argument(
             "config",
             options_list=["--config"],
-            help="Workflow request as a JSON or YAML file.",
+            help="JSON object or JSON/YAML file (@path accepted). Valid input opens review in interactive mode.",
         )
         context.argument(
             "plan_only",

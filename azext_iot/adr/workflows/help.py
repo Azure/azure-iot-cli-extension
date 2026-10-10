@@ -30,8 +30,12 @@ def load_adr_workflow_help():
   type: command
   short-summary: Configure namespace identity and endpoint connectivity.
   long-summary: |
-    Create or adopt a namespace and configure selected DPS, IoT Hub, or Software
-    Updates links. The command plans from live state, skips satisfied work, and
+    Create or adopt a namespace, configure DPS, IoT Hub and Software Updates links,
+    and optionally configure Azure-managed certificate management. Interactive
+    setup supports mouse and keyboard navigation. Valid --config input opens
+    review directly; invalid input is reported without substituting defaults.
+    Use --plain for the append-only interface or --no-input for automation.
+    The command plans from live state, skips satisfied work, and
     delegates each link to the atomic link command, which validates target
     readiness and creates missing service-to-service role assignments for an
     authorized caller before namespace mutation. The final typed confirmation
@@ -55,4 +59,8 @@ def load_adr_workflow_help():
       text: az iot adr ns setup
     - name: Apply setup from a config file
       text: az iot adr ns setup -n factory-ns -g factory-rg --config setup.yaml --yes
+    - name: Review a saved JSON configuration interactively
+      text: az iot adr ns setup --config factory.json
+    - name: Inspect a configuration without changing Azure resources
+      text: az iot adr ns setup --config factory.json --plan-only --no-input
   """

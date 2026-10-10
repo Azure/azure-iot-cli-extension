@@ -70,7 +70,7 @@ def test_parse_endpoint_from_id_and_name():
         [
             "resource-name=other",
             "resource-group=other-rg",
-            "identity=/subscriptions/s/resourceGroups/r/providers/"
+            f"identity=/subscriptions/{SUB}/resourceGroups/r/providers/"
             "Microsoft.ManagedIdentity/userAssignedIdentities/u",
             "allocation-weight=4",
         ],
@@ -340,7 +340,7 @@ links:
     assert request.hubs[0].endpoint_name == "primary"
 
 
-def test_config_preserves_cli_scope_and_rejects_assign_roles(tmp_path):
+def test_config_rejects_cli_scope_conflict_and_assign_roles(tmp_path):
     config = tmp_path / "setup.yaml"
     config.write_text(
         """
@@ -354,16 +354,14 @@ links: {}
 """,
         encoding="utf-8",
     )
-    request = subject.build_setup_request(
-        namespace_name="cli-ns",
-        resource_group_name="cli-rg",
-        subscription_id=SUB,
-        location="eastus",
-        config=str(config),
-    )
-    assert request.namespace_name == "cli-ns"
-    assert request.resource_group_name == "cli-rg"
-    assert request.location == "eastus"
+    with pytest.raises(InvalidArgumentValueError, match="namespace.name conflicts"):
+        subject.build_setup_request(
+            namespace_name="cli-ns",
+            resource_group_name="cli-rg",
+            subscription_id=SUB,
+            location="eastus",
+            config=str(config),
+        )
 
     config.write_text("assignRoles: false\n", encoding="utf-8")
     with pytest.raises(InvalidArgumentValueError, match="no longer supported"):
@@ -378,7 +376,7 @@ links: {}
 namespace: []
 links: {}
 """,
-            "namespace and links",
+            "namespace",
         ),
         (
             """

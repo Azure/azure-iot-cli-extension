@@ -12,11 +12,14 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from uuid import uuid4
 
-import yaml
-from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
+from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
 from msrestazure.tools import parse_resource_id
 
-from azext_iot.adr.workflows.models import EndpointSpec, SetupRequest
+from azext_iot.adr.workflows.configuration import (
+    load_config, validate_endpoint, validate_identity as config_identity, validate_resource_id,
+)
+from azext_iot.adr.workflows.models import CmsSpec, EndpointSpec, SetupRequest
 
 
 _SYSTEM_ASSIGNED = "system-assigned"
@@ -33,6 +36,8 @@ _ENDPOINT_KEYS = {
     "availability",
     "allocation-weight",
     "create-if-missing",
+    "sku",
+    "unit",
 }
 
 
@@ -211,13 +216,13 @@ def _identity(values: Dict[str, str], option_name: str):
         raise InvalidArgumentValueError(
             f"{option_name} requires identity=system-assigned or identity=<uami-resource-id>."
         )
-    if identity.casefold() == _SYSTEM_ASSIGNED:
+    if identity.casefold() in (_SYSTEM_ASSIGNED, "systemassigned"):
         return _SYSTEM_ASSIGNED, None
     if not identity.startswith("/"):
         raise InvalidArgumentValueError(
             f"{option_name} identity must be 'system-assigned' or a UAMI ARM resource ID."
         )
-    return _USER_ASSIGNED, identity
+    return _USER_ASSIGNED, validate_resource_id(identity, "identity", f"{option_name}.identity")
 
 
 def _resource_id(
@@ -275,6 +280,30 @@ def parse_endpoint(
         raise InvalidArgumentValueError(
             "--hub allocation-weight must be an integer."
         ) from error
+    create = parsed.get("create-if-missing", "false").casefold()
+    if create not in ("true", "false"):
+        raise InvalidArgumentValueError(f"--{kind}.create-if-missing must be true or false.")
+    unit = parsed.get("unit")
+    try:
+        unit = int(unit) if unit is not None else None
+    except ValueError as error:
+        raise InvalidArgumentValueError(f"--{kind}.unit must be an integer.") from error
+    aliases = [key for key in ("endpoint", "name", "endpoint-name") if key in parsed]
+    if len(aliases) > 1:
+        raise InvalidArgumentValueError(f"--{kind}.endpoint-name was specified more than once.")
+    canonical = {
+        {"resource-id": "resourceId", "resource-name": "resourceName", "resource-group": "resourceGroup",
+         "endpoint-name": "endpointName", "endpoint": "endpointName", "name": "endpointName",
+         "create-if-missing": "createIfMissing", "allocation-weight": "allocationWeight"}.get(key, key): value
+        for key, value in parsed.items()
+    }
+    canonical["createIfMissing"] = create == "true"
+    if weight is not None:
+        canonical["allocationWeight"] = weight
+    if unit is not None:
+        canonical["unit"] = unit
+    validate_endpoint(canonical, kind, f"--{kind}")
+    validate_resource_id(resource_id, kind, f"--{kind}.resourceId")
     return EndpointSpec(
         kind=kind,
         endpoint_name=endpoint_name,
@@ -283,6 +312,9 @@ def parse_endpoint(
         user_assigned_identity=user_identity,
         availability=parsed.get("availability"),
         allocation_weight=weight,
+        create_if_missing=create == "true",
+        sku=parsed.get("sku"),
+        unit=unit,
     )
 
 
@@ -294,22 +326,23 @@ def _required_config_pairs(value: Any, field_name: str) -> List[str]:
     return _config_pairs(value)
 
 
-def _read_config(path: str) -> Dict[str, Any]:
+def _read_config(value) -> Dict[str, Any]:
+    return load_config(value)
+
+
+def _validate_callback(callback, endpoint, allow_missing):
+    """Support older read callbacks that only know Software Updates creation."""
     try:
-        content = Path(path).expanduser().read_text(encoding="utf-8")
-    except OSError as error:
-        raise InvalidArgumentValueError(
-            f"Unable to read workflow config '{path}': {error}."
-        ) from error
-    try:
-        parsed = yaml.safe_load(content)
-    except yaml.YAMLError as error:
-        raise InvalidArgumentValueError(
-            f"Workflow config '{path}' is not valid YAML or JSON."
-        ) from error
-    if not isinstance(parsed, dict):
-        raise InvalidArgumentValueError("Workflow config must contain an object.")
-    return parsed
+        return callback(endpoint, allow_missing)
+    except (ResourceNotFoundError, HttpResponseError) as error:
+        if not (
+            allow_missing and endpoint.kind in ("hub", "dps")
+            and (isinstance(error, ResourceNotFoundError) or error.status_code == 404)
+        ):
+            raise
+        # Missing is an explicitly requested state, not a default. Plan performs
+        # subscription, region, name availability and identity checks before writes.
+        return None
 
 
 def _config_pairs(value: Optional[Dict[str, Any]]) -> Optional[List[str]]:
@@ -1116,7 +1149,7 @@ def build_setup_request(
     hubs: Optional[List[List[str]]] = None,
     software_updates: Optional[List[str]] = None,
     complete_connectivity: bool = False,
-    config: Optional[str] = None,
+    config: Any = None,
     no_input: bool = False,
     interactive: Optional[bool] = None,
     prompt: Callable[[str], str] = _prompt,
@@ -1147,7 +1180,7 @@ def build_setup_request(
     initial_request: Optional[SetupRequest] = None,
     back_from_resource_group: bool = False,
 ) -> SetupRequest:
-    if config and any(
+    if config is not None and any(
         (
             namespace_outbound_identity,
             dps,
@@ -1160,14 +1193,21 @@ def build_setup_request(
             "--config cannot be combined with workflow capability arguments."
         )
 
-    if config:
+    raw = {}
+    if config is not None:
         raw = _read_config(config)
         ns = raw.get("namespace", {})
         links = raw.get("links", {})
-        if not isinstance(ns, dict) or not isinstance(links, dict):
+        if raw.get("subscriptionId", subscription_id).casefold() != subscription_id.casefold():
             raise InvalidArgumentValueError(
-                "Workflow config namespace and links must be objects."
+                "Workflow config subscriptionId does not match the selected subscription. "
+                "Select it explicitly with --subscription; setup does not switch accounts."
             )
+        for key, explicit in (("name", namespace_name), ("resourceGroup", resource_group_name),
+                              ("location", location), ("tags", tags)):
+            configured = ns.get(key)
+            if explicit is not None and configured is not None and explicit != configured:
+                raise InvalidArgumentValueError(f"Workflow config namespace.{key} conflicts with explicit CLI input.")
         namespace_name = namespace_name or ns.get("name")
         resource_group_name = (
             resource_group_name or ns.get("resourceGroup")
@@ -1175,26 +1215,14 @@ def build_setup_request(
         location = location or ns.get("location")
         if tags is None:
             tags = ns.get("tags")
-        if tags is not None and not isinstance(tags, dict):
-            raise InvalidArgumentValueError(
-                "Workflow config namespace.tags must be an object."
-            )
-        identity = ns.get("outboundIdentity") or {}
-        namespace_outbound_identity = (
-            identity.get("userAssignedResourceId")
-            or identity.get("type")
-            or namespace_outbound_identity
-        )
+        if "outboundIdentity" in ns:
+            namespace_outbound_identity = config_identity(ns["outboundIdentity"], "namespace.outboundIdentity")
         dps = (
             _required_config_pairs(links["dps"], "links.dps")
             if "dps" in links
             else None
         )
         hub_values = links.get("hubs", [])
-        if not isinstance(hub_values, list):
-            raise InvalidArgumentValueError(
-                "Workflow config 'links.hubs' must contain a list."
-            )
         hubs = [
             _required_config_pairs(item, f"links.hubs[{index}]")
             for index, item in enumerate(hub_values)
@@ -1206,11 +1234,6 @@ def build_setup_request(
             if "softwareUpdates" in links
             else None
         )
-        if "assignRoles" in raw:
-            raise InvalidArgumentValueError(
-                "Workflow config 'assignRoles' is no longer supported. Atomic "
-                "link commands always validate and create required service roles."
-            )
 
     namespace_is_fixed = bool(namespace_name)
     namespace_name, resource_group_name = resolve_scope_inputs(
@@ -1229,7 +1252,7 @@ def build_setup_request(
     )
 
     guided_input = False
-    if initial_request or not any(
+    if initial_request or config is None and not any(
         (namespace_outbound_identity, dps, hubs, software_updates)
     ):
         is_interactive = (
@@ -1333,7 +1356,7 @@ def build_setup_request(
             outbound_type = "SystemAssigned"
         elif namespace_outbound_identity.startswith("/"):
             outbound_type = "UserAssigned"
-            outbound_uami = namespace_outbound_identity
+            outbound_uami = validate_resource_id(namespace_outbound_identity, "identity", "--outbound-identity")
             if validate_identity and not guided_input:
                 validate_identity(outbound_uami)
         else:
@@ -1367,15 +1390,15 @@ def build_setup_request(
             [dps_spec] + list(hub_specs) + [su_spec]
         ):
             if endpoint:
-                allow_missing = endpoint is su_spec and create_su
+                allow_missing = endpoint.create_if_missing
                 if validate_endpoint_resource:
-                    resource = validate_endpoint_resource(
-                        endpoint, allow_missing
+                    resource = _validate_callback(
+                        validate_endpoint_resource, endpoint, allow_missing,
                     )
                     if resource is not None and validate_endpoint_identity:
                         validate_endpoint_identity(endpoint, resource)
                 elif validate_endpoint:
-                    validate_endpoint(endpoint, allow_missing)
+                    _validate_callback(validate_endpoint, endpoint, allow_missing)
 
     if complete_connectivity and (not dps_spec or not hub_specs):
         raise ArgumentUsageError(
@@ -1396,7 +1419,14 @@ def build_setup_request(
         create_update_instance=create_su,
         update_instance_name=update_instance_name,
         skipped=tuple(guided.get("skipped", ())) if guided_input else (),
-        check_status=bool(guided.get("check_status")) if guided_input else False,
+        check_status=bool(guided.get("check_status")) if guided_input else raw.get("checkStatus", False),
+        cms=(
+            CmsSpec(
+                raw["cms"]["rootName"], raw["cms"]["intermediateName"],
+                raw["cms"]["policyName"], raw["cms"]["validityDays"],
+            )
+            if raw.get("cms", {}).get("enabled") else None
+        ),
     )
 
 
@@ -1421,7 +1451,7 @@ def _request_guided_values(request: SetupRequest):
         result["software_updates"] = _endpoint_values(
             request.software_updates
         )
-        if request.create_update_instance:
+        if request.create_update_instance and not request.software_updates.create_if_missing:
             result["software_updates"].append(
                 "create-if-missing=true"
             )
@@ -1445,6 +1475,12 @@ def _endpoint_values(endpoint: EndpointSpec):
         values.append(
             f"allocation-weight={endpoint.allocation_weight}"
         )
+    if endpoint.create_if_missing:
+        values.append("create-if-missing=true")
+    if endpoint.sku:
+        values.append(f"sku={endpoint.sku}")
+    if endpoint.unit is not None:
+        values.append(f"unit={endpoint.unit}")
     return values
 
 

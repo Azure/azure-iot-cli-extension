@@ -27,6 +27,17 @@ class EndpointSpec:
     user_assigned_identity: Optional[str] = None
     availability: Optional[str] = None
     allocation_weight: Optional[int] = None
+    create_if_missing: bool = False
+    sku: Optional[str] = None
+    unit: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class CmsSpec:
+    root_name: str = "root"
+    intermediate_name: str = "intermediate"
+    policy_name: str = "default"
+    validity_days: int = 30
 
 
 @dataclass(frozen=True)
@@ -45,6 +56,7 @@ class SetupRequest:
     check_status: bool = False
     subscription_id: Optional[str] = None
     tags: Optional[Dict[str, str]] = None
+    cms: Optional[CmsSpec] = None
 
     @property
     def requests_links(self) -> bool:

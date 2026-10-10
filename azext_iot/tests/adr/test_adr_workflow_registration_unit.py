@@ -723,8 +723,9 @@ def test_setup_command_plan_only_and_script(mocker, tmp_path):
         ),
     )
     items = [
-        SimpleNamespace(command="az one", state="Planned"),
-        SimpleNamespace(command="az skip", state="Satisfied"),
+        SimpleNamespace(command="az one", state="Planned", action="add"),
+        SimpleNamespace(command="az skip", state="Satisfied", action="reuse"),
+        SimpleNamespace(command=None, state="Planned", action="role"),
     ]
     workflow.plan_setup.return_value = ({"state": "Planned"}, items)
     output = tmp_path / "plan.sh"
@@ -750,7 +751,7 @@ def test_setup_command_rejects_incomplete_script(mocker, tmp_path):
             namespace_name="ns", resource_group_name="rg"
         ),
     )
-    item = SimpleNamespace(command="", state="Manual")
+    item = SimpleNamespace(command="", state="Manual", action="add")
     workflow.plan_setup.return_value = ({"state": "Manual"}, [item])
     with pytest.raises(ArgumentUsageError, match="cannot be resolved"):
         command_subject.adr_namespace_setup(

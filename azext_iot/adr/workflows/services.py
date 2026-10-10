@@ -6,6 +6,7 @@
 
 import shlex
 import time
+import re
 from typing import Any, Dict, Optional
 
 from azure.cli.core.azclierror import (
@@ -28,10 +29,15 @@ from azext_iot._factory import (
     adr_update_instance_service_factory,
 )
 from azext_iot.adr.providers.link import LinkProvider
+from azext_iot.adr.providers.link_preflight import validate_target_state
+from azext_iot.adr.providers.certificate_authority import CertificateAuthorityProvider
+from azext_iot.adr.providers.certificate_policy import CertificatePolicyProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
-from azext_iot.adr.rbac import LinkRbacManager, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import LinkRbacManager, resolve_linked_resource_principal, resolve_namespace_outbound_principal
 from azext_iot.adr.workflows.models import EndpointSpec
+from azext_iot.adr.workflows.configuration import validate_resource_id
+from azext_iot.adr.workflows.capabilities import cms_name
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
@@ -273,6 +279,200 @@ class WorkflowServices:
         result = as_dict(resource)
         result.setdefault("id", endpoint.resource_id)
         return result
+
+    def setup_location(self, request, namespace):
+        if namespace:
+            location = namespace.get("location")
+            if request.location and str(location).casefold() != request.location.casefold():
+                raise InvalidArgumentValueError("namespace.location conflicts with the existing namespace location.")
+        else:
+            group = self.show_resource_group(request.resource_group_name)
+            if group is None:
+                raise InvalidArgumentValueError("namespace.resourceGroup was not found; create the resource group first.")
+            location = request.location or group.get("location")
+        if not location:
+            raise InvalidArgumentValueError("namespace.location could not be resolved.")
+        return location
+
+    def validate_setup_identity(self, request, namespace):
+        if request.outbound_user_assigned_identity:
+            self.principal_for_identity("UserAssigned", request.outbound_user_assigned_identity, {}, require_attached=False)
+        elif namespace and request.requests_links and not request.outbound_identity_type:
+            self.namespace_outbound_principal(namespace)
+        if namespace and request.dps:
+            resolve_linked_resource_principal(namespace, {"type": "SystemAssigned"}, "namespace")
+
+    def validate_setup_target(self, endpoint, resource, location):
+        validate_resource_id(endpoint.resource_id, endpoint.kind, f"--{endpoint.kind}.resourceId")
+        validate_target_state(
+            {"location": location}, resource, endpoint.kind, require_standard_hub=endpoint.kind == "hub",
+        )
+        resolve_linked_resource_principal(
+            resource,
+            {
+                "type": "SystemAssigned" if endpoint.identity_type == "system-assigned" else "UserAssigned",
+                "userAssignedIdentity": endpoint.user_assigned_identity,
+            },
+            endpoint.kind,
+        )
+        if endpoint.sku and (resource.get("sku") or {}).get("name") != endpoint.sku:
+            raise InvalidArgumentValueError(
+                f"--{endpoint.kind}.sku conflicts with the existing resource; reuse never updates it."
+            )
+        if endpoint.unit is not None and (resource.get("sku") or {}).get("capacity") != endpoint.unit:
+            raise InvalidArgumentValueError(
+                f"--{endpoint.kind}.unit conflicts with the existing resource; reuse never updates it."
+            )
+
+    def validate_target_creation(self, endpoint, location):
+        validate_resource_id(endpoint.resource_id, endpoint.kind, f"--{endpoint.kind}.resourceId")
+        parsed = parse_resource_id(endpoint.resource_id)
+        if parsed["subscription"].casefold() != self.subscription_id.casefold():
+            raise InvalidArgumentValueError(
+                f"Creating {endpoint.kind} outside the namespace subscription is not supported. "
+                "Create the target with --subscription in a separate command, then rerun setup to reuse it."
+            )
+        if endpoint.kind == "software-updates":
+            self.validate_update_instance_creation(endpoint)
+            availability = as_dict(self.update_instances.check_name(parsed["name"]))
+        else:
+            maximum = 50 if endpoint.kind == "hub" else 64
+            if not re.fullmatch(rf"[A-Za-z0-9][A-Za-z0-9-]{{1,{maximum - 2}}}[A-Za-z0-9]", parsed["name"]):
+                raise InvalidArgumentValueError(
+                    f"--{endpoint.kind}.resourceName must be 3..{maximum} letters, digits or hyphens."
+                )
+            allowed = ("S1", "S2", "S3") if endpoint.kind == "hub" else ("S1",)
+            if endpoint.sku is not None and endpoint.sku not in allowed:
+                raise InvalidArgumentValueError(f"--{endpoint.kind}.sku must be a supported Standard SKU.")
+            if endpoint.unit is not None and (type(endpoint.unit) is not int or endpoint.unit < 1):
+                raise InvalidArgumentValueError(f"--{endpoint.kind}.unit must be a positive integer.")
+            if endpoint.kind == "hub" and location.casefold() == "qatarcentral":
+                raise InvalidArgumentValueError(
+                    "Hub creation in qatarcentral requires data-residency options. Create it with the atomic command first."
+                )
+            client = self._target_client(endpoint)
+            availability = as_dict(
+                client.iot_hub_resource.check_name_availability(operation_inputs={"name": parsed["name"]})
+                if endpoint.kind == "hub" else
+                client.iot_dps_resource.check_provisioning_service_name_availability({"name": parsed["name"]})
+            )
+        if value_of(availability, "nameAvailable", "name_available") is not True:
+            raise InvalidArgumentValueError(f"--{endpoint.kind}.resourceName is unavailable or availability is unknown.")
+        if self.show_resource_group(parsed["resource_group"]) is None:
+            raise InvalidArgumentValueError(f"--{endpoint.kind}.resourceGroup was not found.")
+        locations = {as_dict(item).get("name", "").casefold()
+                     for item in self.subscriptions.subscriptions.list_locations(self.subscription_id)}
+        if location.casefold() not in locations:
+            raise InvalidArgumentValueError(f"namespace.location '{location}' is not a supported subscription location.")
+        if endpoint.identity_type not in ("system-assigned", "user-assigned"):
+            raise InvalidArgumentValueError(f"--{endpoint.kind}.identity must select a managed identity.")
+        if endpoint.user_assigned_identity:
+            validate_resource_id(endpoint.user_assigned_identity, "identity", f"--{endpoint.kind}.identity")
+            self.principal_for_identity(
+                endpoint.identity_type, endpoint.user_assigned_identity, {}, require_attached=False,
+            )
+
+    def _target_client(self, endpoint):
+        factory = adr_iot_hub_service_factory if endpoint.kind == "hub" else adr_iot_service_provisioning_factory
+        return factory(self.cmd.cli_ctx, subscription_id=parse_resource_id(endpoint.resource_id)["subscription"])
+
+    @staticmethod
+    def target_create_command(endpoint, location):
+        parsed = parse_resource_id(endpoint.resource_id)
+        command = (
+            f"az iot {endpoint.kind} create -n {shlex.quote(parsed['name'])} "
+            f"-g {shlex.quote(parsed['resource_group'])} --location {shlex.quote(location)} "
+            f"--sku {endpoint.sku or 'S1'} --unit {endpoint.unit or 1}"
+        )
+        return command + (
+            " --system-assigned-mi" if endpoint.identity_type == "system-assigned" else
+            f" --user-assigned-mi {shlex.quote(endpoint.user_assigned_identity)}"
+        )
+
+    def create_target(self, endpoint, location):
+        # Existing targets are always reused, even if they appeared since plan.
+        try:
+            resource = self.resolve_resource(endpoint)
+        except Exception as error:  # noqa: BLE001 - only a confirmed 404 permits creation
+            if not is_not_found(error):
+                raise
+        else:
+            self.validate_setup_target(endpoint, resource, location)
+            return resource
+        self.validate_target_creation(endpoint, location)
+        from azext_iot.core.custom import iot_dps_create, iot_hub_create
+        parsed = parse_resource_id(endpoint.resource_id)
+        arguments = {
+            "cmd": self.cmd, "client": self._target_client(endpoint),
+            "resource_group_name": parsed["resource_group"], "location": location,
+            "sku": endpoint.sku or "S1", "unit": endpoint.unit or 1,
+        }
+        identities = [endpoint.user_assigned_identity] if endpoint.user_assigned_identity else None
+        if endpoint.kind == "hub":
+            poller = iot_hub_create(
+                **arguments, hub_name=parsed["name"],
+                system_identity=endpoint.identity_type == "system-assigned", user_identities=identities,
+            )
+        else:
+            poller = iot_dps_create(
+                **arguments, dps_name=parsed["name"],
+                mi_system_assigned=endpoint.identity_type == "system-assigned", mi_user_assigned=identities,
+            )
+        # Bound the wait; on unknown completion the next run GETs rather than replaying.
+        poller.result(timeout=2400)
+        resource = self.resolve_resource(endpoint)
+        self.validate_setup_target(endpoint, resource, location)
+        return resource
+
+    def _cms_operation(self, request, kind, create=False):
+        policy = kind == "policy"
+        provider = CertificatePolicyProvider(self.cmd) if policy else CertificateAuthorityProvider(self.cmd)
+        arguments = {
+            "namespace_name": request.namespace_name, "resource_group_name": request.resource_group_name,
+            "certificate_authority_name": request.cms.intermediate_name if policy else cms_name(request, kind),
+        }
+        if policy:
+            arguments["certificate_policy_name"] = request.cms.policy_name
+        if create:
+            if policy:
+                arguments["validity_days"] = request.cms.validity_days
+            else:
+                arguments["certificate_authority_type"] = "Root" if kind == "root" else "ICA"
+                if kind == "intermediate":
+                    arguments.update(issuer_type="Microsoft", issuer_certificate_authority_name=request.cms.root_name)
+        try:
+            resource = as_dict((provider.create if create else provider.show)(**arguments))
+        except Exception as error:  # noqa: BLE001 - CMS payloads/errors can contain certificate material
+            if not create and is_not_found(error):
+                return None
+            raise CLIInternalError(
+                f"CMS {kind} {'create' if create else 'read'} failed ({type(error).__name__}). "
+                "Inspect the resource provisioning status and caller ARM permissions, then rerun; "
+                "setup will not replay an unknown or in-progress creation."
+            ) from None
+        properties = as_dict(resource.get("properties"))
+        issuer = as_dict(properties.get("issuer"))
+        return {
+            "properties": {
+                "provisioningState": properties.get("provisioningState"),
+                **(
+                    {"certificate": {
+                        "validityPeriodInDays": as_dict(properties.get("certificate")).get("validityPeriodInDays"),
+                    }}
+                    if policy else {
+                        "certificateAuthorityType": properties.get("certificateAuthorityType"),
+                        "issuer": {key: issuer[key] for key in
+                                   ("issuerType", "certificateAuthorityResourceId", "status") if key in issuer},
+                    }
+                ),
+            },
+        }
+
+    def show_cms(self, request, kind):
+        return self._cms_operation(request, kind)
+
+    def create_cms(self, request, kind):
+        return self._cms_operation(request, kind, create=True)
 
     def list_link_targets(self, kind: str, resource_group_name: str):
         if kind == "hub":

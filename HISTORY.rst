@@ -6,6 +6,12 @@ Release History
 1.0.0b2 (Preview)
 +++++++++++++++++
 
+**Namespace setup**
+
+* Added a minimal, mouse-enabled terminal interface for namespace setup with reversible input, JSON-to-review, explicit write approval, and read-only revalidation before applying.
+* Setup configuration supports creating missing DPS/Hub targets through the existing release commands and optional Azure-managed root/intermediate CA and certificate-policy onboarding. External PKI remains available through individual CA commands.
+* Invalid configuration is rejected instead of silently replaced with defaults. Plain-terminal and noninteractive workflows remain available.
+
 **ADR bug fixes**
 
 * Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
