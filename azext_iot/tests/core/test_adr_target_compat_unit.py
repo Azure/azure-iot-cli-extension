@@ -28,7 +28,7 @@ TARGETS = [
      "2026-10-01-preview", "2026-10-01-preview"),
     ("dps", "iot_dps_resource", "provisioningServices", "provisioning_service_name",
      "iot_service_provisioning_factory", "adr_iot_service_provisioning_factory",
-     "2026-06-01-preview", "2026-06-01-preview"),
+     "2026-11-01", "2026-11-01"),
 ]
 
 

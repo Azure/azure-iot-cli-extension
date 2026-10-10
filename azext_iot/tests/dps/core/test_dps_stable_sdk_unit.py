@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Retained wire tests against the real, synchronous June DPS management SDK."""
+"""Retained wire tests against the real, synchronous DPS 2026-11-01 management SDK."""
 
 import base64
 from copy import deepcopy
@@ -62,7 +62,7 @@ def dps_resource():
 def assert_stable_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-06-01-preview"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-01"]
 
 
 @pytest.mark.parametrize(

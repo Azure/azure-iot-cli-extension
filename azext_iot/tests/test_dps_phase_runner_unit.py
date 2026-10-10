@@ -1072,7 +1072,7 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker, regio
     reader = RUNNER["ArmReader"](SUB, region=region)
     reader.dps._config.credential.get_token("ignored")  # pylint: disable=protected-access
     token.assert_called_once_with(subscription=SUB, resource="https://management.azure.com/")
-    assert reader.dps._config.api_version == "2026-06-01-preview"  # pylint: disable=protected-access
+    assert reader.dps._config.api_version == "2026-11-01"  # pylint: disable=protected-access
     assert reader.hub._config.api_version == "2026-10-01-preview"  # pylint: disable=protected-access
     assert reader.adr._config.api_version == "2026-11-02-preview"  # pylint: disable=protected-access
     assert reader.dps._config.base_url == RUNNER["TARGETS"]["target"](region)["endpoint"]
@@ -1126,7 +1126,7 @@ def test_inventory_wire_contract_does_not_confuse_missing_results_with_empty_inv
         with pytest.raises(RUNNER["PhaseError"], match="Incomplete"):
             reader.inventory()
     assert len(responses.calls) == 1
-    assert reader.reads[0]["api_version"] == "2026-06-01-preview"
+    assert reader.reads[0]["api_version"] == "2026-11-01"
 
 
 @responses.activate
@@ -1135,7 +1135,7 @@ def test_inventory_pagination_failure_is_not_partial_ownership_evidence_or_retri
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
     url = RUNNER["ARM"] + f"/subscriptions/{SUB}/providers/Microsoft.Devices/provisioningServices"
-    next_page = url + "?api-version=2026-06-01-preview&page=2"
+    next_page = url + "?api-version=2026-11-01&page=2"
     responses.add(responses.GET, url, json={"value": Reader(1).resources, "nextLink": next_page})
     responses.add(responses.GET, url, status=500, json={"error": {"code": "UnitFailure"}})
     reader = RUNNER["ArmReader"](SUB)
