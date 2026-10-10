@@ -22,6 +22,7 @@ from azext_iot.adr.ui.core.spec import (
     ResourceSpec,
 )
 from azext_iot.adr.ui.kinds._common import dig, name_of, prop, short_id, value_style
+from azext_iot.adr.ui.kinds.link_actions import build_actions
 
 #: Endpoint type discriminator -> short label shown in the TYPE column.
 _TYPE_LABELS = {
@@ -91,11 +92,12 @@ def build(session) -> ResourceSpec:
             runs="az iot adr ns link dps|hub|su list --ns <namespace> -g <resource-group>  ·  read-only",
             note=(
                 "At most one DPS and one Software Updates instance; DPS precedes hubs. "
-                "Press w for guided setup, ordering and required service roles."
+                "Pending links: wait, never resend. Failed links: use update/recovery, not add."
             ),
         ),
         row_id=lambda p: f"{_endpoint_type(p)}/{name_of(p)}",
         list=list_endpoints,
+        actions=build_actions(),
         columns=(
             Column("name", "NAME", name_of, width=24),
             Column(

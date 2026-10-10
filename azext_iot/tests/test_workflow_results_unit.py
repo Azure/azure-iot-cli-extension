@@ -622,8 +622,9 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 31
+        assert len(nodes) == 32
         assert "test_adr_radar_int.py::TestADRRadar::test_radar_readonly_namespace_smoke" in nodes
+        assert "test_adr_radar_int.py::TestADRRadar::test_radar_device_crud_and_tag_preservation" in nodes
         assert {
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",

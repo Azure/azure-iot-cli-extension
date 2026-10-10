@@ -17,13 +17,18 @@ class _RecordingApp:
     """Stands in for the real application so nothing tries to own the terminal."""
 
     last = None
+    operations_running = False
 
     def __init__(self, **kwargs):
         type(self).last = kwargs
         self.ran = False
 
-    def run(self):
+    def run(self, *, mouse):
+        assert mouse is True
         self.ran = True
+
+    def final_outcomes(self):
+        return []
 
 
 @pytest.fixture
@@ -70,7 +75,8 @@ def test_launch_silences_and_restores_the_provider_console(recording_app, monkey
     console.quiet = False
     original_status = console.status
 
-    def run(_self):
+    def run(_self, *, mouse):
+        assert mouse is True
         assert console.quiet is True
         with console.status("first"), console.status("second"):
             assert console._live is None
@@ -142,3 +148,24 @@ def test_refresh_floor_matches_the_store():
     from azext_iot.adr.ui.core.store import MIN_INTERVAL_SEC
 
     assert MIN_REFRESH_INTERVAL_SEC == MIN_INTERVAL_SEC
+
+
+def test_exit_reports_unfinished_or_failed_operations(recording_app, monkeypatch, mocker):
+    monkeypatch.setattr(recording_app, "final_outcomes", lambda _self: ["Update failed\naz exact command"])
+    logger = mocker.patch.object(entry, "get_logger").return_value
+    adr_ui_launch(cmd=object())
+    logger.warning.assert_called_once_with("%s", "Update failed\naz exact command")
+
+
+def test_detached_writes_cannot_restart_provider_spinners(recording_app, monkeypatch):
+    from azext_iot.adr.providers.base import console
+
+    original_status, original_quiet = console.status, console.quiet
+    monkeypatch.setattr(recording_app, "operations_running", True)
+    try:
+        adr_ui_launch(cmd=object())
+        assert console.quiet is True
+        with console.status("late provider step"):
+            assert console._live is None
+    finally:
+        console.status, console.quiet = original_status, original_quiet

@@ -15,32 +15,38 @@ from typing import Iterable, List, Optional, Tuple
 
 from textual.app import ComposeResult
 from textual.screen import Screen
+from textual.containers import Horizontal
+from textual.widgets import Button, Footer, Static
+from textual.css.query import NoMatches
 
 from azext_iot.adr.ui.core.spec import Guide
-from azext_iot.adr.ui.widgets.chrome import (
-    Breadcrumbs,
-    ContextBar,
-    FlashLine,
-    HintBar,
-    InfoPanel,
-    PageGuide,
-)
-from azext_iot.adr.ui.widgets.tray import OperationsTray
+from azext_iot.adr.ui.widgets.chrome import FlashLine
 
 
 class ChromeScreen(Screen):
     """Context bar, info panel, breadcrumbs, page guide, hint bar, content, flash line."""
 
     def compose(self) -> ComposeResult:
-        yield ContextBar(id="context-bar")
-        yield InfoPanel(id="info-panel")
-        yield Breadcrumbs(id="breadcrumbs")
-        # Above the keys, because "what is this page" is the question that comes first.
-        yield PageGuide(id="page-guide")
-        yield HintBar(id="hint-bar")
+        with Horizontal(id="selectors"):
+            yield Button("Namespaces", id="namespace-selector")
+            yield Button("Resources", id="resource-selector")
+            yield Button("o ops idle", id="operations")
+        yield Static("", id="context-bar")
         yield from self.compose_content()
-        yield OperationsTray(id="ops-tray")
         yield FlashLine(id="flash-line")
+        yield Footer()
+
+    def on_button_pressed(self, event):
+        actions = {
+            "namespace-selector": self.app.action_namespaces,
+            "resource-selector": self.app.action_command_bar,
+            "operations": self.app.action_operations,
+        }
+        if event.button.id in actions:
+            actions[event.button.id]()
+
+    def on_screen_resume(self):
+        self.app.sync_chrome(self)
 
     def compose_content(self) -> Iterable[ComposeResult]:
         """Yield the screen's own widgets. Overridden by every concrete screen."""
@@ -69,5 +75,5 @@ class ChromeScreen(Screen):
         """Show a transient message. Safe before mount and after teardown."""
         try:
             self.query_one("#flash-line", FlashLine).flash(message, level)
-        except Exception:  # noqa: BLE001 - a status message must never break a flow
+        except NoMatches:
             return

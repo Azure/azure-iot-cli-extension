@@ -116,9 +116,9 @@ class ChildRef:
 class Action:
     """A named operation offered on a selected row.
 
-    ``invoke`` receives ``(session, scope, payload)``. Mutating actions must pass
-    ``no_wait=True`` to the provider and return the resulting poller so the operations
-    tray can drive it (see design doc PR1).
+    ``invoke`` receives ``(session, scope, payload)`` on an I/O thread. ADR actions
+    return a poller for the operations tracker. Software Updates instances finish
+    inline using their provider's own terminal-wait budget.
     """
 
     name: str
@@ -130,6 +130,14 @@ class Action:
     invoke: Optional[Callable[..., Any]] = None
     #: Kinds whose cached data is invalidated once the action reaches a terminal state.
     refreshes: Tuple[str, ...] = ()
+    command: str = ""
+    note: str = ""
+    mutation: bool = True
+    collection: bool = False
+    fields: Tuple = ()
+    preview: Optional[Callable[..., str]] = None
+    unavailable: str = "Not applicable to this resource."
+    review_note: Optional[Callable[..., str]] = None
 
     def is_applicable(self, payload: Payload) -> bool:
         return True if self.applies_to is None else bool(self.applies_to(payload))

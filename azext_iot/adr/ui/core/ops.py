@@ -19,7 +19,7 @@ This module is deliberately free of any UI framework import.
 
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -53,6 +53,7 @@ class Operation:
     #: Kinds whose cached data this operation invalidates once it succeeds.
     refreshes: Tuple[str, ...] = ()
     acknowledged: bool = False
+    watching: bool = True
 
     def elapsed(self, now: Optional[float] = None) -> float:
         end = self.finished_at if self.finished_at is not None else (now or time.monotonic())
@@ -62,6 +63,8 @@ class Operation:
         seconds = int(self.elapsed(now))
         clock = f"{seconds // 60:02d}:{seconds % 60:02d}"
         if self.state is OpState.RUNNING:
+            if not self.watching:
+                return f"{self.label} {self.target} - not watching; outcome unknown"
             return f"{self.label} {self.target} - running {clock}"
         if self.state is OpState.SUCCEEDED:
             return f"{self.label} {self.target} - succeeded in {clock}"
@@ -156,6 +159,10 @@ class OperationTracker:
     def operations(self) -> List[Operation]:
         with self._lock:
             return list(self._operations)
+
+    def snapshot(self) -> List[Operation]:
+        with self._lock:
+            return [replace(operation) for operation in self._operations]
 
     @property
     def running(self) -> List[Operation]:

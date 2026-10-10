@@ -10,10 +10,11 @@ import json
 from typing import Any, Dict, Optional
 
 from rich.syntax import Syntax
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
-from textual.widgets import Static
+from textual.widgets import Button, Static
 
 from azext_iot.adr.ui.core.redaction import redact
 from azext_iot.adr.ui.core.spec import Guide, ResourceSpec
@@ -26,7 +27,6 @@ class DetailScreen(ChromeScreen):
     BINDINGS = [
         Binding("escape", "back", "Back", show=True),
         Binding("y", "back", "Close", show=False),
-        Binding("j", "back", "Close", show=False),
     ]
 
     def __init__(
@@ -35,6 +35,7 @@ class DetailScreen(ChromeScreen):
         payload: Dict[str, Any],
         title: Optional[str] = None,
         name: Optional[str] = None,
+        scope=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -42,16 +43,19 @@ class DetailScreen(ChromeScreen):
         self.payload = redact(payload)
         self._title = title or (spec.title if spec is not None else "Resource")
         self._name = name
+        self.scope = dict(scope or {})
 
     def compose_content(self) -> ComposeResult:
         with VerticalScroll():
+            if self.spec:
+                yield Static(Text(f"{self.spec.title}: {self.resource_name()}"))
+                yield Static("Snapshot from the list; refresh the parent table for current state.")
+                for child in self.spec.children:
+                    yield Button(f"{child.key or ''} {child.label}", id=f"child-{child.kind}")
             yield Static(id="json-body")
 
     def on_mount(self) -> None:
-        try:
-            body = json.dumps(self.payload, indent=2, sort_keys=True, default=str)
-        except (TypeError, ValueError):  # pragma: no cover - payloads are JSON already
-            body = str(self.payload)
+        body = json.dumps(self.payload, indent=2, sort_keys=True, default=str)
         syntax_theme = (
             "ansi_light"
             if getattr(self.app, "_theme_name", "dark") == "light"
@@ -88,3 +92,20 @@ class DetailScreen(ChromeScreen):
 
     def action_back(self) -> None:
         self.app.pop_screen_safely()
+
+    def selected_payload(self):
+        return self.payload
+
+    def on_key(self, event):
+        for child in self.spec.children if self.spec else ():
+            if child.key == event.key:
+                event.stop()
+                self.app.open_scoped_child(child, self.scope)
+                return
+
+    def on_button_pressed(self, event):
+        for child in self.spec.children if self.spec else ():
+            if event.button.id == f"child-{child.kind}":
+                self.app.open_scoped_child(child, self.scope)
+                return
+        super().on_button_pressed(event)

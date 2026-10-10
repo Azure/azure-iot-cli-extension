@@ -15,6 +15,7 @@ from azext_iot.adr.ui.core.spec import (
     Guide,
     ResourceSpec,
 )
+from azext_iot.adr.ui.core.actions import crud
 from azext_iot.adr.ui.kinds._common import (
     age_column,
     dig,
@@ -46,11 +47,11 @@ def link_readiness(payload) -> str:
         return "needs DPS"
     if endpoint_count(payload, "messaging") == 0:
         return "needs Hub"
-    return "ready"
+    return "configured"
 
 
 _READINESS_STYLES = {
-    "ready": STYLE_ACTIVE,
+    "configured": STYLE_ACTIVE,
     "needs identity": STYLE_WARN,
     "needs DPS": STYLE_WARN,
     "needs Hub": STYLE_WARN,
@@ -77,21 +78,20 @@ def build(session) -> ResourceSpec:
         aliases=("ns",),
         guide=Guide(
             about="Device Registry namespaces in the current subscription.",
-            action=(
-                "Enter explore  \u00b7  n new namespace  \u00b7  w connect selected namespace"
-            ),
+            action="Enter for details; a for existing namespace actions.",
             runs="Read-only; refreshes in the background.",
             note=(
-                "Linked resources counts DPS, IoT Hubs and update instances."
+                "Use az iot adr ns setup for onboarding. Endpoint counts do not prove readiness."
             ),
         ),
-        row_id=name_of,
+        row_id=lambda p: p.get("id") or name_of(p),
         list=list_namespaces,
+        actions=crud("namespace", "iot adr ns", "namespace_name", ("resource_group_name",)),
         columns=(
-            name_column(width=32),
+            name_column(width=26),
+            state_column(width=14),
             Column("rg", "RESOURCE GROUP", resource_group_of, width=24),
             Column("location", "LOCATION", lambda p: p.get("location", ""), width=18),
-            state_column(width=14),
             Column(
                 "readiness",
                 "LINK READINESS",
@@ -131,7 +131,7 @@ def build(session) -> ResourceSpec:
         scope_key="namespace_name",
         # Children live in the namespace's own resource group, which may differ from the
         # one the session started in.
-        scope_extra=lambda p: {"resource_group_name": resource_group_of(p)},
+        scope_extra=lambda p: {"resource_group_name": resource_group_of(p), "namespace_name": name_of(p)},
         children=(
             ChildRef(
                 "link", "Linked resources", "l",
@@ -149,5 +149,6 @@ def build(session) -> ResourceSpec:
                 "ca", "Certificate authorities", "c",
                 "X.509 trust roots and certificate policies.",
             ),
+            ChildRef("device", "Devices", "d", "Registry device metadata; never credentials."),
         ),
     )

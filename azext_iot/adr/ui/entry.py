@@ -14,6 +14,7 @@ from contextlib import contextmanager, nullcontext
 from typing import Optional
 
 from azure.cli.core.azclierror import CLIInternalError
+from knack.log import get_logger
 
 # Single source of truth for the floor; the store enforces the same value at runtime.
 from azext_iot.adr.ui.core.store import MIN_INTERVAL_SEC as MIN_REFRESH_INTERVAL_SEC
@@ -26,7 +27,7 @@ _TEXTUAL_MISSING_MSG = (
 
 
 @contextmanager
-def _silence_provider_console():
+def _silence_provider_console(keep_silent=None):
     """Disable provider Live displays while Textual owns the terminal."""
     from azext_iot.adr.providers.base import console
 
@@ -36,8 +37,10 @@ def _silence_provider_console():
     try:
         yield
     finally:
-        console.status = status
-        console.quiet = quiet
+        # Detached writes must not restart a provider spinner on the restored shell.
+        if keep_silent is None or not keep_silent():
+            console.status = status
+            console.quiet = quiet
 
 
 def adr_ui_launch(
@@ -52,7 +55,7 @@ def adr_ui_launch(
     """Launch the terminal UI. Returns nothing; the UI owns the terminal until it exits."""
     try:
         from azext_iot.adr.ui.app import RadrApp
-    except ModuleNotFoundError as error:  # pragma: no cover - depends on install shape
+    except ModuleNotFoundError as error:
         missing = str(error.name or "")
         if missing != "textual" and not missing.startswith("textual."):
             raise
@@ -75,5 +78,7 @@ def adr_ui_launch(
         theme_name=theme,
         log_path=active_log,
     )
-    with _silence_provider_console():
-        app.run()
+    with _silence_provider_console(lambda: app.operations_running):
+        app.run(mouse=True)
+    for outcome in app.final_outcomes():
+        get_logger(__name__).warning("%s", outcome)

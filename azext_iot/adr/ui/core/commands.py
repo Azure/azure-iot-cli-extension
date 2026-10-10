@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 #: Scope keys mapped to the CLI flags that carry them. Ordered so generated commands read
 #: the way the documentation writes them.
 _FLAGS: Tuple[Tuple[str, str], ...] = (
+    ("subscription_id", "--subscription"),
     ("namespace_name", "--ns"),
     ("resource_group_name", "-g"),
     ("certificate_authority_name", "--ca-name"),

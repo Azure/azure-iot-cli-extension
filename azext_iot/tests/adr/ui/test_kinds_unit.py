@@ -55,7 +55,7 @@ SCOPE = {
 
 def test_every_kind_registers_and_validates(registry):
     """Registration runs spec validation, so this covers all supported kinds at once."""
-    assert len(registry) == 9
+    assert len(registry) == 13
 
 
 def test_namespace_is_the_root(registry):
@@ -83,13 +83,13 @@ def test_child_relationships_are_declared(registry):
     def children(kind):
         return {ref.kind for ref in registry.get(kind).children}
 
-    assert {"group", "job", "link", "ca"} == children("namespace")
+    assert {"group", "job", "link", "ca", "device"} == children("namespace")
     assert children("group") == {"member"}
     assert children("job") == {"run"}
     assert children("ca") == {"policy"}
 
 
-@pytest.mark.parametrize("alias", ["device", "registry-device", "dev", "rd", "auth", "attr", "cap"])
+@pytest.mark.parametrize("alias", ["rd", "auth", "attr", "cap"])
 def test_retired_device_surfaces_are_not_registered(registry, alias):
     assert registry.resolve(alias) is None
 
@@ -100,15 +100,15 @@ def test_live_and_demo_have_no_retired_devices_or_link_delete_actions(registry):
 
     assert "registry_device" not in _PROVIDER_PATHS
     for kinds in (registry, build_synthetic_registry()):
-        for alias in ("device", "attribute", "capability", "auth"):
+        for alias in ("attribute", "capability", "auth"):
             assert kinds.resolve(alias) is None
         assert kinds.resolve("group") is not None
-    assert registry.get("link").actions == ()
+    assert registry.get("link").action("hub_remove").destructive
 
 
 def test_namespace_hierarchy_explains_every_related_collection(registry):
     children = registry.get("namespace").children
-    assert [child.kind for child in children] == ["link", "group", "job", "ca"]
+    assert [child.kind for child in children] == ["link", "group", "job", "ca", "device"]
     assert all(child.description for child in children)
     assert children[0].label == "Linked resources"
 
@@ -205,7 +205,7 @@ def test_namespace_row_renders_from_a_realistic_payload(registry):
     assert cells["HUBS"] == "2"
     assert cells["DPS"] == "1"
     assert cells["UPDATES"] == "0"
-    assert cells["LINK READINESS"] == "ready"
+    assert cells["LINK READINESS"] == "configured"
     assert cells["TAGS"] == "environment=prod owner=iot"
     assert STYLE_OK in row.styles
 
@@ -325,7 +325,7 @@ def test_namespace_without_a_name_still_renders_one_readable_row(registry):
     model = TableModel(registry.get("namespace"))
     model.apply([payload])
     assert model.rows[0].cells[0] == "anonymous-ns"
-    assert model.rows[0].cells[1] == "rg", "resource group is parsed from the id too"
+    assert model.rows[0].cells[2] == "rg", "resource group is parsed from the id too"
 
 
 # -- required scope ------------------------------------------------------------------

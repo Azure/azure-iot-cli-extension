@@ -14,6 +14,7 @@ from azext_iot.adr.ui.core.spec import (
     Guide,
     ResourceSpec,
 )
+from azext_iot.adr.ui.core.actions import Field, NS_SCOPE, VALIDITY, crud, provider_action
 from azext_iot.adr.ui.kinds._common import (
     age_column,
     dig,
@@ -51,6 +52,25 @@ def build_ca(session) -> ResourceSpec:
         ),
         row_id=name_of,
         list=list_authorities,
+        actions=crud(
+            "certificate_authority", "iot adr ns ca", "certificate_authority_name",
+            create_fields=(
+                Field("certificate_authority_type", "--type", "Type: Root or ICA", "Root", ("Root", "ICA")),
+                Field("issuer_type", "--issuer-type", "Issuer (ICA only): Microsoft or External",
+                      choices=("Microsoft", "External"), optional=True),
+                Field("issuer_certificate_authority_name", "--issuer-ca-name", "Root CA name (Microsoft ICA only)",
+                      optional=True),
+            ),
+        ) + (
+            provider_action(
+                "certificate_authority", "iot adr ns ca revoke", "revoke", "certificate_authority_name",
+                destructive=True, label="Revoke and rotate",
+                applies_to=lambda p: prop("certificateAuthorityType")(p) == "ICA"
+                and prop("issuer", "issuerType")(p) == "Microsoft",
+                unavailable="Only Microsoft-issued ICAs can be revoked and rotated.",
+                note="Issues a replacement from the same root. Success does not prove the old certificate is rejected.",
+            ),
+        ),
         columns=(
             name_column(width=26),
             Column(
@@ -60,8 +80,8 @@ def build_ca(session) -> ResourceSpec:
                 width=8,
                 style=value_style(prop("certificateAuthorityType"), _CA_TYPE_STYLES),
             ),
-            Column("issuer", "ISSUER", prop("issuerType"), width=12),
-            Column("issued_by", "ISSUED BY", prop("issuerCertificateAuthorityName"), width=22),
+            Column("issuer", "ISSUER", prop("issuer", "issuerType"), width=12),
+            Column("issued_by", "ISSUED BY", prop("issuer", "certificateAuthorityResourceId"), width=22, wide=True),
             Column(
                 "expires",
                 "EXPIRES IN",
@@ -101,9 +121,13 @@ def build_policy(session) -> ResourceSpec:
         ),
         row_id=name_of,
         list=list_policies,
+        actions=crud(
+            "certificate_policy", "iot adr ns ca policy", "certificate_policy_name",
+            (*NS_SCOPE, "certificate_authority_name"), create_fields=(VALIDITY,), update_fields=(VALIDITY,),
+        ),
         columns=(
             name_column(width=26),
-            Column("validity", "VALIDITY (DAYS)", prop("validityDays"), width=16),
+            Column("validity", "VALIDITY (DAYS)", prop("certificate", "validityPeriodInDays"), width=16),
             state_column(),
             age_column(),
         ),
@@ -129,10 +153,15 @@ def build_update_instance(session) -> ResourceSpec:
         guide=Guide(
             about="Software Updates instances - the service that runs update jobs against devices in this namespace.",
             runs="az iot adr ns su instance list -g <resource-group>  ·  read-only",
-            note="Listed at resource-group level; linking one to a namespace is done in guided setup.",
+            note="Manage standalone instances here; add or remove namespace associations through Links.",
         ),
         row_id=name_of,
         list=list_instances,
+        actions=crud(
+            "update_instance", "iot adr ns su instance", "update_instance_name",
+            ("resource_group_name",), create_fields=(Field("location", "--location", "Region"),),
+            no_wait=False,
+        ),
         columns=(
             name_column(width=28),
             Column("rg", "RESOURCE GROUP", resource_group_of, width=22),
@@ -149,4 +178,5 @@ def build_update_instance(session) -> ResourceSpec:
         ),
         sort=("name", False),
         scope_key="update_instance_name",
+        scope_extra=lambda p: {"resource_group_name": resource_group_of(p)},
     )

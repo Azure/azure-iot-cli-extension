@@ -14,6 +14,7 @@ from azext_iot.adr.ui.core.spec import (
     Guide,
     ResourceSpec,
 )
+from azext_iot.adr.ui.core.actions import Field, crud, provider_action
 from azext_iot.adr.ui.kinds._common import (
     age_column,
     name_column,
@@ -54,6 +55,17 @@ def build(session) -> ResourceSpec:
         ),
         row_id=name_of,
         list=list_groups,
+        actions=crud(
+            "group", "iot adr ns group", "group_name", no_wait=False,
+            create_fields=(Field("query_string", "--query-string", "Device query"),),
+            update_fields=(Field("display_name", "--display-name", "Display name"),),
+        ) + (
+            provider_action(
+                "group", "iot adr ns group refresh", "refresh", "group_name",
+                label="Refresh membership",
+                note="Requests service membership evaluation; limited by the service to once per hour.",
+            ),
+        ),
         columns=(
             name_column(width=24),
             Column("display", "DISPLAY NAME", prop("displayName"), width=22),
@@ -66,7 +78,7 @@ def build(session) -> ResourceSpec:
                 width=13,
                 style=value_style(prop("membershipState"), _MEMBERSHIP_STYLES),
             ),
-            Column("query", "QUERY", prop("queryString"), width=34, wide=True),
+            Column("query", "QUERY", prop("queryFilter"), width=34, wide=True),
             Column("type", "TYPE", prop("groupType"), width=16, wide=True),
             state_column(),
             age_column(),

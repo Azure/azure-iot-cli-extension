@@ -15,11 +15,17 @@ This module is deliberately free of any UI framework import.
 """
 
 from dataclasses import dataclass, field
+from copy import copy
+from threading import BoundedSemaphore, RLock
 from typing import Any, Callable, Dict, Optional
 
 #: Provider classes by the name the kinds refer to them by. Imported lazily in
 #: :meth:`Session.provider` so building a session stays cheap.
 _PROVIDER_PATHS = {
+    "device": ("azext_iot.adr.providers.registry_device", "RegistryDeviceProvider"),
+    "schema_registry": ("azext_iot.adr.providers.schema", "SchemaRegistryProvider"),
+    "device_class": ("azext_iot.adr.providers.device_class", "DeviceClassProvider"),
+    "software_update": ("azext_iot.adr.providers.software_update", "SoftwareUpdateProvider"),
     "namespace": ("azext_iot.adr.providers.namespace", "NamespaceProvider"),
     "group": ("azext_iot.adr.providers.group", "GroupProvider"),
     "job": ("azext_iot.adr.providers.job", "JobProvider"),
@@ -44,11 +50,13 @@ class SessionError(Exception):
     caller may surface in a dialog rather than the single-line flash.
     """
 
-    def __init__(self, message: str, detail: Optional[str] = None, recoverable: bool = True):
+    def __init__(self, message: str, detail: Optional[str] = None, recoverable: bool = True,
+                 status_code=None):
         super().__init__(message)
         self.message = message
         self.detail = detail
         self.recoverable = recoverable
+        self.status_code = status_code
 
     def __str__(self) -> str:
         return self.message
@@ -65,14 +73,14 @@ def translate_error(error: Exception) -> SessionError:
     Provider messages are already written for humans, so they are preserved verbatim;
     this only adds context for the failures that arrive as bare HTTP errors.
     """
-    from azure.cli.core.azclierror import AzCLIError
+    from azure.cli.core.azclierror import AzCLIError, ResourceNotFoundError
 
     status = _http_status(error)
     text = str(error).strip() or error.__class__.__name__
 
     if isinstance(error, AzCLIError):
         # Argument, usage and not-found errors already carry actionable guidance.
-        return SessionError(text)
+        return SessionError(text, status_code=404 if isinstance(error, ResourceNotFoundError) else status)
 
     if status == 401 or status == 403:
         return SessionError(
@@ -80,7 +88,7 @@ def translate_error(error: Exception) -> SessionError:
             detail=text,
         )
     if status == 404:
-        return SessionError("The resource was not found.", detail=text)
+        return SessionError("The resource was not found.", detail=text, status_code=404)
     if status == 429:
         return SessionError("The service is throttling requests. Backing off.", detail=text)
     if status is not None and status >= 500:
@@ -119,8 +127,13 @@ class Session:
 
     def __init__(self, cmd, resource_group_name: Optional[str] = None,
                  namespace_name: Optional[str] = None, read_only: bool = False):
-        self.cmd = cmd
+        self.cmd = copy(cmd)
+        if cmd is not None:
+            self.cmd.cli_ctx = copy(cmd.cli_ctx)
+            self.cmd.cli_ctx.data = dict(cmd.cli_ctx.data)
         self.read_only = read_only
+        self._io_slots = BoundedSemaphore(4)
+        self._provider_lock = RLock()
         self._providers: Dict[str, Any] = {}
         self.scope = Scope(
             resource_group_name=resource_group_name,
@@ -131,6 +144,7 @@ class Session:
 
     def resolve_subscription(self) -> Optional[str]:
         """Read the active subscription from the CLI profile. Never fatal."""
+        from knack.util import CLIError
         if self.scope.subscription_id or self.cmd is None:
             return self.scope.subscription_id
         try:
@@ -141,14 +155,19 @@ class Session:
             subscription = Profile(cli_ctx=self.cmd.cli_ctx).get_subscription(subscription_id)
             self.scope.subscription_id = subscription.get("id")
             self.scope.subscription_name = subscription.get("name")
-        except Exception:  # noqa: BLE001 - an unusable profile must not stop the UI
-            return None
+            self.cmd.cli_ctx.data["subscription_id"] = self.scope.subscription_id
+        except (CLIError, ValueError, OSError) as error:
+            raise SessionError(f"Could not resolve subscription: {error}") from error
         return self.scope.subscription_id
 
     # -- providers ---------------------------------------------------------
 
     def provider(self, name: str):
         """Return a cached provider. Each constructor builds a client, so reuse matters."""
+        with self._provider_lock:
+            return self._provider(name)
+
+    def _provider(self, name):
         if name not in self._providers:
             try:
                 module_path, class_name = _PROVIDER_PATHS[name]
@@ -163,7 +182,8 @@ class Session:
     def call(self, func: Callable[..., Any], *args, **kwargs) -> Any:
         """Invoke a provider method, translating every failure into ``SessionError``."""
         try:
-            return func(*args, **kwargs)
+            with self._io_slots:
+                return func(*args, **kwargs)
         except SessionError:
             raise
         except Exception as error:  # noqa: BLE001 - this is the boundary

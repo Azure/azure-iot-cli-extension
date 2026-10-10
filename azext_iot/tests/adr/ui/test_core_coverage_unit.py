@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from azext_iot.adr.ui.core import commands, ops, rbac
+from azext_iot.adr.ui.core import commands, ops
 from azext_iot.adr.ui.core.redaction import REDACTED, redact
 from azext_iot.adr.ui.core.session import Session
 from azext_iot.adr.ui.core.spec import ChildRef, SpecError, state_style, validate_spec
@@ -90,38 +90,6 @@ def test_poller_without_waiter_fails_closed():
     assert operation.state is ops.OpState.FAILED
     assert "without a waiter" in operation.error
     poller.result.assert_not_called()
-
-
-def test_embedded_permissions_cli_inherits_context_without_invoking_azure(monkeypatch):
-    factory = Mock()
-    monkeypatch.setattr("azext_iot.common.embedded_cli.EmbeddedCLI", factory)
-    context = object()
-    session = SimpleNamespace(cmd=SimpleNamespace(cli_ctx=context))
-    assert rbac._embedded_cli(session) is factory.return_value
-    factory.assert_called_once_with(cli_ctx=context, capture_stderr=True)
-    factory.return_value.invoke.assert_not_called()
-
-
-@pytest.mark.parametrize("payload", [None, [], {}, {"value": {}}, {"value": None}])
-def test_malformed_permissions_response_is_unknown_not_allowed(monkeypatch, payload):
-    result = Mock()
-    result.success.return_value = True
-    result.as_json.return_value = payload
-    cli = Mock()
-    cli.invoke.return_value = result
-    monkeypatch.setattr(rbac, "_embedded_cli", lambda session: cli)
-    context = SimpleNamespace(cloud=SimpleNamespace(
-        endpoints=SimpleNamespace(resource_manager="https://arm.example.test/")))
-    session = SimpleNamespace(cmd=SimpleNamespace(cli_ctx=context))
-    assert rbac.permissions_at_scope(session, "/subscriptions/sub/resourceGroups/rg", ["*/write"]) is None
-    assert "--method get" in cli.invoke.call_args.args[0]
-
-
-def test_permissions_without_scope_never_constructs_cli(monkeypatch):
-    factory = Mock()
-    monkeypatch.setattr(rbac, "_embedded_cli", factory)
-    assert rbac.permissions_at_scope(None, "", ["*/write"]) is None
-    factory.assert_not_called()
 
 
 def test_redaction_copies_nested_tuples_without_touching_original():
@@ -212,8 +180,6 @@ def test_empty_table_names_namespace_scope(spec):
 def test_command_subscription_override_matches_profile_factory_and_planned_resource_scope(monkeypatch):
     from azure.cli.core import get_default_cli
     from azure.cli.core._profile import Profile
-    from azext_iot.adr.ui.screens.onboard.create import CreateRequest
-    from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
 
     cli_ctx = get_default_cli()
     subscriptions = [
@@ -233,12 +199,9 @@ def test_command_subscription_override_matches_profile_factory_and_planned_resou
     provider = session.provider("namespace")
     assert provider is session.provider("namespace")
     assert client_factory.call_args.kwargs["subscription_id"] == "subscription-b"
-    credential.assert_called_once_with(cli_ctx, subscription_id="subscription-b")
-    screen = OnboardScreen(session, session.scope.as_dict())
-    screen.context["create_resource_group"] = CreateRequest("resource_group", "new-rg", "new-rg", "eastus2")
-    requirements = screen._permission_requirements()
-    assert "/subscriptions/subscription-b" in requirements
-    assert all("subscription-a" not in scope for scope in requirements)
+    credential.assert_called_once_with(session.cmd.cli_ctx, subscription_id="subscription-b")
+    cli_ctx.data["subscription_id"] = "subscription-a"
+    assert session.cmd.cli_ctx.data["subscription_id"] == "subscription-b"
     assert Profile(cli_ctx=cli_ctx).get_subscription()["id"] == "subscription-a"
     client_factory.return_value.namespaces.begin_create_or_replace.assert_not_called()
 

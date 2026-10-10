@@ -19,15 +19,15 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.widgets import DataTable, Input, Static
-from textual.widgets.data_table import RowDoesNotExist
+from textual.widgets.data_table import RowDoesNotExist, CellDoesNotExist
 
+from azext_iot.adr.ui.core.io import run_io
 from azext_iot.adr.ui.core.spec import STYLE_ACTIVE, STYLE_ERROR, ResourceSpec
 from azext_iot.adr.ui.screens.base import ChromeScreen
 from azext_iot.adr.ui.core.table import TableModel
 from azext_iot.adr.ui.theme import style_for
 
 _LOADING_ROW_ID = "__loading__"
-_LOADING_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
 
 class BrowseScreen(ChromeScreen):
@@ -58,7 +58,7 @@ class BrowseScreen(ChromeScreen):
         self.model = TableModel(spec)
         self._filtering = False
         self._loading = False
-        self._loading_frame = 0
+        self._column_indices = []
 
     # -- composition -------------------------------------------------------
 
@@ -75,12 +75,16 @@ class BrowseScreen(ChromeScreen):
         )
         self.query_one("#filter-input", Input).display = False
         self._build_columns()
-        self.set_interval(0.1, self._animate_loading_row)
         self.refresh_rows()
+        self.query_one("#rows", DataTable).focus()
         if self.refresh_interval:
             # Polling keeps the table current; the cache decides whether a tick costs a
             # request. Only the visible screen is mounted, so background screens are quiet.
-            self.set_interval(self.refresh_interval, self.refresh_rows)
+            self.set_interval(self.refresh_interval, self._refresh_visible)
+
+    def _refresh_visible(self):
+        if self.app.screen is self:
+            self.refresh_rows()
 
     # -- data --------------------------------------------------------------
 
@@ -101,14 +105,20 @@ class BrowseScreen(ChromeScreen):
             # already in flight, which on a slow collection could starve it forever.
             return
         self._loading = True
-        self._loading_frame = 0
         self.model.begin_load()
         self._repaint()
+        if self.app.io_slots.locked():
+            self.flash("Waiting for an available Azure request slot.", "warning")
         self.run_worker(
-            partial(self._load, force),
+            self._load_rows(force),
             name=f"load-{self.spec.kind}",
-            thread=True,
         )
+
+    async def _load_rows(self, force):
+        try:
+            await run_io(partial(self._load, force), self.app.io_slots)
+        finally:
+            self._loading = False
 
     def _missing_scope_message(self, missing) -> str:
         readable = {
@@ -135,9 +145,9 @@ class BrowseScreen(ChromeScreen):
             result = self.source(self.scope, force=force)
             payloads = list(result)
         except Exception as error:  # noqa: BLE001 - this worker is the error boundary
-            app.call_from_thread(self._on_load_failed, str(error))
+            app.post_from_thread(self._on_load_failed, str(error))
         else:
-            app.call_from_thread(
+            app.post_from_thread(
                 self._on_loaded,
                 payloads,
                 getattr(result, "error", None),
@@ -175,8 +185,21 @@ class BrowseScreen(ChromeScreen):
     def _build_columns(self) -> None:
         table = self.query_one("#rows", DataTable)
         table.clear(columns=True)
-        for column in self.model.columns:
-            table.add_column(column.label, key=column.key, width=column.width)
+        budget = max(16, self.size.width - 8)
+        self._column_indices = []
+        for index, column in enumerate(self.model.columns):
+            width = min(column.width or 20, budget - 2)
+            if index and (column.width or 20) + 2 > budget:
+                continue
+            table.add_column(column.label, key=column.key, width=width)
+            self._column_indices.append(index)
+            budget -= width + 2
+
+    def on_resize(self):
+        if self.is_mounted:
+            selected = self.selected_row_id()
+            self._build_columns()
+            self._repaint(selected)
 
     def _repaint(self, selected: Optional[str] = None) -> None:
         """Rebuild visible rows, preserving the cursor by row identity."""
@@ -189,12 +212,14 @@ class BrowseScreen(ChromeScreen):
         loading_offset = 0
         if self._loading and self.model.columns:
             loading_cells = [self._loading_text(theme)]
-            loading_cells.extend("" for _ in self.model.columns[1:])
+            loading_cells.extend("" for _ in self._column_indices[1:])
             table.add_row(*loading_cells, key=_LOADING_ROW_ID)
             loading_offset = 1
         for row in self.model.rows:
             cells = []
             for index, value in enumerate(row.cells):
+                if index not in self._column_indices:
+                    continue
                 token = row.styles[index]
                 if row.status_style == STYLE_ERROR and index == 0:
                     token = STYLE_ERROR
@@ -212,29 +237,16 @@ class BrowseScreen(ChromeScreen):
             if index is not None:
                 table.move_cursor(row=index + loading_offset)
 
-        self.query_one("#status-line", Static).update(self.model.status_text())
+        hidden = len(self.model.columns) - len(self._column_indices)
+        self.query_one("#status-line", Static).update(
+            self.model.status_text() + (f" · {hidden} columns in details" if hidden else "")
+        )
         self._sync_chrome()
 
     def _loading_text(self, theme=None) -> Text:
-        frame = _LOADING_FRAMES[self._loading_frame]
         return Text(
-            f"{frame} Loading resources...",
+            "… Loading resources...",
             style=f"bold {style_for(STYLE_ACTIVE, theme)}",
-        )
-
-    def _animate_loading_row(self) -> None:
-        if not self._loading or not self.model.columns:
-            return
-        self._loading_frame = (self._loading_frame + 1) % len(_LOADING_FRAMES)
-        table = self.query_one("#rows", DataTable)
-        try:
-            table.get_row(_LOADING_ROW_ID)
-        except RowDoesNotExist:
-            return
-        table.update_cell(
-            _LOADING_ROW_ID,
-            self.model.columns[0].key,
-            self._loading_text(getattr(self.app, "theme_tokens", None)),
         )
 
     def _sync_chrome(self) -> None:
@@ -255,7 +267,7 @@ class BrowseScreen(ChromeScreen):
                 if row_key.value == _LOADING_ROW_ID
                 else row_key.value
             )
-        except Exception:  # noqa: BLE001 - cursor can be transiently invalid mid-repaint
+        except (RowDoesNotExist, CellDoesNotExist):
             return None
 
     def selected_payload(self) -> Optional[Dict[str, Any]]:
@@ -277,11 +289,6 @@ class BrowseScreen(ChromeScreen):
     def hint_bindings(self) -> List[tuple]:
         """Hints derived from real bindings plus the spec's own children and actions."""
         hints = super().hint_bindings()
-        hints.extend(
-            (binding.key_display or binding.key, binding.description)
-            for binding in self.app.BINDINGS
-            if binding.action in ("new_setup", "onboard")
-        )
         for child in self.spec.children:
             if child.key:
                 hints.append((child.key, child.label.lower()))
@@ -305,11 +312,14 @@ class BrowseScreen(ChromeScreen):
     def action_sort(self) -> None:
         """Sort by the column under the cursor; repeating reverses direction."""
         table = self.query_one("#rows", DataTable)
-        columns = self.model.columns
         index = table.cursor_coordinate.column if table.row_count else 0
-        if 0 <= index < len(columns):
-            self.model.set_sort(columns[index].key)
+        if 0 <= index < len(self._column_indices):
+            self.model.set_sort(self.model.columns[self._column_indices[index]].key)
             self._repaint()
+
+    def on_data_table_header_selected(self, event: DataTable.HeaderSelected) -> None:
+        self.model.set_sort(event.column_key.value)
+        self._repaint()
 
     def action_start_filter(self) -> None:
         self._filtering = True
@@ -352,13 +362,8 @@ class BrowseScreen(ChromeScreen):
         self.app.pop_screen_safely()
 
     def action_drill_down(self) -> None:
-        """Enter shows the hierarchy when there is a choice, else opens the only child."""
-        if len(self.spec.children) > 1:
-            payload = self.selected_payload()
-            if payload is not None:
-                self.app.open_overview(self.spec, payload, list(self.spec.children))
-        elif self.spec.children:
-            self._open_child(self.spec.children[0])
+        """Enter or a row click opens details, replacing the table."""
+        self.action_show_json()
 
     def _open_child(self, child) -> None:
         payload = self.selected_payload()

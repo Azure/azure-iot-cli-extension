@@ -16,7 +16,7 @@ from azext_iot.adr.ui.core.session import Session, SessionError, translate_error
 
 
 class _Cmd:
-    cli_ctx = object()
+    cli_ctx = SimpleNamespace(data={})
 
 
 def make_session(**kwargs):
@@ -176,10 +176,11 @@ def test_subscription_resolution_failure_is_not_fatal(monkeypatch):
 
     class BrokenProfile:
         def __init__(self, cli_ctx=None):
-            raise RuntimeError("no profile")
+            raise ValueError("no profile")
 
     monkeypatch.setattr(profile_module, "Profile", BrokenProfile)
-    assert session.resolve_subscription() is None
+    with pytest.raises(SessionError, match="Could not resolve subscription"):
+        session.resolve_subscription()
 
 
 def test_subscription_is_resolved_once(monkeypatch):

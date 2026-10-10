@@ -55,7 +55,7 @@ def test_age_units_with_frozen_clock(monkeypatch, delta, expected, naive):
     ("Succeeded", "None", 1, 1, "needs identity"),
     ("Succeeded", "SystemAssigned", 0, 1, "needs DPS"),
     ("Succeeded", "UserAssigned", 1, 0, "needs Hub"),
-    ("Succeeded", "SystemAssigned", 1, 2, "ready"),
+    ("Succeeded", "SystemAssigned", 1, 2, "configured"),
 ])
 def test_namespace_readiness_reflects_endpoint_dependencies(state, identity, dps, hubs, expected):
     payload = {
@@ -69,7 +69,7 @@ def test_namespace_readiness_reflects_endpoint_dependencies(state, identity, dps
     spec = namespace.build(Mock())
     assert spec.column("readiness").text(payload) == expected
     assert spec.column("readiness").style(payload) == {
-        "blocked": "error", "ready": "active",
+        "blocked": "error", "configured": "active",
     }.get(expected, "warn")
     assert spec.column("dps").extract(payload) == dps
     assert spec.column("hubs").extract(payload) == hubs
@@ -95,7 +95,9 @@ def test_link_rows_disambiguate_names_and_summarize_known_endpoint_types():
     assert [spec.column("identity").text(row) for row in rows] == ["UserAssigned:mi", "SystemAssigned", "none", "none"]
     assert spec.summarize_rows(rows) == "DPS 1  ·  IoT Hubs 1  ·  Updates 1"
     assert spec.summarize_rows([]) == "DPS 0  ·  IoT Hubs 0  ·  Updates 0"
-    assert spec.actions == ()
+    assert {action.name for action in spec.actions} == {
+        f"{kind}_{method}" for kind in ("hub", "dps", "su") for method in ("add", "wait", "update", "remove")
+    }
 
 
 @pytest.mark.parametrize("job_type, target", [

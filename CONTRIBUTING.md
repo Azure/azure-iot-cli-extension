@@ -237,24 +237,25 @@ python -m pytest azext_iot/tests/adr/ui -k "_unit.py" -p no:rerunfailures \
   --cov=azext_iot.adr.ui --cov-config=.coveragerc --cov-fail-under=99
 ```
 
-The live smoke scenario creates one unique, absence-checked ADR namespace.
-It exercises real radar Session/provider reads, namespace navigation, empty child
-collections, and read-only action guards without a TTY. Cleanup is registered
-before creation and deletes only the test-owned namespace. It does not provision
-Hub, DPS, or Software Updates resources or replace manual onboarding evaluation.
+The live scenarios create unique, absence-checked ADR namespaces. They exercise
+real radar Session/provider reads, namespace navigation, empty child collections,
+read-only action guards, and mouse-driven device create/update/delete with
+namespace tag preservation, without a TTY. Cleanup is registered before creation
+and deletes only test-owned resources. These scenarios do not provision Hub, DPS,
+or Software Updates resources and do not qualify those providers' write paths.
 
 Use the candidate extension and a dedicated Azure CLI profile: ADR preflight
 selects the configured test subscription. Configure `azext_iot_adr_subscription`,
 `azext_iot_adr_resource_group`, and `azext_iot_adr_location` as described in the
-integration workflow guidance. To run only this smoke scenario:
+integration workflow guidance. To run both radar scenarios:
 
 ```bash
 AZURE_TEST_RUN_LIVE=True python -m pytest \
-  azext_iot/tests/adr/test_adr_radar_int.py::TestADRRadar::test_radar_readonly_namespace_smoke \
+  azext_iot/tests/adr/test_adr_radar_int.py \
   -p no:rerunfailures --timeout=900
 ```
 
-The existing `ADR-int` selection also includes this scenario.
+The existing `ADR-int` selection also includes these scenarios.
 
 If namespace continuation fails in the service,
 `azext_iot_adr_radar_skip_namespace_list=true` explicitly omits namespace listing

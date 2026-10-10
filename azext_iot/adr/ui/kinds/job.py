@@ -7,6 +7,7 @@
 """Jobs (what to roll out, and to whom) and their runs (when it executed)."""
 
 from azext_iot.adr.ui.core.spec import ChildRef, Column, Guide, ResourceSpec
+from azext_iot.adr.ui.core.actions import Field, crud
 from azext_iot.adr.ui.kinds._common import (
     RUN_STATUS_STYLES,
     age_column,
@@ -50,6 +51,15 @@ def build(session) -> ResourceSpec:
         ),
         row_id=name_of,
         list=list_jobs,
+        actions=crud(
+            "job", "iot adr ns job", "job_name",
+            create_fields=(
+                Field("target_group_name", "--target-group-name", "Target group"),
+                Field("update_provider", "--update-id-provider", "Update provider"),
+                Field("update_name", "--update-id-name", "Update name"),
+                Field("update_version", "--update-id-version", "Update version"),
+            ),
+        ),
         columns=(
             name_column(width=24),
             Column("type", "TYPE", prop("jobType"), width=18),

@@ -15,12 +15,12 @@ from textual.widgets import DataTable, Input
 from textual.widgets.data_table import RowDoesNotExist
 
 from azext_iot.adr.ui.app import RadrApp
-from azext_iot.adr.ui.core.spec import ChildRef
+from azext_iot.adr.ui.core.spec import ChildRef, Column
 from azext_iot.adr.ui.core.store import FetchResult
 from azext_iot.adr.ui.core.table import LoadState
 from azext_iot.adr.ui.screens.browse import BrowseScreen
 from azext_iot.adr.ui.screens.detail import DetailScreen
-from azext_iot.adr.ui.screens.overview import OverviewScreen
+from azext_iot.adr.ui.kinds.synthetic import build_synthetic_registry
 from azext_iot.adr.ui.widgets.chrome import FlashLine
 from azext_iot.tests.adr.ui.conftest import make_payload, widget_spec
 from azext_iot.tests.adr.ui.test_app_coverage_unit import settle
@@ -28,7 +28,7 @@ from azext_iot.tests.adr.ui.test_app_coverage_unit import settle
 
 def run_browse(spec, source, scenario):
     async def runner():
-        app = RadrApp()
+        app = RadrApp(registry=build_synthetic_registry())
         async with app.run_test(size=(120, 40)) as pilot:
             await settle(app, pilot)
             screen = BrowseScreen(spec, source, {"namespace_name": "ns", "resource_group_name": "rg"})
@@ -161,7 +161,7 @@ def test_overlapping_refresh_is_dropped_and_loading_animation_tolerates_repaint_
         return [make_payload("loaded")]
 
     async def runner():
-        app = RadrApp()
+        app = RadrApp(registry=build_synthetic_registry())
         try:
             async with app.run_test(size=(120, 40)) as pilot:
                 await settle(app, pilot)
@@ -173,10 +173,8 @@ def test_overlapping_refresh_is_dropped_and_loading_animation_tolerates_repaint_
                     assert len(calls) == 1
                     table = screen.query_one(DataTable)
                     assert screen.selected_payload() is None
-                    screen._animate_loading_row()
                     assert "Loading resources" in table.get_row("__loading__")[0].plain
                     table.remove_row("__loading__")
-                    screen._animate_loading_row()
                     assert table.row_count == 0
                     assert screen._loading
                 finally:
@@ -191,7 +189,7 @@ def test_overlapping_refresh_is_dropped_and_loading_animation_tolerates_repaint_
     asyncio.run(runner())
 
 
-def test_declared_multiple_children_open_overview_but_filter_input_does_not_navigate():
+def test_declared_multiple_children_open_details_but_filter_input_does_not_navigate():
     children = (ChildRef("group", "Groups", "g"), ChildRef("member", "Members", "m"))
 
     async def scenario(app, pilot, screen):
@@ -202,7 +200,31 @@ def test_declared_multiple_children_open_overview_but_filter_input_does_not_navi
         assert screen.model.row_count == 1
         await pilot.press("enter")
         await settle(app, pilot)
-        assert isinstance(app.screen, OverviewScreen)
-        assert [entry[0] for entry in app.screen.child_entries] == list(children)
+        assert isinstance(app.screen, DetailScreen)
+        assert list(app.screen.spec.children) == list(children)
         assert app.screen.scope["widget_name"] == "one"
     run_browse(widget_spec(children=children), Mock(return_value=[make_payload("one")]), scenario)
+
+
+def test_narrow_column_sort_uses_displayed_index_and_header_click():
+    columns = (
+        Column("name", "NAME", lambda p: p["name"], width=20),
+        Column("hidden", "HIDDEN", lambda p: p["properties"]["provisioningState"], width=200),
+        Column("state", "STATE", lambda p: p["properties"]["provisioningState"], width=10),
+    )
+
+    async def scenario(_app, pilot, screen):
+        assert screen._column_indices == [0, 2]
+        table = screen.query_one(DataTable)
+        table.move_cursor(column=1)
+        screen.action_sort()
+        assert screen.model.sort_key == "state"
+        await pilot.click("#rows", offset=(3, 0))
+        assert screen.model.sort_key == "name"
+        event = Mock(key="g")
+        screen._filtering = True
+        screen.on_key(event)
+        event.stop.assert_not_called()
+        screen._filtering = False
+        screen.on_key(Mock(key="none"))
+    run_browse(widget_spec(columns=columns), Mock(return_value=[make_payload("one")]), scenario)

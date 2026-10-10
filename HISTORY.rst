@@ -16,10 +16,10 @@ Release History
 
 **Namespace terminal UI**
 
-* Added ``az iot adr ns ui`` for namespace browsing, read-only diagnostics, and guided connectivity setup.
-* Onboarding uses the release providers and role matrix, including the namespace system-assigned identity's DPS provisioning role and the three Software Updates service roles. Missing grants require role-assignment write permission at each scope; existing grants are reused.
-* Link operations wait inside the execution worker through the shared provider, retaining bounded propagation recovery and ambiguous-write protection without blocking the terminal UI.
-* Guided setup cannot overlap pending or running operations. Provider progress displays are disabled while the UI owns the terminal and restored when it exits.
+* Added ``az iot adr ns ui`` (radar), a minimal single-table resource browser with keyboard and mouse interaction, contextual actions, scoped refresh, and optional read-only mode.
+* Added basic resource create/update/delete through the release providers, typed destructive confirmation, stale-approval checks, and bounded background operations. Update forms start from current resource values.
+* Namespace creation and onboarding are deliberately excluded. Use ``az iot adr ns setup`` for onboarding and ``az iot adr ns check`` for diagnostics when those commands are installed.
+* Link add/update retains the release role matrix and propagation recovery. Role-assignment writes are disclosed during review; provider status displays do not compete with the terminal UI.
 
 **Known limitations**
 

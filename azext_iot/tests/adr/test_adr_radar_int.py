@@ -8,22 +8,25 @@
 
 import asyncio
 from dataclasses import replace
+import json
 import os
 import shlex
 from types import SimpleNamespace
 
 import pytest
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Input
 
 from azext_iot.adr.ui.app import RadrApp
 from azext_iot.adr.ui.core.session import Session
 from azext_iot.adr.ui.core.spec import Action, Registry
 from azext_iot.adr.ui.screens.browse import BrowseScreen
-from azext_iot.adr.ui.screens.onboard.screen import OnboardScreen
-from azext_iot.adr.ui.screens.overview import OverviewScreen
-from azext_iot.adr.ui.widgets.chrome import ContextBar, FlashLine
+from azext_iot.adr.ui.screens.detail import DetailScreen
+from azext_iot.adr.ui.widgets.actions import ActionForm, ReviewDialog
+from azext_iot.adr.ui.widgets.chrome import FlashLine
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger, wait_for_listed_resource
+from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper, CleanupLedger, resource_is_absent, wait_for_listed_resource, wait_for_resource_absent,
+)
 from azext_iot.tests.adr.conftest import TEST_LOCATION, TEST_RG, TEST_SUBSCRIPTION, generate_adr_namespace_name
 
 
@@ -65,20 +68,16 @@ async def _browse_readonly_namespace(session, namespace):
             root = app.screen
             assert isinstance(root, BrowseScreen) and root.spec.kind == "namespace"
             assert not root.model.error
-            names = [row.id for row in root.model.rows]
+            names = [row.payload["name"] for row in root.model.rows]
             assert namespace["name"] in names
             root.query_one("#rows", DataTable).move_cursor(row=names.index(namespace["name"]))
             await pilot.press("enter")
             await _settle(app, pilot)
             overview = app.screen
-            assert isinstance(overview, OverviewScreen)
+            assert isinstance(overview, DetailScreen)
             assert overview.scope["namespace_name"] == namespace["name"]
-            bar = overview.query_one(ContextBar)
-            assert namespace["name"] in bar.text and scope["resource_group_name"] in bar.text
-            table = overview.query_one("#resource-map", DataTable)
-            assert table.row_count == 4
-            assert [table.get_row_at(index)[1].plain for index in range(4)] == ["0"] * 4
-            for key, kind in (("l", "link"), ("g", "group"), ("j", "job"), ("c", "ca")):
+            assert not overview.query(DataTable)
+            for key, kind in (("l", "link"), ("d", "device"), ("g", "group"), ("j", "job"), ("c", "ca")):
                 await pilot.press(key)
                 await _settle(app, pilot)
                 assert isinstance(app.screen, BrowseScreen) and app.screen.spec.kind == kind
@@ -98,22 +97,8 @@ async def _browse_readonly_namespace(session, namespace):
             )
             app.perform_action(root.spec, action, namespace, scope)
             assert app.screen is overview
-            assert "state-changing actions are disabled" in overview.query_one(FlashLine).text
-
-            # Render the live namespace snapshot without admitting a subscription or
-            # catalog into setup. This exercises Apply without enumerating Hub/DPS/SU
-            # candidates or opening an Azure RBAC permission/grant probe.
-            onboard = OnboardScreen(session, scope, namespace=namespace)
-            await app.push_screen(onboard)
-            await _settle(app, pilot)
-            await pilot.press("a")
-            await pilot.pause()
-            assert app.screen is onboard
-            assert "read-only session: apply is disabled" in onboard.query_one(FlashLine).text
+            assert "writes are disabled" in overview.query_one(FlashLine).text
             assert not app.tracker.operations
-            await pilot.press("escape")
-            await _settle(app, pilot)
-            assert app.screen is overview
         finally:
             # Join the HTTP-reading workers before run_test shuts down its timers and
             # before the caller can delete the owned namespace.
@@ -121,8 +106,82 @@ async def _browse_readonly_namespace(session, namespace):
     assert not list(app.workers)
 
 
+async def _reviewed_action(app, pilot, spec, name, payload, values=None):
+    app.perform_action(spec, spec.action(name), payload, app.scope)
+    await pilot.pause()
+    if values is not None:
+        assert isinstance(app.screen, ActionForm)
+        for key, value in values.items():
+            app.screen.query_one(f"#field-{key}", Input).value = value
+        await pilot.click("#review")
+        await pilot.pause()
+    assert isinstance(app.screen, ReviewDialog)
+    if app.screen.action.destructive:
+        app.screen.query_one("#confirm-name", Input).value = app.screen.target_name
+        await pilot.pause()
+    await pilot.click("#confirm")
+    await _settle(app, pilot)
+    operation = app.tracker.operations[0]
+    assert operation.state.value == "succeeded", operation.describe()
+
+
 @pytest.mark.usefixtures("set_cwd")
 class TestADRRadar(ADRFullInfraHelper, ADRLiveScenarioTest):
+    def test_radar_device_crud_and_tag_preservation(self):
+        namespace = generate_adr_namespace_name()
+        args = f"-n {namespace} -g {TEST_RG}"
+        device_args = f"-n radar-device --ns {namespace} -g {TEST_RG}"
+        device_show = f"iot adr ns device show {device_args}"
+
+        def remove_device():
+            if ("namespace", namespace, TEST_RG) not in getattr(self, "_owned_resources", {}):
+                return
+            if not resource_is_absent(self, device_show):
+                self.cmd(f"iot adr ns device delete {device_args} --yes")
+                wait_for_resource_absent(self, device_show)
+
+        with CleanupLedger() as cleanup:
+            cleanup.register("namespace", self.cleanup_full_infra, depends_on=("device",))
+            cleanup.register("device", remove_device)
+            self.create_owned_resource(
+                f"iot adr ns create {args} -l {TEST_LOCATION} --tags keep=original",
+                kind="namespace", name=namespace, resource_group=TEST_RG,
+            )
+            assert resource_is_absent(self, device_show)
+            session = Session(SimpleNamespace(cli_ctx=self.cli_ctx), TEST_RG, namespace)
+            assert session.resolve_subscription().casefold() == TEST_SUBSCRIPTION.casefold()
+
+            async def scenario():
+                app = RadrApp(session=session, resource_group_name=TEST_RG, namespace_name=namespace,
+                              refresh_interval=900)
+                async with app.run_test(size=(110, 36)) as pilot:
+                    try:
+                        await _settle(app, pilot)
+                        device_spec = app.registry.get("device")
+                        await _reviewed_action(app, pilot, device_spec, "create", {}, {"name": "radar-device"})
+                        created = self.cmd(device_show).get_output_in_json()
+                        current = created["properties"].get("enablementState")
+                        desired = "Disabled" if current == "Enabled" else "Enabled"
+                        await _reviewed_action(
+                            app, pilot, device_spec, "update", created, {"enablement_state": desired},
+                        )
+                        updated = self.cmd(device_show).get_output_in_json()
+                        assert updated["properties"]["enablementState"] == desired
+                        await _reviewed_action(app, pilot, device_spec, "delete", updated)
+                        assert resource_is_absent(self, device_show)
+                        existing = self.cmd(f"iot adr ns show {args}").get_output_in_json()
+                        assert existing["tags"] == {"keep": "original"}
+                        await _reviewed_action(
+                            app, pilot, app.registry.get("namespace"), "update", existing,
+                            {"tags": json.dumps({"keep": "original", "added": "radar"})},
+                        )
+                        assert self.cmd(f"iot adr ns show {args}").get_output_in_json()["tags"] == {
+                            "keep": "original", "added": "radar",
+                        }
+                    finally:
+                        await app.workers.wait_for_complete()
+            asyncio.run(scenario())
+
     def test_radar_readonly_namespace_smoke(self):
         namespace_name = generate_adr_namespace_name()
         assert self.cmd("account show").get_output_in_json()["id"].casefold() == TEST_SUBSCRIPTION.casefold()

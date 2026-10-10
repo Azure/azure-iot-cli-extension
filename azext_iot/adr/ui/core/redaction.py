@@ -17,6 +17,12 @@ _SENSITIVE_FIELDS = {
     "secondaryconnectionstring",
     "secondarykey",
     "sharedaccesskey",
+    "symmetrickey",
+    "certificatechain",
+    "certificatesigningrequest",
+    "privatekey",
+    "token",
+    "accesstoken",
 }
 
 
@@ -24,7 +30,8 @@ def redact(value: Any) -> Any:
     """Return a recursively copied value with known credential fields replaced."""
     if isinstance(value, dict):
         return {
-            key: REDACTED if str(key).casefold() in _SENSITIVE_FIELDS else redact(item)
+            key: REDACTED if str(key).casefold() in _SENSITIVE_FIELDS
+            or (str(key).casefold() == "certificate" and isinstance(item, str)) else redact(item)
             for key, item in value.items()
         }
     if isinstance(value, list):

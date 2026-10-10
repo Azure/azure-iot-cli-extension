@@ -63,7 +63,7 @@ class Diff:
     def is_empty(self) -> bool:
         return not (self.added or self.updated or self.removed or self.reordered)
 
-    def __repr__(self) -> str:  # pragma: no cover - diagnostics only
+    def __repr__(self) -> str:
         return (
             f"Diff(added={len(self.added)}, updated={len(self.updated)}, "
             f"removed={len(self.removed)}, reordered={self.reordered})"

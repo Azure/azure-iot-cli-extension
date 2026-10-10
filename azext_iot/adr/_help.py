@@ -1964,10 +1964,10 @@ def load_adr_help():
   type: command
   short-summary: Launch the Device Registry terminal UI.
   long-summary: |
-    An interactive, keyboard-driven view of Device Registry namespaces and their resources.
-    Browse groups, jobs, endpoints and certificates without typing commands, and run
-    guided onboarding to link a provisioning service, IoT Hubs and one Software Updates
-    instance to a namespace.
+    An interactive view of Device Registry resources with mouse and keyboard navigation.
+    Browse namespaces, devices, groups, jobs, links and certificates, and review basic
+    create, update and delete actions before execution. Namespace creation and guided
+    onboarding are not included.
 
     Requires an interactive terminal. Press '?' inside the UI for the key reference.
   examples:

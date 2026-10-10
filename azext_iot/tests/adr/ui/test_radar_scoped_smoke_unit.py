@@ -12,8 +12,29 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from azext_iot.adr.ui.core.session import Session
 from azext_iot.tests.adr import test_adr_radar_int as radar
-from azext_iot.tests.adr.ui.test_radar_smoke_contract_unit import PREFIX, _smoke_session
+
+
+SUBSCRIPTION = "00000000-0000-0000-0000-000000000001"
+PREFIX = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/rg/providers/"
+
+
+def _smoke_session(namespace):
+    session = Session(
+        SimpleNamespace(cli_ctx=SimpleNamespace(data={})),
+        namespace_name=namespace["name"], resource_group_name="rg", read_only=True,
+    )
+    session.scope.subscription_id = SUBSCRIPTION
+    session.scope.subscription_name = "offline"
+    session._providers["namespace"] = Mock(
+        list=Mock(return_value=[{"name": "unrelated", "resourceGroup": "rg"}, namespace]),
+        show=Mock(return_value=namespace),
+    )
+    session._providers["link"] = Mock(list_all=Mock(return_value=[]))
+    for name in ("group", "job", "certificate_authority", "device"):
+        session._providers[name] = Mock(list=Mock(return_value=[]))
+    return session
 
 
 @pytest.mark.parametrize("value, expected", [
@@ -40,9 +61,9 @@ def test_scoped_smoke_reads_owned_namespace_and_all_child_collections(monkeypatc
     session.provider("namespace").list.assert_not_called()
     session.provider("namespace").show.assert_called_once_with(namespace_name="owned", resource_group_name="rg")
     session.provider("link").list_all.assert_called_once_with(namespace_name="owned", resource_group_name="rg")
-    for name in ("group", "job", "certificate_authority"):
+    for name in ("group", "job", "certificate_authority", "device"):
         session.provider(name).list.assert_called_once_with(namespace_name="owned", resource_group_name="rg")
-    assert set(session._providers) == {"namespace", "link", "group", "job", "certificate_authority"}
+    assert set(session._providers) == {"namespace", "link", "group", "job", "certificate_authority", "device"}
     for provider in session._providers.values():
         assert all(call[0] in ("show", "list", "list_all") for call in provider.mock_calls)
     network.assert_not_called()
