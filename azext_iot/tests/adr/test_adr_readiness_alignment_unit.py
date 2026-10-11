@@ -151,7 +151,7 @@ def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation):
 
         def command(text):
             if text == "iot adr ns show -n ns -g rg" and scenario.writes and not advanced[0]:
-                scenario.clock.now += readiness._FRESH_DPS_GRANT_WINDOW + 1
+                scenario.clock.now += readiness._FRESH_GRANT_WINDOW + 1
                 advanced[0] = True
             return original(text)
 

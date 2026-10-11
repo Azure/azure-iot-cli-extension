@@ -231,6 +231,7 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
             )
             registry = self.cmd(
                 f"iot adr schema registry create {registry_args} "
+                f"--location {TEST_LOCATION} "
                 f"--registry-namespace {registry_namespace} "
                 "--storage-account-container-url "
                 f"{shlex.quote(container_url)} --system-assigned-mi"

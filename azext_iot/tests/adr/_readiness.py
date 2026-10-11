@@ -46,7 +46,7 @@ _OWNED_LINK_TYPES = {
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 _AUTHORIZATION_BACKOFFS = (30, 60, 120)
-_FRESH_DPS_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_FRESH_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
 _LINK_INITIATE_REJECTED = re.compile(
     r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
     r"Verify the endpoint configuration, then resubmit the request\."
@@ -281,7 +281,7 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
         binding.kind != "dps"
         or submitted_at is None
         or now is None
-        or now - submitted_at > _FRESH_DPS_GRANT_WINDOW
+        or now - submitted_at > _FRESH_GRANT_WINDOW
     ):
         return False
     error = endpoint.get("linkingError") or {}
@@ -294,6 +294,26 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
         and match
         and match["service"] == "DPS"
     )
+
+
+def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
+    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    if (
+        binding.kind != "hub"
+        or submitted_at is None
+        or now is None
+        or now - submitted_at > _FRESH_GRANT_WINDOW
+    ):
+        return False
+    expected_error = {
+        "code": "LinkInitiateFailed",
+        "message": (
+            "The namespace's managed identity is not authorized to link the Hub resource. "
+            "Grant it access on the resource, then resubmit the request. "
+            "(Hub resource reported: [AuthorizationFailed])"
+        ),
+    }
+    return endpoint.get("linkingState") == "Failed" and endpoint.get("linkingError") == expected_error
 
 
 def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, now=None):
@@ -313,8 +333,11 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
         return None
     if binding.authorized_failure(endpoint):
         return "bound-link-initiate"
-    if _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
-        return "fresh-dps-generic"
+    if (
+        _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now)
+        or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
+    ):
+        return "fresh-grant"
     return None
 
 
@@ -424,7 +447,7 @@ def link_with_readiness(
             )
             if recovery_reason and progressed:
                 if retry_at is None:
-                    if recovery_reason == "fresh-dps-generic":
+                    if recovery_reason == "fresh-grant":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
                     else:
                         delay = min(10 * (retries + 1), 30)
