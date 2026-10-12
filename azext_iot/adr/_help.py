@@ -633,7 +633,8 @@ def load_adr_help():
     A missing grant is created when you can create role assignments; it is kept after unlinking.
     Keep that resource group until the unlink completes.
     The command does not wait. Confirm removal with 'az iot adr ns show'.
-    Avoid concurrent namespace updates while this command runs.
+    Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
+    Inspect the namespace and rerun the command to retry against its latest state.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes

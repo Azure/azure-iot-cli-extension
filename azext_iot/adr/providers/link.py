@@ -184,9 +184,15 @@ class LinkProvider(ADRProvider):
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
     ):
-        namespace = self.client.namespaces.get(
+        namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
+            cls=lambda response, resource, _: (resource, response.http_response.headers.get("ETag")),
         )
+        if not isinstance(etag, str) or not etag.strip() or etag.strip() == "*":
+            raise AzureResponseError(
+                "The namespace response did not include a usable ETag header. "
+                "Endpoint removal was not submitted because concurrent changes cannot be protected."
+            )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
         parse_target = {
             "messaging": _parse_hub_resource_id,
@@ -205,7 +211,7 @@ class LinkProvider(ADRProvider):
         # NoPolling returns the initial PUT response, not asynchronous completion.
         poller = self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name, namespace_name=namespace_name,
-            resource=resource, polling=False, retry_total=0,
+            resource=resource, headers={"If-Match": etag}, polling=False, retry_total=0,
         )
         return adapt_modeless_lro_poller(poller).result()
 

@@ -462,7 +462,7 @@ def calculate_hash(
                 "bytes": file_metadata.bytes,
                 "hash": file_metadata.hash,
                 "hashAlgorithm": hash_algo,
-                "uri": Path(file_metadata.path).resolve().as_uri(),
+                "uri": Path(file_metadata.path).absolute().as_uri(),
             }
         )
     return result

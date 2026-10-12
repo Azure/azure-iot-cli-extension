@@ -19,6 +19,7 @@ Release History
 * Added GA schema registry, schema, and schema-version management and wait commands.
 * Certificate policies accept validity periods from 1 to 90 days. Link-recovery failures preserve the original service error as their cause.
 * Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
+* Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
 * Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
 * ADR groups/jobs/job runs, reports, registry-device authentication/attribute/capability child commands, and ADR Software Updates are excluded because their operations are absent from these GA APIs. Existing Hub jobs, DPS enrollment groups, and ``iot du`` remain available.
 
@@ -30,11 +31,12 @@ Release History
 * Preserved DPS enrollment-group create/update key output, table formatting, and linked-Hub no-op updates. Use ``--show-keys false`` to redact keys from enrollment-group create/update output.
 * Automatic route tests probe the documented GA sources and any legacy sources present in saved routes. Explicit legacy source values and resource properties are not silently removed.
 * Repaired the generated modeless LRO callback defect outside generated files while preserving healthy callbacks, void DELETE results, and the original poller interface.
+* Embedded CLI JSON consumers preserve the original command failure instead of masking it with a JSON-parsing error.
 * Set the extension package version to ``1.0.0`` and removed extension-wide preview metadata. This branch is preparation only: deployment readiness and live release qualification remain separate approval gates.
 
 **Device Update bug fixes**
 
-* ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs.
+* ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs without resolving symlinks.
 
 **Test infrastructure**
 

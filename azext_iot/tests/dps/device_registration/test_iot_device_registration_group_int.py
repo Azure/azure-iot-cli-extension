@@ -10,7 +10,6 @@ from azure.cli.core.azclierror import (
     AzureResponseError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
-    CLIInternalError,
     UnauthorizedError,
     InvalidArgumentValueError,
 )
@@ -438,14 +437,11 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module,
                 cstring=dps_cstring
             ),
         )
-        try:
-            registration = show_registration_result.as_json()
-            assert registration["etag"]
-            assert registration["lastUpdatedDateTimeUtc"]
-            assert registration["registrationId"] == device_id
-            assert registration["status"] == "failed"
-        except CLIInternalError:
-            raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
+        registration = show_registration_result.as_json()
+        assert registration["etag"]
+        assert registration["lastUpdatedDateTimeUtc"]
+        assert registration["registrationId"] == device_id
+        assert registration["status"] == "failed"
 
 
 @pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
