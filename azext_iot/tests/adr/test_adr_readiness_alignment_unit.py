@@ -182,6 +182,28 @@ def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, er
     assert scenario.write_times == [0, 30]
 
 
+def test_retried_resource_mi_rejection_can_outlive_freshness_window():
+    scenario = Scenario("dps")
+    scenario.error = _resource_mi_rejection()
+    scenario.states = ["Failed", "Failed", "Failed", "Failed", "Failed", "Succeeded"]
+    original = scenario.command
+    advanced = [False]
+
+    def command(text):
+        if text == "iot adr ns show -n ns -g rg" and len(scenario.writes) == 2 and not advanced[0]:
+            scenario.error = _resource_mi_rejection("Updated server wording after the recovery update.")
+            scenario.clock.now = readiness._FRESH_GRANT_WINDOW + 1
+            advanced[0] = True
+        return original(text)
+
+    scenario.cmd.side_effect = command
+
+    result = scenario.run()
+
+    assert result["linkingState"] == "Succeeded"
+    assert len(scenario.writes) == 2
+
+
 @pytest.mark.parametrize(("kind", "error", "stale"), [
     pytest.param("hub", _resource_mi_rejection(), False, id="dps-error-on-hub"),
     pytest.param("dps", _hub_commit_rejection(), False, id="hub-error-on-dps"),

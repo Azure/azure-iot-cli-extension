@@ -600,6 +600,7 @@ def provisioned_storage_with_identity_module(
         role=role,
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES
     )
+    sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
     yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
 
 

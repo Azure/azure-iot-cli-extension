@@ -351,6 +351,20 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
     return None
 
 
+def _same_recovered_fresh_grant_failure(namespace, endpoint, expected):
+    properties = namespace["properties"]
+    if (
+        namespace.get("error") or properties.get("error")
+        or endpoint.get("error") or (endpoint.get("status") or {}).get("error")
+        or (endpoint.get("provisioningStatus") or {}).get("error")
+    ):
+        return False
+    current = endpoint.get("linkingError") or {}
+    if set(expected) == {"code"}:
+        return current.get("code") == expected["code"]
+    return current == expected
+
+
 def link_hub_with_readiness(
     scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
     *, timeout=HUB_LINK_READINESS_TIMEOUT, clock=None, sleeper=None,
@@ -418,6 +432,7 @@ def link_with_readiness(
     progressed = True  # The initial add is never replayed.
     retries = 0
     retry_at = None
+    recovered_fresh_grant_error = None
     while True:
         namespace = budget.call(scenario.cmd, show).get_output_in_json()
         assert _namespace_identity(namespace) == binding.namespace_identity, (
@@ -469,9 +484,19 @@ def link_with_readiness(
                     })
                     assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
                     budget.call(scenario.cmd, recovery[0] + " --no-wait")
+                    if recovery_reason == "fresh-grant":
+                        error = deepcopy(endpoint.get("linkingError"))
+                        recovered_fresh_grant_error = (
+                            {"code": error["code"]} if error.get("code") == "ResourceMiNotAuthorized" else error
+                        )
                     retries += 1
                     progressed = False
                     retry_at = None
+            elif (
+                recovered_fresh_grant_error is not None
+                and _same_recovered_fresh_grant_failure(namespace, endpoint, recovered_fresh_grant_error)
+            ):
+                pass
             elif not recovery_reason:
                 raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:
