@@ -8,6 +8,7 @@ Release History
 
 **ADR bug fixes**
 
+* Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
 * Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
 * Namespace link add/update preserve the original service failure as the exception cause when recovery stops on a later state-validation error or timeout, unless the stopping error already has an exception cause or context.
 
