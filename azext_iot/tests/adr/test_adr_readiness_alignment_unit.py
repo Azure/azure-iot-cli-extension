@@ -124,6 +124,28 @@ def _generic_rejection(service="DPS", **extra):
     }
 
 
+def _resource_mi_rejection(message=None):
+    return {
+        "code": "ResourceMiNotAuthorized",
+        "message": message or (
+            "DPS could not read the ADR namespace using its inbound identity used for this request. "
+            "Grant that identity namespace read access, allow time for a recent role assignment to "
+            "propagate, then resubmit the request. (DPS resource reported: [400315])"
+        ),
+    }
+
+
+def _hub_commit_rejection(message=None):
+    return {
+        "code": "LinkCommitFailed",
+        "message": message or (
+            "The namespace's managed identity is not authorized to link the Hub resource. "
+            "Grant it access on the resource, then resubmit the request. "
+            "(Hub resource reported: [AuthorizationFailed])"
+        ),
+    }
+
+
 def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
     scenario = Scenario("dps")
     scenario.error = _generic_rejection("DPS")
@@ -136,6 +158,67 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
     assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
     assert scenario.write_times == [0, 30]
     assert scenario.clock.sleeps == [10, 10, 10, 10]
+
+
+@pytest.mark.parametrize(("kind", "error"), [
+    pytest.param("dps", _resource_mi_rejection(), id="dps-resource-mi"),
+    pytest.param(
+        "dps",
+        _resource_mi_rejection("Updated server wording for the same authorization code."),
+        id="dps-message-change",
+    ),
+    pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
+])
+def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
+    scenario = Scenario(kind)
+    scenario.error = error
+    scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
+
+    result = scenario.run()
+
+    assert result["linkingState"] == "Succeeded"
+    assert len(scenario.writes) == 2
+    assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
+    assert scenario.write_times == [0, 30]
+
+
+@pytest.mark.parametrize(("kind", "error", "stale"), [
+    pytest.param("hub", _resource_mi_rejection(), False, id="dps-error-on-hub"),
+    pytest.param("dps", _hub_commit_rejection(), False, id="hub-error-on-dps"),
+    pytest.param(
+        "dps",
+        {**_resource_mi_rejection(), "code": "OtherAuthorizationFailure"},
+        False,
+        id="dps-altered-code",
+    ),
+    pytest.param(
+        "hub",
+        _hub_commit_rejection("The Hub link commit failed for another reason."),
+        False,
+        id="hub-altered-message",
+    ),
+    pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
+    pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+])
+def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
+    scenario = Scenario(kind)
+    scenario.error = error
+    if stale:
+        original = scenario.command
+        advanced = [False]
+
+        def command(text):
+            if text == "iot adr ns show -n ns -g rg" and scenario.writes and not advanced[0]:
+                scenario.clock.now += readiness._FRESH_GRANT_WINDOW + 1
+                advanced[0] = True
+            return original(text)
+
+        scenario.cmd.side_effect = command
+
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+
+    assert len(scenario.writes) == 1
 
 
 @pytest.mark.parametrize("mutation", ["hub-service", "extra-detail", "stale-grant", "hub-link"])
