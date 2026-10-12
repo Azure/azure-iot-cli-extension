@@ -276,7 +276,7 @@ def _read_authorization_failure(endpoint):
 
 
 def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's generic DPS linkInitiate envelope only while fresh grants can still propagate."""
+    """Match observed DPS authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "dps"
         or submitted_at is None
@@ -285,6 +285,11 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
     ):
         return False
     error = endpoint.get("linkingError") or {}
+    if (
+        endpoint.get("linkingState") == "Failed"
+        and error.get("code") == "ResourceMiNotAuthorized"
+    ):
+        return True
     message = error.get("message")
     match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
     return bool(
@@ -305,15 +310,19 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
         or now - submitted_at > _FRESH_GRANT_WINDOW
     ):
         return False
-    expected_error = {
-        "code": "LinkInitiateFailed",
-        "message": (
-            "The namespace's managed identity is not authorized to link the Hub resource. "
-            "Grant it access on the resource, then resubmit the request. "
-            "(Hub resource reported: [AuthorizationFailed])"
-        ),
-    }
-    return endpoint.get("linkingState") == "Failed" and endpoint.get("linkingError") == expected_error
+    error = endpoint.get("linkingError") or {}
+    expected_message = (
+        "The namespace's managed identity is not authorized to link the Hub resource. "
+        "Grant it access on the resource, then resubmit the request. "
+        "(Hub resource reported: [AuthorizationFailed])"
+    )
+    return (
+        endpoint.get("linkingState") == "Failed"
+        and error in (
+            {"code": "LinkInitiateFailed", "message": expected_message},
+            {"code": "LinkCommitFailed", "message": expected_message},
+        )
+    )
 
 
 def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, now=None):
@@ -324,19 +333,20 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
     # Only the canonical structured linkingError may authorize the new retry.
     # Conflicting/alternate error envelopes must not be hidden by a matching one.
     error = endpoint.get("linkingError") or {}
-    if error.get("code") != "LinkInitiateFailed":
+    fresh_grant_rejection = (
+        _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now)
+        or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
+    )
+    if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection:
         return "read" if _read_authorization_failure(endpoint) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
         or (endpoint.get("provisioningStatus") or {}).get("error")
     ):
         return None
-    if binding.authorized_failure(endpoint):
+    if error.get("code") == "LinkInitiateFailed" and binding.authorized_failure(endpoint):
         return "bound-link-initiate"
-    if (
-        _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now)
-        or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
-    ):
+    if fresh_grant_rejection:
         return "fresh-grant"
     return None
 

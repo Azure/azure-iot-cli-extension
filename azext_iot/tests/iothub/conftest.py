@@ -327,7 +327,7 @@ def setup_hub_controlplane_states(
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
-    sleep(30)
+    sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
     suffix = "systemid" if use_system_endpoints else "userid"
     user_identity_parameter = "[system]" if use_system_endpoints else user_id
