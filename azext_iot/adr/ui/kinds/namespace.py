@@ -89,14 +89,15 @@ def build(session) -> ResourceSpec:
         actions=crud("namespace", "iot adr ns", "namespace_name", ("resource_group_name",)),
         columns=(
             name_column(width=26),
-            state_column(width=14),
-            Column("rg", "RESOURCE GROUP", resource_group_of, width=24),
-            Column("location", "LOCATION", lambda p: p.get("location", ""), width=18),
+            state_column(width=11),
+            Column("rg", "RESOURCE GROUP", resource_group_of, width=24, disambiguates=True),
+            Column("location", "LOCATION", lambda p: p.get("location", ""), width=15),
             Column(
                 "readiness",
                 "LINK READINESS",
                 link_readiness,
                 width=16,
+                wide=True,
                 style=readiness_style,
             ),
             Column(
@@ -104,20 +105,23 @@ def build(session) -> ResourceSpec:
                 "HUBS",
                 lambda payload: endpoint_count(payload, "messaging"),
                 width=7,
+                wide=True,
             ),
             Column(
                 "dps",
                 "DPS",
                 lambda payload: endpoint_count(payload, "provisioning"),
                 width=6,
+                wide=True,
             ),
             Column(
                 "updates",
                 "UPDATES",
                 lambda payload: endpoint_count(payload, "updating"),
                 width=9,
+                wide=True,
             ),
-            Column("tags", "TAGS", tag_summary, width=32),
+            Column("tags", "TAGS", tag_summary, width=32, wide=True),
             Column(
                 "identity",
                 "IDENTITY",
@@ -135,8 +139,9 @@ def build(session) -> ResourceSpec:
         children=(
             ChildRef(
                 "link", "Linked resources", "l",
-                "DPS, IoT Hubs and Software Updates endpoints attached to this namespace.",
+                "DPS, IoT Hubs and Software Updates endpoints attached to this namespace.", "links",
             ),
+            ChildRef("device", "Devices", "d", "Registry device metadata; never credentials."),
             ChildRef(
                 "group", "Groups", "g",
                 "Saved device queries and their current membership.",
@@ -147,8 +152,7 @@ def build(session) -> ResourceSpec:
             ),
             ChildRef(
                 "ca", "Certificate authorities", "c",
-                "X.509 trust roots and certificate policies.",
+                "X.509 trust roots and certificate policies.", "certificates",
             ),
-            ChildRef("device", "Devices", "d", "Registry device metadata; never credentials."),
         ),
     )

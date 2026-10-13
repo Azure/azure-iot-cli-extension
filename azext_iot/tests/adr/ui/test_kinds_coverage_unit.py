@@ -118,7 +118,7 @@ def test_job_columns_project_provider_target_and_update_resource_ids(job_type, t
         properties["target"] = target
     payload = {"name": "rollout-not-the-update-name", "properties": properties}
     spec = job.build(Mock())
-    table = TableModel(spec)
+    table = TableModel(spec, show_wide=True)
     table.apply([payload])
     cells = dict(zip((column.key for column in table.columns), table.row_at(0).cells))
     assert cells["name"] == "rollout-not-the-update-name"

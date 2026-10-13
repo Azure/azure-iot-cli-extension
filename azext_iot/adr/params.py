@@ -1330,8 +1330,8 @@ def load_adr_arguments(self, _):
         context.argument(
             "theme",
             options_list=["--theme"],
-            help="UI theme: dark, light, or high-contrast. Press Ctrl+T inside the UI "
-                 "to switch between dark and light.",
+            help="UI theme: terminal (default), dark, light, or high-contrast. Terminal uses your "
+                 "terminal's current colors. Ctrl+T cycles terminal, dark, and light.",
         )
         context.argument(
             "log_file",

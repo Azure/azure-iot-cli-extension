@@ -30,6 +30,13 @@ from azext_iot.adr.ui.kinds._common import (
 _CA_TYPE_STYLES = {"Root": STYLE_OK, "ICA": STYLE_MUTED}
 
 
+def _ca_type_label(payload) -> str:
+    """``Root`` or ``ICA · Microsoft``: an intermediate's issuer belongs with its type."""
+    kind = str(prop("certificateAuthorityType")(payload) or "")
+    issuer = str(prop("issuer", "issuerType")(payload) or "")
+    return f"{kind} \u00b7 {issuer}" if kind == "ICA" and issuer else kind
+
+
 def build_ca(session) -> ResourceSpec:
     def list_authorities(scope):
         return session.list_from(
@@ -73,29 +80,31 @@ def build_ca(session) -> ResourceSpec:
         ),
         columns=(
             name_column(width=26),
+            state_column(width=19),
             Column(
                 "type",
                 "TYPE",
-                prop("certificateAuthorityType"),
-                width=8,
+                _ca_type_label,
+                width=15,
                 style=value_style(prop("certificateAuthorityType"), _CA_TYPE_STYLES),
+                sort_key=lambda p: str(prop("certificateAuthorityType")(p)).lower(),
             ),
-            Column("issuer", "ISSUER", prop("issuer", "issuerType"), width=12),
+            Column("issuer", "ISSUER", prop("issuer", "issuerType"), width=12, wide=True),
             Column("issued_by", "ISSUED BY", prop("issuer", "certificateAuthorityResourceId"), width=22, wide=True),
             Column(
                 "expires",
                 "EXPIRES IN",
                 lambda p: humanize_age(prop("notAfter", default="")(p)),
                 width=11,
+                wide=True,
                 sort_key=lambda p: str(prop("notAfter", default="")(p)),
             ),
-            state_column(),
             age_column(),
         ),
         sort=("name", False),
         requires=("namespace_name", "resource_group_name"),
         scope_key="certificate_authority_name",
-        children=(ChildRef("policy", "Certificate policies", "p"),),
+        children=(ChildRef("policy", "Certificate policies", "p", short="policies"),),
     )
 
 
@@ -164,7 +173,8 @@ def build_update_instance(session) -> ResourceSpec:
         ),
         columns=(
             name_column(width=28),
-            Column("rg", "RESOURCE GROUP", resource_group_of, width=22),
+            state_column(),
+            Column("rg", "RESOURCE GROUP", resource_group_of, width=22, disambiguates=True),
             Column("location", "LOCATION", lambda p: p.get("location", ""), width=14),
             Column(
                 "identity",
@@ -173,7 +183,6 @@ def build_update_instance(session) -> ResourceSpec:
                 width=20,
                 wide=True,
             ),
-            state_column(),
             age_column(),
         ),
         sort=("name", False),

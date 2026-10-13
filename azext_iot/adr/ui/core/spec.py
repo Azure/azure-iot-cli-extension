@@ -49,6 +49,10 @@ class Column:
     extract: Callable[[Payload], Any]
     width: Optional[int] = None
     wide: bool = False
+    #: Shown in the default table only when it is needed to tell rows apart: two loaded rows
+    #: share a name but differ here (an unscoped namespace list with the same name in two
+    #: resource groups). Wide mode and details always show it.
+    disambiguates: bool = False
     #: Optional style token for the cell, derived from the payload.
     style: Optional[Callable[[Payload], Optional[str]]] = None
     #: Sort key; defaults to the extracted value lowercased for stable text ordering.
@@ -110,6 +114,12 @@ class ChildRef:
     key: Optional[str] = None
     #: Short customer-facing explanation used by hierarchy overviews.
     description: str = ""
+    #: Concise display label for links and key hints (``links``); defaults to ``label``.
+    short: str = ""
+
+    @property
+    def display_label(self) -> str:
+        return self.short or self.label.lower()
 
 
 @dataclass(frozen=True)
@@ -125,8 +135,12 @@ class Action:
     label: str
     key: Optional[str] = None
     destructive: bool = False
-    #: Whether the action applies to this payload; used to hide inapplicable actions.
+    #: Whether the action applies to this payload right now; otherwise it is listed but disabled
+    #: with ``unavailable`` as the reason.
     applies_to: Optional[Callable[[Payload], bool]] = None
+    #: Whether a row action belongs to this payload at all (for example a hub link action on a
+    #: DPS row). Irrelevant row actions are not listed; collection actions are always listed.
+    relevant_to: Optional[Callable[[Payload], bool]] = None
     invoke: Optional[Callable[..., Any]] = None
     #: Kinds whose cached data is invalidated once the action reaches a terminal state.
     refreshes: Tuple[str, ...] = ()
@@ -141,6 +155,11 @@ class Action:
 
     def is_applicable(self, payload: Payload) -> bool:
         return True if self.applies_to is None else bool(self.applies_to(payload))
+
+    def is_relevant(self, payload: Payload) -> bool:
+        if self.collection or self.relevant_to is None or not payload:
+            return True
+        return bool(self.relevant_to(payload))
 
 
 @dataclass(frozen=True)

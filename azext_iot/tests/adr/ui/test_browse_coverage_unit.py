@@ -96,9 +96,12 @@ def test_wide_sort_filter_submit_and_escape_preserve_row_identity():
         assert screen.selected_row_id() == "beta"
         await pilot.press("ctrl+w")
         assert screen.model.show_wide
-        assert len(table.columns) == 4
+        assert len(table.columns) == 5  # selection gutter plus four declared columns
         assert screen.selected_row_id() == "beta"
         await pilot.press("s")
+        await pilot.pause()
+        await pilot.press("enter")  # the current sort column is first and reverses
+        await pilot.pause()
         assert screen.model.sort_descending
         assert screen.selected_row_id() == "beta"
         await pilot.press("slash")
@@ -109,23 +112,24 @@ def test_wide_sort_filter_submit_and_escape_preserve_row_identity():
         assert screen.model.row_count == 1
         assert screen.selected_row_id() == "alpha"
         await pilot.press("enter")
-        assert not field.display and not screen._filtering
-        assert screen.model.filter_text == "alpha"
+        # Enter keeps the search and hands the keys back to the table; the field stays visible.
+        assert app.focused is table and field.display and not screen._filtering
+        assert screen.model.filter_text == "alpha" and field.value == "alpha"
         await pilot.press("escape")
-        assert screen.model.filter_text == ""
+        assert screen.model.filter_text == "" and field.value == ""
         assert screen.model.row_count == 2
         await pilot.press("slash")
         field.value = "nonexistent"
         await pilot.pause()
         assert screen.selected_payload() is None
+        # Esc while typing clears the search outright.
         await pilot.press("escape")
-        assert not field.display
-        assert screen.model.filter_text == "nonexistent"
-        await pilot.press("escape")
+        assert app.focused is table and not screen._filtering
+        assert screen.model.filter_text == ""
         assert screen.model.row_count == 2
         await pilot.press("ctrl+w")
         assert not screen.model.show_wide
-        assert len(table.columns) == 3
+        assert len(table.columns) == 4
         assert source.call_count == 1
 
     run_browse(widget_spec(children=()), source, scenario)
@@ -173,7 +177,7 @@ def test_overlapping_refresh_is_dropped_and_loading_animation_tolerates_repaint_
                     assert len(calls) == 1
                     table = screen.query_one(DataTable)
                     assert screen.selected_payload() is None
-                    assert "Loading resources" in table.get_row("__loading__")[0].plain
+                    assert "Loading resources" in table.get_row("__loading__")[1].plain
                     table.remove_row("__loading__")
                     assert table.row_count == 0
                     assert screen._loading
@@ -196,8 +200,8 @@ def test_declared_multiple_children_open_details_but_filter_input_does_not_navig
         await pilot.press("slash", "g")
         assert app.screen is screen
         assert screen.model.filter_text == "g"
-        await pilot.press("escape", "escape")
-        assert screen.model.row_count == 1
+        await pilot.press("escape")
+        assert app.screen is screen and screen.model.row_count == 1
         await pilot.press("enter")
         await settle(app, pilot)
         assert isinstance(app.screen, DetailScreen)
@@ -215,9 +219,8 @@ def test_narrow_column_sort_uses_displayed_index_and_header_click():
 
     async def scenario(_app, pilot, screen):
         assert screen._column_indices == [0, 2]
-        table = screen.query_one(DataTable)
-        table.move_cursor(column=1)
-        screen.action_sort()
+        assert [key for key, _label in screen.sort_choices()] == ["name", "state"], "displayed columns only"
+        screen.sort_by("state")
         assert screen.model.sort_key == "state"
         await pilot.click("#rows", offset=(3, 0))
         assert screen.model.sort_key == "name"

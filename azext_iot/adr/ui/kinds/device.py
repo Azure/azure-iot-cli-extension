@@ -22,7 +22,8 @@ def build(session):
         requires=("namespace_name", "resource_group_name"),
         columns=(name_column(), Column("enabled", "ENABLEMENT", prop("enablementState"), width=14),
                  state_column(), Column("model", "MODEL", prop("model"), width=20, wide=True)),
-        guide=Guide("Registry device metadata.", runs="az iot adr ns device list · read-only",
+        guide=Guide("Registry device metadata.",
+                    runs="az iot adr ns device list --ns <namespace> -g <resource-group>  ·  read-only",
                     note="Credentials, certificates and authentication keys are not retrieved."),
         actions=crud(
             "device", "iot adr ns device", "registry_device_name", create_fields=(),

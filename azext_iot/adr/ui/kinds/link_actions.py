@@ -16,6 +16,9 @@ TYPES = {
     "dps": "Microsoft.Devices/provisioningServices",
     "su": "Microsoft.DeviceUpdate/updateInstances",
 }
+#: Menu labels only; operation names, commands and provider methods keep ``<kind>_<method>``.
+_TARGET_NAMES = {"hub": "an IoT Hub", "dps": "a DPS", "su": "Software Updates"}
+_ROW_LABELS = {"wait": "Wait for link", "update": "Retry failed link (update)", "remove": "Remove link"}
 
 
 def status(payload):
@@ -27,8 +30,11 @@ def _action(kind, method):
     writing = method != "wait"
     destructive = method == "remove"
 
+    def relevant(payload):
+        return payload.get("endpointType", "").casefold() == TYPES[kind].casefold()
+
     def applies(payload):
-        return payload.get("endpointType", "").casefold() == TYPES[kind].casefold() and (
+        return relevant(payload) and (
             method not in ("wait", "update") or status(payload) == ("Accepted" if method == "wait" else "Failed")
         )
 
@@ -93,14 +99,15 @@ def _action(kind, method):
         return session.call(getattr(provider, f"{kind}_{method}"), **args)
 
     return Action(
-        name=f"{kind}_{method}", label=f"{kind.upper()} {method}",
-        destructive=destructive, mutation=writing, collection=creating, applies_to=applies,
+        name=f"{kind}_{method}", label=f"Link {_TARGET_NAMES[kind]}" if creating else _ROW_LABELS[method],
+        destructive=destructive, mutation=writing, collection=creating, applies_to=applies, relevant_to=relevant,
         fields=(NAME, Field("target", "", "Existing target ARM resource ID")) if creating else (),
         invoke=invoke, preview=preview, review_note=note, refreshes=("link", "namespace"),
         note=("May write service ROLE grants; details appear on Review." if method in ("add", "update")
               else "Remove endpoint only; retain target and roles." if destructive else "GET only; does not resend."),
-        unavailable=f"Requires a {kind.upper()} link"
-        + (" in Accepted state." if method == "wait" else " in Failed state." if method == "update" else "."),
+        # Relevance already matched the link type, so the reason only names the state it waits for.
+        unavailable=("Only when the link is Accepted." if method == "wait"
+                     else "Only when the link Failed." if method == "update" else f"Requires a {kind.upper()} link."),
     )
 
 

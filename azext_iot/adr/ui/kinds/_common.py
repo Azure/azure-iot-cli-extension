@@ -133,23 +133,26 @@ def name_column(label: str = "NAME", width: int = 26) -> Column:
     return Column("name", label, name_of, width=width)
 
 
-def state_column(width: int = 12) -> Column:
+def state_column(width: int = 12, label: str = "STATUS", wide: bool = False) -> Column:
     """Provisioning state, coloured by outcome and always readable as text."""
     return Column(
         "state",
-        "STATE",
+        label,
         prop("provisioningState"),
         width=width,
+        wide=wide,
         style=state_style,
     )
 
 
 def age_column(width: int = 7) -> Column:
+    """Secondary everywhere: shown in details and wide mode, not the default table."""
     return Column(
         "age",
         "AGE",
         lambda p: humanize_age(dig(p, "systemData", "createdAt", default="")),
         width=width,
+        wide=True,
         sort_key=lambda p: str(dig(p, "systemData", "createdAt", default="")),
     )
 

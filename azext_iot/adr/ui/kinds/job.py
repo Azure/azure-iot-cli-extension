@@ -69,7 +69,7 @@ def build(session) -> ResourceSpec:
                 lambda p: short_id(prop("target", "resourceId")(p)),
                 width=22,
             ),
-            Column("update", "UPDATE", _update_identity, width=28),
+            Column("update", "UPDATE", _update_identity, width=28, wide=True),
             state_column(),
             age_column(),
         ),
@@ -98,7 +98,7 @@ def build_run(session) -> ResourceSpec:
         parent="job",
         guide=Guide(
             about="Executions of this job, newest first, with per-device progress.",
-            runs="az iot adr ns job run list --job <job> --ns <namespace>  ·  read-only",
+            runs="az iot adr ns job run list --job-name <job> --ns <namespace> -g <resource-group>  ·  read-only",
             note=(
                 "A run in progress updates on the next refresh; long jobs may take a while to reach a terminal state."
             ),
@@ -120,7 +120,7 @@ def build_run(session) -> ResourceSpec:
             Column("succeeded", "OK", prop("succeededCount"), width=6),
             Column("failed", "FAILED", prop("failedCount"), width=7),
             Column("total", "TOTAL", prop("totalCount"), width=7, wide=True),
-            state_column(),
+            state_column(label="STATE", wide=True),
         ),
         sort=("scheduled", True),
         requires=("namespace_name", "resource_group_name"),

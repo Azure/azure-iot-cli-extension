@@ -12,7 +12,7 @@ import threading
 from unittest.mock import Mock
 
 import pytest
-from textual.widgets import Button, DataTable, Input, OptionList
+from textual.widgets import Button, DataTable, Input, OptionList, Static
 
 from azext_iot.adr.ui.app import RadrApp
 from azext_iot.adr.ui.core.actions import Field
@@ -24,7 +24,8 @@ from azext_iot.adr.ui.screens.detail import DetailScreen
 from azext_iot.adr.ui.screens.help import CommandBar, HelpScreen
 from azext_iot.adr.ui.widgets.actions import ActionForm, ActionMenu, QuitDialog, ReviewDialog
 from azext_iot.adr.ui.widgets.chrome import FlashLine
-from azext_iot.adr.ui.widgets.tray import OperationsDialog
+from azext_iot.adr.ui.widgets.minimal import KeysLine
+from azext_iot.adr.ui.widgets.tray import OperationsScreen
 from azext_iot.tests.adr.ui.conftest import make_payload, widget_spec
 
 
@@ -43,6 +44,13 @@ def app_for(action=None, read_only=False):
     app = RadrApp(registry=registry, resource_group_name="rg", read_only=read_only, refresh_interval=900)
     app.scope["subscription_id"] = "sub"
     return app
+
+
+async def click_key(app, pilot, name):
+    """Click one group of the state-specific key line, exactly where it is drawn."""
+    keys = app.screen.query_one(KeysLine)
+    await pilot.click("#keys-line", offset=keys.offset_of(name))
+    await pilot.pause()
 
 
 def run(app, scenario, size=(80, 24)):
@@ -87,8 +95,10 @@ def test_mouse_row_details_selectors_search_and_resize():
         await pilot.resize_terminal(80, 24)
         await pilot.pause()
         table = app.screen.query_one(DataTable)
-        assert table.region.right <= 80
-        assert table.size.height >= 10
+        keys = app.screen.query_one(KeysLine)
+        assert table.region.right <= 78 and table.region.x >= 2
+        assert table.size.height == 3 and table.region.bottom < keys.region.y
+        assert keys.region.bottom <= 24 and "help" in str(keys.render())
         await pilot.click("#namespace-selector")
         await settle(app, pilot)
         assert isinstance(app.screen, BrowseScreen)
@@ -151,8 +161,9 @@ def test_mouse_action_menu_typed_delete_review_and_cancel(approve):
         assert not app.operations_running
         if approve:
             await pilot.click("#operations")
-            assert isinstance(app.screen, OperationsDialog)
-            await pilot.click("#ack")
+            assert isinstance(app.screen, OperationsScreen)
+            await pilot.click("#ops-dismiss")
+            await pilot.pause()
             assert not app.tracker.operations
     run(app_for(action), scenario)
 
@@ -196,11 +207,20 @@ def test_readonly_generic_menu_and_late_gate_never_invoke():
 
     async def scenario(app, pilot):
         root = app.screen
+        # The only action writes: read-only hides it, so there is no menu and no "a" in the key line.
+        assert "actions" not in [key.name for key in root.keys()]
         await pilot.press("a")
-        options = app.screen.query_one(OptionList)
-        assert options.get_option_at_index(0).disabled
-        app.action_actions()
-        await pilot.click("#cancel")
+        await pilot.pause()
+        assert app.screen is root
+        assert root.query_one(FlashLine).text == "Read-only session: write actions are hidden."
+        await app.push_screen(ActionMenu(root.spec, make_payload("one"), True))
+        assert not app.screen.query(OptionList)
+        assert str(app.screen.query_one("#action-hidden", Static).render()) == \
+            "Read-only session: write actions are hidden."
+        menu_keys = app.screen.query_one("#dialog-keys")
+        await pilot.click("#dialog-keys", offset=menu_keys.offset_of("close"))
+        await pilot.pause()
+        assert app.screen is root
         app.perform_action(root.spec, action, make_payload("one"), app.scope)
         assert "Read-only" in root.query_one(FlashLine).text
         app._start_action(root.spec, action, make_payload("one"), app.scope, "az ...")
@@ -244,9 +264,11 @@ def test_error_operation_and_stop_watching_never_replay():
         pending = app.tracker.start("Pending", "two")
         await pilot.click("#operations")
         await pilot.pause()
-        await pilot.click("#stop-watch")
+        await pilot.click("#ops-stop")
+        await pilot.pause()
         assert not pending.watching and "not watching" in pending.describe()
-        await pilot.click("#re-read")
+        assert not app.screen.query_one("#ops-stop").display, "stop watching applies to watched operations only"
+        await pilot.click("#ops-reread")
         await settle(app, pilot)
         assert app.screen is root
         invoke.assert_called_once()
@@ -259,10 +281,10 @@ def test_empty_actions_operations_and_no_root_back():
     async def scenario(app, pilot):
         root = app.screen
         await pilot.press("escape")
-        assert "quit" in root.query_one(FlashLine).text
+        assert "Quit radar" in root.query_one(FlashLine).text, "points at the standard-key way out"
         await pilot.press("a", "escape")
         await pilot.press("o", "x")
-        await pilot.click("#close")
+        await click_key(app, pilot, "close")
         await pilot.press("question_mark", "escape")
         assert app.screen is root
     run(app_for(), scenario)
@@ -331,8 +353,11 @@ def test_form_cancel_optional_input_and_unavailable_menu():
         await pilot.press("escape")
         assert app.screen is root
         unusable = replace(action, collection=False, applies_to=lambda _p: False)
-        await app.push_screen(ActionMenu(replace(root.spec, actions=(unusable,)), {}, False))
-        assert app.screen.query_one(OptionList).get_option_at_index(0).disabled
+        await app.push_screen(ActionMenu(replace(root.spec, actions=(unusable,)), make_payload("one"), False))
+        # Generic "not applicable" is not worth an entry or a note.
+        assert not app.screen.query(OptionList)
+        assert str(app.screen.query_one("#action-hidden", Static).render()) == "No actions for this resource."
+        app.screen.action_choose()
         await pilot.press("escape")
         await app.push_screen(ReviewDialog(Action("read", "Read", mutation=False), "one", "az test", app.scope))
         await pilot.press("escape")

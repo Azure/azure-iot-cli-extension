@@ -54,6 +54,9 @@ class Operation:
     refreshes: Tuple[str, ...] = ()
     acknowledged: bool = False
     watching: bool = True
+    #: ``resource group · subscription`` the operation was reviewed in; it never follows a later
+    #: scope change.
+    context: str = ""
 
     def elapsed(self, now: Optional[float] = None) -> float:
         end = self.finished_at if self.finished_at is not None else (now or time.monotonic())
@@ -87,7 +90,7 @@ class OperationTracker:
     # -- registration ------------------------------------------------------
 
     def start(self, label: str, target: str, command: str = "",
-              refreshes: Tuple[str, ...] = ()) -> Operation:
+              refreshes: Tuple[str, ...] = (), context: str = "") -> Operation:
         with self._lock:
             operation = Operation(
                 id=self._next_id,
@@ -95,6 +98,7 @@ class OperationTracker:
                 target=target,
                 command=command,
                 refreshes=tuple(refreshes),
+                context=context,
             )
             self._next_id += 1
             self._operations.insert(0, operation)

@@ -45,6 +45,15 @@ def _endpoint_type(payload) -> str:
     return _TYPE_LABELS.get(str(payload.get("endpointType") or ""), "other")
 
 
+_SHORT_TYPES = {"DPS": "dps", "IoT Hub": "hub", "Software Updates": "su"}
+
+
+def _type_label(payload) -> str:
+    """Display-only short type; sorting, styling and provider mapping use the full type."""
+    kind = _endpoint_type(payload)
+    return _SHORT_TYPES.get(kind, kind)
+
+
 def _identity(payload) -> str:
     identity = payload.get("inboundCallerIdentity") or {}
     kind = str(identity.get("type") or "")
@@ -103,19 +112,19 @@ def build(session) -> ResourceSpec:
             Column(
                 "type",
                 "TYPE",
-                _endpoint_type,
-                width=14,
+                _type_label,
+                width=11,
                 style=value_style(_endpoint_type, _TYPE_STYLES),
                 sort_key=lambda p: (_TYPE_ORDER.get(_endpoint_type(p), 9), name_of(p)),
             ),
-            Column("target", "TARGET", lambda p: short_id(p.get("resourceId")), width=26),
-            Column("identity", "IDENTITY", _identity, width=22),
+            Column("target", "TARGET", lambda p: short_id(p.get("resourceId")), width=26, wide=True),
+            Column("identity", "IDENTITY", _identity, width=22, wide=True),
             Column(
                 "linking",
-                "LINKING",
+                "STATUS",
                 lambda p: dig(p, "provisioningStatus", "status", default="")
                 or p.get("linkingState", ""),
-                width=12,
+                width=10,
                 style=value_style(
                     lambda p: dig(p, "provisioningStatus", "status", default="")
                     or p.get("linkingState", ""),

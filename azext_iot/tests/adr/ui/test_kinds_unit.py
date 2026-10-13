@@ -108,7 +108,7 @@ def test_live_and_demo_have_no_retired_devices_or_link_delete_actions(registry):
 
 def test_namespace_hierarchy_explains_every_related_collection(registry):
     children = registry.get("namespace").children
-    assert [child.kind for child in children] == ["link", "group", "job", "ca", "device"]
+    assert [child.kind for child in children] == ["link", "device", "group", "job", "ca"]
     assert all(child.description for child in children)
     assert children[0].label == "Linked resources"
 
@@ -197,7 +197,7 @@ def test_namespace_row_renders_from_a_realistic_payload(registry):
         "identity": {"type": "SystemAssigned"},
         "tags": {"environment": "prod", "owner": "iot"},
     }
-    model = TableModel(registry.get("namespace"))
+    model = TableModel(registry.get("namespace"), show_wide=True)
     model.apply([payload])
     row = model.rows[0]
     assert row.cells[0] == "factory"
@@ -230,7 +230,7 @@ def test_link_rows_sort_provisioning_before_messaging(registry):
     ]
     model = TableModel(registry.get("link"))
     model.apply(payloads)
-    assert [row.cells[1] for row in model.rows] == ["DPS", "IoT Hub"]
+    assert [row.cells[1] for row in model.rows] == ["dps", "hub"]
 
 
 def test_link_row_ids_are_unique_across_sections(registry):

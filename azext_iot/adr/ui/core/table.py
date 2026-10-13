@@ -120,6 +120,13 @@ class TableModel:
     def total_count(self) -> int:
         return len(self._order)
 
+    def distinguishes(self, index: int) -> bool:
+        """Whether a column is needed to tell loaded rows with the same name apart."""
+        seen = {}
+        for row in self._rows.values():
+            seen.setdefault(row.cell(0), set()).add(row.cell(index))
+        return any(len(values) > 1 for values in seen.values())
+
     def row_at(self, index: int) -> Optional[Row]:
         order = self._visible_order()
         if 0 <= index < len(order):
@@ -259,15 +266,29 @@ class TableModel:
                 reverse=self.sort_descending,
             )
 
+    def filter_terms(self) -> List[Tuple[str, bool]]:
+        """``(term, negated)`` per space-separated word; ``!word`` excludes rows containing it."""
+        terms = []
+        for word in self.filter_text.split():
+            negated = word.startswith("!")
+            word = word[1:] if negated else word
+            if word:
+                terms.append((word, negated))
+        return terms
+
     def _visible_order(self) -> List[str]:
-        if not self.filter_text:
+        """Local, case-insensitive match over every column's text, visible or not.
+
+        Every term must match (``west fail`` narrows twice); nothing here performs I/O."""
+        terms = self.filter_terms()
+        if not terms:
             return self._order
-        needle = self.filter_text
-        return [
-            row_id
-            for row_id in self._order
-            if any(needle in cell.lower() for cell in self._rows[row_id].cells)
-        ]
+
+        def keep(row_id):
+            cells = [cell.lower() for cell in self._rows[row_id].cells]
+            return all(any(term in cell for cell in cells) != negated for term, negated in terms)
+
+        return [row_id for row_id in self._order if keep(row_id)]
 
     # -- presentation helpers ---------------------------------------------
 

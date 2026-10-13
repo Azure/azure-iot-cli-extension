@@ -112,7 +112,7 @@ def build_member(session) -> ResourceSpec:
         parent="group",
         guide=Guide(
             about="Devices that currently match this group's query.",
-            runs="az iot adr ns group list-members -n <group> --ns <namespace>  ·  read-only",
+            runs="az iot adr ns group list-members -n <group> --ns <namespace> -g <resource-group>  ·  read-only",
             note="Membership is derived, not assigned - to change it, change the query or the devices.",
         ),
         row_id=member_name,

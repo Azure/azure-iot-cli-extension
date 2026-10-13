@@ -160,6 +160,25 @@ class Session:
             raise SessionError(f"Could not resolve subscription: {error}") from error
         return self.scope.subscription_id
 
+    def for_scope(self, subscription_id: str, subscription_name: Optional[str] = None,
+                  resource_group_name: Optional[str] = None) -> "Session":
+        """A new session targeting another subscription and resource group.
+
+        Only this session's private copy of the CLI context is retargeted: the profile's default
+        subscription and the caller's context are never written. This session is left untouched,
+        so work it already started keeps its original target. Providers are shared only when the
+        subscription is unchanged, because a provider's clients are bound to one subscription.
+        """
+        session = Session(self.cmd, resource_group_name, None, self.read_only)
+        session._io_slots = self._io_slots
+        session.scope.subscription_id = subscription_id
+        session.scope.subscription_name = subscription_name
+        if session.cmd is not None:
+            session.cmd.cli_ctx.data["subscription_id"] = subscription_id
+        if subscription_id == self.scope.subscription_id:
+            session._provider_lock, session._providers = self._provider_lock, self._providers
+        return session
+
     # -- providers ---------------------------------------------------------
 
     def provider(self, name: str):
