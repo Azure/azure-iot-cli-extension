@@ -19,14 +19,23 @@ from azext_iot import IoTExtCommandsLoader
 
 
 WAIT_COMMANDS = {
-    "dt wait": ("azext_iot.digitaltwins.commands_resource.wait_instance", ""),
-    "dt endpoint wait": ("azext_iot.digitaltwins.commands_resource.wait_endpoint", "--en endpoint"),
-    "dt data-history connection wait": ("azext_iot.digitaltwins.commands_resource.wait_data_connection", "--cn connection"),
-    "dt network private-endpoint connection wait": (
-        "azext_iot.digitaltwins.commands_resource.wait_private_endpoint_conn", "--cn connection",
+    "dt wait": ("azext_iot.digitaltwins.commands_resource.wait_instance", "-n resource"),
+    "dt endpoint wait": ("azext_iot.digitaltwins.commands_resource.wait_endpoint", "-n resource --en endpoint"),
+    "dt data-history connection wait": (
+        "azext_iot.digitaltwins.commands_resource.wait_data_connection", "-n resource --cn connection",
     ),
-    "iot du account wait": ("azext_iot.deviceupdate.commands_account.wait_on_account", ""),
-    "iot du instance wait": ("azext_iot.deviceupdate.commands_instance.wait_on_instance", "--instance instance"),
+    "dt network private-endpoint connection wait": (
+        "azext_iot.digitaltwins.commands_resource.wait_private_endpoint_conn", "-n resource --cn connection",
+    ),
+    "iot du account wait": ("azext_iot.deviceupdate.commands_account.wait_on_account", "-n resource"),
+    "iot du instance wait": (
+        "azext_iot.deviceupdate.commands_instance.wait_on_instance", "-n resource --instance instance",
+    ),
+    "iot adr schema wait": ("azext_iot.adr.commands_schema.adr_schema_show", "-n resource --registry registry"),
+    "iot adr schema registry wait": ("azext_iot.adr.commands_schema.adr_schema_registry_show", "-n resource"),
+    "iot adr schema version wait": (
+        "azext_iot.adr.commands_schema.adr_schema_version_show", "--version 1 --schema schema --registry registry",
+    ),
 }
 TIMEOUT_MESSAGE = "Wait operation timed-out after 1 seconds"
 UNSUPPORTED_CONDITIONS = {
@@ -48,7 +57,7 @@ def wait_command(request, mocker):
     getter_path, arguments = WAIT_COMMANDS[request.param]
     getter = mocker.patch(getter_path, autospec=True)
     mocker.patch("time.sleep")
-    return f"{request.param} -n resource -g rg {arguments}", getter
+    return f"{request.param} -g rg {arguments}", getter
 
 
 def invoke_wait(cli, command, condition, output_format="json"):
