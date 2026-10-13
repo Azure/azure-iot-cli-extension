@@ -474,20 +474,27 @@ class WorkflowServices:
     def create_cms(self, request, kind):
         return self._cms_operation(request, kind, create=True)
 
-    def list_link_targets(self, kind: str, resource_group_name: str):
-        if kind == "hub":
-            resources = adr_iot_hub_service_factory(
-                self.cmd.cli_ctx
-            ).iot_hub_resource.list_by_resource_group(
-                resource_group_name=resource_group_name
+    def list_link_targets(
+        self, kind: str, resource_group_name: Optional[str] = None, subscription_id: Optional[str] = None,
+    ):
+        if kind in ("hub", "dps"):
+            operations = (
+                adr_iot_hub_service_factory(
+                    self.cmd.cli_ctx, subscription_id=subscription_id,
+                ).iot_hub_resource if kind == "hub" else
+                adr_iot_service_provisioning_factory(
+                    self.cmd.cli_ctx, subscription_id=subscription_id,
+                ).iot_dps_resource
             )
-        elif kind == "dps":
-            resources = adr_iot_service_provisioning_factory(
-                self.cmd.cli_ctx
-            ).iot_dps_resource.list_by_resource_group(
-                resource_group_name=resource_group_name
+            resources = (
+                operations.list_by_resource_group(resource_group_name=resource_group_name)
+                if resource_group_name else operations.list_by_subscription()
             )
         elif kind == "software-updates":
+            if subscription_id is not None:
+                raise InvalidArgumentValueError(
+                    "Choosing a subscription for resource discovery is supported only for IoT Hub and DPS."
+                )
             resources = self.update_instances.list(resource_group_name)
         else:
             raise InvalidArgumentValueError(
@@ -506,10 +513,13 @@ class WorkflowServices:
         system_data = as_dict(
             value_of(resource, "systemData", "system_data")
         )
+        scope = parse_resource_id(value_of(resource, "id") or "")
         choice = {
             "kind": kind,
             "id": value_of(resource, "id"),
             "name": value_of(resource, "name"),
+            "resourceGroup": scope.get("resource_group"),
+            "subscriptionId": scope.get("subscription"),
             "location": value_of(resource, "location"),
             "provisioningState": value_of(
                 properties, "provisioningState", "provisioning_state"

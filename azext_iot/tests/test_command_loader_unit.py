@@ -83,7 +83,7 @@ _SU_ID = (
     "Microsoft.DeviceUpdate/updateInstances/su"
 )
 _WORKFLOW_PARSER_CASES = {
-    "iot adr ns check": ["-n", "namespace", "-g", "resource-group", "--no-input", "--plain"],
+    "iot adr ns check": ["-n", "namespace", "-g", "resource-group", "--plain"],
     "iot adr ns setup": [
         "-n", "namespace", "-g", "resource-group", "--no-input", "--plain",
         "--plan-only", "--yes", "--namespace-outbound-identity", "system-assigned",
@@ -778,16 +778,41 @@ def test_workflow_commands_parse_with_global_subscription(mocker, management_com
     ])
     assert parsed.namespace_name == "namespace"
     assert parsed.resource_group_name == "resource-group"
-    assert parsed.no_input is True
     assert parsed.plain is True
     assert parsed._subscription == "namespace-sub"  # pylint: disable=protected-access
     if command_name.endswith("setup"):
+        assert parsed.no_input is True
         assert parsed.plan_only is True
         assert parsed.yes is True
         assert parsed.namespace_outbound_identity == "system-assigned"
         assert parsed.dps == ["endpoint=dps", f"resource-id={_DPS_ID}", "identity=system-assigned"]
         assert parsed.hubs == [["endpoint=hub", f"resource-id={_HUB_ID}", "identity=system-assigned"]]
         assert parsed.software_updates == ["endpoint=su", f"resource-id={_SU_ID}", "create-if-missing=true"]
+
+
+@pytest.mark.parametrize("arguments", [[], ["-n", "namespace"], ["-g", "resource-group"]])
+def test_check_parser_requires_explicit_scope(management_command_parser, arguments):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args(["iot", "adr", "ns", "check", *arguments])
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("name_option", ["-n", "--name", "--namespace", "--ns"])
+def test_check_parser_accepts_namespace_aliases(management_command_parser, name_option):
+    parsed = management_command_parser.parse_args([
+        "iot", "adr", "ns", "check", name_option, "namespace", "-g", "resource-group",
+    ])
+    assert parsed.namespace_name == "namespace"
+    assert parsed.resource_group_name == "resource-group"
+    assert not parsed.no_input
+
+
+def test_check_parser_keeps_no_input_compatibility(management_command_parser):
+    parsed = management_command_parser.parse_args([
+        "iot", "adr", "ns", "check", "-n", "namespace", "-g", "resource-group", "--no-input",
+    ])
+    assert parsed.no_input is True
+    assert parsed.namespace_name == "namespace" and parsed.resource_group_name == "resource-group"
 
 
 def test_link_command_parser_leaves_subscription_for_current_account_default(

@@ -243,9 +243,9 @@ def load_config(value):
 
 
 def request_config(request):
-    """Export a legacy SetupRequest as deterministic, validated TUI configuration.
+    """Export a SetupRequest as deterministic, validated setup configuration.
 
-    Skipped UI rows are not desired capabilities and have no schema representation.
+    Skipped guided answers are not desired capabilities and have no schema representation.
     No resource data or service response material is included.
     """
     namespace = {"name": request.namespace_name, "resourceGroup": request.resource_group_name}

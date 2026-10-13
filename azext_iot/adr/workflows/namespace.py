@@ -765,6 +765,9 @@ class NamespaceWorkflow:
             for item in plan
             if item.action == "skip" or item.item_id == "namespace-tags"
         ]
+        observe_items = getattr(self.progress, "observe_items", None)
+        if callable(observe_items):
+            observe_items(items)
         try:
             return self._apply_setup(request, items)
         except KeyboardInterrupt as error:

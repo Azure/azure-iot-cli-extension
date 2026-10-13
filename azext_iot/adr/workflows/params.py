@@ -19,22 +19,30 @@ def load_adr_workflow_arguments(self, _):
                 "namespace_name",
                 options_list=["--name", "-n", "--namespace", "--ns"],
                 help="Device Registry namespace name.",
+                required=command == "iot adr ns check",
             )
             context.argument(
                 "resource_group_name",
                 arg_type=resource_group_name_type,
+                required=command == "iot adr ns check",
             )
             context.argument(
                 "no_input",
                 options_list=["--no-input"],
                 arg_type=get_three_state_flag(),
-                help="Disable interactive prompts.",
+                help=(
+                    "Accepted for compatibility; check always runs without prompts."
+                    if command == "iot adr ns check" else "Never prompt; plan only the supplied inputs."
+                ),
             )
             context.argument(
                 "plain",
                 options_list=["--plain"],
                 arg_type=get_three_state_flag(),
-                help="Use append-only text without color or animation.",
+                help=(
+                    "Use plain text without color or animation."
+                    if command == "iot adr ns check" else "Use numbered plain-text prompts without color or animation."
+                ),
             )
 
     with self.argument_context("iot adr ns setup") as context:
@@ -79,7 +87,7 @@ def load_adr_workflow_arguments(self, _):
         context.argument(
             "config",
             options_list=["--config"],
-            help="JSON object or JSON/YAML file (@path accepted). Valid input opens review in interactive mode.",
+            help="JSON object or JSON/YAML file (@path accepted). In a terminal, valid input goes straight to plan review.",
         )
         context.argument(
             "plan_only",

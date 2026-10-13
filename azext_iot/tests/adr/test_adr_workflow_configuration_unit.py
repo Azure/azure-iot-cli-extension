@@ -13,7 +13,7 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.workflows.configuration import load_config, request_config, validate_identity
 from azext_iot.adr.workflows.input import (
-    _endpoint_values, _required_config_pairs, build_setup_request, parse_endpoint,
+    _config_pairs, _required_config_pairs, build_setup_request, parse_endpoint,
 )
 from azext_iot.adr.workflows.models import CmsSpec, EndpointSpec
 
@@ -62,7 +62,7 @@ def test_full_configuration_roundtrip_and_detached_copy(tmp_path):
     assert load_config(str(yaml_path)) == {
         "schemaVersion": 1, "namespace": {"name": "ns", "resourceGroup": "rg"}, "cms": {"enabled": False},
     }
-    request = build_setup_request(None, None, SUB, config=source, interactive=False, no_input=True)
+    request = build_setup_request(None, None, SUB, config=source)
     assert request.cms == CmsSpec()
     assert request.check_status
     assert request.dps.create_if_missing and request.dps.sku == "S1" and request.dps.unit == 1
@@ -72,15 +72,15 @@ def test_full_configuration_roundtrip_and_detached_copy(tmp_path):
 
 
 def test_namespace_only_and_missing_scope():
-    request = build_setup_request(None, None, SUB, config={"namespace": {"name": "ns", "resourceGroup": "rg"}}, no_input=True)
+    request = build_setup_request(None, None, SUB, config={"namespace": {"name": "ns", "resourceGroup": "rg"}})
     assert not request.requests_links
     assert request.outbound_identity_type is None and request.cms is None
     assert load_config({}) == {"schemaVersion": 1}
     with pytest.raises(ArgumentUsageError, match="resource-group"):
-        build_setup_request(None, None, SUB, config={}, no_input=True)
+        build_setup_request(None, None, SUB, config={})
     with pytest.raises(ArgumentUsageError, match="--name"):
-        build_setup_request(None, "rg", SUB, config={}, no_input=True)
-    request = build_setup_request("ns", "rg", SUB, config={"cms": False}, no_input=True)
+        build_setup_request(None, "rg", SUB, config={})
+    request = build_setup_request("ns", "rg", SUB, config={"cms": False})
     assert request.cms is None
 
 
@@ -200,21 +200,21 @@ def test_missing_path_and_non_utf8(tmp_path):
 def test_cli_config_conflicts(field, cli):
     kwargs = {"namespace_name": None, "resource_group_name": None, **cli}
     with pytest.raises(InvalidArgumentValueError, match=f"namespace.{field} conflicts"):
-        build_setup_request(**kwargs, subscription_id=SUB, config=config(), no_input=True)
+        build_setup_request(**kwargs, subscription_id=SUB, config=config())
 
 
 def test_subscription_conflicts_and_identity_forms():
     source = config()
     source["subscriptionId"] = OTHER_SUB
     with pytest.raises(InvalidArgumentValueError, match="--subscription"):
-        build_setup_request(None, None, SUB, config=source, no_input=True)
+        build_setup_request(None, None, SUB, config=source)
     for identity in (UAMI, {"userAssignedResourceId": UAMI}, {"type": "UserAssigned", "userAssignedResourceId": UAMI}):
         assert validate_identity(identity, "identity") == UAMI
     assert validate_identity("SystemAssigned", "identity") == "system-assigned"
     for validity in (1, 90):
         source = {"cms": {"enabled": True, "validityDays": validity},
                   "namespace": {"outboundIdentity": UAMI}}
-        request = build_setup_request("ns", "rg", SUB, config=source, no_input=True)
+        request = build_setup_request("ns", "rg", SUB, config=source)
         assert request.cms.validity_days == validity and request.outbound_user_assigned_identity == UAMI
 
 
@@ -230,11 +230,13 @@ def test_strict_legacy_flags(option, match):
 
 def test_endpoint_creation_roundtrip_and_input_callbacks(mocker):
     endpoint = EndpointSpec("hub", "hub", HUB, "system-assigned", create_if_missing=True, sku="S2", unit=2)
-    assert parse_endpoint(_endpoint_values(endpoint), "hub", "rg", SUB) == endpoint
+    exported = {"endpointName": "hub", "resourceId": HUB, "identity": {"type": "SystemAssigned"},
+                "createIfMissing": True, "sku": "S2", "unit": 2}
+    assert parse_endpoint(_config_pairs(exported), "hub", "rg", SUB) == endpoint
     source = config()
     source["links"]["hubs"][0].update(createIfMissing=True, sku="S1", unit=1)
     validate = mocker.Mock()
-    build_setup_request(None, None, SUB, config=source, no_input=True, validate_endpoint=validate)
+    build_setup_request(None, None, SUB, config=source, validate_endpoint_resource=validate)
     assert all(call.args[1] for call in validate.call_args_list)
     with pytest.raises(InvalidArgumentValueError, match="non-empty object"):
         _required_config_pairs([], "links.dps")
@@ -249,17 +251,17 @@ def test_numeric_relative_config_filename(tmp_path, monkeypatch):
 
 
 def test_request_config_export_is_valid_detached_and_deterministic():
-    request = build_setup_request(None, None, SUB, config=config(), no_input=True)
+    request = build_setup_request(None, None, SUB, config=config())
     exported = request_config(request)
     assert exported == request_config(request)
-    rebuilt = build_setup_request(None, None, SUB, config=exported, no_input=True)
+    rebuilt = build_setup_request(None, None, SUB, config=exported)
     assert rebuilt == request
     exported["namespace"]["tags"]["owner"] = "changed"
     assert request.tags["owner"] == "team"
-    basic = build_setup_request("ns", "rg", SUB, config={}, no_input=True)
+    basic = build_setup_request("ns", "rg", SUB, config={})
     assert "cms" not in request_config(basic)
     source = {"namespace": {"outboundIdentity": {"type": "UserAssigned", "userAssignedResourceId": UAMI}}}
-    request = build_setup_request("ns", "rg", SUB, config=source, no_input=True)
+    request = build_setup_request("ns", "rg", SUB, config=source)
     assert request_config(request)["namespace"]["outboundIdentity"] == source["namespace"]["outboundIdentity"]
 
 
@@ -269,15 +271,15 @@ def test_request_config_export_is_valid_detached_and_deterministic():
     ("dps", False, ResourceNotFoundError("missing"), False),
     ("hub", True, HttpResponseError("forbidden"), False),
 ])
-@pytest.mark.parametrize("callback_name", ["validate_endpoint", "validate_endpoint_resource"])
-def test_legacy_read_callback_accepts_missing_hub_dps_only_when_requested(mocker, kind, create, error, allowed, callback_name):
+def test_read_callback_accepts_missing_hub_dps_only_when_requested(mocker, kind, create, error, allowed):
+    callback_name = "validate_endpoint_resource"
     source = {"links": {}}
     endpoint = {"resourceName": "target", "identity": "system-assigned", "createIfMissing": create}
     source["links"].update({"hubs": [endpoint]} if kind == "hub" else {"dps": endpoint})
     callback = mocker.Mock(side_effect=error)
     if allowed:
-        request = build_setup_request("ns", "rg", SUB, config=source, no_input=True, **{callback_name: callback})
+        request = build_setup_request("ns", "rg", SUB, config=source, **{callback_name: callback})
         assert (request.dps or request.hubs[0]).create_if_missing
     else:
         with pytest.raises(type(error)):
-            build_setup_request("ns", "rg", SUB, config=source, no_input=True, **{callback_name: callback})
+            build_setup_request("ns", "rg", SUB, config=source, **{callback_name: callback})

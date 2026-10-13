@@ -238,6 +238,8 @@ def test_list_link_targets(service_fixture, mocker):
     hub = service.list_link_targets("hub", RG)[0]
     assert hub["sku"] == "S1"
     assert hub["principalId"] == "hub-p"
+    assert hub["resourceGroup"] == RG
+    assert hub["subscriptionId"] == SUB
 
     dps_client = mocker.patch.object(
         subject, "adr_iot_service_provisioning_factory"
@@ -266,6 +268,66 @@ def test_list_link_targets(service_fixture, mocker):
 
     with pytest.raises(InvalidArgumentValueError, match="Unsupported"):
         service.list_link_targets("bad", RG)
+
+
+@pytest.mark.parametrize("kind,factory_name,operation_name,resource_id", [
+    ("hub", "adr_iot_hub_service_factory", "iot_hub_resource", HUB_ID),
+    ("dps", "adr_iot_service_provisioning_factory", "iot_dps_resource", DPS_ID),
+])
+@pytest.mark.parametrize("group", [None, "other-rg"])
+@pytest.mark.parametrize("subscription", [None, "11111111-1111-1111-1111-111111111111"])
+def test_list_link_targets_scoped_discovery(
+    service_fixture, mocker, kind, factory_name, operation_name, resource_id, group, subscription,
+):
+    service, _, _, _, _ = service_fixture
+    factory = mocker.patch.object(subject, factory_name)
+    operations = getattr(factory.return_value, operation_name)
+    target_sub = subscription or SUB
+    target_id = resource_id.replace(SUB, target_sub).replace(f"/{RG}/", "/other-rg/")
+    method = operations.list_by_resource_group if group else operations.list_by_subscription
+    method.return_value = iter([{
+        "id": target_id, "name": kind, "location": "eastus",
+        "properties": {"provisioningState": "Succeeded"},
+    }])
+
+    choice, = service.list_link_targets(kind, group, subscription_id=subscription)
+
+    factory.assert_called_once_with(service.cmd.cli_ctx, subscription_id=subscription)
+    assert choice["id"] == target_id
+    assert choice["resourceGroup"] == "other-rg"
+    assert choice["subscriptionId"] == target_sub
+    assert choice["location"] == "eastus"
+    assert service.cmd.cli_ctx.data["subscription_id"] == SUB
+    service.cli.invoke.assert_not_called()
+    if group:
+        method.assert_called_once_with(resource_group_name=group)
+        operations.list_by_subscription.assert_not_called()
+    else:
+        method.assert_called_once_with()
+        operations.list_by_resource_group.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,factory_name,operation_name", [
+    ("hub", "adr_iot_hub_service_factory", "iot_hub_resource"),
+    ("dps", "adr_iot_service_provisioning_factory", "iot_dps_resource"),
+])
+def test_list_link_targets_discovery_failure_is_not_an_empty_result(
+    service_fixture, mocker, kind, factory_name, operation_name,
+):
+    service, _, _, _, _ = service_fixture
+    factory = mocker.patch.object(subject, factory_name)
+    error = HttpResponseError("Subscription resource discovery is forbidden")
+    getattr(factory.return_value, operation_name).list_by_subscription.side_effect = error
+    with pytest.raises(HttpResponseError) as raised:
+        service.list_link_targets(kind, subscription_id=SUB)
+    assert raised.value is error
+
+
+def test_list_link_targets_software_updates_does_not_ignore_explicit_subscription(service_fixture):
+    service, _, _, update, _ = service_fixture
+    with pytest.raises(InvalidArgumentValueError, match="only for IoT Hub and DPS"):
+        service.list_link_targets("software-updates", RG, subscription_id=SUB)
+    update.list.assert_not_called()
 
 
 def test_resolve_update_instance_and_invalid_resources(service_fixture, mocker):

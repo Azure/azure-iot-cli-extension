@@ -8,7 +8,7 @@ Release History
 
 **Namespace setup**
 
-* Added a minimal, mouse-enabled terminal interface for namespace setup with reversible input, JSON-to-review, explicit write approval, and read-only revalidation before applying.
+* Added guided namespace setup for terminals: one question at a time in normal scrollback, no full-screen interface or mouse capture. A new setup proposes a new DPS and IoT Hub named after the namespace (existing resources or namespace-only can be chosen), existing links are reused, supplied values are never asked again, and a single typed approval covers the plan, which is re-read before applying. ``--yes``, ``--no-input`` and non-terminal runs never prompt or propose resources.
 * Setup configuration supports creating missing DPS/Hub targets through the existing release commands and optional Azure-managed root/intermediate CA and certificate-policy onboarding. External PKI remains available through individual CA commands.
 * Invalid configuration is rejected instead of silently replaced with defaults. Plain-terminal and noninteractive workflows remain available.
 

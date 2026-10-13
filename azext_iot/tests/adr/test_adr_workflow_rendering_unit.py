@@ -5,28 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 from io import StringIO
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from prompt_toolkit.application import create_app_session
-from prompt_toolkit.completion import CompleteEvent
-from prompt_toolkit.document import Document
-from prompt_toolkit.input import DummyInput
-from prompt_toolkit.output import DummyOutput
+from azure.core.exceptions import HttpResponseError
 from rich.console import Console
 
 from azext_iot.adr.workflows import rendering as subject
 from azext_iot.adr.workflows.models import EndpointSpec, SetupRequest
-
-
-@pytest.fixture(autouse=True)
-def prompt_io(mocker):
-    """Keep real prompt sessions without opening the host terminal."""
-    output = DummyOutput()
-    # The renderer explicitly targets stderr, bypassing the app session output.
-    create_output = mocker.patch.object(subject, "create_output", return_value=output)
-    with create_app_session(input=DummyInput(), output=output) as session:
-        yield session, create_output
 
 
 def _console(stream, force_terminal=False):
@@ -115,28 +102,153 @@ def _plan():
     }
 
 
-def test_plain_renderer_outputs_all_views(mocker):
+@pytest.mark.parametrize("plain", [True, False])
+@pytest.mark.parametrize("state", ["Succeeded", "Warning", "Blocked"])
+def test_minimal_check_verdict_findings_and_unexecuted_remediation(plain, state):
+    stream = StringIO()
+    renderer = subject.WorkflowRenderer(
+        "Namespace check", plain=plain, console=_console(stream, force_terminal=not plain),
+    )
+    renderer.header("sub", "rg", "ns")
+    report = {
+        "namespace": "ns", "state": state, "items": [
+            {"id": "namespace", "state": "Satisfied", "target": "ns", "message": "Provisioned"},
+            {"id": "role-hub", "state": "Blocked", "target": "hub", "details": {"role": "IoT Hub Data Contributor"},
+             "message": "Grant missing", "command": "az role assignment create --role Contributor"},
+            {"id": "hub-link", "state": "Warning", "target": "hub", "message": "Accepted",
+             "command": "az iot adr ns link hub show -n west --ns ns -g rg"},
+            {"id": "dps-links", "state": "NotConfigured", "target": "DPS"},
+        ],
+    }
+    if state == "Blocked":
+        renderer.error(ValueError("blocked"), report)
+    else:
+        renderer.receipt(report)
+    output = _plain_terminal(stream)
+    assert "0 writes" in output
+    assert "Grant missing" in output and "Accepted" in output
+    assert "[WRITE]" in output and "[read-only]" in output
+    assert "az role assignment create" in output
+    assert "Applying" not in output and "confirm the plan" not in output
+    assert "kept" not in output
+    assert "step " not in output and "❯" not in output and "▌" not in output
+    assert "Namespace: ns" in output and "Resource group: rg" in output and "Subscription: sub" in output
+    if not plain:
+        assert "RESOURCES" in output and "ACCESS" in output and "LINKS" in output
+        assert "Contributor" in output
+    else:
+        assert "\x1b" not in stream.getvalue()
+        assert "hub · IoT Hub Data Contributor: Grant missing" in output
+
+
+def test_check_result_and_failure_never_open_interactive_ui(mocker):
+    stream = StringIO()
+    live = mocker.patch.object(subject, "Live")
+    renderer = subject.WorkflowRenderer("Namespace check", console=_console(stream, force_terminal=True))
+    renderer.receipt({"namespace": "ns", "state": "Succeeded", "items": []})
+    renderer.error(RuntimeError("Denied"))
+    output = _plain_terminal(stream)
+    assert "Ready" in output and "Check failed" in output and "Denied" in output
+    assert "Applying" not in output and "0 writes" in output
+    assert renderer._hold_live is None
+    live.assert_not_called()
+    assert subject.WorkflowRenderer._check_command_label("") == "WRITE"
+
+
+@pytest.mark.parametrize("plain", [True, False])
+@pytest.mark.parametrize("wrapped", [True, False])
+def test_check_preserves_service_error_code_and_status(plain, wrapped):
+    stream = StringIO()
+    renderer = subject.WorkflowRenderer(
+        "Namespace check", plain=plain, console=_console(stream, force_terminal=not plain),
+    )
+    response = MagicMock(status_code=403, reason="Forbidden")
+    response.json.return_value = {"error": {"code": "AuthorizationFailed", "message": "Request denied"}}
+    response.text.return_value = '{"error": {"code": "AuthorizationFailed", "message": "Request denied"}}'
+    error = HttpResponseError(message="Request denied", response=response)
+    renderer.error(subject.RenderedWorkflowError(error, renderer) if wrapped else error)
+    output = _plain_terminal(stream)
+    assert "status        403" in output
+    assert "code          AuthorizationFailed" in output
+    assert "Request denied" in output and "0 writes" in output
+    assert "Applying" not in output and "kept" not in output
+
+
+def test_failure_metadata_preserves_nested_mapping_code():
+    error = RuntimeError("Request denied")
+    error.error = {"code": "AuthorizationFailed"}
+    error.response = SimpleNamespace(status_code=403)
+    assert subject.WorkflowRenderer._failure_metadata(error) == [
+        "code          AuthorizationFailed", "status        403",
+    ]
+
+
+def test_plain_check_keeps_long_suggested_commands_on_one_line():
+    stream = StringIO()
+    renderer = subject.WorkflowRenderer("Namespace check", plain=True, console=Console(file=stream, width=40))
+    command = "az role assignment create --role Contributor --scope /subscriptions/sub/resourceGroups/long-group"
+    renderer.receipt({"namespace": "ns", "state": "Blocked", "items": [
+        {"id": "role", "state": "Blocked", "target": "scope", "command": command},
+    ]})
+    assert f"Suggested only [WRITE]: {command}" in stream.getvalue().splitlines()
+
+
+def test_check_keeps_complete_target_scope_at_eighty_columns():
+    stream = StringIO()
+    target = (
+        "/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/another-group/"
+        "providers/Microsoft.Devices/IotHubs/complete-target-name"
+    )
+    renderer = subject.WorkflowRenderer(
+        "Namespace check",
+        console=Console(file=stream, force_terminal=True, width=80, theme=subject._THEME),
+    )
+    renderer.receipt({
+        "namespace": "ns", "state": "Blocked",
+        "items": [{"id": "role-hub", "state": "Blocked", "target": target,
+                   "details": {"role": "Contributor"}, "message": "Required grant missing"}],
+    })
+    assert target in "".join(_plain_terminal(stream).split())
+    assert "Required grant missing" in _plain_terminal(stream)
+
+
+@pytest.mark.parametrize("width", [80, 120])
+def test_check_keeps_complete_finding_identifiers(width):
+    stream = StringIO()
+    console = Console(file=stream, force_terminal=True, width=width, theme=subject._THEME)
+    renderer = subject.WorkflowRenderer("Namespace check", console=console)
+    names = [
+        "namespace-outbound-identity",
+        "role-hub-west-namespace-iot-hub-data-contributor",
+        "role-hub-west-namespace-contributor",
+    ]
+    renderer.receipt({
+        "namespace": "ns", "state": "Blocked",
+        "items": [{"id": name, "state": "Blocked", "target": ""} for name in names],
+    })
+    output = _plain_terminal(stream)
+    for name in names:
+        assert name in "".join(output.split())
+    assert "…" not in output
+
+
+def test_plain_renderer_outputs_all_views():
     stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
         plain=True,
         console=_console(stream),
     )
-    mocker.patch("builtins.input", return_value="answer")
-    assert renderer.prompt("Value: ") == "answer"
-    renderer.write("message")
+    renderer.busy("validating")
     renderer.header("sub", "rg", "ns")
-    renderer.journey("Prepare", "Resources", "Access")
     renderer.phase("Prepare")
     renderer.input_status("Subscription", "sub", "Satisfied", "Found")
     renderer.input_status("Namespace", "ns", "Satisfied", "Found")
     renderer.phase("Prepare")
     renderer.phase("Resources")
     renderer.input_status("Resource group", "rg", "Satisfied", "Found")
-    renderer.validation(_plan())
-    renderer.trust(_plan())
     renderer.plan(_plan())
-    renderer.confirmation(_plan())
+    renderer.confirmed()
     renderer.receipt({
         "namespace": "ns",
         "state": "Succeeded",
@@ -145,12 +257,13 @@ def test_plain_renderer_outputs_all_views(mocker):
     renderer.error(RuntimeError("failed"), _plan())
     output = _plain_terminal(stream)
     assert "Azure IoT · Device Registry" in output
-    assert output.count("step 1/3") == 1
+    assert "step " not in output  # unattended runs have no steps to navigate
     assert "✓ subscription" in output
     assert "create      namespace" in output
     assert "location" in output
     assert "link        hub link" in output
-    assert "3 change(s)" in output
+    assert "[working] validating" in output
+    assert "confirmed" in output
     assert "Namespace setup complete" in output
     assert "Fix: az role assignment create" in output
 
@@ -185,17 +298,12 @@ def test_rich_execution_and_symbols():
     )
     assert renderer.rich
     renderer.header("sub", "rg", "ns")
-    renderer.journey("Prepare", "Resources", "Access")
     renderer.phase("Prepare")
     renderer.input_status("Subscription", "sub", "Satisfied", "Found")
     renderer.input_status("Namespace", "ns", "Satisfied", "Found")
     renderer.phase("Resources")
-    workspace = renderer._workspace_ansi("")
-    assert "Software Updates" not in workspace
-    renderer.validation(_plan())
-    renderer.trust(_plan())
     renderer.plan(_plan())
-    renderer.confirmation(_plan())
+    renderer.confirmed()
     renderer.receipt({
         "namespace": "ns",
         "state": "Warning",
@@ -212,59 +320,7 @@ def test_rich_execution_and_symbols():
     assert "✓" in output
     assert "Successful" in output
     assert "Failed" in output
-    assert "step 2/3" in output
-    assert "resources" in output
-
-
-def test_rich_prompt_sessions_do_not_open_host_console(mocker, prompt_io):
-    session, renderer_output = prompt_io
-    create_input = mocker.patch(
-        "prompt_toolkit.input.defaults.create_input",
-        side_effect=AssertionError("Real terminal input must not be opened"),
-    )
-    create_output = mocker.patch(
-        "prompt_toolkit.output.defaults.create_output",
-        side_effect=AssertionError("Real terminal output must not be opened"),
-    )
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    assert renderer.rich
-    original = renderer._prompt_session
-    assert isinstance(original, subject.PromptSession)
-    assert original.app.input is session.input
-    assert original.app.output is session.output
-    renderer_output.assert_called_once_with(stdout=subject.sys.stderr)
-
-    mocker.patch.object(original, "prompt", return_value="p")
-    assert renderer.action("Review?", {"p": "save"}) == "p"
-    assert renderer._prompt_session is not original
-    assert renderer._prompt_session.app.input is session.input
-    assert renderer._prompt_session.app.output is session.output
-    assert renderer_output.call_count == 2
-    create_input.assert_not_called()
-    create_output.assert_not_called()
-
-
-def test_prompt_navigation_commands(mocker):
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        plain=True,
-        console=_console(stream),
-    )
-    mocker.patch("builtins.input", side_effect=[":help", "value"])
-    assert renderer.prompt("Input: ") == "value"
-    assert ":back previous input" in stream.getvalue()
-
-    mocker.patch("builtins.input", return_value=":back")
-    with pytest.raises(subject.BackRequested):
-        renderer.prompt("Input: ")
-
-    mocker.patch("builtins.input", return_value=":quit")
-    with pytest.raises(subject.WorkflowCancelled):
-        renderer.prompt("Input: ")
+    assert "step " not in output
 
 
 def test_rich_renderer_escapes_dynamic_markup():
@@ -273,7 +329,6 @@ def test_rich_renderer_escapes_dynamic_markup():
         "Namespace setup",
         console=_console(stream, force_terminal=True),
     )
-    renderer.write("! bad [value] [/]")
     renderer.input_status(
         "IoT Hub",
         "hub[value]",
@@ -283,384 +338,13 @@ def test_rich_renderer_escapes_dynamic_markup():
     output = stream.getvalue()
     assert "[value]" in output
     assert "[/]" in output
-    assert "[y/n]" in renderer._workspace_ansi(
-        "Apply namespace setup? [y/n]: "
-    )
 
 
-def test_rich_prompt_reuses_workspace(mocker):
+def test_busy_status_is_transient_and_history_is_append_only():
     stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
         console=_console(stream, force_terminal=True),
-    )
-    renderer.header("sub", None, None)
-    renderer.journey("Prepare", "Resources")
-    renderer.phase("Prepare")
-    renderer.write("Configure")
-    renderer.write("  1  Namespace identity")
-    live_class = mocker.patch.object(subject, "Live")
-    prompt = mocker.patch.object(
-        renderer._prompt_session,
-        "prompt",
-        side_effect=[":help", "1"],
-    )
-    assert renderer.prompt("Selection: ") == "1"
-    assert prompt.call_count == 2
-    assert prompt.call_args.kwargs["bottom_toolbar"]
-    output = _plain_terminal(stream)
-    assert output.count("$ az iot adr ns setup") == 1
-    assert "step 1/2  ● prepare ── ○ resources" in output
-    live_class.return_value.start.assert_called_once_with(refresh=True)
-    assert renderer._body.count(
-        ":back previous input  ·  :help commands  ·  :quit cancel"
-    ) == 1
-
-    renderer.write("Namespace identity configured")
-    assert "configured" in renderer._body[-1]
-    renderer.close()
-    live_class.return_value.stop.assert_called_once()
-
-
-def test_launch_header_prints_once_and_prompt_is_transient(mocker):
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(stream, force_terminal=True),
-    )
-    renderer.header("sub", None, None)
-    renderer.header("sub", "rg", "ns")
-    reset = mocker.patch.object(
-        renderer._prompt_session.default_buffer, "reset"
-    )
-    mocker.patch.object(
-        renderer._prompt_session, "prompt", return_value="value"
-    )
-
-    assert renderer.prompt("Value: ") == "value"
-    reset.assert_called_once_with()
-    output = _plain_terminal(stream)
-    assert output.count("$ az iot adr ns setup") == 1
-    assert "$ az iot adr ns setup" not in renderer._workspace_ansi(
-        "Value: "
-    )
-
-
-def test_action_mode_accepts_keys_and_labels(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    prompt = mocker.patch.object(
-        renderer, "_prompt", side_effect=["retry", "2"]
-    )
-    actions = {"r": "retry", "q": "quit"}
-    assert renderer.action("Recover?", actions) == "r"
-    assert renderer.action("Recover?", actions) == "q"
-    assert prompt.call_args.kwargs["action_keys"] == {
-        "r": "r",
-        "q": "q",
-    }
-
-    prompt.side_effect = ["", "invalid", "r"]
-    assert renderer.action(
-        "Default?", actions, default="q"
-    ) == "q"
-    assert renderer.action("Invalid?", actions) == "r"
-
-
-def test_action_mode_rotates_prompt_session(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    original = renderer._prompt_session
-    mocker.patch.object(original, "prompt", return_value="p")
-
-    assert renderer.action("Review?", {"p": "save"}) == "p"
-    assert renderer._prompt_session is not original
-
-
-def test_action_bindings_submit_single_key():
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    event = MagicMock()
-    bindings = renderer._action_bindings({"s": "s"})
-    binding = next(
-        item for item in bindings.bindings if "s" in item.keys
-    )
-    binding.handler(event)
-    event.app.exit.assert_called_with(result="s")
-    help_binding = next(
-        item for item in bindings.bindings if "?" in item.keys
-    )
-    help_binding.handler(event)
-    event.app.exit.assert_called_with(result="?")
-
-
-def test_rich_selection_supports_number_and_clears_menu(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    prompt = mocker.patch.object(
-        renderer, "_prompt", return_value="2"
-    )
-    selected = renderer.select(
-        "Resources",
-        {
-            "one": ("one", "First"),
-            "two": ("two", "Second"),
-        },
-    )
-    assert selected == "two"
-    assert not renderer._body
-    assert prompt.call_args.kwargs["completer"]
-
-    prompt.side_effect = ["invalid", "q"]
-    with pytest.raises(subject.WorkflowCancelled):
-        renderer.select(
-            "Resources", {"one": ("one", "First")}
-        )
-
-    prompt.side_effect = None
-    prompt.return_value = "Exact-Resource"
-    assert renderer.select(
-        "Resource",
-        {"one": ("one", "First")},
-        guidance="Type a name or ARM ID.",
-        allow_custom=True,
-    ) == "Exact-Resource"
-
-
-def test_configuration_selection_shows_all_options(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    renderer.header("sub", "rg", "ns")
-    renderer.journey(
-        "Subscription",
-        "Resource group",
-        "Namespace",
-        "Configuration",
-    )
-    renderer.phase("Configuration")
-    snapshots = []
-
-    def prompt(*_, **__):
-        snapshots.append(renderer._workspace().plain)
-        return "done"
-
-    mocker.patch.object(renderer, "_prompt", side_effect=prompt)
-    assert renderer.select(
-        "Configuration — every item is optional",
-        {
-            "identity": ("identity", "Outbound identity          pending"),
-            "hub": ("hub", "Link IoT Hub               pending"),
-            "done": ("done", "Done → review plan"),
-        },
-    ) == "done"
-    assert "1  Outbound identity" in snapshots[0]
-    assert "2  Link IoT Hub" in snapshots[0]
-    assert "3  Done → review plan" in snapshots[0]
-    assert "Workflow  ─" not in snapshots[0]
-
-
-def test_prompt_reserves_space_for_completions_below_input(mocker):
-    session = mocker.patch.object(subject, "PromptSession")
-    subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    assert session.call_args.kwargs["reserve_space_for_menu"] == 8
-
-
-def test_plain_selection_prints_choices(mocker):
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup", plain=True, console=_console(stream)
-    )
-    mocker.patch("builtins.input", return_value="1")
-    assert renderer.select(
-        "Resources", {"one": ("one", "First")}
-    ) == "one"
-    assert "1  First" in stream.getvalue()
-
-    mocker.patch("builtins.input", side_effect=["invalid", "1"])
-    assert renderer.select(
-        "Resources", {"one": ("one", "First")}
-    ) == "one"
-    assert "Choose a listed number or name" in stream.getvalue()
-
-
-def test_plain_action_feedback_is_visible(mocker):
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup", plain=True, console=_console(stream)
-    )
-    mocker.patch(
-        "builtins.input", side_effect=["invalid", "r"]
-    )
-    assert renderer.action(
-        "Recover?", {"r": "retry", "q": "quit"}
-    ) == "r"
-    renderer.write("! resource not found")
-    renderer.busy("loading resources…")
-    output = stream.getvalue()
-    assert "[r] retry · [q] quit" in output
-    assert "Choose one of the highlighted keys" in output
-    assert "! resource not found" in output
-    assert "[working] loading resources" in output
-
-
-def test_resource_choices_hidden_until_filtering():
-    base = subject.FuzzyWordCompleter(["hub-one", "hub-two"])
-    completer = subject.InputFilteredCompleter(base)
-    assert not list(
-        completer.get_completions(
-            Document(""), CompleteEvent()
-        )
-    )
-    completions = list(
-        completer.get_completions(
-            Document("one"), CompleteEvent()
-        )
-    )
-    assert any(item.text == "hub-one" for item in completions)
-
-
-def test_picker_has_one_completion_per_resource(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    captured = {}
-
-    def prompt(*_, **kwargs):
-        captured["completer"] = kwargs["completer"]
-        captured["workspace"] = renderer._workspace().plain
-        return "adr-vnext-scale-rg-10"
-
-    mocker.patch.object(renderer, "_prompt", side_effect=prompt)
-    assert renderer.select(
-        "Resource group",
-        {
-            "one": (
-                "adr-vnext-scale-rg-10",
-                "adr-vnext-scale-rg-10 · centraluseuap",
-                "adr-vnext-scale-rg-10",
-            )
-        },
-        allow_custom=True,
-        show_options=False,
-    ) == "adr-vnext-scale-rg-10"
-    completions = list(
-        captured["completer"].get_completions(
-            Document("adr-vnext"), CompleteEvent()
-        )
-    )
-    assert len(completions) == 1
-    assert completions[0].text == (
-        "adr-vnext-scale-rg-10 · centraluseuap"
-    )
-    assert "1  adr-vnext-scale-rg-10" not in captured["workspace"]
-
-
-def test_picker_shows_search_context_and_notice(mocker):
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(stream, force_terminal=True),
-    )
-    renderer.account({
-        "subscriptionId": "sub",
-        "subscriptionName": "Production",
-    })
-    renderer.search_context("rg")
-    snapshots = []
-
-    def prompt(*_, **__):
-        snapshots.append(renderer._workspace().plain)
-        return "1"
-
-    mocker.patch.object(renderer, "_prompt", side_effect=prompt)
-    assert renderer.select(
-        "IoT Hub", {"one": ("hub", "hub")}
-    ) == "hub"
-    renderer.notice("Plan saved: plan.json")
-    assert "searched         rg · Production" in snapshots[0]
-    assert "Plan saved: plan.json" in _plain_terminal(stream)
-    renderer.search_context("rg")
-    renderer.clear_search_context()
-    assert renderer._search_context is None
-
-
-def test_picker_keybindings_do_not_traverse_history():
-    event = MagicMock()
-    buffer = event.current_buffer
-    buffer.complete_state = None
-    buffer.text = ""
-    subject.WorkflowRenderer._up_key(event)
-    subject.WorkflowRenderer._down_key(event)
-    buffer.start_completion.assert_not_called()
-    buffer.history_backward.assert_not_called()
-
-    buffer.text = "hub"
-    subject.WorkflowRenderer._up_key(event)
-    subject.WorkflowRenderer._down_key(event)
-    assert buffer.start_completion.call_count == 2
-
-    buffer.complete_state = object()
-    subject.WorkflowRenderer._up_key(event)
-    subject.WorkflowRenderer._down_key(event)
-    buffer.complete_previous.assert_called_once()
-    buffer.complete_next.assert_called_once()
-
-    subject.WorkflowRenderer._back_key(event)
-    event.app.exit.assert_called_once_with(result=":back")
-
-
-def test_validation_error_stays_with_visible_actions(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    renderer.write("! resource not found")
-    snapshots = []
-
-    def prompt(*_, **__):
-        snapshots.append(renderer._workspace().plain)
-        return "2"
-
-    mocker.patch.object(renderer, "_prompt", side_effect=prompt)
-    assert renderer.select(
-        "Next action",
-        {
-            "retry": ("retry", "Retry"),
-            "edit": ("edit", "Edit input"),
-            "quit": ("quit", "Quit"),
-        },
-    ) == "edit"
-    assert "! resource not found" in snapshots[0]
-    assert "1  Retry" in snapshots[0]
-    assert "2  Edit input" in snapshots[0]
-    assert "3  Quit" in snapshots[0]
-
-
-def test_busy_status_and_step_bar_follow_scope():
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(stream, force_terminal=True),
-    )
-    renderer.journey(
-        "Subscription",
-        "Resource group",
-        "Namespace",
-        "Configuration",
     )
     renderer.phase("Resource group")
     renderer.input_status("Subscription", "sub", "Satisfied", "Found")
@@ -670,19 +354,16 @@ def test_busy_status_and_step_bar_follow_scope():
     assert "⠋ validating resource group" in output
     history = _plain_terminal(stream)
     assert "✓ subscription      sub · Found" in history
-    assert (
-        "step 2/4  ✔ subscription ── ● resource group "
-        "── ○ namespace ── ○ configuration"
-    ) in history
-    for token in ("⠋", ":back", ":help", ":quit"):
-        offset = output.index(token)
-        assert any(
-            span.start <= offset < span.end and span.style == "active"
-            for span in workspace.spans
-        )
-    renderer.idle()
-    assert renderer._busy is None
+    assert "step " not in history and "○" not in history
+    offset = output.index("⠋")
+    assert any(
+        span.start <= offset < span.end and span.style == "active"
+        for span in workspace.spans
+    )
+    # Unattended runs have no keys to advertise.
+    assert ":back" not in output and ":quit" not in output
     renderer.close()
+    assert renderer._hold_live is None
 
 
 def test_summary_deduplicates_and_marks_staged_input():
@@ -704,67 +385,6 @@ def test_summary_deduplicates_and_marks_staged_input():
     assert "other             value · nothing written yet" in output
 
 
-def test_subphase_status_does_not_repeat_the_configuration_step():
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup", console=_console(stream, force_terminal=True),
-    )
-    renderer.journey("Subscription", "Resource group", "Namespace", "Configuration")
-    for phase in ("Configuration", "Apply", "Verify"):
-        renderer.phase(phase)
-        renderer.input_status(phase, f"{phase} complete", "Succeeded")
-        assert not renderer._phase_pending
-
-    output = _plain_terminal(stream)
-    assert output.count("step 4/4") == 1
-    for phase in ("Configuration", "Apply", "Verify"):
-        assert output.count(f"{phase} complete") == 1
-
-
-def test_subphases_map_to_real_steps():
-    setup = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    setup.journey(
-        "Subscription", "Resource group", "Namespace", "Configuration"
-    )
-    setup.phase("Apply")
-    assert setup._active_stage() == "Configuration"
-
-    check = subject.WorkflowRenderer(
-        "Namespace check",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    check.journey("Scope", "Resources", "Access", "Results")
-    check.phase("Subscription")
-    assert check._active_stage() == "Scope"
-    check.phase("Links")
-    assert check._active_stage() == "Results"
-
-
-def test_rich_prompt_hands_visible_card_to_next_prompt(mocker):
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    live_class = mocker.patch.object(subject, "Live")
-    mocker.patch.object(
-        renderer._prompt_session,
-        "prompt",
-        side_effect=["first", "second"],
-    )
-    assert renderer.prompt("First: ") == "first"
-    first_live = live_class.return_value
-    renderer.input_status("Namespace", "ns", "Satisfied", "Found")
-    first_live.stop.assert_called_once()
-
-    assert renderer.prompt("Second: ") == "second"
-    assert first_live.stop.call_count == 1
-    assert live_class.call_count == 2
-    renderer.close()
-
-
 def test_plain_renderer_close_is_noop():
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
@@ -774,46 +394,12 @@ def test_plain_renderer_close_is_noop():
     renderer.close()
 
 
-def test_renderer_cancelled_is_neutral():
-    stream = StringIO()
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(stream, force_terminal=True),
-    )
-    renderer.cancelled()
-    output = stream.getvalue()
-    assert "Namespace setup cancelled" in output
-    assert "Nothing was changed." in output
-    assert "failed" not in output
-    assert "nonzero" not in output
-
-
-def test_workspace_reset_preserves_scope():
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    renderer.input_status("Subscription", "sub", "Satisfied", "Found")
-    renderer.input_status("Resource group", "rg", "Satisfied", "Found")
-    renderer.input_status("Namespace", "ns", "Satisfied", "Found")
-    renderer.input_status("IoT Hub", "hub", "Satisfied", "Found")
-    renderer._tasks.append({"state": "Succeeded", "target": "task"})
-    renderer._body.append("old")
-
-    renderer.reset_setup()
-
-    assert not renderer._tasks
-    assert not renderer._body
-    assert renderer._phase == "Configuration"
-
-
 def test_workspace_plan_is_bounded():
     stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
         console=_console(stream, force_terminal=True),
     )
-    renderer.journey("Review", "Apply")
     renderer.phase("Review")
     plan = {
         "summary": {"Planned": 10},
@@ -944,55 +530,56 @@ def test_failure_includes_step_elapsed_and_response_status():
     assert "status        429" in output
 
 
-def test_recovery_and_active_workspace_variants(mocker):
+def test_active_workspace_variants():
     renderer = subject.WorkflowRenderer(
         "Namespace setup",
         console=_console(StringIO(), force_terminal=True),
     )
-    action = mocker.patch.object(renderer, "action", return_value="c")
-    assert renderer.recovery(can_continue=True) == "c"
-    assert "c" in action.call_args.args[1]
-    assert renderer.failure is None
-
     renderer._tasks[:] = [{"target": "task"}]
     renderer._execution_started = subject.time.monotonic()
     renderer._execution_total = 2
     renderer._execution_completed = 1
-    renderer._body[:] = ["body", "second"]
     renderer._busy = "busy"
-    renderer._alert = "! alert"
     output = renderer._workspace().plain
-    assert "Applying  1/2" in output
-    assert "body\nsecond" in output
-    assert "⠋ busy" in output
-    assert "! alert" in output
+    assert output.startswith("Applying  1/2 · ")
+    assert "⠋ task\n\n⠋ busy" in output
 
 
-def test_check_trust_and_phase_fallbacks():
+def test_repeated_busy_updates_one_transient_line_and_quiet_details():
+    stream = StringIO()
+    renderer = subject.WorkflowRenderer("Namespace setup", console=_console(stream, force_terminal=True))
+    renderer.busy("reading DPS…")
+    live = renderer._hold_live
+    renderer.busy("reading IoT Hub…")
+    assert renderer._hold_live is live and "⠋ reading IoT Hub…" in renderer._workspace().plain
+    renderer.close()
+    renderer.account({"subscriptionId": "sub"})  # no user name: nothing to show
+    renderer.receipt({"namespace": "ns", "state": "Succeeded", "items": [
+        {"state": "Manual", "action": "assign", "target": "role"}]})
+    output = _plain_terminal(stream)
+    assert "✓ account" not in output and "Manual: Assign role\nResume:" in output
+
+
+def test_check_reports_access_without_setup_approval_language():
     stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace check",
         console=_console(stream, force_terminal=True),
     )
-    renderer.trust({
+    report = {
+        "state": "Warning",
         "items": [{
             "state": "Manual",
             "action": "grant",
             "target": "/scope",
             "details": {"role": "Contributor"},
         }],
-    })
+    }
+    renderer.receipt(report)
     output = _plain_terminal(stream)
-    assert "resolved at apply" in output
+    assert "resolved at apply" not in output
+    assert "0 writes" in output
     assert "Contributor" in output
-
-    renderer.journey("Scope", "Results")
-    renderer.phase("Namespace")
-    assert renderer._active_stage() == "Scope"
-    renderer.phase("Links")
-    assert renderer._active_stage() == "Results"
-    renderer.phase("Other")
-    assert renderer._active_stage() == "Scope"
 
 
 def test_execution_exit_stops_active_live():
@@ -1038,7 +625,7 @@ def test_execution_records_explicit_failure_scope():
             lambda: (_ for _ in ()).throw(RuntimeError("failed")),
             workflow_scope="software-updates",
         )
-    assert renderer.failure["scope"] == "software-updates"
+    assert renderer._failure["scope"] == "software-updates"
 
 
 @pytest.mark.parametrize("rich", [False, True])
@@ -1070,46 +657,12 @@ def test_execution_suppresses_expected_branch_failure(mocker, rich):
         assert execution.live is None
         assert not renderer._tasks
         assert renderer._execution_completed == 0
-    assert renderer.failure is None
-    assert not renderer.mutated_scopes
+    assert renderer._failure is None
     assert subject.provider_console.quiet is original_quiet
     handled_error.assert_called_once_with(error)
     for stop in stops:
         stop.assert_called_once_with()
     assert "failed" not in _plain_terminal(stream).lower()
-
-
-def test_execution_tracks_successful_mutated_scopes():
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        plain=True,
-        console=_console(StringIO()),
-    )
-    execution = subject.WorkflowExecution(renderer)
-    execution.run(
-        "Create role",
-        lambda: None,
-        workflow_scope="software-updates",
-        mutation=True,
-    )
-    assert renderer.mutated_scopes == frozenset(
-        {"software-updates"}
-    )
-
-
-def test_workspace_confirmation_replaces_ephemeral_body():
-    renderer = subject.WorkflowRenderer(
-        "Namespace setup",
-        console=_console(StringIO(), force_terminal=True),
-    )
-    renderer.write("old input")
-    renderer.confirmation(_plan())
-    renderer.write("invalid answer")
-    renderer.confirmation(_plan())
-    assert renderer._body == [
-        "3 change(s) · Atomic link commands own service role validation and creation.",
-        "Successful operations are preserved if a later step fails.",
-    ]
 
 
 @pytest.mark.parametrize(
@@ -1184,23 +737,19 @@ def test_workspace_plan_details_and_empty_sections():
     assert "principal" in content.plain
 
     renderer = subject.WorkflowRenderer(
-        "Namespace check",
+        "Namespace setup",
         console=_console(StringIO(), force_terminal=True),
     )
-    renderer.validation({"items": []})
-    renderer.trust({"items": []})
-
     renderer.account({
         "subscriptionId": "sub",
         "userName": "user@example.com",
         "tenantId": "tenant",
     })
-    renderer.journey("One", "Two")
     renderer.phase("Unknown")
     output = _plain_terminal(renderer.console.file)
-    assert "account" in output
-    assert "user@example.com · tenant" in output
-    assert "account" in output
+    assert "user@example.com" in output
+    assert renderer._account["subscriptionId"] == "sub"
+    assert renderer._account["tenantId"] == "tenant"
 
 
 def test_manual_receipt_includes_rbac_and_resume():
@@ -1247,7 +796,7 @@ def test_receipts_render_check_and_link_details():
             "message": "ready",
         }],
     })
-    assert "namespace: ready" in check_stream.getvalue()
+    assert "namespace · ready" in _plain_terminal(check_stream)
 
     setup_stream = StringIO()
     setup = subject.WorkflowRenderer(
@@ -1295,7 +844,7 @@ def test_receipts_render_check_and_link_details():
     assert "Receipt write failed: secondary write failed" in error_output
 
 
-def test_plain_account_and_role_confirmation():
+def test_plain_account_summary():
     stream = StringIO()
     renderer = subject.WorkflowRenderer(
         "Namespace setup", plain=True, console=_console(stream)
@@ -1304,17 +853,9 @@ def test_plain_account_and_role_confirmation():
         "userName": "user@example.com",
         "tenantId": "tenant",
     })
-    renderer.confirmation({
-        "summary": {"Planned": 1},
-        "items": [{
-            "action": "grant",
-            "state": "Planned",
-        }],
-    })
     output = stream.getvalue()
     assert "account" in output
     assert "user@example.com · tenant" in output
-    assert "1 missing role assignment(s) will be created" in output
 
 
 def test_renderer_creates_default_console():

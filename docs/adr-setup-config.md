@@ -2,10 +2,12 @@
 
 Setup accepts **one namespace per configuration**. Use a JSON object string, a
 JSON file path, or `@path`. Legacy `.yaml` / `.yml` files remain supported.
-Configuration is validated before setup plans or writes resources. Interactive
-setup can review and edit it; automation uses the same engine without prompts.
+Configuration is validated before setup plans or writes resources. In a
+terminal, valid configuration goes straight to plan review and approval;
+automation uses the same engine without prompts.
 
-For interactive navigation and review, see the [ADR setup UI guide](adr-setup-ui.md).
+For the guided prompts, approval and change routes, see the
+[ADR setup guide](adr-setup-ui.md).
 
 ```sh
 az iot adr ns setup --subscription 00000000-0000-0000-0000-000000000000 \
@@ -104,8 +106,9 @@ All keys are case-sensitive. Unknown keys are errors at every level.
 - `subscriptionId`, if present, must be a subscription UUID matching the selected
   CLI subscription. Use `--subscription` explicitly to select it. Setup never
   runs `az account set` or changes the global account.
-- Namespace `name` and `resourceGroup` may be omitted while editing a partial
-  interactive configuration. Both are required by the noninteractive builder.
+- Namespace `name` and `resourceGroup` may be omitted from a configuration used
+  in a terminal; guided setup asks only for the missing ones. Both are required
+  without prompts (`--yes`, `--no-input`, or no terminal).
 - Tags are an object with string keys and values. Empty tag values are allowed.
 - An endpoint requires exactly one target selector and an explicit identity.
   `resourceName` defaults to the namespace resource group and selected
@@ -207,21 +210,16 @@ resources. Review the refreshed plan before confirming again.
 
 `configuration.load_config(value)` accepts a dictionary, JSON object string, or
 path and returns a validated detached dictionary. `{"namespace": {}}` is valid
-for an unfinished interactive form.
+for a guided setup that still has to ask for the namespace.
 
-`configuration.request_config(request)` exports a legacy `SetupRequest` to the
-same schema for deterministic TUI prefill. UI-only skipped rows have no desired
-resource effect and are not exported. The final form calls:
+`configuration.request_config(request)` exports a `SetupRequest` to the same
+schema; guided setup uses it to turn explicit arguments into configuration.
+Skipped guided answers have no desired resource effect and are not exported.
+Guided setup composes one complete configuration and builds the request with
+the same strict, prompt-free builder used by automation:
 
 ```python
-request = build_setup_request(
-    namespace_name=None,
-    resource_group_name=None,
-    subscription_id=selected_subscription,
-    config=configuration,
-    interactive=False,
-    no_input=True,
-)
+request = build_setup_request(None, None, selected_subscription, config=configuration)
 ```
 
 Compute a fresh plan and compare it with the confirmed plan before apply.
