@@ -152,7 +152,7 @@ class DetailScreen(ChromeScreen):
     def on_resize(self, _event) -> None:
         if not (self.spec and self.spec.children):
             return
-        current = [[c.id for c in row.children] for row in self.query(".link-row")]
+        current = [[c.id for c in row.children] for row in self.query(".link-row").results()]
         wanted = [[f"child-{c.kind}" for c in line] for line in self._link_lines(self._links_width())]
         if current != wanted:
             self.call_after_refresh(self._rebuild_links)

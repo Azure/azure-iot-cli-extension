@@ -184,7 +184,7 @@ class ChromeScreen(Screen):
 
     def focus_first_control(self) -> None:
         """Start on the page's first visible control (never a header control), if it has one."""
-        for control in self.query("#title-row Clickable, #content Clickable"):
+        for control in self.query("#title-row Clickable, #content Clickable").results():
             if control.can_focus and control.display:
                 control.focus()
                 return

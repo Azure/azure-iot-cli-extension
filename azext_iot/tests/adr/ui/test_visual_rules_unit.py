@@ -300,8 +300,11 @@ def _detail_spec(**overrides):
         Column("state", "STATE", lambda p: p["properties"]["provisioningState"], style=lambda p: 1 / 0),
         Column("broken", "BROKEN", lambda p: p["missing"]["deep"]),
     )
-    options = dict(children=children, columns=columns,
-                   guide=Guide(about="x", runs="az iot adr ns widget list --ns <namespace> -g <resource-group> \u00b7 read"))
+    options = {
+        "children": children,
+        "columns": columns,
+        "guide": Guide(about="x", runs="az iot adr ns widget list --ns <namespace> -g <resource-group> \u00b7 read"),
+    }
     options.update(overrides)
     return widget_spec(**options)
 
@@ -466,7 +469,7 @@ def test_small_helpers():
     screen.query_one.return_value = same
     fit_dialog_list(screen, "#x")
     assert "Diff(added=0" in repr(Diff())
-    assert Registry().aliases() == {}
+    assert not Registry().aliases()
     diagnostics.exception("visual rules %s", "ok")
     model = TableModel(widget_spec())
     for state, expected in ((LoadState.NEVER_LOADED, "Loading"), (LoadState.LOADING, "Loading"),

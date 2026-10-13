@@ -131,7 +131,7 @@ class OperationsScreen(ChromeScreen):
         self.set_interval(1, self._paint)
 
     def _paint(self):
-        for row in self.query(OperationRow):
+        for row in self.query(OperationRow).results():
             if row.index < len(self._operations):
                 row.show(self._operations[row.index], row.index == self._selected)
         self.refresh_title()
