@@ -93,6 +93,20 @@ def _etag_arguments(etag=None):
     return {"match_condition": MatchConditions.IfPresent}
 
 
+def _get_device_type_refs(device_type_ref=None, remove_device_type_ref=None):
+    if device_type_ref is not None and remove_device_type_ref:
+        raise MutuallyExclusiveArgumentError(
+            "--device-type-ref and --remove-device-type-ref cannot be used together."
+        )
+    if device_type_ref == "":
+        raise InvalidArgumentValueError("--device-type-ref cannot be empty.")
+    if device_type_ref is not None:
+        return [device_type_ref]
+    if remove_device_type_ref:
+        return []
+    return None
+
+
 def _execute_dps_query(query_method, query_args, top=None):
     """Execute a modeless DPS query while following continuation headers."""
     if top is not None and (isinstance(top, bool) or not isinstance(top, int) or top < 0):
@@ -252,6 +266,7 @@ def iot_dps_device_enrollment_create(
     edge_enabled=False,
     webhook_url=None,
     device_information=None,
+    device_type_ref=None,
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
@@ -260,6 +275,7 @@ def iot_dps_device_enrollment_create(
     login=None,
     auth_type_dataplane=None,
 ):
+    device_type_refs = _get_device_type_refs(device_type_ref)
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
         dps_name,
@@ -318,6 +334,7 @@ def iot_dps_device_enrollment_create(
             "iotHubs": iot_hub_list,
             "customAllocationDefinition": custom_allocation_definition,
             "optionalDeviceInformation": _get_twin_collection(device_information),
+            "deviceTypeRefs": device_type_refs,
             **_validate_adr_certificate_reference(
                 adr_namespace,
                 adr_ca_name,
@@ -355,6 +372,8 @@ def iot_dps_device_enrollment_update(
     edge_enabled=None,
     webhook_url=None,
     device_information=None,
+    device_type_ref=None,
+    remove_device_type_ref=None,
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
@@ -363,6 +382,7 @@ def iot_dps_device_enrollment_update(
     login=None,
     auth_type_dataplane=None,
 ):
+    device_type_refs = _get_device_type_refs(device_type_ref, remove_device_type_ref)
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
         dps_name,
@@ -449,6 +469,8 @@ def iot_dps_device_enrollment_update(
             enrollment_record["capabilities"] = {"iotEdge": edge_enabled}
         if device_information:
             enrollment_record["optionalDeviceInformation"] = _get_twin_collection(device_information)
+        if device_type_refs is not None:
+            enrollment_record["deviceTypeRefs"] = device_type_refs
 
         reference_supplied = any(
             value is not None
@@ -604,6 +626,7 @@ def iot_dps_device_enrollment_group_create(
     iot_hubs=None,
     edge_enabled=False,
     webhook_url=None,
+    device_type_ref=None,
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
@@ -613,6 +636,7 @@ def iot_dps_device_enrollment_group_create(
     auth_type_dataplane=None,
     show_keys=False,
 ):
+    device_type_refs = _get_device_type_refs(device_type_ref)
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
         dps_name,
@@ -672,6 +696,7 @@ def iot_dps_device_enrollment_group_create(
             "allocationPolicy": allocation_policy,
             "iotHubs": iot_hub_list,
             "customAllocationDefinition": custom_allocation_definition,
+            "deviceTypeRefs": device_type_refs,
             **_validate_adr_certificate_reference(
                 adr_namespace,
                 adr_ca_name,
@@ -709,6 +734,8 @@ def iot_dps_device_enrollment_group_update(
     iot_hubs=None,
     edge_enabled=None,
     webhook_url=None,
+    device_type_ref=None,
+    remove_device_type_ref=None,
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
@@ -718,6 +745,7 @@ def iot_dps_device_enrollment_group_update(
     auth_type_dataplane=None,
     show_keys=False,
 ):
+    device_type_refs = _get_device_type_refs(device_type_ref, remove_device_type_ref)
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
         dps_name,
@@ -826,6 +854,8 @@ def iot_dps_device_enrollment_group_update(
             }
         if edge_enabled is not None:
             enrollment_record["capabilities"] = {"iotEdge": edge_enabled}
+        if device_type_refs is not None:
+            enrollment_record["deviceTypeRefs"] = device_type_refs
         if any(
             value is not None
             for value in (
