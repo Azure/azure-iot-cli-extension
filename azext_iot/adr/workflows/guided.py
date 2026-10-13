@@ -723,7 +723,7 @@ class TerminalReplies:
 
 def _apply_settings(descriptor, settings):
     """Set the terminal's input settings now; a terminal that has gone away (EIO) has none left to set."""
-    import termios
+    import termios  # pylint: disable=import-error  # Called only after the POSIX probe imports it.
 
     try:
         termios.tcsetattr(descriptor, termios.TCSANOW, settings)
@@ -734,7 +734,7 @@ def _apply_settings(descriptor, settings):
 
 def _quiet(settings) -> list:
     """Terminal settings for reading answers: no echo, no line editing, and reads that never wait."""
-    import termios
+    import termios  # pylint: disable=import-error  # Called only after the POSIX probe imports it.
 
     quiet = list(settings)
     quiet[3] &= ~(termios.ICANON | termios.ECHO)

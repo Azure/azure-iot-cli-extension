@@ -387,7 +387,8 @@ def test_no_echo_only_touches_real_terminals():
         with guided.no_echo(StringIO()):
             pass
     termios = pytest.importorskip("termios")
-    leader, follower = os.openpty()
+    pty = pytest.importorskip("pty")
+    leader, follower = pty.openpty()
     try:
         stream = os.fdopen(follower, "r", closefd=False)
         with guided.no_echo(stream):
@@ -3740,8 +3741,30 @@ def pty_pair():
     os.close(master)
 
 
+def _assert_terminal_settings(actual, expected, termios):
+    # BSD sets PENDIN when restoring canonical input; it is pending-input state, not a saved setting.
+    actual, expected = list(actual), list(expected)
+    pending = getattr(termios, "PENDIN", 0)
+    actual[3] &= ~pending
+    expected[3] &= ~pending
+    assert actual == expected
+
+
+@pytest.mark.parametrize("pending", [0x4000, 0x20000000])
+def test_terminal_restoration_ignores_only_pending_input_state(pending):
+    termios = MagicMock(PENDIN=pending)
+    before = [1, 2, 3, 8, 9600, 9600, [b"\x03"]]
+    after = deepcopy(before)
+    after[3] |= pending
+    _assert_terminal_settings(after, before, termios)
+    assert before[3] == 8 and after[3] == 8 | pending
+    after[3] &= ~8
+    with pytest.raises(AssertionError):
+        _assert_terminal_settings(after, before, termios)
+
+
 def test_probe_reads_the_answer_without_echo_and_keeps_what_was_typed(pty_pair):
-    import termios
+    termios = pytest.importorskip("termios")
 
     master, stdin = pty_pair
     before = termios.tcgetattr(stdin.fileno())
@@ -3753,14 +3776,17 @@ def test_probe_reads_the_answer_without_echo_and_keeps_what_was_typed(pty_pair):
 
     replies, typed = guided.probe_background(stdin, terminal, timeout=2)
     assert written == [guided.BACKGROUND_QUERY] and typed == "adr" and replies.background == "#1e1e1e"
-    assert not replies.outstanding and replies.terminal is None and termios.tcgetattr(stdin.fileno()) == before
+    assert not replies.outstanding and replies.terminal is None
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
     replies, typed = guided.probe_background(stdin, lambda text: os.write(master, UNSUPPORTED_REPLY.encode()))
-    assert replies.background is None and typed == "" and termios.tcgetattr(stdin.fileno()) == before
+    assert replies.background is None and typed == ""
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
 
 
 def test_a_silent_terminal_costs_the_bounded_wait_and_echo_waits_for_the_late_answer(pty_pair):
     import select
-    import termios
+
+    termios = pytest.importorskip("termios")
 
     master, stdin = pty_pair
     before = termios.tcgetattr(stdin.fileno())
@@ -3772,7 +3798,8 @@ def test_a_silent_terminal_costs_the_bounded_wait_and_echo_waits_for_the_late_an
     assert replies.terminal == (stdin.fileno(), before)
     os.write(master, b"zz\n")  # typed after the last prompt, still unread when setup ends
     replies.close()
-    assert termios.tcgetattr(stdin.fileno()) == before and replies.terminal is None
+    assert replies.terminal is None
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
     assert select.select([stdin], [], [], 1)[0] and os.read(stdin.fileno(), 64) == b"zz\n"  # left for the shell
     replies.close()  # once only
 
@@ -3781,7 +3808,7 @@ def test_a_silent_terminal_costs_the_bounded_wait_and_echo_waits_for_the_late_an
     assert replies.background == "#1e1e1e" and replies.outstanding == {"da1"}  # its DA1 may still come
     replies.outstanding.clear()  # it came during the prompts
     replies.close()
-    assert termios.tcgetattr(stdin.fileno()) == before
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
     with open(guided.__file__, encoding="utf-8") as source:
         assert "TIOCSTI" not in source.read()
 
@@ -4012,7 +4039,7 @@ def test_the_prompt_passes_the_focus_inks_with_its_wash(monkeypatch):
 
 
 def test_a_terminal_that_hangs_up_ends_the_probe_and_other_read_errors_surface(pty_pair, monkeypatch):
-    import termios
+    termios = pytest.importorskip("termios")
 
     master, stdin = pty_pair
     before = termios.tcgetattr(stdin.fileno())
@@ -4021,16 +4048,17 @@ def test_a_terminal_that_hangs_up_ends_the_probe_and_other_read_errors_surface(p
     replies, typed = guided.probe_background(stdin, lambda text: None, timeout=1)
     assert typed == "" and replies.outstanding  # stopped at once, nothing guessed
     replies.close()
-    assert termios.tcgetattr(stdin.fileno()) == before
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
     monkeypatch.setattr(guided.os, "read", MagicMock(side_effect=OSError(errno.EBADF, "EBADF")))
     with pytest.raises(OSError, match="EBADF"):
         guided.probe_background(stdin, lambda text: None, timeout=1)
-    assert termios.tcgetattr(stdin.fileno()) == before  # restored on the way out
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)  # restored on the way out
 
 
 def test_every_way_out_of_the_probe_but_an_answer_restores_the_terminal_at_once(pty_pair, monkeypatch):
     import select
-    import termios
+
+    termios = pytest.importorskip("termios")
 
     master, stdin = pty_pair
     before = termios.tcgetattr(stdin.fileno())
@@ -4040,7 +4068,7 @@ def test_every_way_out_of_the_probe_but_an_answer_restores_the_terminal_at_once(
 
     with pytest.raises(OSError, match="query not written"):  # the query never reached the terminal
         guided.probe_background(stdin, broken, timeout=1)
-    assert termios.tcgetattr(stdin.fileno()) == before
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
 
     waiting = MagicMock(side_effect=KeyboardInterrupt)
     monkeypatch.setattr(select, "select", waiting)
@@ -4048,7 +4076,8 @@ def test_every_way_out_of_the_probe_but_an_answer_restores_the_terminal_at_once(
         guided.probe_background(stdin, lambda text: None, timeout=1)
     waiting.side_effect = None
     monkeypatch.undo()
-    assert waiting.call_count == 1 and termios.tcgetattr(stdin.fileno()) == before
+    assert waiting.call_count == 1
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
 
     monkeypatch.setattr(guided.os, "read", MagicMock(side_effect=KeyboardInterrupt))
     os.write(master, b"x")
@@ -4056,7 +4085,7 @@ def test_every_way_out_of_the_probe_but_an_answer_restores_the_terminal_at_once(
         guided.probe_background(stdin, lambda text: None, timeout=1)
     guided.os.read.side_effect = None
     monkeypatch.undo()
-    assert termios.tcgetattr(stdin.fileno()) == before
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
 
     applied, real = [], termios.tcsetattr
 
@@ -4070,7 +4099,9 @@ def test_every_way_out_of_the_probe_but_an_answer_restores_the_terminal_at_once(
     with pytest.raises(termios.error, match="refused"):
         guided.probe_background(stdin, lambda text: None, timeout=0.05)
     monkeypatch.undo()
-    assert len(applied) == 3 and applied[-1] == before and termios.tcgetattr(stdin.fileno()) == before
+    assert len(applied) == 3
+    _assert_terminal_settings(applied[-1], before, termios)
+    _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
 
 
 def test_a_failing_probe_or_prompter_still_releases_the_terminal(mocker):
