@@ -311,7 +311,7 @@ def test_labels_and_links():
         {"endpoint": "a", "resource": "a", "state": ""},
         {"endpoint": "b", "resource": "hub-b", "state": "Linked"},
     ]
-    assert guided.linked_endpoints(None, "dps") == []
+    assert not guided.linked_endpoints(None, "dps")
 
 
 def test_plan_rows_order_tags_and_roles():
@@ -554,7 +554,7 @@ def test_list_fragments_are_bounded_and_marked():
     wide = "".join(fragment for _, fragment in guided.list_fragments(guided.Picker(
         [guided.Row("a", "a", "d" * 200, "NEW")]), 60))
     assert wide.endswith("…") and "NEW" in wide and "\n" not in wide
-    assert guided.list_fragments(guided.Picker([], text="x"), 80) == []
+    assert not guided.list_fragments(guided.Picker([], text="x"), 80)
     choices = [guided.Row(f"c{index}", f"choice {index}") for index in range(16)]
     shown = "".join(fragment for _, fragment in guided.list_fragments(guided.Picker(choices, filterable=False), 80))
     assert shown.count("choice") == guided.CHOICE_ROWS and shown.endswith("1–14 of 16 · ↑↓ for more")
@@ -1495,7 +1495,7 @@ def test_transcript_fits_common_terminal_sizes(mocker, width):
     namespace = "n" * 63
     engine = Engine(NEW_PLAN)
     prompter = Scripted(long_rg, namespace, "new", "S1", True, True, KeyboardInterrupt())
-    _, text, raw, _ = run(fake, prompter, engine, mocker, width=width)
+    _, text, _, _ = run(fake, prompter, engine, mocker, width=width)
     assert all(cell_len(line) <= min(width, guided.MAX_WIDTH) for line in text.splitlines())
     joined = text.replace("\n" + " " * 23, "")
     assert ("n" * 46 + "-hub") in joined and ("n" * 59 + "-dps") in joined and long_rg in joined
@@ -1706,7 +1706,7 @@ def test_explicit_mode_identity_change_is_planned_and_saved(mocker, tmp_path):
     arguments = {"dps": ["resource-name=my-dps", "create-if-missing=true", "identity=system-assigned"],
                  "location": "westus2", "tags": {"env": "dev"}}
     prompter = Scripted("rg-demo", "adr-demo", Back, "identity", UAMI_ID, "save", str(target), "back", Back, "quit")
-    result, text, _, _ = run(fake, prompter, engine, mocker, arguments=arguments)
+    result, _, _, _ = run(fake, prompter, engine, mocker, arguments=arguments)
     assert result is None
     assert prompter.labels[2:] == ["Approve:", "Change:", "Outbound identity:", "Change:", "Save to:",
                                    "Change:", "Approve:", "Change:"]  # the edit and Save both stay in Change
@@ -2689,7 +2689,9 @@ def test_picker_focuses_the_first_row_only_for_an_empty_field():
     ("", DPS_ID),  # nothing chosen yet: Enter takes the focused first row
 ])
 def test_terminal_picker_enter_keeps_a_default_outside_the_list(default, expected):
-    caption = lambda shown, total, query: f"{total} DPS in rg-demo · type to filter, or a resource ID"  # noqa: E731
+    def caption(_shown, total, _query):
+        return f"{total} DPS in rg-demo · type to filter, or a resource ID"
+
     assert _terminal("\r", "ask", "DPS:", DPS_ROWS, default=default, caption=caption, focus_first=True) == expected
 
 
@@ -3168,7 +3170,7 @@ def test_enter_commits_the_marks_and_never_drops_or_adds_a_pending_hub(monkeypat
     """Empty field, or a search that only filters: Enter commits exactly the marks, wherever the pointer is. A Hub
     itself in the field (typed in full, or a name or ID matching no row, e.g. corrected after a failed check) is
     neither dropped nor added unasked: Enter explains and Space adds it."""
-    many = dict(limit=10, marked=["/id/plant-0"])
+    many = {"limit": 10, "marked": ["/id/plant-0"]}
     # The ordinary filtered multi-select: the search stays a search, not an unmarked Hub.
     assert _terminal("plant-2 plant-\r", "ask_many", "IoT Hubs:", PLANTS, limit=10) == ["/id/plant-2"]
     assert _terminal("plant-0\r", "ask_many", "IoT Hubs:", PLANTS, **many) == ["/id/plant-0"]  # marked already
@@ -3684,23 +3686,27 @@ def test_prompts_never_take_a_late_answer_as_keys_and_esc_still_goes_back(monkey
     replies = guided.TerminalReplies()
     with create_pipe_input() as pipe:
         prompter = guided.TerminalPrompter(StringIO(), input=pipe, output=DummyOutput(), replies=replies)
+        assert prompter._input() is pipe  # Windows pipe inputs parse on send, not on read.
         pipe.send_text("adr-\x1b]11;rgb:1e1e/")  # the colour answer arrives late, split across reads
         timer = threading.Timer(0.4, pipe.send_text, ["1e1e/1e1e\x1b\\demo\r"])
         timer.start()
-        assert prompter.ask("Namespace:", ()) == "adr-demo"  # never part of the name, never Back
-        timer.join()
+        try:
+            assert prompter.ask("Namespace:", ()) == "adr-demo"  # never part of the name, never Back
+        finally:
+            timer.join()
         assert apps[0].ttimeoutlen == guided.LATE_ESCAPE and replies.outstanding == {"da1"}
         pipe.send_text("\x1b")
         with pytest.raises(BackRequested):  # the user's own Esc still means Back while an answer is due
             prompter.ask("Namespace:", ())
         pipe.send_text("\x1b[?62;22c\x1b[Bn\r")  # DA1 late, then the user's arrow key and text
+        escape_timeout = guided.LATE_ESCAPE if replies.outstanding else 0.05
         assert prompter.confirm("CMS:", default=True) is False
-        assert not replies.outstanding and apps[-1].ttimeoutlen == guided.LATE_ESCAPE
+        assert not replies.outstanding and apps[-1].ttimeoutlen == escape_timeout
         pipe.send_text("ok\r")
         assert prompter.ask("Name:", ()) == "ok" and apps[-1].ttimeoutlen == 0.05  # nothing due: the usual wait
         parser = pipe.vt100_parser
         replies.attach(pipe)
-        assert parser.adr_replies is replies  # attached once per input, never wrapped twice
+        assert getattr(parser, "adr_replies") is replies  # attached once per input, never wrapped twice
     guided.TerminalReplies().attach(object())  # an input without a vt100 parser is left as it is
 
 
@@ -3960,7 +3966,7 @@ def test_focus_wash_settles_once_after_a_move_and_only_with_motion(monkeypatch):
 def test_focused_text_on_the_wash_is_native_or_legibly_coloured():
     from prompt_toolkit.styles import Style as PromptStyle
 
-    assert guided.focus_inks(None) == {}
+    assert not guided.focus_inks(None)
     for background in ("#1e1e1e", "#ffffff", "#282c34", "#fdf6e3"):
         tints = guided.surface_tints(background, "truecolor")
         inks = guided.focus_inks(tints)
@@ -3969,7 +3975,7 @@ def test_focused_text_on_the_wash_is_native_or_legibly_coloured():
         focus = "bg:" + tints.focus
         fragments = guided.list_fragments(picker, 80, marked={"a"}, focus=focus, inks=inks)
         style = PromptStyle.from_dict(guided.prompt_style("truecolor"))
-        first = "".join(text for _, text in fragments).split("\n")[0]
+        first = "".join(text for _, text in fragments).split("\n", maxsplit=1)[0]
         focused = [(fragment, text) for fragment, text in fragments if focus in fragment and text.strip()]
         assert "".join(text for _, text in focused).split() == first.split()  # the whole focused row is washed
         for fragment, text in focused:

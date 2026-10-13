@@ -1485,14 +1485,16 @@ class TerminalPrompter:
         if not text and picker.index < 0 and rows:
             picker.index = 0  # a choice list always has a focused row, even without (or with a stale) default
         state = {"error": error}
-        limit, marked = multi if multi else (0, None)
+        limit, marked = multi if multi else (0, [])
         if caption and multi:
             # The caption also counts the marked rows; its height allows for the longest count.
             base = caption
 
-            def caption(shown, total, query, most=False):
+            def counted_caption(shown, total, query, most=False):
                 count = limit if most else len(marked)
                 return base(shown, total, query) + (f" · {count} selected" if count else "")
+
+            caption = counted_caption
         buffer = Buffer(document=Document(initial, len(initial)), multiline=False)
 
         def changed(_buffer):
@@ -1666,7 +1668,7 @@ class TerminalPrompter:
         if rows or multi or action:  # typed values a multi-select marks join its list
             # Hidden while filtering leaves no match: an empty list must not leave a blank row under the question.
             def listing():
-                return list_fragments(picker, columns(), captioned=bool(caption), marked=marked, focus=wash(),
+                return list_fragments(picker, columns(), captioned=bool(caption), marked=marked if multi else None, focus=wash(),
                                       inks=inks)
 
             parts.append(ConditionalContainer(block(listing, hang=INDENT + MARK + 2),
@@ -2833,7 +2835,7 @@ class GuidedSetup:
             if not count:
                 return f"No {label} to choose {scope}{notes} · type a name, or any resource ID"
             if query and not shown:
-                return f"No {label} {scope.split(' · ')[0]} matches · enter checks what you typed"
+                return f"No {label} {scope.split(' · ', maxsplit=1)[0]} matches · enter checks what you typed"
             if query:  # ``total``: every row searched, with marks carried from another subscription or typed
                 return f"{shown} of {total} match"
             return f"{count} {label if count == 1 else plural} {scope}{notes} · type to filter, or a resource ID"
