@@ -7,8 +7,8 @@ command. Accepted answers form one aligned block of `Label:  value` lines, the
 answer or review the plan (see [One workspace](#one-workspace)). There is no
 alternate screen, full-screen frame, or mouse capture, so native text
 selection, copying and scrolling keep working. Foreground and background are
-the terminal's own. The only exceptions are two faint washes of that same
-background, behind the focused list row and the plan under approval, and only
+the terminal's own. The only exceptions are a faint focused-row wash and the
+static Mist surface behind the plan under approval, and only
 when the terminal reports its background color (see
 [Motion and color](#motion-and-color)).
 
@@ -44,23 +44,29 @@ While you answer, the same block shows your answers (`✓ DPS:`, `✓ IoT Hub:`,
 `✓ Software updates:`, `✓ CMS:`) under the scope rows. When the plan is read,
 those rows are replaced by the plan in the same place.
 
-Only the plan under approval sits on a **surface**: a faint, flat wash of the
-terminal's own background, a breath lighter on a dark theme or darker on a
-light one, leaning slightly toward the azure accent. There is no border,
-stroke or shadow. The `▄` and `▀` rows above are half-height edges of that
-same wash, which give the plan half a row of air above and below. They are
-drawn in the wash color, so on screen they read as part of the surface, not
-as a frame. The surface stops one column short of the terminal's width, and
+Only the plan under approval sits on **Mist**: a static frosted-glass
+approximation with soft pockets of teal, azure, violet and rose in a cool
+slate tint. The field is blended with the terminal's actual background,
+blurred once and cached; nothing animates while you read. It is ordinary
+opaque terminal color, not real transparency or a change to your terminal's
+blur settings. There is no border, stroke or shadow. The `▄` and `▀` rows
+above are feathered half-height edges, giving the plan half a row of air
+above and below. They read as part of the surface, not as a frame.
+Content remains capped at 88 columns. The surface stops one column short of that width, and
 rows inside it wrap one column earlier, so the wash never touches the last
 column. Colored text on the surface is adjusted to keep at least 4.5:1
-contrast with it (see [Motion and color](#motion-and-color)). When
+contrast with every background behind text. Secondary details use readable
+quiet ink rather than dimming. Values remain bold in the terminal's native
+foreground, whose contrast is preserved as described below. When
 **Change:** opens, the surface disappears with the plan, and it returns with
 the next plan.
 
 When the terminal doesn't report its background color, or with `NO_COLOR`,
 `--plain` or 16 colors, nothing is painted. The plan heading then stands
 between blank rows on the terminal's own background, exactly as in the sample
-without its `▄` and `▀` rows.
+without its `▄` and `▀` rows. If only the background is reported, setup keeps
+the previous faint flat wash instead of guessing the foreground. At 256
+colors Mist becomes one quiet background entry with feathered edges.
 
 Labels end with a colon, share one column and are drawn in the accent color.
 Values are bold in the terminal's normal foreground, so a label never reads as
@@ -536,12 +542,13 @@ dark terminal. It picks the palette from the color depth the terminal reports:
   entries keep at least 3:1 contrast on the same backgrounds, and no 24-bit
   codes are sent.
 
-### The terminal's background
+### The terminal's colors
 
 The two washes (the focused list row and the plan surface) are drawn only when
 setup knows the background. Before its first line, an interactive run asks the
-terminal once, with the standard background-color query (OSC 11) followed by a
-device-attributes query (DA1), which every terminal answers, in order:
+terminal once, with foreground (OSC 10) and background (OSC 11) color queries
+followed by a device-attributes query (DA1). Replies share the same bounded
+wait and input filter:
 
 - It asks only when stdin and stderr are the same terminal, colors are on
   (no `NO_COLOR`, `--plain` or `TERM=dumb`), the depth is 256 or 24-bit, and the
@@ -568,17 +575,22 @@ device-attributes query (DA1), which every terminal answers, in order:
   the focus is the pointer and bold, and the plan stands on the terminal's own
   background.
 
-From the reported color, setup derives the washes: the surface is lifted
-toward white on a dark background (6%) or lowered toward black on a light one
-(3.5%), with a 4% lean toward the accent; the focus wash leans further toward
-the accent. Each wash must differ from the background by a contrast between
-1.05:1 (visible) and 1.4:1 (never loud), or none is drawn; a mid-gray
-background therefore gets none. At 256 colors, each wash is the nearest xterm
-entry within those limits that is not the background's own. Colored text on a
-wash is moved toward the foreground side, in its own hue (or to the nearest
-xterm entry at 256 colors), until it has at least 4.5:1 contrast with the wash
-and, for the focus, with the background it fades in from. Bold values stay in
-the terminal's own foreground.
+The focused-row wash is unchanged: a faint lean toward the azure accent,
+visible but quiet against the reported background. The background-only
+fallback remains a flat wash (6% white on dark themes or 3.5% black on light
+themes, then 4% azure). Those washes stay between 1.05:1 and 1.4:1 contrast
+against the terminal; a mid-gray background can therefore get no wash.
+
+With both colors known, Mist uses a white/ink and azure-slate veil, four
+stationary hue pockets, and soft edges. Its opacity is limited by the actual
+native text contrast: at least 88% of the terminal's original contrast,
+capped at 7:1. If the theme already has less than 4.5:1, Mist must not reduce
+it at all. Light themes can use a whiter frost; a dark theme with insufficient
+contrast keeps its native background. Colored labels, tags, warnings and
+secondary details keep at least 4.5:1 against all text-row backgrounds.
+The coarse 256-color palette uses a single faint entry meeting the same
+text-contrast constraints, or no surface when none is available. No new
+dependency, ongoing animation or additional Azure request is needed.
 
 ### Effects
 

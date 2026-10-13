@@ -18,6 +18,8 @@ import codecs
 import errno
 from contextlib import contextmanager
 from copy import deepcopy
+from functools import lru_cache
+from itertools import groupby
 import json
 import math
 import os
@@ -34,7 +36,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
 from azure.cli.core.azclierror import AzCLIError, AzureResponseError, InvalidArgumentValueError
 from azure.core.exceptions import AzureError, ClientAuthenticationError, ResourceNotFoundError
 from knack.util import CLIError
-from rich.cells import cell_len
+from rich.cells import cell_len, get_character_cell_size
 from rich.console import Console
 from rich.style import Style
 from rich.text import Span, Text
@@ -338,6 +340,133 @@ def finished(tints: Tints) -> Tints:
     return tints._replace(inks=inks, rich_inks=rich)
 
 
+class MistSurface(NamedTuple):
+    """Static cell backgrounds, including the two half-row caps, and readable foregrounds."""
+    rows: tuple
+    inks: Dict[str, str]
+    quiet: str
+
+
+def _blur_colors(grid, radius):
+    """A clipped box blur along each row; prefix sums keep the cost linear in the cell count."""
+    blurred = []
+    for row in grid:
+        sums = [(0.0, 0.0, 0.0)]
+        for color in row:
+            sums.append(tuple(a + b for a, b in zip(sums[-1], color)))
+        colors = []
+        for index in range(len(row)):
+            low, high = max(0, index - radius), min(len(row), index + radius + 1)
+            colors.append(tuple((b - a) / (high - low) for a, b in zip(sums[low], sums[high])))
+        blurred.append(colors)
+    return blurred
+
+
+@lru_cache(maxsize=4)
+def mist_surface(background: str, foreground: str, palette: str, width: int, height: int) -> Optional[MistSurface]:
+    """The approved spectral mist: a still, blurred hue field blended with the actual terminal colors."""
+    if palette not in ("truecolor", "256") or width < 2 or height < 1:
+        return None
+
+    def rgb(color):
+        return tuple(int(color[index:index + 2], 16) for index in (1, 3, 5))
+
+    def blend(first, second, part):
+        return tuple(a + (b - a) * part for a, b in zip(first, second))
+
+    def hex_color(color):
+        return "#%02x%02x%02x" % tuple(round(channel) for channel in color)
+
+    base, white, black = rgb(background), (255, 255, 255), (0, 0, 0)
+    dark = luminance(background) < TINT_DARK
+    native = contrast(foreground, background)
+    target = native if native < INK_CONTRAST else min(7, native * 0.88)
+    lift = not dark and native < INK_CONTRAST
+    stops = [blend(rgb(color), white, .3) if dark else rgb(color) for color in GRADIENTS["truecolor"]]
+    blobs = zip(stops, ((.04, .2, .28, 1, 1), (.40, .65, .30, 1.1, .7),
+                        (.76, .30, .25, 1, .9), (1, .95, .14, .5, .45)))
+    blobs = list(blobs)
+    half_rows = 2 * height + 2
+    field = []
+    for y in range(half_rows):
+        v = y / (half_rows - 1)
+        scale = 1 + .1 * (1 - v) if dark else 1
+        veil = blend(blend(base, white if dark else black, (.045 if dark else .018) * scale),
+                     rgb("#6a96d8"), (.13 if dark else .075) * scale)
+        row = []
+        for x in range(width):
+            u, color = x / (width - 1), veil
+            for ink, (bx, by, rx, ry, weight) in blobs:
+                alpha = (.11 if dark else .07) * weight * math.exp(-(((u - bx) / rx) ** 2 + ((v - by) / ry) ** 2))
+                color = blend(color, ink, alpha)
+            row.append(color)
+        field.append(row)
+    field = list(zip(*_blur_colors(list(zip(*_blur_colors(field, 4))), 3)))
+    field = [[hex_color(blend(base, color, (.62 if x in (0, width - 1) else 1) *
+                              (.55 if y in (0, half_rows - 1) else 1)))
+              for x, color in enumerate(row)] for y, row in enumerate(field)]
+
+    # Scale the whole field first, then enforce the floor after averaging and rounding each text cell.
+    grounds = set(color for row in field[1:-1] for color in row)
+    scale = 1
+    if not lift and min(contrast(foreground, color) for color in grounds) < target:
+        low, high = 0, 1
+        for _ in range(14):
+            middle = (low + high) / 2
+            if all(contrast(foreground, mix(background, color, middle)) >= target for color in grounds):
+                low = middle
+            else:
+                high = middle
+        scale = low
+        field = [[mix(background, color, scale) for color in row] for row in field]
+    if native < INK_CONTRAST and scale < .35:
+        return None
+    if palette == "256":
+        base_index = xterm(background)[0]
+        faint = [entry for entry in XTERM if entry[0] != base_index
+                 and 1.05 <= contrast(entry[1], background) <= 1.6
+                 and contrast(foreground, entry[1]) >= target]
+        if not faint:
+            return None
+        colors = [rgb(color) for row in field[1:-1] for color in row]
+        mean = hex_color(tuple(sum(channels) / len(colors) for channels in zip(*colors)))
+        index, body = min(faint, key=lambda entry: _distance(entry[1], mean))
+        grays = [entry for entry in XTERM if entry[0] != base_index
+                 and entry[1][1:3] == entry[1][3:5] == entry[1][5:7]]
+
+        def cap(row):
+            mean = hex_color(tuple(sum(channels) / len(row) for channels in zip(*(rgb(color) for color in row))))
+            return f"color({min(grays, key=lambda entry: _distance(entry[1], mean))[0]})"
+
+        rows = ((cap(field[0]),) * width,) + ((f"color({index})",) * width,) * height + ((cap(field[-1]),) * width,)
+        grounds = (body,)
+    else:
+        if sum(contrast(color, background) for row in field[1:-1] for color in row) / (2 * height * width) < 1.03:
+            return None
+        toward = "#ffffff" if lift else background
+
+        @lru_cache(maxsize=None)
+        def keep(color):
+            for step in range(41):
+                candidate = mix(color, toward, step / 40)
+                if contrast(foreground, candidate) >= target:
+                    return candidate
+            return background
+
+        body = [tuple(keep(mix(first, second, .5)) for first, second in zip(field[2 * y + 1], field[2 * y + 2]))
+                for y in range(height)]
+        rows = (tuple(field[0]), *body, tuple(field[-1]))
+        colors = set(color for row in body for color in row)
+        grounds = (min(colors, key=luminance), max(colors, key=luminance))
+    colors = {role: legible(color, grounds, palette) for role, color in RGB.items()}
+    quiet, rich_quiet = legible(mix(foreground, background, .5), grounds, palette)
+    if min(contrast(foreground, color) for color in grounds) < target or any(
+            contrast(ink, ground) < INK_CONTRAST
+            for ink in [quiet] + [pair[0] for pair in colors.values()] for ground in grounds):
+        return None
+    return MistSurface(rows, {role: pair[1] for role, pair in colors.items()}, rich_quiet)
+
+
 KIND_LABELS = {"dps": "DPS", "hub": "IoT Hub", "software-updates": "Software updates"}
 KIND_WORDS = {"dps": "DPS", "hub": "IoT Hub", "software-updates": "Software Updates"}
 # Whose managed identity a link's "linked" principal is (rbac.LINK_ROLE_MATRIX). Generated wording only: resource
@@ -592,9 +721,9 @@ def command_rows(lines: Sequence[str], room: int) -> List[tuple]:
 # The terminal's background
 # --------------------------------------------------------------------------------------------
 
-# Asked once per guided run, before its first line: the background colour (OSC 11), then the device attributes
-# (DA1), which every terminal answers, in order, so a DA1 answer with no colour before it means "no colour coming".
-BACKGROUND_QUERY = "\x1b]11;?\x1b\\\x1b[c"
+# Asked once before the first line: foreground/background (OSC 10/11), then device attributes (DA1).
+# The ordered DA1 reply ends the color probe even when a terminal does not support color queries.
+BACKGROUND_QUERY = "\x1b]10;?\x1b\\\x1b]11;?\x1b\\\x1b[c"
 BACKGROUND_WAIT = 0.5  # seconds; terminals answer within milliseconds, so only a silent one waits this long
 COLOR_SPEC = re.compile(r"[0-9A-Za-z:/#]{0,48}")
 DA1_PARAMS = re.compile(r"[0-9;]{0,48}")
@@ -632,19 +761,22 @@ class TerminalReplies:
         self.outstanding = set(outstanding)
         self.held = ""
         self.background: Optional[str] = None
+        self.foreground: Optional[str] = None
         self.terminal = None  # (descriptor, settings) to restore when echo was left off for a late answer
 
     def _state(self, text: str) -> str:
-        """'osc' or 'da1' for a whole outstanding answer, 'more' while ``text`` can still become one, else ''."""
-        if "osc" in self.outstanding:
-            head = "\x1b]11;"
+        """The kind of a whole outstanding answer, 'more' while ``text`` can still become one, else ''."""
+        for kind, number in (("osc", 11), ("foreground", 10)):
+            if kind not in self.outstanding:
+                continue
+            head = f"\x1b]{number};"
             if head.startswith(text):
                 return "more"
             if text.startswith(head):
                 body = text[len(head):]
                 for end in ("\x07", "\x1b\\"):
                     if body.endswith(end) and COLOR_SPEC.fullmatch(body[:-len(end)]):
-                        return "osc"
+                        return kind
                 if COLOR_SPEC.fullmatch(body[:-1] if body.endswith("\x1b") else body):
                     return "more"
         if "da1" in self.outstanding:
@@ -682,9 +814,13 @@ class TerminalReplies:
         return "".join(passed)
 
     def _answered(self, kind: str, text: str):
-        if kind == "osc":
-            self.background = parse_background(text[5:-1] if text.endswith("\x07") else text[5:-2])
-            self.outstanding.discard("osc")
+        if kind in ("osc", "foreground"):
+            color = parse_background(text[5:-1] if text.endswith("\x07") else text[5:-2])
+            if kind == "osc":
+                self.background = color
+            else:
+                self.foreground = color
+            self.outstanding.discard(kind)
         else:  # answers arrive in order: after DA1 no colour is coming
             self.outstanding.clear()
 
@@ -770,7 +906,7 @@ def probe_background(stdin, write: Callable[[str], Any], timeout: float = BACKGR
         return None, ""
     import select
 
-    replies = TerminalReplies()
+    replies = TerminalReplies(("foreground", "osc", "da1"))
     decoder = codecs.getincrementaldecoder("utf-8")("replace")
     typed = []
     try:  # every way out of here but a normal return leaves the terminal's own settings, at once
@@ -840,6 +976,7 @@ class Screen:
         self.palette = system if system in ("truecolor", "256") else "ansi"
         self.console.push_theme(theme(self.palette))
         self._tints: Optional[Tints] = None  # set by ``probe`` when the terminal tells its background
+        self.foreground: Optional[str] = None
         self.replies: Optional[TerminalReplies] = None
         self._inset = 0
         self._lock = threading.Lock()
@@ -882,6 +1019,7 @@ class Screen:
         self.replies, typed = probe_background(stdin, write)
         if self.replies and self.replies.background:
             self.tints = surface_tints(self.replies.background, self.palette)
+            self.foreground = self.replies.foreground
         return typed
 
     def release(self):
@@ -968,6 +1106,11 @@ class Screen:
         if not (self.tints and self.repaint):
             return [Text()] + rows + [Text()]
         span = self.width - 1
+        if self.foreground:
+            mist = mist_surface(self.tints.background, self.foreground, self.palette, span, len(rows))
+            if mist is None:
+                return [Text()] + rows + [Text()]
+            return self._mist_rows(rows, mist, span)
         ink = Style(color=self.tints.rich_surface)
         washed = [Text("▄" * span, ink)]
         for row in rows:
@@ -978,6 +1121,35 @@ class Screen:
             row.stylize_before(Style(bgcolor=self.tints.rich_surface))  # under the row's own colours
             washed.append(row)
         return washed + [Text("▀" * span, ink)]
+
+    def _mist_rows(self, rows: Sequence[Text], mist: MistSurface, width: int) -> List[Text]:
+        def foreground(style):
+            if isinstance(style, str) and style in THEME_ROLES:
+                role, bold = THEME_ROLES[style]
+                return Style(color=mist.inks[role], bold=bold)
+            resolved = self.console.get_style(style)
+            return resolved + Style(color=mist.quiet, dim=False) if resolved.dim else resolved
+
+        def cap(colors, glyph):
+            return Text.assemble(*((glyph * len(list(cells)), Style(color=color)) for color, cells in groupby(colors)))
+
+        painted = [cap(mist.rows[0], "▄")]
+        for row, colors in zip(rows, mist.rows[1:-1]):
+            content = row.copy()
+            content.pad_right(width - cell_len(content.plain))
+            backgrounds, column = [], 0
+            for char in content.plain:
+                size = get_character_cell_size(char)
+                backgrounds.append(colors[min(column, width - 1)] if size or not backgrounds else backgrounds[-1])
+                column += size
+            spans, start = [], 0
+            for color, chars in groupby(backgrounds):
+                end = start + len(list(chars))
+                spans.append(Span(start, end, Style(bgcolor=color)))
+                start = end
+            spans += [Span(part.start, part.end, foreground(part.style)) for part in content.spans]
+            painted.append(Text(content.plain, style=foreground(content.style), spans=spans))
+        return painted + [cap(mist.rows[-1], "▀")]
 
     def note_lines(self, message, *, mark="↺", style=ACCENT, timing="") -> List[Text]:
         prefix = Text(" " * INDENT)

@@ -3509,6 +3509,7 @@ def test_surface_is_only_behind_the_plan_and_gone_in_change(mocker, monkeypatch)
     monkeypatch.delenv("NO_COLOR", raising=False)
     out, term = tty_screen(monkeypatch, color="truecolor")
     out.tints = guided.surface_tints("#1e1e1e", "truecolor")
+    out.foreground = "#d4d4d4"
     seen = {}
 
     class Recording(Scripted):
@@ -3520,7 +3521,7 @@ def test_surface_is_only_behind_the_plan_and_gone_in_change(mocker, monkeypatch)
     guided.run_guided_setup(services(), SUB, screen=out, prompter=prompter)
     approve, raw = seen["Approve:"][0]
     assert "▄▄▄▄" in approve and "▀▀▀▀" in approve and "  Plan  ✦ 4 new · ⇄ 2 links" in approve
-    assert "nothing is deleted" not in approve and "48;2;44;47;50" in raw
+    assert "nothing is deleted" not in approve and "48;2;" in raw
     change, raw = seen["Change:"][0]
     assert "▄" not in change and "▀" not in change and "48;" not in raw  # repainted away: the answers, unwashed
     assert "▄▄▄▄" in seen["Approve:"][1][0]  # back to approval (read again): on the surface again
@@ -3792,7 +3793,8 @@ def test_a_silent_terminal_costs_the_bounded_wait_and_echo_waits_for_the_late_an
     before = termios.tcgetattr(stdin.fileno())
     started = guided.time.monotonic()
     replies, typed = guided.probe_background(stdin, lambda text: None, timeout=0.1)
-    assert 0.1 <= guided.time.monotonic() - started < 1 and typed == "" and replies.outstanding == {"osc", "da1"}
+    assert 0.1 <= guided.time.monotonic() - started < 1 and typed == ""
+    assert replies.outstanding == {"foreground", "osc", "da1"}
     during = termios.tcgetattr(stdin.fileno())
     assert not during[3] & termios.ECHO and during[3] & termios.ICANON  # no echo of a late answer; lines as usual
     assert replies.terminal == (stdin.fileno(), before)
@@ -3805,7 +3807,7 @@ def test_a_silent_terminal_costs_the_bounded_wait_and_echo_waits_for_the_late_an
 
     replies, _ = guided.probe_background(stdin, lambda text: os.write(master, b"\x1b]11;#1e1e1e\x07"),
                                          timeout=0.1)
-    assert replies.background == "#1e1e1e" and replies.outstanding == {"da1"}  # its DA1 may still come
+    assert replies.background == "#1e1e1e" and replies.outstanding == {"foreground", "da1"}
     replies.outstanding.clear()  # it came during the prompts
     replies.close()
     _assert_terminal_settings(termios.tcgetattr(stdin.fileno()), before, termios)
@@ -4131,6 +4133,101 @@ def test_a_screen_without_washes_keeps_its_theme():
     assert guided.legible("#2f81c9", grounds, "truecolor") == ("#ffffff", "#ffffff")
     best = max(guided.XTERM, key=lambda entry: min(guided.contrast(entry[1], ground) for ground in grounds))
     assert guided.legible("#2f81c9", grounds, "256") == (best[1], f"color({best[0]})")
+
+
+@pytest.mark.parametrize("background,foreground", [
+    ("#1e1e1e", "#d4d4d4"), ("#ffffff", "#202020"),
+    ("#282c34", "#abb2bf"), ("#fdf6e3", "#657b83"),
+])
+@pytest.mark.parametrize("palette", ["truecolor", "256"])
+@pytest.mark.parametrize("width", [79, 87])
+def test_mist_is_static_bounded_and_keeps_native_and_semantic_text_readable(background, foreground, palette, width):
+    mist = guided.mist_surface(background, foreground, palette, width, 12)
+    assert mist is not None
+    assert len(mist.rows) == 14 and all(len(row) == width for row in mist.rows)
+    native = guided.contrast(foreground, background)
+    target = native if native < 4.5 else min(7, native * .88)
+    grounds = {Color.parse(color).get_truecolor().hex for row in mist.rows[1:-1] for color in row}
+    assert all(guided.contrast(foreground, ground) >= target for ground in grounds)
+    for ink in list(mist.inks.values()) + [mist.quiet]:
+        drawn = Color.parse(ink).get_truecolor().hex
+        assert all(guided.contrast(drawn, ground) >= 4.5 for ground in grounds)
+    if palette == "truecolor":
+        assert len(grounds) > 8
+    else:
+        assert len(grounds) == 1 and all(color.startswith("color(") for row in mist.rows for color in row)
+    assert guided.mist_surface(background, foreground, palette, width, 12) is mist
+
+
+def test_mist_falls_back_without_guessing_or_lowering_already_low_dark_contrast():
+    assert guided.mist_surface("#1e1e1e", "#444444", "truecolor", 87, 12) is None
+    assert guided.mist_surface("#1e1e1e", "#d4d4d4", "ansi", 87, 12) is None
+    assert guided.mist_surface("#1e1e1e", "#d4d4d4", "truecolor", 87, 0) is None
+
+
+@pytest.mark.parametrize("columns", [80, 120])
+def test_mist_paints_only_approval_cells_and_preserves_unicode_and_styles(monkeypatch, columns):
+    from rich.text import Text
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    out, _ = tty_screen(monkeypatch, columns=columns, color="truecolor")
+    out.tints = guided.surface_tints("#1e1e1e", "truecolor")
+    out.foreground = "#d4d4d4"
+    body = out.fact_lines("DPS:", "温度-cafe\u0301", "S1 · australiaeast", tag="NEW", tag_style=guided.GOOD_BOLD)
+    original = [row.copy() for row in body]
+    rows = out.surface("Plan", Text("✦ 1 new", guided.GOOD_BOLD), body)
+    assert rows[0].plain == "▄" * (out.width - 1)
+    assert rows[-1].plain == "▀" * (out.width - 1)
+    assert all(cell_len(row.plain) == out.width - 1 for row in rows)
+    assert body == original
+    text = rows[2]
+    start = text.plain.index("温")
+    for index in range(start, start + len("温度-cafe\u0301")):
+        style = text.get_style_at_offset(out.console, index)
+        assert style.bold and style.color is None and style.bgcolor is not None
+    for index, character in enumerate(text.plain):
+        style = text.get_style_at_offset(out.console, index)
+        assert not style.dim
+        if character.strip() and style.color:
+            assert guided.contrast(style.color.get_truecolor().hex, style.bgcolor.get_truecolor().hex) >= 4.5
+    raw = out._render(rows)
+    assert "48;2;" in raw and not any(code in raw for code in ("\x1b[?1049h", "\x1b[2J", "\x1b[3J"))
+    assert out.surface("Plan", Text("✦ 1 new", guided.GOOD_BOLD), body) == rows
+    out.foreground = "#444444"
+    bare = out.surface("Plan", Text("✦ 1 new"), body)
+    assert bare[0].plain == bare[-1].plain == "" and "48;" not in out._render(bare)
+
+
+def test_foreground_and_background_replies_are_filtered_at_every_split():
+    foreground = "\x1b]10;rgb:d4d4/d4d4/d4d4\x1b\\"
+    text = "ad" + foreground + DARK_REPLY + "r"
+    for cut in range(len(text) + 1):
+        replies, keys = _filtered(text[:cut], text[cut:], outstanding=("foreground", "osc", "da1"))
+        assert keys == "adr" and replies.foreground == "#d4d4d4" and replies.background == "#1e1e1e"
+        assert not replies.outstanding
+    replies, keys = _filtered("\x1b]10;#202020\x07" + LIGHT_REPLY, outstanding=("foreground", "osc", "da1"))
+    assert keys == "" and replies.foreground == "#202020" and replies.background == "#ffffff"
+    assert _filtered(foreground)[1] == foreground  # not requested: ordinary input is not discarded
+
+
+def test_probe_passes_both_terminal_colors_to_the_screen(mocker, monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    mocker.patch.object(guided, "same_terminal", return_value=True)
+
+    def answered(_stdin, write):
+        write(guided.BACKGROUND_QUERY)
+        replies = guided.TerminalReplies(("foreground", "osc", "da1"))
+        replies.feed("\x1b]10;#d4d4d4\x07" + DARK_REPLY)
+        return replies, "typed"
+
+    mocker.patch.object(guided, "probe_background", side_effect=answered)
+    stream = Tty()
+    out = guided.Screen(stream, console=Console(file=stream, force_terminal=True, width=80, color_system="truecolor"))
+    assert out.probe(_Stdin()) == "typed"
+    assert stream.getvalue() == "\x1b]10;?\x1b\\\x1b]11;?\x1b\\\x1b[c"
+    assert out.foreground == "#d4d4d4"
+    assert out.tints == guided.surface_tints("#1e1e1e", "truecolor")
 
 
 def test_attached_parser_sees_only_the_users_keys_and_a_lone_escape_at_flush():
