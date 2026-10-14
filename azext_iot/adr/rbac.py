@@ -623,8 +623,7 @@ class LinkRbacManager:
                 {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
             )
             logger.warning(
-                "Waiting %s seconds for the new Reader grant to propagate before submitting unlink. "
-                "This does not wait for unlink completion.",
+                "Waiting %s seconds for the new Reader grant to propagate before submitting unlink.",
                 UNLINK_READER_PROPAGATION_DELAY_SECONDS,
             )
             self._sleep(UNLINK_READER_PROPAGATION_DELAY_SECONDS)

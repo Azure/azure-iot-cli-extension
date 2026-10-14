@@ -242,7 +242,7 @@ def test_2026_command_surface_is_registered():
     )
     for endpoint in ("hub", "dps", "su"):
         assert commands[f"iot adr ns link {endpoint} remove"] == (
-            "command", f"adr_link_{endpoint}_remove", {"confirmation": True},
+            "command", f"adr_link_{endpoint}_remove", {"confirmation": True, "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands

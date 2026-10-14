@@ -16,7 +16,6 @@ from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     ROLE_PROPAGATION_DELAY,
     SU_LIFECYCLE_TIMEOUT,
-    wait_for_condition,
     wait_for_resource_absent,
 )
 from azext_iot.tests.adr.conftest import (
@@ -69,22 +68,15 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes",
         ).get_output_in_json()
         assert submitted["id"].casefold() == before["id"].casefold()
-        assert submitted["properties"]["provisioningState"] in {"Accepted", "Updating", "Succeeded"}
+        assert submitted["properties"]["provisioningState"] == "Succeeded"
+        assert endpoint_name not in submitted["properties"].get(section, {}).get("endpoints", {})
         reader = self._reader_assignments(principal, scope)
         assert len(reader) == 1
         if existing_reader:
             assert reader[0]["id"] == existing_reader[0]["id"], "Reuse Reader rather than creating duplicate grants."
 
-        # Completion belongs to the test, not the nonwaiting delete command.
-        after = wait_for_condition(
-            lambda: self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json(),
-            lambda ns: ns["properties"]["provisioningState"] == "Succeeded"
-            and endpoint_name not in ns["properties"].get(section, {}).get("endpoints", {}),
-            description=f"{kind} endpoint '{endpoint_name}' removal",
-            is_terminal_failure=lambda ns: ns["properties"]["provisioningState"] in {"Failed", "Canceled", "Cancelled"},
-            timeout=600,
-            describe=lambda ns: str(ns["properties"]),
-        )
+        after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        assert after["properties"]["provisioningState"] == "Succeeded"
         for key in ("id", "location", "tags", "identity"):
             assert after.get(key) == before.get(key), key
         expected = writable_namespace_properties(before["properties"])

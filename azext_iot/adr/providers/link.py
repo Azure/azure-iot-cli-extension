@@ -196,6 +196,7 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
+        no_wait=False,
     ):
         namespace = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
@@ -216,25 +217,33 @@ class LinkProvider(ADRProvider):
         resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
         resource["properties"] = properties
         resource["identity"] = sanitize_arm_identity(namespace["identity"])
-        # NoPolling returns the initial PUT response, not asynchronous completion.
-        return self.client.namespaces.begin_create_or_replace(
+        poller = self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name, namespace_name=namespace_name,
-            resource=resource, polling=False, retry_total=0,
-        ).result()
+            resource=resource, retry_total=0,
+        )
+        return self._wait(
+            poller,
+            f"Removing {display_name} endpoint '{endpoint_name}' from namespace {namespace_name}...",
+            no_wait=no_wait,
+            failure_target=(section, endpoint_name),
+        )
 
-    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
+            no_wait=no_wait,
         )
 
-    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
+            no_wait=no_wait,
         )
 
-    def su_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+    def su_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
+            no_wait=no_wait,
         )
 
     def _patch_link(
