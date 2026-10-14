@@ -12,7 +12,7 @@ Release History
 
 **ADR bug fixes**
 
-* Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
 
 1.0.0b2 (Preview)
 +++++++++++++++++
