@@ -109,7 +109,7 @@ stages:
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
 
       - stage: Unit
-        displayName: Windows Python 3.12 bootstrap and unit/style follow-up only
+        displayName: Windows-only bootstrap and isolated-test follow-up
         dependsOn: Resolve
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]

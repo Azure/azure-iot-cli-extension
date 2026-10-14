@@ -31,7 +31,7 @@ INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
 BRANCHES = {"users/hangyiwang/ado147-integration-parity-retries"}
-DIAGNOSTIC_SOURCE_SHA = "90ad5c01172c0eb58589f64f2d6f288215459c5c"
+DIAGNOSTIC_SOURCE_SHA = "ed8674e337d0def98c4b57794eef795311168b1a"
 INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
     "pythonVersions": ["3.10", "3.13"], "regions": "australiaeast", "armEndpoint": "public",

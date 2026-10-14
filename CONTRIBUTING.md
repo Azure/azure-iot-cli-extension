@@ -224,7 +224,7 @@ For all resources, if the environmental variable is not provided, a new instance
 ### Azure Pipelines release automation
 
 **Isolated partial diagnostic branch:** this branch permits only `Partial`,
-pins the integration source to `90ad5c01172c0eb58589f64f2d6f288215459c5c`,
+pins the integration source to `ed8674e337d0def98c4b57794eef795311168b1a`,
 and has no publishing stage or credential group. It exercises available
 components while MSDO installation is pending; it does not replace the
 production security gate. The final `MissingCoverage` stage intentionally
@@ -232,11 +232,13 @@ fails and retains a report with `releaseQualified: false`, even when all
 component checks pass. Live tests require the actual Build Service permission
 probe, successful component gates, no competing workloads, and admission
 before 23:00 UTC on October 14, 2026. Do not merge these diagnostic-only changes.
-The Windows 3.12 follow-up branch limits Unit to that single combination and
+The Windows follow-up branch limits Unit to Windows Python 3.10-3.13 and
 queues with PermissionProbe, Build, CommandLint, IndexCompatibility, and
 IntegrationDiagnostic skipped. It selects cached Python 3.13 before feed
 authentication, then lets the requested interpreter's pip bootstrap use that
-authenticated feed. It does not replace results from the original partial run.
+authenticated feed. Its source pin includes only the Windows startup/proxy
+test-isolation corrections, not product changes. It does not replace results
+from the original partial run.
 
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
 on `1ES.Official.PipelineTemplate.yml` from the stable

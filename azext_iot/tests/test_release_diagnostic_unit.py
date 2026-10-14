@@ -38,10 +38,13 @@ def test_no_publish_or_scanner_substitute(diagnostic):
         diagnostic.release.automation_allowed()
 
 
-def test_followup_only_runs_windows312_after_feed_authentication():
+def test_followup_only_runs_windows_after_feed_authentication():
     template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text())
     job = template["jobs"][0]
-    assert job["strategy"]["matrix"] == {"Python312": {"python": "3.12"}}
+    assert job["strategy"]["matrix"] == {
+        "Python310": {"python": "3.10"}, "Python311": {"python": "3.11"},
+        "Python312": {"python": "3.12"}, "Python313": {"python": "3.13"},
+    }
     steps = job["steps"]
     feed = next(index for index, step in enumerate(steps) if step.get("template") == "release-feed.yml")
     selection = next(index for index, step in enumerate(steps) if step.get("task") == "UsePythonVersion@0")
