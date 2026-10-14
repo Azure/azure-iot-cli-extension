@@ -10,6 +10,7 @@ from azext_iot._factory import (
     adr_service_factory,
     adr_update_instance_service_factory,
 )
+from azext_iot.adr.rbac import UNLINK_WARNING
 
 adr_namespace_ops = CliCommandType(
     operations_tmpl="azext_iot.adr.commands_namespace#{}",
@@ -235,7 +236,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_hub_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_hub_update", supports_no_wait=True)
-        cmd_group.command("remove", "adr_link_hub_remove", confirmation=True, supports_no_wait=True)
+        cmd_group.command("remove", "adr_link_hub_remove", confirmation=UNLINK_WARNING + " Continue?", supports_no_wait=True)
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
         cmd_group.command(
@@ -247,7 +248,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_dps_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_dps_update", supports_no_wait=True)
-        cmd_group.command("remove", "adr_link_dps_remove", confirmation=True, supports_no_wait=True)
+        cmd_group.command("remove", "adr_link_dps_remove", confirmation=UNLINK_WARNING + " Continue?", supports_no_wait=True)
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
         cmd_group.command(
@@ -259,7 +260,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_su_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_su_update", supports_no_wait=True)
-        cmd_group.command("remove", "adr_link_su_remove", confirmation=True, supports_no_wait=True)
+        cmd_group.command("remove", "adr_link_su_remove", confirmation=UNLINK_WARNING + " Continue?", supports_no_wait=True)
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")
         cmd_group.command(

@@ -14,6 +14,7 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
+    UNLINK_WARNING,
     adr_link_ops,
     adr_link_wait_ops,
     adr_schema_ops,
@@ -242,7 +243,8 @@ def test_2026_command_surface_is_registered():
     )
     for endpoint in ("hub", "dps", "su"):
         assert commands[f"iot adr ns link {endpoint} remove"] == (
-            "command", f"adr_link_{endpoint}_remove", {"confirmation": True, "supports_no_wait": True},
+            "command", f"adr_link_{endpoint}_remove",
+            {"confirmation": UNLINK_WARNING + " Continue?", "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands
@@ -589,10 +591,11 @@ def test_load_adr_arguments():
         )
         for command in arguments
     )
-    assert not any(
-        command.startswith("iot adr ns link") and command.endswith(" remove")
-        for command in arguments
-    )
+    for kind in ("hub", "dps", "su"):
+        remove_arguments = arguments[f"iot adr ns link {kind} remove"]
+        assert set(remove_arguments) == {"skip_permission_check"}
+        assert remove_arguments["skip_permission_check"]["options_list"] == ["--skip-permission-check"]
+        assert remove_arguments["skip_permission_check"]["action"] == "store_true"
 
     for command in (
         "iot adr ns wait",

@@ -6,10 +6,15 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**ADR unlink permission checks**
+
+* Namespace ``link hub|dps|su remove`` now uses a state-aware, read-only advisory permission check instead of creating Reader assignments or blocking on preflight failures. ``LinkedResourceDeleted`` and ``Failed`` endpoints skip the check. ``Succeeded`` endpoints check the outbound identity's read-grant evidence at the linked resource's resource group, or subscription when that group is confirmed deleted.
+* Missing access, unavailable checks and other endpoint states warn and continue, leaving ADR authoritative. Added ``--skip-permission-check``; ``--yes`` still skips only confirmation. Unlink never creates or removes role assignments; custom roles, conditions, group membership and deny assignments are not fully evaluated.
+
 **ADR unlink polling**
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
-* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint, retains the unlink Reader grant, and does not retry the namespace PUT.
+* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint and does not retry the namespace PUT.
 
 **Wait command bug fixes**
 
@@ -17,7 +22,7 @@ Release History
 
 **ADR bug fixes**
 
-* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before permission checks or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection and rerun guidance.
 
 1.0.0b2 (Preview)
 +++++++++++++++++
