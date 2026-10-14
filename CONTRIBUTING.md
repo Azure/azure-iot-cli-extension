@@ -285,6 +285,9 @@ organization-mandated secret-scanning control.
    installer can upgrade pip internally. Its bootstrap packages must use the
    same authenticated feed, not public PyPI. Publication selects cached Python
    only and cannot implicitly install an interpreter or pip.
+   Command-table lint uses an isolated `azdev==0.2.13` environment rather than
+   combining azdev's dependencies with `dev_requirements`: their pylint pins
+   differ. The unit/style matrix retains the repository's existing test-tool pins.
 3. Set `ReleasePipelineId` in pipeline 147's `aziotcli_test_primary` group to this
    new definition's numeric ID. Grant the project Build Service **Queue builds**,
    **View builds**, **View build pipeline** and **Stop builds** on 147 as needed;

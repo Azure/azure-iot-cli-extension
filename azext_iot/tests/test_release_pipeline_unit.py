@@ -942,3 +942,14 @@ def test_interpreter_bootstrap_cannot_install_pip_before_feed_authentication():
                                if step.get("task") == "UsePythonVersion@0")
         assert feed_index < selection_index
         assert steps[selection_index]["inputs"]["versionSpec"] == version
+
+
+def test_command_linter_does_not_mix_unit_tooling_dependency_pins():
+    _, stages = all_stages()
+    steps = stages["CommandLint"]["jobs"][0]["steps"]
+    script = next(step["bash"] for step in steps if "bash" in step)
+    assert 'source "$AGENT_TEMPDIRECTORY/lint-venv/bin/activate"' in script
+    assert "python -m pip install azdev==0.2.13" in script
+    assert "dev_requirements" not in script
+    assert "--no-deps" not in script
+    assert "azdev linter --include-whl-extensions azure-iot --min-severity medium" in script
