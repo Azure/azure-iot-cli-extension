@@ -30,7 +30,8 @@ REPOSITORY = "Azure/azure-iot-cli-extension"
 INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
-BRANCHES = {"dev", "preview", "release/1.1.0-preview"}
+BRANCHES = {"users/hangyiwang/ado147-integration-parity-retries"}
+DIAGNOSTIC_SOURCE_SHA = "90ad5c01172c0eb58589f64f2d6f288215459c5c"
 INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
     "pythonVersions": ["3.10", "3.13"], "regions": "australiaeast", "armEndpoint": "public",
@@ -126,6 +127,8 @@ def checkout(destination, resolving=False):
     fetch = ["git", "fetch", "--quiet", "--filter=blob:none", "--depth=1", "origin"]
     subprocess.run(fetch + [source_branch if resolving else source_commit], cwd=destination, check=True)
     tip = commit(command(["git", "rev-parse", "FETCH_HEAD"], destination))
+    if resolving and tip != DIAGNOSTIC_SOURCE_SHA:
+        raise ValueError("The integration PR changed; review and repin this diagnostic before running it.")
     selected = source_commit or tip
     subprocess.run(["git", "checkout", "--quiet", "--detach", selected], cwd=destination, check=True)
     if command(["git", "rev-parse", "HEAD"], destination) != selected:
@@ -412,10 +415,7 @@ def verify_integration_artifacts(directory, artifacts):
 
 
 def automation_allowed():
-    if environment("BUILD_SOURCEBRANCH") != "refs/heads/dev":
-        raise ValueError("Publication requires the reviewed release automation on dev, not a feature branch.")
-    if environment("BUILD_REPOSITORY_NAME") != REPOSITORY:
-        raise ValueError("Publication is only allowed from the upstream repository.")
+    raise ValueError("Publication is disabled in this premerge diagnostic.")
 
 
 def publication_allowed():
