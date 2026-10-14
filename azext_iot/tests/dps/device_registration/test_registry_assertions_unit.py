@@ -18,12 +18,10 @@ from azure.core.exceptions import HttpResponseError
 from azure.core.pipeline.transport import HttpResponse, HttpTransport
 
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as cli_tests
 from azext_iot.tests.dps import _csr_issuance as csr, _csr_registry as registry, _registry_assertions as assertions
 from azext_iot.tests.dps.device_registration import test_csr_registry_cleanup_unit as registry_tests
 
 wire = registry_tests.wire
-offline_cli = cli_tests.offline_cli
 
 
 @pytest.fixture

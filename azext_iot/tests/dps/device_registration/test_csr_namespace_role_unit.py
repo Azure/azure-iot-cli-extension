@@ -22,7 +22,6 @@ from azure.core.pipeline.transport import HttpTransport
 from azure.mgmt.authorization import AuthorizationManagementClient
 
 from azext_iot.adr.rbac import CONTRIBUTOR_ROLE, LINK_ROLE_IDS
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as cli_tests
 from azext_iot.tests.dps import _csr_issuance as csr, _csr_registry as registry
 from azext_iot.tests.dps.device_registration import test_csr_issuance_fixture_unit as fixture_tests
 from azext_iot.tests.dps.device_registration.test_registry_assertions_unit import _Response
@@ -30,7 +29,6 @@ from azext_iot.tests.dps.device_registration.test_registry_assertions_unit impor
 scope = fixture_tests.scope
 resource = fixture_tests.resource
 namespace_commands = fixture_tests.namespace_commands
-offline_cli = cli_tests.offline_cli
 
 
 @pytest.fixture
