@@ -133,6 +133,10 @@ _DPS:_
 Unit tests end in "_unit.py" so execute the following command to run all unit tests,
 `pytest -k "_unit.py"`
 
+Isolated subprocess tests must retain Windows startup variables such as
+`SYSTEMROOT`. Proxy tests must explicitly control both uppercase and lowercase
+proxy variables; do not disable the managed agent's network proxy to make tests pass.
+
 Execute the following command to run the IoT Hub unit tests:
 
 `pytest azext_iot/tests/iothub/ -k "_unit.py"`

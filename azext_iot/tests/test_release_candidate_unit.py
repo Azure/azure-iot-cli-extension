@@ -11,6 +11,7 @@ import hashlib
 from http.client import HTTPException
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -408,10 +409,13 @@ def test_cli_validates_then_preserves_candidate_for_existing_retry_selection(
 def test_standalone_stdlib_helper_fails_explicitly_without_manifest(environment, parent, tmp_path):
     metadata = tmp_path / "parent.json"
     metadata.write_text(json.dumps(parent), encoding="utf-8")
+    child_environment = {key: value for key, value in os.environ.items()
+                         if key.upper() in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")}
+    child_environment.update(environment)
     result = subprocess.run(
         [sys.executable, "-I", str(ROOT / "azext_iot/tests/_release_candidate.py"), "verify",
          "--metadata", str(metadata), "--candidate", str(tmp_path)],
-        env=environment, capture_output=True, text=True, check=False,
+        env=child_environment, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 1
     assert "manifest is missing" in result.stderr and "Traceback" not in result.stderr
