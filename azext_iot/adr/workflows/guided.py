@@ -116,6 +116,17 @@ PALETTES = {
 GRADIENTS = {"ansi": ("cyan", "blue", "magenta"), "256": ("#119994", "#2f81c9", "#945bd6", "#ca478d")}
 GRADIENTS["truecolor"] = GRADIENTS["256"]
 
+FRAME_BADGES = {
+    "truecolor": {
+        "NEW": Style(color="#f5fbf9", bgcolor="#22715b", bold=True),
+        "LINK": Style(color="#f6f6ff", bgcolor="#585eb0", bold=True),
+    },
+    "256": {
+        "NEW": Style(color="color(231)", bgcolor="color(29)", bold=True),
+        "LINK": Style(color="color(231)", bgcolor="color(61)", bold=True),
+    },
+}
+
 # Rich styles are theme names, resolved by the Screen's console for its palette (see ``theme``).
 BOLD = Style(bold=True)
 DIM = Style(dim=True)
@@ -1028,10 +1039,10 @@ class Screen:
             self.replies.close()
 
     @contextmanager
-    def inset(self):
-        """Rows built inside wrap one cell short of the width when they will be washed (``surface``), so the wash
-        never reaches the terminal's last column."""
-        previous, self._inset = self._inset, 1 if self.tints and self.repaint else 0
+    def inset(self, cells: Optional[int] = None):
+        """Reserve the wash's last column, or explicit space for the frame and its gutter."""
+        previous = self._inset
+        self._inset = (1 if self.tints and self.repaint else 0) if cells is None else cells
         try:
             yield
         finally:
@@ -1075,14 +1086,16 @@ class Screen:
         return rows
 
     def fact_lines(self, label, value, detail="", *, tag="", tag_style=PLAIN, mark="✓", mark_style=GOOD,
-                   value_style=BOLD, extra=()) -> List[Text]:
+                   value_style=BOLD, extra=(), badge=False) -> List[Text]:
         body = Text()
         body.append(str(value), value_style)
         if tag:
-            body.append("  ")
-            body.append(tag, tag_style)
+            body.append(" " if badge else "  ")
+            if badge:
+                tag_style = FRAME_BADGES.get(self.palette, {}).get(tag, tag_style)
+            body.append(f"\u00a0{tag}\u00a0" if badge else tag, tag_style)
         if detail:
-            body.append("  " if not tag else " · ", DIM)
+            body.append((" " if badge else " · ") if tag else "  ", DIM)
             body.append(str(detail), DIM)
         prefix = Text(" " * INDENT)
         prefix.append(mark.ljust(MARK), mark_style)
@@ -1094,22 +1107,21 @@ class Screen:
             rows += self.hanging_lines(Text(" " * indent), line if isinstance(line, Text) else Text(str(line)), indent)
         return rows
 
-    def surface(self, title: str, summary: Text, body: Sequence[Text]) -> List[Text]:
-        """The approval region: its heading and the plan. On a terminal whose background is known (``probe``), a
-        frosted wash of that background lies behind it, one cell short of the width, with half-row caps of the very
-        same wash above and below so the text has air: no border, no stroke, no motion. Otherwise, and in plain
-        output, the heading stands between blank lines on the terminal's own background."""
+    def surface(self, title: str, summary: Text, body: Sequence[Text]) -> Optional[List[Text]]:
+        """The known-color approval surface, or plain output. None requests a narrower frame layout instead."""
         heading = Text(" " * INDENT)
         heading.append(title, BOLD)
         heading.append("  ")
         rows = self.hanging_lines(heading, summary, INDENT + cell_len(title) + 2) + list(body)
-        if not (self.tints and self.repaint):
+        if not self.repaint:
             return [Text()] + rows + [Text()]
+        if not self.tints:
+            return None
         span = self.width - 1
         if self.foreground:
             mist = mist_surface(self.tints.background, self.foreground, self.palette, span, len(rows))
             if mist is None:
-                return [Text()] + rows + [Text()]
+                return None
             return self._mist_rows(rows, mist, span)
         ink = Style(color=self.tints.rich_surface)
         washed = [Text("▄" * span, ink)]
@@ -1121,6 +1133,48 @@ class Screen:
             row.stylize_before(Style(bgcolor=self.tints.rich_surface))  # under the row's own colours
             washed.append(row)
         return washed + [Text("▀" * span, ink)]
+
+    def frame_surface(self, title: str, summary: Text, body: Sequence[Text]) -> List[Text]:
+        """A static hairline frame on the native background, using the wordmark and spinner's gradient."""
+        span = self.width - 1
+        colors = [Style(color=color) for color in gradient(GRADIENTS[self.palette], span)]
+        marks = {mark for mark, _, _ in TAGS.values()}
+
+        def native(text):
+            def style(value, content):
+                resolved = self.console.get_style(value)
+                if resolved.bgcolor is not None or content.strip() in marks:
+                    return resolved + Style(dim=False)
+                return resolved + Style(color="default", dim=False)
+
+            return Text(text.plain, style=style(text.style, text.plain), spans=[
+                Span(part.start, part.end, style(part.style, text.plain[part.start:part.end])) for part in text.spans
+            ])
+
+        def rule(start, end):
+            return Text.assemble(*((char, color) for char, color in zip(start + "─" * (span - 2) + end, colors)))
+
+        def sides(row):
+            content = native(row)
+            content.pad_right(span - 1 - cell_len(content.plain))
+            line = Text("│", colors[0])
+            line.append_text(content[1:])
+            line.append("│", colors[-1])
+            return line
+
+        heading = Text("   ")
+        heading.append(title, BOLD)
+        heading.append("  ")
+        with self.inset(3):
+            headings = self.hanging_lines(heading, summary, cell_len(heading.plain))
+        top = Text("╭", colors[0])
+        top.append("─", colors[1])
+        top.append_text(native(headings[0])[2:])
+        top.append(" ")
+        for column in range(cell_len(top.plain), span - 1):
+            top.append("─", colors[column])
+        top.append("╮", colors[-1])
+        return [Text(), top] + [sides(row) for row in headings[1:] + list(body)] + [rule("╰", "╯")]
 
     def _mist_rows(self, rows: Sequence[Text], mist: MistSurface, width: int) -> List[Text]:
         def foreground(style):
@@ -2504,10 +2558,16 @@ class GuidedSetup:
                                       tag_style=REUSE_BOLD)
 
     def _plan_lines(self) -> List[Text]:
-        with self.screen.inset():  # washed rows wrap a cell short of the width
-            return self._washed_plan()
+        with self.screen.inset():
+            summary, body = self._plan_content()
+            surface = self.screen.surface("Plan", summary, body)
+        if surface is not None:
+            return surface
+        with self.screen.inset(3):  # right border, its gutter, and the untouched terminal column
+            summary, body = self._plan_content(frame=True)
+            return self.screen.frame_surface("Plan", summary, body)
 
-    def _washed_plan(self) -> List[Text]:
+    def _plan_content(self, *, frame=False) -> tuple:
         items = [item for item in ordered_items(self.plan) if item.get("action") != "skip"]
         new_namespace = any(item.get("id") == "namespace" and item.get("action") == "create" for item in items)
         counts = plan_counts(items, new_namespace) + (
@@ -2525,7 +2585,7 @@ class GuidedSetup:
         for entry in plan_entries(items, self.namespace, new_namespace, self._elsewhere):
             mark, tag, style = TAGS[entry.tag]
             lines += self.screen.fact_lines(entry.label, entry.value, entry.detail, tag=tag, tag_style=style,
-                                            mark=mark, mark_style=style, extra=entry.extra)
+                                            mark=mark, mark_style=style, extra=entry.extra, badge=frame)
             # Role rows sit under the link, indented from the label column so an identity and its roles fit a row.
             for role in entry.roles:
                 prefix = Text(" " * (INDENT + MARK + 2))
@@ -2534,12 +2594,12 @@ class GuidedSetup:
         mark, tag, style = TAGS["warning"]
         for kind, endpoint, reason in self.unassessed:
             lines += self.screen.fact_lines(KIND_LABELS[kind] + ":", endpoint, "existing link", tag=tag,
-                                            tag_style=style, mark=mark, mark_style=style, extra=[Text(reason)])
+                                            tag_style=style, mark=mark, mark_style=style, extra=[Text(reason)], badge=frame)
         if self.notes:
             lines.append(Text())
         for message, mark, style in self.notes:
             lines += self.screen.note_lines(message, mark=mark, style=style)
-        return self.screen.surface("Plan", summary, lines)
+        return summary, lines
 
     # ---- questions -----------------------------------------------------------------------
 

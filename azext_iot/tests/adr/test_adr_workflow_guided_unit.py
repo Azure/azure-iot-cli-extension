@@ -2781,7 +2781,7 @@ def test_one_activity_animation_for_reads_and_writes(monkeypatch):
 
     monkeypatch.delenv("NO_COLOR", raising=False)
     source = inspect.getsource(guided)
-    assert not any(name in source for name in ("PULSE", "_pulse", "BUSY", "def frame"))  # the old effects are gone
+    assert not any(name in source for name in ("PULSE", "_pulse", "BUSY", "def frame("))  # old animated effects
     assert set(re.findall("[\u2800-\u28ff]", source)) == set(guided.SPINNER + guided.STILL)
 
     def screen_for(motion, system="truecolor"):
@@ -3496,7 +3496,9 @@ def test_plan_surface_is_a_faint_wash_without_a_border_and_fits_the_width(monkey
     assert len(long) > 4 and long[2].plain.startswith("        ") and all(  # wrapped under the summary
         cell_len(line.plain) == out.width - 1 for line in long)
 
-    plain_out, _ = tty_screen(monkeypatch)  # no known background: the terminal's own, between blank rows
+    interactive, _ = tty_screen(monkeypatch)
+    assert interactive.surface("Plan", summary, body) is None  # the caller builds the narrower frame instead
+    plain_out = screen()
     bare = plain_out.surface("Plan", summary, body)
     assert [line.plain for line in bare] == ["", "  Plan  ✦ 4 new · ⇄ 2 links", body[0].plain, ""]
     assert "48;" not in plain_out._render(bare)
@@ -3526,6 +3528,124 @@ def test_surface_is_only_behind_the_plan_and_gone_in_change(mocker, monkeypatch)
     assert "▄" not in change and "▀" not in change and "48;" not in raw  # repainted away: the answers, unwashed
     assert "▄▄▄▄" in seen["Approve:"][1][0]  # back to approval (read again): on the surface again
     assert prompter.labels[-3:] == ["Approve:", "Change:", "Approve:"]
+
+
+@pytest.mark.parametrize("palette", ["256", "truecolor", "standard"])
+@pytest.mark.parametrize("columns", [40, 80, 120])
+def test_frame_reuses_the_wordmark_gradient_and_only_fills_readable_tags(monkeypatch, columns, palette):
+    from rich.text import Text
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    out, _ = tty_screen(monkeypatch, columns=columns, color=palette)
+    with out.inset(3):
+        body = out.fact_lines("DPS:", "温度-cafe\u0301-with-a-long-resource-name", "S1 · australiaeast",
+                              tag="NEW", tag_style=guided.GOOD_BOLD, mark="✦", mark_style=guided.GOOD_BOLD,
+                              badge=True)
+        body += out.fact_lines("IoT Hub:", "a" * 50, "IoT Hub system-assigned managed identity",
+                               tag="LINK", tag_style=guided.LINK_BOLD, mark="⇄", mark_style=guided.LINK_BOLD,
+                               badge=True)
+    original = [row.copy() for row in body]
+    rows = out.frame_surface("Plan", Text("✦ 2 new · ⇄ 1 link"), body)
+    assert rows[0].plain == "" and rows[1].plain.startswith("╭─ Plan  ") and rows[1].plain.endswith("╮")
+    assert rows[-1].plain == "╰" + "─" * (out.width - 3) + "╯"
+    assert all(cell_len(row.plain) == out.width - 1 for row in rows[1:])
+    assert body == original and out._inset == 0
+    assert out.frame_surface("Plan", Text("✦ 2 new · ⇄ 1 link"), body) == rows
+    bottom = rows[-1]
+    for index, color in enumerate(guided.gradient(guided.GRADIENTS[out.palette], out.width - 1)):
+        assert bottom.get_style_at_offset(out.console, index).color == Color.parse(color)
+    for row in rows[2:-1]:
+        assert row.plain.startswith("│") and row.plain.endswith("│")
+        assert row.get_style_at_offset(out.console, 0).color == Color.parse(guided.GRADIENTS[out.palette][0])
+        assert row.get_style_at_offset(out.console, len(row.plain) - 1).color == Color.parse(
+            guided.GRADIENTS[out.palette][-1])
+    painted = []
+    for row in rows[1:]:
+        for index, char in enumerate(row.plain):
+            style = row.get_style_at_offset(out.console, index)
+            assert not style.dim
+            if style.bgcolor:
+                painted.append(char)
+                assert guided.contrast(style.color.get_truecolor().hex, style.bgcolor.get_truecolor().hex) >= 4.5
+            elif char.isalnum():
+                assert style.color is None or style.color.is_default
+    assert "".join(painted).replace("\u00a0", "").replace(" ", "") == ("NEWLINK" if palette != "standard" else "")
+    raw = out._render(rows)
+    assert not any(code in raw for code in ("\x1b[?1049h", "\x1b[2J", "\x1b[3J"))
+    if palette != "truecolor":
+        assert "38;2;" not in raw and "48;2;" not in raw
+    if palette == "standard":
+        assert "38;5;" not in raw and "48;5;" not in raw
+
+
+def test_da1_only_terminal_gets_a_frame_that_leaves_change_and_preserves_engine_work(mocker, monkeypatch):
+    # Rich caches a combined style's first ANSI encoding across consoles of different color depths.
+    guided.Style._add.cache_clear()
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    out, term = tty_screen(monkeypatch, color="256")
+    replies = guided.TerminalReplies(("foreground", "osc", "da1"))
+    replies.feed(UNSUPPORTED_REPLY)
+    probe = mocker.patch.object(guided, "probe_background", return_value=(replies, ""))
+    mocker.patch.object(guided, "same_terminal", return_value=True)
+    assert out.probe(_Stdin()) == ""
+    assert out.tints is None and out.foreground is None and not replies.outstanding
+    engine = Engine(NEW_PLAN)
+    mocker.patch.object(guided, "NamespaceWorkflow", engine)
+    seen = {}
+
+    class Recording(Scripted):
+        def _next(self, kind, label, rows=(), **kwargs):
+            seen.setdefault(label, []).append((term.text, out._render(out._region)))
+            return super()._next(kind, label, rows, **kwargs)
+
+    prompter = Recording("rg-demo", "adr-demo", "new", "S1", False, False, Back, Back, KeyboardInterrupt())
+    guided.run_guided_setup(services(), SUB, screen=out, prompter=prompter)
+    for text, raw in seen["Approve:"]:
+        assert "╭─ Plan  ✦ 4 new · ⇄ 2 links" in text and "╯" in text
+        assert "adr-demo-dps" in text and "adr-demo-hub" in text
+        assert "48;5;29" in raw and "48;5;61" in raw
+        assert "38;2;" not in raw and "48;2;" not in raw
+    text, raw = seen["Change:"][0]
+    assert not any(char in text for char in "╭╰╮╯") and "48;" not in raw
+    assert prompter.labels[-3:] == ["Approve:", "Change:", "Approve:"]
+    probe.assert_called_once()
+    assert not engine.applied
+
+
+def test_frame_keeps_a_wrapped_heading_and_monochrome_structure_without_affecting_plain_output(monkeypatch):
+    from rich.text import Text
+
+    monkeypatch.setenv("NO_COLOR", "1")
+    out, _ = tty_screen(monkeypatch, columns=80, color="truecolor")
+    with out.inset(3):
+        body = out.fact_lines("DPS:", "my-dps", "S1", tag="NEW", tag_style=guided.GOOD_BOLD, badge=True)
+    summary = Text(" · ".join(["✦ 9 new"] * 30))
+    rows = out.frame_surface("Plan", summary, body)
+    assert all(cell_len(row.plain) == 79 for row in rows[1:])
+    assert flat(" ".join(row.plain.replace("│", " ") for row in rows)).count("9 new") == 30
+    assert rows[-2].plain.startswith("│") and rows[-1].plain.endswith("╯")
+    raw = out._render(rows)
+    for match in re.finditer(r"\x1b\[([0-9;]*)m", raw):
+        assert set(match[1].split(";")) <= {"", "0", "1", "2", "22"}
+    bare = screen(plain_mode=True).surface("Plan", Text("✦ 1 new"), body)
+    assert bare[0].plain == bare[-1].plain == ""
+    assert not any(char in "\n".join(row.plain for row in bare) for char in "╭╰╮╯")
+
+
+def test_failed_mist_contrast_rebuilds_the_plan_for_the_frame_width(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    setup = hub_setup()
+    out, _ = tty_screen(monkeypatch, columns=80, color="truecolor")
+    out.tints = guided.surface_tints("#1e1e1e", "truecolor")
+    out.foreground = "#444444"
+    setup.screen, setup.plan, setup.mode = out, NEW_PLAN, "plan"
+    before = deepcopy(setup.plan)
+    rows = setup._plan_lines()
+    assert rows[1].plain.startswith("╭─ Plan")
+    assert all(cell_len(row.plain) == 79 for row in rows[1:])
+    assert setup.plan == before and out._inset == 0
+    text = " ".join(row.plain.replace("│", " ") for row in rows)
+    assert "IoT Hub system-assigned managed identity" in flat(text)
 
 
 def test_role_items_needing_attention_stay_visible_under_their_row(mocker):
@@ -4194,8 +4314,7 @@ def test_mist_paints_only_approval_cells_and_preserves_unicode_and_styles(monkey
     assert "48;2;" in raw and not any(code in raw for code in ("\x1b[?1049h", "\x1b[2J", "\x1b[3J"))
     assert out.surface("Plan", Text("✦ 1 new", guided.GOOD_BOLD), body) == rows
     out.foreground = "#444444"
-    bare = out.surface("Plan", Text("✦ 1 new"), body)
-    assert bare[0].plain == bare[-1].plain == "" and "48;" not in out._render(bare)
+    assert out.surface("Plan", Text("✦ 1 new"), body) is None  # unsafe Mist also requests the frame fallback
 
 
 def test_foreground_and_background_replies_are_filtered_at_every_split():

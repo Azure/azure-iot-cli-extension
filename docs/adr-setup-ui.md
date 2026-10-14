@@ -7,9 +7,9 @@ command. Accepted answers form one aligned block of `Label:  value` lines, the
 answer or review the plan (see [One workspace](#one-workspace)). There is no
 alternate screen, full-screen frame, or mouse capture, so native text
 selection, copying and scrolling keep working. Foreground and background are
-the terminal's own. The only exceptions are a faint focused-row wash and the
-static Mist surface behind the plan under approval, and only
-when the terminal reports its background color (see
+the terminal's own. The exceptions are a faint focused-row wash and the
+static Mist surface when the terminal reports its background, and small
+readable NEW/LINK badges in the approval frame fallback (see
 [Motion and color](#motion-and-color)).
 
 Setup owns onboarding. `az iot adr ns check -n <namespace> -g <resource-group>`
@@ -61,12 +61,29 @@ foreground, whose contrast is preserved as described below. When
 **Change:** opens, the surface disappears with the plan, and it returns with
 the next plan.
 
-When the terminal doesn't report its background color, or with `NO_COLOR`,
-`--plain` or 16 colors, nothing is painted. The plan heading then stands
-between blank rows on the terminal's own background, exactly as in the sample
-without its `▄` and `▀` rows. If only the background is reported, setup keeps
-the previous faint flat wash instead of guessing the foreground. At 256
-colors Mist becomes one quiet background entry with feathered edges.
+When background detection is unavailable, or Mist cannot preserve readable
+contrast, the approval plan uses a **hairline frame** instead. The heading
+and counts sit in its top edge. Its static border uses the same
+teal → azure → violet → rose gradient as the title and loading square:
+left-to-right across both horizontal edges, with teal and rose sides.
+Nothing fills the plan's background. Labels, values and details keep the
+terminal's native foreground; values remain bold and details are not dimmed.
+At 256 or 24-bit color, NEW and LINK have small white-on-jade and
+white-on-periwinkle badges, each with at least 4.5:1 contrast.
+
+The frame also stops one column short of the capped width. Its right edge
+and gutter reserve two additional columns, so long names and identities
+wrap rather than being clipped. It disappears in Change just like Mist.
+No extra question, Azure request, animation, terminal setting or color
+query is introduced. In particular, a terminal that returns only DA1 still
+gets the frame without needing `COLORTERM=truecolor`.
+
+At 16 colors the border uses the title's cyan/blue/magenta steps, with native
+bold tags instead of filled badges. `NO_COLOR` retains the frame without any
+color. `--plain`, redirected output and `TERM=dumb` keep the unframed,
+append-only plan. If only the background is reported, setup keeps the
+previous faint flat wash. With both colors known, 256-color Mist remains
+one quiet background entry with feathered edges.
 
 Labels end with a colon, share one column and are drawn in the accent color.
 Values are bold in the terminal's normal foreground, so a label never reads as
@@ -571,9 +588,9 @@ wait and input filter:
   at once, before the error or the cancel is reported. From the question on,
   everything up to the end of the run, including starting the first prompt,
   sits inside the same restore.
-- Without an answer, or with an answer setup can't read, nothing is painted:
-  the focus is the pointer and bold, and the plan stands on the terminal's own
-  background.
+- Without an answer, or with an answer setup can't read, the focus is still
+  the pointer and bold. The approval plan gets the native-background
+  gradient frame described above, not an assumed terminal theme.
 
 The focused-row wash is unchanged: a faint lean toward the azure accent,
 visible but quiet against the reported background. The background-only
@@ -589,7 +606,7 @@ it at all. Light themes can use a whiter frost; a dark theme with insufficient
 contrast keeps its native background. Colored labels, tags, warnings and
 secondary details keep at least 4.5:1 against all text-row backgrounds.
 The coarse 256-color palette uses a single faint entry meeting the same
-text-contrast constraints, or no surface when none is available. No new
+text-contrast constraints, or the native-background frame when none is available. No new
 dependency, ongoing animation or additional Azure request is needed.
 
 ### Effects
