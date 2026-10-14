@@ -55,6 +55,16 @@ def test_followup_only_runs_windows_after_feed_authentication():
     assert "platform: Windows" in text and "platform: Linux" not in text and "platform: MacOS" not in text
 
 
+def test_command_linter_uses_its_own_pinned_tooling():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-stages.yml").read_text())
+    stages = next(value for entry in template["stages"] for key, value in entry.items()
+                  if key == "${{ if ne(parameters.mode, 'Plan') }}")
+    job = next(stage for stage in stages if stage.get("stage") == "CommandLint")["jobs"][0]
+    script = next(step["bash"] for step in job["steps"] if "bash" in step)
+    assert "python -m pip install azdev==0.2.13" in script
+    assert "dev_requirements" not in script and "--no-deps" not in script
+
+
 @pytest.mark.parametrize("denied", [None, 0, 1, 2, 3, 4, 5])
 def test_permissions_use_actual_token_and_fail_closed(diagnostic, monkeypatch, denied):
     calls = []

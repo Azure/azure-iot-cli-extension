@@ -2,7 +2,7 @@
 
 trigger: none
 pr: none
-name: partial-windows-followup-$(Date:yyyyMMdd).$(Rev:r)
+name: partial-lint-followup-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode

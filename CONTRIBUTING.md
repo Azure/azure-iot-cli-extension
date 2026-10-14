@@ -239,6 +239,10 @@ authentication, then lets the requested interpreter's pip bootstrap use that
 authenticated feed. Its source pin includes only the Windows startup/proxy
 test-isolation corrections, not product changes. It does not replace results
 from the original partial run.
+The lint follow-up branch builds its own pinned-source diagnostic candidate and
+keeps azdev's command-linter dependencies separate from `dev_requirements`.
+Its unit and live-integration stages are skipped; it cannot qualify or publish
+a release, and it does not replace the earlier candidate's provenance.
 
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
 on `1ES.Official.PipelineTemplate.yml` from the stable

@@ -142,7 +142,7 @@ stages:
                   python -m venv "$AGENT_TEMPDIRECTORY/lint-venv"
                   source "$AGENT_TEMPDIRECTORY/lint-venv/bin/activate"
                   cd "$SOURCE"
-                  python -m pip install -r dev_requirements azdev
+                  python -m pip install azdev==0.2.13
                   git clone --quiet --depth=1 --branch dev https://github.com/Azure/azure-cli.git \
                     "$AGENT_TEMPDIRECTORY/azure-cli"
                   azdev setup -c "$AGENT_TEMPDIRECTORY/azure-cli" -r "$SOURCE"
