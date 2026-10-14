@@ -2,10 +2,10 @@
 
 parameters:
   - name: mode
-    displayName: Nonpublishing premerge qualification only
+    displayName: Partial diagnostics only; MSDO missing; no release qualification or publication
     type: string
-    default: Validate
-    values: [Validate]
+    default: Partial
+    values: [Partial]
   - name: sourceBranch
     displayName: Pinned integration PR source
     type: string
@@ -13,8 +13,25 @@ parameters:
     values: [users/hangyiwang/ado147-integration-parity-retries]
 
 stages:
+  - stage: PermissionProbe
+    displayName: Check actual Build Service permissions without changing access
+    dependsOn: []
+    jobs:
+      - job: PermissionProbe
+        steps:
+          - checkout: self
+            clean: true
+            persistCredentials: false
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.13"
+          - script: python scripts/release_diagnostic.py permissions
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
   - stage: Resolve
     displayName: Freeze source and validate prerequisites
+    dependsOn: []
     jobs:
       - job: Resolve
         steps:
@@ -24,6 +41,9 @@ stages:
           - task: UsePythonVersion@0
             inputs:
               versionSpec: "3.13"
+          - script: >-
+              echo "##vso[task.logissue type=warning]PARTIAL DIAGNOSTIC:
+              MSDO will not run. This run cannot qualify a release or publish anything."
           - ${{ if eq(parameters.mode, 'Plan') }}:
               - script: python scripts/release_pipeline.py plan
                 displayName: Show nonpublishing onboarding plan
@@ -106,50 +126,6 @@ stages:
             parameters:
               sourceBranch: ${{ parameters.sourceBranch }}
               platform: MacOS
-
-      - stage: Security
-        dependsOn: Resolve
-        variables:
-          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
-        jobs:
-          - job: Security
-            pool:
-              name: iotupx-1espt-release-probe
-              image: iotupx-1espt-windows2025
-              os: windows
-            steps:
-              - template: release-source.yml
-                parameters:
-                  sourceBranch: ${{ parameters.sourceBranch }}
-              - pwsh: |
-                  git fetch --no-tags "$env:SOURCE" "$env:SOURCE_COMMIT"
-                  if ($LASTEXITCODE -ne 0) { throw "Cannot fetch the qualified security checkout." }
-                  git checkout --detach "$env:SOURCE_COMMIT"
-                  if ($LASTEXITCODE -ne 0) { throw "Cannot select the qualified security checkout." }
-                  if ((git rev-parse HEAD) -ne $env:SOURCE_COMMIT) { throw "Security source mismatch." }
-                displayName: Put the qualified source at the native scanner's repository root
-                env:
-                  SOURCE: $(Agent.TempDirectory)/release-source
-                  SOURCE_COMMIT: $(sourceCommit)
-              - task: UseDotNet@2
-                inputs:
-                  packageType: sdk
-                  version: 5.0.x
-              - task: UseDotNet@2
-                inputs:
-                  packageType: sdk
-                  version: 6.0.x
-              - task: MicrosoftSecurityDevOps@1
-                displayName: Run the existing security tool suite; fail on high findings
-                inputs:
-                  break: true
-                  publish: true
-                  artifactName: release-security-$(System.JobAttempt)
-                env:
-                  GDN_BANDIT_TARGET: $(Build.SourcesDirectory)/azext_iot
-                  GDN_BANDIT_RECURSIVE: "true"
-                  BUILD_SOURCEVERSION: $(sourceCommit)
-                  BUILD_SOURCEBRANCH: refs/heads/${{ parameters.sourceBranch }}
 
       - stage: CommandLint
         dependsOn: [Resolve, Build]
@@ -245,13 +221,13 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
-      - stage: Integration
-        displayName: Qualify the same wheel through pipeline 147
-        dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility]
+      - stage: IntegrationDiagnostic
+        displayName: Test the same wheel through 147; NOT release qualification
+        dependsOn: [Resolve, Build, Unit, PermissionProbe, CommandLint, IndexCompatibility]
         condition: >-
           and(not(canceled()), eq(dependencies.Resolve.result, 'Succeeded'),
           eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'),
-          eq(dependencies.Security.result, 'Succeeded'), eq(dependencies.CommandLint.result, 'Succeeded'),
+          eq(dependencies.PermissionProbe.result, 'Succeeded'), eq(dependencies.CommandLint.result, 'Succeeded'),
           eq(dependencies.IndexCompatibility.result, 'Succeeded'))
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
@@ -275,6 +251,10 @@ stages:
                   versionSpec: "3.13"
               - download: current
                 artifact: release-candidate
+              - script: python scripts/release_diagnostic.py admission
+                displayName: Fail closed on expired admission or competing workloads
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               - script: >-
                   python scripts/release_pipeline.py integrate
                   --directory "$(Pipeline.Workspace)/release-candidate"
@@ -311,56 +291,29 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
-  - ${{ if eq(parameters.mode, 'Release') }}:
-      - stage: Publish
-        displayName: Publish the qualified GitHub release and submit the index PR
-        dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility, Integration]
-        condition: >-
-          and(not(canceled()), eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
-          eq(dependencies.Resolve.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'),
-          eq(dependencies.Unit.result, 'Succeeded'), eq(dependencies.Security.result, 'Succeeded'),
-          eq(dependencies.CommandLint.result, 'Succeeded'), eq(dependencies.IndexCompatibility.result, 'Succeeded'),
-          eq(dependencies.Integration.result, 'Succeeded'))
-        variables:
-          - group: aziotcli_release_publish
-          - name: sourceCommit
-            value: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
-        jobs:
-          - job: Publish
-            templateContext:
-              type: releaseJob
-              isProduction: true
-              inputs:
-                - input: pipelineArtifact
-                  artifactName: release-candidate
-                  targetPath: $(Pipeline.Workspace)/release-candidate
-                - input: pipelineArtifact
-                  artifactName: release-tooling
-                  targetPath: $(Pipeline.Workspace)/release-tooling
-            steps:
-              - checkout: none
-              - task: UsePythonVersion@0
-                inputs:
-                  versionSpec: "3.13"
-              - script: >-
-                  python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" publish
-                  --directory "$(Pipeline.Workspace)/release-candidate"
-                  --record "$(Agent.TempDirectory)/publication/release.json"
-                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
-                env:
-                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
-                  RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
-              - script: >-
-                  python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" index
-                  --directory "$(Pipeline.Workspace)/release-candidate"
-                  --record "$(Agent.TempDirectory)/publication/release.json"
-                  --work-dir "$(Agent.TempDirectory)/index-submission"
-                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
-                env:
-                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
-                  RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
-                  INDEX_FORK_REPOSITORY: $(IndexForkRepository)
-                  PYTHONNOUSERSITE: "1"
-                  PYTHONPATH: ""
+  - stage: MissingCoverage
+    displayName: INCOMPLETE release validation - MSDO was not run
+    dependsOn: [Resolve, Build, Unit, PermissionProbe, CommandLint, IndexCompatibility, IntegrationDiagnostic]
+    condition: always()
+    jobs:
+      - job: MissingCoverage
+        templateContext:
+          outputs:
+            - output: pipelineArtifact
+              path: $(Build.ArtifactStagingDirectory)/partial-diagnostic
+              artifact: partial-diagnostic
+              isProduction: false
+              condition: always()
+        steps:
+          - checkout: self
+            clean: true
+            persistCredentials: false
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.13"
+          - script: >-
+              python scripts/release_diagnostic.py report
+              --output "$(Build.ArtifactStagingDirectory)/partial-diagnostic/report.json"
+            displayName: Retain component outcomes and explicitly fail full qualification
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)

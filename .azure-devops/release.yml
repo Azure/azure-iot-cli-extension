@@ -2,14 +2,14 @@
 
 trigger: none
 pr: none
-name: release-$(Date:yyyyMMdd).$(Rev:r)
+name: partial-no-msdo-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode
-    displayName: Nonpublishing premerge qualification only
+    displayName: Partial diagnostics only; MSDO missing; no release qualification or publication
     type: string
-    default: Validate
-    values: [Validate]
+    default: Partial
+    values: [Partial]
   - name: sourceBranch
     displayName: Pinned integration PR source
     type: string
