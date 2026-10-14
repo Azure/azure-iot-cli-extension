@@ -902,6 +902,8 @@ def test_production_publication_consumes_scanned_artifacts_without_source_checko
     assert all("--prepared" in script for script in scripts)
     assert "pip install" not in json.dumps(job)
     assert "git clone" not in json.dumps(job)
+    python = next(step for step in job["steps"] if step.get("task") == "UsePythonVersion@0")
+    assert python["inputs"]["disableDownloadFromRegistry"] is True
 
 
 def test_every_release_dependency_install_uses_native_feed_authentication():
@@ -921,3 +923,22 @@ def test_every_release_dependency_install_uses_native_feed_authentication():
                        if "prepare-publication" in step.get("bash", ""))
     assert '/publication-venv/bin/activate"' in preparation["bash"]
     assert "azdev==0.2.13" in preparation["bash"]
+
+
+def test_interpreter_bootstrap_cannot_install_pip_before_feed_authentication():
+    _, stages = all_stages()
+    source = yaml.safe_load((ROOT / ".azure-devops/templates/release-source.yml").read_text(encoding="utf-8"))
+    bootstrap = source["steps"][1]
+    assert bootstrap["task"] == "UsePythonVersion@0"
+    assert bootstrap["inputs"] == {"versionSpec": "3.13", "disableDownloadFromRegistry": True}
+    assert {parameter["name"] for parameter in source["parameters"]} == {"sourceBranch"}
+    unit = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
+    for steps, version in (
+        (unit["jobs"][0]["steps"], "$(python)"),
+        (stages["IndexCompatibility"]["jobs"][0]["steps"], "3.14"),
+    ):
+        feed_index = next(index for index, step in enumerate(steps) if step.get("template") == "release-feed.yml")
+        selection_index = next(index for index, step in enumerate(steps)
+                               if step.get("task") == "UsePythonVersion@0")
+        assert feed_index < selection_index
+        assert steps[selection_index]["inputs"]["versionSpec"] == version

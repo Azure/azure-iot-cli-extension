@@ -24,6 +24,7 @@ stages:
           - task: UsePythonVersion@0
             inputs:
               versionSpec: "3.13"
+              disableDownloadFromRegistry: true
           - ${{ if eq(parameters.mode, 'Plan') }}:
               - script: python scripts/release_pipeline.py plan
                 displayName: Show nonpublishing onboarding plan
@@ -209,8 +210,11 @@ stages:
               - template: release-source.yml
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
-                  pythonVersion: "3.14"
               - template: release-feed.yml
+              - task: UsePythonVersion@0
+                displayName: Select index Python using the authenticated feed for bootstrap packages
+                inputs:
+                  versionSpec: "3.14"
               - download: current
                 artifact: release-candidate
               - bash: |
@@ -273,6 +277,7 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: "3.13"
+                  disableDownloadFromRegistry: true
               - download: current
                 artifact: release-candidate
               - script: >-
@@ -342,6 +347,7 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: "3.13"
+                  disableDownloadFromRegistry: true
               - script: >-
                   python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" publish
                   --directory "$(Pipeline.Workspace)/release-candidate"

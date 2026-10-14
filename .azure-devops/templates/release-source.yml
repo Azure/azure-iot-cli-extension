@@ -3,17 +3,16 @@
 parameters:
   - name: sourceBranch
     type: string
-  - name: pythonVersion
-    type: string
-    default: "3.13"
 
 steps:
   - checkout: self
     clean: true
     persistCredentials: false
   - task: UsePythonVersion@0
+    displayName: Select cached bootstrap Python without downloading packages
     inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
+      versionSpec: "3.13"
+      disableDownloadFromRegistry: true
   - script: python scripts/release_pipeline.py checkout --source "$(Agent.TempDirectory)/release-source"
     displayName: Check out the exact qualified source, separate from pipeline code
     env:

@@ -35,8 +35,11 @@ jobs:
       - template: release-source.yml
         parameters:
           sourceBranch: ${{ parameters.sourceBranch }}
-          pythonVersion: $(python)
       - template: release-feed.yml
+      - task: UsePythonVersion@0
+        displayName: Select matrix Python using the authenticated feed for bootstrap packages
+        inputs:
+          versionSpec: $(python)
       - ${{ if eq(parameters.platform, 'MacOS') }}:
           - bash: |
               source scripts/select-openssl.sh
