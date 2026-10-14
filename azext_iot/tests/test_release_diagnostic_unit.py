@@ -38,6 +38,20 @@ def test_no_publish_or_scanner_substitute(diagnostic):
         diagnostic.release.automation_allowed()
 
 
+def test_followup_only_runs_windows312_after_feed_authentication():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text())
+    job = template["jobs"][0]
+    assert job["strategy"]["matrix"] == {"Python312": {"python": "3.12"}}
+    steps = job["steps"]
+    feed = next(index for index, step in enumerate(steps) if step.get("template") == "release-feed.yml")
+    selection = next(index for index, step in enumerate(steps) if step.get("task") == "UsePythonVersion@0")
+    assert feed < selection
+    source = yaml.safe_load((ROOT / ".azure-devops/templates/release-source.yml").read_text())
+    assert source["steps"][1]["inputs"] == {"versionSpec": "3.13", "disableDownloadFromRegistry": True}
+    text = (ROOT / ".azure-devops/templates/release-stages.yml").read_text()
+    assert "platform: Windows" in text and "platform: Linux" not in text and "platform: MacOS" not in text
+
+
 @pytest.mark.parametrize("denied", [None, 0, 1, 2, 3, 4, 5])
 def test_permissions_use_actual_token_and_fail_closed(diagnostic, monkeypatch, denied):
     calls = []

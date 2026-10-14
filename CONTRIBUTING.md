@@ -232,6 +232,11 @@ fails and retains a report with `releaseQualified: false`, even when all
 component checks pass. Live tests require the actual Build Service permission
 probe, successful component gates, no competing workloads, and admission
 before 23:00 UTC on October 14, 2026. Do not merge these diagnostic-only changes.
+The Windows 3.12 follow-up branch limits Unit to that single combination and
+queues with PermissionProbe, Build, CommandLint, IndexCompatibility, and
+IntegrationDiagnostic skipped. It selects cached Python 3.13 before feed
+authentication, then lets the requested interpreter's pip bootstrap use that
+authenticated feed. It does not replace results from the original partial run.
 
 `.azure-devops/release.yml` is the manual release orchestrator. Keep its pipeline
 on `1ES.Official.PipelineTemplate.yml` from the stable

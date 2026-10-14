@@ -2,7 +2,7 @@
 
 trigger: none
 pr: none
-name: partial-no-msdo-$(Date:yyyyMMdd).$(Rev:r)
+name: partial-python312-bootstrap-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode

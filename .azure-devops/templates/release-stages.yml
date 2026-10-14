@@ -109,7 +109,7 @@ stages:
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
 
       - stage: Unit
-        displayName: Full release unit and style matrix
+        displayName: Windows Python 3.12 bootstrap and unit/style follow-up only
         dependsOn: Resolve
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
@@ -117,15 +117,7 @@ stages:
           - template: release-unit.yml
             parameters:
               sourceBranch: ${{ parameters.sourceBranch }}
-              platform: Linux
-          - template: release-unit.yml
-            parameters:
-              sourceBranch: ${{ parameters.sourceBranch }}
               platform: Windows
-          - template: release-unit.yml
-            parameters:
-              sourceBranch: ${{ parameters.sourceBranch }}
-              platform: MacOS
 
       - stage: CommandLint
         dependsOn: [Resolve, Build]
@@ -185,8 +177,11 @@ stages:
               - template: release-source.yml
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
-                  pythonVersion: "3.14"
               - template: release-feed.yml
+              - task: UsePythonVersion@0
+                displayName: Select index Python using the authenticated feed for bootstrap packages
+                inputs:
+                  versionSpec: "3.14"
               - download: current
                 artifact: release-candidate
               - bash: |
