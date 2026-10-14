@@ -395,6 +395,14 @@ def test_namespace_outbound_principal_defaults_to_system_identity():
     assert resolve_namespace_outbound_principal(_namespace()) == "ns-system"
 
 
+@pytest.mark.parametrize("exists", [True, False])
+def test_workflow_assignment_lookup_reuses_strict_scoped_verification(mocker, exists):
+    manager = LinkRbacManager(MagicMock())
+    lookup = mocker.patch.object(manager, "_assignment_exists", return_value=exists)
+    assert manager.assignment_exists("principal", HUB_DATA_ROLE, TARGET_SCOPE) is exists
+    lookup.assert_called_once_with("principal", HUB_DATA_ROLE, TARGET_SCOPE, strict=True)
+
+
 def test_namespace_outbound_principal_uses_selected_uami_case_insensitively():
     namespace = _namespace(
         {"type": "UserAssigned", "userAssignedIdentity": UAMI.upper()}

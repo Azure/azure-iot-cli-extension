@@ -6,6 +6,12 @@ Release History
 1.0.0b2 (Preview)
 +++++++++++++++++
 
+**Namespace setup**
+
+* Added guided namespace setup for terminals: one question at a time in normal scrollback, no full-screen interface or mouse capture. A new setup proposes a new DPS and IoT Hub named after the namespace (existing resources or namespace-only can be chosen), existing links are reused, supplied values are never asked again, and a single typed approval covers the plan, which is re-read before applying. ``--yes``, ``--no-input`` and non-terminal runs never prompt or propose resources.
+* Setup configuration supports creating missing DPS/Hub targets through the existing release commands and optional Azure-managed root/intermediate CA and certificate-policy onboarding. External PKI remains available through individual CA commands.
+* Invalid configuration is rejected instead of silently replaced with defaults. Plain-terminal and noninteractive workflows remain available.
+
 **ADR bug fixes**
 
 * Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
@@ -13,6 +19,14 @@ Release History
 
 1.0.0b1 (Preview)
 +++++++++++++++++
+
+**Namespace workflows**
+
+* Added ``az iot adr ns setup`` for guided or scripted namespace creation/adoption, DPS-first Hub linking, optional Software Updates, plan review, script export, and setup receipts.
+* Added ``az iot adr ns check`` for read-only namespace, link, identity, and service-role diagnostics.
+* Workflows reuse the release link providers for validation, scoped RBAC, mutation recovery, and propagation handling.
+* Exported commands use the current identity flags and explicitly select the reviewed subscription. Target and identity reads follow their ARM resource IDs, including existing cross-subscription links.
+* Setup can link an existing cross-subscription Update Instance, but rejects creating a missing one there during input/plan validation, before namespace writes.
 
 **Known limitations**
 

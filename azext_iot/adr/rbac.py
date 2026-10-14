@@ -391,6 +391,10 @@ class LinkRbacManager:
                 return True
         return False
 
+    def assignment_exists(self, principal_id: str, role: str, scope: str) -> bool:
+        """Read the scoped assignment without granting or changing access."""
+        return self._assignment_exists(principal_id, role, scope, strict=True)
+
     def verify_many(self, requests: Iterable[dict], *, guard) -> None:
         """Read-only recovery preflight: exact existing roles, principals and scopes.
 
