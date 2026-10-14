@@ -3,12 +3,22 @@
 Release History
 ===============
 
+1.1.0b1 (Preview)
++++++++++++++++++
+
+**Wait command bug fixes**
+
+* Digital Twins, Device Update, and Device Registry schema, schema registry, and schema version generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
+
+**ADR bug fixes**
+
+* Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
+
 1.0.0b2 (Preview)
 +++++++++++++++++
 
 **ADR bug fixes**
 
-* Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
 * Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
 * Namespace link add/update preserve the original service failure as the exception cause when recovery stops on a later state-validation error or timeout, unless the stopping error already has an exception cause or context.
 

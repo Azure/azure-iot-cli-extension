@@ -26,12 +26,10 @@ from azext_iot.adr import commands_wait
 from azext_iot.adr.providers.registry_device import RegistryDeviceProvider
 from azext_iot.tests.adr import test_adr_registry_device_unit as provider_tests
 from azext_iot.tests.adr import test_adr_sdk_unit as sdk_tests
-from azext_iot.tests.adr import test_adr_validation_scenarios_unit as validation_tests
 
 
 registry_device_provider = provider_tests.registry_device_provider
 wire_client = sdk_tests.wire_client
-offline_cli = validation_tests.offline_cli
 NAMESPACE_URL = sdk_tests.NAMESPACE_URL
 
 
