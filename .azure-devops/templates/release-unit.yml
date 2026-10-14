@@ -36,6 +36,7 @@ jobs:
         parameters:
           sourceBranch: ${{ parameters.sourceBranch }}
           pythonVersion: $(python)
+      - template: release-feed.yml
       - ${{ if eq(parameters.platform, 'MacOS') }}:
           - bash: |
               source scripts/select-openssl.sh
@@ -43,9 +44,15 @@ jobs:
             displayName: Select capability-checked OpenSSL 3 on macOS
             workingDirectory: $(Agent.TempDirectory)/release-source
       - script: python -m pip install tox
-      - script: tox run -vv --notest
+      - script: >-
+          tox run --notest
+          -x "testenv:python-azcur-unit.pass_env+=PIP_*"
+          -x "testenv:lint.pass_env+=PIP_*"
         workingDirectory: $(Agent.TempDirectory)/release-source
-      - script: tox run --skip-pkg-install
+      - script: >-
+          tox run --skip-pkg-install
+          -x "testenv:python-azcur-unit.pass_env+=PIP_*"
+          -x "testenv:lint.pass_env+=PIP_*"
         displayName: Run existing clean, lint, serial unit and coverage environments
         workingDirectory: $(Agent.TempDirectory)/release-source
       - task: PublishTestResults@2

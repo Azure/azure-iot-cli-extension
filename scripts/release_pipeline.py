@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 from urllib.error import HTTPError
-from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
@@ -29,6 +29,7 @@ import zipfile
 REPOSITORY = "Azure/azure-iot-cli-extension"
 INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
+FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
 BRANCHES = {"dev", "preview", "release/1.1.0-preview"}
 INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
@@ -113,7 +114,6 @@ def github(resource, **kwargs):
 
 def checkout(destination, resolving=False):
     if resolving:
-        feed_url(environment("RELEASE_PIP_FEED_URL"))
         if environment("RELEASE_MODE") == "Release":
             automation_allowed()
     source_branch = branch(environment("RELEASE_SOURCE_BRANCH"))
@@ -168,26 +168,40 @@ def producer():
     }
 
 
-def feed_url(value):
-    uri = urlsplit(value)
-    if (uri.scheme != "https" or not uri.hostname or uri.username or uri.password
-            or uri.query or uri.fragment or uri.port not in (None, 443)):
-        raise ValueError("ReleasePipFeedUrl must be an approved HTTPS feed URL without credentials, query or fragment.")
-    path = uri.path.rstrip("/")
-    if not path.endswith("/simple"):
-        path += "/simple"
-    return urlunsplit((uri.scheme, uri.netloc, path + "/", "", ""))
+def feed_environment():
+    authenticated = os.environ.get("PIP_INDEX_URL", "")
+    try:
+        uri = urlsplit(authenticated)
+        port = uri.port
+    except ValueError:
+        raise ValueError("PipAuthenticate did not provide a valid authenticated feed URL.") from None
+    expected = urlsplit(FEED)
+    if (uri.scheme != expected.scheme or uri.hostname != expected.hostname
+            or uri.path.rstrip("/") != expected.path.rstrip("/")
+            or not uri.username or not uri.password or port not in (None, 443)
+            or uri.query or uri.fragment or any(char.isspace() for char in authenticated)):
+        raise ValueError("PipAuthenticate must authenticate exactly the configured aziotcli/pip feed.")
+    result = {key: value for key, value in os.environ.items() if not key.startswith("PIP_")}
+    result.update(
+        PIP_INDEX_URL=authenticated, PIP_CONFIG_FILE=os.devnull, PIP_EXTRA_INDEX_URL="",
+        PIP_KEYRING_PROVIDER="disabled", PIP_NO_INPUT="1", PIP_DISABLE_PIP_VERSION_CHECK="1",
+        PIP_NO_CACHE_DIR="1",
+    )
+    return result
+
+
+def configure_feed():
+    configured = feed_environment()
+    for key in sorted(set(os.environ) | set(configured)):
+        if key.startswith("PIP_") and key != "PIP_INDEX_URL":
+            if not re.fullmatch(r"PIP_[A-Z0-9_]+", key):
+                raise ValueError("Invalid inherited pip configuration variable name.")
+            print(f"##vso[task.setvariable variable={key}]{configured.get(key, '')}", flush=True)
+    print("Using only the authenticated aziotcli/pip feed; alternate indexes and pip configuration are disabled.")
 
 
 def build_candidate(source, work_dir):
-    feed = urlsplit(feed_url(environment("RELEASE_PIP_FEED_URL")))
-    token = command(["az", "account", "get-access-token", "--resource", "https://management.azure.com/",
-                     "--query", "accessToken", "--output", "tsv", "--only-show-errors"])
-    if not token or "\n" in token or "\r" in token:
-        raise ValueError("The release service connection did not provide a package-feed token.")
-    build_env = dict(os.environ, PIP_INDEX_URL=urlunsplit(
-        (feed.scheme, f"build:{quote(token, safe='')}@{feed.netloc}", feed.path, "", "")),
-        PIP_EXTRA_INDEX_URL="", PIP_DISABLE_PIP_VERSION_CHECK="1")
+    build_env = feed_environment()
 
     def run(args):
         subprocess.run(args, cwd=source, env=build_env, check=True)
@@ -500,14 +514,56 @@ def verify_existing_index_branch(fork, ref, contents, entry):
     verify_index_change(before, json.loads(contents), entry)
 
 
-def publish(directory, receipt):
+def index_metadata(wheel, destination):
+    if Path(environment("VIRTUAL_ENV")).resolve() != Path(sys.prefix).resolve():
+        raise ValueError("Index metadata generation requires the activated tooling virtual environment.")
+    from importlib.metadata import version
+    from azdev.operations.extensions.util import get_ext_metadata
+
+    if version("azdev") != "0.2.13":
+        raise ValueError("Index metadata generation requires azdev 0.2.13.")
+    destination.mkdir(parents=True, exist_ok=False)
+    return get_ext_metadata(str(destination), str(wheel), "azure-iot")
+
+
+def prepare_publication(directory, tooling, work_dir):
     from packaging.version import Version
 
-    publication_allowed()
     candidate = verify_candidate(directory)
     version = Version(candidate["wheel"]["version"])
     if str(version) != candidate["wheel"]["version"]:
         raise ValueError("The wheel version must already be normalized.")
+    wheel = candidate["wheel"]
+    entry = {
+        "downloadUrl": f"https://github.com/{REPOSITORY}/releases/download/v{version}/{wheel['file']}",
+        "sha256Digest": wheel["sha256"], "filename": wheel["file"],
+        "metadata": index_metadata(directory / wheel["file"], work_dir / "index-metadata"),
+    }
+    tooling.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(Path(__file__), tooling / "release_pipeline.py")
+    prepared = tooling / "publication.json"
+    write(prepared, {"candidate": candidate, "indexEntry": entry, "prerelease": version.is_prerelease})
+    verify_publication_inputs(directory, prepared)
+
+
+def verify_publication_inputs(directory, prepared):
+    candidate = verify_candidate(directory)
+    value = read(prepared)
+    entry = value["indexEntry"]
+    wheel = candidate["wheel"]
+    expected_url = f"https://github.com/{REPOSITORY}/releases/download/v{wheel['version']}/{wheel['file']}"
+    if (value["candidate"] != candidate or type(value["prerelease"]) is not bool
+            or set(entry) != {"downloadUrl", "sha256Digest", "filename", "metadata"}
+            or entry["filename"] != wheel["file"] or entry["sha256Digest"] != wheel["sha256"]
+            or entry["downloadUrl"] != expected_url or entry["metadata"].get("version") != wheel["version"]):
+        raise ValueError("Prepared publication metadata does not match the qualified candidate.")
+    return candidate, value
+
+
+def publish(directory, receipt, prepared):
+    publication_allowed()
+    candidate, preparation = verify_publication_inputs(directory, prepared)
+    version = candidate["wheel"]["version"]
     tag = f"v{version}"
     existing_tag = tag_commit(tag)
     if existing_tag is not None and existing_tag != candidate["sourceCommit"]:
@@ -517,10 +573,10 @@ def publish(directory, receipt):
         release = github(f"repos/{REPOSITORY}/releases", method="POST", data={
             "tag_name": tag, "target_commitish": candidate["sourceCommit"],
             "name": f"azure-iot {version}", "draft": True,
-            "prerelease": version.is_prerelease, "generate_release_notes": True,
+            "prerelease": preparation["prerelease"], "generate_release_notes": True,
         })
     if (release["target_commitish"] != candidate["sourceCommit"] and existing_tag != candidate["sourceCommit"]
-            or release["prerelease"] != version.is_prerelease):
+            or release["prerelease"] != preparation["prerelease"]):
         raise ValueError("Existing release has different source or prerelease metadata.")
     for asset in (candidate["wheel"], candidate["sbom"]):
         matches = [item for item in release["assets"] if item["name"] == asset["file"]]
@@ -558,9 +614,9 @@ def publish(directory, receipt):
     return result
 
 
-def index_pull_request(directory, receipt, work_dir):
+def index_pull_request(directory, receipt, work_dir, prepared):
     publication_allowed()
-    candidate = verify_candidate(directory)
+    candidate, preparation = verify_publication_inputs(directory, prepared)
     publication = read(receipt)
     if publication["candidate"] != candidate:
         raise ValueError("Publication receipt belongs to a different candidate.")
@@ -579,12 +635,9 @@ def index_pull_request(directory, receipt, work_dir):
     fork_info = github(f"repos/{fork}")
     if not fork_info.get("fork") or fork_info.get("parent", {}).get("full_name") != INDEX_REPOSITORY:
         raise ValueError("The configured repository is not a fork of the official index.")
-    index_dir = work_dir / "azure-cli-extensions"
     work_dir.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "clone", "--quiet", "--depth=1", "--branch", "main",
-                    f"https://github.com/{INDEX_REPOSITORY}.git", str(index_dir)], check=True)
-    index_path = index_dir / "src/index.json"
-    before = read(index_path)
+    source_sha = commit(github(f"repos/{INDEX_REPOSITORY}/git/ref/heads/main")["object"]["sha"])
+    before = json.loads(github_contents(INDEX_REPOSITORY, source_sha))
     prior = before["extensions"].get("azure-iot", [])
     same_version = [entry for entry in prior if entry["metadata"]["version"] == candidate["wheel"]["version"]]
     if same_version:
@@ -593,30 +646,29 @@ def index_pull_request(directory, receipt, work_dir):
             raise ValueError("The index already contains conflicting metadata for this version.")
         print("The exact candidate is already indexed; no duplicate PR was created.")
         return {"status": "already-indexed"}
-    subprocess.run(["azdev", "extension", "repo", "add", str(index_dir)], check=True)
-    subprocess.run(["azdev", "extension", "update-index", expected_url], check=True)
-    after = read(index_path)
-    added = after["extensions"]["azure-iot"][-1]
+    after = json.loads(json.dumps(before))
+    added = preparation["indexEntry"]
+    after["extensions"].setdefault("azure-iot", []).append(added)
     verify_index_change(before, after, added)
     if (added["metadata"]["version"] != candidate["wheel"]["version"]
             or added["sha256Digest"] != candidate["wheel"]["sha256"]
             or added["filename"] != candidate["wheel"]["file"] or added["downloadUrl"] != expected_url):
         raise ValueError("Index update changed more than the verified candidate entry.")
-    source_sha = command(["git", "rev-parse", "HEAD"], index_dir)
+    index_path = work_dir / "index.json"
+    index_path.write_text(json.dumps(after, indent=4, sort_keys=True), encoding="utf-8")
     release_branch = f"release/azure-iot-{candidate['wheel']['version']}"
     ref = github(f"repos/{fork}/git/ref/heads/{quote(release_branch, safe='')}", missing=True)
     encoded = base64.b64encode(index_path.read_bytes()).decode()
     if ref:
         contents = github_contents(fork, release_branch)
-        if contents != index_path.read_bytes():
-            if ref["object"]["sha"] != source_sha:
-                verify_existing_index_branch(fork, release_branch, contents, added)
-            else:
-                old = github(f"repos/{fork}/contents/src/index.json?" + urlencode({"ref": release_branch}))
-                github(f"repos/{fork}/contents/src/index.json", method="PUT", data={
-                    "message": f"Update azure-iot to {candidate['wheel']['version']}",
-                    "content": encoded, "sha": old["sha"], "branch": release_branch,
-                })
+        if ref["object"]["sha"] != source_sha:
+            verify_existing_index_branch(fork, release_branch, contents, added)
+        elif contents != index_path.read_bytes():
+            old = github(f"repos/{fork}/contents/src/index.json?" + urlencode({"ref": release_branch}))
+            github(f"repos/{fork}/contents/src/index.json", method="PUT", data={
+                "message": f"Update azure-iot to {candidate['wheel']['version']}",
+                "content": encoded, "sha": old["sha"], "branch": release_branch,
+            })
     else:
         github(f"repos/{fork}/git/refs", method="POST",
                data={"ref": f"refs/heads/{release_branch}", "sha": source_sha})
@@ -644,12 +696,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=[
         "plan", "resolve", "checkout", "build", "candidate", "verify", "integrate", "cancel",
-        "verify-integration", "index-check", "publish", "index",
+        "verify-integration", "index-check", "feed-environment", "prepare-publication", "publish", "index",
     ])
     parser.add_argument("--source", type=Path)
     parser.add_argument("--directory", type=Path)
     parser.add_argument("--record", type=Path)
     parser.add_argument("--work-dir", type=Path)
+    parser.add_argument("--prepared", type=Path)
     args = parser.parse_args()
     if args.operation == "plan":
         print(json.dumps({
@@ -663,6 +716,10 @@ def main():
         create_candidate(args.source, args.directory)
     elif args.operation == "build":
         build_candidate(args.source, args.work_dir)
+    elif args.operation == "feed-environment":
+        configure_feed()
+    elif args.operation == "prepare-publication":
+        prepare_publication(args.directory, args.prepared, args.work_dir)
     elif args.operation == "verify":
         verify_candidate(args.directory)
     elif args.operation == "integrate":
@@ -672,11 +729,11 @@ def main():
     elif args.operation == "verify-integration":
         verify_integration_artifacts(args.directory, args.work_dir)
     elif args.operation == "publish":
-        publish(args.directory, args.record)
+        publish(args.directory, args.record, args.prepared)
     elif args.operation == "index-check":
         index_check(args.source, args.directory, args.work_dir)
     elif args.operation == "index":
-        result = index_pull_request(args.directory, args.record, args.work_dir)
+        result = index_pull_request(args.directory, args.record, args.work_dir, args.prepared)
         write(args.work_dir / "index-pr.json", result)
 
 

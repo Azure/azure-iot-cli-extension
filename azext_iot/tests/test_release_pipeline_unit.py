@@ -8,6 +8,7 @@ import base64
 from copy import deepcopy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 from unittest.mock import Mock
@@ -34,7 +35,8 @@ def candidate(tmp_path, monkeypatch):
         "BUILD_SOURCEBRANCH": "refs/heads/dev", "BUILD_REPOSITORY_NAME": release.REPOSITORY,
         "SYSTEM_TEAMPROJECTID": PROJECT, "SYSTEM_JOBATTEMPT": "1",
         "RELEASE_SOURCE_BRANCH": "release/1.1.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
-        "RELEASE_PIP_FEED_URL": "https://pkgs.dev.azure.com/test-project/feed/simple/", "RELEASE_MODE": "Validate",
+        "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
+        "RELEASE_MODE": "Validate",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -55,6 +57,13 @@ def candidate(tmp_path, monkeypatch):
         "sbom": {"file": "SBOM.zip", "sha256": release.digest(directory / "SBOM.zip")},
     }
     release.write(directory / "candidate.json", value)
+    release.write(tmp_path / "publication.json", {
+        "candidate": value, "prerelease": True, "indexEntry": {
+            "downloadUrl": f"https://github.com/{release.REPOSITORY}/releases/download/v1.1.0b1/{filename}",
+            "sha256Digest": value["wheel"]["sha256"], "filename": filename,
+            "metadata": {"version": "1.1.0b1"},
+        },
+    })
     return directory, value
 
 
@@ -241,25 +250,57 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(candidate,
     "http://feed.invalid/simple", "https://user:password@feed.invalid/simple",
     "https://feed.invalid/simple?token=x", "https://feed.invalid/simple#x", "https://feed.invalid:80/simple",
 ])
-def test_invalid_feed_configuration_rejected(url):
-    with pytest.raises(ValueError, match="approved HTTPS"):
-        release.feed_url(url)
+def test_invalid_feed_configuration_rejected(monkeypatch, url):
+    monkeypatch.setenv("PIP_INDEX_URL", url)
+    with pytest.raises(ValueError, match="PipAuthenticate"):
+        release.feed_environment()
 
 
-def test_feed_url_normalization():
-    assert release.feed_url("https://feed.invalid/path") == "https://feed.invalid/path/simple/"
-    assert release.feed_url("https://feed.invalid/path/simple/") == "https://feed.invalid/path/simple/"
+def test_native_feed_disables_fallbacks_and_does_not_print_credentials(candidate, monkeypatch, capsys):
+    monkeypatch.setenv("PIP_EXTRA_INDEX_URL", "https://unapproved.invalid/simple/")
+    monkeypatch.setenv("PIP_TRUSTED_HOST", "unapproved.invalid")
+    monkeypatch.setenv("PIP_CONFIG_FILE", "unapproved-pip.conf")
+    configured = release.feed_environment()
+    assert configured["PIP_CONFIG_FILE"] == os.devnull
+    assert configured["PIP_EXTRA_INDEX_URL"] == ""
+    assert configured["PIP_KEYRING_PROVIDER"] == "disabled"
+    assert "PIP_TRUSTED_HOST" not in configured
+    release.configure_feed()
+    output = capsys.readouterr().out
+    assert "offline-placeholder" not in output and "PIP_INDEX_URL" not in output
+    assert "##vso[task.setvariable variable=PIP_TRUSTED_HOST]\n" in output
+    assert "unapproved" not in output
 
 
-def test_build_token_is_scoped_to_child_environment_not_command_or_artifact(candidate, tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("change", [
+    "missing-auth", "other-host", "other-feed", "query", "bad-port", "whitespace",
+])
+def test_native_feed_rejects_wrong_auth_destination_without_leaking_tokens(candidate, monkeypatch, capsys, change):
+    valid = os.environ["PIP_INDEX_URL"]
+    values = {
+        "missing-auth": release.FEED,
+        "other-host": valid.replace("pkgs.dev.azure.com", "other.invalid"),
+        "other-feed": valid.replace("/_packaging/pip/", "/_packaging/other/"),
+        "query": valid + "?token=not-for-logs",
+        "bad-port": valid.replace("pkgs.dev.azure.com", "pkgs.dev.azure.com:invalid"),
+        "whitespace": valid + "\n",
+    }
+    monkeypatch.setenv("PIP_INDEX_URL", values[change])
+    with pytest.raises(ValueError, match="PipAuthenticate") as error:
+        release.configure_feed()
+    assert "offline-placeholder" not in str(error.value)
+    assert not any(capsys.readouterr())
+
+
+def test_build_uses_native_feed_without_azure_token_retrieval(candidate, tmp_path, monkeypatch, capsys):
     directory, value = candidate
     source = tmp_path / "source"
     dist = source / "dist"
     dist.mkdir(parents=True)
     (dist / value["wheel"]["file"]).write_bytes((directory / value["wheel"]["file"]).read_bytes())
     (tmp_path / "sbom-tool").touch()
-    secret = "offline-placeholder-not-a-real-token"
-    token_command = Mock(return_value=secret)
+    secret = "offline-placeholder"
+    token_command = Mock(side_effect=AssertionError("Azure token retrieval must not be used"))
     monkeypatch.setattr(release, "command", token_command)
     run = Mock()
     monkeypatch.setattr(release.subprocess, "run", run)
@@ -267,8 +308,7 @@ def test_build_token_is_scoped_to_child_environment_not_command_or_artifact(cand
     monkeypatch.setattr(release, "digest", Mock(
         return_value="bf5d4f99bc98c119d549d08fc02ae92598a7a42772f17317c01031a92632e05b"))
     release.build_candidate(source, tmp_path)
-    assert "--resource" in token_command.call_args.args[0]
-    assert "https://management.azure.com/" in token_command.call_args.args[0]
+    token_command.assert_not_called()
     for call in run.call_args_list:
         assert secret not in json.dumps(call.args)
         if "env" in call.kwargs:
@@ -276,6 +316,59 @@ def test_build_token_is_scoped_to_child_environment_not_command_or_artifact(cand
             assert call.kwargs["env"]["PIP_EXTRA_INDEX_URL"] == ""
     assert secret not in capsys.readouterr().out
     assert not (dist / "requirements.txt").exists()
+
+
+def test_prepare_publication_uses_official_metadata_without_publishing(candidate, tmp_path, monkeypatch):
+    directory, value = candidate
+    monkeypatch.delenv("RELEASE_GITHUB_TOKEN")
+    metadata = Mock(return_value={"version": value["wheel"]["version"], "name": "azure-iot"})
+    monkeypatch.setattr(release, "index_metadata", metadata)
+    tooling = tmp_path / "tooling"
+    release.prepare_publication(directory, tooling, tmp_path / "preparation")
+    metadata.assert_called_once_with(directory / value["wheel"]["file"], tmp_path / "preparation/index-metadata")
+    assert (tooling / "release_pipeline.py").read_bytes() == (ROOT / "scripts/release_pipeline.py").read_bytes()
+    actual, prepared = release.verify_publication_inputs(directory, tooling / "publication.json")
+    assert actual == value and prepared["prerelease"] is True
+    assert prepared["indexEntry"]["downloadUrl"].endswith("/v1.1.0b1/" + value["wheel"]["file"])
+    release.github.assert_not_called()
+
+
+def test_index_metadata_requires_activated_virtualenv(monkeypatch, tmp_path):
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+    with pytest.raises(ValueError, match="VIRTUAL_ENV"):
+        release.index_metadata(tmp_path / "wheel.whl", tmp_path / "metadata")
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "not-active"))
+    with pytest.raises(ValueError, match="activated"):
+        release.index_metadata(tmp_path / "wheel.whl", tmp_path / "metadata")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("filename", "other.whl"), ("downloadUrl", "https://other.invalid/candidate.whl"),
+    ("sha256Digest", "0" * 64), ("metadata", {"version": "1.2.0"}),
+])
+def test_prepared_metadata_must_match_candidate(candidate, tmp_path, field, value):
+    directory, _ = candidate
+    prepared = tmp_path / "publication.json"
+    payload = release.read(prepared)
+    payload["indexEntry"][field] = value
+    release.write(prepared, payload)
+    with pytest.raises(ValueError, match="Prepared publication"):
+        release.verify_publication_inputs(directory, prepared)
+
+
+@pytest.mark.parametrize("change", ["candidate", "prerelease"])
+def test_invalid_preparation_blocks_publication_before_network(candidate, tmp_path, change):
+    directory, _ = candidate
+    prepared = tmp_path / "publication.json"
+    payload = release.read(prepared)
+    if change == "candidate":
+        payload["candidate"]["producer"]["build"] = "901"
+    else:
+        payload["prerelease"] = "false"
+    release.write(prepared, payload)
+    with pytest.raises(ValueError, match="Prepared publication"):
+        release.publish(directory, tmp_path / "release.json", prepared)
+    release.github.assert_not_called()
 
 
 def test_real_ado_repository_and_serialized_parameter_shape(candidate):
@@ -421,7 +514,7 @@ def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, sou
     directory, _ = candidate
     monkeypatch.setenv("BUILD_SOURCEBRANCH", source_branch)
     with pytest.raises(ValueError, match="reviewed release automation"):
-        release.publish(directory, tmp_path / "release.json")
+        release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     release.github.assert_not_called()
 
 
@@ -439,7 +532,7 @@ def test_existing_public_release_is_reused_without_writes(candidate, tmp_path, m
     monkeypatch.setattr(release, "find_release", Mock(return_value=published))
     mocked = Mock(return_value=published)
     monkeypatch.setattr(release, "github", mocked)
-    result = release.publish(directory, tmp_path / "release.json")
+    result = release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     assert result["candidate"] == value
     assert result["tag"] == "v1.1.0b1"
     assert all("method" not in call.kwargs for call in mocked.call_args_list)
@@ -458,7 +551,7 @@ def test_existing_release_conflicts_are_never_overwritten(candidate, tmp_path, m
     monkeypatch.setattr(release, "tag_commit", Mock(return_value=AUTOMATION_SHA if problem == "tag" else SOURCE_SHA))
     monkeypatch.setattr(release, "find_release", Mock(return_value=published))
     with pytest.raises(ValueError):
-        release.publish(directory, tmp_path / "release.json")
+        release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     release.github.assert_not_called()
 
 
@@ -486,7 +579,7 @@ def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path
 
     monkeypatch.setattr(release, "github", github)
     monkeypatch.setattr(release, "api", upload)
-    result = release.publish(directory, tmp_path / "release.json")
+    result = release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     assert result["candidate"] == value
     assert [method for method, _, _ in events] == ["POST", "POST", "PATCH", "GET"]
     assert events[1][2] == {"ref": "refs/tags/v1.1.0b1", "sha": SOURCE_SHA}
@@ -500,7 +593,7 @@ def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch):
     monkeypatch.setattr(release, "tag_commit", Mock(return_value=None))
     monkeypatch.setattr(release, "api", Mock(return_value={"digest": "sha256:wrong"}))
     with pytest.raises(ValueError, match="remains a draft"):
-        release.publish(directory, tmp_path / "release.json")
+        release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     release.github.assert_not_called()
 
 
@@ -529,7 +622,7 @@ def index_context(candidate, tmp_path, monkeypatch):
     url = f"https://github.com/{release.REPOSITORY}/releases/download/v1.1.0b1/{value['wheel']['file']}"
     release.write(receipt, {"release": 10, "tag": "v1.1.0b1", "wheelUrl": url, "candidate": value})
     work = tmp_path / "submission"
-    index = work / "azure-cli-extensions/src/index.json"
+    index = work / "index.json"
     before = {"extensions": {"azure-iot": [{
         "metadata": {"version": "0.31.0"}, "downloadUrl": "https://example.invalid/old.whl",
         "filename": "old.whl", "sha256Digest": "c" * 64,
@@ -538,14 +631,12 @@ def index_context(candidate, tmp_path, monkeypatch):
     entry = {"metadata": {"version": "1.1.0b1"}, "downloadUrl": url,
              "filename": value["wheel"]["file"], "sha256Digest": value["wheel"]["sha256"]}
 
-    def run(args, **_kwargs):
-        if args[:3] == ["azdev", "extension", "update-index"]:
-            updated = deepcopy(before)
-            updated["extensions"]["azure-iot"].append(entry)
-            release.write(index, updated)
+    def contents(repository, _ref):
+        return json.dumps(before).encode() if repository == release.INDEX_REPOSITORY else index.read_bytes()
 
-    monkeypatch.setattr(release.subprocess, "run", Mock(side_effect=run))
-    monkeypatch.setattr(release, "command", Mock(return_value="c" * 40))
+    monkeypatch.setattr(release, "github_contents", Mock(side_effect=contents))
+    monkeypatch.setattr(release.subprocess, "run", Mock(side_effect=AssertionError("No production tool execution")))
+    monkeypatch.setattr(release, "command", Mock(side_effect=AssertionError("No production checkout")))
     return directory, receipt, work, index, entry
 
 
@@ -559,6 +650,8 @@ def test_index_submission_preserves_versions_and_never_merges(index_context, mon
             return {"html_url": "https://github.com/Azure/azure-cli-extensions/pull/123"}
         if resource == "repos/test-bot/azure-cli-extensions":
             return {"fork": True, "parent": {"full_name": release.INDEX_REPOSITORY}}
+        if resource == "repos/Azure/azure-cli-extensions/git/ref/heads/main":
+            return {"object": {"sha": "c" * 40}}
         if "/git/ref/heads/" in resource:
             return None
         if "/contents/" in resource:
@@ -568,9 +661,10 @@ def test_index_submission_preserves_versions_and_never_merges(index_context, mon
         raise AssertionError(resource)
 
     monkeypatch.setattr(release, "github", github)
-    result = release.index_pull_request(directory, receipt, work)
+    result = release.index_pull_request(directory, receipt, work, directory.parent / "publication.json")
     assert result["status"] == "review-required"
     assert len(release.read(index)["extensions"]["azure-iot"]) == 2
+    assert index.read_text(encoding="utf-8") == json.dumps(release.read(index), indent=4, sort_keys=True)
     assert [method for _, method, _ in writes] == ["POST", "PUT", "POST"]
     assert all("/merge" not in resource for resource, _, _ in writes)
     assert writes[1][0].startswith("repos/test-bot/")
@@ -578,23 +672,38 @@ def test_index_submission_preserves_versions_and_never_merges(index_context, mon
     assert writes[2][2]["base"] == "main"
 
 
-def test_index_identical_branch_reuses_open_pr(index_context, monkeypatch):
+@pytest.mark.parametrize("unrelated", [None, "file", "commit"])
+def test_index_identical_branch_requires_validation_before_reuse(index_context, monkeypatch, unrelated):
     directory, receipt, work, index, _ = index_context
 
     def github(resource, **kwargs):
         assert "method" not in kwargs
         if resource == "repos/test-bot/azure-cli-extensions":
             return {"fork": True, "parent": {"full_name": release.INDEX_REPOSITORY}}
+        if resource == "repos/Azure/azure-cli-extensions/git/ref/heads/main":
+            return {"object": {"sha": "c" * 40}}
         if "/git/ref/heads/" in resource:
             return {"object": {"sha": "d" * 40}}
         if "/contents/" in resource:
             return {"encoding": "base64", "content": base64.b64encode(index.read_bytes()).decode()}
         if "/pulls?" in resource:
             return [{"html_url": "https://github.com/Azure/azure-cli-extensions/pull/123"}]
+        if "/compare/" in resource:
+            return {
+                "ahead_by": 2 if unrelated == "commit" else 1,
+                "files": [{"filename": "other.py" if unrelated == "file" else "src/index.json"}],
+                "commits": [{"parents": [{"sha": "c" * 40}]}],
+                "merge_base_commit": {"sha": "c" * 40},
+            }
         raise AssertionError(resource)
 
     monkeypatch.setattr(release, "github", github)
-    assert release.index_pull_request(directory, receipt, work)["status"] == "review-required"
+    if unrelated:
+        with pytest.raises(ValueError, match="unrelated commits or files"):
+            release.index_pull_request(directory, receipt, work, directory.parent / "publication.json")
+    else:
+        assert release.index_pull_request(
+            directory, receipt, work, directory.parent / "publication.json")["status"] == "review-required"
 
 
 def test_index_existing_version_cannot_point_elsewhere(index_context, monkeypatch):
@@ -602,11 +711,12 @@ def test_index_existing_version_cannot_point_elsewhere(index_context, monkeypatc
     before = release.read(index)
     before["extensions"]["azure-iot"].append({**entry, "sha256Digest": "wrong"})
     release.write(index, before)
-    monkeypatch.setattr(release, "github", Mock(return_value={
-        "fork": True, "parent": {"full_name": release.INDEX_REPOSITORY},
-    }))
+    monkeypatch.setattr(release, "github_contents", Mock(return_value=index.read_bytes()))
+    monkeypatch.setattr(release, "github", Mock(side_effect=[
+        {"fork": True, "parent": {"full_name": release.INDEX_REPOSITORY}}, {"object": {"sha": "c" * 40}},
+    ]))
     with pytest.raises(ValueError, match="conflicting metadata"):
-        release.index_pull_request(directory, receipt, work)
+        release.index_pull_request(directory, receipt, work, directory.parent / "publication.json")
 
 
 def test_large_index_content_uses_blob_api(monkeypatch):
@@ -692,7 +802,12 @@ def test_yaml_preserves_all_twelve_unit_style_combinations():
         for version in ("3.10", "3.11", "3.12", "3.13")
     }
     steps = template["jobs"][0]["steps"]
-    assert any(step.get("script") == "tox run --skip-pkg-install" for step in steps)
+    commands = [step["script"] for step in steps if "script" in step]
+    assert any(script.startswith("tox run --skip-pkg-install") for script in commands)
+    for script in commands:
+        if script.startswith("tox run"):
+            assert 'testenv:python-azcur-unit.pass_env+=PIP_*' in script
+            assert 'testenv:lint.pass_env+=PIP_*' in script
 
 
 def test_yaml_selects_compliant_images_and_windows_source_analysis():
@@ -784,3 +899,25 @@ def test_production_publication_consumes_scanned_artifacts_without_source_checko
     scripts = [step["script"] for step in job["steps"] if "script" in step]
     assert 'release-tooling/release_pipeline.py" publish' in scripts[-2]
     assert 'release-tooling/release_pipeline.py" index' in scripts[-1]
+    assert all("--prepared" in script for script in scripts)
+    assert "pip install" not in json.dumps(job)
+    assert "git clone" not in json.dumps(job)
+
+
+def test_every_release_dependency_install_uses_native_feed_authentication():
+    _, stages = all_stages()
+    feed = yaml.safe_load((ROOT / ".azure-devops/templates/release-feed.yml").read_text(encoding="utf-8"))
+    assert feed["steps"][0] == {
+        "task": "PipAuthenticate@1", "inputs": {"artifactFeeds": "aziotcli/pip", "onlyAddExtraIndex": False},
+    }
+    for name in ("Build", "CommandLint", "IndexCompatibility"):
+        steps = stages[name]["jobs"][0]["steps"]
+        assert {"template": "release-feed.yml"} in steps
+    unit = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
+    assert {"template": "release-feed.yml"} in unit["jobs"][0]["steps"]
+    assert "ReleaseAzureServiceConnection" not in json.dumps(stages)
+    assert "ReleasePipFeedUrl" not in json.dumps(stages)
+    preparation = next(step for step in stages["Build"]["jobs"][0]["steps"]
+                       if "prepare-publication" in step.get("bash", ""))
+    assert '/publication-venv/bin/activate"' in preparation["bash"]
+    assert "azdev==0.2.13" in preparation["bash"]

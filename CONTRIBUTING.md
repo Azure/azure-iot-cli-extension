@@ -268,16 +268,17 @@ organization-mandated secret-scanning control.
    any definition temporarily pointing at unrelated YAML disabled; correct the
    branch/path before running. Use `Plan` for the first run. `Validate` is a real,
    resource-creating integration run, not a dry run.
-2. Configure non-queue-overridable `ReleaseAzureServiceConnection` and
-   `ReleasePipFeedUrl` pipeline variables. The former names an approved ADO Azure
-   service connection, preferably workload-identity federation. Its principal
-   must read the **same corporate package feed** used by the existing release.
-   The latter is that feed's HTTPS URL without credentials (`/simple/` is
-   normalized). The build obtains an ARM-audience token inside `AzureCLI@2`,
-   passes authenticated pip configuration only to build/SBOM child processes,
-   and never emits the token or persists it in an artifact. Do not enable
-   credential/debug tracing. Feed access is separate from integration-resource
-   access; do not assume the existing test identity has it.
+2. Confirm `aziotcli/pip` is the approved corporate/CFS dependency route.
+   `PipAuthenticate@1` uses the project's Build Service identity for this Azure
+   Artifacts feed; no Azure service connection or ARM token is used for packages.
+   Build, unit/style, command lint, and index compatibility validate the exact
+   authenticated feed URL and disable alternate indexes, external pip configuration,
+   keyring, and caches. Tox explicitly inherits these settings without changing
+   the candidate source. Grant only the necessary feed access; saving uncached
+   upstream packages can require Feed and Upstream Reader (Collaborator), not
+   merely Reader. A successful download probe proves access, not corporate/CFS
+   approval. Do not log credentials or persist authenticated configuration in
+   artifacts. Integration-resource authentication remains separate.
 3. Set `ReleasePipelineId` in pipeline 147's `aziotcli_test_primary` group to this
    new definition's numeric ID. Grant the project Build Service **Queue builds**,
    **View builds**, **View build pipeline** and **Stop builds** on 147 as needed;
@@ -338,16 +339,29 @@ flag. Existing mismatched tags/assets are never moved or overwritten. An
 identical public release is reused. **Public release already distributes the
 wheel**; index-team approval only gates its addition to the CLI index.
 
-After publication, the official `azdev extension update-index <wheel URL>` tool
-appends the candidate without removing prior versions. The helper verifies the
-version/URL/hash and that no other index entries changed, writes only the
-approved fork, and creates or reuses the version-specific PR against
+Before qualification finishes, Build activates an isolated virtual environment
+with pinned `azdev==0.2.13` and uses the same `get_ext_metadata` helper as
+`azdev extension update-index` on the local, immutable wheel. The CLI update-index
+command accepts only already-published HTTPS wheels, so its metadata generation
+is separated from publication. The governed `release-tooling` artifact retains
+that index entry, the normalized prerelease classification, and the complete
+candidate identity alongside the reviewed stdlib-only publication script.
+Validate exercises this preparation without needing a GitHub publishing credential.
+
+After publication, the helper reads the current upstream index at an exact commit
+through GitHub's API and appends the prepared candidate without removing prior
+versions. No source checkout, dependency installation, or azdev execution occurs
+in the production release job. The helper verifies the version/URL/hash and that
+no other index entries changed, writes only the approved fork, and creates or
+reuses the version-specific PR against
 `Azure/azure-cli-extensions:main`. It never merges or approves that PR. A failure
 here leaves the GitHub release public: retry the Publish job, which reuses the
 identical public release before retrying index submission, not the Build stage.
 Release/index URLs remain in the job's logs and GitHub state rather than
 new artifacts emitted by a production release job. Conflicting existing index
-branches require manual review.
+branches require manual review. Every existing branch that differs from the
+upstream commit is checked for unrelated commits/files, even when its index bytes
+already match the expected update.
 
 This pipeline is additive: it does not disable existing GitHub workflows,
 change schedules, or remove FICs. Cut those consumers over only after an

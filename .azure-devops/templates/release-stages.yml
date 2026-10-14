@@ -35,7 +35,6 @@ stages:
                 displayName: Resolve and verify the immutable source
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_PIP_FEED_URL: $(ReleasePipFeedUrl)
                   RELEASE_MODE: ${{ parameters.mode }}
 
   - ${{ if ne(parameters.mode, 'Plan') }}:
@@ -58,19 +57,12 @@ stages:
               - template: release-source.yml
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
-              - task: AzureCLI@2
+              - template: release-feed.yml
+              - script: >-
+                  python scripts/release_pipeline.py build
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --work-dir "$(Agent.TempDirectory)"
                 displayName: Build wheel and runtime SBOM using the authenticated package feed
-                inputs:
-                  azureSubscription: $(ReleaseAzureServiceConnection)
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  visibleAzLogin: false
-                  inlineScript: >-
-                    python scripts/release_pipeline.py build
-                    --source "$(Agent.TempDirectory)/release-source"
-                    --work-dir "$(Agent.TempDirectory)"
-                env:
-                  RELEASE_PIP_FEED_URL: $(ReleasePipFeedUrl)
               - script: >-
                   python scripts/release_pipeline.py candidate
                   --source "$(Agent.TempDirectory)/release-source"
@@ -81,9 +73,20 @@ stages:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - bash: |
                   set -euo pipefail
-                  mkdir -p "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling"
-                  cp scripts/release_pipeline.py "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling/"
-                displayName: Stage reviewed automation for checkout-free production release jobs
+                  python -m venv "$AGENT_TEMPDIRECTORY/publication-venv"
+                  source "$AGENT_TEMPDIRECTORY/publication-venv/bin/activate"
+                  python -m pip install azdev==0.2.13 packaging
+                  python scripts/release_pipeline.py prepare-publication \
+                    --directory "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-candidate" \
+                    --prepared "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling" \
+                    --work-dir "$AGENT_TEMPDIRECTORY/publication-preparation"
+                displayName: Prepare official azdev index metadata and governed publication inputs
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+                  AZURE_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azure-config
+                  AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azdev-config
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
 
       - stage: Unit
         displayName: Full release unit and style matrix
@@ -159,6 +162,7 @@ stages:
               - template: release-source.yml
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
               - download: current
                 artifact: release-candidate
               - script: python scripts/release_pipeline.py verify --directory "$(Pipeline.Workspace)/release-candidate"
@@ -206,6 +210,7 @@ stages:
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
                   pythonVersion: "3.14"
+              - template: release-feed.yml
               - download: current
                 artifact: release-candidate
               - bash: |
@@ -337,11 +342,11 @@ stages:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: "3.13"
-              - script: python -m pip install packaging azdev==0.2.13
               - script: >-
                   python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" publish
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/publication/release.json"
+                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -351,12 +356,11 @@ stages:
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/publication/release.json"
                   --work-dir "$(Agent.TempDirectory)/index-submission"
+                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
                   INDEX_FORK_REPOSITORY: $(IndexForkRepository)
-                  AZURE_CONFIG_DIR: $(Agent.TempDirectory)/index-submission/azure-config
-                  AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/index-submission/azdev-config
                   PYTHONNOUSERSITE: "1"
                   PYTHONPATH: ""
