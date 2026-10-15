@@ -15,6 +15,7 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
 from azext_iot.common.arm import sanitize_arm_identity
@@ -225,6 +226,11 @@ class LinkProvider(ADRProvider):
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
                 resource=resource, headers={"If-Match": etag}, retry_total=0,
+                # Keep retry suppression on the PUT, not on the poller's idempotent GETs.
+                polling=ARMPolling(
+                    timeout=self.client._config.polling_interval,
+                    path_format_arguments={"endpoint": self.client._config.base_url},
+                ),
             )
             return self._wait(
                 poller,

@@ -14,6 +14,7 @@ Release History
 **ADR unlink polling**
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
+* Operation-status and final namespace GETs retain SDK retries for transient failures; retry suppression applies only to the initial namespace read and PUT.
 * Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint and does not retry the namespace PUT.
 
 **Wait command bug fixes**

@@ -16,6 +16,7 @@ from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from azure.core.polling import LROPoller
+from azure.mgmt.core.polling.arm_polling import ARMPolling
 
 from azext_iot.adr import commands_link
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
@@ -48,7 +49,7 @@ def unlink_rbac(mocker):
 def unlink_client():
     credential = Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-token", 9999999999)
-    with DeviceRegistryMgmtClient(credential, "sub", polling_interval=0, retry_total=0) as client:
+    with DeviceRegistryMgmtClient(credential, "sub", polling_interval=0, retry_backoff_factor=0) as client:
         yield client
 
 
@@ -100,7 +101,9 @@ def test_delete_preserves_namespace_and_waits_without_target_reads(
         source["identity"].pop("principalId")
         source["identity"]["type"] = "UserAssigned"
     original = deepcopy(source)
-    client = Mock()
+    client = Mock(_config=SimpleNamespace(
+        polling_interval=7, base_url="https://centraluseuap.management.azure.com",
+    ))
     client.namespaces.get.return_value = (source, ETAG)
     completed = {"properties": {"provisioningState": "Succeeded"}}
     client.namespaces.begin_create_or_replace.return_value.result.return_value = completed
@@ -116,10 +119,15 @@ def test_delete_preserves_namespace_and_waits_without_target_reads(
 
     client.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="ns", retry_total=0, cls=ANY)
     arguments = client.namespaces.begin_create_or_replace.call_args.kwargs
-    assert set(arguments) == {"resource_group_name", "namespace_name", "resource", "headers", "retry_total"}
+    assert set(arguments) == {"resource_group_name", "namespace_name", "resource", "headers", "retry_total", "polling"}
     assert arguments["headers"] == {"If-Match": ETAG}
     assert arguments["namespace_name"] == "ns" and arguments["resource_group_name"] == "rg"
     assert arguments["retry_total"] == 0
+    polling = arguments["polling"]
+    assert isinstance(polling, ARMPolling)
+    assert polling._timeout == 7
+    assert polling._path_format_arguments == {"endpoint": client._config.base_url}
+    assert polling._operation_config == {}
     body = arguments["resource"]
     expected = writable_namespace_properties(original["properties"])
     del expected[section]["endpoints"]["primary"]
@@ -304,20 +312,72 @@ def test_delete_real_sdk_raises_async_service_failure(fixture_cmd, unlink_client
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("status", [403, 500])
-def test_delete_real_sdk_preserves_async_status_http_error(fixture_cmd, unlink_client, kind, section, _endpoint_type, status):
+@pytest.mark.parametrize("stage", ["async-status", "final-resource"])
+@pytest.mark.parametrize("status", [403, 429, 500, 503])
+def test_delete_real_sdk_preserves_polling_http_error_after_retries(
+    fixture_cmd, unlink_client, kind, section, _endpoint_type, stage, status,
+):
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
         network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
                     headers={"Azure-AsyncOperation": STATUS_URL})
-        network.get(STATUS_URL, status=status, json={
+        if stage == "final-resource":
+            network.get(STATUS_URL, json={"status": "Succeeded"})
+        failure_url = STATUS_URL if stage == "async-status" else URL
+        network.get(failure_url, status=status, json={
             "error": {"code": "StatusReadDenied", "message": "Original operation-status error."},
         })
         with pytest.raises(HttpResponseError, match="Original operation-status error") as raised:
             getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
         assert raised.value.status_code == status
         assert raised.value.error.code == "StatusReadDenied"
-        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET"]
+        policy = unlink_client._config.retry_policy
+        attempts = 1 if status == 403 else 1 + min(policy.total_retries, policy.status_retries)
+        assert [call.request.method for call in network.calls] == (
+            ["GET", "PUT"] + (["GET"] if stage == "final-resource" else []) + ["GET"] * attempts
+        )
+        expected_url = STATUS_URL if stage == "async-status" else network.calls[0].request.url
+        assert all(call.request.url == expected_url for call in network.calls[-attempts:])
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("stage", ["async-status", "final-resource"])
+@pytest.mark.parametrize("failure", [
+    pytest.param(429, id="throttled"),
+    pytest.param(500, id="server-error"),
+    pytest.param(503, id="unavailable"),
+    pytest.param(ServiceRequestError, id="connection-error"),
+    pytest.param(ServiceResponseError, id="read-error"),
+])
+def test_delete_real_sdk_recovers_from_transient_polling_error(
+    fixture_cmd, unlink_client, kind, section, _endpoint_type, stage, failure,
+):
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    with responses.RequestsMock() as network:
+        network.get(URL, json=namespace(), headers={"ETag": ETAG})
+        network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
+                    headers={"Azure-AsyncOperation": STATUS_URL})
+        if stage == "final-resource":
+            network.get(STATUS_URL, json={"status": "Succeeded"})
+        failure_url = STATUS_URL if stage == "async-status" else URL
+        if isinstance(failure, int):
+            network.get(failure_url, status=failure, json={"error": {"code": "Transient", "message": "Try again."}})
+        else:
+            network.get(failure_url, body=failure("Transient transport error."))
+        network.get(failure_url, json={"status": "Succeeded"} if stage == "async-status" else completed)
+        if stage == "async-status":
+            network.get(URL, json=completed)
+
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
+
+        assert result == completed
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET", "GET", "GET"]
+        resource_url = network.calls[0].request.url
+        assert [call.request.url for call in network.calls] == (
+            [resource_url, resource_url, STATUS_URL, STATUS_URL, resource_url] if stage == "async-status"
+            else [resource_url, resource_url, STATUS_URL, resource_url, resource_url]
+        )
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -348,7 +408,7 @@ def test_delete_no_wait_returns_poller_without_waiting(mocker, fixture_cmd, kind
 
 
 @pytest.mark.parametrize("stage", ["get", "put"])
-@pytest.mark.parametrize("status", [400, 403, 404, 409, 412, 429, 500])
+@pytest.mark.parametrize("status", [400, 403, 404, 409, 412, 429, 500, 503])
 def test_delete_real_sdk_preserves_backend_error_without_retries(fixture_cmd, unlink_client, caplog, stage, status):
     failure = {"error": {"code": "BackendUnlinkRejected", "message": "Original backend deletion detail."}}
     with responses.RequestsMock() as network:
@@ -364,6 +424,22 @@ def test_delete_real_sdk_preserves_backend_error_without_retries(fixture_cmd, un
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("error_type", [ServiceRequestError, ServiceResponseError])
+def test_delete_real_sdk_does_not_retry_put_transport_error(
+    fixture_cmd, unlink_client, kind, section, _endpoint_type, error_type,
+):
+    error = error_type("Original PUT transport error.")
+    with responses.RequestsMock() as network:
+        network.get(URL, json=namespace(), headers={"ETag": ETAG})
+        network.put(URL, body=error)
+        with pytest.raises(error_type) as raised:
+            getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
+        assert raised.value is error
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 def test_delete_real_cli_returns_completed_response(offline_cli, mocker, kind, section, _endpoint_type):
     get = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get",
                        return_value=(namespace(), ETAG))
@@ -375,7 +451,7 @@ def test_delete_real_cli_returns_completed_response(offline_cli, mocker, kind, s
                                "-g", "rg", "--yes", "-o", "json"], out_file=output) == 0
     assert json.loads(output.getvalue()) == completed
     assert get.call_count == put.call_count == 1
-    assert "polling" not in put.call_args.kwargs
+    assert isinstance(put.call_args.kwargs["polling"], ARMPolling)
     assert put.call_args.kwargs["headers"] == {"If-Match": ETAG}
 
 
