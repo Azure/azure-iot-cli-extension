@@ -339,14 +339,21 @@ def _create_namespace(run_uid, kind, dps, hub):
             receipts.write(receipt_name, child_record, exclusive=True)
             # CertificatePolicy is a ProxyResource; use its immutable UUID instead of tags for ownership.
             tag_options = "" if label == "policy" else f" --tags {tags}"
-            invoke(f"{command} create {arguments} {options}{tag_options}")
+            created = invoke(f"{command} create {arguments} {options}{tag_options}")
+            policy_uuid = None
+            if label == "policy":
+                created = created.as_json()
+                assert created["id"].lower() == expected_id.lower()
+                policy_uuid = created["properties"].get("uuid")
+                assert policy_uuid, "Certificate policy returned no ownership UUID."
+                receipts.write(receipt_name, {**child_record, "uuid": policy_uuid})
             invoke(f"{command} wait {arguments} {WAIT_OPTIONS}" + (" --created" if label == "policy" else ""))
             child = invoke(f"{command} show {arguments}").as_json()
             assert child["id"].lower() == expected_id.lower()
             if label == "policy":
-                policy_uuid = child["properties"].get("uuid")
-                assert policy_uuid, "Certificate policy returned no ownership UUID."
-                receipts.write(receipt_name, {**child_record, "uuid": policy_uuid})
+                assert child["properties"].get("uuid") == policy_uuid, (
+                    "Certificate policy ownership UUID changed after creation."
+                )
             else:
                 assert all(child.get("tags", {}).get(key) == value for key, value in record["tags"].items())
             assert child["properties"]["provisioningState"] == "Succeeded"

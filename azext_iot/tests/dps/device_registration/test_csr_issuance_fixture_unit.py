@@ -381,6 +381,20 @@ def test_uncertain_ica_submission_preserves_failure_and_cleans_persisted_child(n
     assert sum("delete -n issuingca" in command for command in namespace_commands.commands) == 1
 
 
+@pytest.mark.parametrize("failed", ["policy wait", "policy show"])
+def test_policy_follow_up_failure_preserves_error_and_cleans_created_resources(
+    namespace_commands, resource, scope, failed,
+):
+    namespace_commands.fail = failed
+    with pytest.raises(ForbiddenError, match="Injected service rejection"):
+        csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    receipt = json.loads((scope / "csr-child-policy.json").read_text(encoding="utf-8"))
+    assert receipt["uuid"] == "policy-uuid"
+    assert sum(failed in command for command in namespace_commands.commands) == 1
+    assert not namespace_commands.resources
+    assert not namespace_commands.roles
+
+
 @pytest.mark.parametrize("failed", ["iot dps identity assign", "iot adr ns link add", "create -n issuingca"])
 def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namespace_commands, resource, failed):
     namespace_commands.fail = failed
