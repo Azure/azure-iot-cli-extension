@@ -72,7 +72,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         assert endpoint_name in after["properties"][section]["endpoints"]
         assert after["tags"] == before["tags"]
 
-    def _remove_endpoint(self, namespace_name, kind, section, endpoint_name, target_name, *, skip_permission_check=False):
+    def _remove_endpoint(self, namespace_name, kind, section, endpoint_name, target_name, *, skip_rbac_check=False):
         selector = f"--ns {namespace_name} -g {TEST_RG}"
         before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         principal = resolve_namespace_outbound_principal(before)
@@ -85,13 +85,13 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         prepared_reader = self._reader_assignments(principal, scope)
         assert len(prepared_reader) == 1, "Fixture must prepare the required access before unlink."
         self._delete_owned_resource(kind, target_name, TEST_RG)
-        skip_option = " --skip-permission-check" if skip_permission_check else ""
+        skip_option = " --skip-rbac-check" if skip_rbac_check else ""
         with self.assertLogs("cli.azext_iot.adr", level="INFO") as logs:
             submitted = self.cmd(
                 f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes{skip_option}",
             ).get_output_in_json()
         assert not any("Cannot confirm read access" in message or "Could not verify" in message for message in logs.output)
-        if not skip_permission_check:
+        if not skip_rbac_check:
             assert any(
                 "Observed a read-capable role assignment" in message
                 or "Skipping permission check for endpoint linkingState" in message
@@ -179,7 +179,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             self._assert_live_target_removal_rejected(namespace_name, "hub", "messaging", "first")
             self._remove_endpoint(namespace_name, "hub", "messaging", "first", first_hub)
             self._remove_endpoint(
-                namespace_name, "hub", "messaging", "second", second_hub, skip_permission_check=True,
+                namespace_name, "hub", "messaging", "second", second_hub, skip_rbac_check=True,
             )
             self._remove_endpoint(namespace_name, "dps", "provisioning", "dps", dps_name)
         finally:

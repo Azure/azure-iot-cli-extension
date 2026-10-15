@@ -678,7 +678,7 @@ class LinkRbacManager:
             "The advisory check recognizes unconditional Reader, Contributor and Owner assignments, "
             "including inherited grants; custom roles, group membership and deny assignments are not fully evaluated. "
             "Continuing without changing role assignments; ADR may reject removal. "
-            "Verify the identity's read access or use --skip-permission-check to skip this advisory check.",
+            "Verify the identity's read access or use --skip-rbac-check to skip this advisory check.",
             namespace_principal_id, scope,
         )
 

@@ -593,9 +593,9 @@ def test_load_adr_arguments():
     )
     for kind in ("hub", "dps", "su"):
         remove_arguments = arguments[f"iot adr ns link {kind} remove"]
-        assert set(remove_arguments) == {"skip_permission_check"}
-        assert remove_arguments["skip_permission_check"]["options_list"] == ["--skip-permission-check"]
-        assert remove_arguments["skip_permission_check"]["action"] == "store_true"
+        assert set(remove_arguments) == {"skip_rbac_check"}
+        assert remove_arguments["skip_rbac_check"]["options_list"] == ["--skip-rbac-check"]
+        assert remove_arguments["skip_rbac_check"]["action"] == "store_true"
 
     for command in (
         "iot adr ns wait",

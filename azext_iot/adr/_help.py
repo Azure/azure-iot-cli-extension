@@ -755,7 +755,7 @@ def load_adr_help():
     LinkedResourceDeleted and Failed endpoints skip permission checks. Other states warn and continue.
     Missing access or unavailable checks warn and continue; ADR decides whether removal is allowed.
     Custom roles, conditions, group membership and deny assignments are not fully evaluated.
-    No role assignments are created or removed. Use --skip-permission-check to bypass only this
+    No role assignments are created or removed. Use --skip-rbac-check to bypass only this
     advisory check; --yes skips confirmation but does not skip permission checking.
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
@@ -769,7 +769,7 @@ def load_adr_help():
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
     - name: Remove an endpoint without the advisory permission check
-      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --skip-permission-check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --skip-rbac-check
   """
 
     helps[

@@ -201,6 +201,37 @@ def test_delete_preflight_failure_warns_and_continues(fixture_cmd, unlink_rbac, 
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("resource_id", [
+    pytest.param(123, id="integer"),
+    pytest.param(["invalid"], id="list"),
+    pytest.param({"id": "invalid"}, id="object"),
+    pytest.param(True, id="boolean"),
+])
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, resource_id, skip,
+):
+    source = namespace()
+    source["properties"][section]["endpoints"]["primary"]["resourceId"] = resource_id
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        network.put(URL, json=completed)
+
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
+            "primary", "ns", "rg", skip_rbac_check=skip,
+        )
+
+        assert result == completed
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+        assert "primary" not in json.loads(network.calls[1].request.body)["properties"][section]["endpoints"]
+        assert ("did not include a string resourceId" in caplog.text) is (not skip)
+        assert ("Continuing without changing role assignments" in caplog.text) is (not skip)
+        unlink_rbac.check_unlink_read_access.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("stage", ["get", "put", "result"])
 @pytest.mark.parametrize("error_type", [HttpResponseError, ServiceRequestError])
 def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, section, _endpoint_type, stage, error_type):
@@ -253,13 +284,13 @@ def test_delete_command_handler_forwards_selectors_and_flags(mocker, kind, secti
     provider_type = mocker.patch.object(commands_link, "LinkProvider")
     handler = getattr(commands_link, f"adr_link_{kind}_remove")
     cmd, client = Mock(), Mock()
-    assert handler(cmd, client, "primary", "ns", "rg", no_wait=no_wait, skip_permission_check=skip) is getattr(
+    assert handler(cmd, client, "primary", "ns", "rg", no_wait=no_wait, skip_rbac_check=skip) is getattr(
         provider_type.return_value, kind + "_remove",
     ).return_value
     provider_type.assert_called_once_with(cmd, client=client)
     getattr(provider_type.return_value, kind + "_remove").assert_called_once_with(
         endpoint_name="primary", namespace_name="ns", resource_group_name="rg",
-        no_wait=no_wait, skip_permission_check=skip,
+        no_wait=no_wait, skip_rbac_check=skip,
     )
 
 
@@ -611,7 +642,9 @@ def test_delete_real_cli_accepts_no_wait(offline_cli, mocker, kind, section, _en
     assert not output.getvalue().strip()
 
 
-@pytest.mark.parametrize("option", ["--timeout", "--interval", "--delete-linked-resource", "--system-assigned-mi"])
+@pytest.mark.parametrize("option", [
+    "--timeout", "--interval", "--delete-linked-resource", "--system-assigned-mi", "--skip-permission-check",
+])
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):
     with pytest.raises(SystemExit) as raised:
@@ -664,7 +697,7 @@ def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("no_wait", [False, True])
 @pytest.mark.parametrize("skip", [False, True])
-def test_delete_real_cli_permission_skip_is_independent_of_yes_and_no_wait(
+def test_delete_real_cli_rbac_skip_is_independent_of_yes_and_no_wait(
     offline_cli, mocker, unlink_rbac, kind, section, _endpoint_type, no_wait, skip,
 ):
     mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=(namespace(), ETAG))
@@ -675,7 +708,7 @@ def test_delete_real_cli_permission_skip_is_independent_of_yes_and_no_wait(
     output = StringIO()
     args = ["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns", "-g", "rg", "--yes"]
     if skip:
-        args.append("--skip-permission-check")
+        args.append("--skip-rbac-check")
     if no_wait:
         args.append("--no-wait")
     assert offline_cli.invoke(args, out_file=output) == 0
@@ -685,28 +718,28 @@ def test_delete_real_cli_permission_skip_is_independent_of_yes_and_no_wait(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-def test_delete_skip_permission_check_does_not_bypass_etag_or_endpoint_validation(
+def test_delete_skip_rbac_check_does_not_bypass_etag_or_endpoint_validation(
     fixture_cmd, unlink_rbac, kind, section, _endpoint_type,
 ):
     client = Mock()
     client.namespaces.get.return_value = (namespace(), None)
     provider = LinkProvider(fixture_cmd, client=client)
     with pytest.raises(AzureResponseError, match="usable ETag"):
-        getattr(provider, kind + "_remove")("primary", "ns", "rg", skip_permission_check=True)
+        getattr(provider, kind + "_remove")("primary", "ns", "rg", skip_rbac_check=True)
     client.namespaces.get.return_value = (namespace(), ETAG)
     with pytest.raises(ResourceNotFoundError):
-        getattr(provider, kind + "_remove")("missing", "ns", "rg", skip_permission_check=True)
+        getattr(provider, kind + "_remove")("missing", "ns", "rg", skip_rbac_check=True)
     unlink_rbac.check_unlink_read_access.assert_not_called()
     client.namespaces.begin_create_or_replace.assert_not_called()
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_delete_skip_permission_check_does_not_bypass_confirmation(offline_cli, mocker, kind):
+def test_delete_skip_rbac_check_does_not_bypass_confirmation(offline_cli, mocker, kind):
     confirm = mocker.patch("azure.cli.core.commands.AzCliCommand._user_confirmed", return_value=False)
     provider = mocker.patch.object(commands_link, "LinkProvider")
     assert offline_cli.invoke(
         ["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns", "-g", "rg",
-         "--skip-permission-check"],
+         "--skip-rbac-check"],
     ) != 0
     confirm.assert_called_once()
     assert "no role assignments are changed" in confirm.call_args.args[0]

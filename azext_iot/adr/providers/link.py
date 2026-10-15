@@ -198,7 +198,7 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
-        no_wait=False, skip_permission_check=False,
+        no_wait=False, skip_rbac_check=False,
     ):
         logger.warning("%s", UNLINK_WARNING)
         namespace, etag = self.client.namespaces.get(
@@ -214,7 +214,7 @@ class LinkProvider(ADRProvider):
                 "Endpoint removal was not submitted because concurrent changes cannot be protected."
             )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
-        if not skip_permission_check:
+        if not skip_rbac_check:
             self._check_unlink_permissions(namespace, endpoint, section)
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
@@ -260,12 +260,15 @@ class LinkProvider(ADRProvider):
             )
             return
         try:
+            resource_id = endpoint.get("resourceId")
+            if not isinstance(resource_id, str):
+                raise AzureResponseError("The linked endpoint did not include a string resourceId.")
             parse_target = {
                 "messaging": _parse_hub_resource_id,
                 "provisioning": _parse_dps_resource_id,
                 "updating": _parse_su_resource_id,
             }[section]
-            target = parse_target(endpoint.get("resourceId"))
+            target = parse_target(resource_id)
             self._rbac_manager().check_unlink_read_access(
                 resolve_namespace_outbound_principal(namespace),
                 f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
@@ -274,35 +277,35 @@ class LinkProvider(ADRProvider):
             logger.warning(
                 "Could not verify the namespace outbound identity's read access: %s "
                 "Continuing without changing role assignments; ADR may reject removal. "
-                "Use --skip-permission-check to skip this advisory check.",
+                "Use --skip-rbac-check to skip this advisory check.",
                 error,
             )
 
     def hub_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_permission_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
-            no_wait=no_wait, skip_permission_check=skip_permission_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
         )
 
     def dps_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_permission_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
-            no_wait=no_wait, skip_permission_check=skip_permission_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
         )
 
     def su_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_permission_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
-            no_wait=no_wait, skip_permission_check=skip_permission_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
         )
 
     def _patch_link(

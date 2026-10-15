@@ -247,7 +247,7 @@ def test_unlink_unconfirmed_read_access_warns_without_grants(unlink_resource_cli
     assert "Cannot confirm read access" in caplog.text
     assert "Continuing without changing role assignments" in caplog.text
     assert "custom roles, group membership and deny assignments" in caplog.text
-    assert "--skip-permission-check" in caplog.text
+    assert "--skip-rbac-check" in caplog.text
     assert manager.cli.invoke.call_count == 1
     assert not manager.created
     manager._sleep.assert_not_called()
