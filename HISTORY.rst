@@ -3,6 +3,13 @@
 Release History
 ===============
 
+1.1.0b1 (Preview)
++++++++++++++++++
+
+**Wait command bug fixes**
+
+* Digital Twins, Device Update, and Device Registry schema, schema registry, and schema version generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
+
 1.0.0b2 (Preview)
 +++++++++++++++++
 
