@@ -25,10 +25,7 @@ from azext_iot.adr.common import (
 )
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
-from azext_iot.common.arm import (
-    adapt_modeless_lro_poller,
-    sanitize_arm_identity,
-)
+from azext_iot.common.arm import sanitize_arm_identity
 
 
 class UpdateInstanceProvider(ADRProvider):
@@ -36,7 +33,7 @@ class UpdateInstanceProvider(ADRProvider):
         self.cmd = cmd
         self.client = adr_update_instance_service_factory(cmd.cli_ctx)
 
-    def _await_terminal(self, poller, **kwargs):
+    def _bounded_poller_result(self, poller, **kwargs):
         # ADU resources, unlike ADR, can exceed the ADR default LRO budget.
         return wait_for_terminal_state(poller, **kwargs)
 
@@ -112,12 +109,10 @@ class UpdateInstanceProvider(ADRProvider):
                 current.get("identity")
             )
 
-        poller = adapt_modeless_lro_poller(
-            self.client.update_instances.begin_create(
-                resource_group_name=resource_group_name,
-                update_instance_name=update_instance_name,
-                resource=resource,
-            )
+        poller = self.client.update_instances.begin_create(
+            resource_group_name=resource_group_name,
+            update_instance_name=update_instance_name,
+            resource=resource,
         )
         return self._wait(
             poller,
@@ -149,12 +144,10 @@ class UpdateInstanceProvider(ADRProvider):
                 "or --user-assigned-mi."
             )
 
-        poller = adapt_modeless_lro_poller(
-            self.client.update_instances.begin_update(
-                resource_group_name=resource_group_name,
-                update_instance_name=update_instance_name,
-                properties=properties,
-            )
+        poller = self.client.update_instances.begin_update(
+            resource_group_name=resource_group_name,
+            update_instance_name=update_instance_name,
+            properties=properties,
         )
         return self._wait(
             poller,
@@ -280,11 +273,9 @@ class UpdateInstanceProvider(ADRProvider):
         resource_group_name: str,
         **kwargs,
     ):
-        poller = adapt_modeless_lro_poller(
-            self.client.update_instances.begin_delete(
-                resource_group_name=resource_group_name,
-                update_instance_name=update_instance_name,
-            )
+        poller = self.client.update_instances.begin_delete(
+            resource_group_name=resource_group_name,
+            update_instance_name=update_instance_name,
         )
         return self._wait(
             poller,

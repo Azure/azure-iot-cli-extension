@@ -274,9 +274,17 @@ def delete_namespace(name):
         child = find_child(name, label)
         if child is None:
             continue
-        if child["id"].lower() != expected_id.lower() or any(
-            child.get("tags", {}).get(key) != value for key, value in record["tags"].items()
-        ):
+        ownership_changed = child["id"].lower() != expected_id.lower()
+        if label == "policy":
+            policy_uuid = child_record.get("uuid")
+            ownership_changed = ownership_changed or (
+                not policy_uuid or child["properties"].get("uuid") != policy_uuid
+            )
+        else:
+            ownership_changed = ownership_changed or any(
+                child.get("tags", {}).get(key) != value for key, value in record["tags"].items()
+            )
+        if ownership_changed:
             raise AssertionError("Refusing CSR child deletion after an ownership change.")
         if child["properties"].get("provisioningState") != "Deleting":
             invoke(f"{command} delete {arguments} -y")
@@ -325,14 +333,29 @@ def _create_namespace(run_uid, kind, dps, hub):
         for label, command, arguments, child_path, options in _children(name):
             if find_child(name, label) is not None:
                 raise AssertionError(f"Refusing to overwrite existing CSR {label}.")
-            receipts.write(f"csr-child-{label}.json", {
-                "id": record["id"] + "/" + child_path, "tags": record["tags"],
-            }, exclusive=True)
-            invoke(f"{command} create {arguments} {options} --tags {tags}")
+            receipt_name = f"csr-child-{label}.json"
+            expected_id = record["id"] + "/" + child_path
+            child_record = {"id": expected_id, "tags": record["tags"]}
+            receipts.write(receipt_name, child_record, exclusive=True)
+            # CertificatePolicy is a ProxyResource; use its immutable UUID instead of tags for ownership.
+            tag_options = "" if label == "policy" else f" --tags {tags}"
+            created = invoke(f"{command} create {arguments} {options}{tag_options}")
+            policy_uuid = None
+            if label == "policy":
+                created = created.as_json()
+                assert created["id"].lower() == expected_id.lower()
+                policy_uuid = created["properties"].get("uuid")
+                assert policy_uuid, "Certificate policy returned no ownership UUID."
+                receipts.write(receipt_name, {**child_record, "uuid": policy_uuid})
             invoke(f"{command} wait {arguments} {WAIT_OPTIONS}" + (" --created" if label == "policy" else ""))
             child = invoke(f"{command} show {arguments}").as_json()
-            assert child["id"].lower() == (record["id"] + "/" + child_path).lower()
-            assert all(child.get("tags", {}).get(key) == value for key, value in record["tags"].items())
+            assert child["id"].lower() == expected_id.lower()
+            if label == "policy":
+                assert child["properties"].get("uuid") == policy_uuid, (
+                    "Certificate policy ownership UUID changed after creation."
+                )
+            else:
+                assert all(child.get("tags", {}).get(key) == value for key, value in record["tags"].items())
             assert child["properties"]["provisioningState"] == "Succeeded"
             if label != "policy":
                 assert child["properties"]["certificateAuthorityType"] == ("Root" if label == "root" else "ICA")

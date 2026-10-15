@@ -6,7 +6,6 @@
 
 from typing import Optional
 from azext_iot.common.arm import (
-    adapt_modeless_lro_poller,
     get_resource_group,
     get_subscription_id,
     hub_description_for_write,
@@ -67,13 +66,11 @@ class IoTHubProvider(object):
 
     def _begin_hub_update(self):
         """Submit the current Hub state as a sanitized, conditional full PUT."""
-        return adapt_modeless_lro_poller(
-            self.discovery.client.begin_create_or_update(
-                resource_group_name=self.rg,
-                resource_name=self.hub_resource["name"],
-                iot_hub_description=hub_description_for_write(
-                    self.hub_resource
-                ),
-                **hub_etag_arguments(self.hub_resource),
-            )
+        return self.discovery.client.begin_create_or_update(
+            resource_group_name=self.rg,
+            resource_name=self.hub_resource["name"],
+            iot_hub_description=hub_description_for_write(
+                self.hub_resource
+            ),
+            **hub_etag_arguments(self.hub_resource),
         )
