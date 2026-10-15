@@ -30,7 +30,7 @@ ensure_azure_namespace_path()
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
 _ADR_CANARY_ARM_ENDPOINT = "https://centraluseuap.management.azure.com"
 _ADR_IOT_HUB_API_VERSION = "2026-10-01-preview"
-_ADR_DPS_API_VERSION = "2026-06-01-preview"
+_ADR_DPS_API_VERSION = "2026-11-01"
 
 logger = get_logger(__name__)
 
@@ -221,14 +221,16 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
     """Create the Software Updates Update Instance management client."""
     from azure.cli.core.commands.client_factory import get_subscription_id
 
-    from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
+    from azext_iot.sdk.deviceupdate.duregistry import (
+        DeviceRegistrySoftwareUpdateMgmtClient,
+    )
     from azext_iot.adr.endpoints import get_adr_arm_endpoint
 
     endpoint = get_adr_arm_endpoint()
     credential_scopes = _get_canary_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
-    return DeviceUpdateClient(
+    return DeviceRegistrySoftwareUpdateMgmtClient(
         credential=get_cli_credential(
             cli_ctx, subscription_id=subscription_id
         ),

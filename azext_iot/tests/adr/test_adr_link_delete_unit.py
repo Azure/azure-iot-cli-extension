@@ -38,6 +38,8 @@ STATUS_URL = (
 UAMI = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi"
 TARGET_RG = "/subscriptions/target-sub/resourceGroups/target-rg"
 ETAG = '"namespace-version-1"'
+# RFC 9110 etagc: printable boundaries, literal backslash and obs-text boundaries.
+BOUNDARY_ETAG = '"!#~\\\x80\xff"'
 
 
 @pytest.fixture(autouse=True)
@@ -264,10 +266,10 @@ def test_delete_command_handler_forwards_selectors_and_flags(mocker, kind, secti
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("status", [200, 201])
 @pytest.mark.parametrize("etag,expected_etag", [
-    (ETAG, ETAG),
-    (f" \t{ETAG}\t ", ETAG),
-    ('""', '""'),
-    ('"!#~\\\x80\xff"', '"!#~\\\x80\xff"'),
+    pytest.param(ETAG, ETAG, id="strong-etag"),
+    pytest.param(f" \t{ETAG}\t ", ETAG, id="trim-http-ows"),
+    pytest.param('""', '""', id="empty-opaque-tag"),
+    pytest.param(BOUNDARY_ETAG, BOUNDARY_ETAG, id="allowed-character-boundaries"),
 ])
 def test_delete_real_sdk_polls_async_status_and_returns_completed_namespace(
     fixture_cmd, unlink_rbac, unlink_client, kind, section, _endpoint_type, status, etag, expected_etag,
@@ -477,10 +479,31 @@ def test_delete_real_cli_reports_conflict(offline_cli, mocker, caplog, kind, sec
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("etag", [
-    None, "", " ", "\t", "*", " \t*\t ", 7, b'"v1"',
-    'W/"v1"', ' \tW/"v1"\t ', 'w/"v1"', "v1", '"v1', 'v1"', '"v"1"',
-    '"v1", "v2"', '"with space"', '"with\ttab"', '"\x00"', '"\x1f"', '"\x7f"', '"\u0100"',
-    '\n"v1"', '"v1"\r', '"v1"\r\n',
+    pytest.param(None, id="missing-header"),
+    pytest.param("", id="empty-header"),
+    pytest.param(" ", id="space-only-header"),
+    pytest.param("\t", id="tab-only-header"),
+    pytest.param("*", id="wildcard"),
+    pytest.param(" \t*\t ", id="wildcard-with-http-ows"),
+    pytest.param(7, id="integer-header"),
+    pytest.param(b'"v1"', id="bytes-header"),
+    pytest.param('W/"v1"', id="weak-etag"),
+    pytest.param(' \tW/"v1"\t ', id="weak-etag-with-http-ows"),
+    pytest.param('w/"v1"', id="lowercase-weak-prefix"),
+    pytest.param("v1", id="unquoted-tag"),
+    pytest.param('"v1', id="missing-closing-quote"),
+    pytest.param('v1"', id="missing-opening-quote"),
+    pytest.param('"v"1"', id="embedded-quote"),
+    pytest.param('"v1", "v2"', id="multiple-tags"),
+    pytest.param('"with space"', id="embedded-space"),
+    pytest.param('"with\ttab"', id="embedded-tab"),
+    pytest.param('"\x00"', id="nul-control-character"),
+    pytest.param('"\x1f"', id="c0-control-upper-boundary"),
+    pytest.param('"\x7f"', id="del-control-character"),
+    pytest.param('"\u0100"', id="outside-latin1-range"),
+    pytest.param('\n"v1"', id="leading-line-feed"),
+    pytest.param('"v1"\r', id="trailing-carriage-return"),
+    pytest.param('"v1"\r\n', id="trailing-crlf"),
 ])
 def test_delete_unusable_etag_stops_before_rbac_and_put(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, etag):
     client = Mock()

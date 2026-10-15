@@ -9,6 +9,7 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.iothub.conftest import generate_hub_id, RG
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
 cli = EmbeddedCLI()
@@ -20,8 +21,8 @@ def provisioned_mqtt5_hub():
     name = generate_hub_id()
     try:
         hub_resource = cli.invoke(
-            f"iot hub create -n {name} -g {RG} --sku S1 "
-            "--connection-profile MqttV5 --yes",
+            f"iot hub create -n {name} -g {RG} --sku S1 --location {HUB_TEST_LOCATION} "
+            "--disable-local-auth true --connection-profile MqttV5 --yes",
             capture_stderr=True,
         )
         yield hub_resource.as_json()

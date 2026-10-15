@@ -20,6 +20,7 @@ from azext_iot.tests.adr._helpers import (
     SU_LIFECYCLE_TIMEOUT,
     wait_for_resource_absent,
 )
+from azext_iot.tests.adr._readiness import link_dps_with_readiness, link_hub_with_readiness
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -29,6 +30,7 @@ from azext_iot.tests.adr.conftest import (
     generate_identity_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -133,23 +135,46 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             infrastructure = self.setup_full_infra(
                 TEST_RG, namespace_name, first_hub, generate_identity_name(), assign_setup_roles=False,
             )
+            identity_resource_id = infrastructure["identity_resource_id"]
             self.cmd(f"iot adr ns update -n {namespace_name} -g {TEST_RG} --tags unlink-test=preserve")
             dps = self.create_owned_resource(
                 f"iot dps create -n {dps_name} -g {TEST_RG} --location {TEST_LOCATION} --system-assigned-mi",
                 kind="dps", name=dps_name, resource_group=TEST_RG,
             ).get_output_in_json()
+            dps_id = dps["id"]
             self.create_owned_resource(
-                f"iot hub create -n {second_hub} -g {TEST_RG} --sku S1 --location {TEST_LOCATION} "
-                f"--user-assigned-mi {infrastructure['identity_resource_id']}",
+                f"iot hub create -n {second_hub} -g {TEST_RG} --sku S1 --location {HUB_TEST_LOCATION} "
+                f"--user-assigned-mi {identity_resource_id} --disable-local-auth true",
                 kind="hub", name=second_hub, resource_group=TEST_RG,
             )
             selector = f"--ns {namespace_name} -g {TEST_RG}"
-            self.cmd(f"iot adr ns link dps add {selector} -n dps --dps-id {dps['id']} --system-assigned-mi")
+            link_dps_with_readiness(
+                self,
+                f"iot adr ns link dps add {selector} -n dps --dps-id {dps_id} --system-assigned-mi",
+                namespace_name,
+                TEST_RG,
+                "dps",
+                {
+                    "resourceId": dps_id,
+                    "inboundCallerIdentity": {"type": "SystemAssigned"},
+                },
+            )
             for endpoint_name, hub_name in (("first", first_hub), ("second", second_hub)):
                 hub = self.cmd(f"iot hub show -n {hub_name} -g {TEST_RG}").get_output_in_json()
-                self.cmd(
-                    f"iot adr ns link hub add {selector} -n {endpoint_name} --hub-id {hub['id']} "
-                    f"--user-assigned-mi {infrastructure['identity_resource_id']}",
+                hub_id = hub["id"]
+                add_cmd = (
+                    f"iot adr ns link hub add {selector} -n {endpoint_name} --hub-id {hub_id} "
+                    f"--user-assigned-mi {identity_resource_id}"
+                )
+                link_hub_with_readiness(
+                    self, add_cmd, namespace_name, TEST_RG, endpoint_name,
+                    {
+                        "resourceId": hub_id,
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned",
+                            "userAssignedIdentity": identity_resource_id,
+                        },
+                    },
                 )
             self._assert_live_target_removal_rejected(namespace_name, "hub", "messaging", "first")
             self._remove_endpoint(namespace_name, "hub", "messaging", "first", first_hub)

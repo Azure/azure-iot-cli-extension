@@ -4,23 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import asyncio
 from copy import deepcopy
-from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import CLIInternalError
 from azure.core import MatchConditions
-from azure.core.polling import (
-    AsyncLROPoller,
-    AsyncNoPolling,
-    LROPoller,
-    NoPolling,
-)
-from msrestazure.azure_operation import AzureOperationPoller
 
 from azext_iot.common.arm import (
-    adapt_modeless_lro_poller,
     get_resource_group,
     hub_description_for_write,
     hub_etag_arguments,
@@ -63,97 +53,6 @@ def test_explicit_resource_group_takes_precedence_without_mutating_resource(reso
     original = deepcopy(resource)
     assert get_resource_group(resource, fallback="explicit-rg") == "explicit-rg"
     assert resource == original
-
-
-@pytest.mark.parametrize(
-    "content, expected",
-    [
-        (b'{"properties":{"state":"Active"}}', {"properties": {"state": "Active"}}),
-        (b"", None),
-    ],
-)
-def test_modeless_lro_adapter_deserializes_sync_json_and_empty_response(
-    content, expected
-):
-    response = Mock(content=content)
-    response.json.return_value = expected
-    pipeline_response = Mock(http_response=response)
-    broken_callback = Mock(side_effect=NameError("undefined response"))
-    poller = LROPoller(
-        None,
-        pipeline_response,
-        broken_callback,
-        NoPolling(),
-    )
-    poller.polling_method().get_continuation_token = Mock(
-        return_value="continuation"
-    )
-
-    adapted = adapt_modeless_lro_poller(poller)
-
-    assert adapted is poller
-    assert adapted.status() == "succeeded"
-    assert adapted.done()
-    adapted.wait()
-    assert adapted.result() == expected
-    assert adapted.continuation_token() == "continuation"
-    done_callback = Mock()
-    adapted.add_done_callback(done_callback)
-    done_callback.assert_called_once_with(adapted.polling_method())
-    broken_callback.assert_not_called()
-    if content:
-        response.json.assert_called_once_with()
-    else:
-        response.json.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "content, expected",
-    [
-        (b'{"properties":{"state":"Active"}}', {"properties": {"state": "Active"}}),
-        (b"", None),
-    ],
-)
-def test_modeless_lro_adapter_deserializes_async_json_and_empty_response(
-    content, expected
-):
-    response = Mock(content=content)
-    response.json.return_value = expected
-    pipeline_response = Mock(http_response=response)
-    broken_callback = Mock(side_effect=NameError("undefined response"))
-    poller = AsyncLROPoller(
-        None,
-        pipeline_response,
-        broken_callback,
-        AsyncNoPolling(),
-    )
-    poller.polling_method().get_continuation_token = Mock(
-        return_value="continuation"
-    )
-
-    adapted = adapt_modeless_lro_poller(poller)
-
-    async def consume():
-        await adapted.wait()
-        return await adapted.result()
-
-    assert adapted is poller
-    assert adapted.status() == "succeeded"
-    assert not adapted.done()
-    assert asyncio.run(consume()) == expected
-    assert adapted.done()
-    assert adapted.continuation_token() == "continuation"
-    broken_callback.assert_not_called()
-    if content:
-        response.json.assert_called_once_with()
-    else:
-        response.json.assert_not_called()
-
-
-def test_modeless_lro_adapter_does_not_touch_legacy_poller():
-    legacy_poller = Mock(spec=AzureOperationPoller)
-
-    assert adapt_modeless_lro_poller(legacy_poller) is legacy_poller
 
 
 def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():

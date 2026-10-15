@@ -17,6 +17,7 @@ from azext_iot.tests.adr._helpers import (
     is_retryable_resource_error,
     resource_is_absent,
     wait_for_condition,
+    wait_for_listed_resource,
     wait_for_resource_absent,
 )
 from azext_iot.tests.adr.conftest import (
@@ -231,6 +232,7 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
             )
             registry = self.cmd(
                 f"iot adr schema registry create {registry_args} "
+                f"--location {TEST_LOCATION} "
                 f"--registry-namespace {registry_namespace} "
                 "--storage-account-container-url "
                 f"{shlex.quote(container_url)} --system-assigned-mi"
@@ -400,9 +402,11 @@ class TestADRSemanticModelLifecycle(_SchemaScenario):
             assert created_device["properties"]["deviceTypeRefs"] == [
                 thing_v1["id"]
             ]
-            listed_devices = self.cmd(
-                f"iot adr ns device list --ns {namespace_name} -g {TEST_RG}"
-            ).get_output_in_json()
+            listed_devices = wait_for_listed_resource(
+                self,
+                f"iot adr ns device list --ns {namespace_name} -g {TEST_RG}",
+                device_name,
+            )
             listed_device = next(
                 device
                 for device in listed_devices
