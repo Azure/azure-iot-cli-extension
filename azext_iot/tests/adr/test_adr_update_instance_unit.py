@@ -23,6 +23,7 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot import _factory
 from azext_iot.adr.common import build_managed_service_identity
+from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
 from azext_iot.sdk.deviceupdate.duregistry import (
     DeviceRegistrySoftwareUpdateMgmtClient,
@@ -172,6 +173,25 @@ def test_wait_uses_standard_arm_poller(update_instance_provider):
         }
 
     wait.assert_called_once_with(poller, wait_sec=0)
+
+
+def test_wait_rejects_failed_update_instance(update_instance_provider):
+    poller = Mock()
+    poller._polling_method._initial_response.http_response.headers = {}
+    failed = {
+        "id": INSTANCE_WIRE_URL,
+        "properties": {
+            "provisioningState": "Failed",
+            "error": {"code": "ProvisioningFailed", "message": "Service rejected the operation."},
+        },
+    }
+    with patch(
+        "azext_iot.adr.providers.update_instance.wait_for_terminal_state",
+        return_value=failed,
+    ), pytest.raises(ADRResourceStateError, match="provisioningState='Failed'") as raised:
+        update_instance_provider._await_terminal(poller, wait_sec=0)
+
+    assert raised.value.body == failed
 
 
 @pytest.mark.parametrize(
