@@ -754,7 +754,10 @@ def load_adr_help():
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
     After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
-    Avoid concurrent namespace updates while this command runs.
+    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
+    Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
+    A conflict reports guidance to inspect the namespace and rerun the command against its latest state.
+    Any Reader grant created during preflight is retained after a conflict.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
