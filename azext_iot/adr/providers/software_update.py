@@ -38,7 +38,7 @@ class SoftwareUpdateDataProvider(ADRProvider):
         self.registry_client = adr_service_factory(cmd.cli_ctx)
         self.client = None
 
-    def _await_terminal(self, poller, **kwargs):
+    def _bounded_poller_result(self, poller, **kwargs):
         # ADU resources, unlike ADR, can exceed the ADR default LRO budget.
         return wait_for_terminal_state(poller, **kwargs)
 

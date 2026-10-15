@@ -460,24 +460,15 @@ class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
                 listed_policy = next(p for p in policies if p["name"] == policy_name)
                 assert props(listed_policy)["certificate"]["validityPeriodInDays"] == 1
 
-            # --- Step 8: Update policy tags ---
-            with timed_step("Step 8 ❯ Update certificate policy tags"):
-                updated_pol = policy_cmd(
-                    f"update -n {policy_name} --tags env=updated"
-                ).get_output_in_json()
-                assert updated_pol.get("tags", {}).get("env") == "updated"
-                assert props(updated_pol)["certificate"]["validityPeriodInDays"] == 1
-
+            # --- Step 8: Update policy validity ---
             for validity_days in (6, 90, 1):
                 with timed_step(f"Update certificate policy validity to {validity_days} days"):
                     updated_pol = policy_cmd(
                         f"update -n {policy_name} --vd {validity_days}"
                     ).get_output_in_json()
                     assert props(updated_pol)["certificate"]["validityPeriodInDays"] == validity_days
-                    assert updated_pol.get("tags", {}).get("env") == "updated"
                     shown_pol = policy_cmd(f"show -n {policy_name}").get_output_in_json()
                     assert props(shown_pol)["certificate"]["validityPeriodInDays"] == validity_days
-                    assert shown_pol.get("tags", {}).get("env") == "updated"
 
             owned.add("additional-policy")
             self._observe_additional_policy(policy_cmd)

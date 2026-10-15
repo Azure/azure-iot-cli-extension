@@ -26,7 +26,7 @@ FACTORIES = [
     ("adr_iot_hub_service_factory", "iot_hub_resource", "Microsoft.Devices/IotHubs",
      {"resource_name": "target"}, "2026-10-01-preview"),
     ("adr_iot_service_provisioning_factory", "iot_dps_resource", "Microsoft.Devices/provisioningServices",
-     {"provisioning_service_name": "target"}, "2026-06-01-preview"),
+     {"provisioning_service_name": "target"}, "2026-11-01"),
 ]
 
 
