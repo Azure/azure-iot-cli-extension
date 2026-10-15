@@ -1451,5 +1451,3 @@ def _validate_allocation_policy_for_enrollment(
                     "Please provide both the Azure function webhook url and provisioning"
                     " service api-version when the allocation-policy is defined as Custom."
                 )
-    elif iot_hub_list and not current_enrollment:
-        raise RequiredArgumentMissingError("Please provide allocation policy.")

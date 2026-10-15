@@ -232,7 +232,7 @@ class TestEnrollmentGroupCreate():
         (generate_enrollment_group_create_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hub_host_name='hub')),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
-        (generate_enrollment_group_create_req(iot_hubs='hub1 hub2'))
+        (generate_enrollment_group_create_req(allocation_policy='static'))
     ])
     def test_enrollment_group_create_invalid_args(
         self, fixture_cmd, fixture_gdcs, mocked_response, patch_certificate_open, req
@@ -260,6 +260,26 @@ class TestEnrollmentGroupCreate():
                 webhook_url=req['webhook_url'],
             )
         assert not mocked_response.calls
+
+    @pytest.mark.parametrize("iot_hubs", ["hub1", "hub1 hub2", ["hub1"], ["hub1", "hub2"]])
+    @pytest.mark.parametrize("adr", [False, True])
+    def test_enrollment_group_create_inherits_allocation_policy(self, serviceclient, fixture_cmd, iot_hubs, adr):
+        arguments = {
+            "adr_namespace": "adr-ns", "adr_ca_name": "factory-ca", "adr_certificate_policy_name": "device-policy",
+        } if adr else {}
+        subject.iot_dps_device_enrollment_group_create(
+            fixture_cmd, enrollment_id, dps_name=mock_dps_target["entity"],
+            resource_group_name=resource_group, iot_hubs=iot_hubs, **arguments,
+        )
+        assert len(serviceclient.calls) == 1
+        body = json.loads(serviceclient.calls[0].request.body)
+        assert body["iotHubs"] == (iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs)
+        assert "allocationPolicy" not in body
+        assert "customAllocationDefinition" not in body
+        if adr:
+            assert body["namespaceName"] == "adr-ns"
+            assert body["certificateAuthorityName"] == "factory-ca"
+            assert body["certificatePolicyName"] == "device-policy"
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_group_create_req(certificate_path='myCert'))

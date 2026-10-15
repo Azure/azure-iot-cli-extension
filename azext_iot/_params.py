@@ -1110,7 +1110,8 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AllocationType),
             help="Type of allocation policy to determine how a device is assigned to an IoT Hub. If not "
             "provided, the allocation policy will be the current allocation policy default set for the "
-            "Device Provisioning Service instance.",
+            "Device Provisioning Service instance, including when --iot-hubs is specified. "
+            "This is independent of the ADR certificate policy.",
             arg_group="Allocation Policy"
         )
         context.argument(
