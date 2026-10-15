@@ -10,6 +10,10 @@ Release History
 
 * Digital Twins, Device Update, and Device Registry schema, schema registry, and schema version generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
 
+**ADR bug fixes**
+
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
+
 1.0.0b2 (Preview)
 +++++++++++++++++
 

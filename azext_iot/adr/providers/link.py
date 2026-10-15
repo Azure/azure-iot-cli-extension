@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
+import re
 from time import monotonic, sleep
 from typing import Optional
 
@@ -197,9 +198,18 @@ class LinkProvider(ADRProvider):
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
     ):
-        namespace = self.client.namespaces.get(
+        namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
+            cls=lambda response, resource, _: (resource, response.http_response.headers.get("ETag")),
         )
+        if isinstance(etag, str):
+            etag = etag.strip(" \t")
+        # RFC 9110 entity-tag syntax, excluding weak validators because If-Match uses strong comparison.
+        if not isinstance(etag, str) or re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', etag) is None:
+            raise AzureResponseError(
+                "The namespace response did not include a usable ETag header (a strong, quoted entity-tag is required). "
+                "Endpoint removal was not submitted because concurrent changes cannot be protected."
+            )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
         parse_target = {
             "messaging": _parse_hub_resource_id,
@@ -217,10 +227,20 @@ class LinkProvider(ADRProvider):
         resource["properties"] = properties
         resource["identity"] = sanitize_arm_identity(namespace["identity"])
         # NoPolling returns the initial PUT response, not asynchronous completion.
-        return self.client.namespaces.begin_create_or_replace(
-            resource_group_name=resource_group_name, namespace_name=namespace_name,
-            resource=resource, polling=False, retry_total=0,
-        ).result()
+        try:
+            return self.client.namespaces.begin_create_or_replace(
+                resource_group_name=resource_group_name, namespace_name=namespace_name,
+                resource=resource, headers={"If-Match": etag}, polling=False, retry_total=0,
+            ).result()
+        except HttpResponseError as error:
+            if error.status_code == 412:
+                logger.warning(
+                    "Namespace '%s' changed before endpoint removal (HTTP 412). "
+                    "Inspect the namespace with 'az iot adr ns show' and rerun the remove command. "
+                    "Any Reader grant created during preflight is retained.",
+                    namespace_name,
+                )
+            raise
 
     def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
         return self._remove_endpoint(
