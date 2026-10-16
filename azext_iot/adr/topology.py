@@ -103,6 +103,23 @@ def endpoint_update_body(
     return body
 
 
+def endpoint_settings_match(actual: dict, expected: dict) -> bool:
+    """Match writable fields, allowing only omitted Hub provisioning settings to appear."""
+    actual = endpoint_update_body(actual)
+    expected = endpoint_update_body(expected)
+    if not endpoint_is_type(expected, IOT_HUB_ENDPOINT_TYPE):
+        return actual == expected
+    actual_settings = actual.pop("provisioning", {})
+    expected_settings = expected.pop("provisioning", {})
+    return (
+        actual == expected
+        and isinstance(actual_settings, dict)
+        and isinstance(expected_settings, dict)
+        and not (actual_settings.keys() - expected_settings.keys() - {"availability", "allocationWeight"})
+        and all(key in actual_settings and actual_settings[key] == value for key, value in expected_settings.items())
+    )
+
+
 def writable_namespace_properties(properties: dict) -> dict:
     """Copy replaceable namespace state, projecting endpoints to their writable
     fields so a CreateOrReplace PUT does not echo server-computed status."""
