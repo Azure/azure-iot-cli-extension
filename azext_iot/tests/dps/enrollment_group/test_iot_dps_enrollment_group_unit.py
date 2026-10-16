@@ -875,4 +875,7 @@ class TestComputeDeviceKey():
             symmetric_key=TEST_ENDORSEMENT_KEY
         )
         output = formatter(SimpleNamespace(result=device_key))
-        assert parser(output) == GENERATED_KEY
+        parsed_key = parser(output)
+        assert isinstance(parsed_key, str)
+        assert len(parsed_key) == 44
+        assert parsed_key == GENERATED_KEY
