@@ -231,6 +231,7 @@ class TestEnrollmentGroupCreate():
         (generate_enrollment_group_create_req(allocation_policy='custom')),
         (generate_enrollment_group_create_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hub_host_name='hub')),
+        (generate_enrollment_group_create_req(iot_hub_host_name='legacy-hub', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(allocation_policy='static'))
     ])

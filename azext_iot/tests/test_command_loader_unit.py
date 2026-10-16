@@ -474,6 +474,23 @@ def test_dps_certificate_etag_parser(management_command_parser, tmp_path, action
         assert parsed.etag == ("current-etag" if option else None)
 
 
+@pytest.mark.parametrize("action", ["generate-verification-code", "verify"])
+def test_dps_certificate_help_describes_optional_etag(command_table, monkeypatch, action):
+    from azext_iot.core import help as core_help
+
+    helps = {}
+    monkeypatch.setattr(core_help, "helps", helps)
+    core_help.patch_core_help()
+    command = f"iot dps certificate {action}"
+    assert command in command_table
+    help_entry = yaml.safe_load(helps[command])
+    assert "certificate read permission" in help_entry["long-summary"]
+    examples = [example["text"] for example in help_entry["examples"]]
+    assert all(command in example for example in examples)
+    assert any("--etag" in example for example in examples)
+    assert any("--etag" not in example for example in examples)
+
+
 @pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)
 @pytest.mark.parametrize("auth_type", ["key", "login"])
 def test_pnp_standard_authentication_options(management_command_parser, command_name, auth_type):

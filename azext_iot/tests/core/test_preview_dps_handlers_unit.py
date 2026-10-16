@@ -60,6 +60,7 @@ def test_dps_certificate_etag_read_failure_does_not_write(mocker, preview_mgmt, 
         getattr(custom, f"iot_dps_certificate_{action}")(client, "dps", "cert", **arguments)
 
     if status == 403:
+        assert "Certificate read failed" in str(raised.value)
         assert "--etag" in str(raised.value)
         assert "Microsoft.Devices/provisioningServices/certificates/read" in str(raised.value)
         assert raised.value.__cause__ is error

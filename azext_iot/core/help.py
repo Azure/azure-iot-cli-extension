@@ -20,6 +20,8 @@ long-summary: |
     Use the verification code as the CN of a new certificate signed with the root certificate's private key.
     If --etag is omitted, the current certificate ETag is fetched automatically. This requires certificate read permission.
     Supply --etag to skip the read and operate only on that version. A concurrent change still causes the operation to fail.
+    To read an ETag explicitly, use 'az iot dps certificate show --dps-name MyDps -g MyResourceGroup
+    --name MyCertificate --query etag -o tsv'.
 examples:
   - name: Generate a verification code using the automatically fetched ETag.
     text: >
@@ -28,9 +30,6 @@ examples:
     text: >
         az iot dps certificate generate-verification-code --dps-name MyDps -g MyResourceGroup
         --name MyCertificate --etag AAAAAAAAAAA=
-  - name: Read the current certificate ETag if you have certificate read permission.
-    text: >
-        az iot dps certificate show --dps-name MyDps -g MyResourceGroup --name MyCertificate --query etag -o tsv
 """
 
     helps["iot dps certificate verify"] = """

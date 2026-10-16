@@ -1417,6 +1417,10 @@ def _validate_arguments_for_attestation_mechanism(
 def _validate_allocation_policy_for_enrollment(
     allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version, current_enrollment=None
 ):
+    if not current_enrollment and iot_hub_host_name and iot_hub_list:
+        raise MutuallyExclusiveArgumentError(
+            "--iot-hubs and --iot-hub-host-name cannot be combined."
+        )
     explicitly_selected_policy = allocation_policy is not None
     # get the enrollment values if not provided but present
     if current_enrollment:

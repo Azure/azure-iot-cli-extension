@@ -266,7 +266,9 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(allocation_policy='custom')),
         (generate_enrollment_create_req(allocation_policy='custom', webhook_url="https://www.test.test")),
         (generate_enrollment_create_req(allocation_policy='static', iot_hubs='hub1 hub2')),
-        (generate_enrollment_create_req(allocation_policy='static', iot_hub_host_name='hubname'))
+        (generate_enrollment_create_req(allocation_policy='static', iot_hub_host_name='hubname')),
+        (generate_enrollment_create_req(
+            attestation_type='symmetricKey', iot_hub_host_name='legacy-hub', iot_hubs='hub1 hub2'))
     ])
     def test_enrollment_create_invalid_args(self, fixture_gdcs, fixture_cmd, req):
         with pytest.raises(CLIError):

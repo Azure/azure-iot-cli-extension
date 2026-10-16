@@ -848,9 +848,10 @@ def _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_g
         if error.status_code != 403:
             raise
         raise ForbiddenError(
-            "Unable to fetch the certificate ETag: certificate read access was denied. "
+            f"Unable to fetch the certificate ETag: {error}\n"
             "Supply --etag with the current ETag obtained from a previous certificate response or an authorized reader, "
-            "or request Microsoft.Devices/provisioningServices/certificates/read permission."
+            "or resolve the certificate read failure. Automatic lookup requires "
+            "Microsoft.Devices/provisioningServices/certificates/read permission."
         ) from error
     current_etag = certificate.get("etag")
     if not isinstance(current_etag, str) or not current_etag.strip() or current_etag == "*":
