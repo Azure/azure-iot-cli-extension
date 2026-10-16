@@ -7,6 +7,11 @@
 OVERWRITE_FILE_MSG = "File {0} is not empty. Overwrite file? "
 FILE_NOT_EMPTY_ERROR = "Command aborted. Include the --replace flag to overwrite file."
 FILE_NOT_FOUND_ERROR = 'File {0} does not exist.'
+SAVE_STATE_FALLBACK_ERROR = (
+    "Could not write the exported hub state to {0}: {1}. To avoid losing the exported data, it was "
+    "written to {2} instead. Move or rename that file once the original destination is usable."
+)
+SAVE_STATE_WRITE_ERROR = "Could not write the exported hub state to {0}: {1}. The exported data could not be preserved."
 LOGIN_WITH_ARM_ERROR = "Hub aspect 'arm' is not supported with connection string via --login."
 TARGET_HUB_NOT_FOUND_MSG = "Destination IoT Hub {0} was not found and cannot be created with current hub aspects."
 MISSING_RG_ON_CREATE_ERROR = "Please provide the resource group for the hub that will be created."
