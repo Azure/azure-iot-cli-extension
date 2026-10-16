@@ -850,6 +850,13 @@ def test_help_surface_matches_2026_commands_and_su_type():
     assert "iot adr ns su device-class update" not in helps
 
 
+def test_job_run_delete_help_does_not_require_cancellation():
+    load_adr_help()
+
+    delete_help = yaml.safe_load(helps["iot adr ns job run delete"])["long-summary"]
+    assert "Active runs can be deleted without canceling them first." in " ".join(delete_help.split())
+
+
 def test_every_registered_adr_command_has_help():
     load_adr_help()
     assert set(_registered_commands()) <= set(helps)

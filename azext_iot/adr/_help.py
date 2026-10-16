@@ -1867,8 +1867,8 @@ def load_adr_help():
   type: command
   short-summary: Delete a Device Registry job run.
   long-summary: |
-    Deletes the run record. Cancel an in-flight run with
-    'az iot adr ns job run cancel' before deleting it.
+    Deletes the run record. Active runs can be deleted without canceling
+    them first.
   examples:
     - name: Delete a job run
       text: az iot adr ns job run delete -n myRun --job-name myJob --ns myNamespace -g myResourceGroup
