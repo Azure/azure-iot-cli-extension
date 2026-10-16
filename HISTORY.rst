@@ -25,6 +25,8 @@ Unreleased
 
 **IoT Hub Device Provisioning Service (DPS) updates**
 
+* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
+
 * Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
 
 * Updated the DPS control plane SDK to API version ``2026-08-31``.
