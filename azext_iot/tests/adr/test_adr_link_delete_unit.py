@@ -14,13 +14,14 @@ import pytest
 import responses
 from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azure.core.credentials import AccessToken
-from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.core.exceptions import DeserializationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from azure.core.polling import LROPoller
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
 from azext_iot.adr import commands_link
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE, SU_ENDPOINT_TYPE
 from azext_iot.adr.providers.link import LinkProvider
+from azext_iot.adr.rbac import LinkRbacManager
 from azext_iot.adr.topology import writable_namespace_properties
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
@@ -232,8 +233,103 @@ def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("field,value", [
+    pytest.param("outbound-id", ["bad-id"], id="uami-id-list"),
+    pytest.param("outbound-id", {"id": UAMI}, id="uami-id-object"),
+    pytest.param("outbound-id", 123, id="uami-id-integer"),
+    pytest.param("attached-details", ["bad-projection"], id="attached-details-list"),
+    pytest.param("attached-details", 123, id="attached-details-integer"),
+    pytest.param("attached-details", True, id="attached-details-boolean"),
+    pytest.param("outbound", ["bad-outbound"], id="outbound-identity-list"),
+])
+@pytest.mark.parametrize("state,skip", [
+    pytest.param("Succeeded", False, id="advisory"),
+    pytest.param("Succeeded", True, id="explicit-skip"),
+    pytest.param("Failed", False, id="failed-link"),
+    pytest.param("LinkedResourceDeleted", False, id="deleted-resource"),
+])
+def test_delete_real_sdk_malformed_identity_is_advisory(
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, field, value, state, skip,
+):
+    source = namespace()
+    source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
+    if field == "outbound-id":
+        source["properties"]["outboundIdentity"]["userAssignedIdentity"] = value
+    elif field == "attached-details":
+        source["identity"]["userAssignedIdentities"][UAMI] = value
+    else:
+        source["properties"]["outboundIdentity"] = value
+    original = deepcopy(source)
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        network.put(URL, json=completed)
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
+            "primary", "ns", "rg", skip_rbac_check=skip,
+        )
+        assert result == completed
+        assert source == original
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+        body = json.loads(network.calls[1].request.body)
+        assert "primary" not in body["properties"][section]["endpoints"]
+        assert body["properties"]["outboundIdentity"] == source["properties"]["outboundIdentity"]
+        assert body["identity"] == {"type": source["identity"]["type"], "userAssignedIdentities": {UAMI: {}}}
+        assert ("Could not verify" in caplog.text) is (state == "Succeeded" and not skip)
+        assert ("Continuing without changing role assignments" in caplog.text) is (state == "Succeeded" and not skip)
+        unlink_rbac.check_unlink_read_access.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+def test_delete_real_sdk_group_deserialization_failure_is_advisory(
+    fixture_cmd, mocker, unlink_client, caplog, kind, section, _endpoint_type,
+):
+    from azure.mgmt.resource import ResourceManagementClient
+
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("offline-token", 9999999999)
+    manager = LinkRbacManager(fixture_cmd.cli_ctx, cli=Mock())
+    check = mocker.spy(manager, "check_unlink_read_access")
+    mocker.patch.object(LinkProvider, "_rbac_manager", return_value=manager)
+    mocker.patch("azext_iot._factory._get_canary_credential_scopes", return_value=["https://management.azure.com/.default"])
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    group_url = "https://management.azure.com/subscriptions/target-sub/resourcegroups/target-rg"
+    with ResourceManagementClient(credential, "target-sub") as resources, responses.RequestsMock() as network:
+        mocker.patch("azure.cli.core.commands.client_factory.get_mgmt_service_client", return_value=resources)
+        network.get(URL, json=namespace(), headers={"ETag": ETAG})
+        network.get(group_url, json=["malformed-group"])
+        network.put(URL, json=completed)
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
+
+        assert result == completed
+        assert [call.request.method for call in network.calls] == ["GET", "GET", "PUT"]
+        assert network.calls[1].request.url.split("?")[0] == group_url
+        assert network.calls[2].request.headers["If-Match"] == ETAG
+        assert isinstance(check.spy_exception, DeserializationError)
+        assert "Could not verify" in caplog.text
+        assert "Continuing without changing role assignments" in caplog.text
+        manager.cli.invoke.assert_not_called()
+        assert not manager.created
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("error_type", [AttributeError, TypeError, ValueError])
+def test_delete_does_not_swallow_unexpected_advisory_errors(
+    fixture_cmd, unlink_rbac, kind, section, _endpoint_type, error_type,
+):
+    client = Mock()
+    client.namespaces.get.return_value = (namespace(), ETAG)
+    error = error_type("unexpected implementation failure")
+    unlink_rbac.check_unlink_read_access.side_effect = error
+    with pytest.raises(error_type) as raised:
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
+    assert raised.value is error
+    client.namespaces.begin_create_or_replace.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("stage", ["get", "put", "result"])
-@pytest.mark.parametrize("error_type", [HttpResponseError, ServiceRequestError])
+@pytest.mark.parametrize("error_type", [HttpResponseError, ServiceRequestError, DeserializationError])
 def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, section, _endpoint_type, stage, error_type):
     client = Mock()
     client.namespaces.get.return_value = (namespace(), ETAG)
@@ -678,15 +774,21 @@ def test_delete_state_gate_skips_identity_target_and_permission_work(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("error_type", [AzureResponseError, HttpResponseError, ServiceRequestError, ServiceResponseError])
+@pytest.mark.parametrize("error_type", [
+    AzureResponseError, HttpResponseError, ServiceRequestError, ServiceResponseError, DeserializationError,
+])
+@pytest.mark.parametrize("stage", ["put", "result"])
 def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
-    fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, error_type,
+    fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, error_type, stage,
 ):
     client = Mock()
     client.namespaces.get.return_value = (namespace(), ETAG)
     unlink_rbac.check_unlink_read_access.side_effect = error_type("permission lookup unavailable")
     rejection = HttpResponseError("ADR unlink rejected")
-    client.namespaces.begin_create_or_replace.return_value.result.side_effect = rejection
+    operation = client.namespaces.begin_create_or_replace
+    if stage == "result":
+        operation = operation.return_value.result
+    operation.side_effect = rejection
     with pytest.raises(HttpResponseError) as raised:
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert raised.value is rejection

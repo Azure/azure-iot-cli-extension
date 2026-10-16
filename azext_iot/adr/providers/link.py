@@ -14,7 +14,7 @@ from azure.cli.core.azclierror import (
     AzureResponseError,
     ResourceNotFoundError,
 )
-from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.core.exceptions import DeserializationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
@@ -263,6 +263,21 @@ class LinkProvider(ADRProvider):
             resource_id = endpoint.get("resourceId")
             if not isinstance(resource_id, str):
                 raise AzureResponseError("The linked endpoint did not include a string resourceId.")
+            outbound = namespace["properties"].get("outboundIdentity") or {}
+            if not isinstance(outbound, dict):
+                raise AzureResponseError("The namespace outboundIdentity must be an object.")
+            if str(outbound.get("type") or "SystemAssigned").casefold() == "userassigned":
+                if not isinstance(outbound.get("userAssignedIdentity"), str):
+                    raise AzureResponseError("The outbound userAssignedIdentity must be a string resource ID.")
+                identity = namespace.get("identity") or {}
+                if not isinstance(identity, dict):
+                    raise AzureResponseError("The namespace identity must be an object.")
+                attached = identity.get("userAssignedIdentities") or {}
+                if not isinstance(attached, dict) or any(
+                    not isinstance(identity_id, str) or (details is not None and not isinstance(details, dict))
+                    for identity_id, details in attached.items()
+                ):
+                    raise AzureResponseError("The attached user-assigned identity metadata is malformed.")
             parse_target = {
                 "messaging": _parse_hub_resource_id,
                 "provisioning": _parse_dps_resource_id,
@@ -273,7 +288,7 @@ class LinkProvider(ADRProvider):
                 resolve_namespace_outbound_principal(namespace),
                 f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
             )
-        except (CLIError, HttpResponseError, ServiceRequestError, ServiceResponseError) as error:
+        except (CLIError, HttpResponseError, ServiceRequestError, ServiceResponseError, DeserializationError) as error:
             logger.warning(
                 "Could not verify the namespace outbound identity's read access: %s "
                 "Continuing without changing role assignments; ADR may reject removal. "
