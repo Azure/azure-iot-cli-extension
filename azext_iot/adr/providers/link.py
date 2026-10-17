@@ -18,6 +18,7 @@ from azure.core.exceptions import DeserializationError, HttpResponseError, Servi
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
+from msrestazure.tools import parse_resource_id
 from azext_iot.common.arm import sanitize_arm_identity
 
 from azext_iot._factory import (
@@ -214,14 +215,28 @@ class LinkProvider(ADRProvider):
                 "Endpoint removal was not submitted because concurrent changes cannot be protected."
             )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
+        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
+        if "identity" in namespace:
+            identity = namespace["identity"]
+            if identity is not None and not isinstance(identity, dict):
+                raise AzureResponseError(
+                    "The namespace response identity must be an object or null. "
+                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
+                )
+            attached = identity.get("userAssignedIdentities") if identity else None
+            if attached is not None and (
+                not isinstance(attached, dict) or any(not isinstance(identity_id, str) for identity_id in attached)
+            ):
+                raise AzureResponseError(
+                    "The namespace response identity.userAssignedIdentities must be an object with string keys or null. "
+                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
+                )
+            resource["identity"] = sanitize_arm_identity(identity)
         if not skip_rbac_check:
             self._check_unlink_permissions(namespace, endpoint, section)
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
-        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
         resource["properties"] = properties
-        if "identity" in namespace:
-            resource["identity"] = sanitize_arm_identity(namespace["identity"])
         try:
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
@@ -263,6 +278,9 @@ class LinkProvider(ADRProvider):
             resource_id = endpoint.get("resourceId")
             if not isinstance(resource_id, str):
                 raise AzureResponseError("The linked endpoint did not include a string resourceId.")
+            parsed_id = parse_resource_id(resource_id.strip())
+            if not all(parsed_id.get(field) for field in ("subscription", "resource_group", "name")):
+                raise AzureResponseError("The linked endpoint resourceId must be a resource-group-scoped ARM resource ID.")
             outbound = namespace["properties"].get("outboundIdentity") or {}
             if not isinstance(outbound, dict):
                 raise AzureResponseError("The namespace outboundIdentity must be an object.")

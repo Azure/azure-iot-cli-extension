@@ -233,6 +233,137 @@ def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("prefix", ["", "/subscriptions/sub", "/resourceGroups/rg"])
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_real_sdk_unscoped_resource_id_is_advisory(
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, prefix, skip,
+):
+    source = namespace()
+    source["properties"][section]["endpoints"]["primary"]["resourceId"] = f"{prefix}/providers/{_endpoint_type}/primary"
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        network.put(URL, json=completed)
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
+            "primary", "ns", "rg", skip_rbac_check=skip,
+        )
+        assert result == completed
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+        body = json.loads(network.calls[1].request.body)
+        assert "primary" not in body["properties"][section]["endpoints"]
+        assert body["identity"]["userAssignedIdentities"] == {UAMI: {}}
+    assert ("resource-group-scoped ARM resource ID" in caplog.text) is (not skip)
+    assert ("Continuing without changing role assignments" in caplog.text) is (not skip)
+    unlink_rbac.check_unlink_read_access.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("field", ["identity", "userAssignedIdentities"])
+@pytest.mark.parametrize("value", [
+    pytest.param(123, id="integer"),
+    pytest.param(0, id="zero"),
+    pytest.param(True, id="true"),
+    pytest.param(False, id="false"),
+    pytest.param(UAMI, id="string"),
+    pytest.param("", id="empty-string"),
+    pytest.param([UAMI], id="list"),
+    pytest.param([], id="empty-list"),
+    pytest.param([{"id": UAMI}], id="list-of-objects"),
+])
+@pytest.mark.parametrize("outbound_type,state,skip", [
+    pytest.param("UserAssigned", "Succeeded", False, id="user-advisory"),
+    pytest.param("UserAssigned", "Succeeded", True, id="user-skip"),
+    pytest.param("SystemAssigned", "Succeeded", False, id="system-advisory"),
+    pytest.param("SystemAssigned", "Succeeded", True, id="system-skip"),
+    pytest.param("UserAssigned", "Failed", False, id="failed-link"),
+    pytest.param("SystemAssigned", "LinkedResourceDeleted", False, id="deleted-resource"),
+])
+def test_delete_real_sdk_rejects_malformed_identity_containers_before_preflight(
+    fixture_cmd, unlink_client, unlink_rbac, mocker, caplog,
+    kind, section, _endpoint_type, field, value, outbound_type, state, skip,
+):
+    source = namespace()
+    source["properties"]["outboundIdentity"]["type"] = outbound_type
+    source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
+    if field == "identity":
+        source["identity"] = value
+    else:
+        source["identity"]["userAssignedIdentities"] = value
+    original = deepcopy(source)
+    provider = LinkProvider(fixture_cmd, client=unlink_client)
+    preflight = mocker.patch.object(provider, "_check_unlink_permissions")
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        with pytest.raises(AzureResponseError, match="attached identities cannot be safely preserved") as error:
+            getattr(provider, kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+        assert field in str(error.value)
+        assert [call.request.method for call in network.calls] == ["GET"]
+    assert source == original
+    preflight.assert_not_called()
+    unlink_rbac.check_unlink_read_access.assert_not_called()
+    assert "Continuing" not in caplog.text
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_rejects_non_string_attached_identity_keys(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, skip):
+    source = namespace()
+    source["identity"]["userAssignedIdentities"] = {123: {}}
+    client = Mock()
+    client.namespaces.get.return_value = (source, ETAG)
+    with pytest.raises(AzureResponseError, match="identity.userAssignedIdentities"):
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+    client.namespaces.begin_create_or_replace.assert_not_called()
+    unlink_rbac.check_unlink_read_access.assert_not_called()
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("identity,expected", [
+    pytest.param(None, None, id="null"),
+    pytest.param({}, {}, id="empty-object"),
+    pytest.param({"type": "None"}, {"type": "None"}, id="no-identity"),
+    pytest.param(
+        {"type": "SystemAssigned", "principalId": "ns-system", "userAssignedIdentities": None},
+        {"type": "SystemAssigned"}, id="null-attachments",
+    ),
+    pytest.param(
+        {"type": "SystemAssigned", "principalId": "ns-system", "userAssignedIdentities": {}},
+        {"type": "SystemAssigned"}, id="empty-attachments",
+    ),
+    pytest.param(
+        {"type": "SystemAssigned, UserAssigned", "principalId": "ns-system", "userAssignedIdentities": {
+            UAMI: {"principalId": "ns-user"}, UAMI + "-other": None,
+        }},
+        {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {UAMI: {}, UAMI + "-other": {}}},
+        id="multiple-attachments",
+    ),
+])
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_real_sdk_preserves_supported_identity_shapes(
+    fixture_cmd, unlink_client, kind, section, _endpoint_type, identity, expected, skip,
+):
+    source = namespace()
+    source["identity"] = identity
+    source["properties"]["outboundIdentity"] = {"type": "SystemAssigned"}
+    original = deepcopy(source)
+    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        network.put(URL, json=completed)
+        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
+            "primary", "ns", "rg", skip_rbac_check=skip,
+        )
+        assert result == completed
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+        body = json.loads(network.calls[1].request.body)
+        assert body["identity"] == expected
+        assert "primary" not in body["properties"][section]["endpoints"]
+    assert source == original
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("field,value", [
     pytest.param("outbound-id", ["bad-id"], id="uami-id-list"),
     pytest.param("outbound-id", {"id": UAMI}, id="uami-id-object"),

@@ -106,6 +106,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         assert submitted["id"].casefold() == before["id"].casefold()
         assert submitted["properties"]["provisioningState"] == "Succeeded"
         assert endpoint_name not in submitted["properties"].get(section, {}).get("endpoints", {})
+        assert submitted.get("identity") == before.get("identity")
         reader = self._reader_assignments(principal, scope)
         assert reader == prepared_reader, "Unlink must not create, remove or change role assignments."
 
@@ -136,6 +137,19 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 TEST_RG, namespace_name, first_hub, generate_identity_name(), assign_setup_roles=False,
             )
             identity_resource_id = infrastructure["identity_resource_id"]
+            extra_identity_name = generate_identity_name()
+            extra_identity = self.create_owned_resource(
+                f"identity create -n {extra_identity_name} -g {TEST_RG} --location {TEST_LOCATION}",
+                kind="identity", name=extra_identity_name, resource_group=TEST_RG,
+            ).get_output_in_json()
+            attached = self.cmd(
+                f"iot adr ns identity assign -n {namespace_name} -g {TEST_RG} --user {extra_identity['id']}",
+            ).get_output_in_json()
+            assert "SystemAssigned" in attached["type"]
+            assert "UserAssigned" in attached["type"]
+            assert {identity_id.casefold() for identity_id in attached["userAssignedIdentities"]} == {
+                identity_resource_id.casefold(), extra_identity["id"].casefold(),
+            }
             self.cmd(f"iot adr ns update -n {namespace_name} -g {TEST_RG} --tags unlink-test=preserve")
             dps = self.create_owned_resource(
                 f"iot dps create -n {dps_name} -g {TEST_RG} --location {TEST_LOCATION} --system-assigned-mi",
@@ -195,6 +209,9 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 "--tags unlink-test=preserve",
                 kind="namespace", name=namespace_name, resource_group=TEST_RG,
             ).get_output_in_json()
+            assert namespace["identity"]["type"] == "SystemAssigned"
+            assert namespace["identity"]["principalId"]
+            assert not namespace["identity"].get("userAssignedIdentities")
             su = self.create_owned_resource(
                 f"iot adr ns su instance create -n {su_name} -g {TEST_RG} "
                 f"--location {TEST_LOCATION} --system-assigned-mi",
