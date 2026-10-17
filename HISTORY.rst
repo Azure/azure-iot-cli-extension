@@ -6,6 +6,11 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**Hub bug fixes**
+
+* Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
+* Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
+
 **ADR unlink polling**
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
