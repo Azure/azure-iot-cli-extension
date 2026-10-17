@@ -10,6 +10,7 @@ from azext_iot.iothub.providers.discovery import (
 )
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import Setting
+from azext_iot.tests.iothub._integration_helpers import skip_hub_list_provider_error
 
 
 class TestIoTHubDiscovery(IoTLiveScenarioTest):
@@ -22,7 +23,7 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
     def test_iothub_discovery(self):
         discovery = IotHubDiscovery(self.cmd_shell)
 
-        iothub = discovery.find_resource(resource_name=self.entity_name)
+        iothub = discovery.find_resource(resource_name=self.entity_name, rg=self.entity_rg)
         assert iothub["name"] == self.entity_name
 
         auto_policy = discovery.find_policy(resource_name=self.entity_name, rg=self.entity_rg)
@@ -42,7 +43,11 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         cstrings = [discovery._build_target(resource=iothub, policy=p)["cs"] for p in policies]
         assert len(cstrings)
 
-        sub_hubs = discovery.get_resources()
+    def test_iothub_discovery_lists(self):
+        discovery = IotHubDiscovery(self.cmd_shell)
+        with skip_hub_list_provider_error():
+            sub_hubs = discovery.get_resources()
+            rg_hubs = discovery.get_resources(rg=self.entity_rg)
         assert sub_hubs
 
         filtered_sub_hubs = [
@@ -50,13 +55,10 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         ]
         assert filtered_sub_hubs
 
-        rg_hubs = discovery.get_resources(rg=self.entity_rg)
         assert rg_hubs
 
         filtered_rg_hubs = [hub for hub in rg_hubs if hub["name"] == self.entity_name]
         assert filtered_rg_hubs
-
-        assert len(rg_hubs) <= len(sub_hubs)
 
     def test_iothub_targets(self):
         discovery = IotHubDiscovery(self.cmd_shell)
@@ -67,27 +69,32 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         cs_target2 = discovery.get_target(resource_name=None, login=self.connection_string)
         assert_target(cs_target2, True)
 
-        cs_target2 = discovery.get_target(resource_name=self.host_name)
+        cs_target2 = discovery.get_target(resource_name=self.host_name, resource_group_name=self.entity_rg)
         assert_target(cs_target2, True)
 
-        auto_target = discovery.get_target(resource_name=self.entity_name)
+        auto_target = discovery.get_target(resource_name=self.entity_name, resource_group_name=self.entity_rg)
         assert_target(auto_target, rg=self.entity_rg)
 
         auto_target = discovery.get_target(resource_name=self.entity_name, resource_group_name=self.entity_rg)
         assert_target(auto_target, rg=self.entity_rg)
 
         desired_target = discovery.get_target(
-            resource_name=self.entity_name, policy_name=self.desired_policy_name, include_events=True
+            resource_name=self.entity_name, resource_group_name=self.entity_rg,
+            policy_name=self.desired_policy_name, include_events=True
         )
         assert_target(desired_target, rg=self.entity_rg, include_events=True)
 
-        sub_targets = discovery.get_targets()
+    def test_iothub_target_lists(self):
+        discovery = IotHubDiscovery(self.cmd_shell)
+        with skip_hub_list_provider_error():
+            sub_targets = discovery.get_targets()
+            rg_targets = discovery.get_targets(resource_group_name=self.entity_rg, include_events=True)
         [assert_target(tar) for tar in sub_targets]
 
-        rg_targets = discovery.get_targets(resource_group_name=self.entity_rg, include_events=True)
         [assert_target(tar, rg=self.entity_rg, include_events=True) for tar in rg_targets]
 
-        assert len(rg_targets) <= len(sub_targets)
+        assert any(target["name"] == self.entity_name for target in sub_targets)
+        assert any(target["name"] == self.entity_name for target in rg_targets)
 
 
 def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs):

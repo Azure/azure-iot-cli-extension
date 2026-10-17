@@ -5,17 +5,20 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import Optional
+from functools import partial
 from uuid import uuid4
 import pytest
+from msrestazure.tools import parse_resource_id
 from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import invoke_checked
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 pytestmark = pytest.mark.hub_infrastructure(
     sys_identity=True,
     user_identity=True,
@@ -32,11 +35,12 @@ def generate_ep_names(count=1):
 
 def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
     iot_hub_objs, event_hub_obj = provisioned_event_hub_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
-    iot_sub = iot_hub_obj["subscriptionid"]
+    iot_rg = iot_hub_entry["rg"]
+    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     eventhub_instance = event_hub_obj["eventhub"]["name"]
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
@@ -255,11 +259,12 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
 def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
     iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
-    iot_sub = iot_hub_obj["subscriptionid"]
+    iot_rg = iot_hub_entry["rg"]
+    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
     cli.invoke(
@@ -616,15 +621,17 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
 
 def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
+    invoke = partial(invoke_checked, cli, description="Storage endpoint lifecycle command")
     iot_hub_objs, storage_obj = provisioned_storage_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
-    iot_sub = iot_hub_obj["subscriptionid"]
+    iot_rg = iot_hub_entry["rg"]
+    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} -y -f".format(
             iot_hub, iot_rg
         )
@@ -637,7 +644,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     default_file_format = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
     # use connection string - note how the connection string needs to have entity path and the
     # endpoint uri and path are left blank
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
             iot_hub, iot_rg, endpoint_names[0], iot_rg, storage_cs, container_name
         )
@@ -656,7 +663,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=300
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
@@ -666,7 +673,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # Use hub identity with no defaults
     custom_file_format = default_file_format.replace("/", "_")
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
             iot_hub,
@@ -694,7 +701,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=10
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
         )
@@ -703,7 +710,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # Use user identity
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity {} -b {} -w {}".format(
             iot_hub,
@@ -732,7 +739,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=500
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
         )
@@ -741,13 +748,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # List
-    endpoint_list = cli.invoke(
+    endpoint_list = invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
         )
     ).as_json()
 
-    storage_list = cli.invoke(
+    storage_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
@@ -758,7 +765,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # Update
     # Keybased -> System, change all optional props
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity [system] -b {} -w {} --ff {}".format(
             iot_hub,
@@ -786,7 +793,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=50
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
@@ -796,7 +803,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # System -> User, change some optional props
     custom_file_format = default_file_format.replace("/", "_")
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity {} -b {}".format(
             iot_hub,
@@ -823,7 +830,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=10
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
         )
@@ -832,7 +839,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # User -> Keybased, change no optional props
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} "
         "-c {}".format(
             iot_hub,
@@ -857,7 +864,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         max_chunk_size_in_bytes=500
     )
 
-    endpoint_output = cli.invoke(
+    endpoint_output = invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
         )
@@ -866,14 +873,14 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # Delete one event hub endpoint
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
             iot_hub, iot_rg, endpoint_names[0]
         )
     )
 
     # ensure that only one got deleted
-    storage_list = cli.invoke(
+    storage_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
@@ -882,13 +889,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert len(storage_list) == 2
 
     # Delete all event hub endpoints
-    cli.invoke(
+    invoke(
         "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
             iot_hub, iot_rg, "storage-container"
         )
     )
 
-    endpoint_list = cli.invoke(
+    endpoint_list = invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
         )
@@ -898,13 +905,16 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
 
 @pytest.mark.skipif(not ensure_iothub_sdk_min_version("2.3.0"), reason="Cosmos Db Endpoints requires azure-mgmt-iothub>=2.3.0.")
+# First in its concurrent shard, so setup also pays for the shared hub and Cosmos account (~9 minutes).
+@pytest.mark.timeout(30 * 60, func_only=False)
 def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module):
     iot_hub_objs, cosmosdb_obj = provisioned_cosmosdb_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
-    iot_sub = iot_hub_obj["subscriptionid"]
+    iot_rg = iot_hub_entry["rg"]
+    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
     cli.invoke(
@@ -1184,10 +1194,11 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
 def test_iot_fabric_eventstream_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
     iot_hub_objs, event_hub_obj = provisioned_event_hub_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_rg = iot_hub_entry["rg"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     eventhub_instance = event_hub_obj["eventhub"]["name"]
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
@@ -1404,13 +1415,16 @@ def test_iot_fabric_eventstream_endpoint_lifecycle(provisioned_event_hub_with_id
     assert fabric_list == []
 
 
+# The successful baseline needed over 27 minutes for this body and shared module teardown.
+@pytest.mark.timeout(35 * 60, func_only=False)
 def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
     iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
-    iot_hub_obj = iot_hub_objs[0]["hub"]
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub_obj = iot_hub_entry["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_rg = iot_hub_entry["rg"]
     queue_cs = servicebus_obj["queueConnectionString"]
     topic_cs = servicebus_obj["topicConnectionString"]
     built_in_endpoint = "events"

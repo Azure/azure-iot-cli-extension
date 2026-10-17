@@ -24,6 +24,8 @@ def generate_names(prefix: str = "", count: int = 1):
 
 
 @pytest.mark.hub_infrastructure(desired_tags="test=message_route")
+# Passing baselines spent 850-885s on Event Hub setup plus this body, too close to the 900s default.
+@pytest.mark.timeout(30 * 60, func_only=False)
 def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub_module):
     iot_hub = provisioned_only_iot_hubs_module[0]["name"]
     iot_rg = provisioned_only_iot_hubs_module[0]["rg"]

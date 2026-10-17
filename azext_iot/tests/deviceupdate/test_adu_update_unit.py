@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import os
 import pytest
 from unittest.mock import MagicMock
 from azure.core.exceptions import AzureError
@@ -269,6 +270,34 @@ def test_calculate_hash(tmp_path):
     assert result[0]["hashAlgorithm"] == "sha256"
     assert result[0]["uri"].startswith("file://")
     assert result[0]["hash"]
+
+
+def test_calculate_hash_accepts_relative_path(tmp_path, monkeypatch):
+    target = tmp_path / "relative.bin"
+    target.write_bytes(b"relative")
+    monkeypatch.chdir(tmp_path)
+
+    result = subject.calculate_hash(file_paths=[target.name])
+
+    assert result[0]["uri"] == target.as_uri()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Creating Windows symlinks requires additional privileges.")
+@pytest.mark.parametrize("relative", [False, True])
+def test_calculate_hash_preserves_symlink_uri(tmp_path, monkeypatch, relative):
+    target = tmp_path / "target.bin"
+    target.write_bytes(b"symlink content")
+    link = tmp_path / "input link.bin"
+    link.symlink_to(target)
+    monkeypatch.chdir(tmp_path)
+
+    result = subject.calculate_hash(file_paths=[link.name if relative else str(link)])[0]
+    target_result = subject.calculate_hash(file_paths=[str(target)])[0]
+
+    assert result["uri"] == link.as_uri()
+    assert result["uri"] != target.as_uri()
+    assert result["bytes"] == len(b"symlink content")
+    assert result["hash"] == target_result["hash"]
 
 
 # ---------------------------------------------------------------------------

@@ -417,6 +417,10 @@ def load_iothub_help():
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
+                       Selected Hub-state reads must succeed before the output file is written. Device state capture is
+                       not supported for Basic-tier hubs because a complete device snapshot cannot be guaranteed.
+                       Use --aspects arm to export only the ARM template of a Basic-tier hub.
+
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
         - name: Export the supported state of the specified hub to the specified file.
@@ -446,6 +450,11 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the import process.
+
+                       All selected aspects and their required restore fields are validated before --replace deletes
+                       destination state. Unselected aspects need not be present. Empty device maps and empty ADM/edge
+                       configuration groups are valid; a selected ARM template must contain the Hub resource.
+                       Device state restore is not supported for Basic-tier hubs.
 
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
@@ -483,6 +492,9 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the migration process.
+
+                       Selected source Hub-state reads and snapshot validation must succeed before destination state
+                       is deleted or recreated. Device state migration is not supported for Basic-tier hubs.
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
 

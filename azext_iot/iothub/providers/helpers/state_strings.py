@@ -7,6 +7,13 @@
 OVERWRITE_FILE_MSG = "File {0} is not empty. Overwrite file? "
 FILE_NOT_EMPTY_ERROR = "Command aborted. Include the --replace flag to overwrite file."
 FILE_NOT_FOUND_ERROR = 'File {0} does not exist.'
+STATE_FILE_READ_ERROR = "Cannot read Hub state file '{0}': {1}"
+INVALID_STATE_MSG = "Invalid Hub state at '{0}': {1}."
+BASIC_DEVICES_UNSUPPORTED_MSG = (
+    "Device state capture and restore are not supported for Basic-tier IoT Hubs: "
+    "the device listing is limited to 1000 identities and cannot guarantee a complete snapshot. "
+    "Select only supported aspects with --aspects."
+)
 LOGIN_WITH_ARM_ERROR = "Hub aspect 'arm' is not supported with connection string via --login."
 TARGET_HUB_NOT_FOUND_MSG = "Destination IoT Hub {0} was not found and cannot be created with current hub aspects."
 MISSING_RG_ON_CREATE_ERROR = "Please provide the resource group for the hub that will be created."
@@ -33,7 +40,7 @@ SAVE_ROUTE_FAIL_MSG = "Skipping route {0} because it relies on endpoint {1}."
 SAVE_FILE_UPLOAD_UAI_RETRIEVE_FAIL_MSG = "Skipping the file upload because it relies on user assigned identity {0}."
 SAVE_FILE_UPLOAD_RETRIEVE_FAIL_MSG = "Failed to retrieve permissions for file upload. Skipping the file upload."
 SAVE_ARM_DESC = "Saved ARM template."
-SAVE_ARM_DESC_RETRIEVE_FAIL_MSG = "Failed to retrieve ARM template. Skipping ARM template retrieval."
+SAVE_ARM_DESC_RETRIEVE_FAIL_MSG = "Failed to retrieve a complete ARM template. State capture has been aborted."
 SAVE_ARM_DESC_RETRIEVE_ERROR_MSG = SAVE_ARM_DESC_RETRIEVE_FAIL_MSG + " \nError Message: {0}"
 PRIVATE_ENDPOINT_WARNING_MSG = "Private endpoints for IoT Hub will be ignored for state import."
 CREATE_IOT_HUB_MSG = "Created IoT Hub {0}."
