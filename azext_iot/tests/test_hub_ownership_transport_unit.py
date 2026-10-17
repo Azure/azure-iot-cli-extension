@@ -356,6 +356,44 @@ def test_controller_delete_success_does_not_require_json_but_requires_absence(tr
     assert [call[0] for call in wire.calls].count("DELETE") == 1
 
 
+@pytest.mark.parametrize("header", ["location", "azure-asyncoperation"])
+@pytest.mark.parametrize("identifier", ["opaque=token", "opaque=="])
+def test_observed_delete_accepts_equals_in_acknowledged_operation_path(transport, monkeypatch, header, identifier):
+    observer, arm, wire = transport
+    create_hub(wire)
+    original = wire.handle
+    operation = (
+        f"{ownership.ARM}/subscriptions/{ownership.SUBSCRIPTION}/providers/microsoft.devices/"
+        f"locations/{ownership.REGION}/operationresults/{identifier}?h=private-poll-query"
+    )
+
+    def handle(request):
+        result = original(request)
+        if request.method == "DELETE":
+            return 202, None, {header: operation}
+        return result
+
+    monkeypatch.setattr(wire, "handle", handle)
+    assert wire.submit("DELETE", HUB).status_code == 202
+    result = runner.cleanup_regular(
+        arm, observer.data, "uid", "regular", time.monotonic() + 10, observer.path,
+        region=ownership.REGION, endpoint=ownership.ARM,
+    )
+    assert result["complete"] and result["absentIds"] == [HUB]
+    mutation = observer.data["resources"][HUB]["mutations"][-1]
+    assert mutation["status"] == 202 and mutation["absenceConfirmed"]
+    assert [call[0] for call in wire.calls].count("DELETE") == 1
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+    receipt = observer.path.read_text(encoding="utf-8")
+    key = ownership.polling_key(operation)
+    assert key in receipt and operation not in receipt and "private-poll-query" not in receipt
+    assert key != ownership.polling_key(operation.replace(identifier, identifier + "="))
+    assert key != ownership.polling_key(operation.replace("private-poll-query", "different-query"))
+    with pytest.raises(ownership.OwnershipError, match="polling URL"):
+        ownership.polling_key(ownership.ARM + HUB.replace(ownership.GROUP, "foreign-group")
+                              + f"/operationstatuses/{identifier}")
+
+
 @pytest.mark.parametrize("body", [b"", b"malformed-json"])
 def test_controller_get_200_requires_valid_json(transport, monkeypatch, body):
     _, arm, _ = transport
@@ -1278,7 +1316,7 @@ def test_polling_urls_are_scoped_and_receipts_store_only_digests(transport, head
     (lambda url: url.replace("operationstatuses", "operationstatuses/token%3Aopaque"), "path; pathCharacterCodes=U+0025"),
 ])
 def test_polling_rejection_reports_only_validation_categories(change, reason):
-    url = ownership.ARM + HUB + "/operationstatuses/owned?sig=private-poll-query"
+    url = ownership.ARM + HUB + "/operationstatuses/owned==?sig=private-poll-query"
     with pytest.raises(ownership.OwnershipError) as error:
         ownership.polling_key(change(url))
     assert str(error.value) == "Unplanned ARM polling URL: " + reason
