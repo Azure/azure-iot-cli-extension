@@ -8,6 +8,8 @@ Unreleased
 
 **IoT Hub updates**
 
+* Fixed ``az iot hub monitor-events`` to fail immediately with an actionable error when hub discovery detects that local authentication is disabled, instead of attempting SAS authentication to the built-in Event Hub-compatible endpoint.
+
 * Fixed ``az iot edge devices create`` accepting unsafe device Ids from ``--cfg`` or ``--device`` as file system path segments. Device Id validation and bundle path containment checks now run before device-specific filesystem operations.
 
 * Fixed ``az iot hub state export`` failing when device or module twins omit ``x509Thumbprint``, or module identities omit optional read-only fields. Device authentication, module authentication, and writable twin properties are preserved.

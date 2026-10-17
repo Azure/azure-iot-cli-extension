@@ -2779,6 +2779,7 @@ def _iot_hub_monitor_events(
         resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         include_events=True,
+        monitor_events=True,
         login=login,
     )
 

@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from types import SimpleNamespace
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_iot_hub_connection_string
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -27,6 +29,48 @@ def get_mgmt_client(mocker, fixture_cmd):
 
 
 class TestIoTHubDiscovery:
+    @pytest.mark.parametrize("disable_local_auth", [True, False, None])
+    @pytest.mark.parametrize("monitor_events", [True, False])
+    def test_local_auth_check_only_for_event_monitoring(
+        self, fixture_cmd, disable_local_auth, monitor_events
+    ):
+        discovery = IotHubDiscovery(cmd=fixture_cmd)
+        resource = SimpleNamespace(
+            name="myhub",
+            properties=SimpleNamespace(
+                host_name="myhub.azure-devices.net",
+                disable_local_auth=disable_local_auth,
+                event_hub_endpoints={
+                    "events": SimpleNamespace(
+                        endpoint="sb://events.servicebus.windows.net/",
+                        path="myhub",
+                        partition_count=2,
+                        partition_ids=["0", "1"],
+                    )
+                },
+            ),
+            additional_properties={"resourcegroup": "myrg"},
+            location="eastus",
+            sku=SimpleNamespace(tier="Standard"),
+        )
+        policy = SimpleNamespace(key_name="iothubowner", primary_key="primary", secondary_key="secondary")
+
+        if monitor_events and disable_local_auth is True:
+            with pytest.raises(InvalidArgumentValueError) as error:
+                discovery._build_target(resource, policy, key_type="primary", include_events=True, monitor_events=True)
+            message = str(error.value)
+            assert "myhub" in message
+            assert "disableLocalAuth=true" in message
+            assert "requires SAS authentication" in message
+            assert "custom Event Hub" in message
+            return
+
+        target = discovery._build_target(
+            resource, policy, key_type="primary", include_events=True, monitor_events=monitor_events
+        )
+        assert target["entity"] == resource.properties.host_name
+        assert target["events"]["partition_ids"] == ["0", "1"]
+
     def test_get_target_by_cstring(self, fixture_cmd, get_mgmt_client):
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
