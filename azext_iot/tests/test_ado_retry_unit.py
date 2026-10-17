@@ -325,6 +325,9 @@ def test_ado_federation_uses_job_and_service_connection_without_github_token(moc
 def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     entry_text = (ROOT / ".azure-devops/integration_tests.yml").read_text()
     entry = yaml.safe_load(entry_text)
+    implementation = yaml.safe_load((ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text())
+    assert entry["extends"]["template"] == "templates/integration-pipeline.yml"
+    entry["stages"] = implementation["stages"]
     parameters = {value["name"]: value for value in entry["parameters"]}
     assert entry["trigger"] == entry["pr"] == "none"
     assert parameters["mode"]["default"] == "Integration tests"
@@ -351,24 +354,27 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
 
 
 def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    entry = yaml.safe_load((ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text())
     services = next(value for value in entry["variables"] if value.get("name") == "servicesCsv")
     assert services == {
         "name": "servicesCsv",
         "${{ if containsValue(parameters.services, 'DPS/Hub/ADR/ADU') }}": {"value": ",".join(retry.SERVICES)},
         "${{ else }}": {"value": "${{ join(',', parameters.services) }}"},
     }
-    plan = next(step for step in entry["stages"][0]["jobs"][0]["steps"] if "bash" in step)
+    manual = next(step["${{ if not(parameters.health) }}"] for step in entry["stages"][0]["jobs"][0]["steps"]
+                  if "${{ if not(parameters.health) }}" in step)
+    plan = next(step for step in manual if "bash" in step)
     assert plan["env"]["SERVICES"] == "${{ replace(variables.servicesCsv, ',', ' ') }}"
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     nonempty = "${{ if ne(variables.servicesCsv, '') }}"
     each = "${{ each service in split(variables.servicesCsv, ',') }}"
     stages = next(value[nonempty] for value in integration if nonempty in value)
     assert stages == [{each: [{
-        "template": "templates/integration-service.yml",
+        "template": "integration-service.yml",
         "parameters": {
             "service": "${{ service }}", "pythonVersions": "${{ parameters.pythonVersions }}",
             "regions": "${{ split(parameters.regions, ',') }}",
+            "health": "${{ parameters.health }}",
         },
     }]}]
     gate = next(value for value in integration if value.get("stage") == "Qualify")
@@ -420,7 +426,7 @@ def test_standalone_runners_and_children_inherit_candidate_dependencies(tmp_path
 
 
 def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    entry = yaml.safe_load((ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text())
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     stages = {stage["stage"]: stage for stage in integration if "stage" in stage}
     assert list(stages) == ["Build", "Lint", "Unit", "Qualify"]
@@ -448,7 +454,7 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
 
 
 def test_pipeline_adapts_shared_four_shards_and_unit_gate_without_cross_job_cache():
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    entry = yaml.safe_load((ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text())
     stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     unit = next(stage for stage in stages if stage.get("stage") == "Unit")
     job, gate = unit["jobs"]
@@ -475,8 +481,8 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]
     assert stage["stage"] == "${{ parameters.service }}"
-    assert stage["dependsOn"] == ["Build", "Lint", "Unit"]
-    assert " ".join(stage["condition"].split()) == (
+    assert stage["dependsOn"] == ["Build", "Lint", "Unit", {"${{ if parameters.health }}": ["Plan"]}]
+    assert " ".join(stage["${{ if not(parameters.health) }}"]["condition"].split()) == (
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )

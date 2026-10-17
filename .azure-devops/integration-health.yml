@@ -1,0 +1,14 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+trigger: none
+pr: none
+name: iot-health-$(Date:yyyyMMdd).$(Rev:r)
+lockBehavior: sequential
+pool:
+  vmImage: ubuntu-24.04
+
+extends:
+  template: templates/integration-pipeline.yml
+  parameters:
+    health: true
+    mode: Integration tests
