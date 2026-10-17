@@ -1280,6 +1280,20 @@ def test_cleanup_client_failure_still_runs_legacy_cleanup_and_fails(mocker):
     legacy.assert_called_once_with(hub_name="owned-hub", rg="rg")
 
 
+@pytest.mark.parametrize("device_ids", [[], ["unexpected-device"]])
+def test_management_only_cases_leave_hub_cleanup_to_owned_arm_fixtures(mocker, device_ids):
+    from azext_iot.tests.iothub.core.test_iothub_command_happy_paths_int import TestHubCommandHappyPaths
+
+    data_cleanup = mocker.patch.object(IoTLiveScenarioTest, "tearDown")
+    scenario = SimpleNamespace(_generated_device_ids=device_ids)
+    if device_ids:
+        with pytest.raises(AssertionError, match="Management-only cases"):
+            TestHubCommandHappyPaths.tearDown(scenario)
+    else:
+        TestHubCommandHappyPaths.tearDown(scenario)
+    data_cleanup.assert_not_called()
+
+
 def test_query_adapter_follows_continuation_after_an_empty_first_page():
     from azext_iot.operations.generic import _execute_query
 

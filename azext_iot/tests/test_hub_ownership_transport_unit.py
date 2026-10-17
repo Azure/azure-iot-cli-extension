@@ -55,6 +55,7 @@ class Wire:
         self.accepted = {}
         self.operations = {}
         self.identity_headers = {}
+        self.failover_location = None
         self.receipt = None
 
     def send(self, request, **kwargs):
@@ -74,6 +75,8 @@ class Wire:
     def handle(self, request):
         target = urlsplit(request.url).path.casefold()
         if request.method == "GET":
+            if target == self.failover_location:
+                return 200, None, {}
             if target in self.operations:
                 resource_id, header = self.operations[target]
                 body = {"status": "Succeeded"} if header == "azure-asyncoperation" else self.resources[resource_id]
@@ -148,7 +151,10 @@ class Wire:
                 location["role"] = "secondary" if location["role"] == "primary" else "primary"
             operation = HUB + "/operationstatuses/owned-failover"
             self.operations[operation] = HUB, "azure-asyncoperation"
-            return 202, None, {"azure-asyncoperation": ownership.ARM + operation, "retry-after": "0"}
+            headers = {"azure-asyncoperation": ownership.ARM + operation, "retry-after": "0"}
+            if self.failover_location:
+                headers["location"] = ownership.ARM + self.failover_location
+            return 202, None, headers
         if target.endswith("/exporttemplate"):
             selected = ownership.request_body(request.body)["resources"]
             resources = [
@@ -707,7 +713,8 @@ def test_route_action_allowlist_does_not_authorize_arbitrary_resource_actions(tr
     assert not any(call[0] == "POST" for call in wire.calls)
 
 
-def test_real_failover_sdk_tracks_owned_action_and_polling(transport):
+@pytest.mark.parametrize("empty_result", [False, True])
+def test_real_failover_sdk_tracks_owned_action_and_polling(transport, empty_result):
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
     observer, _, wire = transport
@@ -716,17 +723,25 @@ def test_real_failover_sdk_tracks_owned_action_and_polling(transport):
     wire.resources[HUB]["properties"]["locations"] = [
         {"role": "primary", "location": ownership.REGION}, {"role": "secondary", "location": "eastus2euap"},
     ]
+    final_url = HUB + "/operationresults/owned-failover"
+    if empty_result:
+        wire.failover_location = final_url
     with IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url="https://management.azure.com") as client:
         client.iot_hub.begin_manual_failover(
             iot_hub_name=HUB.rsplit("/", 1)[1], resource_group_name=ownership.GROUP,
             failover_input={"failoverRegion": "eastus2euap"}, polling_interval=0,
         ).result()
+    if empty_result:
+        assert any(call[0] == "GET" and urlsplit(call[1]).path.casefold() == final_url for call in wire.calls)
     assert wire.submit("GET", HUB).status_code == 200
     record = observer.data["resources"][HUB]
     mutation = record["mutations"][-1]
     assert mutation["method"] == "POST" and mutation["action"] == "failover"
     assert mutation["node"] == ownership.FAILOVER_NODE and mutation["status"] == 202
     assert mutation["polling"] and not record["uncertain"]
+    assert mutation["pollingSucceeded"]
+    if empty_result:
+        assert set(mutation["polling"]) == {"azure-asyncoperation", "location"}
     assert len([call for call in wire.calls if call[0] == "POST"]) == 1
     assert wire.resources[HUB]["properties"]["locations"][1]["role"] == "primary"
     wire.submit("DELETE", HUB)
@@ -737,14 +752,18 @@ def test_real_failover_sdk_tracks_owned_action_and_polling(transport):
     assert "unplanned owned ARM action" in ownership.ownership_errors(damaged, "uid", "regular")
 
 
+@pytest.mark.parametrize("empty_result", [False, True])
 @pytest.mark.parametrize("poll_state", ["not-read", "missing", "Running", "Failed", "unrelated"])
-def test_hub_read_cannot_acknowledge_unresolved_failover(transport, monkeypatch, poll_state):
+def test_hub_read_cannot_acknowledge_unresolved_failover(transport, monkeypatch, poll_state, empty_result):
     observer, _, wire = transport
     create_hub(wire)
     observer.current_node = ownership.FAILOVER_NODE
     wire.resources[HUB]["properties"]["locations"] = [
         {"role": "primary", "location": ownership.REGION}, {"role": "secondary", "location": "eastus2euap"},
     ]
+    if empty_result:
+        final_url = HUB + "/operationresults/owned-failover"
+        wire.failover_location = final_url
     wire.submit("POST", HUB + "/failover", {"failoverRegion": "eastus2euap"})
     operation = HUB + "/operationstatuses/owned-failover"
     if poll_state == "missing":
@@ -764,6 +783,8 @@ def test_hub_read_cannot_acknowledge_unresolved_failover(transport, monkeypatch,
 
         monkeypatch.setattr(wire, "handle", handle)
         assert wire.submit("GET", operation).status_code == 200
+    if empty_result:
+        assert wire.submit("GET", final_url).status_code == 200
     assert wire.submit("GET", HUB).status_code == 200
     record = json.loads(observer.path.read_text())["resources"][HUB]
     assert record["uncertain"]
@@ -776,6 +797,57 @@ def test_hub_read_cannot_acknowledge_unresolved_failover(transport, monkeypatch,
     with pytest.raises(ownership.OwnershipError, match="Uncertain mutation cannot be replayed"):
         wire.submit("DELETE", HUB)
     assert not any(call[0] == "DELETE" for call in wire.calls)
+
+
+@pytest.mark.parametrize("target", [HUB, HUB + "/operationstatuses/owned-failover", HUB + "/operationresults/unrelated"])
+def test_observer_rejects_empty_unacknowledged_gets(transport, monkeypatch, target):
+    observer, _, wire = transport
+    create_hub(wire)
+    observer.current_node = ownership.FAILOVER_NODE
+    wire.resources[HUB]["properties"]["locations"] = [{"role": "secondary", "location": "eastus2euap"}]
+    wire.failover_location = HUB + "/operationresults/owned-failover"
+    wire.submit("POST", HUB + "/failover", {"failoverRegion": "eastus2euap"})
+    monkeypatch.setattr(wire, "handle", lambda _request: (200, None, {}))
+    with pytest.raises(requests.exceptions.JSONDecodeError):
+        wire.submit("GET", target)
+
+
+@pytest.mark.parametrize("kind", [
+    "location", "resource", "child", "status", "unrelated", "query", "unaccepted", "delete", "location-only",
+])
+def test_empty_failover_response_requires_exact_acknowledged_nonresource_location(kind):
+    location = HUB + "/operationresults/owned?token=offline"
+    mutation = {
+        "id": HUB, "action": "failover", "status": 202,
+        "polling": {
+            "location": ownership.polling_key(location),
+            "azure-asyncoperation": ownership.polling_key(HUB + "/operationstatuses/owned-failover"),
+        },
+    }
+    mutations = [mutation]
+    url = location
+    if kind == "resource":
+        url = HUB
+        mutation["polling"]["location"] = ownership.polling_key(url)
+    elif kind == "status":
+        mutation["polling"] = {"azure-asyncoperation": mutation["polling"]["location"]}
+    elif kind == "unrelated":
+        url = HUB + "/operationresults/other?token=offline"
+    elif kind == "query":
+        url = location.replace("token=offline", "token=other")
+    elif kind == "unaccepted":
+        mutation["status"] = None
+    elif kind == "delete":
+        mutation.pop("action")
+        mutation["method"] = "DELETE"
+    elif kind == "location-only":
+        mutation["polling"].pop("azure-asyncoperation")
+    elif kind == "child":
+        url = CERTIFICATE
+        mutation["polling"]["location"] = ownership.polling_key(url)
+        mutations.append({"id": CERTIFICATE, "method": "PUT", "status": 200})
+    data = {"resources": {HUB: {"mutations": mutations}}}
+    assert ownership.empty_failover_result(data, ownership.ARM + url) is (kind == "location")
 
 
 @pytest.mark.parametrize("damage", [

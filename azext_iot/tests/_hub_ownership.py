@@ -253,6 +253,24 @@ def observe_poll(data, url, status, resource, headers=None):
                     observe_get(data, mutation["id"], status, resource)
 
 
+def empty_failover_result(data, url):
+    """A void final Location response is not an empty resource/status document."""
+    parsed = _arm_read_location(url)
+    key = _polling_fingerprint(parsed)
+    path = parsed.path.casefold()
+    if path in data["resources"] or any(
+        path == mutation["id"]
+        for record in data["resources"].values() for mutation in record["mutations"]
+    ):
+        return False
+    return any(
+        mutation.get("action") == "failover" and mutation.get("status") == 202
+        and mutation.get("polling", {}).get("azure-asyncoperation")
+        and key == mutation.get("polling", {}).get("location")
+        for record in data["resources"].values() for mutation in record["mutations"]
+    )
+
+
 def request_body(raw):
     """Decode JSON or the CLI policy's single unquoted envelope template key.
 
@@ -1067,7 +1085,11 @@ class Observer:
                     owner.save()
                 if method == "GET":
                     try:
-                        resource = response.json() if response.status_code == 200 else None
+                        resource = None
+                        if response.status_code == 200 and (
+                            response.content or not empty_failover_result(owner.data, request.url)
+                        ):
+                            resource = response.json()
                         if parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/"):
                             observe_poll(owner.data, request.url, response.status_code, resource, response.headers)
                         observe_get(owner.data, resource_id, response.status_code, resource)

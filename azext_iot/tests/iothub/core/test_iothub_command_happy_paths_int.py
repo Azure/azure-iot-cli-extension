@@ -12,6 +12,11 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest
 
 
 class TestHubCommandHappyPaths(IoTLiveScenarioTest):
+    def tearDown(self):
+        # These ARM-only cases create no data-plane objects. The owned fixtures
+        # delete their Hubs, including the isolated Hub after regional failover.
+        assert not self._generated_device_ids, "Management-only cases must not create device identities."
+
     def _command(self, operation, *, output=True):
         name_option = "--hub-name" if operation.split()[0] in ("policy", "consumer-group") else "--name"
         result = self.cmd(
