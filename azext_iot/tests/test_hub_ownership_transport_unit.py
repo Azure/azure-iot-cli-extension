@@ -1267,3 +1267,19 @@ def test_polling_urls_are_scoped_and_receipts_store_only_digests(transport, head
     assert url not in receipt and ownership.polling_key(url) in receipt
     with pytest.raises(ownership.OwnershipError, match="polling URL"):
         ownership.polling_key(url.replace(ownership.SUBSCRIPTION, "foreign-subscription"))
+
+
+@pytest.mark.parametrize("change,reason", [
+    (lambda url: url.replace("https://", "http://"), "scheme"),
+    (lambda url: url.replace(urlsplit(ownership.ARM).netloc, "foreign.example"), "origin"),
+    (lambda url: url.replace(ownership.SUBSCRIPTION, "foreign-subscription"), "subscription"),
+    (lambda url: url + "#private-fragment", "fragment"),
+    (lambda url: url.replace("operationstatuses", "operationstatuses/../"), "segments"),
+    (lambda url: url.replace("operationstatuses", "operationstatuses/token%3Aopaque"), "path; pathCharacterCodes=U+0025"),
+])
+def test_polling_rejection_reports_only_validation_categories(change, reason):
+    url = ownership.ARM + HUB + "/operationstatuses/owned?sig=private-poll-query"
+    with pytest.raises(ownership.OwnershipError) as error:
+        ownership.polling_key(change(url))
+    assert str(error.value) == "Unplanned ARM polling URL: " + reason
+    assert "private-" not in str(error.value)
