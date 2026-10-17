@@ -33,6 +33,7 @@ from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
+from azext_iot.adr.topology import endpoint_settings_match
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
 
@@ -455,9 +456,11 @@ def link_with_readiness(
         if any(_link_state(other) in {"Failed", "Canceled", "Cancelled"} for other in others):
             raise AssertionError("Non-recoverable failure on another namespace endpoint")
         if endpoint:
-            assert _endpoint_settings(endpoint) == expected, (
+            actual = _endpoint_settings(endpoint)
+            assert endpoint_settings_match(actual, expected), (
                 f"{label} endpoint target, identity or provisioning settings changed"
             )
+            expected = actual
         if ns_state == "Succeeded" and state == "Succeeded":
             _log(LogKind.RESULT, "%s link namespace and endpoint both Succeeded after %d recovery updates", label, retries)
             return {"name": endpoint_name, **endpoint}

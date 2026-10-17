@@ -17,7 +17,7 @@ from knack.util import CLIError
 
 from azext_iot.adr.providers.base import ADRResourceStateError, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.topology import endpoint_update_body
+from azext_iot.adr.topology import endpoint_settings_match, endpoint_update_body
 
 logger = get_logger(__name__)
 AUTHORIZATION_DELAYS = (30, 60, 120)
@@ -174,17 +174,11 @@ class LinkRecovery:
         if state == "Succeeded" and endpoint.get("linkingError"):
             raise AzureResponseError("Endpoint reports Succeeded with a linkingError; recovery stopped.")
         actual = _normalized(endpoint_update_body(endpoint))
-        # The RP can fill omitted Hub provisioning defaults on the first read.
-        # Requested values must match; then freeze every writable setting.
-        expected = deepcopy(self.expected)
-        actual_settings = actual.get("provisioning", {})
-        expected_settings = expected.pop("provisioning", {})
-        comparison = {key: value for key, value in actual.items() if key != "provisioning"}
+        # The RP may populate omitted defaults after a failed first observation.
+        # Freeze each setting as it appears, while always honoring requested values.
         if (
-            comparison != expected
-            or not isinstance(actual_settings, dict)
-            or any(actual_settings.get(key) != value for key, value in expected_settings.items())
-            or (self.snapshot is not None and actual != self.snapshot)
+            not endpoint_settings_match(actual, self.expected)
+            or (self.snapshot is not None and not endpoint_settings_match(actual, self.snapshot))
         ):
             changed = sorted(
                 key for key in set(actual) | set(self.expected)
