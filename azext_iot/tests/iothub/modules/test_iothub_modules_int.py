@@ -26,7 +26,6 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         super(TestIoTHubModules, self).__init__(test_case)
 
     @pytest.mark.skipif(not sas_phase_enabled(), reason="Module method qualification requires the owned service-SAS phase.")
-    @pytest.mark.timeout(300, func_only=False)
     def test_iothub_invoke_module_method(self):
         device = self.generate_device_names(1)[0]
         module = self.generate_module_names(1)[0]
