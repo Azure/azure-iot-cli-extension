@@ -55,15 +55,18 @@ def test_dps_management_happy_paths(request, tmp_path):
 
         baseline = policy_snapshot(command("policy list"))
         policy_name = "command-happy-path"
-        policy = command(f"policy create --policy-name {policy_name} --rights EnrollmentRead")
+        # DPS requires registration-read permission alongside enrollment-read.
+        read_rights = ("EnrollmentRead", "RegistrationStatusRead")
+        write_rights = (*read_rights, "EnrollmentWrite", "RegistrationStatusWrite")
+        policy = command(f"policy create --policy-name {policy_name} --rights {' '.join(read_rights)}")
         initial = policy_snapshot([policy])
-        assert initial[policy_name][0] == {"EnrollmentRead"}
+        assert initial[policy_name][0] == set(read_rights)
         assert policy_snapshot([command(f"policy show --policy-name {policy_name}")]) == initial
         assert policy_snapshot(command("policy list")) == {**baseline, **initial}
 
-        policy = command(f"policy update --policy-name {policy_name} --rights EnrollmentRead EnrollmentWrite")
+        policy = command(f"policy update --policy-name {policy_name} --rights {' '.join(write_rights)}")
         updated = policy_snapshot([policy])
-        assert updated[policy_name][0] == {"EnrollmentRead", "EnrollmentWrite"}
+        assert updated[policy_name][0] == set(write_rights)
         assert updated[policy_name][1:] == initial[policy_name][1:]
         assert policy_snapshot([command(f"policy show --policy-name {policy_name}")]) == updated
         connection = parse_iot_dps_connection_string(command(
