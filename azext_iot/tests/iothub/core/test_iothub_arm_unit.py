@@ -225,6 +225,8 @@ def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():
             "locations": [{"location": "centraluseuap"}],
             "iotHubDetails": {"gatewayVersion": "V2"},
             "privateEndpointConnections": [{"id": "/private/one"}],
+            "minTlsVersion": "1.2",
+            "minTlsVersionMigration": {},
             "eventHubEndpoints": {
                 "disabled": None,
                 "events": {
@@ -255,6 +257,7 @@ def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():
     }
     assert body["properties"]["eventHubEndpoints"]["disabled"] is None
     assert body["properties"]["routing"] == {"routes": [{"name": "route"}]}
+    assert body["properties"]["minTlsVersion"] == "1.2"
     assert {
         "deviceRegistry",
         "provisioningState",
@@ -265,6 +268,7 @@ def test_hub_write_sanitizer_is_non_mutating_and_removes_all_projections():
         "locations",
         "iotHubDetails",
         "privateEndpointConnections",
+        "minTlsVersionMigration",
     }.isdisjoint(body["properties"])
 
 

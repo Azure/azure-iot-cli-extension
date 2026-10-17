@@ -140,6 +140,7 @@ def hub_description_for_write(hub: dict) -> dict:
         "locations",
         "iotHubDetails",
         "privateEndpointConnections",
+        "minTlsVersionMigration",
     ):
         properties.pop(key, None)
 
