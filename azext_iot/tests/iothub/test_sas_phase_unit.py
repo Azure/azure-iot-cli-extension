@@ -105,7 +105,7 @@ def test_sas_authorized_target_is_attested_without_reducing_manifest(tmp_path, m
         assert not list(tmp_path.iterdir())
 
 
-def test_manifest_retains_eight_upload_first_local_auth_and_preview_nodes():
+def test_manifest_retains_nine_upload_first_local_auth_and_preview_nodes():
     assert len(subject.NODES) == len(set(subject.NODES)) == 9
     assert subject.NODES[0].endswith("::TestIoTStorage::test_device_upload_file")
     assert subject.NODES[-2:] == (

@@ -1742,13 +1742,11 @@ def iot_hub_policy_create(cmd, client, hub_name, policy_name, permissions, resou
     policies.append({"keyName": policy_name, "rights": rights})
     hub["properties"]["authorizationPolicies"] = policies
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=_get_resource_group_from_hub(hub),
-                resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub),
-                **hub_etag_arguments(hub),
-            )
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
         )
     )
     return iot_hub_policy_list(client, hub_name, _get_resource_group_from_hub(hub))
@@ -1763,13 +1761,11 @@ def iot_hub_policy_delete(cmd, client, hub_name, policy_name, resource_group_nam
     updated_policies = [p for p in policies if p["keyName"].lower() != policy_name.lower()]
     hub["properties"]["authorizationPolicies"] = updated_policies
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=_get_resource_group_from_hub(hub),
-                resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub),
-                **hub_etag_arguments(hub),
-            )
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
         )
     )
     return iot_hub_policy_list(client, hub_name, _get_resource_group_from_hub(hub))
