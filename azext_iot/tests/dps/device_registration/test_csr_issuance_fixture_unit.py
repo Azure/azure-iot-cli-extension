@@ -654,7 +654,7 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
                 "operationId": "operation", "status": "assigned",
                 "registrationState": {
                     "registrationId": ids[-1], "deviceId": ids[-1], "assignedHub": "modern",
-                    "connectionProfile": "MqttV5", "issuedCertificateChain": ["opaque-contract-value"],
+                    "issuedCertificateChain": ["opaque-contract-value"],
                     "registryDeviceExternalId": "external-id",
                     "substatus": "initialAssignment",
                 },
@@ -684,34 +684,21 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
         registry_assertions.assert_called_with(resource, owner, certificate=certificate)
 
 
-@pytest.mark.parametrize("profile,valid", [
-    pytest.param({"connectionProfile": "classic"}, True, id="classic-lowercase"),
-    pytest.param({"connectionProfile": "Classic"}, True, id="classic-canonical"),
-    pytest.param({"connectionProfile": "CLASSIC"}, True, id="classic-uppercase"),
-    pytest.param({"connectionProfile": "MqttV5"}, True, id="mqtt-canonical"),
-    pytest.param({"connectionProfile": "mqttv5"}, True, id="mqtt-lowercase"),
-    pytest.param({"connectionProfile": "MQTTV5"}, True, id="mqtt-uppercase"),
-    pytest.param({"connectionProfile": "mQtTv5"}, True, id="mqtt-mixed-case"),
-    pytest.param({}, False, id="missing"),
-    pytest.param({"connectionProfile": None}, False, id="null"),
-    pytest.param({"connectionProfile": ""}, False, id="empty"),
-    pytest.param({"connectionProfile": "Unknown"}, False, id="unknown"),
-    pytest.param({"connectionProfile": "MqttV6"}, False, id="unknown-version"),
-    pytest.param({"connectionProfile": " Classic"}, False, id="leading-whitespace"),
-    pytest.param({"connectionProfile": "classic "}, False, id="trailing-whitespace"),
-    pytest.param({"connectionProfile": False}, False, id="boolean"),
-    pytest.param({"connectionProfile": 1}, False, id="number"),
-    pytest.param({"connectionProfile": []}, False, id="list"),
-    pytest.param({"connectionProfile": {}}, False, id="object"),
-    pytest.param({"connectionProfile": b"classic"}, False, id="bytes"),
+@pytest.mark.parametrize("overrides,valid", [
+    pytest.param({}, True, id="ga-without-connection-profile"),
+    pytest.param({"connectionProfile": "Classic"}, True, id="preserve-extra-classic-profile"),
+    pytest.param({"connectionProfile": "MqttV5"}, True, id="preserve-extra-mqtt-profile"),
+    pytest.param({"issuedCertificateChain": []}, False, id="empty-certificate-chain"),
+    pytest.param({"issuedCertificateChain": None}, False, id="null-certificate-chain"),
+    pytest.param({"registryDeviceExternalId": ""}, False, id="missing-registry-correlation"),
 ])
-def test_csr_connection_profile_contract_preserves_wire_value(resource, tmp_path, mocker, profile, valid):
+def test_csr_ga_contract_preserves_response(resource, tmp_path, mocker, overrides, valid):
     from azext_iot.tests.dps.device_registration.test_csr_registry_cleanup_unit import result as registration_result
 
     registration_id = "owned-registration"
     result = registration_result(registration_id)
     del result["registrationState"]["connectionProfile"]
-    result["registrationState"].update(profile)
+    result["registrationState"].update(overrides)
     expected = deepcopy(result)
     owner = mocker.Mock()
     mocker.patch.object(scenario, "generate_names", return_value=registration_id)

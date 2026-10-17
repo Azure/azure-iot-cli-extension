@@ -87,7 +87,7 @@ def test_gwv2_target_uses_service_hostname(discovery, provisioned_only_iot_hubs_
 
 
 def test_connection_string_uses_gwv2_hostname(provisioned_only_iot_hubs_module):
-    """Verify connection-string show uses the device hostname for GWv2 hubs."""
+    """Verify auto connection-string selection uses the device hostname for GWv2 hubs."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
 
@@ -95,7 +95,9 @@ def test_connection_string_uses_gwv2_hostname(provisioned_only_iot_hubs_module):
     props = hub.get("properties", {})
     device_hostname = props.get("deviceHostName")
 
-    result = cli.invoke(f"iot hub connection-string show -n {hub_name} -g {hub_rg}").as_json()
+    result = cli.invoke(
+        f"iot hub connection-string show -n {hub_name} -g {hub_rg} --hostname-type auto"
+    ).as_json()
     cs = result["connectionString"]
     assert "HostName=" in cs
 

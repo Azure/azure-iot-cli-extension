@@ -11,6 +11,8 @@ Release History
 * All seven modeless synchronous SDK packages use ``2026-11-01``: Device Registry/CMS, IoT Hub management/service/device, and DPS management/service/device.
 * Reused supported implementations and tests from ``release/1.0.0-preview`` and ``release/1.1.0-preview``. Hub and DPS management requests use the active cloud's ARM endpoint; ADR/CMS remains public-cloud-only. Explicit public-cloud canary overrides remain available. API deployment and availability must be qualified per cloud.
 * Preserved the Hub data-plane adapter's request/response, query, messaging, and file-upload compatibility around freshly generated SDK code.
+* Hub updates omit unsupported TLS-migration response metadata while preserving the configured minimum TLS version.
+* Hub policy create/delete read policy output after successful writes instead of requiring keys in the Hub update response.
 * Updated dependency floors to match the generated SDK contracts: ``azure-core>=1.37.0``, ``azure-mgmt-core>=1.6.0``, ``isodate>=0.6.1``, and ``typing-extensions>=4.6.0``.
 
 **Device Registry and certificate management**

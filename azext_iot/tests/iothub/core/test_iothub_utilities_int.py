@@ -144,7 +144,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             )
 
     def test_iothub_connection_string_show(self):
-        conn_str_pattern = r"^HostName={0}(\.\w+)?\.azure-devices\.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
+        conn_str_pattern = r"^HostName={0}\.azure-devices\.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
             self.entity_name
         )
         conn_str_eventhub_pattern = (
