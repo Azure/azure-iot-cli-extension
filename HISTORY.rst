@@ -36,6 +36,13 @@ Release History
 1.0.0b1 (Preview)
 +++++++++++++++++
 
+**Namespace terminal UI**
+
+* Added ``az iot adr ns ui`` (radar), a minimal single-table resource browser with keyboard and mouse interaction, contextual actions, scoped refresh, and optional read-only mode.
+* Added basic resource create/update/delete through the release providers, typed destructive confirmation, stale-approval checks, and bounded background operations. Update forms start from current resource values.
+* Namespace creation and onboarding are deliberately excluded. Use ``az iot adr ns setup`` for onboarding and ``az iot adr ns check`` for diagnostics when those commands are installed.
+* Link add/update retains the release role matrix and propagation recovery. Role-assignment writes are disclosed during review; provider status displays do not compete with the terminal UI.
+
 **Known limitations**
 
 * Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.

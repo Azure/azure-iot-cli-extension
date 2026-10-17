@@ -1965,3 +1965,24 @@ def load_adr_help():
   """,
         }
     )
+
+    helps[
+        "iot adr ns ui"
+    ] = """
+  type: command
+  short-summary: Launch the Device Registry terminal UI.
+  long-summary: |
+    An interactive view of Device Registry resources with mouse and keyboard navigation.
+    Browse namespaces, devices, groups, jobs, links and certificates, and review basic
+    create, update and delete actions before execution. Namespace creation and guided
+    onboarding are not included.
+
+    Requires an interactive terminal. Press '?' inside the UI for the key reference.
+  examples:
+    - name: Launch and pick a namespace interactively
+      text: az iot adr ns ui
+    - name: Launch scoped to a namespace
+      text: az iot adr ns ui --ns myNamespace -g myResourceGroup
+    - name: Launch without any state-changing actions
+      text: az iot adr ns ui --ns myNamespace -g myResourceGroup --read-only
+  """

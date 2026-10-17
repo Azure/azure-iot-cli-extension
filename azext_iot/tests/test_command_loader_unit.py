@@ -145,7 +145,7 @@ def management_command_parser():
     loader.load_command_table(None)
     names = [
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
-        "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
+        "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND, "iot adr ns ui",
         "iot adr ns ca policy create", "iot adr ns ca policy update",
         *(f"iot dps certificate {action}" for action in _DPS_CERTIFICATE_COMMANDS),
     ]
@@ -559,7 +559,7 @@ def test_certificate_policy_parser_rejects_noninteger_validity(management_comman
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 128
+    assert sum(name.startswith("iot adr ") for name in command_table) == 129
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)
@@ -588,6 +588,7 @@ def test_command_table_loads(command_table):
         "iot hub topic-group list",
         "iot hub topic-group update",
         "iot hub topic-group delete",
+        "iot adr ns ui",
     ]:
         assert expected in command_table, f"Missing command: {expected}"
 
@@ -1307,3 +1308,30 @@ def test_topic_group_delete_flag_cli_parsing(
     parser.add_argument(*argument.options_list, **argument.options)
 
     assert getattr(parser.parse_args(values), argument_name) is expected
+
+
+def test_radar_command_allows_interactive_namespace_selection(management_command_parser):
+    parsed = management_command_parser.parse_args(["iot", "adr", "ns", "ui"])
+
+    assert parsed.namespace_name is None
+    assert parsed.resource_group_name is None
+
+
+def test_radar_command_parses_session_options(management_command_parser):
+    parsed = management_command_parser.parse_args(
+        [
+            "iot", "adr", "ns", "ui",
+            *_NAMESPACE_ARGUMENTS,
+            "--read-only",
+            "--refresh-interval", "10",
+            "--theme", "light",
+            "--log-file", "radar.log",
+        ]
+    )
+
+    assert parsed.namespace_name == "namespace"
+    assert parsed.resource_group_name == "resource-group"
+    assert parsed.read_only is True
+    assert parsed.refresh_interval == 10
+    assert parsed.theme == "light"
+    assert parsed.log_file == "radar.log"

@@ -224,7 +224,10 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 128
+    service_commands = {name for name in commands if name != "iot adr ns ui"}
+    assert len(service_commands) == 128
+    assert commands["iot adr ns ui"] == ("command", "adr_ui_launch", {})
+    assert not any(name.startswith("iot adr ns registry-device") for name in commands)
     assert commands["iot adr schema registry create"] == (
         "command",
         "adr_schema_registry_create",
