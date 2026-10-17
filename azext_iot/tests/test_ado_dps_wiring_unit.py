@@ -176,10 +176,10 @@ def test_controller_owned_collection_respects_legacy_boundary(tmp_path, legacy):
     manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
     regular = manifest["expected_nodeids"]("regular")
     required = {manifest["normalize_nodeid"](node) for node in expected}
-    assert len(regular) == 37 and required <= regular
+    assert len(regular) == 41 and required <= regular
     matcher = Expression.compile(expression)
     retained = {node for node in regular if matcher.evaluate(lambda keyword, node=node: keyword.lower() in node.lower())}
-    assert retained == regular - required and len(retained) == 31
+    assert retained == regular - required and len(retained) == 35
     assert len(manifest["expected_nodeids"]("service-sas")) == 29
     assert len(manifest["expected_nodeids"]("local-auth-toggle")) == 3
 

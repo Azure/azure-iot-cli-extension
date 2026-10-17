@@ -13,6 +13,11 @@ Release History
 * Malformed outbound identity metadata and resource-group response deserialization failures warn and continue during advisory preflight; namespace write and polling errors still propagate.
 * Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--skip-rbac-check``. Valid identity assignments are preserved.
 
+**DPS certificate and enrollment fixes**
+
+* Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
+* Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
+
 **ADR unlink polling**
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
