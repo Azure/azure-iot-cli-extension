@@ -414,7 +414,7 @@ def safe_junit(raw, destination, phase, selected, *, debug=None):
     identities = []
     output = ET.Element("testsuite", name=f"dps-{phase}")
     if debug:
-        output.set("mode", "debug")
+        output.set("mode", "attempt" if "attempt" in debug else "debug")
     for case in cases:
         identity = MANIFEST["junit_nodeid"](case)
         known = identity in expected
@@ -426,9 +426,12 @@ def safe_junit(raw, destination, phase, selected, *, debug=None):
             duration = "0"
         clean_case = ET.SubElement(output, "testcase", name=name, classname=classname, time=duration)
         outcome = next((kind for kind in ("error", "failure", "skipped") if case.find(kind) is not None), None)
+        issues = ([child.tag for child in case if child.tag in ("error", "failure", "skipped")]
+                  if debug and "attempt" in debug else [outcome] if outcome else [])
         if outcome:
             counts[{"error": "errors", "failure": "failures", "skipped": "skipped"}[outcome]] += 1
-            ET.SubElement(clean_case, outcome, message="Diagnostic omitted; consult the redacted phase log.")
+            for issue in issues:
+                ET.SubElement(clean_case, issue, message="Diagnostic omitted; consult the redacted phase log.")
         else:
             counts["passed"] += 1
     for key in ("tests", "failures", "errors", "skipped"):
@@ -572,8 +575,16 @@ def combine_coverage(coverage_files, destination=None, *, run_process=subprocess
 
 
 def run(subscription, group, output, reader, execute=child, clock=time.monotonic, *,
-        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None, combine=combine_coverage):
+        debug_phase=None, debug_nodes=None, region="centraluseuap", endpoint=None, combine=combine_coverage,
+        attempt_selection=None):
     debug = FOCUSED["select"]("DPS", debug_phase, debug_nodes)
+    if attempt_selection:
+        if debug:
+            raise ValueError("Debug and ADO attempt selection cannot be combined.")
+        debug = FOCUSED["attempt"]("DPS", attempt_selection["phase"], attempt_selection["requestedNodes"],
+                                   attempt_selection["attempt"])
+        if debug != attempt_selection:
+            raise ValueError("Attempt selection does not match this checkout.")
     target = TARGETS["target"](region, endpoint)
     TARGETS["public_scope"](subscription, group, **target)
     if getattr(reader, "target", target) != target:
@@ -668,7 +679,9 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    AZURE_IOT_ADR_ARM_ENDPOINT=target["endpoint"],
                                    azext_iot_adr_location=region, azext_iot_adr_arm_endpoint=target["endpoint"],
                                    azext_iot_adr_arm_resource="https://management.azure.com",
-                                   azext_iot_dps_workers="0" if debug or name == "local-auth-toggle" else "7",
+                                   azext_iot_dps_workers=(
+                                       "0" if name == "local-auth-toggle" or debug and not attempt_selection else "7"
+                                   ),
                                    azext_iot_dps_junit=str(raw_junit),
                                    azext_iot_dps_coverage_file=str(coverage_file.resolve()),
                                    azext_iot_dps_install_token=install_token,
@@ -756,9 +769,24 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                             records = ownership(receipts, name, uid, subscription, group, baseline_ids, **target)
                             # Serial verification: a sibling's slow cleanup must not consume this phase's window.
                             reader.deadline = min(deadline, clock() + phase["cleanup"])
-                            result["cleanup"] = verify_cleanup(
-                                reader, records, uid, reader.deadline, clock=clock,
-                            )
+                            from azext_iot.tests import _cleanup_handoff as handoff
+                            if attempt_selection and handoff.enabled():
+                                result["cleanup"] = {
+                                    "mode": "handoff", "complete": False,
+                                    "remaining": [{"id": record["id"], "state": "see cleanup submission receipts"}
+                                                  for record in records],
+                                }
+                                submitted = {
+                                    json.loads(path.read_text(encoding="utf-8"))["resource"]
+                                    for path in Path(os.environ[handoff.ENV]).glob("*.json")
+                                }
+                                for record in records:
+                                    if record["id"] not in submitted:
+                                        handoff.record(record["id"], "pending", "NoCleanupSubmission")
+                            else:
+                                result["cleanup"] = verify_cleanup(
+                                    reader, records, uid, reader.deadline, clock=clock,
+                                )
                             result["cleanup"]["owned_ids"] = [record["id"] for record in records]
                             result["cleanup"]["absent_ids"] = (
                                 result["cleanup"]["owned_ids"] if result["cleanup"]["complete"] else []
@@ -778,7 +806,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                             result["exit_code"] == 0 and not result["timed_out"] and not result["interrupted"]
                             and counts.get("valid") and counts.get("passed", 0) > 0
                             and not counts.get("failures") and not counts.get("errors") and not counts.get("skipped")
-                            and result["cleanup"].get("complete")
+                            and (result["cleanup"].get("complete") or result["cleanup"].get("mode") == "handoff")
                         ) else "failed"
                         result["finished_at"] = utc()
                         write_json(folder / "result.json", result)
@@ -803,7 +831,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         if summary["cancelled"]:
             summary["status"] = "failed"
         if debug:
-            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
+            mode = "attempt" if attempt_selection else "debug"
+            summary["status"] = mode + ("-passed" if summary["status"] == "passed" else "-failed")
         summary["finished_at"] = utc()
         summary["arm_reads"] = getattr(reader, "reads", [])
         write_json(summary_path, summary)
@@ -811,7 +840,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         thread.join(timeout=1)
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
-    return 0 if summary["status"] == ("debug-passed" if debug else "passed") else 1
+    success = ("attempt-passed" if attempt_selection else "debug-passed") if debug else "passed"
+    return 0 if summary["status"] == success else 1
 
 
 def main():

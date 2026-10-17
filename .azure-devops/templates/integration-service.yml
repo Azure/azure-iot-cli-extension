@@ -1,0 +1,122 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: service
+    type: string
+  - name: pythonVersions
+    type: object
+  - name: regions
+    type: object
+
+stages:
+  - stage: ${{ parameters.service }}
+    displayName: ${{ parameters.service }} integration tests (manual recovery)
+    dependsOn:
+      - Build
+      - Lint
+      - Unit
+    condition: |
+      and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
+          eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+    jobs:
+      - job: Tests
+        timeoutInMinutes: 360
+        cancelTimeoutInMinutes: 15
+        strategy:
+          maxParallel: 1
+          matrix:
+            ${{ each python in parameters.pythonVersions }}:
+              ${{ each region in parameters.regions }}:
+                ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
+                  python: ${{ python }}
+                  region: ${{ region }}
+        steps:
+          - checkout: self
+            clean: true
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(python)
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              targetPath: $(Pipeline.Workspace)/history
+          - bash: |
+              set -euo pipefail
+              python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
+              python azext_iot/tests/_ado_pipeline.py candidate --history "$HISTORY" --output candidate
+              az extension add --source candidate/*.whl -y
+              if [ "$SERVICE" = DPS ]; then
+                python -m tox r -e DPS-int --notest
+                export azext_iot_candidate_wheel="$(realpath candidate/*.whl)"
+                extension=$(.tox/DPS-int/bin/python -c \
+                  'import sysconfig; print(sysconfig.get_path("purelib") + "/azure-cli-extensions/azure-iot")')
+                .tox/DPS-int/bin/python azext_iot/tests/_locked_install.py "$extension"
+                PYTHONPATH="$PYTHONPATH:$extension" .tox/DPS-int/bin/python -c \
+                  "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
+              fi
+              export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
+              python -c "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
+            displayName: Install candidate and prepare test environment
+            env:
+              HISTORY: $(Pipeline.Workspace)/history
+              PYTHONPATH: $(Build.SourcesDirectory)
+              SERVICE: ${{ parameters.service }}
+              AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+          - task: AzureCLI@2
+            displayName: Retry failed cases or rerun the full service with fresh fixtures
+            inputs:
+              azureSubscription: $(AzureServiceConnection)
+              addSpnToEnvironment: true
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
+                export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
+                python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
+                  --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
+                  --wheel candidate --history "$HISTORY" --output attempt
+            env:
+              SERVICE: ${{ parameters.service }}
+              TEST_PYTHON: $(python)
+              TEST_REGION: $(region)
+              TEST_ENDPOINT: $(endpoint)
+              HISTORY: $(Pipeline.Workspace)/history
+              PYTHONPATH: $(Build.SourcesDirectory)
+              AZEXT_IOT_CI_AUTH: ado
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
+              AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+              AZURE_TEST_RUN_LIVE: 'True'
+              PYTHONUNBUFFERED: '1'
+              azext_iot_testrg: cli-int-test-rg
+              azext_iot_testhub_location: $(region)
+              azext_iot_test_arm_endpoint: $(endpoint)
+              AZURE_IOT_ADR_ARM_ENDPOINT: $(endpoint)
+              AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
+              AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
+              azext_iot_hub_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+              azext_iot_adr_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
+              azext_iot_adr_resource_group: cli-int-test-rg
+              azext_iot_adr_location: $(region)
+              azext_iot_adr_arm_endpoint: $(endpoint)
+              azext_iot_adr_arm_resource: https://management.azure.com
+          - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
+            condition: succeededOrFailed()
+            displayName: Report incomplete execution before publishing
+            env:
+              SERVICE: ${{ parameters.service }}
+              TEST_PYTHON: $(python)
+              TEST_REGION: $(region)
+          - publish: attempt
+            condition: succeededOrFailed()
+            artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            displayName: Publish effective results (original attempts remain in artifacts)
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: attempt/final.xml
+              testRunTitle: ${{ parameters.service }} Python $(python) $(region) attempt $(System.JobAttempt)
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: true
