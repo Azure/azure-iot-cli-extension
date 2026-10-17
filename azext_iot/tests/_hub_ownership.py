@@ -162,11 +162,20 @@ def _arm_read_location(url):
         parsed = urlsplit(url)
     except ValueError as error:
         raise OwnershipError("Unplanned ARM polling URL") from error
-    if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
-            or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
-            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
-            or any(part in (".", "..") for part in parsed.path.split("/")[1:])):
-        raise OwnershipError("Unplanned ARM polling URL")
+    checks = (
+        ("scheme", parsed.scheme == "https"),
+        ("origin", parsed.netloc in ("management.azure.com", urlsplit(ARM).netloc)),
+        ("subscription", parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")),
+        ("fragment", not parsed.fragment),
+        ("path", bool(re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path))),
+        ("segments", not any(part in (".", "..") for part in parsed.path.split("/")[1:])),
+    )
+    invalid = [name for name, valid in checks if not valid]
+    if invalid:
+        if "path" in invalid:
+            codes = sorted({f"U+{ord(char):04X}" for char in re.sub(r"[A-Za-z0-9_.()/-]", "", parsed.path)})
+            invalid.append("pathCharacterCodes=" + ",".join(codes))
+        raise OwnershipError("Unplanned ARM polling URL: " + "; ".join(invalid))
     return parsed
 
 

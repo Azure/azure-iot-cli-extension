@@ -32,8 +32,7 @@ class TestHubCommandHappyPaths(IoTLiveScenarioTest):
         name = generate_generic_id()
         baseline = policy_snapshot(self._command("policy list"))
         try:
-            self._command(f"policy create --name {name} --permissions RegistryRead ServiceConnect", output=False)
-            created = policy_snapshot(self._command("policy list"))
+            created = policy_snapshot(self._command(f"policy create --name {name} --permissions RegistryRead ServiceConnect"))
             assert set(created) == set(baseline) | {name}
             assert {key: value for key, value in created.items() if key != name} == baseline
             assert created[name][0] == {"RegistryRead", "ServiceConnect"}
@@ -47,7 +46,7 @@ class TestHubCommandHappyPaths(IoTLiveScenarioTest):
             assert renewed[name][2] == initial[name][2]
             assert policy_snapshot([self._command(f"policy show --name {name}")]) == renewed
             assert policy_snapshot(self._command("policy list")) == {**baseline, **renewed}
-            self._command(f"policy delete --name {name}", output=False)
+            assert policy_snapshot(self._command(f"policy delete --name {name}")) == baseline
             assert policy_snapshot(self._command("policy list")) == baseline
             assert self._command("show")["properties"]["disableLocalAuth"] is True
         finally:
