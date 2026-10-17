@@ -184,6 +184,14 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provi
         matching = [h for h in linked_hubs if h["name"] == device_hostname]
         assert len(matching) == 1, \
             f"Should find linked hub with name '{device_hostname}'. Found: {[h['name'] for h in linked_hubs]}"
+        shown = invoke_checked(
+            cli,
+            f"iot dps linked-hub show --dps-name {dps_name} -g {dps_rg} --linked-hub {device_hostname}",
+            description="Read the test-owned managed-identity Hub link",
+        ).as_json()
+        assert shown["name"] == shown["hostName"] == device_hostname
+        assert shown["authenticationType"] == matching[0]["authenticationType"] == "SystemAssigned"
+        assert not shown.get("connectionString")
     finally:
         _cleanup_linked_hub(dps_name, dps_rg, device_hostname)
 

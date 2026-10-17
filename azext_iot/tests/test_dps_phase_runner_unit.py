@@ -118,7 +118,7 @@ def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts
     summary = json.loads((tmp_path / "dps-phases.json").read_text())
     assert summary["baseline"]["resources"] == reader.resources
     assert reader.inventories == 4  # Baseline and each phase's cleanup.
-    assert len(reader.gets) == 12  # Eight regular IDs, three SAS IDs, then one toggle DPS.
+    assert len(reader.gets) == 13  # Nine regular IDs, three SAS IDs, then one toggle DPS.
     ids = RUNNER["inventory_ids"](reader.resources)
     assert len({phase["run_uid"] for phase in summary["phases"]}) == 3
     assert all(phase["cleanup"]["inventory_ids"] == ids for phase in summary["phases"])

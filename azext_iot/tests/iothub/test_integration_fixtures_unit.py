@@ -533,6 +533,49 @@ def method_responder_scenario(mocker):
     tasks.finish(timeout=2)
 
 
+@pytest.mark.parametrize("failure_stage", [None, "connect", "response", "shutdown"])
+def test_module_method_responder_uses_module_credentials_and_surfaces_failures(
+    mocker, method_responder_scenario, failure_stage,
+):
+    from azure.iot.device import IoTHubModuleClient, MethodResponse
+
+    scenario, client, _ = method_responder_scenario
+    connection_string = "HostName=device-host.example;DeviceId=device;ModuleId=module;SharedAccessKey=unit"
+    scenario.entity_name, scenario.entity_rg = "owned-hub", "owned-rg"
+    scenario.cmd = Mock()
+    scenario.cmd.return_value.get_output_in_json.return_value = {"connectionString": connection_string}
+    factory = mocker.patch.object(IoTHubModuleClient, "create_from_connection_string", return_value=client)
+    failure = RuntimeError(f"module {failure_stage} failure")
+    if failure_stage:
+        method = {"connect": client.connect, "response": client.send_method_response, "shutdown": client.shutdown}
+        method[failure_stage].side_effect = failure
+
+    def exercise():
+        with integration_helpers.device_method_responder(scenario, "device", module_id="module"):
+            assert client.connected
+            client.on_method_request_received(SimpleNamespace(
+                request_id="module-request", name="echo", payload={"request": "module"},
+            ))
+
+    if failure_stage:
+        with pytest.raises(RuntimeError, match=f"module {failure_stage} failure") as raised:
+            exercise()
+        assert raised.value is failure
+    else:
+        exercise()
+        response = client.send_method_response.call_args.args[0]
+        assert isinstance(response, MethodResponse)
+        assert response.request_id == "module-request" and response.status == 200
+        assert response.payload == {"method": "echo", "received": {"request": "module"}}
+    factory.assert_called_once_with(connection_string, connection_retry=False, auto_connect=False)
+    scenario.cmd.assert_called_once_with(
+        "iot hub module-identity connection-string show -d device -m module "
+        "-n owned-hub -g owned-rg --auth-type login --hostname-type auto",
+    )
+    scenario.get_device_cstring.assert_not_called()
+    client.shutdown.assert_called_once_with()
+
+
 def test_device_messaging_drains_feedback_simulator_before_method_invocation(mocker, method_responder_scenario):
     from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
 

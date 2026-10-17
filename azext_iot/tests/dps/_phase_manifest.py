@@ -52,6 +52,7 @@ REGULAR_BASE_NODEIDS = frozenset(
     f"{module}::{name}[login]" for module, names in LIFECYCLES.items() for name in names
 ) | {
     "core/test_dps_discovery_int.py::test_dps_discovery",
+    "core/test_dps_command_happy_paths_int.py::test_dps_management_happy_paths",
     "core/test_dps_unit_capacity_int.py::test_dps_unit_capacity_owned_lifecycle",
     "core/test_dps_discovery_int.py::test_dps_targets[key]",
     "core/test_dps_discovery_int.py::test_dps_targets[login]",
@@ -83,7 +84,7 @@ def resource_kinds(phase):
     if phase not in ("regular", "service-sas"):
         raise ValueError("Unknown DPS phase.")
     return (
-        ("h", "nh", "hub", "unit1", "unitdefault", *CSR_RESOURCE_KINDS)
+        ("h", "nh", "hub", "unit1", "unitdefault", "control", *CSR_RESOURCE_KINDS)
         if phase == "regular" else ("h", "nh", "hub")
     )
 

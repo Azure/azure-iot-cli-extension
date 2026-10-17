@@ -711,12 +711,13 @@ def test_dps_gc_does_not_apply_list_workaround_to_hub_deletion(mocker, monkeypat
     assert not list(tmp_path.glob("*.done"))
 
 
-@pytest.mark.parametrize("device_hostname", [None, "test-hub.device.azure-devices.net"])
-def test_dps_linked_hostname_uses_resource_not_connection_string(device_hostname):
-    properties = {"hostName": "test-hub.azure-devices.net", "deviceHostName": device_hostname}
-    assert dps_fixtures._hub_link_host_name({"hub": {"properties": properties}}) == (
-        device_hostname or properties["hostName"]
-    )
+@pytest.mark.parametrize("properties", [
+    {"hostName": "test-hub.azure-devices.net"},
+    {"hostName": "test-hub.azure-devices.net", "deviceHostName": None},
+    {"hostName": "test-hub.azure-devices.net", "deviceHostName": "test-hub.device.azure-devices.net"},
+])
+def test_dps_linked_hostname_matches_classic_default(properties):
+    assert dps_fixtures._hub_link_host_name({"hub": {"properties": properties}}) == properties["hostName"]
 
 
 @pytest.mark.parametrize("receipt_mode", [False, True])
@@ -884,12 +885,15 @@ def test_dps_hub_fixture_waits_after_granting_caller_role(mocker, monkeypatch):
 @pytest.mark.parametrize("existing_auth", [None, "KeyBased", "SystemAssigned"])
 def test_dps_fixture_links_with_managed_identity(mocker, existing_auth):
     cli = mocker.patch.object(dps_fixtures, "cli")
-    hostname = "test-hub.device.azure-devices.net"
+    hostname = "test-hub.azure-devices.net"
     cli.invoke.return_value.as_json.return_value = (
         [{"name": hostname, "authenticationType": existing_auth}] if existing_auth else []
     )
     enable_identity = mocker.patch.object(dps_fixtures, "_enable_dps_hub_identity")
-    hub = {"name": "test-hub", "rg": "hub-rg", "hub": {"properties": {"deviceHostName": hostname}}}
+    hub = {
+        "name": "test-hub", "rg": "hub-rg",
+        "hub": {"properties": {"hostName": hostname, "deviceHostName": "test-hub.device.azure-devices.net"}},
+    }
 
     assert dps_fixtures._link_hub("test-dps", hub) == hostname
 
@@ -907,6 +911,7 @@ def test_dps_fixture_links_with_managed_identity(mocker, existing_auth):
         else:
             assert command.startswith("iot dps linked-hub create ")
             assert "--hub-name test-hub --hub-resource-group hub-rg" in command
+            assert "--hostname-type" not in command
 
 
 def test_dps_fixture_uses_no_service_connection_strings(mocker, monkeypatch):

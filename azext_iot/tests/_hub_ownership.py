@@ -44,10 +44,23 @@ ROUTE_REJECTION_NODE = (
 ENDPOINT_REJECTION_NODE = (
     "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::test_iot_endpoint_force_delete"
 )
+FAILOVER_NODE = (
+    "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+    "TestHubCommandHappyPaths::test_manual_failover"
+)
 
 
 def regular_phase(phase):
     return phase == "regular" or (isinstance(phase, str) and phase.startswith("regular-"))
+
+
+def planned_action(target, action, node):
+    if action in ("generateverificationcode", "verify"):
+        return re.search(r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+$", target) is not None
+    return (
+        action == "failover" and node == FAILOVER_NODE
+        and re.search(r"/microsoft.devices/iothubs/[^/]+$", target) is not None
+    )
 
 
 def planned_root(resource_id):
@@ -305,6 +318,8 @@ def observe_get(data, resource_id, status, resource):
                 mutation["pollingFailed"] = True
             if mutation.get("pollingFailed"):
                 confirmed = False
+            elif mutation.get("action") == "failover" and not mutation.get("pollingSucceeded"):
+                confirmed = False
             elif mutation["method"] == "DELETE":
                 confirmed = status == 404
             else:
@@ -449,11 +464,13 @@ def ownership_errors(data, run_id, phase):
                 errors.append("mutation outside owned resource tree")
             if expected_rejection(mutation) and (target != resource_id or mutation is mutations[0]):
                 errors.append("invalid expected validation rejection")
-            if mutation.get("method") == "POST" and (
-                mutation.get("action") not in ("generateverificationcode", "verify")
-                or re.search(r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+$", target) is None
+            if mutation.get("method") == "POST" and not planned_action(
+                target, mutation.get("action"), mutation.get("node"),
             ):
                 errors.append("unplanned owned ARM action")
+            if (mutation.get("action") == "failover" and mutation.get("reconciled")
+                    and not mutation.get("pollingSucceeded")):
+                errors.append("uncorrelated failover completion")
     if data.get("violations"):
         errors.append("ownership boundary violation")
     return errors
@@ -827,6 +844,7 @@ class Observer:
         if (status != 200 or resource.get("id", "").casefold() != target
                 or resource.get("tags", {}).get(OWNER_TAG) != self.data["runId"]):
             self.reject("Referenced root ownership changed")
+        return resource
 
     def require_owned_export(self, resource_id):
         target = resource_id.casefold()
@@ -936,7 +954,9 @@ class Observer:
             parsed = urlsplit(http.url)
             method = http.method.upper()
             mutation = method in ("PUT", "PATCH", "DELETE") or (
-                method == "POST" and parsed.path.casefold().rstrip("/").endswith(("/generateverificationcode", "/verify"))
+                method == "POST" and parsed.path.casefold().rstrip("/").endswith(
+                    ("/generateverificationcode", "/verify", "/failover")
+                )
             )
             if parsed.hostname in ARM_HOSTS and mutation:
                 # urllib3's adapter is below Azure Core's retry loop. Disable
@@ -990,26 +1010,33 @@ class Observer:
                 if method == "POST" and action == "validate" and "/microsoft.resources/deployments/" in action_root:
                     owner.validate_deployment(action_root, body)
                     readonly = True
-                certificate_action = (
-                    method == "POST" and re.search(
-                        r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+/(generateverificationcode|verify)$",
-                        resource_id,
-                    ) is not None
+                owned_action = method == "POST" and planned_action(
+                    action_root, action, owner.current_node,
                 )
+                if owned_action and action == "failover":
+                    resource = owner.require_owned_reference(action_root, "microsoft.devices/iothubs")
+                    secondaries = {
+                        location["location"].casefold()
+                        for location in resource.get("properties", {}).get("locations", [])
+                        if location.get("role", "").casefold() == "secondary"
+                    }
+                    if (set(body) != {"failoverRegion"} or not isinstance(body["failoverRegion"], str)
+                            or body["failoverRegion"].casefold() not in secondaries):
+                        owner.reject("Failover requires the owned Hub's configured secondary region")
                 if method == "POST" and not resource_id.endswith((
                     "/listkeys", "/listconnectionstrings", "/checknameavailability",
-                )) and not certificate_action and not readonly:
+                )) and not owned_action and not readonly:
                     owner.reject("Unplanned ARM action")
                 root = None
                 deployed = None
-                if method in ("PUT", "PATCH", "DELETE") or certificate_action:
-                    target = resource_id.rsplit("/", 1)[0] if certificate_action else resource_id
+                if method in ("PUT", "PATCH", "DELETE") or owned_action:
+                    target = action_root if owned_action else resource_id
                     if method == "PUT" and "/microsoft.resources/deployments/" in resource_id:
                         root, hub_root, count = owner.prepare_deployment(resource_id, api, body)
                         deployed = hub_root, count
                     else:
                         root = owner.prepare(method, target, api, body)
-                    if certificate_action:
+                    if owned_action:
                         owner.data["resources"][root]["mutations"][-1]["action"] = resource_id.rsplit("/", 1)[1]
                         owner.save()
                     if len(owner.data["resources"][root]["mutations"]) == 1:

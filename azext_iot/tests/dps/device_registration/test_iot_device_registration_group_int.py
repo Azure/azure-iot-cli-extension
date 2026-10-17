@@ -6,6 +6,7 @@
 
 import json
 import os
+from shlex import quote
 from azure.cli.core.azclierror import (
     AzureResponseError,
     RequiredArgumentMissingError,
@@ -21,7 +22,7 @@ from azext_iot.tests.dps.device_registration import (
     check_hub_device, compare_registrations, register_fresh_generated_credential,
 )
 from azext_iot.tests.generators import generate_generic_id, generate_names
-from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, invoke_checked, set_cmd_auth_type
 from azext_iot.tests.test_utils import create_certificate
 
 
@@ -254,6 +255,36 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["registrationId"] == device_id1
         assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
+
+        invoke_checked(
+            cli,
+            set_cmd_auth_type(
+                f"iot dps enrollment-group registration delete --dps-name {dps_name} -g {dps_rg} "
+                f"--registration-id {device_id2} --etag {quote(service_side['etag'])}",
+                auth_type=auth_phase, cstring=dps_cstring,
+            ),
+            description="Delete only the second test-owned group registration",
+        )
+        remaining = invoke_checked(
+            cli,
+            set_cmd_auth_type(
+                f"iot dps enrollment-group registration list --dps-name {dps_name} -g {dps_rg} --group-id {group_id}",
+                auth_type=auth_phase, cstring=dps_cstring,
+            ),
+            description="Read registrations after the targeted deletion",
+        ).as_json()
+        assert {item["registrationId"] for item in remaining} == {device_id1}
+        with pytest.raises(ResourceNotFoundError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot dps enrollment-group registration show --dps-name {dps_name} -g {dps_rg} "
+                    f"--registration-id {device_id2}",
+                    auth_type=auth_phase, cstring=dps_cstring,
+                ),
+                capture_stderr=True,
+            )
+        compare_registrations(device1_registration, remaining[0])
+        check_hub_device(cli, device_id2, "sas", hub)
 
 
 @pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)

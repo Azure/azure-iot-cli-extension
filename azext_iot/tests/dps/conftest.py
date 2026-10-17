@@ -502,9 +502,8 @@ def _cleanup_created_resource(name, run_uid, kind, find_fn, delete_fn):
 
 
 def _hub_link_host_name(iot_hub: Dict) -> str:
-    """Match linked-hub's auto hostname selection without retrieving Hub SAS keys."""
-    properties = iot_hub["hub"]["properties"]
-    return properties.get("deviceHostName") or properties["hostName"]
+    """Match linked-hub's classic hostname default without retrieving Hub SAS keys."""
+    return iot_hub["hub"]["properties"]["hostName"]
 
 
 def _enable_dps_hub_identity(dps_name: str, iot_hub: Dict) -> None:

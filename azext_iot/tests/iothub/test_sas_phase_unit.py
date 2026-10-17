@@ -106,7 +106,7 @@ def test_sas_authorized_target_is_attested_without_reducing_manifest(tmp_path, m
 
 
 def test_manifest_retains_eight_upload_first_local_auth_and_preview_nodes():
-    assert len(subject.NODES) == len(set(subject.NODES)) == 8
+    assert len(subject.NODES) == len(set(subject.NODES)) == 9
     assert subject.NODES[0].endswith("::TestIoTStorage::test_device_upload_file")
     assert subject.NODES[-2:] == (
         subject.ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_identity_roundtrip",
@@ -932,7 +932,7 @@ class Proof:
         assert not blocked, str(blocked)
         assert tuple(item.nodeid for item in session.items) == NODES
         skipped = sum(evaluate_skip_marks(item) is not None for item in session.items)
-        assert skipped == (6 if os.environ["azext_iot_hub_auth_phase"] == "regular" else 0)
+        assert skipped == (7 if os.environ["azext_iot_hub_auth_phase"] == "regular" else 0)
         print(f"SAFE_COLLECTION nodes={len(NODES)} skipped=" + str(skipped))
 
 sys.exit(pytest.main(["-c", "setup.cfg", "--collect-only", "-q", "-o", "addopts=",
@@ -961,7 +961,7 @@ sys.exit(pytest.main(["-c", "setup.cfg", "--collect-only", "-q", "-o", "addopts=
         assert not (tmp_path / "receipt.json").exists()
     else:
         assert result.returncode == 0, result.stdout + result.stderr
-        assert f"SAFE_COLLECTION nodes={len(subject.NODES)} skipped=" + ("6" if mode == "regular" else "0") in result.stdout
+        assert f"SAFE_COLLECTION nodes={len(subject.NODES)} skipped=" + ("7" if mode == "regular" else "0") in result.stdout
 
 
 @pytest.mark.parametrize("subscription", [None, "", " \t\n"])

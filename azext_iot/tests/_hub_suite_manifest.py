@@ -90,6 +90,12 @@ CASES = (
             **_with(_PROTOCOL, auth=("service:login", "device:x509"), dependencies=("hub", "local-certificates"))),
     *_cases("core/test_iothub_certificate_int", "TestIoTHubCertificates",
             "test_hub_certificate_lifecycle_int", **_CONTROL),
+    *_cases("core/test_iothub_command_happy_paths_int", "TestHubCommandHappyPaths",
+            "test_policy_lifecycle", **_POLICY),
+    *_cases("core/test_iothub_command_happy_paths_int", "TestHubCommandHappyPaths",
+            "test_consumer_group_reads test_enrichment_update_delete test_skus_quota_and_stats", **_CONTROL),
+    *_cases("core/test_iothub_command_happy_paths_int", "TestHubCommandHappyPaths",
+            "test_manual_failover", dependencies=("hub", "isolated-hub", "paired-region"), **_CONTROL),
     *_cases("core/test_iothub_discovery_int", "TestIoTHubDiscovery",
             "test_iothub_discovery test_iothub_discovery_lists test_iothub_target_lists", **_POLICY),
     *_cases("core/test_iothub_discovery_int", "TestIoTHubDiscovery", "test_iothub_targets",
@@ -143,6 +149,9 @@ CASES = (
     *_cases("modules/test_iothub_modules_int", "TestIoTHubModules",
             "test_iothub_module_identity test_iothub_module_renew_key test_iothub_module_connection_string_show "
             "test_iothub_module_generate_sas_token test_iothub_module_hostname_type_permutations"),
+    *_cases("modules/test_iothub_modules_int", "TestIoTHubModules", "test_iothub_invoke_module_method",
+            protocol=("https", "mqtt"),
+            **_with(_SAS, auth=("service:key", "service:login", "module:key", "hub-policy:sas"))),
     *_cases("state/test_hub_state_dataplane_int", "", "test_migrate_dataplane test_export_import_dataplane", **_PORTABILITY),
     *_cases("state/test_hub_state_int", "", "test_mirgate_hub_dataplane_error", **_PORTABILITY),
     *_cases("state/test_hub_state_int", "",
@@ -185,6 +194,16 @@ SHARDS = {
             "azext_iot/tests/iothub/state/test_hub_state_int.py::test_export_import_migrate_missing_hubs_error",
         ),
         "regular-state-schemes-cert": (
+            "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+            "TestHubCommandHappyPaths::test_policy_lifecycle",
+            "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+            "TestHubCommandHappyPaths::test_consumer_group_reads",
+            "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+            "TestHubCommandHappyPaths::test_enrichment_update_delete",
+            "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+            "TestHubCommandHappyPaths::test_skus_quota_and_stats",
+            "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+            "TestHubCommandHappyPaths::test_manual_failover",
             "azext_iot/tests/iothub/core/test_iothub_certificate_int.py::"
             "TestIoTHubCertificates::test_hub_certificate_lifecycle_int",
             "azext_iot/tests/iothub/core/test_iothub_discovery_int.py::"
