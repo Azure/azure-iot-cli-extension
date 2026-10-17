@@ -4,10 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+from shlex import quote
+
 import pytest
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, device_method_responder, wait_for_query_ids
+from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
@@ -20,6 +24,23 @@ from azext_iot.tests.iothub import (
 class TestIoTHubModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModules, self).__init__(test_case)
+
+    @pytest.mark.skipif(not sas_phase_enabled(), reason="Module method qualification requires the owned service-SAS phase.")
+    def test_iothub_invoke_module_method(self):
+        device = self.generate_device_names(1)[0]
+        module = self.generate_module_names(1)[0]
+        target = f"-d {device} -n {self.entity_name} -g {self.entity_rg} --auth-type key"
+        self.cmd(f"iot hub device-identity create {target}")
+        self.cmd(f"iot hub module-identity create {target} -m {module}")
+        payload = {"request": module}
+        literal = quote(json.dumps(payload)).replace("{", "{{").replace("}", "}}")
+        with device_method_responder(self, device, module_id=module):
+            result = self.cmd(
+                f"iot hub invoke-module-method {target} -m {module} --method-name echo "
+                f"--method-payload {literal} --timeout 30"
+            ).get_output_in_json()
+            assert result["status"] == 200
+            assert result["payload"] == {"method": "echo", "received": payload}
 
     @pytest.mark.timeout(
         900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
