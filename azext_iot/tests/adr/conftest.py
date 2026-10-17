@@ -76,6 +76,7 @@ _ADR_XDIST_GROUPS = {
         "test_external_activation_no_wait",
     },
     "adr-g3-link-lifecycle": {
+        "test_adr_unlink_missing_rg_advisory",
         "test_adr_link_lifecycle",
         "test_adr_link_sequential_add",
         "test_adr_certificate_authority_lifecycle",

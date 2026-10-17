@@ -726,6 +726,7 @@ def load_adr_help():
     To unlink, delete the linked resource first, then run link hub/dps/su remove to remove
     its endpoint from the namespace. Remove does not delete or check the linked resource
     and waits for the namespace update to complete unless --no-wait is specified.
+    Remove performs a state-aware advisory permission check without changing role assignments.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
     After add/update --no-wait, use link hub/dps/su wait to track completion.
     After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
@@ -748,21 +749,27 @@ def load_adr_help():
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
     Delete the linked {resource} first; this command removes only the namespace endpoint.
-    The namespace outbound identity needs Reader on the linked resource's resource group.
-    A missing grant is created when you can create role assignments; it is kept after unlinking.
-    Keep that resource group until the unlink completes.
+    For linkingState Succeeded, a read-only advisory check looks for Reader, Contributor or Owner
+    grants for the namespace outbound identity on the linked resource's resource group,
+    including inherited grants. If that group is confirmed deleted, it checks the subscription.
+    LinkedResourceDeleted and Failed endpoints skip permission checks. Other states warn and continue.
+    Missing access or unavailable checks warn and continue; ADR decides whether removal is allowed.
+    Custom roles, conditions, group membership and deny assignments are not fully evaluated.
+    No role assignments are created or removed. Use --skip-rbac-check to bypass only this
+    advisory check; --yes skips confirmation but does not skip permission checking.
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
     After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
-    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
+    Missing, weak, or malformed namespace ETags stop removal before permission checks or writes.
     Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
     A conflict reports guidance to inspect the namespace and rerun the command against its latest state.
-    Any Reader grant created during preflight is retained after a conflict.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
+    - name: Remove an endpoint without the advisory permission check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --skip-rbac-check
   """
 
     helps[
