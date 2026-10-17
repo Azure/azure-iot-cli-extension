@@ -6,6 +6,7 @@
 
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane
@@ -85,6 +86,13 @@ class IotHubDiscovery(BaseDiscovery):
         # but that will be better served aligning with vNext pattern for Iot Hub
 
         include_events = kwargs.get("include_events", False)
+
+        if kwargs.get("monitor_events") and getattr(resource.properties, "disable_local_auth", None) is True:
+            raise InvalidArgumentValueError(
+                f"IoT Hub '{resource.name}' has disableLocalAuth=true. "
+                "The built-in Event Hub-compatible endpoint requires SAS authentication, which is disabled on this hub. "
+                "Route telemetry to a custom Event Hub and use a Microsoft Entra-authenticated Event Hubs consumer."
+            )
 
         target = {}
         target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
