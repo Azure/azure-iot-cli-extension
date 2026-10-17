@@ -100,6 +100,7 @@ _PNP_PARSER_CASES = {
     "iot hub digital-twin update": ["--patch", "[]"],
     "iot hub digital-twin invoke-command": ["--cn", "noop"],
 }
+_DPS_CERTIFICATE_COMMANDS = ("generate-verification-code", "verify", "update", "delete")
 for _kind, _resource_option, _resource_id in (
     ("hub", "--hub-resource-id", _HUB_ID),
     ("dps", "--dps-resource-id", _DPS_ID),
@@ -146,6 +147,7 @@ def management_command_parser():
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
         "iot adr ns ca policy create", "iot adr ns ca policy update",
+        *(f"iot dps certificate {action}" for action in _DPS_CERTIFICATE_COMMANDS),
     ]
     loader.command_table = {
         name: loader.command_table[name]
@@ -452,6 +454,41 @@ def test_identity_update_composes_native_argument_validators(management_command_
     ])
     assert not getattr(parsed, "_command_validator", None)
     assert {mode2_iot_login_handler, validate_identity_update} <= set(parsed._argument_validators)
+
+
+@pytest.mark.parametrize("action", _DPS_CERTIFICATE_COMMANDS)
+@pytest.mark.parametrize("option", [None, "--etag", "-e"])
+def test_dps_certificate_etag_parser(management_command_parser, tmp_path, action, option):
+    arguments = ["iot", "dps", "certificate", action, "--dps-name", "dps", "-g", "rg", "-n", "cert"]
+    if action in ("verify", "update"):
+        certificate = tmp_path / "proof.pem"
+        certificate.write_text("certificate", encoding="utf-8")
+        arguments += ["--path", str(certificate)]
+    if option:
+        arguments += [option, "current-etag"]
+    if option is None and action in ("update", "delete"):
+        with pytest.raises(SystemExit):
+            management_command_parser.parse_args(arguments)
+    else:
+        parsed = management_command_parser.parse_args(arguments)
+        assert parsed.etag == ("current-etag" if option else None)
+
+
+@pytest.mark.parametrize("action", ["generate-verification-code", "verify"])
+def test_dps_certificate_help_describes_optional_etag(command_table, monkeypatch, action):
+    from azext_iot.core import help as core_help
+
+    helps = {}
+    monkeypatch.setattr(core_help, "helps", helps)
+    core_help.patch_core_help()
+    command = f"iot dps certificate {action}"
+    assert command in command_table
+    help_entry = yaml.safe_load(helps[command])
+    assert "certificate read permission" in help_entry["long-summary"]
+    examples = [example["text"] for example in help_entry["examples"]]
+    assert all(command in example for example in examples)
+    assert any("--etag" in example for example in examples)
+    assert any("--etag" not in example for example in examples)
 
 
 @pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)

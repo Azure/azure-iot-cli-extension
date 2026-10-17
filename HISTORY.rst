@@ -11,6 +11,11 @@ Release History
 * Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
 * Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
 
+**DPS certificate and enrollment fixes**
+
+* Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
+* Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
+
 **ADR unlink polling**
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
