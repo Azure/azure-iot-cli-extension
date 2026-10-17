@@ -1,7 +1,5 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
-lockBehavior: sequential
-
 parameters:
   - name: health
     type: boolean
@@ -47,9 +45,6 @@ variables:
       value: https://management.azure.com
     ${{ else }}:
       value: https://centraluseuap.management.azure.com
-
-pool:
-  vmImage: ubuntu-24.04
 
 stages:
   - stage: Plan

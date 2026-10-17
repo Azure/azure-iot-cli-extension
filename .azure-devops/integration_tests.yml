@@ -3,6 +3,9 @@
 trigger: none
 pr: none
 name: integration-$(Date:yyyyMMdd).$(Rev:r)
+lockBehavior: sequential
+pool:
+  vmImage: ubuntu-24.04
 
 parameters:
   - name: mode
