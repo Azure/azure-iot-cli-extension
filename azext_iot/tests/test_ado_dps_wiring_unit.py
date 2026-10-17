@@ -28,6 +28,7 @@ CONTROLLER_ENV = (
 )
 LEGACY_DPS_EXPRESSION = (
     "_int.py and not test_register_and_issue_certificate_contract and not test_register_without_csr_deadline_contract"
+    " and not test_dps_management_happy_paths"
 )
 
 
@@ -99,7 +100,7 @@ def test_ado_dps_template_has_one_honestly_scoped_legacy_invocation():
     assert "--junitxml=junit/test-iotext-int.xml" in command
     assert "legacy partial regular only, not full qualification" in script
     assert (
-        "Owned normal registration, CSR issuance, service-SAS and local-auth-toggle coverage "
+        "Owned management, normal registration, CSR issuance, service-SAS and local-auth-toggle coverage "
         "require the GitHub DPS controller" in script
     )
     assert "_dps_phase_runner.py" not in script
@@ -164,21 +165,23 @@ def test_ado_legacy_script_runs_once_preserves_pins_and_propagates_pytest_exit(t
     assert arguments[arguments.index("-k") + 1] == LEGACY_DPS_EXPRESSION
 
 
-@pytest.mark.parametrize("legacy", [False, True], ids=["all-four-controller-cases", "legacy-excludes-all-four"])
+@pytest.mark.parametrize("legacy", [False, True], ids=["all-five-controller-cases", "legacy-excludes-all-five"])
 def test_real_registration_collection_respects_legacy_controller_boundary(tmp_path, legacy):
     command = next(line for line in _script().splitlines() if line.strip().startswith("pytest "))
     arguments = shlex.split(command)
     expression = arguments[arguments.index("-k") + 1]
     prefix = "azext_iot/tests/dps/device_registration/test_iot_device_registration_int.py"
+    management = "azext_iot/tests/dps/core/test_dps_command_happy_paths_int.py"
     expected = {
         f"{prefix}::{name}[{option}]"
         for name in ("test_register_without_csr_deadline_contract", "test_register_and_issue_certificate_contract")
         for option in ("default", "deadline")
     }
+    expected.add(f"{management}::test_dps_management_happy_paths")
     manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
     regular = manifest["expected_nodeids"]("regular")
     required = {manifest["normalize_nodeid"](node) for node in expected}
-    assert len(regular) == 35 and required <= regular
+    assert len(regular) == 36 and required <= regular
     matcher = Expression.compile(expression)
     retained = {node for node in regular if matcher.evaluate(lambda keyword, node=node: keyword.lower() in node.lower())}
     assert retained == regular - required and len(retained) == 31
@@ -199,7 +202,10 @@ import pytest
 class ControllerFixtureContract:
     def pytest_collection_finish(self, session):
         for item in session.items:
-            assert "provisioned_csr_issuance" in item.fixturenames
+            if item.name == "test_dps_management_happy_paths":
+                assert {"request", "tmp_path"} <= set(item.fixturenames)
+            else:
+                assert "provisioned_csr_issuance" in item.fixturenames
 sys.exit(pytest.main(sys.argv[1:], plugins=[ControllerFixtureContract()]))
 """
     environment = {key: value for key, value in os.environ.items() if key not in CONTROLLER_ENV}
@@ -214,12 +220,28 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[ControllerFixtureContract()]))
     )
     result = subprocess.run(
         [sys.executable, "-B", "-c", script, "-c", str(config), "--rootdir", str(ROOT), "--confcutdir", str(ROOT),
-         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", expression if legacy else "_int.py", prefix],
+         "--collect-only", "-q", "-p", "no:cacheprovider", "-k", expression if legacy else "_int.py", prefix, management],
         cwd=ROOT, env=environment, capture_output=True, text=True, timeout=60, check=False,
     )
     assert result.returncode == (5 if legacy else 0), result.stdout + result.stderr
-    selected = {line for line in result.stdout.splitlines() if line.startswith(prefix + "::")}
+    selected = {line for line in result.stdout.splitlines() if line.startswith((prefix + "::", management + "::"))}
     assert selected == (set() if legacy else expected)
+
+
+@pytest.mark.parametrize("receipts,phase", [
+    (None, "regular"),
+    ({"run_uid": "owned-run"}, "service-sas"),
+    ({"run_uid": "owned-run"}, "local-auth-toggle"),
+])
+def test_management_case_rejects_unowned_or_wrong_phase_before_cli_creation(mocker, receipts, phase):
+    from azext_iot.tests.dps.core import test_dps_command_happy_paths_int as management
+
+    mocker.patch.object(management._phase_receipts, "settings", return_value=receipts)
+    mocker.patch.object(management._phase, "get_phase", return_value=phase)
+    cli = mocker.patch.object(management, "EmbeddedCLI")
+    with pytest.raises(pytest.UsageError, match="admitted, receipt-enabled regular DPS runner"):
+        management.test_dps_management_happy_paths(request=None, tmp_path=None)
+    cli.assert_not_called()
 
 
 @pytest.mark.parametrize("override", [
