@@ -21,6 +21,7 @@ Release History
 * Added GA schema registry, schema, and schema-version management and wait commands.
 * Certificate policies accept validity periods from 1 to 90 days. Link-recovery failures preserve the original service error as their cause.
 * Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
+* Recognize the explicit DPS inbound-identity authorization response during fresh role propagation, retaining verified grants, identity-preserving updates, and the existing two-retry limit.
 * Namespace link removal uses the namespace response ETag to prevent overwriting concurrent changes. Missing ETags stop removal; a conflicting write returns HTTP 412 without an automatic retry.
 * Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
 * ADR groups/jobs/job runs, reports, registry-device authentication/attribute/capability child commands, and ADR Software Updates are excluded because their operations are absent from these GA APIs. Existing Hub jobs, DPS enrollment groups, and ``iot du`` remain available.
@@ -42,6 +43,7 @@ Release History
 
 **Test infrastructure**
 
+* Schema registry integration fixtures explicitly use the selected test region instead of inheriting the resource group's location.
 * Reused the updated preview release's concurrent owned Hub/DPS phase controllers, ADR worker grouping, fixture readiness fixes, and strict workflow result gates. GA-specific API and command-scope adaptations remain; live qualification is still deferred.
 * Reused deterministic serial unit sharding and advisory extension-index compatibility checks. The full twelve OS/Python combinations and existing Azure Pipelines unit coverage remain enabled.
 

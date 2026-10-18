@@ -510,3 +510,36 @@ def test_schema_commands_delegate_all_arguments(mocker, command, provider_type, 
     assert getattr(commands_schema, f"adr_schema_{command}")(cmd, **kwargs) is operation.return_value
     factory.assert_called_once_with(cmd)
     operation.assert_called_once_with(**kwargs)
+
+
+@pytest.mark.parametrize("location", ["centraluseuap", "australiaeast"])
+def test_schema_live_resources_use_selected_location(mocker, location):
+    import shlex
+    from azext_iot.tests.adr import test_adr_schema_int as live
+
+    mocker.patch.object(live, "TEST_LOCATION", location)
+    mocker.patch.object(live, "resource_is_absent", return_value=True)
+    mocker.patch.object(live, "CleanupLedger")
+    scenario = live.TestADRSchemaLifecycle("test_schema_registry_and_versions_lifecycle")
+    creates = []
+
+    def command(text):
+        if text.startswith("iot adr schema registry create"):
+            creates.append(shlex.split(text))
+            raise RuntimeError("stop after registry create")
+        if text.startswith("storage account create"):
+            creates.append(shlex.split(text))
+            return Mock(get_output_in_json=Mock(return_value={
+                "isHnsEnabled": True,
+                "primaryEndpoints": {"blob": "https://storage.blob.core.windows.net/"},
+            }))
+        assert text.startswith("storage container-rm create")
+        return Mock(get_output_in_json=Mock(return_value={}))
+
+    mocker.patch.object(scenario, "cmd", side_effect=command)
+    with pytest.raises(RuntimeError, match="stop after registry create"):
+        scenario.test_schema_registry_and_versions_lifecycle()
+    assert len(creates) == 2
+    for tokens in creates:
+        assert "--location" in tokens
+        assert tokens[tokens.index("--location") + 1] == location

@@ -213,10 +213,12 @@ class TestADRSchemaLifecycle(_SchemaScenario):
             )
             registry = self.cmd(
                 f"iot adr schema registry create {registry_args} "
+                f"--location {TEST_LOCATION} "
                 f"--registry-namespace {registry_namespace} "
                 "--storage-account-container-url "
                 f"{shlex.quote(container_url)} --system-assigned-mi"
             ).get_output_in_json()
+            assert registry["location"].casefold() == TEST_LOCATION.casefold()
             assert registry["identity"]["type"] == "SystemAssigned"
             assert registry["identity"]["principalId"]
             assert registry["properties"]["namespace"] == registry_namespace

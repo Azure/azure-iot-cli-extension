@@ -28,6 +28,14 @@ from azext_iot.tests.adr.test_adr_link_unit import DPS_ID, HUB_ID, UAMI_ID
 SAMI = "11111111-1111-4111-8111-111111111111"
 UAMI = "22222222-2222-4222-8222-222222222222"
 CLIENT = "33333333-3333-4333-8333-333333333333"
+INBOUND_DENIAL = {
+    "code": "ResourceMiNotAuthorized",
+    "message": (
+        "DPS could not read the ADR namespace using its inbound identity used for this request. "
+        "Grant that identity namespace read access, allow time for a recent role assignment to propagate, "
+        "then resubmit the request. (DPS resource reported: [400315])"
+    ),
+}
 
 
 def _denial(harness, *, kind=None, principal=None, action=None, scope=None):
@@ -293,9 +301,13 @@ def test_combined_add_grants_for_the_hub_stage_do_not_enable_dps_generic_retries
     assert not h.clock.delays
 
 
-@pytest.mark.parametrize("kind", ["hub", "dps"])
-def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocked_response, kind):
+@pytest.mark.parametrize("kind,inbound,failed_status", [
+    ("hub", False, False), ("dps", False, False), ("dps", True, False), ("dps", True, True),
+])
+def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocked_response, kind, inbound, failed_status):
     h = _harness(mocker, kind)
+    if inbound:
+        h.denial = deepcopy(INBOUND_DENIAL)
     h.provider._await_terminal = MethodType(LinkProvider._await_terminal, h.provider)
     section = KINDS[kind][0]
     patches = []
@@ -308,6 +320,8 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
 
     def respond(request):
         if "/asyncOperationStatuses/link" in request.url:
+            if failed_status and len(patches) == 1:
+                return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Failed", "error": h.denial})
             return 200, {"Content-Type": "application/json"}, json.dumps({"status": "Succeeded"})
         if request.method == "PATCH":
             patches.append(json.loads(request.body))
@@ -387,6 +401,52 @@ def test_generic_rejection_without_fresh_link_grants_is_not_retried(mocker, kind
 def test_generic_rejection_retry_requires_the_exact_hub_or_dps_envelope(mocker, denial):
     h = _harness(mocker, "dps")
     h.denial = denial
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 1
+    assert not h.clock.delays
+
+
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("action", ["add", "update"])
+def test_dps_inbound_denial_recovers_only_after_verifying_fresh_grants(mocker, identity, action):
+    h = _harness(mocker, "dps", identity, action)
+    h.denial = deepcopy(INBOUND_DENIAL)
+    verify = mocker.spy(h.provider._rbac, "verify_many")
+    result = h.run(timeout_sec=300, wait_sec=1)
+    assert result["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"] == "Succeeded"
+    assert h.patches == [{"provisioning": {"endpoints": {"dps": h.body}}}] * 2
+    assert h.clock.delays == [30]
+    assert verify.call_count == 2
+    assert len(h.created) == len(LINK_ROLE_MATRIX["dps"])
+
+
+def test_dps_inbound_denial_has_bounded_recovery(mocker):
+    h = _harness(mocker)
+    h.denial = deepcopy(INBOUND_DENIAL)
+    h.outcomes = ["initiate"] * 10
+    with pytest.raises(ADRResourceStateError, match="ResourceMiNotAuthorized"):
+        h.run(timeout_sec=600, wait_sec=1)
+    assert len(h.patches) == 1 + PROPAGATION_RETRIES
+    assert h.clock.delays == [30, 60]
+
+
+@pytest.mark.parametrize("mutation", ["hub", "old-grants", "other-grants", "code", "message", "details"])
+def test_dps_inbound_denial_does_not_broaden_recovery(mocker, mutation):
+    h = _harness(mocker, "hub" if mutation == "hub" else "dps", action="update")
+    if mutation in {"old-grants", "other-grants"}:
+        h.outcomes = ["success"]
+        h.run()
+        h.provider._rbac.created[:] = [] if mutation == "old-grants" else [(SAMI, "Contributor", NS_ID + "-other")]
+        h.patches.clear()
+    h.outcomes = ["initiate", "success"]
+    h.denial = deepcopy(INBOUND_DENIAL)
+    if mutation == "code":
+        h.denial["code"] = "AuthorizationFailed"
+    elif mutation == "message":
+        h.denial["message"] += " Another failure."
+    elif mutation == "details":
+        h.denial["details"] = [{"code": "OtherFailure"}]
     with pytest.raises(ADRResourceStateError):
         h.run()
     assert len(h.patches) == 1

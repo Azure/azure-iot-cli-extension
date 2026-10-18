@@ -16,6 +16,7 @@ from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.providers.link_recovery import LinkRecovery
 from azext_iot.tests.adr import _readiness as readiness
 from azext_iot.tests.adr.test_adr_readiness_unit import Clock, DPS_ID, LINKS, NS_ID, UAMI_ID, _expected, _output
+from azext_iot.tests.adr.test_adr_link_initiate_recovery_unit import INBOUND_DENIAL
 
 
 # Observed Hub envelope in run 35353501504. The subscription/RG remain offline
@@ -124,9 +125,10 @@ def _generic_rejection(service="DPS", **extra):
     }
 
 
-def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
+@pytest.mark.parametrize("error", [_generic_rejection("DPS"), INBOUND_DENIAL])
+def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update(error):
     scenario = Scenario("dps")
-    scenario.error = _generic_rejection("DPS")
+    scenario.error = deepcopy(error)
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()
@@ -138,10 +140,13 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
     assert scenario.clock.sleeps == [10, 10, 10, 10]
 
 
+@pytest.mark.parametrize("error", [_generic_rejection("DPS"), INBOUND_DENIAL])
 @pytest.mark.parametrize("mutation", ["hub-service", "extra-detail", "stale-grant", "hub-link"])
-def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation):
+def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation, error):
     scenario = Scenario("hub" if mutation == "hub-link" else "dps")
-    scenario.error = _generic_rejection("Hub" if mutation == "hub-service" else "DPS")
+    scenario.error = deepcopy(error)
+    if mutation == "hub-service":
+        scenario.error["message"] = scenario.error["message"].replace("DPS", "Hub")
     if mutation == "extra-detail":
         scenario.error["details"] = [{"code": "IH400315"}]
     if mutation == "stale-grant":

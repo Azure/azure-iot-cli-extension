@@ -31,7 +31,11 @@ from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
-from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
+from azext_iot.adr.providers.link_recovery import (
+    LinkRecovery,
+    _DPS_INBOUND_AUTHORIZATION_ERROR,
+    _namespace_identity,
+)
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.adr.topology import endpoint_settings_match
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
@@ -278,7 +282,7 @@ def _read_authorization_failure(endpoint):
 
 
 def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's generic DPS linkInitiate envelope only while fresh grants can still propagate."""
+    """Match observed DPS grant-propagation envelopes only within the fresh-grant window."""
     if (
         binding.kind != "dps"
         or submitted_at is None
@@ -291,10 +295,14 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
     match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
     return bool(
         endpoint.get("linkingState") == "Failed"
-        and error.get("code") == "LinkInitiateFailed"
-        and not set(error) - {"code", "message"}
-        and match
-        and match["service"] == "DPS"
+        and (
+            error == _DPS_INBOUND_AUTHORIZATION_ERROR
+            or (
+                error.get("code") == "LinkInitiateFailed"
+                and not set(error) - {"code", "message"}
+                and match and match["service"] == "DPS"
+            )
+        )
     )
 
 
@@ -306,7 +314,7 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
     # Only the canonical structured linkingError may authorize the new retry.
     # Conflicting/alternate error envelopes must not be hidden by a matching one.
     error = endpoint.get("linkingError") or {}
-    if error.get("code") != "LinkInitiateFailed":
+    if error.get("code") not in {"LinkInitiateFailed", "ResourceMiNotAuthorized"}:
         return "read" if _read_authorization_failure(endpoint) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")

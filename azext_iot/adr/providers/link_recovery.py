@@ -45,6 +45,14 @@ _LINK_INITIATE_ACTIONS = {
     "hub": ("Hub", "Microsoft.Devices/IotHubs/linkInitiate/action"),
     "dps": ("DPS", "Microsoft.Devices/provisioningServices/linkInitiate/action"),
 }
+_DPS_INBOUND_AUTHORIZATION_ERROR = {
+    "code": "ResourceMiNotAuthorized",
+    "message": (
+        "DPS could not read the ADR namespace using its inbound identity used for this request. "
+        "Grant that identity namespace read access, allow time for a recent role assignment to propagate, "
+        "then resubmit the request. (DPS resource reported: [400315])"
+    ),
+}
 
 
 def validate_options(timeout, interval):
@@ -218,16 +226,19 @@ class LinkRecovery:
         return self._bound_link_initiate_authorization(error) or self._fresh_grant_rejection(error)
 
     def _fresh_grant_rejection(self, error):
-        """Retry the generic Hub/DPS rejection briefly, only after this command created link grants.
+        """Retry observed grant-propagation failures only after this command created link grants.
 
-        ADR hides the service code, so this also matches real configuration
-        errors; PROPAGATION_RETRIES bounds the extra wait for those.
+        The generic envelope can also hide configuration errors;
+        PROPAGATION_RETRIES bounds the extra wait for those.
         """
+        if not self.recent_grants or self.retries >= PROPAGATION_RETRIES:
+            return False
+        if self.kind == "dps" and error == _DPS_INBOUND_AUTHORIZATION_ERROR:
+            return True
         message = error.get("message")
         match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
         return bool(
-            self.recent_grants and self.retries < PROPAGATION_RETRIES
-            and match and self.kind in _LINK_INITIATE_ACTIONS
+            match and self.kind in _LINK_INITIATE_ACTIONS
             and match["service"] == _LINK_INITIATE_ACTIONS[self.kind][0]
             and error.get("code") == "LinkInitiateFailed"
             and not set(error) - {"code", "message"}
