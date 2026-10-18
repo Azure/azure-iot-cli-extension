@@ -366,9 +366,9 @@ def link_with_readiness(
     """Submit once, then recover only a persisted terminal authorization failure.
 
     Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
-    Recovery uses the existing identity-preserving update/preflight. After an
-    accepted update, stale Failed reads cannot trigger another write: observe
-    progress first, or Succeeded. All CLI/read errors propagate unchanged.
+    Recovery hands off once to the operation-aware, identity-preserving waited
+    update under the remaining deadline. Stale GETs cannot replay that update.
+    All CLI/read errors propagate unchanged.
     """
     assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
     section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
@@ -387,8 +387,7 @@ def link_with_readiness(
     assert isinstance(namespace_id, str) and namespace_id.casefold().endswith(expected_path.casefold()), (
         "Namespace snapshot does not match the intended link scope"
     )
-    # Use only LinkRecovery's pure classifier/snapshot, never its mutation loop:
-    # this scenario deliberately exercises no-wait submission and GET readiness.
+    # The initial add still exercises no-wait submission and GET readiness.
     binding = LinkRecovery(
         provider=None, namespace=original, section=section, name=endpoint_name,
         expected=expected, budget=None, verify=None,
@@ -401,7 +400,6 @@ def link_with_readiness(
     budget.call(scenario.cmd, command + " --no-wait")
     submitted_at = budget.clock()
     expected = _endpoint_settings(expected)
-    progressed = True  # The initial add is never replayed.
     retries = 0
     retry_at = None
     while True:
@@ -435,7 +433,6 @@ def link_with_readiness(
             _log(LogKind.RESULT, "%s link namespace and endpoint both Succeeded after %d recovery updates", label, retries)
             return {"name": endpoint_name, **endpoint}
         if ns_state in _ACTIVE_STATES or state in _ACTIVE_STATES:
-            progressed = True
             retry_at = None
         elif any(_link_state(other) in _ACTIVE_STATES for other in others):
             retry_at = None
@@ -443,7 +440,7 @@ def link_with_readiness(
             recovery_reason = _authorization_failure(
                 namespace, endpoint, binding, submitted_at=submitted_at, now=budget.clock(),
             )
-            if recovery_reason and progressed:
+            if recovery_reason and not retries:
                 if retry_at is None:
                     if recovery_reason == "fresh-dps-generic":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
@@ -456,9 +453,10 @@ def link_with_readiness(
                         "properties": {section: {"endpoints": {endpoint_name: endpoint}}},
                     })
                     assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
-                    budget.call(scenario.cmd, recovery[0] + " --no-wait")
+                    remaining = int(budget.end - budget.clock())
+                    assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
+                    budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
                     retries += 1
-                    progressed = False
                     retry_at = None
             elif not recovery_reason:
                 raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")

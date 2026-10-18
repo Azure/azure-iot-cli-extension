@@ -94,7 +94,11 @@ class Scenario:
                 self.last_state = self.states.pop(0)
             return _output(self.body(self.last_state))
         assert " role " not in text
-        assert text.endswith(" --no-wait")
+        if " add " in text:
+            assert text.endswith(" --no-wait")
+        else:
+            assert "--no-wait" not in text
+            assert int(text.rsplit(" --timeout ", 1)[1]) > 0
         assert f" link {self.kind} " in text
         assert " add " in text or " update " in text
         if " update " in text and self.write_error:
@@ -175,7 +179,7 @@ def test_observed_denial_recovers_only_exact_original_outbound_identity(mocker, 
     classifier = mocker.spy(LinkRecovery, "authorized_failure")
     run = mocker.patch.object(LinkRecovery, "run", side_effect=AssertionError("Do not replace no-wait coverage"))
     snapshot = deepcopy(scenario.original)
-    expected_update = failed_link_recovery_commands(scenario.body("Failed"))[0] + " --no-wait"
+    expected_update = failed_link_recovery_commands(scenario.body("Failed"))[0] + " --timeout 590"
     result = scenario.run()
     assert result["linkingState"] == "Succeeded"
     assert all(result[key] == value for key, value in scenario.expected.items())
@@ -312,13 +316,13 @@ def test_stale_failure_does_not_replay_accepted_recovery_or_extend_deadline():
     assert max(scenario.clock.sleeps) == 10
 
 
-def test_progress_allows_bounded_recovery_but_never_suppresses_persistent_failure():
+def test_progress_after_waited_recovery_never_replays_it_or_suppresses_persistent_failure():
     scenario = Scenario()
     scenario.states = (["InProgress"] + ["Failed"] * 4) * 30
     with pytest.raises(AssertionError, match="Timed out"):
         scenario.run(timeout=240)
     assert scenario.clock.now == 240
-    assert scenario.write_times == [0, 20, 80, 140, 190]
+    assert scenario.write_times == [0, 20]
     assert sum(" add " in command for command in scenario.writes) == 1
 
 
