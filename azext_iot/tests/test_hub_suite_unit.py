@@ -36,18 +36,34 @@ def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path)
     assert set(node for shard in control_shards for node in shard) == set(control)
     assert set(node for shard in entra_shards for node in shard) == set(entra)
     assert [len(shard) for shard in control_shards] == [6, 19, 5, 3]
-    assert [len(shard) for shard in entra_shards] == [7, 37 if preview else 35]
+    assert [len(shard) for shard in entra_shards] == [7, 35 if preview else 33, 2]
     assert len(set(entra) & set(sas)) == (2 if preview else 0)
     assert not set(control) & (set(entra) | set(sas))
     exceptions = {case.node for case in cases if case.exclusion}
     assert set(control) | set(entra) | set(sas) | exceptions == set(manifest.inventory())
     assert len(exceptions) == (3 if preview else 2)
     assert all(case.group and case.protocol and case.auth and case.dependencies for case in cases)
-    assert manifest.phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert manifest.phases("HubData") == ("entra-state-config", "entra-devices-protocol", "entra-identities", "sas")
     assert manifest.phases("HubControl") == (
         "regular-state-workflow", "regular-state-schemes-cert", "regular-endpoints-a", "regular-endpoints-b",
     )
     assert json.loads(json.dumps(manifest.manifest("HubData", "entra")))["expected"] == list(entra)
+
+
+def test_query_heavy_identities_have_an_independent_budget_without_changing_coverage():
+    identities = manifest.nodes("HubData", "entra-identities")
+    assert identities == manifest.SHARDS["HubData"]["entra-identities"]
+    assert len(identities) == 2
+    assert not set(identities) & set(manifest.nodes("HubData", "entra-devices-protocol"))
+    assert all(node in manifest.nodes("HubData", "entra") for node in identities)
+
+
+def test_hub_data_explicit_shards_cannot_overlap(monkeypatch):
+    monkeypatch.setitem(
+        manifest.SHARDS["HubData"], "entra-identities", manifest.SHARDS["HubData"]["entra-state-config"][:1],
+    )
+    with pytest.raises(ValueError, match="HubData shard partition mismatch"):
+        manifest.contract()
 
 
 def test_sas_exact_order_and_existing_normal_skip_contract():

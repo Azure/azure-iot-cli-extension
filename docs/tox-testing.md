@@ -119,6 +119,13 @@ markers that also budget module-scoped setup/teardown:
 `test_export_import_migrate_missing_hubs_error`. Per-test timeouts are failure
 guards, not expected durations, so a shard's ceilings may sum past its runtime cap.
 
+HubData isolates the device and module identity round trips in `entra-identities`,
+separate from `entra-devices-protocol` and `entra-state-config`. Each Entra phase
+retains its 75-minute runtime cap and independent owned fixture; the two identity
+cases retain their existing 30-minute query-visibility bounds. This prevents their
+serial query waits from consuming the protocol phase's budget. SAS coverage and
+the total selected case inventory are unchanged.
+
 Every selected service runs its full branch-specific suite. GitHub dispatch and
 reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
 capacity-limit input; the release caller does not supply a quota override either.

@@ -25,7 +25,7 @@ HUB_CONTROL_PHASES = (
     "regular-endpoints-a",
     "regular-endpoints-b",
 )
-HUB_DATA_ENTRA_PHASES = ("entra-state-config", "entra-devices-protocol")
+HUB_DATA_ENTRA_PHASES = ("entra-state-config", "entra-devices-protocol", "entra-identities")
 HUB_DATA_PHASES = HUB_DATA_ENTRA_PHASES + ("sas",)
 
 
@@ -266,6 +266,13 @@ SHARDS = {
             "azext_iot/tests/iothub/state/test_hub_state_int.py::test_mirgate_hub_dataplane_error",
         ),
         "entra-devices-protocol": (),
+        # Each identity round trip can spend 30 minutes waiting for query visibility.
+        "entra-identities": (
+            "azext_iot/tests/iothub/devices/test_iothub_devices_int.py::"
+            "TestIoTHubDevices::test_iothub_device_identity",
+            "azext_iot/tests/iothub/modules/test_iothub_modules_int.py::"
+            "TestIoTHubModules::test_iothub_module_identity",
+        ),
     },
 }
 
@@ -277,8 +284,10 @@ def _assigned_phase(case):
             raise ValueError("HubControl shard partition mismatch for " + case.node)
         return matches
     if case.suite == "HubData" and "entra" in case.phases:
-        state_config = case.node in SHARDS["HubData"]["entra-state-config"]
-        phases_ = ["entra-state-config" if state_config else "entra-devices-protocol"]
+        matches = [phase for phase, nodes_ in SHARDS["HubData"].items() if case.node in nodes_]
+        if len(matches) > 1:
+            raise ValueError("HubData shard partition mismatch for " + case.node)
+        phases_ = matches or ["entra-devices-protocol"]
         if "sas" in case.phases:
             phases_.append("sas")
         return tuple(phases_)

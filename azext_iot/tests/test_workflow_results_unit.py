@@ -714,7 +714,7 @@ def test_hub_data_manifest_preserves_exact_sas_nodes_and_normal_auth_default():
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
-    assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "entra-identities", "sas")
     assert sum(len(nodes("HubData", phase)) for phase in phases("HubData") if phase.startswith("entra-")) == 44
     assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 33
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
