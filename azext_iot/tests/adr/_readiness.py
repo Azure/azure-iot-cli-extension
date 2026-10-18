@@ -251,7 +251,7 @@ def _endpoint_settings(endpoint):
     return settings
 
 
-def _read_authorization_failure(endpoint):
+def _read_authorization_failure(endpoint, endpoint_name):
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     error = status.get("error") or endpoint.get("error") or endpoint.get("linkingError") or {}
     target = endpoint.get("resourceId")
@@ -264,12 +264,21 @@ def _read_authorization_failure(endpoint):
                        target or "", re.IGNORECASE)
     if hub:
         # Hub data-plane RBAC can lag its ARM assignment.
-        messages.add(
+        prefix = (
             f"The namespace's managed identity could not read the device count on hub "
-            f"'{hub[1].lower()}.service.azure-devices.net' because it lacks IoT Hub data-plane read access. "
+            f"'{hub[1].lower()}.service.azure-devices.net'"
+        )
+        suffix = (
+            " because it lacks IoT Hub data-plane read access. "
             "Assign it a role that grants IoT Hub data-plane read (for example IoT Hub Data Reader) on the hub, "
             "then resubmit the request."
         )
+        messages.add(prefix + suffix)
+        if error == {
+            "code": "AdrMiNotAuthorized",
+            "message": f"{prefix} (endpoint '{endpoint_name}' being linked, resource '{target}'){suffix}",
+        }:
+            return True
     # LinkInitiateFailed must always use the production principal/action/scope
     # binding, never this older message-only read-authorization compatibility path.
     return error.get("code") != "LinkInitiateFailed" and error.get("message") in messages
@@ -338,7 +347,7 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
         or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
     )
     if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection:
-        return "read" if _read_authorization_failure(endpoint) else None
+        return "read" if _read_authorization_failure(endpoint, binding.name) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
         or (endpoint.get("provisioningStatus") or {}).get("error")

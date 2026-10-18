@@ -468,18 +468,22 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     assert clock.now == 50
 
 
-def _hub_data_read_message(host):
+def _hub_data_read_message(host, context=""):
     return (
-        f"The namespace's managed identity could not read the device count on hub '{host}' because it lacks "
+        f"The namespace's managed identity could not read the device count on hub '{host}'{context} because it lacks "
         "IoT Hub data-plane read access. Assign it a role that grants IoT Hub data-plane read "
         "(for example IoT Hub Data Reader) on the hub, then resubmit the request."
     )
 
 
-def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered():
+@pytest.mark.parametrize("contextual", [False, True])
+def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered(contextual):
     expected = _expected("hub")
     host = expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
-    failed = _namespace(expected=expected, message=_hub_data_read_message(host))
+    context = f" (endpoint 'secondary' being linked, resource '{HUB_ID}')" if contextual else ""
+    failed = _namespace(expected=expected, message=_hub_data_read_message(host, context))
+    if contextual:
+        failed["properties"]["messaging"]["endpoints"]["secondary"]["linkingError"]["code"] = "AdrMiNotAuthorized"
     scenario = Mock()
     scenario.cmd.side_effect = [
         _output(None), _output(failed), _output(failed), _output(None),
@@ -489,19 +493,53 @@ def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered():
     endpoint = _link(scenario, Clock(), expected)
 
     assert endpoint["linkingState"] == "Succeeded"
-    assert sum(" update " in command for command in _commands(scenario)) == 1
+    commands = _commands(scenario)
+    assert sum(" update " in command for command in commands) == 1
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
+    assert all(endpoint[key] == value for key, value in expected.items())
 
 
+@pytest.mark.parametrize("contextual", [False, True])
 @pytest.mark.parametrize("kind,host", [("hub", "otherhub.service.azure-devices.net"), ("dps", None)])
-def test_hub_data_plane_read_failure_is_bound_to_the_linked_hub(kind, host):
+def test_hub_data_plane_read_failure_is_bound_to_the_linked_hub(kind, host, contextual):
     expected = _expected(kind)
     host = host or expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
-    message = _hub_data_read_message(host)
+    context = f" (endpoint '{LINKS[kind][2]}' being linked, resource '{expected['resourceId']}')" if contextual else ""
+    message = _hub_data_read_message(host, context)
+    failed = _namespace(expected=expected, message=message, kind=kind)
+    if contextual:
+        section, _, name = LINKS[kind]
+        failed["properties"][section]["endpoints"][name]["linkingError"]["code"] = "AdrMiNotAuthorized"
     scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), _output(_namespace(expected=expected, message=message, kind=kind))]
+    scenario.cmd.side_effect = [_output(None), _output(failed)]
 
     with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure"):
         _link(scenario, Clock(), expected, kind=kind)
+
+    assert scenario.cmd.call_count == 2
+
+
+@pytest.mark.parametrize("mutation", ["endpoint", "resource", "code", "details", "suffix"])
+def test_contextual_hub_read_failure_requires_exact_endpoint_resource_and_error(mutation):
+    name = "other-endpoint" if mutation == "endpoint" else "secondary"
+    target = HUB_ID.replace("/rg/", "/other-rg/") if mutation == "resource" else HUB_ID
+    message = _hub_data_read_message(
+        "hub.service.azure-devices.net", f" (endpoint '{name}' being linked, resource '{target}')"
+    )
+    failed = _namespace(message=message)
+    error = failed["properties"]["messaging"]["endpoints"]["secondary"]["linkingError"]
+    error["code"] = "AdrMiNotAuthorized"
+    if mutation == "code":
+        error["code"] = "AuthorizationFailed"
+    elif mutation == "details":
+        error["details"] = [{"code": "OtherFailure"}]
+    elif mutation == "suffix":
+        error["message"] += " Another failure occurred."
+    scenario = Mock()
+    scenario.cmd.side_effect = [_output(None), _output(failed)]
+
+    with pytest.raises(AssertionError, match="Non-recoverable Hub link failure"):
+        _link(scenario, Clock())
 
     assert scenario.cmd.call_count == 2
 
