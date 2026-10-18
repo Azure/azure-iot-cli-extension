@@ -162,6 +162,36 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
     )
 
 
+@pytest.mark.parametrize("failure_at", [None, 0, 1])
+def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mocker, failure_at):
+    error = CLIInternalError("Storage grant could not be verified")
+    assign = mocker.patch.object(
+        fixtures, "assign_role_with_propagation",
+        side_effect=[error if failure_at == index else None for index in range(2)],
+    )
+    hubs = [{"hub": {"identity": {"principalId": "hub-system"}}}]
+    storage = {"storage": {"id": "storage-scope"}}
+    fixture = fixtures.provisioned_storage_with_identity_module.__wrapped__(
+        Mock(), {"principalId": "storage-user"}, hubs, storage,
+    )
+    if failure_at is not None:
+        with pytest.raises(CLIInternalError) as raised:
+            next(fixture)
+        assert raised.value is error
+    else:
+        assert next(fixture) == (hubs, storage)
+        with pytest.raises(StopIteration):
+            next(fixture)
+    principals = ["hub-system", "storage-user"][:2 if failure_at is None else failure_at + 1]
+    assert [call.kwargs for call in assign.call_args_list] == [
+        {
+            "role": "Storage Blob Data Contributor", "scope": "storage-scope",
+            "assignee": principal, "max_tries": fixtures.MAX_RBAC_ASSIGNMENT_TRIES, "wait": 180,
+        }
+        for principal in principals
+    ]
+
+
 @pytest.mark.parametrize("marker_kwargs,system_endpoints", [
     ({"system_endpoints": True}, True),
     ({"system_endpoints": False}, False),
