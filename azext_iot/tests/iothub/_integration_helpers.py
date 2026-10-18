@@ -134,6 +134,7 @@ def assign_role_with_propagation(*, role, scope, assignee, max_tries, wait):
     assign_role_assignment(role=role, scope=scope, assignee=assignee, max_tries=max_tries)
     if not is_assigned():
         raise CLIInternalError(f"Required data role '{role}' was not assigned on '{scope}'.")
+    logger.info("New role '%s' for '%s' at '%s': allowing %ss for propagation.", role, assignee, scope, wait)
     sleep(wait)
 
 

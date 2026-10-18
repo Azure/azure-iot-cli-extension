@@ -32,6 +32,7 @@ from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAG
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
+STORAGE_ROLE_PROPAGATION_SECONDS = 180
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
@@ -588,17 +589,21 @@ def provisioned_storage_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
     user_id = provisioned_user_identity_module["principalId"]
-    assign_role_assignment(
+    # ARM visibility is not effective storage access. Apply the existing
+    # post-grant grace period; endpoint errors remain failures, never replays.
+    assign_role_with_propagation(
         assignee=hub_principal_id,
         scope=scope,
         role=role,
-        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+        wait=STORAGE_ROLE_PROPAGATION_SECONDS,
     )
-    assign_role_assignment(
+    assign_role_with_propagation(
         assignee=user_id,
         scope=scope,
         role=role,
-        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+        wait=STORAGE_ROLE_PROPAGATION_SECONDS,
     )
     yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
 
