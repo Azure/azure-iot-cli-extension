@@ -26,13 +26,12 @@ from azext_iot.tests.settings import (
 )
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
 from azext_iot.tests.iothub._integration_helpers import (
-    assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
+    STORAGE_ROLE_PROPAGATION_SECONDS, assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
 )
 from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
-STORAGE_ROLE_PROPAGATION_SECONDS = 180
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)

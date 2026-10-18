@@ -35,6 +35,7 @@ _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-pre
 # Documented query tolerance, not a maximum-latency guarantee:
 # https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
 QUERY_VISIBILITY_TIMEOUT = 30 * 60
+STORAGE_ROLE_PROPAGATION_SECONDS = 180
 logger = get_logger(__name__)
 
 

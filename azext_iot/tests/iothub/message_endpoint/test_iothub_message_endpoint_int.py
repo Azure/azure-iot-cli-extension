@@ -15,6 +15,7 @@ from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import invoke_checked
+from azext_iot.tests.iothub._integration_helpers import STORAGE_ROLE_PROPAGATION_SECONDS
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
@@ -620,6 +621,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     assert endpoint_list == []
 
 
+@pytest.mark.timeout(900 + 2 * STORAGE_ROLE_PROPAGATION_SECONDS, func_only=False)
 def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
     invoke = partial(invoke_checked, cli, description="Storage endpoint lifecycle command")
     iot_hub_objs, storage_obj = provisioned_storage_with_identity_module
