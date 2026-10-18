@@ -35,6 +35,7 @@ _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-pre
 # Documented query tolerance, not a maximum-latency guarantee:
 # https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
 QUERY_VISIBILITY_TIMEOUT = 30 * 60
+STORAGE_ROLE_PROPAGATION_SECONDS = 180
 logger = get_logger(__name__)
 
 
@@ -134,6 +135,7 @@ def assign_role_with_propagation(*, role, scope, assignee, max_tries, wait):
     assign_role_assignment(role=role, scope=scope, assignee=assignee, max_tries=max_tries)
     if not is_assigned():
         raise CLIInternalError(f"Required data role '{role}' was not assigned on '{scope}'.")
+    logger.info("New role '%s' for '%s' at '%s': allowing %ss for propagation.", role, assignee, scope, wait)
     sleep(wait)
 
 
@@ -194,8 +196,8 @@ def device_receiver(connection_string):
 
 
 @contextmanager
-def device_method_responder(scenario, device_id, readiness_timeout=15):
-    """Keep the simulator's real method handler connected for one invocation.
+def device_method_responder(scenario, device_id, readiness_timeout=15, *, module_id=None):
+    """Keep a real device or module method handler connected for one invocation.
 
     Use the scenario's tracked worker and existing 90-second drain budget. A
     stuck connect, callback or shutdown therefore prevents resource deletion,
@@ -204,13 +206,20 @@ def device_method_responder(scenario, device_id, readiness_timeout=15):
     """
     from azext_iot.iothub.providers.mqtt import MQTTProvider
 
-    connection_string = scenario.get_device_cstring(device_id)
+    if module_id is None:
+        connection_string = scenario.get_device_cstring(device_id)
+    else:
+        connection_string = scenario.cmd(
+            f"iot hub module-identity connection-string show -d {device_id} -m {module_id} "
+            f"-n {scenario.entity_name} -g {scenario.entity_rg} --auth-type login --hostname-type auto"
+        ).get_output_in_json()["connectionString"]
     ready, closing, received = Event(), Event(), Event()
     handler_lock = Lock()
     failures, callback_failures = Queue(), Queue()
 
     def run():
-        provider = None
+        client = None
+        handler = None
         accepting = True
         callback_error = None
 
@@ -221,19 +230,36 @@ def device_method_responder(scenario, device_id, readiness_timeout=15):
                     if not accepting:
                         raise RuntimeError("Direct method arrived after responder closure.")
                     received.set()
-                    provider.method_request_handler(request)
+                    handler(request)
                 except BaseException as error:  # SDK callback boundary: re-raised on the test thread below.
                     if callback_error is None:
                         callback_error = error
                     callback_failures.put(error)
 
         try:
-            provider = MQTTProvider(
-                hub_hostname=scenario.device_host_name, device_id=device_id,
-                device_conn_string=connection_string,
-            )
-            provider.device_client.on_method_request_received = respond
-            provider.device_client.connect()
+            if module_id is None:
+                provider = MQTTProvider(
+                    hub_hostname=scenario.device_host_name, device_id=device_id,
+                    device_conn_string=connection_string,
+                )
+                client, handler = provider.device_client, provider.method_request_handler
+                client.on_method_request_received = respond
+                client.connect()
+            else:
+                from azure.iot.device import IoTHubModuleClient, MethodResponse
+
+                client = IoTHubModuleClient.create_from_connection_string(
+                    connection_string, connection_retry=False, auto_connect=False,
+                )
+
+                def module_handler(request):
+                    client.send_method_response(MethodResponse.create_from_method_request(
+                        request, status=200, payload={"method": request.name, "received": request.payload},
+                    ))
+
+                handler = module_handler
+                client.connect()
+                client.on_method_request_received = respond
             ready.set()
             closing.wait()
         except BaseException as error:  # Worker boundary: retain the original exception, not the SDK wrapper.
@@ -241,14 +267,14 @@ def device_method_responder(scenario, device_id, readiness_timeout=15):
             raise
         finally:
             ready.set()  # Also wake the owner when setup fails.
-            if provider is not None:
+            if client is not None:
                 # Drain the actual handler (including send_method_response) before
                 # closing the gate. Never hold this lock during SDK shutdown:
                 # shutdown itself joins SDK callback threads.
                 with handler_lock:
                     accepting = False
                 try:
-                    provider.device_client.shutdown()
+                    client.shutdown()
                 except BaseException as error:
                     failures.put(error)
                     raise

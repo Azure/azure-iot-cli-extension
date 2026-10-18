@@ -42,6 +42,7 @@ NODES = (
     MESSAGING + "test_hub_monitor_events",
     MESSAGING + "test_hub_monitor_feedback",
     ROOT + "messaging/test_iothub_c2d_messages_int.py::TestIoTHubC2DMessages::test_iothub_c2d_messages_http",
+    ROOT + "modules/test_iothub_modules_int.py::TestIoTHubModules::test_iothub_invoke_module_method",
     ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_identity_roundtrip",
     ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_responding_digital_twin",
 )
@@ -67,7 +68,7 @@ def enabled():
 
 def require_runtime():
     if ACTIVE is None:
-        raise HubSasError("HubSAS must use its validated eight-node pytest entry point.")
+        raise HubSasError("HubSAS must use its validated pytest entry point.")
     return ACTIVE
 
 

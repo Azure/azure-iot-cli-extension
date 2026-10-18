@@ -6,13 +6,14 @@
 """
 Integration tests for IoT Hub certificate management commands.
 
-Covers: iot hub certificate list, create, generate-verification-code, verify, delete.
+Covers: iot hub certificate list, show, create, update, generate-verification-code, verify, delete.
 These are CRUD-only tests — no device connections, avoiding the flaky CA propagation timing.
 """
 
 import os
+from shlex import quote
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.test_utils import create_certificate
+from azext_iot.tests.test_utils import certificate_fingerprints, create_certificate
 
 
 CERT_NAME = "test-root-cert"
@@ -74,6 +75,27 @@ class TestIoTHubCertificates(IoTLiveScenarioTest):
         ).get_output_in_json()
         cert_names = [c["name"] for c in list_result["value"]]
         assert CERT_NAME in cert_names
+
+        shown = self.cmd(
+            f"iot hub certificate show --hub-name {self.entity_name} -g {self.entity_rg} -n {CERT_NAME}"
+        ).get_output_in_json()
+        assert shown["id"] == create_result["id"]
+        assert shown["properties"]["thumbprint"].upper() in certificate_fingerprints(root_cert["certificate"])
+        replacement_name = f"{CERT_NAME}-replacement"
+        replacement_file = f"{replacement_name}-cert.pem"
+        self._cert_files.extend([replacement_file, f"{replacement_name}-key.pem"])
+        root_cert = create_certificate(replacement_name, 1, output_dir)
+        updated = self.cmd(
+            f"iot hub certificate update --hub-name {self.entity_name} -g {self.entity_rg} -n {CERT_NAME} "
+            f"--path {quote(replacement_file)} --etag {quote(shown['etag'])}"
+        ).get_output_in_json()
+        readback = self.cmd(
+            f"iot hub certificate show --hub-name {self.entity_name} -g {self.entity_rg} -n {CERT_NAME}"
+        ).get_output_in_json()
+        assert readback["id"] == shown["id"]
+        assert readback["properties"]["thumbprint"] == updated["properties"]["thumbprint"]
+        assert readback["properties"]["thumbprint"] != shown["properties"]["thumbprint"]
+        assert readback["properties"]["thumbprint"].upper() in certificate_fingerprints(root_cert["certificate"])
 
         # Generate verification code
         verification_result = self.cmd(

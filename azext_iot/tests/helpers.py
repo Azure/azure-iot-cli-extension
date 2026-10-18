@@ -9,6 +9,7 @@ import os
 
 from contextlib import contextmanager
 from functools import wraps
+from hashlib import sha256
 from inspect import getsourcefile
 from time import monotonic, sleep
 from types import SimpleNamespace
@@ -56,6 +57,18 @@ TEST_PIPELINE_ID = "{} {} {}".format(
     settings.env.job_id
 ).strip()
 USE_TAGS = str(settings.env.use_tags).lower() == "true"
+
+
+def policy_snapshot(policies):
+    """Compare policy preservation without putting service keys in assertion output."""
+    return {
+        policy["keyName"]: (
+            frozenset(policy["rights"].replace(" ", "").split(",")),
+            sha256(policy["primaryKey"].encode()).hexdigest(),
+            sha256(policy["secondaryKey"].encode()).hexdigest(),
+        )
+        for policy in policies
+    }
 
 
 def invoke_checked(cli: EmbeddedCLI, command: str, *, description: str) -> EmbeddedCLI:

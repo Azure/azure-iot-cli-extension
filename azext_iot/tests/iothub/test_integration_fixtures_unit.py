@@ -162,6 +162,36 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
     )
 
 
+@pytest.mark.parametrize("failure_at", [None, 0, 1])
+def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mocker, failure_at):
+    error = CLIInternalError("Storage grant could not be verified")
+    assign = mocker.patch.object(
+        fixtures, "assign_role_with_propagation",
+        side_effect=[error if failure_at == index else None for index in range(2)],
+    )
+    hubs = [{"hub": {"identity": {"principalId": "hub-system"}}}]
+    storage = {"storage": {"id": "storage-scope"}}
+    fixture = fixtures.provisioned_storage_with_identity_module.__wrapped__(
+        Mock(), {"principalId": "storage-user"}, hubs, storage,
+    )
+    if failure_at is not None:
+        with pytest.raises(CLIInternalError) as raised:
+            next(fixture)
+        assert raised.value is error
+    else:
+        assert next(fixture) == (hubs, storage)
+        with pytest.raises(StopIteration):
+            next(fixture)
+    principals = ["hub-system", "storage-user"][:2 if failure_at is None else failure_at + 1]
+    assert [call.kwargs for call in assign.call_args_list] == [
+        {
+            "role": "Storage Blob Data Contributor", "scope": "storage-scope",
+            "assignee": principal, "max_tries": fixtures.MAX_RBAC_ASSIGNMENT_TRIES, "wait": 180,
+        }
+        for principal in principals
+    ]
+
+
 @pytest.mark.parametrize("marker_kwargs,system_endpoints", [
     ({"system_endpoints": True}, True),
     ({"system_endpoints": False}, False),
@@ -535,6 +565,49 @@ def method_responder_scenario(mocker):
     )
     yield scenario, client, tasks
     tasks.finish(timeout=2)
+
+
+@pytest.mark.parametrize("failure_stage", [None, "connect", "response", "shutdown"])
+def test_module_method_responder_uses_module_credentials_and_surfaces_failures(
+    mocker, method_responder_scenario, failure_stage,
+):
+    from azure.iot.device import IoTHubModuleClient, MethodResponse
+
+    scenario, client, _ = method_responder_scenario
+    connection_string = "HostName=device-host.example;DeviceId=device;ModuleId=module;SharedAccessKey=unit"
+    scenario.entity_name, scenario.entity_rg = "owned-hub", "owned-rg"
+    scenario.cmd = Mock()
+    scenario.cmd.return_value.get_output_in_json.return_value = {"connectionString": connection_string}
+    factory = mocker.patch.object(IoTHubModuleClient, "create_from_connection_string", return_value=client)
+    failure = RuntimeError(f"module {failure_stage} failure")
+    if failure_stage:
+        method = {"connect": client.connect, "response": client.send_method_response, "shutdown": client.shutdown}
+        method[failure_stage].side_effect = failure
+
+    def exercise():
+        with integration_helpers.device_method_responder(scenario, "device", module_id="module"):
+            assert client.connected
+            client.on_method_request_received(SimpleNamespace(
+                request_id="module-request", name="echo", payload={"request": "module"},
+            ))
+
+    if failure_stage:
+        with pytest.raises(RuntimeError, match=f"module {failure_stage} failure") as raised:
+            exercise()
+        assert raised.value is failure
+    else:
+        exercise()
+        response = client.send_method_response.call_args.args[0]
+        assert isinstance(response, MethodResponse)
+        assert response.request_id == "module-request" and response.status == 200
+        assert response.payload == {"method": "echo", "received": {"request": "module"}}
+    factory.assert_called_once_with(connection_string, connection_retry=False, auto_connect=False)
+    scenario.cmd.assert_called_once_with(
+        "iot hub module-identity connection-string show -d device -m module "
+        "-n owned-hub -g owned-rg --auth-type login --hostname-type auto",
+    )
+    scenario.get_device_cstring.assert_not_called()
+    client.shutdown.assert_called_once_with()
 
 
 def test_device_messaging_drains_feedback_simulator_before_method_invocation(mocker, method_responder_scenario):
@@ -1239,6 +1312,20 @@ def test_cleanup_client_failure_still_runs_legacy_cleanup_and_fails(mocker):
         IoTLiveScenarioTest.tearDown(scenario)
     assert raised.value is error
     legacy.assert_called_once_with(hub_name="owned-hub", rg="rg")
+
+
+@pytest.mark.parametrize("device_ids", [[], ["unexpected-device"]])
+def test_management_only_cases_leave_hub_cleanup_to_owned_arm_fixtures(mocker, device_ids):
+    from azext_iot.tests.iothub.core.test_iothub_command_happy_paths_int import TestHubCommandHappyPaths
+
+    data_cleanup = mocker.patch.object(IoTLiveScenarioTest, "tearDown")
+    scenario = SimpleNamespace(_generated_device_ids=device_ids)
+    if device_ids:
+        with pytest.raises(AssertionError, match="Management-only cases"):
+            TestHubCommandHappyPaths.tearDown(scenario)
+    else:
+        TestHubCommandHappyPaths.tearDown(scenario)
+    data_cleanup.assert_not_called()
 
 
 def test_query_adapter_follows_continuation_after_an_empty_first_page():

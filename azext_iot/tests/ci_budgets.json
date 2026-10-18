@@ -71,6 +71,11 @@
         "cleanup_minutes": 15
       },
       {
+        "name": "entra-identities",
+        "runtime_minutes": 75,
+        "cleanup_minutes": 15
+      },
+      {
         "name": "sas",
         "runtime_minutes": 45,
         "cleanup_minutes": 15

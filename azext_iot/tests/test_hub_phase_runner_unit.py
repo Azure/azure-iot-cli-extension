@@ -766,7 +766,10 @@ def test_budgets_leave_external_setup_below_github_cap():
             ("regular-endpoints-a", 90 * 60),
             ("regular-endpoints-b", 90 * 60),
         ),
-        "HubData": (("entra-state-config", 75 * 60), ("entra-devices-protocol", 75 * 60), ("sas", 45 * 60)),
+        "HubData": (
+            ("entra-state-config", 75 * 60), ("entra-devices-protocol", 75 * 60),
+            ("entra-identities", 75 * 60), ("sas", 45 * 60),
+        ),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60

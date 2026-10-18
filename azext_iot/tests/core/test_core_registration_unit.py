@@ -21,7 +21,6 @@ from azure.cli.core.util import CLIError
 
 from azext_iot.core.command_map import (
     load_core_commands,
-    PolicyUpdateResultTransform,
     EndpointUpdateResultTransform,
     RouteUpdateResultTransform,
     HubDeleteResultTransform,
@@ -69,11 +68,14 @@ def test_patch_dps_update_help_retains_authentication_and_capacity_examples(monk
     assert any("--set sku.capacity=1" in command for command in commands)
 
 
-def test_policy_update_result_transform(mocker):
-    transform = PolicyUpdateResultTransform(MagicMock())
-    result = {"properties": {"authorizationPolicies": ["p"]}}
-    mocker.patch(f"{cm_path}.LongRunningOperation.__call__", return_value=result)
-    assert transform("poller") == ["p"]
+@pytest.mark.parametrize("action", ["create", "delete"])
+def test_policy_mutations_preserve_handler_output_without_hub_result_transform(action):
+    loader = MagicMock()
+    load_core_commands(loader, None)
+    calls = loader.command_group.return_value.__enter__.return_value.command.call_args_list
+    mutations = [call for call in calls if call.args == (action, f"iot_hub_policy_{action}")]
+    assert len(mutations) == 1
+    assert mutations[0].kwargs == {}
 
 
 def test_endpoint_update_result_transform(mocker):
