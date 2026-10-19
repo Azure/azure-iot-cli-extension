@@ -16,6 +16,9 @@ import json
 import os
 import responses
 import re
+from argparse import Namespace
+from copy import deepcopy
+from azext_iot._validators import process_top
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
@@ -865,6 +868,8 @@ class TestDeviceTwinList:
     @pytest.mark.parametrize("top", [-2, 0])
     def test_device_list_invalid_args(self, fixture_cmd, fixture_ghcs, top):
         with pytest.raises(CLIError):
+            # Preview validates --top in argument processing, before dispatch.
+            process_top(Namespace(top=top))
             subject.iot_device_twin_list(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
@@ -1796,6 +1801,7 @@ class TestQuery:
     @pytest.mark.parametrize("top", [-2, 0])
     def test_query_invalid_args(self, top, fixture_ghcs):
         with pytest.raises(CLIError):
+            process_top(Namespace(top=top))
             subject.iot_query(
                 cmd=None, hub_name_or_hostname=mock_target["entity"], query_command=generic_query, top=top
             )
@@ -1839,8 +1845,9 @@ class TestDeviceMethodInvoke:
 
         if methodbody:
             assert body["payload"] == json.loads(payload)
-        elif "payload" in body.keys():
+        else:
             # We must ensure null is passed for payload.
+            assert "payload" in body
             assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout
@@ -1920,8 +1927,9 @@ class TestDeviceModuleMethodInvoke:
 
         if methodbody:
             assert body["payload"] == json.loads(payload)
-        elif "payload" in body.keys():
+        else:
             # We must ensure null is passed for payload.
+            assert "payload" in body
             assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout
@@ -2542,7 +2550,9 @@ class TestEdgeOffline:
             build_mock_response(
                 mocker, request.param[0], generate_child_device(**child_kvp)
             ),
-            build_mock_response(mocker, request.param[1], {}),
+        ] + [
+            # A failing device read may be retried when the status is transient.
+            build_mock_response(mocker, request.param[1], {}) for _ in range(4)
         ]
         service_client.side_effect = test_side_effect
         return service_client
@@ -2725,14 +2735,15 @@ class TestDeviceDistributedTracing:
         self, mocker, fixture_ghcs, fixture_sas, request
     ):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
         if request.param[1] == 0:
-            mock_target["location"] = "westus"
+            target["location"] = "westus"
         if request.param[1] == 1:
-            mock_target["sku_tier"] = "Basic"
+            target["sku_tier"] = "Basic"
         if request.param[1] == 2:
-            twin_kvp.setdefault("capabilities", {"iotEdge": True})
+            twin_kvp["capabilities"] = {"iotEdge": True}
         test_side_effect = [
             build_mock_response(
                 mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp)
@@ -2759,10 +2770,11 @@ class TestDeviceDistributedTracing:
     @pytest.fixture(params=[(200, 0), (200, 1), (200, 2)])
     def sc_distributed_tracing_update(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
-        mock_target["location"] = "westus2"
-        mock_target["sku_tier"] = "Standard"
+        target["location"] = "westus2"
+        target["sku_tier"] = "Standard"
         if request.param[1] == 0:
             twin_kvp.setdefault(
                 "properties",
@@ -2824,14 +2836,15 @@ class TestDeviceDistributedTracing:
         self, mocker, fixture_ghcs, fixture_sas, request
     ):
         service_client = mocker.patch(path_service_client)
+        fixture_ghcs.return_value = target = deepcopy(mock_target)
         twin_kvp = {}
         twin_kvp.setdefault("capabilities", {"iotEdge": False})
         if request.param[1] == 0:
-            mock_target["location"] = "westus"
+            target["location"] = "westus"
         if request.param[1] == 1:
-            mock_target["sku_tier"] = "Basic"
+            target["sku_tier"] = "Basic"
         if request.param[1] == 2:
-            twin_kvp.setdefault("capabilities", {"iotEdge": True})
+            twin_kvp["capabilities"] = {"iotEdge": True}
         test_side_effect = [
             build_mock_response(
                 mocker, request.param[0], payload=generate_device_twin_show(**twin_kvp)

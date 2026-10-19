@@ -5,16 +5,21 @@
 # --------------------------------------------------------------------------------------------
 
 import re
+import logging
 import responses
 import pytest
 import json
-import logging
 import os
+import inspect
 from functools import partial
+from pathlib import Path
 from urllib3.util.retry import Retry
 
+import azext_iot
+from azext_iot.constants import VERSION
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
+from azure.cli.core.extension import DevExtension
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
@@ -69,8 +74,11 @@ mock_target["resourcegroup"] = "myresourcegroup"
 
 # Mock Iot DPS Target
 mock_dps_target = {}
-mock_dps_target["cs"] = "HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value"
-mock_dps_target["entity"] = "mydps"
+mock_dps_target["cs"] = (
+    "HostName=mydps.azure-devices-provisioning.net;"
+    "SharedAccessKeyName=name;SharedAccessKey=value"
+)
+mock_dps_target["entity"] = "mydps.azure-devices-provisioning.net"
 mock_dps_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["policy"] = "provisioningserviceowner"
@@ -82,6 +90,29 @@ mock_symmetric_key_attestation = {
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pycollect_makeitem(collector, name, obj):
+    from azure.cli.testsdk import LiveScenarioTest
+
+    # Pytest instantiates unittest classes during collection, before skip handling.
+    # Live scenario constructors can provision resources even in a unit-only run.
+    patterns = collector.config.getini("python_files")
+    unit_only = (
+        collector.config.getoption("keyword").strip() == "_unit.py"
+        or (patterns and all(pattern.endswith("_unit.py") for pattern in patterns))
+        or (collector.config.args and all(
+            str(arg).split("::", maxsplit=1)[0].endswith("_unit.py") for arg in collector.config.args
+        ))
+    )
+    if (
+        unit_only
+        and inspect.isclass(obj)
+        and issubclass(obj, LiveScenarioTest)
+    ):
+        return []
+    return None
 
 
 @pytest.fixture(autouse=True)
@@ -104,6 +135,14 @@ def generate_cs(
 
 
 @pytest.fixture(autouse=True)
+def integration_auth_defaults(request, monkeypatch):
+    if request.node.path.name.endswith("_int.py"):
+        # Knack preserves configured-default option hyphens in environment names.
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE", "login")
+
+
+@pytest.fixture(autouse=True)
 def disable_cli_version_check(mocker):
     """Prevent the Azure CLI version-update check from issuing real HTTP calls.
 
@@ -123,6 +162,61 @@ def disable_cli_version_check(mocker):
         except (AttributeError, ModuleNotFoundError):
             # Older/newer azure-cli versions may not expose these symbols.
             pass
+
+
+@pytest.fixture
+def offline_cli(mocker, monkeypatch, tmp_path):
+    monkeypatch.setenv("AZURE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("AZURE_EXTENSION_DIR", str(tmp_path / "extensions"))
+    monkeypatch.setattr("azure.cli.core._config.GLOBAL_CONFIG_DIR", str(tmp_path))
+    guards = [
+        mocker.patch(target, side_effect=AssertionError("unexpected network access"))
+        for target in (
+            "requests.sessions.Session.send",
+            "socket.socket.connect",
+            "socket.create_connection",
+        )
+    ]
+    credential = mocker.Mock(spec=["get_token"])
+    credential.get_token.side_effect = AssertionError("unexpected token acquisition")
+    subscription_id = "00000000-0000-0000-0000-000000000000"
+    tenant_id = "11111111-1111-1111-1111-111111111111"
+    subscription = {
+        "id": subscription_id,
+        "name": "offline",
+        "state": "Enabled",
+        "tenantId": tenant_id,
+        "isDefault": True,
+        "environmentName": "AzureCloud",
+        "user": {"name": "offline@example.invalid", "type": "user"},
+    }
+    mocker.patch(
+        "azure.cli.core._profile.Profile.get_subscription", return_value=subscription
+    )
+    mocker.patch(
+        "azure.cli.core._profile.Profile.load_cached_subscriptions",
+        return_value=[subscription],
+    )
+    mocker.patch(
+        "azure.cli.core._profile.Profile.get_login_credentials",
+        return_value=(credential, subscription_id, tenant_id),
+    )
+    # Use the checkout's real registration, providers and SDKs, not an installed wheel.
+    assert Path(azext_iot.__file__).resolve().parent == Path(__file__).resolve().parents[1]
+    root = str(Path(azext_iot.__file__).resolve().parents[1])
+    extension = DevExtension("azure-iot", root)
+    metadata = dict(DevExtension.get_azext_metadata(root), version=VERSION)
+    mocker.patch.object(extension, "get_metadata", return_value=metadata)
+    mocker.patch("azure.cli.core.extension.get_extensions", return_value=[extension])
+    mocker.patch("azure.cli.core.extension.get_extension_path", return_value=root)
+    cli = DummyCli()
+    cli.config.set_value("extension", "use_dynamic_install", "no")
+    cli.config.set_value("core", "collect_telemetry", "no")
+    mocker.patch("azure.cli.testsdk.base.get_dummy_cli", return_value=cli)
+    yield cli
+    credential.get_token.assert_not_called()
+    for guard in guards:
+        guard.assert_not_called()
 
 
 # Sets current working directory to the directory of the executing file
@@ -459,9 +553,62 @@ def fixture_dt_client(mocker, fixture_cmd):
 
 def pytest_addoption(parser):
     parser.addoption("--api-version", action="store", default=None)
+    parser.addoption(
+        "--integration-progress-interval", type=int, default=0,
+        help="Emit credential-free integration phase progress every N seconds (0 disables).",
+    )
+    parser.addoption(
+        "--integration-results-dir", default=None,
+        help="Persist metadata-only integration outcomes and incomplete/failure evidence after every phase.",
+    )
+
+
+def pytest_configure(config):
+    from azext_iot.tests._integration_progress import IntegrationProgress
+
+    interval = config.getoption("integration_progress_interval")
+    if interval < 0:
+        raise pytest.UsageError("--integration-progress-interval must be nonnegative.")
+    results_dir = config.getoption("integration_results_dir")
+    config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
+    config.pluginmanager.register(
+        IntegrationProgress(config, interval, results_dir=results_dir), "iot-integration-progress",
+    )
+
+
+class ImmediateIntegrationReports:
+    """Keep integration failures visible even if cancellation prevents the final summary."""
+
+    def __init__(self, config):
+        self.config = config
+
+    def pytest_runtest_logreport(self, report):
+        if (
+            hasattr(self.config, "workerinput")
+            or not report.nodeid.partition("::")[0].endswith("_int.py")
+            or report.outcome not in ("failed", "rerun")
+        ):
+            return
+        reporter = self.config.pluginmanager.getplugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_sep("=", f"Immediate {report.outcome} ({report.when}): {report.nodeid}")
+            reporter.write_line(report.longreprtext)
+            reporter.flush()
 
 
 # DPS Fixtures
+@pytest.fixture()
+def dps_service_client_generic_errors(
+    service_client_generic_errors, fixture_gdcs, fixture_dps_sas, patch_certificate_open
+):
+    yield service_client_generic_errors
+    assert service_client_generic_errors.calls
+    assert all(
+        call.request.url.startswith("https://{}/".format(mock_dps_target["entity"]))
+        for call in service_client_generic_errors.calls
+    )
+
+
 @pytest.fixture()
 def fixture_gdcs(mocker):
     gdcs = mocker.patch(path_gdcs)

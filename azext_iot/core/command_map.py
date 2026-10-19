@@ -7,7 +7,7 @@
 from azure.cli.core.commands import CliCommandType, LongRunningOperation
 
 from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
-from azure.cli.command_modules.iot._utils import _dps_certificate_response_transform
+from azext_iot.core.transforms import dps_certificate_response_transform
 
 # Command types for both IoT Hub and DPS management operations
 core_ops = CliCommandType(operations_tmpl="azext_iot.core.custom#{}")
@@ -16,12 +16,6 @@ core_ops = CliCommandType(operations_tmpl="azext_iot.core.custom#{}")
 CS_DEPRECATION_INFO = 'IoT Extension (azure-iot) connection-string command (az iot hub connection-string show)'
 ROUTE_DEPRECATION_INFO = 'IoT Extension (azure-iot) message-route command group (az iot hub message-route)'
 ENDPOINT_DEPRECATION_INFO = 'IoT Extension (azure-iot) message-endpoint command group (az iot hub message-endpoint)'
-
-
-class PolicyUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
-    def __call__(self, poller):
-        result = super().__call__(poller)
-        return result["properties"]["authorizationPolicies"]
 
 
 class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
@@ -109,8 +103,8 @@ def load_core_commands(self, _):
     with self.command_group('iot hub policy', command_type=core_ops, client_factory=iot_hub_service_factory) as g:
         g.command('list', 'iot_hub_policy_list')
         g.show_command('show', 'iot_hub_policy_get')
-        g.command('create', 'iot_hub_policy_create', transform=PolicyUpdateResultTransform(self.cli_ctx))
-        g.command('delete', 'iot_hub_policy_delete', transform=PolicyUpdateResultTransform(self.cli_ctx))
+        g.command('create', 'iot_hub_policy_create')
+        g.command('delete', 'iot_hub_policy_delete')
         g.command('renew-key', 'iot_hub_policy_key_renew', supports_no_wait=True)
 
     # iot hub routing endpoint commands
@@ -176,7 +170,7 @@ def load_core_commands(self, _):
     with self.command_group('iot dps certificate',
                             command_type=core_ops,
                             client_factory=iot_service_provisioning_factory,
-                            transform=_dps_certificate_response_transform) as g:
+                            transform=dps_certificate_response_transform) as g:
         g.command(
             'list', 'iot_dps_certificate_list',
             table_transformer=(

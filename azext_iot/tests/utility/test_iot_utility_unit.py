@@ -232,13 +232,29 @@ class TestVersionComparison(object):
 
 
 class TestEmbeddedCli(object):
+    @pytest.mark.parametrize(
+        "command",
+        ["account show", "ad sp show --id app-id", "extension show -n azure-iot"],
+    )
+    def test_non_subscription_commands_do_not_receive_subscription(
+        self, mocker, mocked_azclient, command
+    ):
+        cli_ctx = mocker.MagicMock()
+        cli_ctx.data = {"subscription_id": "subscription"}
+        cli = EmbeddedCLI(cli_ctx)
+
+        cli.invoke(command)
+
+        expected = command.split() + ["-o", "json"]
+        assert mocked_azclient().invoke.call_args.args[0] == expected
+
     @pytest.fixture(params=[0, 1, 2])
     def mocked_azclient(self, mocker, request):
         azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
 
         def mock_invoke(args, out_file):
             azclient.return_value.exception_handler("Generic Issue")
-            azclient.return_value.result.error = None
+            azclient.return_value.result = mock.Mock(error=None)
             if request.param == 0:
                 out_file.write(json.dumps({"generickey": "genericvalue"}))
             else:
@@ -301,7 +317,7 @@ class TestEmbeddedCli(object):
             if mocked_azclient.test_meta.error_code == 2:
                 with pytest.raises(CLIInternalError) as e:
                     cli.as_json()
-                assert "Issue parsing received payload" in str(e.value)
+                assert "exit code 2" in str(e.value)
         elif mocked_azclient.test_meta.error_code == 0:
             assert success
             assert cli.as_json()

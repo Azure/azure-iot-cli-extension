@@ -20,7 +20,7 @@ def get_mgmt_client(mocker, fixture_cmd):
         mocker.MagicMock(name="subscription"),
         mocker.MagicMock(name="tenant"),
     )
-    patch = mocker.patch("azext_iot._factory.iot_hub_service_factory")
+    patch = mocker.patch("azext_iot.iothub.providers.discovery.iot_hub_service_factory")
     patch.return_value = None
 
     return patch
@@ -58,12 +58,20 @@ class TestIoTHubDiscovery:
         assert target["policy"] == parsed_fake_login["SharedAccessKeyName"]
         assert target["primarykey"] == parsed_fake_login["SharedAccessKey"]
 
-    def test_get_target_by_hostname(self, fixture_cmd, get_mgmt_client):
+    @pytest.mark.parametrize("endpoint", ["", ".service", ".device"])
+    def test_get_target_by_hostname(self, fixture_cmd, get_mgmt_client, mocker, endpoint):
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
         fake_name = "COOLIoTHub"
-        fake_hostname = f"{fake_name}.azure-devices-provisioning.net"
+        fake_hostname = f"{fake_name}{endpoint}.azure-devices.net"
         fake_rg = "COOLRG"
+        lookup = mocker.patch.object(discovery, "find_resource", return_value={
+            "id": f"/subscriptions/sub/resourceGroups/{fake_rg}/providers/Microsoft.Devices/IotHubs/{fake_name}",
+            "name": fake_name,
+            "location": "westus",
+            "sku": {"tier": "Standard"},
+            "properties": {"hostName": fake_hostname},
+        })
 
         target = discovery.get_target(
             resource_name=fake_hostname,
@@ -71,7 +79,10 @@ class TestIoTHubDiscovery:
             auth_type=AuthenticationTypeDataplane.login.value
         )
 
-        # Ensure no ARM calls are made
+        if endpoint:
+            lookup.assert_not_called()
+        else:
+            lookup.assert_called_once_with(resource_name=fake_name, rg=fake_rg)
         assert get_mgmt_client.call_count == 0
 
         assert target["entity"] == fake_hostname
@@ -81,6 +92,7 @@ class TestIoTHubDiscovery:
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["cmd"] == fixture_cmd
 
+        lookup.reset_mock()
         target = discovery.get_target(
             resource_name=fake_hostname,
             resource_group_name=None,
@@ -88,6 +100,7 @@ class TestIoTHubDiscovery:
         )
 
         # Ensure no ARM calls are made
+        lookup.assert_not_called()
         assert get_mgmt_client.call_count == 0
 
         assert AuthenticationTypeDataplane.login.value in target["cs"]

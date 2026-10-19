@@ -3,6 +3,53 @@
 Release History
 ===============
 
+1.0.0 (Unreleased)
+++++++++++++++++++
+
+**API compatibility**
+
+* All seven modeless synchronous SDK packages use ``2026-11-01``: Device Registry/CMS, IoT Hub management/service/device, and DPS management/service/device.
+* Reused supported implementations and tests from ``release/1.0.0-preview`` and ``release/1.1.0-preview``. Hub and DPS management requests use the active cloud's ARM endpoint; ADR/CMS remains public-cloud-only. Explicit public-cloud canary overrides remain available. API deployment and availability must be qualified per cloud.
+* Preserved the Hub data-plane adapter's request/response, query, messaging, and file-upload compatibility around freshly generated SDK code.
+* Hub updates omit unsupported TLS-migration response metadata while preserving the configured minimum TLS version.
+* Hub policy create/delete read policy output after successful writes instead of requiring keys in the Hub update response.
+* Updated dependency floors to match the generated SDK contracts: ``azure-core>=1.37.0``, ``azure-mgmt-core>=1.6.0``, ``isodate>=0.6.1``, and ``typing-extensions>=4.6.0``.
+
+**Device Registry and certificate management**
+
+* Added the GA namespace identity, certificate authority, certificate policy, registry-device CRUD/wait, and Hub/DPS namespace-link command surfaces.
+* Added GA schema registry, schema, and schema-version management and wait commands.
+* Certificate policies accept validity periods from 1 to 90 days. Link-recovery failures preserve the original service error as their cause.
+* Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
+* Recognize the explicit DPS inbound-identity authorization response during fresh role propagation, retaining verified grants, identity-preserving updates, and the existing two-retry limit.
+* Namespace link removal requires a strong, quoted response ETag before RBAC changes or writes and protects concurrent changes with If-Match. It waits for completion and surfaces asynchronous failures by default; ``--no-wait`` returns after submission. HTTP 412 retains the original error and provides retry guidance without automatically retrying the write.
+* Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
+* ADR groups/jobs/job runs, reports, registry-device authentication/attribute/capability child commands, and ADR Software Updates are excluded because their operations are absent from these GA APIs. Existing Hub jobs, DPS enrollment groups, and ``iot du`` remain available.
+
+**DPS and release behavior**
+
+* Retained enrollment, registration-state, certificate issuance, and operation-status recovery commands against the GA DPS APIs.
+* Marked the selected ADR/CMS, device-registration, and linked-Hub management features as stable. Unrelated existing preview commands retain their existing status.
+* Aligned supported-command defaults with ``release/1.1.0-preview``: new Hubs disable Hub-policy SAS unless ``--disable-local-auth false`` is specified; connection-string, SAS, and DPS linked-Hub creation commands default to automatic hostname selection. Classic hostname Entra access with an explicit resource group resolves ARM metadata; split hostnames and unscoped hostname-only access remain ARM-free.
+* DPS enrollment-group create/update redact keys by default; use ``--show-keys`` to include them. Existing show/list table formatting is retained. Linked-Hub updates reject identifiers without a mutation parameter.
+* DPS certificate verification and verification-code generation fetch the current certificate ETag when omitted, while preserving explicit ETags and explaining certificate read-permission failures.
+* New DPS enrollments and enrollment groups may inherit the DPS allocation policy while specifying ``--iot-hubs``. Individual enrollment creation rejects combining ``--iot-hubs`` with ``--iot-hub-host-name``.
+* Generic wait commands report expired timeouts as CLI errors rather than successful output.
+* Automatic route tests probe the documented GA sources and any legacy sources present in saved routes. Explicit legacy source values and resource properties are not silently removed.
+* Repaired the generated modeless LRO callback defect outside generated files while preserving healthy callbacks, void DELETE results, and the original poller interface.
+* Embedded CLI JSON consumers preserve the original command failure instead of masking it with a JSON-parsing error.
+* Set the extension package version to ``1.0.0`` and removed extension-wide preview metadata. This branch is preparation only: deployment readiness and live release qualification remain separate approval gates.
+
+**Device Update bug fixes**
+
+* ``az iot du update calculate-hash`` accepts relative file paths and returns their absolute file URIs without resolving symlinks.
+
+**Test infrastructure**
+
+* Schema registry integration fixtures explicitly use the selected test region instead of inheriting the resource group's location.
+* Reused the updated preview release's concurrent owned Hub/DPS phase controllers, ADR worker grouping, fixture readiness fixes, and strict workflow result gates. GA-specific API and command-scope adaptations remain; live qualification is still deferred.
+* Reused deterministic serial unit sharding and advisory extension-index compatibility checks. The full twelve OS/Python combinations and existing Azure Pipelines unit coverage remain enabled.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 

@@ -1,0 +1,123 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from copy import deepcopy
+
+import pytest
+
+from azext_iot.adr.topology import writable_namespace_properties
+from azext_iot.adr.rbac import LINK_ROLE_IDS, READER_ROLE, resolve_namespace_outbound_principal
+from azext_iot.tests.adr import ADRLiveScenarioTest
+from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper,
+    wait_for_resource_absent,
+)
+from azext_iot.tests.adr.conftest import (
+    TEST_LOCATION,
+    TEST_RG,
+    generate_adr_namespace_name,
+    generate_dps_name,
+    generate_hub_name,
+    generate_identity_name,
+)
+
+
+@pytest.mark.usefixtures("set_cwd")
+class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
+    def _reader_assignments(self, principal, scope):
+        assignments = self.cmd(
+            f"role assignment list --assignee-object-id {principal} --role Reader "
+            f"--scope {scope} --fill-principal-name false",
+        ).get_output_in_json()
+        for assignment in assignments:
+            assert assignment["principalId"].casefold() == principal.casefold()
+            assert assignment["scope"].casefold() == scope.casefold()
+            assert assignment["roleDefinitionId"].rsplit("/", 1)[-1] == LINK_ROLE_IDS[READER_ROLE]
+        return assignments
+
+    def _cleanup_reader(self, principal, scope):
+        for assignment in self._reader_assignments(principal, scope):
+            self.cmd(f"role assignment delete --ids {assignment['id']}")
+        assert not self._reader_assignments(principal, scope)
+
+    def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
+        super()._delete_owned_resource(kind, name, resource_group, no_wait=no_wait)
+        wait_for_resource_absent(
+            self, f"{self._RESOURCE_COMMANDS[kind]} show -n {name} -g {resource_group}",
+            timeout=600,
+        )
+
+    def _remove_endpoint(self, namespace_name, kind, section, endpoint_name, target_name):
+        selector = f"--ns {namespace_name} -g {TEST_RG}"
+        before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        assert before["properties"][section]["endpoints"][endpoint_name]["linkingState"] == "Succeeded"
+        principal = resolve_namespace_outbound_principal(before)
+        scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
+        existing_reader = self._reader_assignments(principal, scope)
+        if not existing_reader:
+            self.addCleanup(self._cleanup_reader, principal, scope)
+        self._delete_owned_resource(kind, target_name, TEST_RG)
+        submitted = self.cmd(
+            f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes",
+        ).get_output_in_json()
+        assert submitted["id"].casefold() == before["id"].casefold()
+        assert submitted["properties"]["provisioningState"] == "Succeeded"
+        assert endpoint_name not in submitted["properties"].get(section, {}).get("endpoints", {})
+        reader = self._reader_assignments(principal, scope)
+        assert len(reader) == 1
+        if existing_reader:
+            assert reader[0]["id"] == existing_reader[0]["id"], "Reuse Reader rather than creating duplicate grants."
+
+        after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        assert after["properties"]["provisioningState"] == "Succeeded"
+        for key in ("id", "location", "tags", "identity"):
+            assert after.get(key) == before.get(key), key
+        expected = writable_namespace_properties(before["properties"])
+        del expected[section]["endpoints"][endpoint_name]
+        actual = writable_namespace_properties(after["properties"])
+        for properties in (actual, expected):
+            for endpoint_section in ("messaging", "provisioning"):
+                properties.setdefault(endpoint_section, {}).setdefault("endpoints", {})
+        assert actual == expected
+        for endpoint_section in ("messaging", "provisioning"):
+            retained = deepcopy(before["properties"].get(endpoint_section, {}).get("endpoints", {}))
+            if endpoint_section == section:
+                retained.pop(endpoint_name)
+            assert after["properties"].get(endpoint_section, {}).get("endpoints", {}) == retained
+        self.cmd(f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes", expect_failure=True)
+
+    @pytest.mark.timeout(3600)
+    def test_adr_link_hub_dps_delete(self):
+        namespace_name, first_hub = generate_adr_namespace_name(), generate_hub_name()
+        second_hub, dps_name = generate_hub_name(), generate_dps_name()
+        try:
+            infrastructure = self.setup_full_infra(
+                TEST_RG, namespace_name, first_hub, generate_identity_name(), assign_setup_roles=False,
+            )
+            self.cmd(f"iot adr ns update -n {namespace_name} -g {TEST_RG} --tags unlink-test=preserve")
+            dps = self.create_owned_resource(
+                f"iot dps create -n {dps_name} -g {TEST_RG} --location {TEST_LOCATION} --system-assigned-mi",
+                kind="dps", name=dps_name, resource_group=TEST_RG,
+            ).get_output_in_json()
+            secondary = self.create_owned_resource(
+                f"iot hub create -n {second_hub} -g {TEST_RG} --sku S1 --location {TEST_LOCATION} "
+                f"--user-assigned-mi {infrastructure['identity_resource_id']}",
+                kind="hub", name=second_hub, resource_group=TEST_RG,
+            ).get_output_in_json()
+            assert secondary["properties"]["disableLocalAuth"] is True
+            selector = f"--ns {namespace_name} -g {TEST_RG}"
+            self.cmd(f"iot adr ns link dps add {selector} -n dps --dps-id {dps['id']} --system-assigned-mi")
+            for endpoint_name, hub_name in (("first", first_hub), ("second", second_hub)):
+                hub = self.cmd(f"iot hub show -n {hub_name} -g {TEST_RG}").get_output_in_json()
+                self.cmd(
+                    f"iot adr ns link hub add {selector} -n {endpoint_name} --hub-id {hub['id']} "
+                    f"--user-assigned-mi {infrastructure['identity_resource_id']}",
+                )
+            self._remove_endpoint(namespace_name, "hub", "messaging", "first", first_hub)
+            self._remove_endpoint(namespace_name, "hub", "messaging", "second", second_hub)
+            self._remove_endpoint(namespace_name, "dps", "provisioning", "dps", dps_name)
+        finally:
+            self.cleanup_full_infra()

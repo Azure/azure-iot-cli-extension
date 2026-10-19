@@ -10,39 +10,68 @@ Help updates for CLI core commands.
 from knack.help_files import helps
 
 
-# TODO - CMS Preview - help additions to core
+# Help additions for core commands
 def patch_core_help():
 
-    # add Hub create examples for ADR properties
+    helps["iot dps certificate generate-verification-code"] = """
+type: command
+short-summary: Generate a verification code for a certificate in an Azure IoT Hub Device Provisioning Service instance.
+long-summary: |
+    Use the verification code as the CN of a new certificate signed with the root certificate's private key.
+    If --etag is omitted, the current certificate ETag is fetched automatically. This requires certificate read permission.
+    Supply --etag to skip the read and operate only on that version. A concurrent change still causes the operation to fail.
+    To read an ETag explicitly, use 'az iot dps certificate show --dps-name MyDps -g MyResourceGroup
+    --name MyCertificate --query etag -o tsv'.
+examples:
+  - name: Generate a verification code using the automatically fetched ETag.
+    text: >
+        az iot dps certificate generate-verification-code --dps-name MyDps -g MyResourceGroup --name MyCertificate
+  - name: Generate a verification code using an explicitly supplied ETag.
+    text: >
+        az iot dps certificate generate-verification-code --dps-name MyDps -g MyResourceGroup
+        --name MyCertificate --etag AAAAAAAAAAA=
+"""
+
+    helps["iot dps certificate verify"] = """
+type: command
+short-summary: Verify a certificate in an Azure IoT Hub Device Provisioning Service instance.
+long-summary: |
+    Upload a verification certificate containing the code returned by generate-verification-code to prove possession.
+    If --etag is omitted, the current certificate ETag is fetched automatically. This requires certificate read permission.
+    Supply --etag to skip the read and operate only on that version. Use the ETag returned after generating the verification
+    code, or read the current ETag with certificate show; an earlier ETag may be stale.
+examples:
+  - name: Verify a certificate using the automatically fetched ETag.
+    text: >
+        az iot dps certificate verify --dps-name MyDps -g MyResourceGroup --name MyCertificate
+        --path /certificates/Verification.pem
+  - name: Verify a certificate using the ETag returned after generating its verification code.
+    text: >
+        az iot dps certificate verify --dps-name MyDps -g MyResourceGroup --name MyCertificate
+        --path /certificates/Verification.pem --etag AAAAAAAAAAA=
+"""
+
+    # Resource creation is separate from canonical namespace linking.
     if "iot hub create" in helps:
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and custom role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and skip role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --skip-ns-ra
+  - name: Create a Standard IoT Hub with a system-assigned identity for later namespace linking.
+    text: az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi
 """
 
-    # add DPS create examples for managed identities
+    # add DPS create examples for ADR properties
     if "iot dps create" in helps:
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with a system-assigned identity
-    text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned
+  - name: Create DPS with a system-assigned identity for later namespace linking.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi
+  - name: Create DPS with one unit (the default). Units must be an integer of at least 1.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --unit 1
   - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned identity
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
+        az iot dps create --name MyDps --resource-group MyResourceGroup --user-assigned-mi IdentityResourceId
   - name: Create an Azure IoT Hub Device Provisioning Service with SAS key (local) authentication disabled, requiring Azure RBAC
     text: >
         az iot dps create --name MyDps --resource-group MyResourceGroup --disable-local-auth
@@ -56,6 +85,8 @@ def patch_core_help():
   - name: Disable SAS key (local) authentication on an existing Device Provisioning Service, requiring Azure RBAC
     text: >
         az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
+  - name: Explicit capacity edits must retain an integer of at least 1.
+    text: az iot dps update --name MyDps --resource-group MyResourceGroup --set sku.capacity=1
 """
 
     # add DPS identity help

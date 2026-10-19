@@ -4,29 +4,283 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import contextmanager
 import os
-from unittest.mock import Mock, patch
+from pathlib import Path
+import subprocess
+import tempfile
+from typing import Optional
+from unittest.mock import MagicMock, Mock, create_autospec, patch
 
 import pytest
 
+from azext_iot.adr.endpoints import get_adr_arm_endpoint
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.certificate_authority import CertificateAuthorityProvider
+from azext_iot.adr.providers.certificate_policy import CertificatePolicyProvider
+from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
-from azext_iot.tests.adr._log import _log, _pretty_log_enabled
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.adr._log import _log, _pretty_log_enabled
 
-TEST_RG = os.getenv("azext_iot_adr_resource_group") or os.getenv("azext_iot_testrg")
-TEST_SUBSCRIPTION = os.getenv("azext_iot_testsubscription")
+# ADR integration defaults mirror scripts/smoke_tests/adr_2026_11_02_full_e2e.sh.
+TEST_SUBSCRIPTION = os.getenv(
+    "azext_iot_adr_subscription",
+    "a386d5ea-ea90-441a-8263-d816368c84a1",
+)
+TEST_RG = os.getenv(
+    "azext_iot_adr_resource_group",
+    "cli-int-test-rg",
+)
 TEST_LOCATION = os.getenv("azext_iot_adr_location", "centraluseuap")
-TEST_API_VERSION = os.getenv("azext_iot_adr_api_version", "2026-04-01")
+TEST_API_VERSION = os.getenv(
+    "azext_iot_adr_api_version",
+    "2026-11-01",
+)
+TEST_ARM_RESOURCE = os.getenv(
+    "azext_iot_adr_arm_resource",
+    "https://management.azure.com",
+)
+TEST_ARM_ENDPOINT = os.getenv(
+    "azext_iot_adr_arm_endpoint",
+    get_adr_arm_endpoint(),
+).rstrip("/").lower()
+PREFLIGHT_TIMEOUT_SECONDS = 60
+OPTIONAL_FIXTURE_ENV_VARS = (
+    "azext_iot_adr_update_instance_id",
+    "azext_iot_adr_update_instance_disposable",
+    "azext_iot_adr_su_link_poll_attempts",
+    "azext_iot_adr_su_probe_reader",
+    "azext_iot_adr_run_resource_parity_int",
+    "azext_iot_adr_ca_auth_profile_name",
+)
+
+_ADR_XDIST_GROUPS = {
+    "adr-g1-namespace": {
+        "test_namespace_crud_lifecycle",
+        "test_namespace_list_by_resource_group",
+        "test_namespace_list_by_subscription",
+        "test_schema_registry_and_versions_lifecycle",
+    },
+    "adr-g2-ca": {
+        "test_microsoft_revocation",
+        "test_microsoft_revocation_no_wait",
+        "test_external_activation_recipe",
+        "test_external_activation_no_wait",
+    },
+    "adr-g3-link-lifecycle": {
+        "test_adr_link_lifecycle",
+        "test_adr_link_sequential_add",
+        "test_adr_certificate_authority_lifecycle",
+        "test_adr_link_validation_negatives",
+    },
+    "adr-g4-mixed-delete": {
+        "test_adr_link_hub_dps_delete",
+        "test_registry_device_lifecycle",
+        "test_namespace_uami_idempotent_assign_and_partial_remove",
+        "test_namespace_identity_assign_remove_show",
+        "test_adr_validation_negatives",
+    },
+}
+_ADR_GROUP_ORDER = {group: index for index, group in enumerate(_ADR_XDIST_GROUPS)}
+_ADR_TEST_GROUP = {test: group for group, tests in _ADR_XDIST_GROUPS.items() for test in tests}
+_ADR_LONG_TEST_ORDER = {
+    "test_namespace_crud_lifecycle": 0,
+    "test_microsoft_revocation": 0,
+    "test_adr_link_lifecycle": 0,
+    "test_adr_link_hub_dps_delete": 1,
+}
+
+
+def _is_adr_integration_item(item):
+    item_path = Path(str(item.path)).resolve()
+    adr_directory = Path(__file__).resolve().parent
+    return item_path.name.endswith("_int.py") and adr_directory in item_path.parents
+
+
+def _adr_xdist_group(nodeid):
+    test_name = nodeid.split("[")[0].rsplit("::", 1)[-1]
+    return _ADR_TEST_GROUP.get(test_name, "adr-g4-mixed-delete")
+
+
+def _run_preflight_command(command):
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=PREFLIGHT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise pytest.UsageError(
+            f"ADR integration preflight could not run {' '.join(command)}: "
+            f"{error}"
+        ) from error
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()
+        raise pytest.UsageError(
+            f"ADR integration preflight failed: {' '.join(command)}"
+            f"\n{detail}"
+        )
+    return result.stdout.strip()
+
+
+@contextmanager
+def _preflight_profile_lock():
+    """Serialize xdist workers' Azure CLI profile writes; readers never see a truncated profile."""
+    try:
+        import fcntl
+    except ImportError:  # Non-POSIX local runs stay serial.
+        yield
+        return
+    path = Path(tempfile.gettempdir()) / "azext-iot-adr-preflight.lock"
+    with open(path, "a", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def _select_preflight_subscription():
+    show = ["az", "account", "show", "--query", "id", "-o", "tsv"]
+    with _preflight_profile_lock():
+        subscription_id = _run_preflight_command(show)
+        # CI already selects it; rewriting azureProfile.json races sibling workers' CLI reads.
+        if (subscription_id or "").casefold() != TEST_SUBSCRIPTION.casefold():
+            _run_preflight_command(["az", "account", "set", "--subscription", TEST_SUBSCRIPTION])
+            subscription_id = _run_preflight_command(show)
+    return subscription_id
+
+
+def run_adr_integration_preflight(config):
+    """Run mandatory checks and report optional ADR fixture availability."""
+    if os.getenv("AZURE_TEST_RUN_LIVE", "").lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        raise pytest.UsageError(
+            "ADR integration tests require AZURE_TEST_RUN_LIVE=True."
+        )
+
+    if TEST_ARM_ENDPOINT.rstrip("/").lower() != get_adr_arm_endpoint():
+        raise pytest.UsageError(
+            "azext_iot_adr_arm_endpoint must match AZURE_IOT_ADR_ARM_ENDPOINT. "
+            "ADR test REST requests and production clients must use the same ARM endpoint."
+        )
+
+    subscription_id = _select_preflight_subscription()
+    if not subscription_id:
+        raise pytest.UsageError(
+            "ADR integration preflight returned an empty subscription ID."
+        )
+    if subscription_id.casefold() != TEST_SUBSCRIPTION.casefold():
+        raise pytest.UsageError(
+            "ADR integration preflight selected subscription "
+            f"{subscription_id}, expected {TEST_SUBSCRIPTION}."
+        )
+    _run_preflight_command(
+        ["az", "group", "show", "--name", TEST_RG, "--output", "none"]
+    )
+    _run_preflight_command(
+        ["az", "iot", "adr", "ns", "--help"]
+    )
+    for provider_namespace in (
+        "Microsoft.DeviceRegistry",
+        "Microsoft.DeviceUpdate",
+    ):
+        provider_state = _run_preflight_command(
+            [
+                "az",
+                "provider",
+                "show",
+                "--namespace",
+                provider_namespace,
+                "--query",
+                "registrationState",
+                "-o",
+                "tsv",
+            ]
+        )
+        if provider_state not in {"Registered", "Registering"}:
+            raise pytest.UsageError(
+                f"{provider_namespace} must be registered before running ADR "
+                "integration tests; current state: "
+                f"{provider_state or 'unknown'}."
+            )
+    _run_preflight_command(
+        [
+            "az",
+            "rest",
+            "--method",
+            "get",
+            "--resource",
+            TEST_ARM_RESOURCE,
+            "--url",
+            (
+                f"{TEST_ARM_ENDPOINT}/subscriptions/{TEST_SUBSCRIPTION}"
+                f"/resourceGroups/{TEST_RG}/providers/"
+                f"Microsoft.DeviceRegistry/namespaces"
+                f"?api-version={TEST_API_VERSION}"
+            ),
+            "--output",
+            "none",
+        ]
+    )
+
+    configured = sorted(
+        variable
+        for variable in OPTIONAL_FIXTURE_ENV_VARS
+        if os.getenv(variable)
+    )
+    missing = sorted(set(OPTIONAL_FIXTURE_ENV_VARS) - set(configured))
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if reporter:
+        reporter.write_line(
+            "ADR preflight: "
+            f"subscription={subscription_id[:8]}..., "
+            f"resource_group={TEST_RG}, location={TEST_LOCATION}, "
+            f"endpoint={TEST_ARM_ENDPOINT}, api={TEST_API_VERSION}"
+        )
+        reporter.write_line(
+            "ADR optional fixtures configured: "
+            + (", ".join(configured) if configured else "none")
+        )
+        reporter.write_line(
+            "ADR optional fixtures missing: "
+            + (", ".join(missing) if missing else "none")
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def adr_integration_preflight(request):
+    """Validate mandatory live-test infrastructure once per ADR integration run."""
+    adr_directory = Path(__file__).resolve().parent
+    # Unit parameter IDs can contain integration node IDs from other services.
+    if not any(
+        item.path.name.endswith("_int.py") and adr_directory in item.path.resolve().parents
+        for item in request.session.items
+    ):
+        return
+
+    run_adr_integration_preflight(request.config)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "xdist_group(name): group ADR integration tests for xdist loadgroup")
 
 
 def pytest_runtest_logreport(report):
-    if not _pretty_log_enabled() or report.when != "call":
+    """In pretty mode, emit PASSED/FAILED via _log so colors work."""
+    if not _pretty_log_enabled():
         return
+    if report.when != "call":
+        return
+
     test_name = report.nodeid.split("::")[-1]
     if report.passed:
         _log("_pass", "%s", test_name)
     elif report.failed:
+        # Include the first line of the failure for context
         short_reason = ""
         if report.longreprtext:
             for line in report.longreprtext.splitlines():
@@ -37,17 +291,299 @@ def pytest_runtest_logreport(report):
         _log("_fail", "%s%s", test_name, short_reason)
 
 
+def pytest_collection_modifyitems(config, items):
+    """Assign balanced xdist load groups and collect longest ADR groups first."""
+    if not any(_is_adr_integration_item(item) for item in items):
+        return
+    grouped = []
+    for index, item in enumerate(items):
+        if not _is_adr_integration_item(item):
+            grouped.append((999, index, item.nodeid, item))
+            continue
+        group = _adr_xdist_group(item.nodeid)
+        item.add_marker(pytest.mark.xdist_group(group))
+        test_name = item.nodeid.split("[")[0].rsplit("::", 1)[-1]
+        grouped.append((_ADR_GROUP_ORDER[group], _ADR_LONG_TEST_ORDER.get(test_name, 50), item.nodeid, item))
+    grouped.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
+    items[:] = [item for _, _, _, item in grouped]
+
+
+@pytest.fixture(autouse=True)
+def mock_adr_poller_wait(request, monkeypatch):
+    """Mock ADR provider poller waits to avoid sleeping in unit tests.
+
+    Skipped for integration tests (_int.py) which need real polling delays.
+    """
+    if request.node.path.name.endswith("_int.py") or request.node.path.name in {
+        "test_adr_base_unit.py",
+        "test_adr_recovery_runtime_edges_unit.py",
+    }:
+        return
+
+    def fast_wait(poller, **kwargs):
+        """Return poller result immediately without sleeping."""
+        return poller.result()
+
+    monkeypatch.setattr(
+        "azext_iot.adr.providers.base.ADRProvider._bounded_poller_result",
+        staticmethod(fast_wait),
+    )
+
+
+@pytest.fixture()
+def mock_poller():
+    """Create a mock LRO poller for testing."""
+
+    def _create_mock_poller(result_value=None):
+        poller = Mock()
+        poller.result.return_value = result_value or Mock()
+        return poller
+
+    return _create_mock_poller
+
+
+@pytest.fixture
+def ca_pki(monkeypatch):
+    from azext_iot.tests.adr._certificate_fixtures import NOW, certificate_fixture
+    from azext_iot.adr.providers import certificate_helpers
+
+    monkeypatch.setattr(certificate_helpers, "datetime", Mock(now=lambda _tz: NOW))
+    return certificate_fixture()
+
+
+# Operation groups reached by `az iot adr ns` commands. Specced strictly so an SDK
+# regeneration that renames or removes one of these methods fails a unit test.
+_SPECCED_OPERATION_GROUPS = (
+    "namespaces",
+    "registry_devices",
+    "certificate_authorities",
+    "certificate_policies",
+    "schema_registries",
+    "schemas",
+    "schema_versions",
+)
+
+_REAL_ADR_CLIENT = None
+
+
+def _real_adr_client():
+    """Instantiate the real management client once per session (no network I/O)."""
+    global _REAL_ADR_CLIENT
+    if _REAL_ADR_CLIENT is None:
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+
+        _REAL_ADR_CLIENT = DeviceRegistryMgmtClient(
+            credential=MagicMock(),
+            subscription_id="00000000-0000-0000-0000-000000000000",
+        )
+    return _REAL_ADR_CLIENT
+
+
+def _spec_adr_client() -> Mock:
+    """Build a strictly-specced mock of the Device Registry management client.
+
+    A bare ``Mock()`` auto-creates any attribute, so an SDK method rename (for
+    example ``namespaces.begin_create_or_replace`` -> ``namespaces.create_or_replace``)
+    silently keeps passing in unit tests while failing at runtime. Here every
+    operation group is replaced with ``create_autospec`` of the *real*
+    generated operations class, so calling a method that no longer exists
+    raises ``AttributeError`` and calling one with the wrong keyword arguments
+    raises ``TypeError``.
+
+    Client attribute names are constrained to the real SDK. The operation
+    groups used by ADR commands additionally enforce method signatures.
+    """
+    real_client = _real_adr_client()
+    client = Mock(spec=real_client)
+    for attribute in _SPECCED_OPERATION_GROUPS:
+        operation_group = getattr(real_client, attribute)
+        setattr(client, attribute, create_autospec(type(operation_group), instance=True))
+    return client
+
+
+@pytest.fixture()
+def mock_adr_client():
+    """Strictly-specced Device Registry client mock. See :func:`_spec_adr_client`."""
+    return _spec_adr_client()
+
+
 @pytest.fixture()
 def fixture_adr_provider(fixture_cmd):
-    with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=Mock()):
-        return ADRProvider(fixture_cmd)
+    """Base ADR provider fixture for testing."""
+    with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
+        mock_client = _spec_adr_client()
+        mock_factory.return_value = mock_client
+        provider = ADRProvider(fixture_cmd)
+        provider.client = mock_client
+        return provider
 
 
 @pytest.fixture()
 def fixture_namespace_provider(fixture_cmd):
-    with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=Mock()):
-        return NamespaceProvider(fixture_cmd)
+    """Namespace provider fixture for testing."""
+    with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
+        mock_client = _spec_adr_client()
+        mock_factory.return_value = mock_client
+        provider = NamespaceProvider(fixture_cmd)
+        provider.client = mock_client
+        return provider
+
+
+@pytest.fixture()
+def fixture_ca_provider(fixture_cmd):
+    """Certificate authority provider fixture for testing."""
+    with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
+        mock_client = _spec_adr_client()
+        mock_factory.return_value = mock_client
+        provider = CertificateAuthorityProvider(fixture_cmd)
+        provider.client = mock_client
+        return provider
+
+
+@pytest.fixture()
+def fixture_ca_policy_provider(fixture_cmd):
+    """Certificate policy provider fixture for testing."""
+    with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
+        mock_client = _spec_adr_client()
+        mock_factory.return_value = mock_client
+        provider = CertificatePolicyProvider(fixture_cmd)
+        provider.client = mock_client
+        return provider
+
+
+@pytest.fixture()
+def fixture_link_provider(fixture_cmd):
+    """Link provider fixture for testing."""
+    with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
+        mock_client = _spec_adr_client()
+        mock_factory.return_value = mock_client
+        provider = LinkProvider(fixture_cmd)
+        provider.client = mock_client
+        provider._rbac = MagicMock()  # pylint: disable=protected-access
+        # Existing endpoint-shape tests isolate namespace mutation from the
+        # cross-RP/RBAC preflight. Dedicated preflight/RBAC tests exercise the
+        # real helpers with strictly controlled clients.
+        provider._preflight_link = MagicMock(  # pylint: disable=protected-access
+            return_value={
+                "location": "centraluseuap",
+                "sku": {"name": "S1"},
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "hostName": "hub.azure-devices.net",
+                },
+            }
+        )
+        provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
+        return provider
 
 
 def generate_adr_namespace_name() -> str:
     return f"testadr{generate_generic_id()[:8]}"
+
+
+def generate_hub_name() -> str:
+    return f"testhub{generate_generic_id()[:8]}"
+
+
+def generate_dps_name() -> str:
+    return f"testdps{generate_generic_id()[:8]}"
+
+
+def generate_identity_name() -> str:
+    return f"testuami{generate_generic_id()[:8]}"
+
+
+def generate_device_id() -> str:
+    return f"testdev{generate_generic_id()[:8]}"
+
+
+def generate_enrollment_group_id() -> str:
+    return f"testgroup{generate_generic_id()[:8]}"
+
+
+# Shared test helpers for unit tests
+
+def _serializable(data: dict) -> Mock:
+    """Wrap *data* so ``.serialize(keep_readonly=True)`` returns it."""
+    m = Mock()
+    m.serialize.return_value = data
+    return m
+
+
+def _ns_mock(location: str = "eastus") -> Mock:
+    """Return a namespace mock with a ``.location`` attribute."""
+    ns = Mock()
+    ns.location = location
+    return ns
+
+
+class RoleAssignmentHelper:
+    """RBAC role-assignment helpers for ADR integration tests.
+
+    Must be mixed into a class that provides ``self.cmd()``
+    (e.g. ``CaptureOutputLiveScenarioTest``).
+    """
+
+    cmd: callable  # provided by CaptureOutputLiveScenarioTest via MRO
+
+    def assign_role(
+        self, assignee_id: str, role: str, scope: str, assignee_type: Optional[str] = "auto",
+    ) -> Optional[str]:
+        """Assign a role; None identifies an object ID whose type ARM should resolve."""
+        from azext_iot.tests.adr._log import LogKind, _log
+
+        try:
+            if assignee_type == "auto":
+                assignee_filter = f"--assignee '{assignee_id}'"
+            else:
+                assignee_filter = (
+                    f"--assignee-object-id '{assignee_id}' "
+                    "--fill-principal-name false"
+                )
+            check_cmd = (
+                f"role assignment list {assignee_filter} --scope '{scope}' "
+                f"--role '{role}'"
+            )
+            _log(LogKind.CMD, "az %s", check_cmd)
+            existing = self.cmd(check_cmd).get_output_in_json()
+            if existing:
+                _log(LogKind.RESULT, "Role '%s' already assigned (skip)", role)
+                return existing[0].get("id", "existing")
+
+            if assignee_type == "auto":
+                create_cmd = f"role assignment create --assignee '{assignee_id}' --role '{role}' --scope '{scope}'"
+            else:
+                create_cmd = (
+                    f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
+                    f"--scope '{scope}'"
+                )
+                if assignee_type:
+                    create_cmd += f" --assignee-principal-type {assignee_type}"
+            _log(LogKind.CMD, "az %s", create_cmd)
+            result = self.cmd(create_cmd).get_output_in_json()
+            _log(LogKind.RESULT, "Role '%s' assigned", role)
+
+            return result.get("id", "unknown")
+        except Exception as e:
+            _log(LogKind.WARN, "Failed to assign role '%s': %s", role, e)
+            return None
+
+    def assign_hub_rp_contributor_role(self, subscription_id: str, resource_group: str):
+        """Assign Contributor to the IoT Hub first-party RP on the resource group."""
+        hub_rp_object_id = "0aab4033-4ad9-4b0b-9934-542334eceffb"
+        rg_scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
+        self.assign_role(hub_rp_object_id, "Contributor", rg_scope, assignee_type="ServicePrincipal")
+
+    def assign_adr_roles_to_identity(self, principal_id: str, scope: str):
+        """Assign ADR Contributor + Onboarding roles to a managed identity."""
+        for role in ["Azure Device Registry Contributor", "Azure Device Registry Onboarding"]:
+            assignment_id = self.assign_role(
+                principal_id,
+                role,
+                scope,
+                assignee_type="ServicePrincipal",
+            )
+            if assignment_id is None:
+                raise AssertionError(
+                    f"Failed to assign required ADR role '{role}'."
+                )
