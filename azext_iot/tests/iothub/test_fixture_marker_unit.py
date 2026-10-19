@@ -77,6 +77,7 @@ def test_dynamic_fixture_uses_its_requesting_test(request):
 
 @pytest.mark.parametrize("settings,expected_count", [(None, 1), ({"count": 1}, 1), ({"count": 2}, 2)])
 def test_hub_provisioner_does_not_borrow_other_test_identity_settings(mocker, settings, expected_count):
+    mocker.patch.object(fixtures, "_regular_phase_observer", return_value=None)
     unrelated = Mock()
     unrelated.get_closest_marker.return_value = SimpleNamespace(kwargs={"count": 2, "sys_identity": True})
     consumer = Mock()

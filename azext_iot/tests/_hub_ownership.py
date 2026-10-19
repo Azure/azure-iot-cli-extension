@@ -365,17 +365,17 @@ def observe_get(data, resource_id, status, resource):
         record["uncertain"] = any(mutation_uncertain(record, m) for m in record["mutations"])
 
 
-def reconcile(arm, data, deadline, save):
+def reconcile(arm, data, deadline, save, *, interval=1):
     """Bounded GET-only reconciliation; never repeat a mutation."""
     previous = arm.deadline
     arm.deadline = min(previous or float("inf"), deadline)
     try:
-        _reconcile(arm, data, arm.deadline, save)
+        _reconcile(arm, data, arm.deadline, save, interval=interval)
     finally:
         arm.deadline = previous
 
 
-def _reconcile(arm, data, deadline, save):
+def _reconcile(arm, data, deadline, save, *, interval=1):
     for record in data["resources"].values():
         if not record.get("uncertain"):
             continue
@@ -417,7 +417,7 @@ def _reconcile(arm, data, deadline, save):
                 return
         pending = targets()
         if pending:
-            time.sleep(min(1, max(0, deadline - time.monotonic())))
+            time.sleep(min(interval, max(0, deadline - time.monotonic())))
 
 
 class OwnershipError(RuntimeError):

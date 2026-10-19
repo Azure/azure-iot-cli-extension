@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from time import sleep
+from time import monotonic, sleep
 from typing import Optional, List
 import json
 import os
@@ -26,7 +26,8 @@ from azext_iot.tests.settings import (
 )
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
 from azext_iot.tests.iothub._integration_helpers import (
-    STORAGE_ROLE_PROPAGATION_SECONDS, assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
+    STORAGE_ROLE_PROPAGATION_SECONDS, assert_hub_policy, assign_role_with_propagation,
+    assign_roles_with_propagation, invoke_checked, is_not_found
 )
 from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
@@ -102,23 +103,20 @@ def generate_hub_depenency_id() -> str:
 
 def assign_iot_hub_dataplane_rbac_role(hub_results):
     """Add IoT Hub Data Contributor role to current user"""
-    for hub in hub_results:
-        # Only add dataplane roles to the hubs that were not created mid test
-        if hub.get("hub"):
-            target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show", capture_stderr=True).as_json()
-            user = account["user"]
+    hubs = [hub["hub"] for hub in hub_results if hub.get("hub")]
+    if not hubs:
+        return
+    account = cli.invoke("account show", capture_stderr=True).as_json()
+    user = account["user"]
 
-            if user["name"] is None:
-                raise CLIInternalError("User not found")  # pylint: disable=broad-except
+    if user["name"] is None:
+        raise CLIInternalError("User not found")
 
-            assign_role_with_propagation(
-                assignee=user["name"],
-                scope=target_hub_id,
-                role=USER_ROLE,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
-                wait=ROLE_ASSIGNMENT_REFRESH_TIME,
-            )
+    assign_roles_with_propagation(
+        assignments=[{"role": USER_ROLE, "scope": hub["id"], "assignee": user["name"]} for hub in hubs],
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+        wait=ROLE_ASSIGNMENT_REFRESH_TIME,
+    )
 
 
 def _owned_regular_phase(manifest, suite, phase):
@@ -130,7 +128,7 @@ def _owned_regular_phase(manifest, suite, phase):
     return all(manifest.auth_phase(name) == "regular" for name in expanded)
 
 
-def _dynamic_hub_was_unused(request):
+def _regular_phase_observer(request):
     import requests
     from azext_iot.tests import _focused_live, _hub_ownership as ownership, _hub_suite_manifest as manifest
     from azext_iot.tests._hub_suite_plugin import PhaseReceipt
@@ -141,7 +139,7 @@ def _dynamic_hub_was_unused(request):
     )
     if (runtime is None and all(value is None for value in (suite, phase, run_id, owner_path, receipt_path))
             and _focused_live.ENV not in os.environ):
-        return False
+        return None
     observer = getattr(runtime, "observer", None)
     if (not isinstance(runtime, PhaseReceipt) or not isinstance(observer, ownership.Observer)
             or not _owned_regular_phase(manifest, suite, phase)
@@ -180,13 +178,47 @@ def _dynamic_hub_was_unused(request):
                         or not (mutation["id"] == resource_id or mutation["id"].startswith(resource_id + "/"))
                         or mutation.get("method") not in ("PUT", "PATCH", "DELETE", "POST")):
                     raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid mutation record.")
-        resource_id = (
-            f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{ENTITY_RG}"
-            f"/providers/Microsoft.Devices/IotHubs/{ENTITY_NAME}"
-        ).casefold()
+        resource_id = _dynamic_hub_id()
         if not ownership.scope_id(resource_id) or not ownership.planned_root(resource_id):
             raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid dynamic Hub scope.")
-        return resource_id not in data["resources"]
+        return observer
+
+
+def _dynamic_hub_id():
+    from azext_iot.tests._hub_ownership import SUBSCRIPTION
+
+    return (
+        f"/subscriptions/{SUBSCRIPTION}/resourceGroups/{ENTITY_RG}/providers/Microsoft.Devices/IotHubs/{ENTITY_NAME}"
+    ).casefold()
+
+
+def _dynamic_hub_was_unused(request):
+    observer = _regular_phase_observer(request)
+    if observer is None:
+        return False
+    with observer.lock:
+        return _dynamic_hub_id() not in observer.data["resources"]
+
+
+@pytest.fixture(scope="module")
+def provisioned_shared_iot_hub(request):
+    """Borrow only this phase's owned scenario Hub; its session cleanup retains ownership."""
+    observer = _regular_phase_observer(request)
+    if observer is None:
+        return request.getfixturevalue("provisioned_only_iot_hubs_module")[0]
+    resource_id = _dynamic_hub_id()
+    with observer.lock:
+        created = resource_id in observer.data["resources"]
+    if not created:
+        _invoke_fixture(
+            f"iot hub create -n {ENTITY_NAME} -g {ENTITY_RG} --sku S1 "
+            f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
+        )
+    with observer.lock:
+        hub = observer.require_owned_reference(resource_id, "microsoft.devices/iothubs")
+    assert_hub_policy(hub)
+    assert hub["properties"]["state"] == "Active", "Shared Hub must be active before use."
+    return {"hub": hub, "name": ENTITY_NAME, "rg": ENTITY_RG}
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -457,7 +489,9 @@ def fixture_isolated_hub(request):
     hubs = _iot_hubs_provisioner(request, require_new=True)
     try:
         hub = hubs[0]
-        assign_iot_hub_dataplane_rbac_role(hubs)
+        selection = request._pyfuncitem.get_closest_marker("hub_selection")  # pylint: disable=protected-access
+        if selection is None or selection.kwargs.get("auth") != ("arm:entra",):
+            assign_iot_hub_dataplane_rbac_role(hubs)
         props = hub["hub"]["properties"]
         scenario.entity_name, scenario.entity_rg = hub["name"], hub["rg"]
         scenario.host_name = props["hostName"]
@@ -499,6 +533,12 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
 
     if require_new and desired_count != 1:
         raise CLIInternalError("A private scenario requires exactly one fresh Hub.")
+    observer = _regular_phase_observer(request) if desired_count > 1 else None
+    deadline = None
+    if observer is not None:
+        timeout = request._pyfuncitem.get_closest_marker("timeout")  # pylint: disable=protected-access
+        budget = (timeout.args[0] if timeout.args else timeout.kwargs.get("timeout", 900)) if timeout else 900
+        deadline = monotonic() + budget
     hub_results = []
     for _ in range(desired_count):
         name = generate_hub_id()
@@ -517,20 +557,49 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        if require_new:
+        if observer is not None:
+            _invoke_fixture(base_create_command + " --no-wait")
+            hub_obj = None
+        elif require_new:
             _require_absent_hub(name)
             _isolated_hub_pending = name
             hub_obj = _invoke_fixture(base_create_command).as_json()
         else:
             hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
-        assert_hub_policy(hub_obj)
+        if observer is None:
+            assert_hub_policy(hub_obj)
         hub_results.append({
             "hub": hub_obj,
             "name": name,
             "rg": RG,
             "storage": provisioned_storage
         })
+    if observer is not None:
+        _wait_for_owned_hubs(observer, hub_results, deadline)
     return hub_results
+
+
+def _wait_for_owned_hubs(observer, hubs, deadline):
+    from azext_iot.tests import _hub_ownership as ownership
+
+    ids = [
+        f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{hub['rg']}"
+        f"/providers/Microsoft.Devices/IotHubs/{hub['name']}".casefold()
+        for hub in hubs
+    ]
+    with observer.lock:
+        evidence = dict(observer.data, resources={
+            resource_id: observer.data["resources"][resource_id] for resource_id in ids
+        })
+        ownership.reconcile(observer.arm, evidence, deadline, observer.save, interval=15)
+        errors = ownership.ownership_errors(evidence, observer.data["runId"], observer.data["phase"])
+        if errors:
+            raise ownership.OwnershipError("Owned Hub provisioning was not confirmed: " + "; ".join(errors))
+        for hub, resource_id in zip(hubs, ids):
+            resource = observer.require_owned_reference(resource_id, "microsoft.devices/iothubs")
+            assert_hub_policy(resource)
+            assert resource["properties"]["state"] == "Active", "Owned Hub must be active before use."
+            hub["hub"] = resource
 
 
 def _get_hub_connection_string(name, rg, policy="iothubowner"):
@@ -590,17 +659,11 @@ def provisioned_storage_with_identity_module(
     user_id = provisioned_user_identity_module["principalId"]
     # ARM visibility is not effective storage access. Apply the existing
     # post-grant grace period; endpoint errors remain failures, never replays.
-    assign_role_with_propagation(
-        assignee=hub_principal_id,
-        scope=scope,
-        role=role,
-        max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
-        wait=STORAGE_ROLE_PROPAGATION_SECONDS,
-    )
-    assign_role_with_propagation(
-        assignee=user_id,
-        scope=scope,
-        role=role,
+    assign_roles_with_propagation(
+        assignments=[
+            {"role": role, "scope": scope, "assignee": principal}
+            for principal in (hub_principal_id, user_id)
+        ],
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
         wait=STORAGE_ROLE_PROPAGATION_SECONDS,
     )

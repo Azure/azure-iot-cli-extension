@@ -112,16 +112,18 @@ def delete_known_devices(devices, device_ids):
 
 
 def assign_role_with_propagation(*, role, scope, assignee, max_tries, wait):
-    """Wait after a new data-role grant, not before it or before every test.
+    """Preserve the full propagation window after a verified new grant."""
+    assign_roles_with_propagation(
+        assignments=[{"role": role, "scope": scope, "assignee": assignee}], max_tries=max_tries, wait=wait,
+    )
 
-    Reuse the shared bounded assignment loop, but do not treat its None return
-    value (including unsuccessful grants) as proof that a role was assigned.
-    Service authorization failures are never caught/retried here.
-    """
-    if not assignee:
+
+def assign_roles_with_propagation(*, assignments, max_tries, wait):
+    """Grant independent roles first, then wait fully after the last new grant."""
+    if any(not assignment["assignee"] for assignment in assignments):
         raise CLIInternalError("A principal is required for the Hub data-role assignment.")
 
-    def is_assigned():
+    def is_assigned(role, scope, assignee):
         assignments = get_role_assignments(scope=scope, role=role, fill_role_definition_name=False)
         return any(
             assignment.get(key) == assignee
@@ -129,14 +131,19 @@ def assign_role_with_propagation(*, role, scope, assignee, max_tries, wait):
             for key in ("name", "principalId", "principalName")
         )
 
-    if is_assigned():
-        return
-
-    assign_role_assignment(role=role, scope=scope, assignee=assignee, max_tries=max_tries)
-    if not is_assigned():
-        raise CLIInternalError(f"Required data role '{role}' was not assigned on '{scope}'.")
-    logger.info("New role '%s' for '%s' at '%s': allowing %ss for propagation.", role, assignee, scope, wait)
-    sleep(wait)
+    created = False
+    for assignment in assignments:
+        if is_assigned(**assignment):
+            continue
+        assign_role_assignment(**assignment, max_tries=max_tries)
+        if not is_assigned(**assignment):
+            raise CLIInternalError(
+                f"Required data role '{assignment['role']}' was not assigned on '{assignment['scope']}'."
+            )
+        created = True
+    if created:
+        logger.info("Verified new role assignments: allowing %ss after the last grant for propagation.", wait)
+        sleep(wait)
 
 
 def get_or_create_hub(client, name, resource_group, create):
