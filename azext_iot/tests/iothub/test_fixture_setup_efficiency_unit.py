@@ -83,6 +83,8 @@ def test_state_grants_read_the_caller_once_and_batch_both_hubs(mocker):
 
 @pytest.fixture
 def phase(mocker, tmp_path):
+    mocker.patch.object(fixtures, "RG", ownership.GROUP)
+    mocker.patch.object(fixtures, "ENTITY_RG", ownership.GROUP)
     events = []
     clock = [0]
     states = {}
