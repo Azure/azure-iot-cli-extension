@@ -17,6 +17,7 @@ from azure.cli.core.azclierror import (
     ArgumentUsageError,
     BadRequestError,
     CLIInternalError,
+    ForbiddenError,
     InvalidArgumentValueError,
     ManualInterrupt,
     MutuallyExclusiveArgumentError,
@@ -836,8 +837,34 @@ def iot_dps_certificate_delete(client, dps_name, certificate_name, etag, resourc
     )
 
 
-def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resource_group_name=None):
+def _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag):
+    if etag is not None:
+        if not etag.strip():
+            raise InvalidArgumentValueError("--etag must not be empty.")
+        return etag
+    try:
+        certificate = iot_dps_certificate_get(client, dps_name, certificate_name, resource_group_name)
+    except HttpResponseError as error:
+        if error.status_code != 403:
+            raise
+        raise ForbiddenError(
+            f"Unable to fetch the certificate ETag: {error}\n"
+            "Supply --etag with the current ETag obtained from a previous certificate response or an authorized reader, "
+            "or resolve the certificate read failure. Automatic lookup requires "
+            "Microsoft.Devices/provisioningServices/certificates/read permission."
+        ) from error
+    current_etag = certificate.get("etag")
+    if not isinstance(current_etag, str) or not current_etag.strip() or current_etag == "*":
+        raise CLIInternalError(
+            "The certificate response did not contain a usable ETag. "
+            "Obtain the current ETag and supply it with --etag."
+        )
+    return current_etag
+
+
+def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     return client.dps_certificate.generate_verification_code(
         resource_group_name=resource_group_name,
         provisioning_service_name=dps_name,
@@ -847,11 +874,12 @@ def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resou
     )
 
 
-def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag, resource_group_name=None):
+def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     request = {"certificate": certificate}
     return client.dps_certificate.verify_certificate(
         resource_group_name=resource_group_name,

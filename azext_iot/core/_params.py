@@ -216,6 +216,14 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    help='A friendly name for the certificate.')
         c.argument('etag', options_list=['--etag', '-e'], help='Entity Tag (etag) of the object.')
 
+    for subgroup in ['generate-verification-code', 'verify']:
+        with self.argument_context('iot dps certificate {}'.format(subgroup)) as c:
+            c.argument(
+                'etag', options_list=['--etag', '-e'],
+                help='Current certificate ETag. If omitted, it is fetched automatically, requiring certificate read '
+                     'permission. Supply an ETag to skip that read and require the specified certificate version.'
+            )
+
     for subgroup in ['create', 'update']:
         with self.argument_context('iot dps certificate {}'.format(subgroup)) as c:
             c.argument('is_verified', options_list=['--verified', '-v'], arg_type=get_three_state_flag(),
