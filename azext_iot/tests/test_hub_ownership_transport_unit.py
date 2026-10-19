@@ -695,7 +695,8 @@ def test_worker_deadline_bounds_entire_read_and_discards_late_results(transport,
         assert not thread.is_alive()
 
 
-def test_worker_read_preserves_real_main_thread_interval_timer(transport, monkeypatch):
+@pytest.mark.parametrize("coalesce_signals", [False, True])
+def test_worker_read_preserves_real_main_thread_interval_timer(transport, monkeypatch, coalesce_signals):
     _, arm, _ = transport
     release = threading.Event()
     monkeypatch.setattr(bounds, "READ_SECONDS", .08)
@@ -705,14 +706,31 @@ def test_worker_read_preserves_real_main_thread_interval_timer(transport, monkey
     previous = signal.getsignal(alarm)
     remaining, interval = get_timer(timer)
     started, fired = time.monotonic(), []
+
+    def on_alarm(*_args):
+        fired.append(time.monotonic())
+
     try:
-        signal.signal(alarm, lambda *_args: fired.append(time.monotonic()))
+        signal.signal(alarm, on_alarm)
         set_timer(timer, .02, .02)
-        poller = namespace_poller()
-        with pytest.raises(bounds.PhaseError, match="bound"):
-            poller.result(timeout=1)
-        assert poller.done() and len(fired) >= 2
+        mask = getattr(signal, "pthread_sigmask")
+        previous_mask = mask(getattr(signal, "SIG_BLOCK"), {alarm}) if coalesce_signals else None
+        try:
+            poller = namespace_poller()
+            with pytest.raises(bounds.PhaseError, match="bound"):
+                poller.result(timeout=1)
+        finally:
+            if previous_mask is not None:
+                mask(getattr(signal, "SIG_SETMASK"), previous_mask)
+        assert poller.done()
+        assert signal.getsignal(alarm) is on_alarm
         assert get_timer(timer)[1] == .02
+        # Signals can coalesce while the main thread is descheduled; observe fresh ticks.
+        expected = len(fired) + 2
+        deadline = time.monotonic() + 1
+        while len(fired) < expected and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert len(fired) >= expected
     finally:
         release.set()
         set_timer(timer, 0)
