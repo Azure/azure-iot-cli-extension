@@ -34,19 +34,19 @@ from azext_iot.common.utility import generate_key
 _IDENTITY_UPDATE_COMMAND = "iot hub device-identity update"
 _DEVICE_CONNECTION_STRING_COMMAND = "iot hub device-identity connection-string show"
 _IDENTITY_LOGIN = "HostName=hub.unit.invalid;SharedAccessKeyName=owner;SharedAccessKey=b2ZmbGluZQ=="
-_LEGACY_DEFAULT_CASES = {
-    "iot hub generate-sas-token": (["--login", _IDENTITY_LOGIN], "hostname_type", None),
-    "iot hub connection-string show": (["-n", "hub"], "hostname_type", "classic"),
-    "iot hub device-identity connection-string show": (["-n", "hub", "-d", "device"], "hostname_type", None),
+_DEFAULT_CASES = {
+    "iot hub generate-sas-token": (["--login", _IDENTITY_LOGIN], "hostname_type", "auto"),
+    "iot hub connection-string show": (["-n", "hub"], "hostname_type", "auto"),
+    "iot hub device-identity connection-string show": (["-n", "hub", "-d", "device"], "hostname_type", "auto"),
     "iot hub module-identity connection-string show": (
-        ["-n", "hub", "-d", "device", "-m", "module"], "hostname_type", None,
+        ["-n", "hub", "-d", "device", "-m", "module"], "hostname_type", "auto",
     ),
     "iot dps linked-hub create": (
-        ["--dps-name", "dps", "--hub-name", "hub", "-g", "rg"], "hostname_type", "classic",
+        ["--dps-name", "dps", "--hub-name", "hub", "-g", "rg"], "hostname_type", "auto",
     ),
     **{
         f"iot dps enrollment-group {action}": (
-            ["--dps-name", "dps", "--enrollment-id", "group"], "show_keys", True if action == "create" else None,
+            ["--dps-name", "dps", "--enrollment-id", "group"], "show_keys", None if action == "show" else False,
         )
         for action in ("create", "update", "show")
     },
@@ -132,6 +132,7 @@ _PNP_PARSER_CASES = {
     "iot hub digital-twin update": ["--patch", "[]"],
     "iot hub digital-twin invoke-command": ["--cn", "noop"],
 }
+_DPS_CERTIFICATE_COMMANDS = ("generate-verification-code", "verify", "update", "delete")
 for _kind, _resource_option, _resource_id in (
     ("hub", "--hub-resource-id", _HUB_ID),
     ("dps", "--dps-resource-id", _DPS_ID),
@@ -177,9 +178,10 @@ def management_command_parser():
     names = [
         *_LINK_PARSER_CASES, *_PNP_PARSER_CASES, *_DEVICE_PARSER_CASES,
         *_SCHEMA_PARSER_CASES,
-        *_LEGACY_DEFAULT_CASES,
+        *_DEFAULT_CASES,
         "iot hub create", "iot dps create", _IDENTITY_UPDATE_COMMAND,
         "iot adr ns ca policy create", "iot adr ns ca policy update",
+        *(f"iot dps certificate {action}" for action in _DPS_CERTIFICATE_COMMANDS),
     ]
     loader.command_table = {
         name: loader.command_table[name]
@@ -511,9 +513,9 @@ def test_identity_update_composes_native_argument_validators(management_command_
     assert {mode2_iot_login_handler, validate_identity_update} <= set(parsed._argument_validators)
 
 
-@pytest.mark.parametrize("command_name", _LEGACY_DEFAULT_CASES)
-def test_existing_ga_defaults_survive_native_argument_loading(management_command_parser, command_name):
-    arguments, key, expected = _LEGACY_DEFAULT_CASES[command_name]
+@pytest.mark.parametrize("command_name", _DEFAULT_CASES)
+def test_release_aligned_defaults_survive_native_argument_loading(management_command_parser, command_name):
+    arguments, key, expected = _DEFAULT_CASES[command_name]
     parsed = management_command_parser.parse_args([*command_name.split(), *arguments])
     assert getattr(parsed, key) == expected
 
@@ -522,6 +524,41 @@ def test_existing_ga_defaults_survive_native_argument_loading(management_command
 @pytest.mark.parametrize("action", ["show", "list"])
 def test_existing_dps_commands_retain_default_table_format(command_table, kind, action):
     assert command_table[f"iot dps {kind} {action}"].table_transformer is None
+
+
+@pytest.mark.parametrize("action", _DPS_CERTIFICATE_COMMANDS)
+@pytest.mark.parametrize("option", [None, "--etag", "-e"])
+def test_dps_certificate_etag_parser(management_command_parser, tmp_path, action, option):
+    arguments = ["iot", "dps", "certificate", action, "--dps-name", "dps", "-g", "rg", "-n", "cert"]
+    if action in ("verify", "update"):
+        certificate = tmp_path / "proof.pem"
+        certificate.write_text("certificate", encoding="utf-8")
+        arguments += ["--path", str(certificate)]
+    if option:
+        arguments += [option, "current-etag"]
+    if option is None and action in ("update", "delete"):
+        with pytest.raises(SystemExit):
+            management_command_parser.parse_args(arguments)
+    else:
+        parsed = management_command_parser.parse_args(arguments)
+        assert parsed.etag == ("current-etag" if option else None)
+
+
+@pytest.mark.parametrize("action", ["generate-verification-code", "verify"])
+def test_dps_certificate_help_describes_optional_etag(command_table, monkeypatch, action):
+    from azext_iot.core import help as core_help
+
+    helps = {}
+    monkeypatch.setattr(core_help, "helps", helps)
+    core_help.patch_core_help()
+    command = f"iot dps certificate {action}"
+    assert command in command_table
+    help_entry = yaml.safe_load(helps[command])
+    assert "certificate read permission" in help_entry["long-summary"]
+    examples = [example["text"] for example in help_entry["examples"]]
+    assert all(command in example for example in examples)
+    assert any("--etag" in example for example in examples)
+    assert any("--etag" not in example for example in examples)
 
 
 @pytest.mark.parametrize("command_name", _PNP_PARSER_CASES)
@@ -874,6 +911,17 @@ def test_atomic_link_root_parser_exposes_recovery_options(management_command_par
     assert parsed.timeout == (91 if custom else (600 if action == "add" else None))
     assert parsed.interval == (2 if custom else (30 if action == "add" else None))
     assert bool(parsed.no_wait) is custom
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("no_wait", [False, True])
+def test_link_remove_root_parser_exposes_no_wait(management_command_parser, kind, no_wait):
+    command = f"iot adr ns link {kind} remove"
+    arguments = [*command.split(), *_LINK_PARSER_CASES[command], "--yes"]
+    if no_wait:
+        arguments.append("--no-wait")
+    parsed = management_command_parser.parse_args(arguments)
+    assert bool(parsed.no_wait) is no_wait
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])

@@ -56,6 +56,10 @@ REGULAR_BASE_NODEIDS = frozenset(
     "core/test_dps_unit_capacity_int.py::test_dps_unit_capacity_owned_lifecycle",
     "core/test_dps_discovery_int.py::test_dps_targets[key]",
     "core/test_dps_discovery_int.py::test_dps_targets[login]",
+    "test_iot_dps_defaults_int.py::test_dps_certificate_verification_etag[automatic]",
+    "test_iot_dps_defaults_int.py::test_dps_certificate_verification_etag[explicit]",
+    "test_iot_dps_defaults_int.py::test_dps_enrollment_inherited_allocation_with_hubs[individual]",
+    "test_iot_dps_defaults_int.py::test_dps_enrollment_inherited_allocation_with_hubs[group]",
 } | {
     "core/test_dps_linked_hub_int.py::" + name for name in (
         "test_linked_hub_create_auto_hostname", "test_linked_hub_create_classic_hostname",

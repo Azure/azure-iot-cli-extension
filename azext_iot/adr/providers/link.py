@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
+import re
 from time import monotonic, sleep
 from typing import Optional
 
@@ -14,9 +15,10 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
-from azext_iot.common.arm import adapt_modeless_lro_poller, sanitize_arm_identity
+from azext_iot.common.arm import sanitize_arm_identity
 
 from azext_iot._factory import (
     _get_canary_credential_scopes,
@@ -183,14 +185,18 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
+        no_wait=False,
     ):
         namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
             cls=lambda response, resource, _: (resource, response.http_response.headers.get("ETag")),
         )
-        if not isinstance(etag, str) or not etag.strip() or etag.strip() == "*":
+        if isinstance(etag, str):
+            etag = etag.strip(" \t")
+        # If-Match requires a strong entity-tag, not a weak validator.
+        if not isinstance(etag, str) or re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', etag) is None:
             raise AzureResponseError(
-                "The namespace response did not include a usable ETag header. "
+                "The namespace response did not include a usable ETag header (a strong, quoted entity-tag is required). "
                 "Endpoint removal was not submitted because concurrent changes cannot be protected."
             )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
@@ -208,21 +214,42 @@ class LinkProvider(ADRProvider):
         resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
         resource["properties"] = properties
         resource["identity"] = sanitize_arm_identity(namespace["identity"])
-        # NoPolling returns the initial PUT response, not asynchronous completion.
-        poller = self.client.namespaces.begin_create_or_replace(
-            resource_group_name=resource_group_name, namespace_name=namespace_name,
-            resource=resource, headers={"If-Match": etag}, polling=False, retry_total=0,
-        )
-        return adapt_modeless_lro_poller(poller).result()
+        try:
+            poller = self.client.namespaces.begin_create_or_replace(
+                resource_group_name=resource_group_name, namespace_name=namespace_name,
+                resource=resource, headers={"If-Match": etag}, retry_total=0,
+                # Suppress PUT retries without suppressing the poller's idempotent GET retries.
+                polling=ARMPolling(
+                    timeout=self.client._config.polling_interval,
+                    path_format_arguments={"endpoint": self.client._config.base_url},
+                ),
+            )
+            return self._wait(
+                poller,
+                f"Removing {display_name} endpoint '{endpoint_name}' from namespace {namespace_name}...",
+                no_wait=no_wait,
+                failure_target=(section, endpoint_name),
+            )
+        except HttpResponseError as error:
+            if error.status_code == 412:
+                logger.warning(
+                    "Namespace '%s' changed before endpoint removal (HTTP 412). "
+                    "Inspect the namespace with 'az iot adr ns show' and rerun the remove command. "
+                    "Any Reader grant created during preflight is retained.",
+                    namespace_name,
+                )
+            raise
 
-    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
+            no_wait=no_wait,
         )
 
-    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
+    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
+            no_wait=no_wait,
         )
 
     def _patch_link(

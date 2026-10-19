@@ -71,7 +71,7 @@ def test_group_output_preserves_defaults_and_explicit_key_controls(mocker, opera
     function = getattr(dps, "iot_dps_device_enrollment_group_" + ("get" if operation == "show" else operation))
     arguments = {} if show_keys is None else {"show_keys": show_keys}
     result = function(mocker.Mock(), "group", dps_name="dps", **arguments)
-    expected_keys = operation != "show" if show_keys is None else show_keys
+    expected_keys = bool(show_keys)
     output = _wire(result)
     keys = output["attestation"].get("symmetricKey") or {}
     assert keys.get("primaryKey") == ("primary-secret" if expected_keys else None)

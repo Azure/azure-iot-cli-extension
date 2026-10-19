@@ -181,10 +181,10 @@ class TestHostnameTypeRouting:
         raise AssertionError(token["sas"])
 
     @pytest.mark.parametrize("scope, hostname_type, expected", [
-        ({}, None, "mygwv2hub.azure-devices.net"),
-        ({"device_id": "d1"}, None, "mygwv2hub.azure-devices.net/devices/d1"),
+        ({}, None, "mygwv2hub.service.azure-devices.net"),
+        ({"device_id": "d1"}, None, "mygwv2hub.device.azure-devices.net/devices/d1"),
         ({"device_id": "d1", "module_id": "m1"}, None,
-         "mygwv2hub.azure-devices.net/devices/d1/modules/m1"),
+         "mygwv2hub.device.azure-devices.net/devices/d1/modules/m1"),
         # Explicit auto on GWv2: hub->service, device/module->device.
         ({}, "auto", "mygwv2hub.service.azure-devices.net"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.device.azure-devices.net/devices/d1"),
@@ -196,9 +196,10 @@ class TestHostnameTypeRouting:
          "mygwv2hub.service.azure-devices.net/devices/d1/modules/m1"),
     ])
     def test_sas_audience(self, fixture_cmd, scope, hostname_type, expected):
+        options = {} if hostname_type is None else {"hostname_type": hostname_type}
         token = subject.iot_get_sas_token(
             cmd=fixture_cmd, hub_name_or_hostname=self.HUB,
-            hostname_type=hostname_type, **scope)
+            **options, **scope)
         assert self._sr(token) == expected
 
     @pytest.mark.parametrize("op, kwargs", [
@@ -212,7 +213,7 @@ class TestHostnameTypeRouting:
             op(cmd=fixture_cmd, hostname_type="service", **kwargs)
 
     @pytest.mark.parametrize("hostname_type, expected_host", [
-        (None, "mygwv2hub.azure-devices.net"),
+        (None, "mygwv2hub.device.azure-devices.net"),
         ("auto", "mygwv2hub.device.azure-devices.net"),
         ("device", "mygwv2hub.device.azure-devices.net"),
         ("classic", "mygwv2hub.azure-devices.net"),
@@ -220,15 +221,16 @@ class TestHostnameTypeRouting:
     def test_device_connection_string_show(
         self, fixture_cmd, hostname_type, expected_host
     ):
+        options = {} if hostname_type is None else {"hostname_type": hostname_type}
         result = subject.iot_get_device_connection_string(
             cmd=fixture_cmd, hub_name_or_hostname=self.HUB, device_id="d1",
-            hostname_type=hostname_type)
+            **options)
         assert result["connectionString"] == (
             f"HostName={expected_host};DeviceId=d1;"
             f"SharedAccessKey={self._DEVICE_PRIMARY}")
 
     @pytest.mark.parametrize("hostname_type, expected_host", [
-        (None, "mygwv2hub.azure-devices.net"),
+        (None, "mygwv2hub.device.azure-devices.net"),
         ("auto", "mygwv2hub.device.azure-devices.net"),
         ("device", "mygwv2hub.device.azure-devices.net"),
         ("classic", "mygwv2hub.azure-devices.net"),
@@ -236,9 +238,10 @@ class TestHostnameTypeRouting:
     def test_module_connection_string_show(
         self, fixture_cmd, hostname_type, expected_host
     ):
+        options = {} if hostname_type is None else {"hostname_type": hostname_type}
         result = subject.iot_get_module_connection_string(
             cmd=fixture_cmd, hub_name_or_hostname=self.HUB, device_id="d1",
-            module_id="m1", hostname_type=hostname_type)
+            module_id="m1", **options)
         assert result["connectionString"] == (
             f"HostName={expected_host};DeviceId=d1;ModuleId=m1;"
             f"SharedAccessKey={self._DEVICE_PRIMARY}")
@@ -269,10 +272,11 @@ class TestHostnameTypeRouting:
 
     @pytest.mark.parametrize("host", ["mygwv2hub.azure-devices.net", "mygwv2hub.service.azure-devices.net"])
     @pytest.mark.parametrize("scope", [{}, {"device_id": "d1"}, {"device_id": "d1", "module_id": "m1"}])
-    def test_default_login_preserves_supplied_hostname(self, mocker, fixture_cmd, host, scope):
+    def test_default_login_routes_sas_and_preserves_connection_string_hostname(self, mocker, fixture_cmd, host, scope):
         target = dict(self.TARGET, entity=host)
         lookup = mocker.patch("azext_iot.operations.hub.IotHubDiscovery.get_target", return_value=target)
-        expected = host + ("/devices/d1" if scope else "") + ("/modules/m1" if "module_id" in scope else "")
+        audience = f"mygwv2hub.{'device' if scope else 'service'}.azure-devices.net"
+        expected = audience + ("/devices/d1" if scope else "") + ("/modules/m1" if "module_id" in scope else "")
         result = subject.iot_get_sas_token(cmd=fixture_cmd, login="cs", **scope)
         assert self._sr(result) == expected
         assert not lookup.call_args.kwargs.get("force_find_resource")
@@ -282,7 +286,7 @@ class TestHostnameTypeRouting:
             )
             assert function(cmd=fixture_cmd, login="cs", **scope)["connectionString"].startswith(f"HostName={host};")
 
-    @pytest.mark.parametrize("hostname_type", ["device", "service"])
+    @pytest.mark.parametrize("hostname_type", ["classic", "device", "service"])
     def test_sas_connection_string_rejects_explicit_hostname_type(
         self, fixture_cmd, hostname_type
     ):
@@ -295,15 +299,15 @@ class TestHostnameTypeRouting:
             )
 
     @pytest.mark.parametrize("scope, hostname_type, login_host, expected", [
-        # Auto cannot infer split endpoint support from a classic hostname.
+        # Login mode transforms the hostname without an ARM lookup.
         ({}, "auto", "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.service.azure-devices.net"),
         ({}, "auto", "mygwv2hub.azure-devices.net",
-         "mygwv2hub.azure-devices.net"),
+         "mygwv2hub.service.azure-devices.net"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.device.azure-devices.net/devices/d1"),
         ({"device_id": "d1"}, "auto", "mygwv2hub.azure-devices.net",
-         "mygwv2hub.azure-devices.net/devices/d1"),
+         "mygwv2hub.device.azure-devices.net/devices/d1"),
         ({"device_id": "d1", "module_id": "m1"}, "auto",
          "mygwv2hub.service.azure-devices.net",
          "mygwv2hub.device.azure-devices.net/devices/d1/modules/m1"),

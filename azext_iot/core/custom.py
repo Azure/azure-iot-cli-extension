@@ -17,6 +17,7 @@ from azure.cli.core.azclierror import (
     ArgumentUsageError,
     BadRequestError,
     CLIInternalError,
+    ForbiddenError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
@@ -97,7 +98,7 @@ def _get_resource_group_from_hub(hub, fallback=None):
     return get_resource_group(hub, fallback=fallback, resource_label="IoT Hub")
 
 
-def _resolve_linked_hub_hostname(hub, hostname_type="classic"):
+def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
     """Resolve IoT Hub hostname for DPS linked hub based on hostname type."""
     if hostname_type == "classic":
         return hub["properties"]["hostName"]
@@ -454,7 +455,7 @@ def iot_dps_linked_hub_create(
     resource_group_name=None,
     authentication_type=None,
     user_assigned_identity=None,
-    hostname_type="classic",
+    hostname_type="auto",
     apply_allocation_policy=None,
     allocation_weight=None,
     no_wait=False
@@ -596,6 +597,18 @@ def iot_dps_linked_hub_update(
     if hub_name and linked_hub:
         raise MutuallyExclusiveArgumentError(
             "Specify either --hub-name or --linked-hub, not both."
+        )
+
+    mutation_args = {
+        "--authentication-type": authentication_type,
+        "--connection-string": connection_string,
+        "--user-assigned-identity": user_assigned_identity,
+        "--allocation-weight": allocation_weight,
+        "--apply-allocation-policy": apply_allocation_policy,
+    }
+    if all(value is None for value in mutation_args.values()):
+        raise RequiredArgumentMissingError(
+            "Provide at least one update parameter: " + ", ".join(mutation_args.keys()) + "."
         )
 
     if linked_hub and '.' not in linked_hub:
@@ -812,8 +825,34 @@ def iot_dps_certificate_delete(client, dps_name, certificate_name, etag, resourc
     )
 
 
-def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resource_group_name=None):
+def _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag):
+    if etag is not None:
+        if not etag.strip():
+            raise InvalidArgumentValueError("--etag must not be empty.")
+        return etag
+    try:
+        certificate = iot_dps_certificate_get(client, dps_name, certificate_name, resource_group_name)
+    except HttpResponseError as error:
+        if error.status_code != 403:
+            raise
+        raise ForbiddenError(
+            f"Unable to fetch the certificate ETag: {error}\n"
+            "Supply --etag with the current ETag obtained from a previous certificate response or an authorized reader, "
+            "or resolve the certificate read failure. Automatic lookup requires "
+            "Microsoft.Devices/provisioningServices/certificates/read permission."
+        ) from error
+    current_etag = certificate.get("etag")
+    if not isinstance(current_etag, str) or not current_etag.strip() or current_etag == "*":
+        raise CLIInternalError(
+            "The certificate response did not contain a usable ETag. "
+            "Obtain the current ETag and supply it with --etag."
+        )
+    return current_etag
+
+
+def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     return client.dps_certificate.generate_verification_code(
         resource_group_name=resource_group_name,
         provisioning_service_name=dps_name,
@@ -823,11 +862,12 @@ def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resou
     )
 
 
-def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag, resource_group_name=None):
+def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     request = {"certificate": certificate}
     return client.dps_certificate.verify_certificate(
         resource_group_name=resource_group_name,
@@ -1111,7 +1151,7 @@ def iot_hub_create(
                 },
                 "minTlsVersion": min_tls_version,
                 "enableDataResidency": enable_data_residency,
-                "disableLocalAuth": False if disable_local_auth is None else disable_local_auth,
+                "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
                 "disableDeviceSAS": disable_device_sas,
                 "disableModuleSAS": disable_module_sas,
                 "enableFileUploadNotifications": False if enable_fileupload_notifications is None else enable_fileupload_notifications,

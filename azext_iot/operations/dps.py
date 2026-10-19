@@ -611,7 +611,7 @@ def iot_dps_device_enrollment_group_create(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
-    show_keys=True,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -716,7 +716,7 @@ def iot_dps_device_enrollment_group_update(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
-    show_keys=None,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -864,7 +864,7 @@ def iot_dps_device_enrollment_group_update(
             sdk.enrollment_group.create_or_update(
                 enrollment_id, _drop_readonly_enrollment(enrollment_record), **_etag_arguments(etag),
             ),
-            True if show_keys is None else show_keys,
+            show_keys,
         )
     except HttpResponseError as e:
         handle_enrollment_error(e, target, "update enrollment group", handle_service_exception)
@@ -1387,6 +1387,10 @@ def _validate_arguments_for_attestation_mechanism(
 def _validate_allocation_policy_for_enrollment(
     allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version, current_enrollment=None
 ):
+    if not current_enrollment and iot_hub_host_name and iot_hub_list:
+        raise MutuallyExclusiveArgumentError(
+            "--iot-hubs and --iot-hub-host-name cannot be combined."
+        )
     explicitly_selected_policy = allocation_policy is not None
     # get the enrollment values if not provided but present
     if current_enrollment:
@@ -1421,5 +1425,3 @@ def _validate_allocation_policy_for_enrollment(
                     "Please provide both the Azure function webhook url and provisioning"
                     " service api-version when the allocation-policy is defined as Custom."
                 )
-    elif iot_hub_list and not current_enrollment:
-        raise RequiredArgumentMissingError("Please provide allocation policy.")

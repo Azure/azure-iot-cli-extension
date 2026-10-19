@@ -153,7 +153,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('hostname_type',
                    options_list=['--hostname-type', '--ht'],
                    arg_type=get_enum_type(["auto", "device", "classic"]),
-                   default="classic",
+                   default="auto",
                    is_preview=False,
                    help="Type of IoT Hub hostname to use when linking. "
                    "'auto' uses the TLS 1.3 device hostname if available, classic otherwise. "
@@ -210,6 +210,14 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    help='A friendly name for the certificate.')
         c.argument('etag', options_list=['--etag', '-e'], help='Entity Tag (etag) of the object.')
 
+    for subgroup in ['generate-verification-code', 'verify']:
+        with self.argument_context('iot dps certificate {}'.format(subgroup)) as c:
+            c.argument(
+                'etag', options_list=['--etag', '-e'],
+                help='Current certificate ETag. If omitted, it is fetched automatically, requiring certificate read '
+                     'permission. Supply an ETag to skip that read and require the specified certificate version.'
+            )
+
     for subgroup in ['create', 'update']:
         with self.argument_context('iot dps certificate {}'.format(subgroup)) as c:
             c.argument('is_verified', options_list=['--verified', '-v'], arg_type=get_three_state_flag(),
@@ -242,7 +250,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable '
-                        'IoT hub scoped SAS keys for authentication. Defaults to false for new Hubs; '
+                        'IoT hub scoped SAS keys for authentication. Defaults to true for new Hubs; '
                         'existing Hub settings are preserved unless specified. '
                         'Use --auth-type login for service data-plane commands.')
         c.argument('disable_device_sas', options_list=['--disable-device-sas', '--dds'],

@@ -605,11 +605,12 @@ def load_adr_help():
     Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    To unlink, delete the linked resource first, then run link hub/dps/su remove to remove
+    To unlink, delete the linked resource first, then run link hub/dps remove to remove
     its endpoint from the namespace. Remove does not delete or check the linked resource
-    and does not wait for unlink completion.
+    and waits for the namespace update to complete unless --no-wait is specified.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
-    After --no-wait, use link hub/dps/su wait to track completion.
+    After add/update --no-wait, use link hub/dps wait to track completion.
+    After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
   """
 
     helps[
@@ -632,12 +633,17 @@ def load_adr_help():
     The namespace outbound identity needs Reader on the linked resource's resource group.
     A missing grant is created when you can create role assignments; it is kept after unlinking.
     Keep that resource group until the unlink completes.
-    The command does not wait. Confirm removal with 'az iot adr ns show'.
+    By default, the command waits up to 600 seconds for the namespace update and reports
+    asynchronous service errors. Use --no-wait to return after submission instead.
+    After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
+    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
     Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
     Inspect the namespace and rerun the command to retry against its latest state.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: Submit endpoint removal without waiting for completion
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[

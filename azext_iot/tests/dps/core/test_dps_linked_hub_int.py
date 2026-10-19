@@ -14,6 +14,7 @@ Tests cover:
 """
 
 import pytest
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.helpers import invoke_checked
 from azext_iot.tests.dps import _phase
@@ -45,7 +46,7 @@ def _cleanup_linked_hub(dps_name, rg, linked_hub_name):
 
 @pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
-    """On a GWv2 hub, explicit auto should resolve to the device hostname."""
+    """On a GWv2 hub, the default should resolve to the device hostname."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
 
@@ -58,7 +59,7 @@ def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, prov
         result = cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--hostname-type auto --authentication-type SystemAssigned"
+            "--authentication-type SystemAssigned"
         ).as_json()
 
         assert result, "Linked hub create should return a result"
@@ -75,7 +76,7 @@ def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, prov
 
 @pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
-    """Default to the classic hostname and accept an unchanged update."""
+    """Honor explicit classic selection and reject an update without mutation flags."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
 
@@ -88,7 +89,7 @@ def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, p
         result = cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
             f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
-            "--authentication-type SystemAssigned"
+            "--hostname-type classic --authentication-type SystemAssigned"
         ).as_json()
 
         assert result, "Linked hub create should return a result"
@@ -103,9 +104,16 @@ def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, p
         unchanged = cli.invoke(
             f"iot dps linked-hub update --dps-name {dps_name} -g {dps_rg} "
             f"--linked-hub {classic_hostname}"
+        )
+        assert not unchanged.success()
+        assert isinstance(unchanged.get_error(), RequiredArgumentMissingError)
+        assert "at least one update parameter" in str(unchanged.get_error())
+        readback = invoke_checked(
+            cli,
+            f"iot dps linked-hub show --dps-name {dps_name} -g {dps_rg} --linked-hub {classic_hostname}",
+            description="Confirm the rejected update did not change the linked Hub",
         ).as_json()
-        assert unchanged["name"] == classic_hostname
-        assert unchanged["authenticationType"] == matching[0]["authenticationType"]
+        assert readback == matching[0]
     finally:
         _cleanup_linked_hub(dps_name, dps_rg, classic_hostname)
 

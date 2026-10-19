@@ -518,10 +518,10 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             expect_failure=True,
         )
 
-        # The default remains classic, including on split-endpoint Hubs.
+        # Explicit classic selection remains available on split-endpoint Hubs.
         cs_classic = self.cmd(
             f"iot hub device-identity connection-string show -d {device_id} "
-            f"-n {self.host_name} -g {self.entity_rg}",
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
         ).get_output_in_json()["connectionString"]
         assert f"HostName={classic_hn}" in cs_classic
 
@@ -533,10 +533,10 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ).get_output_in_json()["connectionString"]
             assert f"HostName={device_hn}" in cs_device
 
-            # Explicit auto selects the device endpoint.
+            # The default selects the device endpoint.
             cs_auto = self.cmd(
                 f"iot hub device-identity connection-string show -d {device_id} "
-                f"-n {self.host_name} -g {self.entity_rg} --hostname-type auto",
+                f"-n {self.host_name} -g {self.entity_rg}",
             ).get_output_in_json()["connectionString"]
             assert f"HostName={device_hn}" in cs_auto
 
@@ -563,9 +563,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
             ).get_output_in_json()
             assert extract_sr(token) == f"{service_hn}/devices/{device_id}"
 
-            # Explicit auto selects the device endpoint.
+            # The default selects the device endpoint.
             token = self.cmd(
-                f"iot hub generate-sas-token -d {device_id} -n {self.host_name} -g {self.entity_rg} --hostname-type auto",
+                f"iot hub generate-sas-token -d {device_id} -n {self.host_name} -g {self.entity_rg}",
                 checks=[self.exists("sas")],
             ).get_output_in_json()
             assert extract_sr(token) == f"{device_hn}/devices/{device_id}"

@@ -58,7 +58,7 @@ def test_classic_fqdn_with_explicit_rg_resolves_arm_metadata(mocker, prefix, rg_
             "hostName": "MyHub.azure-devices.net",
             "serviceHostName": "MyHub.service.azure-devices.net",
             "deviceHostName": "MyHub.device.azure-devices.net",
-            "iotHubDetails": {"gatewayVersion": "v2"},
+            "iotHubDetails": {"gatewayVersion": "V2"},
         },
     }
     find = mocker.patch.object(discovery, "find_resource", return_value=resource)
@@ -66,9 +66,11 @@ def test_classic_fqdn_with_explicit_rg_resolves_arm_metadata(mocker, prefix, rg_
     target = discovery.get_target(
         f"{prefix}MyHub.azure-devices.net", auth_type="login", **{rg_keyword: "rg"}
     )
-    find.assert_not_called()
-    assert target["entity"] == "MyHub.azure-devices.net"
-    assert "serviceHostName" not in target and "deviceHostName" not in target
+    find.assert_called_once_with(resource_name="MyHub", rg="rg")
+    assert target["entity"] == "MyHub.service.azure-devices.net"
+    assert target["deviceHostName"] == resource["properties"]["deviceHostName"]
+    assert target["serviceHostName"] == resource["properties"]["serviceHostName"]
+    find.reset_mock()
     target = discovery.get_target(
         f"{prefix}MyHub.azure-devices.net", auth_type="login",
         force_find_resource=True, **{rg_keyword: "rg"},
@@ -106,7 +108,7 @@ def test_connection_string_override_remains_arm_free_even_with_rg(mocker):
 @pytest.mark.parametrize("endpoint", ["", ".service", ".device"])
 @pytest.mark.parametrize("hostname_type", [None, "classic", "auto", "device", "service"])
 @pytest.mark.parametrize("resource_group", [None, "rg"])
-def test_explicit_hostname_selection_only_discovers_missing_metadata(mocker, endpoint, hostname_type, resource_group):
+def test_hostname_selection_uses_scoped_metadata_only(mocker, endpoint, hostname_type, resource_group):
     discovery = IotHubDiscovery(mocker.Mock())
     hostname = f"MyHub{endpoint}.azure-devices.net"
     resource = {
@@ -122,9 +124,7 @@ def test_explicit_hostname_selection_only_discovers_missing_metadata(mocker, end
     target = discovery.get_target(
         hostname, resource_group_name=resource_group, auth_type="login", hostname_type=hostname_type,
     )
-    requires_lookup = not endpoint and (
-        hostname_type in ("device", "service") or (hostname_type == "auto" and resource_group)
-    )
+    requires_lookup = not endpoint and resource_group
     if requires_lookup:
         find.assert_called_once_with(resource_name="MyHub", rg=resource_group)
     else:

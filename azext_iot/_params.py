@@ -356,11 +356,10 @@ def load_arguments(self, _):
             "hostname_type",
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
-            default=HostnameType.CLASSIC.value,
+            default=HostnameType.AUTO.value,
             is_preview=True,
             help="Type of hostname to use in the connection string. "
-            "Defaults to the classic hostname. "
-            "'auto' uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
+            "'auto' (default) uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
             "'classic' always uses the default hostname. "
             "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
             "'service' uses the TLS 1.3 service hostname (errors if not GWv2).",
@@ -375,11 +374,10 @@ def load_arguments(self, _):
                 "hostname_type",
                 options_list=["--hostname-type", "--ht"],
                 arg_type=get_enum_type(HostnameType),
-                default=None,
+                default=HostnameType.AUTO.value,
                 is_preview=True,
                 help="Type of hostname to use in the connection string. "
-                "Defaults to the supplied --login hostname, or the classic hostname otherwise. "
-                "'auto' uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
+                "'auto' (default) uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
                 "'classic' always uses the default hostname. "
                 "'device' uses the TLS 1.3 device hostname (errors if not GWv2). "
                 "'service' uses the TLS 1.3 service hostname (errors if not GWv2).",
@@ -390,11 +388,10 @@ def load_arguments(self, _):
             "hostname_type",
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
-            default=None,
+            default=HostnameType.AUTO.value,
             is_preview=True,
             help="Type of hostname to use as the SAS token audience. "
-            "Defaults to the supplied --login hostname, or the classic hostname otherwise. "
-            "'auto' uses the device hostname for device/module-scoped tokens "
+            "'auto' (default) uses the device hostname for device/module-scoped tokens "
             "and the service hostname for hub-scoped tokens. "
             "'classic' always uses the default hostname. "
             "'device' uses the device hostname (errors on non-GWv2 hubs). "
@@ -1113,7 +1110,8 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AllocationType),
             help="Type of allocation policy to determine how a device is assigned to an IoT Hub. If not "
             "provided, the allocation policy will be the current allocation policy default set for the "
-            "Device Provisioning Service instance.",
+            "Device Provisioning Service instance, including when --iot-hubs is specified. "
+            "This is independent of the ADR certificate policy.",
             arg_group="Allocation Policy"
         )
         context.argument(

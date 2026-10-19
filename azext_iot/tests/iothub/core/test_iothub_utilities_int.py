@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from re import escape
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -97,7 +99,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         token = self.cmd(
             f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
         ).get_output_in_json()
-        assert extract_sr(token) == classic_hn
+        assert extract_sr(token) == (service_hn if is_gwv2 else classic_hn)
 
         token = self.cmd(
             f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type auto",
@@ -116,7 +118,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         token = self.cmd(
             f"iot hub generate-sas-token --login {self.connection_string}",
         ).get_output_in_json()
-        assert extract_sr(token) == classic_hn
+        assert extract_sr(token) == classic_hn.replace(".", ".service.", 1)
 
         if is_gwv2:
             # service
@@ -144,8 +146,8 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             )
 
     def test_iothub_connection_string_show(self):
-        conn_str_pattern = r"^HostName={0}\.azure-devices\.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
-            self.entity_name
+        conn_str_pattern = r"^HostName={0};SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
+            escape(self.device_host_name)
         )
         conn_str_eventhub_pattern = (
             r"^Endpoint=sb://(.+?)servicebus.windows.net/;SharedAccessKeyName="

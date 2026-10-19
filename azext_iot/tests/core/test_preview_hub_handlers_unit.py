@@ -422,7 +422,7 @@ def test_hub_create_default_put_contract(preview_mgmt):
         "sasTtlAsIso8601": timedelta(hours=1), "connectionString": "", "containerName": "",
     }
     assert body["properties"]["enableFileUploadNotifications"] is False
-    assert body["properties"]["disableLocalAuth"] is False
+    assert body["properties"]["disableLocalAuth"] is True
 
 
 @pytest.mark.parametrize("disable_local_auth", [True, False])
