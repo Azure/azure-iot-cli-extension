@@ -222,7 +222,7 @@ def test_expected_state_failures_still_assert_original_error(mocker, fake_cli, s
         return 1 if error else 0
 
     fake_cli.invoke = mocker.Mock(side_effect=invoke)
-    args = ([{"name": "hub", "rg": "rg"}],) if scenario == "test_mirgate_hub_dataplane_error" else ()
+    args = ({"name": "hub", "rg": "rg"},) if scenario == "test_mirgate_hub_dataplane_error" else ()
     if outcome == "expected_error":
         getattr(controlplane, scenario)(*args)
         assert fake_cli.invoke.call_count == (1 if args else 5)
