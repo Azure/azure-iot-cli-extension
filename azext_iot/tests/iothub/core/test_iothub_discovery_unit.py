@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_iot_hub_connection_string
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -27,6 +28,54 @@ def get_mgmt_client(mocker, fixture_cmd):
 
 
 class TestIoTHubDiscovery:
+    @pytest.mark.parametrize("disable_local_auth", [True, False, None])
+    @pytest.mark.parametrize("monitor_events", [True, False])
+    @pytest.mark.parametrize("auth_type", ["key", "login"])
+    def test_local_auth_check_only_for_event_monitoring(
+        self, mocker, fixture_cmd, disable_local_auth, monitor_events, auth_type
+    ):
+        discovery = IotHubDiscovery(cmd=fixture_cmd)
+        resource = {
+            "name": "myhub",
+            "properties": {
+                "hostName": "myhub.azure-devices.net",
+                "disableLocalAuth": disable_local_auth,
+                "eventHubEndpoints": {
+                    "events": {
+                        "endpoint": "sb://events.servicebus.windows.net/",
+                        "path": "myhub",
+                        "partitionCount": 2,
+                        "partitionIds": ["0", "1"],
+                    }
+                },
+            },
+            "resourcegroup": "myrg",
+            "location": "eastus",
+            "sku": {"tier": "Standard"},
+        }
+        mocker.patch.object(discovery, "find_resource", return_value=resource)
+        find_policy = mocker.patch.object(
+            discovery, "find_policy",
+            return_value={"keyName": "iothubowner", "primaryKey": "primary", "secondaryKey": "secondary"},
+        )
+        target_args = {
+            "resource_name": "myhub",
+            "resource_group_name": "myrg",
+            "auth_type": auth_type,
+            "include_events": True,
+            "monitor_events": monitor_events,
+        }
+
+        if monitor_events and disable_local_auth is True:
+            with pytest.raises(InvalidArgumentValueError, match="disableLocalAuth=true"):
+                discovery.get_target(**target_args)
+            find_policy.assert_not_called()
+            return
+
+        target = discovery.get_target(**target_args)
+        assert target["entity"] == "myhub.azure-devices.net"
+        assert target["events"]["partition_ids"] == ["0", "1"]
+
     def test_get_target_by_cstring(self, fixture_cmd, get_mgmt_client):
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 

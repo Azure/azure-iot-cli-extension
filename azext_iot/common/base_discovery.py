@@ -231,6 +231,9 @@ class BaseDiscovery(ABC):
         """Returns target inforation needed from a connection string."""
         pass
 
+    def _validate_resource(self, resource, **kwargs):
+        """Validate a discovered resource before policy lookup or target construction."""
+
     def get_target(
         self, resource_name: str, resource_group_name: str = None, **kwargs
     ) -> Dict[str, str]:
@@ -290,6 +293,7 @@ class BaseDiscovery(ABC):
                 )
 
             resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+            self._validate_resource(resource, **kwargs)
 
             policy = {
                 "keyName": AuthenticationTypeDataplane.login.value,
@@ -307,6 +311,7 @@ class BaseDiscovery(ABC):
         if "." in resource_name:
             resource_name = resource_name.split(".")[0]
         resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+        self._validate_resource(resource, **kwargs)
         key_type = kwargs.get("key_type", "primary")
         policy_name = kwargs.get("policy_name", "auto")
         rg = resource.get("resourcegroup")
