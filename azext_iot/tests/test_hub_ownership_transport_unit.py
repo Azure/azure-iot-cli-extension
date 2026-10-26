@@ -380,6 +380,16 @@ def test_changed_configuration_between_readiness_attempts_is_not_adopted(storage
             s.wire.submit("PUT", HUB, s.body)
 
 
+def test_identity_cannot_rotate_between_grant_verification_and_endpoint_send(storage_readiness):
+    s = storage_readiness
+    writes = len([call for call in s.wire.calls if call[0] == "PUT"])
+    with pytest.raises(ownership.OwnershipError, match="changed after grant verification"):
+        with storage_attempt(s):
+            s.wire.resources[HUB]["identity"]["principalId"] = "unverified-rotated-principal"
+            s.wire.submit("PUT", HUB, s.body)
+    assert len([call for call in s.wire.calls if call[0] == "PUT"]) == writes
+
+
 def test_storage_readiness_classifies_real_generated_sdk_responses(storage_readiness):
     from azure.core.exceptions import HttpResponseError
     from azext_iot.common.arm import adapt_modeless_lro_poller

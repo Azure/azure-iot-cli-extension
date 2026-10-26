@@ -754,6 +754,7 @@ class Observer:
                 "hubId": hub_id, "storageId": storage_id, "endpoint": endpoint, "container": container,
                 "identity": identity, "principalId": principal, "grantId": grant["id"].casefold(),
                 "uri": storage.get("properties", {}).get("primaryEndpoints", {}).get("blob"),
+                "before": resource_fingerprint(hub),
                 "deadline": deadline, "rejected": False, "submitted": False,
             }
             if not attempt["uri"]:
@@ -775,6 +776,8 @@ class Observer:
             raise OwnershipError("Storage readiness deadline exhausted before submission")
         if method != "PUT" or resource_id != attempt["hubId"] or attempt["submitted"]:
             self.reject("Storage readiness may submit only its exact endpoint PUT before the deadline")
+        if resource_fingerprint(previous) != attempt["before"]:
+            self.reject("Hub identity or configuration changed after grant verification")
         old = previous.get("properties", {}).get("routing", {}).get("endpoints", {}).get("storageContainers", [])
         proposed = body.get("properties", {}).get("routing", {}).get("endpoints", {}).get("storageContainers", [])
         added = [item for item in proposed if item.get("name") == attempt["endpoint"]]
@@ -791,7 +794,7 @@ class Observer:
         unchanged["properties"]["routing"]["endpoints"]["storageContainers"] = old
         if unchanged != hub_description_for_write(previous):
             self.reject("Storage readiness PUT changes unrelated Hub configuration")
-        attempt.update(before=resource_fingerprint(previous), fingerprint=fingerprint, submitted=True)
+        attempt.update(fingerprint=fingerprint, submitted=True)
 
     def prepare(self, method, resource_id, api, body):
         """Return the owning root; called under the transport lock before send."""
