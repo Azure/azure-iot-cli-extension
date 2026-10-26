@@ -38,6 +38,7 @@ Release History
 
 **DPS and release behavior**
 
+* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
 * Retained enrollment, registration-state, certificate issuance, and operation-status recovery commands against the GA DPS APIs.
 * Marked the selected ADR/CMS, device-registration, and linked-Hub management features as stable. Unrelated existing preview commands retain their existing status.
 * Aligned supported-command defaults with ``release/1.1.0-preview``: new Hubs disable Hub-policy SAS unless ``--disable-local-auth false`` is specified; connection-string, SAS, and DPS linked-Hub creation commands default to automatic hostname selection. Classic hostname Entra access with an explicit resource group resolves ARM metadata; split hostnames and unscoped hostname-only access remain ARM-free.
