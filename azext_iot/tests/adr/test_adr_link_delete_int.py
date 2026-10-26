@@ -205,7 +205,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 hub_id = hub["id"]
                 add_cmd = (
                     f"iot adr ns link hub add {selector} -n {endpoint_name} --hub-id {hub_id} "
-                    f"--user-assigned-mi {identity_resource_id}"
+                    f"--user-assigned-mi {identity_resource_id} --availability Available --allocation-weight 1"
                 )
                 link_hub_with_readiness(
                     self, add_cmd, namespace_name, TEST_RG, endpoint_name,
@@ -215,6 +215,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                             "type": "UserAssigned",
                             "userAssignedIdentity": identity_resource_id,
                         },
+                        "provisioning": {"availability": "Available", "allocationWeight": 1},
                     },
                 )
             self._assert_live_target_removal_rejected(namespace_name, "hub", "messaging", "first")
