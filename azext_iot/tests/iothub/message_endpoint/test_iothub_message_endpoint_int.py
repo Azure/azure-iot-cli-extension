@@ -15,7 +15,7 @@ from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import invoke_checked
-from azext_iot.tests.iothub._integration_helpers import STORAGE_ROLE_PROPAGATION_SECONDS
+from azext_iot.tests.iothub._integration_helpers import STORAGE_READINESS_TIMEOUT
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
@@ -621,10 +621,10 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     assert endpoint_list == []
 
 
-@pytest.mark.timeout(900 + 2 * STORAGE_ROLE_PROPAGATION_SECONDS, func_only=False)
+@pytest.mark.timeout(900 + STORAGE_READINESS_TIMEOUT, func_only=False)
 def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
     invoke = partial(invoke_checked, cli, description="Storage endpoint lifecycle command")
-    iot_hub_objs, storage_obj = provisioned_storage_with_identity_module
+    iot_hub_objs, storage_obj, readiness = provisioned_storage_with_identity_module
     iot_hub_entry = iot_hub_objs[0]
     iot_hub_obj = iot_hub_entry["hub"]
 
@@ -675,7 +675,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # Use hub identity with no defaults
     custom_file_format = default_file_format.replace("/", "_")
-    invoke(
+    readiness.invoke(
+        invoke,
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
             iot_hub,
@@ -687,7 +688,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
             10,
             "json",
             custom_file_format
-        )
+        ),
+        endpoint=endpoint_names[1], identity="[system]",
     )
 
     expected_sys_endpoint = build_expected_endpoint(
@@ -712,7 +714,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # Use user identity
-    invoke(
+    readiness.invoke(
+        invoke,
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity {} -b {} -w {}".format(
             iot_hub,
@@ -724,7 +727,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
             user_id,
             720,
             500
-        )
+        ),
+        endpoint=endpoint_names[2], identity=user_id,
     )
 
     expected_user_endpoint = build_expected_endpoint(

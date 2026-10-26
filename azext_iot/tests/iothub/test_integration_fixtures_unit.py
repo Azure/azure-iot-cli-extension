@@ -161,13 +161,16 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
 
 
 @pytest.mark.parametrize("failed", [False, True])
-def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mocker, failed):
+@pytest.mark.parametrize("managed", [False, True])
+def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mocker, failed, managed):
     error = CLIInternalError("Storage grant could not be verified")
     assign = mocker.patch.object(
         fixtures, "assign_roles_with_propagation", side_effect=error if failed else None,
     )
     hubs = [{"hub": {"identity": {"principalId": "hub-system"}}}]
-    storage = {"storage": {"id": "storage-scope"}}
+    storage = {"storage": {"id": "storage-scope"}, "container": {"name": "container"}}
+    observer = Mock() if managed else None
+    mocker.patch.object(fixtures, "_regular_phase_observer", return_value=observer)
     fixture = fixtures.provisioned_storage_with_identity_module.__wrapped__(
         Mock(), {"principalId": "storage-user"}, hubs, storage,
     )
@@ -176,7 +179,9 @@ def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mo
             next(fixture)
         assert raised.value is error
     else:
-        assert next(fixture) == (hubs, storage)
+        result = next(fixture)
+        assert result[:2] == (hubs, storage)
+        assert result[2].observer is observer
         with pytest.raises(StopIteration):
             next(fixture)
     assign.assert_called_once_with(
@@ -185,7 +190,7 @@ def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mo
             for principal in ("hub-system", "storage-user")
         ],
         max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
-        wait=integration_helpers.STORAGE_ROLE_PROPAGATION_SECONDS,
+        wait=0 if managed else integration_helpers.STORAGE_ROLE_PROPAGATION_SECONDS,
     )
 
 
@@ -200,6 +205,7 @@ def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mo
 def test_state_endpoint_roles_match_the_configured_identities(
     mocker, marker_kwargs, system_endpoints, failed_command, failure_kind
 ):
+    mocker.patch.object(fixtures, "_regular_phase_observer", return_value=None)
     user_id = "/user-identities/shared"
     storage = {
         "storage": {"id": "storage-scope", "primaryEndpoints": {"blob": "https://storage.blob.core.windows.net/"}},
