@@ -26,7 +26,7 @@ from azext_iot.tests.settings import (
 )
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
 from azext_iot.tests.iothub._integration_helpers import (
-    assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
+    assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found, StorageEndpointReadiness
 )
 from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
@@ -130,7 +130,7 @@ def _owned_regular_phase(manifest, suite, phase):
     return all(manifest.auth_phase(name) == "regular" for name in expanded)
 
 
-def _dynamic_hub_was_unused(request):
+def _regular_phase_observer(request):
     import requests
     from azext_iot.tests import _focused_live, _hub_ownership as ownership, _hub_suite_manifest as manifest
     from azext_iot.tests._hub_suite_plugin import PhaseReceipt
@@ -141,7 +141,7 @@ def _dynamic_hub_was_unused(request):
     )
     if (runtime is None and all(value is None for value in (suite, phase, run_id, owner_path, receipt_path))
             and _focused_live.ENV not in os.environ):
-        return False
+        return None
     observer = getattr(runtime, "observer", None)
     if (not isinstance(runtime, PhaseReceipt) or not isinstance(observer, ownership.Observer)
             or not _owned_regular_phase(manifest, suite, phase)
@@ -180,13 +180,26 @@ def _dynamic_hub_was_unused(request):
                         or not (mutation["id"] == resource_id or mutation["id"].startswith(resource_id + "/"))
                         or mutation.get("method") not in ("PUT", "PATCH", "DELETE", "POST")):
                     raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid mutation record.")
-        resource_id = (
-            f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/{ENTITY_RG}"
-            f"/providers/Microsoft.Devices/IotHubs/{ENTITY_NAME}"
-        ).casefold()
+        resource_id = _dynamic_hub_id()
         if not ownership.scope_id(resource_id) or not ownership.planned_root(resource_id):
             raise ownership.OwnershipError("Cannot determine shared Hub usage: invalid dynamic Hub scope.")
-        return resource_id not in data["resources"]
+        return observer
+
+
+def _dynamic_hub_id():
+    from azext_iot.tests._hub_ownership import SUBSCRIPTION
+
+    return (
+        f"/subscriptions/{SUBSCRIPTION}/resourceGroups/{ENTITY_RG}/providers/Microsoft.Devices/IotHubs/{ENTITY_NAME}"
+    ).casefold()
+
+
+def _dynamic_hub_was_unused(request):
+    observer = _regular_phase_observer(request)
+    if observer is None:
+        return False
+    with observer.lock:
+        return _dynamic_hub_id() not in observer.data["resources"]
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -327,6 +340,10 @@ def setup_hub_controlplane_states(
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
+    storage_readiness = StorageEndpointReadiness(
+        _regular_phase_observer(request), provisioned_iot_hubs_with_storage_user_module[0]["hub"].get("id"),
+        provisioned_storage["storage"]["id"], storage_container,
+    )
     sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
     suffix = "systemid" if use_system_endpoints else "userid"
@@ -351,10 +368,12 @@ def setup_hub_controlplane_states(
         f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json"
     )
 
-    _invoke_fixture(
+    storage_readiness.invoke(
+        _invoke_fixture,
         f"iot hub message-endpoint create storage-container --en storagecontainer-{suffix} -g {hub_rg} -n {hub_name} "
         f"--identity {user_identity_parameter} --endpoint-uri {storage_endpoint_uri} --container {storage_container} "
-        "-b 350 -w 250 --encoding json"
+        "-b 350 -w 250 --encoding json",
+        endpoint=f"storagecontainer-{suffix}", identity=user_identity_parameter,
     )
 
     _invoke_fixture(
@@ -588,6 +607,7 @@ def provisioned_storage_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
     user_id = provisioned_user_identity_module["principalId"]
+    observer = _regular_phase_observer(request)
     assign_role_assignment(
         assignee=hub_principal_id,
         scope=scope,
@@ -600,8 +620,15 @@ def provisioned_storage_with_identity_module(
         role=role,
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES
     )
-    sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
-    yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
+    # Only the owned controller can prove a rejection safe to retry. Legacy
+    # direct-pytest callers retain their fixed grace and single submission.
+    if observer is None:
+        sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+    readiness = StorageEndpointReadiness(
+        observer, provisioned_iot_hubs_with_user_module[0]["hub"].get("id"), scope,
+        provisioned_storage_module["container"]["name"],
+    )
+    yield provisioned_iot_hubs_with_user_module, provisioned_storage_module, readiness
 
 
 @pytest.fixture(scope="module")

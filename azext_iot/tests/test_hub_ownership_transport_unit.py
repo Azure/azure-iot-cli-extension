@@ -41,6 +41,7 @@ CONTAINER = DATABASE + "/containers/routecontainer"
 NAMESPACE = PREFIX + "microsoft.eventhub/namespaces/aziotclitest" + "c" * 12
 IDENTITY = PREFIX + "microsoft.managedidentity/userassignedidentities/aziotclitest" + "d" * 12
 CERTIFICATE = HUB + "/certificates/cert1"
+STORAGE = PREFIX + "microsoft.storage/storageaccounts/aziotclitest" + "e" * 12
 
 
 class Credential:
@@ -185,6 +186,233 @@ def transport(tmp_path, monkeypatch, request):
 
 def create_hub(wire):
     wire.submit("PUT", HUB, {"location": ownership.REGION, "properties": {"disableLocalAuth": True}})
+
+
+@pytest.fixture
+def storage_readiness(transport, monkeypatch):
+    from types import SimpleNamespace
+    from azext_iot.common.arm import hub_description_for_write
+    from azext_iot.tests import helpers
+
+    observer, arm, wire = transport
+    create_hub(wire)
+    wire.resources[HUB]["properties"].update(state="Active", routing={"endpoints": {"storageContainers": []}})
+    wire.resources[HUB]["identity"] = {
+        "type": "SystemAssigned, UserAssigned", "principalId": "system-principal",
+        "userAssignedIdentities": {IDENTITY: {}},
+    }
+    uri = "https://" + STORAGE.rsplit("/", 1)[1] + ".blob.core.windows.net/"
+    wire.submit("PUT", STORAGE, {"location": ownership.REGION, "properties": {"primaryEndpoints": {"blob": uri}}})
+    wire.submit("PUT", IDENTITY, {"location": ownership.REGION})
+    observer.current_node = (
+        "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::test_iot_storage_endpoint_lifecycle"
+    )
+    grants = [{
+        "principalId": principal, "scope": STORAGE, "roleDefinitionId": "/roles/" + ownership.STORAGE_ROLE_ID,
+        "id": STORAGE + "/providers/microsoft.authorization/roleassignments/" + principal,
+    } for principal in ("system-principal", "offline-principal")]
+    monkeypatch.setattr(helpers, "get_role_assignments", lambda **_kwargs: grants)
+    endpoint = {
+        "name": "storage-ready", "authenticationType": "identityBased", "identity": None,
+        "endpointUri": uri, "containerName": "container", "connectionString": None,
+    }
+    body = hub_description_for_write(wire.resources[HUB])
+    body["properties"]["routing"]["endpoints"]["storageContainers"].append(endpoint)
+    payload = {"error": {"code": "400117", "message": (
+        "Cannot establish connection using the provided credentials. endpointName:storage-ready, "
+        "exceptionMessage:This request is not authorized to perform this operation using this permission. "
+        "If you contact a support representative please include this correlation identifier: "
+        "11111111-2222-3333-4444-555555555555, timestamp: 2026-10-26 14:51:30Z, errorcode: IH400117."
+    )}}
+    scenario = SimpleNamespace(
+        observer=observer, arm=arm, wire=wire, grants=grants, body=body, endpoint=endpoint, payload=payload,
+        status=400, headers={}, change_on_rejection=False, original=wire.handle,
+    )
+
+    def handle(request):
+        if request.method == "PUT" and urlsplit(request.url).path.casefold() == HUB and scenario.status != 200:
+            if scenario.change_on_rejection:
+                wire.resources[HUB]["etag"] = "unexpected-change"
+            return scenario.status, scenario.payload, scenario.headers
+        return scenario.original(request)
+
+    monkeypatch.setattr(wire, "handle", handle)
+    return scenario
+
+
+def storage_attempt(scenario, identity="[system]"):
+    return scenario.observer.storage_endpoint_attempt(
+        HUB, STORAGE, "storage-ready", "container", identity, time.monotonic() + 600,
+    )
+
+
+@pytest.mark.parametrize("identity", ["[system]", IDENTITY])
+def test_exact_storage_rejection_can_retry_then_preserves_clean_ownership(storage_readiness, identity):
+    s = storage_readiness
+    if identity != "[system]":
+        s.endpoint["identity"] = {"userAssignedIdentity": identity}
+    for _ in range(2):
+        with storage_attempt(s, identity) as attempt:
+            assert s.wire.submit("PUT", HUB, s.body).status_code == 400
+        assert attempt["rejected"]
+    rejections = s.observer.data["resources"][HUB]["mutations"][1:]
+    assert len(rejections) == 2 and all(ownership.storage_readiness_rejection(m) for m in rejections)
+    s.status = 200
+    with storage_attempt(s, identity):
+        assert s.wire.submit("PUT", HUB, s.body).status_code == 200
+    assert not ownership.ownership_errors(s.observer.data, "uid", "regular")
+    for target in (HUB, STORAGE, IDENTITY):
+        s.wire.submit("DELETE", target)
+        s.wire.submit("GET", target)
+    assert all(m["status"] == 400 for m in rejections)
+    assert not ownership.ownership_errors(s.observer.data, "uid", "regular")
+
+
+@pytest.mark.parametrize("damage", ["code", "message", "endpoint", "envelope", "location"])
+def test_unrecognized_storage_rejection_never_authorizes_replay(storage_readiness, damage):
+    s = storage_readiness
+    if damage == "code":
+        s.payload["error"]["code"] = "AuthorizationFailed"
+    elif damage in ("message", "endpoint"):
+        s.payload["error"]["message"] = s.payload["error"]["message"].replace(
+            "permission" if damage == "message" else "storage-ready", "different",
+        )
+    elif damage == "envelope":
+        s.payload = {"message": s.payload["error"]["message"]}
+    else:
+        s.headers["location"] = ownership.ARM + HUB + "/operationStatuses/unknown"
+    with storage_attempt(s) as attempt:
+        s.wire.submit("PUT", HUB, s.body)
+    assert not attempt["rejected"]
+    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+        with storage_attempt(s):
+            s.wire.submit("PUT", HUB, s.body)
+
+
+@pytest.mark.parametrize("status", [401, 403, 409, 429, 500])
+def test_other_storage_statuses_are_not_proven_readiness(storage_readiness, status):
+    s = storage_readiness
+    s.status = status
+    with storage_attempt(s) as attempt:
+        s.wire.submit("PUT", HUB, s.body)
+    assert not attempt["rejected"]
+    assert not ownership.storage_readiness_rejection(s.observer.data["resources"][HUB]["mutations"][-1])
+    assert ownership.ownership_errors(s.observer.data, "uid", "regular")
+
+
+@pytest.mark.parametrize("damage", [
+    "foreign", "principal", "scope", "role", "condition", "identity", "inflight", "node",
+])
+def test_storage_readiness_requires_ownership_identity_and_exact_grant(storage_readiness, damage):
+    s = storage_readiness
+    if damage == "foreign":
+        s.wire.resources[STORAGE]["tags"][ownership.OWNER_TAG] = "foreign"
+    elif damage in ("principal", "scope", "role", "condition"):
+        key = {"principal": "principalId", "scope": "scope", "role": "roleDefinitionId", "condition": "condition"}[damage]
+        s.grants[0][key] = "wrong"
+    elif damage == "identity":
+        s.wire.resources[HUB]["identity"]["principalId"] = None
+    elif damage == "inflight":
+        s.wire.resources[HUB]["properties"]["provisioningState"] = "Updating"
+    else:
+        s.observer.current_node = "unrelated-test"
+    writes = len([call for call in s.wire.calls if call[0] == "PUT"])
+    with pytest.raises(ownership.OwnershipError):
+        with storage_attempt(s):
+            s.wire.submit("PUT", HUB, s.body)
+    assert len([call for call in s.wire.calls if call[0] == "PUT"]) == writes
+
+
+@pytest.mark.parametrize("damage", ["container", "uri", "identity", "unrelated"])
+def test_storage_attempt_rejects_different_request_before_send(storage_readiness, damage):
+    s = storage_readiness
+    if damage == "unrelated":
+        s.body["properties"]["disableLocalAuth"] = False
+    else:
+        s.endpoint[{"container": "containerName", "uri": "endpointUri", "identity": "identity"}[damage]] = "wrong"
+    writes = len([call for call in s.wire.calls if call[0] == "PUT"])
+    with pytest.raises(ownership.OwnershipError):
+        with storage_attempt(s):
+            s.wire.submit("PUT", HUB, s.body)
+    assert len([call for call in s.wire.calls if call[0] == "PUT"]) == writes
+
+
+def test_changed_resource_after_rejection_cannot_be_called_readiness(storage_readiness):
+    s = storage_readiness
+    s.change_on_rejection = True
+    with pytest.raises(ownership.OwnershipError, match="changed the Hub"):
+        with storage_attempt(s):
+            s.wire.submit("PUT", HUB, s.body)
+    assert not ownership.storage_readiness_rejection(s.observer.data["resources"][HUB]["mutations"][-1])
+
+
+def test_rejected_storage_command_still_cannot_replay_outside_explicit_scope(storage_readiness):
+    s = storage_readiness
+    with storage_attempt(s):
+        s.wire.submit("PUT", HUB, s.body)
+    with pytest.raises(ownership.OwnershipError, match="cannot be replayed"):
+        s.wire.submit("PUT", HUB, s.body)
+
+
+def test_changed_configuration_between_readiness_attempts_is_not_adopted(storage_readiness):
+    s = storage_readiness
+    with storage_attempt(s):
+        s.wire.submit("PUT", HUB, s.body)
+    s.wire.resources[HUB]["tags"]["external"] = "change"
+    s.body["tags"]["external"] = "change"
+    with pytest.raises(ownership.OwnershipError, match="changed Hub snapshot or request"):
+        with storage_attempt(s):
+            s.wire.submit("PUT", HUB, s.body)
+
+
+def test_identity_cannot_rotate_between_grant_verification_and_endpoint_send(storage_readiness):
+    s = storage_readiness
+    writes = len([call for call in s.wire.calls if call[0] == "PUT"])
+    with pytest.raises(ownership.OwnershipError, match="changed after grant verification"):
+        with storage_attempt(s):
+            s.wire.resources[HUB]["identity"]["principalId"] = "unverified-rotated-principal"
+            s.wire.submit("PUT", HUB, s.body)
+    assert len([call for call in s.wire.calls if call[0] == "PUT"]) == writes
+
+
+def test_storage_readiness_classifies_real_generated_sdk_responses(storage_readiness):
+    from azure.core.exceptions import HttpResponseError
+    from azext_iot.sdk.iothub.mgmt import IotHubClient
+
+    s = storage_readiness
+    with IotHubClient(Credential(), ownership.SUBSCRIPTION, base_url=ownership.ARM) as client:
+        with pytest.raises(HttpResponseError):
+            with storage_attempt(s) as attempt:
+                client.iot_hub_resource.begin_create_or_update(
+                    ownership.GROUP, HUB.rsplit("/", 1)[1], s.body,
+                ).result()
+        assert attempt["rejected"]
+        s.status = 200
+        with storage_attempt(s):
+            result = client.iot_hub_resource.begin_create_or_update(
+                ownership.GROUP, HUB.rsplit("/", 1)[1], s.body,
+            ).result()
+        assert result["properties"]["routing"]["endpoints"]["storageContainers"] == [s.endpoint]
+
+
+@pytest.mark.parametrize("stage", ["context", "send"])
+def test_storage_readiness_deadline_never_writes_or_poison_cleanup(storage_readiness, monkeypatch, stage):
+    s = storage_readiness
+    writes = len([call for call in s.wire.calls if call[0] == "PUT"])
+    clock = time.monotonic()
+    if stage == "context":
+        with pytest.raises(ownership.OwnershipError, match="deadline exhausted"):
+            with s.observer.storage_endpoint_attempt(
+                HUB, STORAGE, "storage-ready", "container", "[system]", clock - 1,
+            ):
+                pytest.fail("Expired scope was admitted")
+    else:
+        with pytest.raises(ownership.OwnershipError, match="deadline exhausted"):
+            with storage_attempt(s):
+                monkeypatch.setattr(ownership.time, "monotonic", lambda: clock + 700)
+                s.wire.submit("PUT", HUB, s.body)
+    assert len([call for call in s.wire.calls if call[0] == "PUT"]) == writes
+    assert not ownership.ownership_errors(s.observer.data, "uid", "regular")
 
 
 @pytest.mark.parametrize("transport", ["australiaeast", "westeurope"], indirect=True)

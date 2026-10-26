@@ -162,6 +162,51 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
     )
 
 
+@pytest.mark.parametrize("failed_at", [None, 0, 1])
+@pytest.mark.parametrize("managed", [False, True])
+def test_storage_endpoint_fixture_preserves_grants_and_legacy_grace(mocker, failed_at, managed):
+    error = CLIInternalError("Storage grant failed")
+    outcomes = [None, None]
+    if failed_at is not None:
+        outcomes[failed_at] = error
+    assign = mocker.patch.object(
+        fixtures, "assign_role_assignment", side_effect=outcomes,
+    )
+    wait = mocker.patch.object(fixtures, "sleep")
+    hubs = [{"hub": {"id": "hub-id", "identity": {"principalId": "hub-system"}}}]
+    storage = {"storage": {"id": "storage-scope"}, "container": {"name": "container"}}
+    observer = Mock() if managed else None
+    mocker.patch.object(fixtures, "_regular_phase_observer", return_value=observer)
+    fixture = fixtures.provisioned_storage_with_identity_module.__wrapped__(
+        Mock(), {"principalId": "storage-user"}, hubs, storage,
+    )
+    if failed_at is not None:
+        with pytest.raises(CLIInternalError) as raised:
+            next(fixture)
+        assert raised.value is error
+    else:
+        result = next(fixture)
+        assert result[:2] == (hubs, storage)
+        assert result[2].observer is observer
+        assert result[2].hub_id == "hub-id"
+        assert result[2].storage_id == "storage-scope"
+        assert result[2].container == "container"
+        with pytest.raises(StopIteration):
+            next(fixture)
+    expected = [
+        mocker.call(
+            role="Storage Blob Data Contributor", scope="storage-scope", assignee=principal,
+            max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
+        )
+        for principal in ("hub-system", "storage-user")
+    ]
+    assert assign.call_args_list == expected[:failed_at + 1 if failed_at is not None else 2]
+    if not managed and failed_at is None:
+        wait.assert_called_once_with(fixtures.ROLE_ASSIGNMENT_REFRESH_TIME)
+    else:
+        wait.assert_not_called()
+
+
 @pytest.mark.parametrize("marker_kwargs,system_endpoints", [
     ({"system_endpoints": True}, True),
     ({"system_endpoints": False}, False),
@@ -170,9 +215,12 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
 ])
 @pytest.mark.parametrize("failed_command", [None, *range(9)])
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
+@pytest.mark.parametrize("managed", [False, True])
 def test_state_endpoint_roles_match_the_configured_identities(
-    mocker, marker_kwargs, system_endpoints, failed_command, failure_kind
+    mocker, marker_kwargs, system_endpoints, failed_command, failure_kind, managed
 ):
+    observer = mocker.MagicMock() if managed else None
+    mocker.patch.object(fixtures, "_regular_phase_observer", return_value=observer)
     user_id = "/user-identities/shared"
     storage = {
         "storage": {"id": "storage-scope", "primaryEndpoints": {"blob": "https://storage.blob.core.windows.net/"}},
@@ -182,7 +230,10 @@ def test_state_endpoint_roles_match_the_configured_identities(
     hubs = [
         {
             "name": name, "rg": "rg", "storage": storage,
-            "hub": {"identity": {"principalId": f"{name}-system", "userAssignedIdentities": {user_id: {}}}},
+            "hub": {
+                "id": f"{name}-id",
+                "identity": {"principalId": f"{name}-system", "userAssignedIdentities": {user_id: {}}},
+            },
         }
         for name in ("origin", "destination")
     ]
@@ -218,7 +269,7 @@ def test_state_endpoint_roles_match_the_configured_identities(
         return 0
 
     client.invoke = mocker.Mock(side_effect=invoke)
-    mocker.patch.object(fixtures, "sleep")
+    wait = mocker.patch.object(fixtures, "sleep")
     mocker.patch.object(fixtures, "create_self_signed_certificate", return_value={"certificate": "unused"})
     mocker.patch("builtins.open", mocker.mock_open())
     mocker.patch.object(fixtures.os.path, "isfile", return_value=True)
@@ -241,6 +292,15 @@ def test_state_endpoint_roles_match_the_configured_identities(
             assert str(raised.value) == f"IoT Hub fixture command failed with exit code {exit_code}."
         assert client.invoke.call_count == failed_command + 1
     assert remove.call_count == (1 if failed_command in (None, 8) else 0)
+    wait.assert_called_once_with(fixtures.ROLE_ASSIGNMENT_REFRESH_TIME)
+    if managed:
+        if failed_command is None or failed_command >= 4:
+            observer.storage_endpoint_attempt.assert_called_once_with(
+                "origin-id", "storage-scope", "storagecontainer-systemid" if system_endpoints else "storagecontainer-userid",
+                "container", "[system]" if system_endpoints else user_id, mocker.ANY,
+            )
+        else:
+            observer.storage_endpoint_attempt.assert_not_called()
 
     expected = []
     for scope, role in (
