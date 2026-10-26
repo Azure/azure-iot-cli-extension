@@ -11,17 +11,23 @@ from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
 
 
-def adr_link_hub_remove(cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+def adr_link_hub_remove(
+    cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
+):
     return LinkProvider(cmd, client=client).hub_remove(
         endpoint_name=endpoint_name, namespace_name=namespace_name, resource_group_name=resource_group_name,
-        no_wait=no_wait,
+        no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
     )
 
 
-def adr_link_dps_remove(cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+def adr_link_dps_remove(
+    cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
+):
     return LinkProvider(cmd, client=client).dps_remove(
         endpoint_name=endpoint_name, namespace_name=namespace_name, resource_group_name=resource_group_name,
-        no_wait=no_wait,
+        no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
     )
 
 

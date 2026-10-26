@@ -605,9 +605,13 @@ def load_adr_help():
     Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    To unlink, delete the linked resource first, then run link hub/dps remove to remove
-    its endpoint from the namespace. Remove does not delete or check the linked resource
+    For a Succeeded link, delete the linked resource before running link hub/dps remove.
+    Failed links do not require deleting the linked resource. Hub endpoints in any state
+    also require clearing Registry Device IoT Hub capability references; see link hub remove --help.
+    Remove does not delete or check the linked resource; it removes only the namespace endpoint
     and waits for the namespace update to complete unless --no-wait is specified.
+    Remove performs a state-aware advisory permission check without changing role assignments by default.
+    Use --grant-reader to explicitly request missing Reader access at the linked resource's resource group.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
     After add/update --no-wait, use link hub/dps wait to track completion.
     After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
@@ -625,25 +629,60 @@ def load_adr_help():
   """
 
     for kind, resource in (("hub", "IoT Hub"), ("dps", "DPS")):
+        hub_prerequisite = (
+            "\n    Hub endpoints, including Failed links, cannot be removed while Registry Devices have IoT Hub"
+            "\n    capabilities referencing the endpoint (EndpointUsedByNestedDevices). Clear these references first,"
+            "\n    for example by deleting the referencing Registry Devices with 'az iot adr ns device delete'."
+            "\n    Deleting the IoT Hub does not clear these references."
+            if kind == "hub" else ""
+        )
         helps[f"iot adr ns link {kind} remove"] = f"""
   type: command
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
-    Delete the linked {resource} first; this command removes only the namespace endpoint.
-    The namespace outbound identity needs Reader on the linked resource's resource group.
-    A missing grant is created when you can create role assignments; it is kept after unlinking.
-    Keep that resource group until the unlink completes.
+    This command removes only the namespace endpoint, not the linked {resource}.
+    For a Succeeded link, delete the linked {resource} first.
+    Failed links do not require the linked resource to be deleted.{hub_prerequisite}
+    For Succeeded links, ADR confirms deletion by reading the target as the namespace outbound identity.
+    This needs read access at a scope that survives deletion: the linked resource's
+    resource group, or its subscription if the group was deleted. Target-scoped roles
+    granted by link add do not provide this parent-scope access.
+    For linkingState Succeeded, a read-only advisory check looks for Reader, Contributor or Owner
+    grants for the namespace outbound identity on the linked resource's resource group,
+    including inherited grants. If that group is confirmed deleted, it checks the subscription.
+    LinkedResourceDeleted and Failed endpoints skip permission checks. Other states warn and continue.
+    By default, missing access or unavailable checks warn and continue; ADR decides whether removal is allowed.
+    When no recognized read grant is found, the warning includes an exact Reader assignment
+    command for an authorized principal to run manually. Reader covers all resources within
+    that scope; subscription-scoped grants are broader than resource-group grants.
+    New role assignments can take several minutes to take effect; if ADR rejects removal
+    immediately after a grant, retry after propagation.
+    Custom roles, conditions, group membership and deny assignments are not fully evaluated.
+    By default, no role assignments are created or removed. Use --no-rbac-check (alias --skip-rbac-check) to bypass only this
+    advisory check, not ADR authorization; --yes skips confirmation but does not skip permission checking.
+    For Succeeded links, --grant-reader explicitly requests missing Reader access for the namespace outbound
+    identity at the linked resource's resource group, not the namespace's resource group.
+    It reuses recognized read grants and requires permission to create role assignments when access is missing.
+    Reader setup failures stop removal. If the target resource group is deleted and no recognized
+    subscription read grant exists, removal stops with a manual command; no subscription grant is created.
+    Other endpoint states never receive Reader grants. --grant-reader cannot be combined with --no-rbac-check
+    or --skip-rbac-check. Assignments are retained after successful removal or any failure, including HTTP 412.
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
+    --no-wait does not skip Reader setup or its assignment-visibility wait.
     After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
-    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
+    Missing, weak, or malformed namespace ETags stop removal before permission checks or writes.
     Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
-    Inspect the namespace and rerun the command to retry against its latest state.
+    A conflict reports guidance to inspect the namespace and rerun the command against its latest state.
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
+    - name: Remove an endpoint without the advisory permission check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-rbac-check
+    - name: Grant missing resource-group Reader access before removing a Succeeded endpoint
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --grant-reader
   """
 
     helps[
@@ -754,8 +793,8 @@ def load_adr_help():
   short-summary: Manage DPS links (provisioning endpoints) on a Device Registry namespace.
   long-summary: |
     Only one DPS may be linked per namespace today. Links live on the namespace, not on the
-    DPS resource. After deleting the DPS resource, run link dps remove to remove its
-    namespace endpoint.
+    DPS resource. Run link dps remove to remove its namespace endpoint. For a Succeeded
+    link, delete the DPS resource first; Failed links do not require deleting it.
   """
 
     helps[

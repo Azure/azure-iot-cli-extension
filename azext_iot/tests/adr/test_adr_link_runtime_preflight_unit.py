@@ -288,7 +288,7 @@ def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
     visible.assert_called_once_with([
         (outbound, "Contributor", dps_id), (inbound, "Contributor", NS_ID),
         ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
-    ])
+    ], strict=False)
     provider.client.namespaces.begin_update.assert_called_once()
 
 

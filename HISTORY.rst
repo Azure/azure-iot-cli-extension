@@ -22,9 +22,19 @@ Release History
 * Certificate policies accept validity periods from 1 to 90 days. Link-recovery failures preserve the original service error as their cause.
 * Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
 * Recognize the explicit DPS inbound-identity authorization response during fresh role propagation, retaining verified grants, identity-preserving updates, and the existing two-retry limit.
-* Namespace link removal requires a strong, quoted response ETag before RBAC changes or writes and protects concurrent changes with If-Match. It waits for completion and surfaces asynchronous failures by default; ``--no-wait`` returns after submission. HTTP 412 retains the original error and provides retry guidance without automatically retrying the write.
+* Namespace link removal requires a strong, quoted response ETag before permission checks or writes and protects concurrent changes with If-Match. It waits for completion and surfaces asynchronous failures by default; ``--no-wait`` returns after submission. HTTP 412 retains the original error and provides retry guidance without automatically retrying the write.
 * Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
 * ADR groups/jobs/job runs, reports, registry-device authentication/attribute/capability child commands, and ADR Software Updates are excluded because their operations are absent from these GA APIs. Existing Hub jobs, DPS enrollment groups, and ``iot du`` remain available.
+
+**ADR unlink permission checks**
+
+* Namespace ``link hub|dps remove`` now defaults to a state-aware, read-only advisory permission check instead of creating Reader assignments or blocking on preflight failures. ``LinkedResourceDeleted`` and ``Failed`` endpoints skip the check. ``Succeeded`` endpoints check the outbound identity's read-grant evidence at the linked resource's resource group, or subscription when that group is confirmed deleted.
+* By default, missing access, unavailable checks, malformed linked resource IDs and other endpoint states warn and continue, leaving ADR authoritative. Added ``--no-rbac-check`` with ``--skip-rbac-check`` as an alias; ``--yes`` still skips only confirmation. Custom roles, conditions, group membership and deny assignments are not fully evaluated.
+* Malformed outbound identity metadata and resource-group response deserialization failures warn and continue during advisory preflight; namespace write and polling errors still propagate.
+* Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--skip-rbac-check``. Valid identity assignments are preserved.
+* Unlink guidance limits target deletion to ``Succeeded`` links and explains that Hub endpoints, including failed links, require clearing Registry Device IoT Hub capability references first.
+* Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed by default.
+* Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check`` or its alias. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
 
 **DPS and release behavior**
 

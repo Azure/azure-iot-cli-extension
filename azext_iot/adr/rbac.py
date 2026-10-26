@@ -14,6 +14,7 @@ import json
 from shlex import quote
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
+from uuid import UUID
 
 from knack.log import get_logger
 from azure.cli.core._profile import Profile
@@ -39,7 +40,18 @@ PERMISSIONS_API_VERSION = "2022-04-01"
 ROLE_ASSIGNMENTS_WRITE_ACTION = "Microsoft.Authorization/roleAssignments/write"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
-UNLINK_READER_PROPAGATION_DELAY_SECONDS = 30
+UNLINK_WARNING = (
+    "This removes only the namespace endpoint, not the linked resource. "
+    "For a Succeeded link, delete the linked resource first; ADR uses the namespace outbound identity to verify deletion. "
+    "Failed links do not require the linked resource to be deleted. "
+    "Permission checks are advisory by default; no role assignments are changed unless --grant-reader is specified. "
+    "Reader assignments requested with --grant-reader are retained even if removal fails."
+)
+HUB_UNLINK_WARNING = UNLINK_WARNING + (
+    " Hub endpoints, including Failed links, cannot be removed while Registry Devices have IoT Hub capabilities "
+    "referencing the endpoint (EndpointUsedByNestedDevices). Clear these references first, for example by deleting "
+    "the referencing Registry Devices with 'az iot adr ns device delete'. Deleting the IoT Hub does not clear these references."
+)
 NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE = (
     "DPS links additionally require the namespace system-assigned identity, "
     "even when outbound uses a user-assigned identity. Enable it with "
@@ -54,6 +66,11 @@ LINK_ROLE_IDS = {
     ADU_ADMINISTRATOR_ROLE: "02ca0879-e8e4-47a5-a61e-5c618b76e64a",
     ADR_ADMINISTRATOR_ROLE: "12675fd7-7f59-493f-9201-f7944860a2f1",
 }
+UNLINK_READ_ROLE_IDS = frozenset({
+    LINK_ROLE_IDS[READER_ROLE],
+    LINK_ROLE_IDS[CONTRIBUTOR_ROLE],
+    "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",  # Owner
+})
 
 
 @dataclass(frozen=True)
@@ -481,7 +498,7 @@ class LinkRbacManager:
         return False
 
     def _wait_for_assignments(
-        self, assignments: Iterable[Tuple[str, str, str]]
+        self, assignments: Iterable[Tuple[str, str, str]], *, strict=False,
     ) -> None:
         """Wait until newly-created assignments are visible to ARM reads."""
         pending = list(dict.fromkeys(assignments))
@@ -494,7 +511,7 @@ class LinkRbacManager:
             still_pending = []
             for principal_id, role, scope in pending:
                 try:
-                    if self._assignment_exists(principal_id, role, scope):
+                    if self._assignment_exists(principal_id, role, scope, strict=strict):
                         continue
                 except AzureResponseError:
                     # Role-assignment reads can be transiently throttled while
@@ -599,38 +616,108 @@ class LinkRbacManager:
 
         self._ensure_assignments(missing, descriptions)
 
-    def ensure_unlink_reader(self, namespace_principal_id: str, resource_group_scope: str) -> None:
-        """Allow the outbound MI to confirm deletion at the surviving parent scope."""
+    def check_unlink_read_access(
+        self, namespace_principal_id: str, resource_group_scope: str, *, grant_reader: bool = False,
+    ) -> None:
+        """Look for read-grant evidence; optionally establish Reader at the surviving resource group."""
+        from azure.cli.core.commands.client_factory import get_mgmt_service_client
+        from azure.core.exceptions import HttpResponseError
+        from azure.mgmt.resource import ResourceManagementClient
+        from azext_iot._factory import _get_canary_credential_scopes
+        from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
+        if not isinstance(namespace_principal_id, str) or not namespace_principal_id.strip():
+            raise AzureResponseError("The namespace outbound identity did not include a usable principalId.")
+        if grant_reader:
+            try:
+                UUID(namespace_principal_id)
+            except ValueError as error:
+                raise AzureResponseError(
+                    "The namespace outbound identity principalId must be a GUID before Reader can be granted."
+                ) from error
+        subscription = _scope_subscription(resource_group_scope)
+        scope = resource_group_scope
         try:
-            if self._assignment_exists(namespace_principal_id, READER_ROLE, resource_group_scope, strict=True):
+            with get_mgmt_service_client(
+                self._cli_ctx, ResourceManagementClient, subscription_id=subscription,
+                base_url=get_adr_arm_endpoint(), credential_scopes=_get_canary_credential_scopes(self._cli_ctx),
+            ) as client:
+                group = client.resource_groups.get(resource_group_scope.rsplit("/", 1)[-1], retry_total=0)
+            group_id = getattr(group, "id", None)
+            if not isinstance(group_id, str) or _normalized_id(group_id) != _normalized_id(resource_group_scope):
+                raise AzureResponseError("The resource-group lookup did not return the expected resource group.")
+        except HttpResponseError as error:
+            if error.status_code != 404 or getattr(error.error, "code", None) != "ResourceGroupNotFound":
+                raise
+            scope = f"/subscriptions/{subscription}"
+            logger.info("Linked resource group is deleted; checking read-grant evidence at %s.", scope)
+
+        assignments = self._invoke_json(
+            "role assignment list "
+            f"--assignee-object-id {quote(namespace_principal_id)} --scope {quote(scope)} "
+            "--include-inherited --fill-principal-name false",
+            subscription=subscription,
+        )
+        if not isinstance(assignments, list) or any(not isinstance(item, dict) for item in assignments):
+            raise AzureResponseError("Malformed role-assignment response during unlink permission check.")
+        for assignment in assignments:
+            if (
+                isinstance(assignment.get("principalId"), str)
+                and _normalized_id(assignment["principalId"]) == _normalized_id(namespace_principal_id)
+                and isinstance(assignment.get("roleDefinitionId"), str)
+                and _normalized_id(assignment["roleDefinitionId"]).rsplit("/", 1)[-1] in UNLINK_READ_ROLE_IDS
+                and isinstance(assignment.get("scope"), str)
+                and _assignment_scope_applies(assignment["scope"], scope, inherited_at_scope=True)
+                and not assignment.get("condition")
+                and not assignment.get("conditionVersion")
+            ):
+                logger.info(
+                    "Observed a read-capable role assignment for namespace outbound principalId=%s at scope=%s. "
+                    "This is not an effective-access guarantee; ADR decides whether removal is allowed.",
+                    namespace_principal_id, scope,
+                )
                 return
-            assignment = (namespace_principal_id, READER_ROLE, resource_group_scope)
+        assignment = (namespace_principal_id, READER_ROLE, scope)
+        if grant_reader:
+            if scope != resource_group_scope:
+                raise AzureResponseError(
+                    "The linked resource group is deleted and no recognized subscription read grant was found. "
+                    "--grant-reader never creates subscription-scoped assignments, which cover all resources "
+                    "in the subscription. Endpoint removal was not submitted. "
+                    "An authorized principal can review and run this command manually, allow propagation, and retry:\n"
+                    f"{self._manual_commands([assignment])}"
+                )
+            logger.warning(
+                "--grant-reader will request Reader for namespace outbound principalId=%s at scope=%s. "
+                "This grants read access to all resources in that resource group. "
+                "If created, the assignment is retained after removal, including if removal fails.",
+                namespace_principal_id, scope,
+            )
             self._ensure_assignments(
                 [assignment],
                 {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
+                strict=True,
             )
             logger.warning(
-                "Waiting %s seconds for the new Reader grant to propagate before submitting unlink.",
-                UNLINK_READER_PROPAGATION_DELAY_SECONDS,
+                "Reader assignment setup completed. New assignments can take several minutes to take effect; "
+                "if ADR rejects removal before access propagates, rerun the remove command later. "
+                "Assignment visibility is not an effective-access guarantee."
             )
-            self._sleep(UNLINK_READER_PROPAGATION_DELAY_SECONDS)
-        except AzureResponseError as error:
-            if "ResourceGroupNotFound" in str(error):
-                message = (
-                    f"{error}\nUnlink Reader setup requires resource group "
-                    f"'{resource_group_scope}' to exist. If that group was "
-                    "deleted, recreate it before retrying. No namespace PUT "
-                    "or broader subscription-level grant was submitted."
-                )
-            else:
-                message = (
-                    f"{error}\nUnlink Reader setup did not complete. No "
-                    "namespace PUT or broader subscription-level grant was "
-                    "submitted."
-                )
-            raise AzureResponseError(message) from error
+            return
+        logger.warning(
+            "Cannot confirm read access for namespace outbound principalId=%s at scope=%s. "
+            "The advisory check recognizes unconditional Reader, Contributor and Owner assignments, "
+            "including inherited grants; custom roles, group membership and deny assignments are not fully evaluated. "
+            "Continuing without changing role assignments; ADR may reject removal. "
+            "If read access is missing, an authorized principal can grant Reader with:\n%s\n"
+            "Reader grants read access to all resources within this scope. "
+            "New assignments can take several minutes to take effect; retry removal after propagation if ADR rejects it. "
+            "Use --no-rbac-check to skip only this advisory check, not ADR authorization.",
+            namespace_principal_id, scope,
+            self._manual_commands([assignment]),
+        )
 
-    def _ensure_assignments(self, missing, descriptions) -> None:
+    def _ensure_assignments(self, missing, descriptions, *, strict=False) -> None:
         if not missing:
             return
 
@@ -677,7 +764,7 @@ class LinkRbacManager:
                 # a duplicate or blocking an otherwise idempotent link retry.
                 try:
                     assignment_now_exists = self._assignment_exists(
-                        principal_id, role, scope
+                        principal_id, role, scope, strict=strict,
                     )
                 except AzureResponseError:
                     assignment_now_exists = False
@@ -703,4 +790,4 @@ class LinkRbacManager:
                 "(service authorization may still need time to propagate):\n%s",
                 self._assignment_summary(created, descriptions),
             )
-        self._wait_for_assignments(created)
+        self._wait_for_assignments(created, strict=strict)

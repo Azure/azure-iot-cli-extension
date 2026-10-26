@@ -635,12 +635,13 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 17
+        assert len(nodes) == 18
         assert {
             "test_adr_schema_int.py::TestADRSchemaLifecycle::test_schema_registry_and_versions_lifecycle",
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
             "test_adr_link_int.py::TestADRLinkSequentialAdd::test_adr_link_sequential_add",
+            "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_unlink_missing_rg_advisory",
         } <= nodes
         assert expected <= nodes
         assert {

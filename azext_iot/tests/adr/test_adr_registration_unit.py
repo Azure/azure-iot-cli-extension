@@ -14,6 +14,8 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
+    HUB_UNLINK_WARNING,
+    UNLINK_WARNING,
     adr_link_ops,
     adr_link_wait_ops,
     adr_schema_ops,
@@ -168,8 +170,10 @@ def test_2026_command_surface_is_registered():
         assert commands[f"{group} create"][2] == {}
         assert f"{group} update" not in commands
     for endpoint in ("hub", "dps"):
+        warning = HUB_UNLINK_WARNING if endpoint == "hub" else UNLINK_WARNING
         assert commands[f"iot adr ns link {endpoint} remove"] == (
-            "command", f"adr_link_{endpoint}_remove", {"confirmation": True, "supports_no_wait": True},
+            "command", f"adr_link_{endpoint}_remove",
+            {"confirmation": warning + " Continue?", "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands
@@ -414,10 +418,13 @@ def test_load_adr_arguments():
         )
         for command in arguments
     )
-    assert not any(
-        command.startswith("iot adr ns link") and command.endswith(" remove")
-        for command in arguments
-    )
+    for kind in ("hub", "dps"):
+        remove_arguments = arguments[f"iot adr ns link {kind} remove"]
+        assert set(remove_arguments) == {"skip_rbac_check", "grant_reader"}
+        assert remove_arguments["skip_rbac_check"]["options_list"] == ["--no-rbac-check", "--skip-rbac-check"]
+        assert remove_arguments["skip_rbac_check"]["action"] == "store_true"
+        assert remove_arguments["grant_reader"]["options_list"] == ["--grant-reader"]
+        assert remove_arguments["grant_reader"]["action"] == "store_true"
 
     for command in (
         "iot adr ns wait",
@@ -604,6 +611,32 @@ def test_help_surface_matches_ga_commands():
         command.startswith("iot adr ns su update") for command in helps
     )
     assert "iot adr ns su device-class update" not in helps
+
+
+def test_unlink_help_explains_prerequisites_and_manual_read_access():
+    load_adr_help()
+    for kind in ("hub", "dps"):
+        help_text = " ".join(yaml.safe_load(helps[f"iot adr ns link {kind} remove"])["long-summary"].split())
+        assert "For a Succeeded link, delete the linked" in help_text
+        assert "Failed links do not require the linked resource to be deleted." in help_text
+        assert "For Succeeded links, ADR confirms deletion by reading the target as the namespace outbound identity." in help_text
+        assert "scope that survives deletion" in help_text
+        assert "Target-scoped roles granted by link add do not provide this parent-scope access." in help_text
+        assert "exact Reader assignment command" in help_text
+        assert "subscription-scoped grants are broader" in help_text
+        assert "several minutes to take effect" in help_text
+        assert "By default, no role assignments are created or removed." in help_text
+        assert "--no-rbac-check (alias --skip-rbac-check)" in help_text
+        assert "Reader setup failures stop removal" in help_text
+        assert "no subscription grant is created" in help_text
+        assert "Assignments are retained after successful removal or any failure, including HTTP 412." in help_text
+        assert "--no-wait does not skip Reader setup" in help_text
+        assert "not ADR authorization" in help_text
+        assert ("EndpointUsedByNestedDevices" in help_text) is (kind == "hub")
+        assert ("az iot adr ns device delete" in help_text) is (kind == "hub")
+        if kind == "hub":
+            assert "Hub endpoints, including Failed links" in help_text
+            assert "Deleting the IoT Hub does not clear these references." in help_text
 
 
 def test_every_registered_adr_command_has_help():
