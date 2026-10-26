@@ -726,7 +726,7 @@ def load_adr_help():
     For a Succeeded link, delete the linked resource before running link hub/dps/su remove.
     Failed links do not require deleting the linked resource. Hub endpoints in any state
     also require clearing Registry Device IoT Hub capability references; see link hub remove --help.
-    Remove deletes only the namespace endpoint, not the linked resource,
+    Remove does not delete or check the linked resource; it removes only the namespace endpoint
     and waits for the namespace update to complete unless --no-wait is specified.
     Remove performs a state-aware advisory permission check without changing role assignments.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
