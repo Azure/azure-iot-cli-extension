@@ -14,6 +14,7 @@ import json
 from shlex import quote
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
+from uuid import UUID
 
 from knack.log import get_logger
 from azure.cli.core._profile import Profile
@@ -43,7 +44,8 @@ UNLINK_WARNING = (
     "This removes only the namespace endpoint, not the linked resource. "
     "For a Succeeded link, delete the linked resource first; ADR uses the namespace outbound identity to verify deletion. "
     "Failed links do not require the linked resource to be deleted. "
-    "Permission checks are advisory; no role assignments are changed."
+    "Permission checks are advisory by default; no role assignments are changed unless --grant-reader is specified. "
+    "Reader assignments requested with --grant-reader are retained even if removal fails."
 )
 HUB_UNLINK_WARNING = UNLINK_WARNING + (
     " Hub endpoints, including Failed links, cannot be removed while Registry Devices have IoT Hub capabilities "
@@ -509,7 +511,7 @@ class LinkRbacManager:
         return False
 
     def _wait_for_assignments(
-        self, assignments: Iterable[Tuple[str, str, str]]
+        self, assignments: Iterable[Tuple[str, str, str]], *, strict=False,
     ) -> None:
         """Wait until newly-created assignments are visible to ARM reads."""
         pending = list(dict.fromkeys(assignments))
@@ -522,7 +524,7 @@ class LinkRbacManager:
             still_pending = []
             for principal_id, role, scope in pending:
                 try:
-                    if self._assignment_exists(principal_id, role, scope):
+                    if self._assignment_exists(principal_id, role, scope, strict=strict):
                         continue
                 except AzureResponseError:
                     # Role-assignment reads can be transiently throttled while
@@ -627,8 +629,10 @@ class LinkRbacManager:
 
         self._ensure_assignments(missing, descriptions)
 
-    def check_unlink_read_access(self, namespace_principal_id: str, resource_group_scope: str) -> None:
-        """Look for read-grant evidence, without promising effective access or changing RBAC."""
+    def check_unlink_read_access(
+        self, namespace_principal_id: str, resource_group_scope: str, *, grant_reader: bool = False,
+    ) -> None:
+        """Look for read-grant evidence; optionally establish Reader at the surviving resource group."""
         from azure.cli.core.commands.client_factory import get_mgmt_service_client
         from azure.core.exceptions import HttpResponseError
         from azure.mgmt.resource import ResourceManagementClient
@@ -637,6 +641,13 @@ class LinkRbacManager:
 
         if not isinstance(namespace_principal_id, str) or not namespace_principal_id.strip():
             raise AzureResponseError("The namespace outbound identity did not include a usable principalId.")
+        if grant_reader:
+            try:
+                UUID(namespace_principal_id)
+            except ValueError as error:
+                raise AzureResponseError(
+                    "The namespace outbound identity principalId must be a GUID before Reader can be granted."
+                ) from error
         subscription = _scope_subscription(resource_group_scope)
         scope = resource_group_scope
         try:
@@ -679,6 +690,33 @@ class LinkRbacManager:
                     namespace_principal_id, scope,
                 )
                 return
+        assignment = (namespace_principal_id, READER_ROLE, scope)
+        if grant_reader:
+            if scope != resource_group_scope:
+                raise AzureResponseError(
+                    "The linked resource group is deleted and no recognized subscription read grant was found. "
+                    "--grant-reader never creates subscription-scoped assignments, which cover all resources "
+                    "in the subscription. Endpoint removal was not submitted. "
+                    "An authorized principal can review and run this command manually, allow propagation, and retry:\n"
+                    f"{self._manual_commands([assignment])}"
+                )
+            logger.warning(
+                "--grant-reader will request Reader for namespace outbound principalId=%s at scope=%s. "
+                "This grants read access to all resources in that resource group. "
+                "If created, the assignment is retained after removal, including if removal fails.",
+                namespace_principal_id, scope,
+            )
+            self._ensure_assignments(
+                [assignment],
+                {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
+                strict=True,
+            )
+            logger.warning(
+                "Reader assignment setup completed. New assignments can take several minutes to take effect; "
+                "if ADR rejects removal before access propagates, rerun the remove command later. "
+                "Assignment visibility is not an effective-access guarantee."
+            )
+            return
         logger.warning(
             "Cannot confirm read access for namespace outbound principalId=%s at scope=%s. "
             "The advisory check recognizes unconditional Reader, Contributor and Owner assignments, "
@@ -687,12 +725,12 @@ class LinkRbacManager:
             "If read access is missing, an authorized principal can grant Reader with:\n%s\n"
             "Reader grants read access to all resources within this scope. "
             "New assignments can take several minutes to take effect; retry removal after propagation if ADR rejects it. "
-            "Use --skip-rbac-check to skip only this advisory check, not ADR authorization.",
+            "Use --no-rbac-check to skip only this advisory check, not ADR authorization.",
             namespace_principal_id, scope,
-            self._manual_commands([(namespace_principal_id, READER_ROLE, scope)]),
+            self._manual_commands([assignment]),
         )
 
-    def _ensure_assignments(self, missing, descriptions) -> None:
+    def _ensure_assignments(self, missing, descriptions, *, strict=False) -> None:
         if not missing:
             return
 
@@ -739,7 +777,7 @@ class LinkRbacManager:
                 # a duplicate or blocking an otherwise idempotent link retry.
                 try:
                     assignment_now_exists = self._assignment_exists(
-                        principal_id, role, scope
+                        principal_id, role, scope, strict=strict,
                     )
                 except AzureResponseError:
                     assignment_now_exists = False
@@ -765,4 +803,4 @@ class LinkRbacManager:
                 "(service authorization may still need time to propagate):\n%s",
                 self._assignment_summary(created, descriptions),
             )
-        self._wait_for_assignments(created)
+        self._wait_for_assignments(created, strict=strict)

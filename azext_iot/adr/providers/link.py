@@ -12,6 +12,7 @@ from typing import Optional
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     AzureResponseError,
+    MutuallyExclusiveArgumentError,
     ResourceNotFoundError,
 )
 from azure.core.exceptions import DeserializationError, HttpResponseError, ServiceRequestError, ServiceResponseError
@@ -201,8 +202,12 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
-        no_wait=False, skip_rbac_check=False,
+        no_wait=False, skip_rbac_check=False, grant_reader=False,
     ):
+        if skip_rbac_check and grant_reader:
+            raise MutuallyExclusiveArgumentError(
+                "--grant-reader cannot be combined with --no-rbac-check (or its alias --skip-rbac-check)."
+            )
         logger.warning("%s", HUB_UNLINK_WARNING if section == "messaging" else UNLINK_WARNING)
         namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
@@ -234,11 +239,11 @@ class LinkProvider(ADRProvider):
                     "Endpoint removal was not submitted because attached identities cannot be safely preserved."
                 )
             resource["identity"] = sanitize_arm_identity(identity)
-        if not skip_rbac_check:
-            self._check_unlink_permissions(namespace, endpoint, section)
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
         resource["properties"] = properties
+        if not skip_rbac_check:
+            self._check_unlink_permissions(namespace, endpoint, section, grant_reader=grant_reader)
         try:
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
@@ -264,7 +269,7 @@ class LinkProvider(ADRProvider):
                 )
             raise
 
-    def _check_unlink_permissions(self, namespace, endpoint, section):
+    def _check_unlink_permissions(self, namespace, endpoint, section, *, grant_reader=False):
         state = endpoint.get("linkingState")
         if state in ("LinkedResourceDeleted", "Failed"):
             logger.info("Skipping permission check for endpoint linkingState '%s'.", state)
@@ -283,7 +288,9 @@ class LinkProvider(ADRProvider):
             parsed_id = parse_resource_id(resource_id.strip())
             if not all(parsed_id.get(field) for field in ("subscription", "resource_group", "name")):
                 raise AzureResponseError("The linked endpoint resourceId must be a resource-group-scoped ARM resource ID.")
-            outbound = namespace["properties"].get("outboundIdentity") or {}
+            outbound = namespace["properties"].get("outboundIdentity")
+            if outbound is None:
+                outbound = {}
             if not isinstance(outbound, dict):
                 raise AzureResponseError("The namespace outboundIdentity must be an object.")
             if str(outbound.get("type") or "SystemAssigned").casefold() == "userassigned":
@@ -307,40 +314,47 @@ class LinkProvider(ADRProvider):
             self._rbac_manager().check_unlink_read_access(
                 resolve_namespace_outbound_principal(namespace),
                 f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
+                grant_reader=grant_reader,
             )
         except (CLIError, HttpResponseError, ServiceRequestError, ServiceResponseError, DeserializationError) as error:
+            if grant_reader:
+                raise AzureResponseError(
+                    "Reader setup could not be completed; endpoint removal was not submitted. "
+                    "Any role assignments already created are retained. "
+                    f"Detail: {error}"
+                ) from error
             logger.warning(
                 "Could not verify the namespace outbound identity's read access: %s "
                 "Continuing without changing role assignments; ADR may reject removal. "
-                "Use --skip-rbac-check to skip this advisory check.",
+                "Use --no-rbac-check to skip this advisory check.",
                 error,
             )
 
     def hub_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
         )
 
     def dps_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
         )
 
     def su_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False,
+        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check,
+            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
         )
 
     def _patch_link(

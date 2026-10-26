@@ -595,9 +595,11 @@ def test_load_adr_arguments():
     )
     for kind in ("hub", "dps", "su"):
         remove_arguments = arguments[f"iot adr ns link {kind} remove"]
-        assert set(remove_arguments) == {"skip_rbac_check"}
-        assert remove_arguments["skip_rbac_check"]["options_list"] == ["--skip-rbac-check"]
+        assert set(remove_arguments) == {"skip_rbac_check", "grant_reader"}
+        assert remove_arguments["skip_rbac_check"]["options_list"] == ["--no-rbac-check", "--skip-rbac-check"]
         assert remove_arguments["skip_rbac_check"]["action"] == "store_true"
+        assert remove_arguments["grant_reader"]["options_list"] == ["--grant-reader"]
+        assert remove_arguments["grant_reader"]["action"] == "store_true"
 
     for command in (
         "iot adr ns wait",
@@ -864,7 +866,12 @@ def test_unlink_help_explains_prerequisites_and_manual_read_access():
         assert "exact Reader assignment command" in help_text
         assert "subscription-scoped grants are broader" in help_text
         assert "several minutes to take effect" in help_text
-        assert "No role assignments are created or removed." in help_text
+        assert "By default, no role assignments are created or removed." in help_text
+        assert "--no-rbac-check (alias --skip-rbac-check)" in help_text
+        assert "Reader setup failures stop removal" in help_text
+        assert "no subscription grant is created" in help_text
+        assert "Assignments are retained after successful removal or any failure, including HTTP 412." in help_text
+        assert "--no-wait does not skip Reader setup" in help_text
         assert "not ADR authorization" in help_text
         assert ("EndpointUsedByNestedDevices" in help_text) is (kind == "hub")
         assert ("az iot adr ns device delete" in help_text) is (kind == "hub")

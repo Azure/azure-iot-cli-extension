@@ -964,9 +964,17 @@ def load_adr_arguments(self, _):
     for kind in ("hub", "dps", "su"):
         with self.argument_context(f"iot adr ns link {kind} remove") as context:
             context.argument(
-                "skip_rbac_check", options_list=["--skip-rbac-check"], action="store_true",
+                "skip_rbac_check", options_list=["--no-rbac-check", "--skip-rbac-check"], action="store_true",
                 help="Skip the advisory outbound-identity read-permission check. "
-                     "Does not bypass confirmation, ETag validation or ADR service validation.",
+                     "Does not bypass confirmation, ETag validation or ADR service validation. "
+                     "Cannot be combined with --grant-reader.",
+            )
+            context.argument(
+                "grant_reader", options_list=["--grant-reader"], action="store_true",
+                help="For Succeeded links, assign missing Reader access to the namespace outbound identity on the "
+                     "linked resource's resource group. Requires permission to assign roles; never grants at subscription "
+                     "scope. Setup failures stop removal. Assignments are retained even if removal fails and can take "
+                     "several minutes to take effect. Cannot be combined with --no-rbac-check.",
             )
         for action in ("add", "update"):
             with self.argument_context(f"iot adr ns link {kind} {action}") as context:

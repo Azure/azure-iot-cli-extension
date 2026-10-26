@@ -728,7 +728,8 @@ def load_adr_help():
     also require clearing Registry Device IoT Hub capability references; see link hub remove --help.
     Remove does not delete or check the linked resource; it removes only the namespace endpoint
     and waits for the namespace update to complete unless --no-wait is specified.
-    Remove performs a state-aware advisory permission check without changing role assignments.
+    Remove performs a state-aware advisory permission check without changing role assignments by default.
+    Use --grant-reader to explicitly request missing Reader access at the linked resource's resource group.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
     After add/update --no-wait, use link hub/dps/su wait to track completion.
     After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
@@ -768,17 +769,25 @@ def load_adr_help():
     grants for the namespace outbound identity on the linked resource's resource group,
     including inherited grants. If that group is confirmed deleted, it checks the subscription.
     LinkedResourceDeleted and Failed endpoints skip permission checks. Other states warn and continue.
-    Missing access or unavailable checks warn and continue; ADR decides whether removal is allowed.
+    By default, missing access or unavailable checks warn and continue; ADR decides whether removal is allowed.
     When no recognized read grant is found, the warning includes an exact Reader assignment
     command for an authorized principal to run manually. Reader covers all resources within
     that scope; subscription-scoped grants are broader than resource-group grants.
     New role assignments can take several minutes to take effect; if ADR rejects removal
     immediately after a grant, retry after propagation.
     Custom roles, conditions, group membership and deny assignments are not fully evaluated.
-    No role assignments are created or removed. Use --skip-rbac-check to bypass only this
+    By default, no role assignments are created or removed. Use --no-rbac-check (alias --skip-rbac-check) to bypass only this
     advisory check, not ADR authorization; --yes skips confirmation but does not skip permission checking.
+    For Succeeded links, --grant-reader explicitly requests missing Reader access for the namespace outbound
+    identity at the linked resource's resource group, not the namespace's resource group.
+    It reuses recognized read grants and requires permission to create role assignments when access is missing.
+    Reader setup failures stop removal. If the target resource group is deleted and no recognized
+    subscription read grant exists, removal stops with a manual command; no subscription grant is created.
+    Other endpoint states never receive Reader grants. --grant-reader cannot be combined with --no-rbac-check
+    or --skip-rbac-check. Assignments are retained after successful removal or any failure, including HTTP 412.
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
+    --no-wait does not skip Reader setup or its assignment-visibility wait.
     After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
     Missing, weak, or malformed namespace ETags stop removal before permission checks or writes.
     Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
@@ -789,7 +798,9 @@ def load_adr_help():
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
     - name: Remove an endpoint without the advisory permission check
-      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --skip-rbac-check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-rbac-check
+    - name: Grant missing resource-group Reader access before removing a Succeeded endpoint
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --grant-reader
   """
 
     helps[

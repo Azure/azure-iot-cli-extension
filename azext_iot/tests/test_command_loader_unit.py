@@ -525,6 +525,17 @@ def test_link_delete_is_registered(command_table, kind):
     assert ("EndpointUsedByNestedDevices" in confirmation) is (kind == "hub")
 
 
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
+def test_link_remove_permission_flags_parser(management_command_parser, kind, option):
+    args = ["iot", "adr", "ns", "link", kind, "remove", *_NAMESPACE_ARGUMENTS, "-n", "primary"]
+    if option:
+        args.append(option)
+    parsed = management_command_parser.parse_args(args)
+    assert bool(parsed.skip_rbac_check) is (option in ("--no-rbac-check", "--skip-rbac-check"))
+    assert bool(parsed.grant_reader) is (option == "--grant-reader")
+
+
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)
 def test_namespace_device_command_parser(command_table, management_command_parser, command_name):
     assert command_table[command_name].command_kwargs["is_preview"]
