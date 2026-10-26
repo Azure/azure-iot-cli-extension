@@ -14,6 +14,7 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
+    HUB_UNLINK_WARNING,
     UNLINK_WARNING,
     adr_link_ops,
     adr_link_wait_ops,
@@ -242,9 +243,10 @@ def test_2026_command_surface_is_registered():
         {"confirmation": True, "supports_no_wait": True},
     )
     for endpoint in ("hub", "dps", "su"):
+        warning = HUB_UNLINK_WARNING if endpoint == "hub" else UNLINK_WARNING
         assert commands[f"iot adr ns link {endpoint} remove"] == (
             "command", f"adr_link_{endpoint}_remove",
-            {"confirmation": UNLINK_WARNING + " Continue?", "supports_no_wait": True},
+            {"confirmation": warning + " Continue?", "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands
@@ -848,6 +850,27 @@ def test_help_surface_matches_2026_commands_and_su_type():
         command.startswith("iot adr ns su update") for command in helps
     )
     assert "iot adr ns su device-class update" not in helps
+
+
+def test_unlink_help_explains_prerequisites_and_manual_read_access():
+    load_adr_help()
+    for kind in ("hub", "dps", "su"):
+        help_text = " ".join(yaml.safe_load(helps[f"iot adr ns link {kind} remove"])["long-summary"].split())
+        assert "For a Succeeded link, delete the linked" in help_text
+        assert "Failed links do not require the linked resource to be deleted." in help_text
+        assert "For Succeeded links, ADR confirms deletion by reading the target as the namespace outbound identity." in help_text
+        assert "scope that survives deletion" in help_text
+        assert "Target-scoped roles granted by link add do not provide this parent-scope access." in help_text
+        assert "exact Reader assignment command" in help_text
+        assert "subscription-scoped grants are broader" in help_text
+        assert "several minutes to take effect" in help_text
+        assert "No role assignments are created or removed." in help_text
+        assert "not ADR authorization" in help_text
+        assert ("EndpointUsedByNestedDevices" in help_text) is (kind == "hub")
+        assert ("az iot adr ns device delete" in help_text) is (kind == "hub")
+        if kind == "hub":
+            assert "Hub endpoints, including Failed links" in help_text
+            assert "Deleting the IoT Hub does not clear these references." in help_text
 
 
 def test_job_run_delete_help_does_not_require_cancellation():

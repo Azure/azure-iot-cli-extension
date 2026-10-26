@@ -12,6 +12,8 @@ Release History
 * Missing access, unavailable checks, malformed linked resource IDs and other endpoint states warn and continue, leaving ADR authoritative. Added ``--skip-rbac-check``; ``--yes`` still skips only confirmation. Unlink never creates or removes role assignments; custom roles, conditions, group membership and deny assignments are not fully evaluated.
 * Malformed outbound identity metadata and resource-group response deserialization failures warn and continue during advisory preflight; namespace write and polling errors still propagate.
 * Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--skip-rbac-check``. Valid identity assignments are preserved.
+* Unlink guidance limits target deletion to ``Succeeded`` links and explains that Hub endpoints, including failed links, require clearing Registry Device IoT Hub capability references first.
+* Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed automatically.
 
 **DPS certificate and enrollment fixes**
 

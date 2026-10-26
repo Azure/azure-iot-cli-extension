@@ -58,7 +58,9 @@ from azext_iot.adr.providers.link_preflight import (
 )
 from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.rbac import LinkRbacManager, UNLINK_WARNING, required_assignments, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import (
+    HUB_UNLINK_WARNING, LinkRbacManager, UNLINK_WARNING, required_assignments, resolve_namespace_outbound_principal,
+)
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -201,7 +203,7 @@ class LinkProvider(ADRProvider):
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
         no_wait=False, skip_rbac_check=False,
     ):
-        logger.warning("%s", UNLINK_WARNING)
+        logger.warning("%s", HUB_UNLINK_WARNING if section == "messaging" else UNLINK_WARNING)
         namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
             cls=lambda response, resource, _: (resource, response.http_response.headers.get("ETag")),

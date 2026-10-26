@@ -881,6 +881,47 @@ def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("state", ["Succeeded", "Failed", "LinkedResourceDeleted"])
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_warning_explains_state_and_hub_prerequisites(
+    fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, state, skip,
+):
+    source = namespace()
+    source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
+    client = Mock()
+    client.namespaces.get.return_value = (source, ETAG)
+    getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+    assert "For a Succeeded link, delete the linked resource first" in caplog.text
+    assert "Failed links do not require the linked resource to be deleted." in caplog.text
+    assert ("EndpointUsedByNestedDevices" in caplog.text) is (kind == "hub")
+    assert ("az iot adr ns device delete" in caplog.text) is (kind == "hub")
+    if kind == "hub":
+        assert "Hub endpoints, including Failed links" in caplog.text
+        assert "Deleting the IoT Hub does not clear these references." in caplog.text
+    assert unlink_rbac.check_unlink_read_access.call_count == (state == "Succeeded" and not skip)
+    client.namespaces.begin_create_or_replace.assert_called_once()
+
+
+@pytest.mark.parametrize("state", ["Succeeded", "Failed"])
+@pytest.mark.parametrize("skip", [False, True])
+def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, unlink_client, caplog, state, skip):
+    source = namespace()
+    source["properties"]["messaging"]["endpoints"]["primary"]["linkingState"] = state
+    with responses.RequestsMock() as network:
+        network.get(URL, json=source, headers={"ETag": ETAG})
+        network.put(URL, status=400, json={"error": {
+            "code": "EndpointUsedByNestedDevices", "message": "Registry Devices still reference this Hub endpoint.",
+        }})
+        with pytest.raises(HttpResponseError) as raised:
+            LinkProvider(fixture_cmd, client=unlink_client).hub_remove("primary", "ns", "rg", skip_rbac_check=skip)
+        assert raised.value.status_code == 400
+        assert raised.value.error.code == "EndpointUsedByNestedDevices"
+        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert network.calls[1].request.headers["If-Match"] == ETAG
+    assert "az iot adr ns device delete" in caplog.text
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("state", ["LinkedResourceDeleted", "Failed", "InProgress", "Canceled", "", None, "Unexpected"])
 def test_delete_state_gate_skips_identity_target_and_permission_work(
     fixture_cmd, mocker, unlink_rbac, caplog, kind, section, _endpoint_type, state,
@@ -976,4 +1017,7 @@ def test_delete_skip_rbac_check_does_not_bypass_confirmation(offline_cli, mocker
     ) != 0
     confirm.assert_called_once()
     assert "no role assignments are changed" in confirm.call_args.args[0]
+    assert "For a Succeeded link, delete the linked resource first" in confirm.call_args.args[0]
+    assert "Failed links do not require the linked resource to be deleted." in confirm.call_args.args[0]
+    assert ("EndpointUsedByNestedDevices" in confirm.call_args.args[0]) is (kind == "hub")
     provider.assert_not_called()

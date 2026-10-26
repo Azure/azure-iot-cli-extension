@@ -41,8 +41,14 @@ RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
 UNLINK_WARNING = (
     "This removes only the namespace endpoint, not the linked resource. "
-    "Delete the linked resource first. ADR may reject removal if the namespace outbound identity "
-    "cannot verify the linked resource's deletion. Permission checks are advisory; no role assignments are changed."
+    "For a Succeeded link, delete the linked resource first; ADR uses the namespace outbound identity to verify deletion. "
+    "Failed links do not require the linked resource to be deleted. "
+    "Permission checks are advisory; no role assignments are changed."
+)
+HUB_UNLINK_WARNING = UNLINK_WARNING + (
+    " Hub endpoints, including Failed links, cannot be removed while Registry Devices have IoT Hub capabilities "
+    "referencing the endpoint (EndpointUsedByNestedDevices). Clear these references first, for example by deleting "
+    "the referencing Registry Devices with 'az iot adr ns device delete'. Deleting the IoT Hub does not clear these references."
 )
 NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE = (
     "DPS links additionally require the namespace system-assigned identity, "
@@ -678,8 +684,12 @@ class LinkRbacManager:
             "The advisory check recognizes unconditional Reader, Contributor and Owner assignments, "
             "including inherited grants; custom roles, group membership and deny assignments are not fully evaluated. "
             "Continuing without changing role assignments; ADR may reject removal. "
-            "Verify the identity's read access or use --skip-rbac-check to skip this advisory check.",
+            "If read access is missing, an authorized principal can grant Reader with:\n%s\n"
+            "Reader grants read access to all resources within this scope. "
+            "New assignments can take several minutes to take effect; retry removal after propagation if ADR rejects it. "
+            "Use --skip-rbac-check to skip only this advisory check, not ADR authorization.",
             namespace_principal_id, scope,
+            self._manual_commands([(namespace_principal_id, READER_ROLE, scope)]),
         )
 
     def _ensure_assignments(self, missing, descriptions) -> None:

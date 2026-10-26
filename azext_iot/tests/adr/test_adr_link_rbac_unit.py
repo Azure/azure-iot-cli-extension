@@ -225,6 +225,7 @@ def test_unlink_recognizes_read_capable_inherited_grants_without_writes(
     }
     assert "not an effective-access guarantee" in caplog.text
     assert "Cannot confirm" not in caplog.text
+    assert "az role assignment create" not in caplog.text
     token_profile.return_value.get_raw_token.assert_not_called()
     create.assert_not_called()
     manager._sleep.assert_not_called()
@@ -248,6 +249,16 @@ def test_unlink_unconfirmed_read_access_warns_without_grants(unlink_resource_cli
     assert "Continuing without changing role assignments" in caplog.text
     assert "custom roles, group membership and deny assignments" in caplog.text
     assert "--skip-rbac-check" in caplog.text
+    command = next(line for line in caplog.text.splitlines() if line.startswith("az role assignment create "))
+    assert shlex.split(command) == [
+        "az", "role", "assignment", "create", "--assignee-object-id", "outbound-mi",
+        "--assignee-principal-type", "ServicePrincipal", "--role", "Reader",
+        "--scope", "/subscriptions/target-sub/resourceGroups/target-rg", "--subscription", "target-sub",
+    ]
+    assert "If read access is missing" in caplog.text
+    assert "Reader grants read access to all resources within this scope." in caplog.text
+    assert "several minutes to take effect" in caplog.text
+    assert "not ADR authorization" in caplog.text
     assert manager.cli.invoke.call_count == 1
     assert not manager.created
     manager._sleep.assert_not_called()
@@ -291,8 +302,9 @@ def test_unlink_group_lookup_failure_does_not_fall_back(unlink_resource_client, 
     (500, "InternalServerError", False),
 ])
 @pytest.mark.parametrize("endpoint", ["https://management.azure.com", "https://centraluseuap.management.azure.com"])
+@pytest.mark.parametrize("has_grant", [False, True])
 def test_unlink_real_group_lookup_falls_back_only_for_confirmed_deleted_rg(
-    mocker, monkeypatch, unlink_resource_client, caplog, status, code, fallback, endpoint,
+    mocker, monkeypatch, unlink_resource_client, caplog, status, code, fallback, endpoint, has_grant,
 ):
     monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", endpoint)
     target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
@@ -301,7 +313,9 @@ def test_unlink_real_group_lookup_falls_back_only_for_confirmed_deleted_rg(
     client = ResourceManagementClient(credential, "target-sub", base_url=endpoint, retry_total=0)
     unlink_resource_client.return_value = client
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    manager.cli.invoke.return_value = _result([_unlink_assignment(scope="/subscriptions/target-sub")])
+    manager.cli.invoke.return_value = _result(
+        [_unlink_assignment(scope="/subscriptions/target-sub")] if has_grant else [],
+    )
     with responses.RequestsMock() as network, caplog.at_level(logging.INFO):
         network.get(endpoint + target_rg.replace("/resourceGroups/", "/resourcegroups/"), status=status, json={
             "error": {"code": code, "message": "The text mentions ResourceGroupNotFound regardless of actual error code."},
@@ -311,13 +325,28 @@ def test_unlink_real_group_lookup_falls_back_only_for_confirmed_deleted_rg(
             command = shlex.split(manager.cli.invoke.call_args.args[0])
             assert command[command.index("--scope") + 1] == "/subscriptions/target-sub"
             assert manager.cli.invoke.call_args.kwargs == {"subscription": "target-sub"}
-            assert "not an effective-access guarantee" in caplog.text
+            assert ("not an effective-access guarantee" in caplog.text) is has_grant
+            if not has_grant:
+                remediation = next(
+                    line for line in caplog.text.splitlines() if line.startswith("az role assignment create ")
+                )
+                assert shlex.split(remediation) == [
+                    "az", "role", "assignment", "create", "--assignee-object-id", "outbound-mi",
+                    "--assignee-principal-type", "ServicePrincipal", "--role", "Reader",
+                    "--scope", "/subscriptions/target-sub", "--subscription", "target-sub",
+                ]
+                assert "Reader grants read access to all resources within this scope." in caplog.text
+            else:
+                assert "az role assignment create" not in caplog.text
+            assert manager.cli.invoke.call_count == 1
+            assert not manager.created
         else:
             with pytest.raises(HttpResponseError) as raised:
                 manager.check_unlink_read_access("outbound-mi", target_rg)
             assert raised.value.status_code == status
             assert raised.value.error.code == code
             manager.cli.invoke.assert_not_called()
+            assert "az role assignment create" not in caplog.text
         assert len(network.calls) == 1
 
 
