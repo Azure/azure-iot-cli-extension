@@ -107,7 +107,8 @@ def validate_context(context):
         raise ValueError("Unknown service/diagnostic identity.")
     if (context["service"] == "RetrySelfTest") != (context["diagnostic"] == "true"):
         raise ValueError("Diagnostic evidence cannot qualify an integration service.")
-    if context["definition"] != "147":
+    definitions = ("147",) if context["diagnostic"] == "true" else ("147", "166")
+    if context["definition"] not in definitions:
         raise ValueError("Attempt evidence belongs to a different pipeline definition.")
     for key in ("wheel", "dependencies"):
         if not re.fullmatch("[a-f0-9]{64}", context[key]):

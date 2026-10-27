@@ -70,6 +70,34 @@ def test_exact_retry_preserves_passes_and_records_recovery(tmp_path):
     assert "Passed on manual retry" in (tmp_path / "final.xml").read_text()
 
 
+def test_health_pipeline_records_and_recovers_its_own_attempts(tmp_path):
+    context = dict(CONTEXT, definition="166")
+    assert retry.recovery_plan([], context)["mode"] == "full"
+    first = attempt({"a": "passed", "b": "failed", "c": "passed"})
+    first["context"] = context.copy()
+    assert retry.pending([first], context) == {"tests": ["b"]}
+    second = attempt({"b": "passed"}, first)
+    second["context"] = context.copy()
+    assert retry.junit([first, second], context, tmp_path / "final.xml") == 0
+
+
+@pytest.mark.parametrize("producer,consumer", [("147", "166"), ("166", "147")])
+def test_health_and_manual_pipeline_evidence_cannot_be_interchanged(producer, consumer):
+    first = attempt({"a": "passed", "b": "passed", "c": "passed"})
+    first["context"]["definition"] = producer
+    with pytest.raises(ValueError, match="Attempt identity changed: definition"):
+        retry.evaluate([first], dict(CONTEXT, definition=consumer))
+
+
+@pytest.mark.parametrize("context", [
+    dict(CONTEXT, definition="999"),
+    dict(CONTEXT, definition="166", service="RetrySelfTest", diagnostic="true"),
+])
+def test_unapproved_pipeline_and_health_diagnostics_cannot_qualify(context):
+    with pytest.raises(ValueError, match="different pipeline definition"):
+        retry.recovery_plan([], context)
+
+
 @pytest.mark.parametrize("defect", [
     "parent", "commit", "wheel", "dependencies", "region", "endpoint", "build", "definition",
     "sequence", "missing", "extra", "rerun-pass", "skip", "setup", "teardown", "incomplete",
