@@ -518,7 +518,22 @@ def test_pnp_update_authentication_default_has_only_the_standard_linter_exceptio
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
 def test_link_delete_is_registered(command_table, kind):
-    assert f"iot adr ns link {kind} remove" in command_table
+    command = command_table[f"iot adr ns link {kind} remove"]
+    confirmation = command.command_kwargs["confirmation"]
+    assert "For a Succeeded link, delete the linked resource first" in confirmation
+    assert "Failed links do not require the linked resource to be deleted." in confirmation
+    assert ("EndpointUsedByNestedDevices" in confirmation) is (kind == "hub")
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
+def test_link_remove_permission_flags_parser(management_command_parser, kind, option):
+    args = ["iot", "adr", "ns", "link", kind, "remove", *_NAMESPACE_ARGUMENTS, "-n", "primary"]
+    if option:
+        args.append(option)
+    parsed = management_command_parser.parse_args(args)
+    assert bool(parsed.skip_rbac_check) is (option in ("--no-rbac-check", "--skip-rbac-check"))
+    assert bool(parsed.grant_reader) is (option == "--grant-reader")
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)

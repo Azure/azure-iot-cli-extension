@@ -8,9 +8,12 @@ from copy import deepcopy
 from time import sleep
 
 import pytest
+from azure.cli.core.azclierror import AzureResponseError
+from azure.core.exceptions import HttpResponseError
 
+from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.topology import writable_namespace_properties
-from azext_iot.adr.rbac import LINK_ROLE_IDS, READER_ROLE, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import LINK_ROLE_IDS, READER_ROLE, LinkRbacManager, resolve_namespace_outbound_principal
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
@@ -56,26 +59,83 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             timeout=3600 if kind == "su" else 600,
         )
 
-    def _remove_endpoint(self, namespace_name, kind, section, endpoint_name, target_name):
+    def _assert_live_target_removal_rejected(self, namespace_name, kind, section, endpoint_name):
+        before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        principal = resolve_namespace_outbound_principal(before)
+        scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
+        assert not self._reader_assignments(principal, scope)
+        with self.assertLogs("cli.azext_iot.adr", level="WARNING") as logs:
+            with pytest.raises((HttpResponseError, ADRResourceStateError)):
+                self.cmd(f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes")
+        assert any("Cannot confirm read access" in message for message in logs.output), logs.output
+        assert not self._reader_assignments(principal, scope), "Unlink must not create Reader grants."
+        after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        assert endpoint_name in after["properties"][section]["endpoints"]
+        assert after["tags"] == before["tags"]
+
+    def _assert_requested_reader_retained(self, namespace_name, kind, section, endpoint_name):
+        before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        endpoint = before["properties"][section]["endpoints"][endpoint_name]
+        assert endpoint["linkingState"] == "Succeeded", endpoint
+        principal = resolve_namespace_outbound_principal(before)
+        scope = endpoint["resourceId"].split("/providers/")[0]
+        assert not self._reader_assignments(principal, scope)
+        self.addCleanup(self._cleanup_reader, principal, scope)
+        command = (
+            f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes --grant-reader"
+        )
+        with pytest.raises((HttpResponseError, ADRResourceStateError)):
+            self.cmd(command)
+        created = self._reader_assignments(principal, scope)
+        assert len(created) == 1, "Explicit grant must be retained after service rejection."
+        sleep(ROLE_PROPAGATION_DELAY)
+        with pytest.raises((HttpResponseError, ADRResourceStateError)):
+            self.cmd(command)
+        assert self._reader_assignments(principal, scope) == created, "Retry must not duplicate the Reader assignment."
+        after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
+        assert endpoint_name in after["properties"][section]["endpoints"]
+        assert after["identity"] == before["identity"]
+        assert after["tags"] == before["tags"]
+
+    def _remove_endpoint(
+        self, namespace_name, kind, section, endpoint_name, target_name, *, skip_rbac_check=False, grant_reader=False,
+    ):
         selector = f"--ns {namespace_name} -g {TEST_RG}"
         before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
-        assert before["properties"][section]["endpoints"][endpoint_name]["linkingState"] == "Succeeded"
         principal = resolve_namespace_outbound_principal(before)
         scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
         existing_reader = self._reader_assignments(principal, scope)
         if not existing_reader:
             self.addCleanup(self._cleanup_reader, principal, scope)
+            assert self.assign_role(principal, READER_ROLE, scope, assignee_type="ServicePrincipal")
+            sleep(ROLE_PROPAGATION_DELAY)
+        prepared_reader = self._reader_assignments(principal, scope)
+        assert len(prepared_reader) == 1, "Fixture must prepare the required access before unlink."
         self._delete_owned_resource(kind, target_name, TEST_RG)
-        submitted = self.cmd(
-            f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes",
-        ).get_output_in_json()
+        permission_option = " --no-rbac-check" if skip_rbac_check else " --grant-reader" if grant_reader else ""
+        with self.assertLogs("cli.azext_iot.adr", level="INFO") as logs:
+            submitted = self.cmd(
+                f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes{permission_option}",
+            ).get_output_in_json()
+        assert not any("Cannot confirm read access" in message or "Could not verify" in message for message in logs.output)
+        if not skip_rbac_check:
+            assert any(
+                "Observed a read-capable role assignment" in message
+                or "Skipping permission check for endpoint linkingState" in message
+                for message in logs.output
+            ), logs.output
+        else:
+            assert not any(
+                "Observed a read-capable role assignment" in message
+                or "Skipping permission check for endpoint linkingState" in message
+                for message in logs.output
+            ), logs.output
         assert submitted["id"].casefold() == before["id"].casefold()
         assert submitted["properties"]["provisioningState"] == "Succeeded"
         assert endpoint_name not in submitted["properties"].get(section, {}).get("endpoints", {})
+        assert submitted.get("identity") == before.get("identity")
         reader = self._reader_assignments(principal, scope)
-        assert len(reader) == 1
-        if existing_reader:
-            assert reader[0]["id"] == existing_reader[0]["id"], "Reuse Reader rather than creating duplicate grants."
+        assert reader == prepared_reader, "Unlink must not create, remove or change role assignments."
 
         after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         assert after["properties"]["provisioningState"] == "Succeeded"
@@ -104,6 +164,19 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 TEST_RG, namespace_name, first_hub, generate_identity_name(), assign_setup_roles=False,
             )
             identity_resource_id = infrastructure["identity_resource_id"]
+            extra_identity_name = generate_identity_name()
+            extra_identity = self.create_owned_resource(
+                f"identity create -n {extra_identity_name} -g {TEST_RG} --location {TEST_LOCATION}",
+                kind="identity", name=extra_identity_name, resource_group=TEST_RG,
+            ).get_output_in_json()
+            attached = self.cmd(
+                f"iot adr ns identity assign -n {namespace_name} -g {TEST_RG} --user {extra_identity['id']}",
+            ).get_output_in_json()
+            assert "SystemAssigned" in attached["type"]
+            assert "UserAssigned" in attached["type"]
+            assert {identity_id.casefold() for identity_id in attached["userAssignedIdentities"]} == {
+                identity_resource_id.casefold(), extra_identity["id"].casefold(),
+            }
             self.cmd(f"iot adr ns update -n {namespace_name} -g {TEST_RG} --tags unlink-test=preserve")
             dps = self.create_owned_resource(
                 f"iot dps create -n {dps_name} -g {TEST_RG} --location {TEST_LOCATION} --system-assigned-mi",
@@ -132,7 +205,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 hub_id = hub["id"]
                 add_cmd = (
                     f"iot adr ns link hub add {selector} -n {endpoint_name} --hub-id {hub_id} "
-                    f"--user-assigned-mi {identity_resource_id}"
+                    f"--user-assigned-mi {identity_resource_id} --availability Available --allocation-weight 1"
                 )
                 link_hub_with_readiness(
                     self, add_cmd, namespace_name, TEST_RG, endpoint_name,
@@ -142,10 +215,15 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                             "type": "UserAssigned",
                             "userAssignedIdentity": identity_resource_id,
                         },
+                        "provisioning": {"availability": "Available", "allocationWeight": 1},
                     },
                 )
-            self._remove_endpoint(namespace_name, "hub", "messaging", "first", first_hub)
-            self._remove_endpoint(namespace_name, "hub", "messaging", "second", second_hub)
+            self._assert_live_target_removal_rejected(namespace_name, "hub", "messaging", "first")
+            self._assert_requested_reader_retained(namespace_name, "hub", "messaging", "first")
+            self._remove_endpoint(namespace_name, "hub", "messaging", "first", first_hub, grant_reader=True)
+            self._remove_endpoint(
+                namespace_name, "hub", "messaging", "second", second_hub, skip_rbac_check=True,
+            )
             self._remove_endpoint(namespace_name, "dps", "provisioning", "dps", dps_name)
         finally:
             self.cleanup_full_infra()
@@ -160,6 +238,9 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 "--tags unlink-test=preserve",
                 kind="namespace", name=namespace_name, resource_group=TEST_RG,
             ).get_output_in_json()
+            assert namespace["identity"]["type"] == "SystemAssigned"
+            assert namespace["identity"]["principalId"]
+            assert not namespace["identity"].get("userAssignedIdentities")
             su = self.create_owned_resource(
                 f"iot adr ns su instance create -n {su_name} -g {TEST_RG} "
                 f"--location {TEST_LOCATION} --system-assigned-mi",
@@ -175,6 +256,44 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
                 f"iot adr ns link su add --ns {namespace_name} -g {TEST_RG} -n su "
                 f"--su-id {su['id']} --system-assigned-mi --timeout 1200",
             )
-            self._remove_endpoint(namespace_name, "su", "updating", "su", su_name)
+            self._assert_requested_reader_retained(namespace_name, "su", "updating", "su")
+            self._remove_endpoint(namespace_name, "su", "updating", "su", su_name, grant_reader=True)
+        finally:
+            self.cleanup_full_infra()
+
+    @pytest.mark.timeout(900)
+    def test_adr_unlink_missing_rg_advisory(self):
+        namespace_name = generate_adr_namespace_name()
+        missing_group = f"unlink-absent-{generate_generic_id()}"
+        assert self.cmd(f"group exists -n {missing_group}").get_output_in_json() is False
+        try:
+            namespace = self.create_owned_resource(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG} --location {TEST_LOCATION}",
+                kind="namespace", name=namespace_name, resource_group=TEST_RG,
+            ).get_output_in_json()
+            principal = resolve_namespace_outbound_principal(namespace)
+            subscription_scope = "/".join(namespace["id"].split("/")[:3])
+            assignments_command = (
+                f"role assignment list --assignee-object-id {principal} --scope {subscription_scope} "
+                "--include-inherited --fill-principal-name false"
+            )
+            before = self.cmd(assignments_command).get_output_in_json()
+            assert not before
+            with self.assertLogs("cli.azext_iot.adr.rbac", level="WARNING") as logs:
+                LinkRbacManager(self.cli_ctx).check_unlink_read_access(
+                    principal, f"{subscription_scope}/resourceGroups/{missing_group}",
+                )
+            assert any(
+                f"Cannot confirm read access for namespace outbound principalId={principal} at scope={subscription_scope}."
+                in message for message in logs.output
+            ), logs.output
+            assert self.cmd(assignments_command).get_output_in_json() == before
+            with pytest.raises(AzureResponseError, match="never creates subscription-scoped assignments") as raised:
+                LinkRbacManager(self.cli_ctx).check_unlink_read_access(
+                    principal, f"{subscription_scope}/resourceGroups/{missing_group}", grant_reader=True,
+                )
+            assert f"--scope '{subscription_scope}'" in str(raised.value)
+            assert self.cmd(assignments_command).get_output_in_json() == before
+            assert self.cmd(f"group exists -n {missing_group}").get_output_in_json() is False
         finally:
             self.cleanup_full_infra()

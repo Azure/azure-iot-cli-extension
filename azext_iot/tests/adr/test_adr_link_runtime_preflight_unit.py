@@ -288,7 +288,7 @@ def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
     visible.assert_called_once_with([
         (outbound, "Contributor", dps_id), (inbound, "Contributor", NS_ID),
         ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
-    ])
+    ], strict=False)
     provider.client.namespaces.begin_update.assert_called_once()
 
 
@@ -378,7 +378,7 @@ def test_su_runtime_uses_exact_three_roles_for_selected_identities(
             (ns_principal, "Contributor", su_id),
             (ns_principal, "Device Update Administrator", su_id),
             (su_principal, "Azure Device Registry Contributor", NS_ID),
-        ])
+        ], strict=False)
         provider.client.namespaces.begin_update.assert_called_once()
         written = provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]
         assert set(written) == {"updating"}
