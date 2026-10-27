@@ -360,16 +360,18 @@ def cancel_integration(record, directory):
 def integrate(directory, record, timeout=19800):
     candidate = verify_candidate(directory)
     payload = {
-        "resources": {"repositories": {"self": {
-            "refName": candidate["sourceBranch"], "version": candidate["sourceCommit"],
-        }}},
-        "templateParameters": dict(INTEGRATION_PARAMETERS, releaseBuildId=int(candidate["producer"]["build"])),
+        "definition": {"id": 147}, "sourceBranch": candidate["sourceBranch"],
+        "sourceVersion": candidate["sourceCommit"],
+        "templateParameters": {
+            key: value if isinstance(value, str) else json.dumps(value)
+            for key, value in dict(INTEGRATION_PARAMETERS, releaseBuildId=candidate["producer"]["build"]).items()
+        },
     }
     run = existing_integration(candidate)
     if run is None:
         if int(os.environ.get("SYSTEM_JOBATTEMPT", "1")) != 1:
             raise ValueError("No child found on a retried job; do not risk requeuing an uncertain prior request.")
-        run = ado("pipelines/147/runs", method="POST", data=payload)
+        run = ado("build/builds", method="POST", data=payload)
     run_id = identifier(run["id"])
     write(record, {"id": run_id, "producer": candidate["producer"]})
     print(f"##vso[task.setvariable variable=integrationBuildId]{run_id}", flush=True)
@@ -418,7 +420,19 @@ def automation_allowed():
         raise ValueError("Publication is only allowed from the upstream repository.")
 
 
+def release_options():
+    mode = environment("RELEASE_MODE")
+    index = os.environ.get("RELEASE_CREATE_INDEX_PR", "false").lower()
+    if mode not in {"Plan", "Validate", "Release"} or index not in {"true", "false"}:
+        raise ValueError("Invalid release mode or createIndexPr option.")
+    if index == "true" and mode != "Release":
+        raise ValueError("createIndexPr requires Release mode and a public GitHub release.")
+    return mode, index == "true"
+
+
 def publication_allowed():
+    if release_options()[0] != "Release":
+        raise ValueError("Publication requires explicit Release mode.")
     automation_allowed()
     environment("RELEASE_GITHUB_TOKEN")
 
@@ -616,6 +630,8 @@ def publish(directory, receipt, prepared):
 
 def index_pull_request(directory, receipt, work_dir, prepared):
     publication_allowed()
+    if not release_options()[1]:
+        raise ValueError("Index submission requires explicit createIndexPr opt-in.")
     candidate, preparation = verify_publication_inputs(directory, prepared)
     publication = read(receipt)
     if publication["candidate"] != candidate:
@@ -695,7 +711,7 @@ def index_pull_request(directory, receipt, work_dir, prepared):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=[
-        "plan", "resolve", "checkout", "build", "candidate", "verify", "integrate", "cancel",
+        "options", "plan", "resolve", "checkout", "build", "candidate", "verify", "integrate", "cancel",
         "verify-integration", "index-check", "feed-environment", "prepare-publication", "publish", "index",
     ])
     parser.add_argument("--source", type=Path)
@@ -704,7 +720,10 @@ def main():
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--prepared", type=Path)
     args = parser.parse_args()
-    if args.operation == "plan":
+    if args.operation == "options":
+        mode, create_index_pr = release_options()
+        print(json.dumps({"mode": mode, "createIndexPr": create_index_pr}))
+    elif args.operation == "plan":
         print(json.dumps({
             "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")),
             "mode": "Plan only; governed onboarding; no qualification, release, tag, or index PR.",

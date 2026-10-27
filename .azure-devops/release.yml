@@ -15,6 +15,10 @@ parameters:
     type: string
     default: release/1.1.0-preview
     values: [dev, preview, release/1.1.0-preview]
+  - name: createIndexPr
+    displayName: Submit an extension-index PR after GitHub publication (Release only)
+    type: boolean
+    default: false
 
 resources:
   repositories:
@@ -40,3 +44,4 @@ extends:
         parameters:
           mode: ${{ parameters.mode }}
           sourceBranch: ${{ parameters.sourceBranch }}
+          createIndexPr: ${{ parameters.createIndexPr }}

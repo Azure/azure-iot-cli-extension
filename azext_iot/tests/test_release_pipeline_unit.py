@@ -36,7 +36,7 @@ def candidate(tmp_path, monkeypatch):
         "SYSTEM_TEAMPROJECTID": PROJECT, "SYSTEM_JOBATTEMPT": "1",
         "RELEASE_SOURCE_BRANCH": "release/1.1.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
-        "RELEASE_MODE": "Validate",
+        "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -101,6 +101,7 @@ def test_unapproved_source_branches(value):
 
 
 def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys):
+    monkeypatch.setenv("RELEASE_MODE", "Plan")
     monkeypatch.delenv("RELEASE_GITHUB_TOKEN")
     monkeypatch.delenv("SYSTEM_ACCESSTOKEN", raising=False)
     monkeypatch.setattr(sys, "argv", ["release_pipeline.py", "plan"])
@@ -109,6 +110,25 @@ def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys):
     assert result["integrationPipeline"] == 147
     assert "no qualification" in result["mode"]
     release.ado.assert_not_called()
+    release.github.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["Plan", "Validate"])
+def test_nonrelease_modes_reject_publication_and_index_opt_in(candidate, tmp_path, monkeypatch, mode):
+    monkeypatch.setenv("RELEASE_MODE", mode)
+    with pytest.raises(ValueError, match="explicit Release"):
+        release.publish(candidate[0], tmp_path / "release.json", tmp_path / "publication.json")
+    monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "True")
+    with pytest.raises(ValueError, match="createIndexPr requires Release"):
+        release.release_options()
+    release.github.assert_not_called()
+
+
+def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkeypatch):
+    monkeypatch.delenv("RELEASE_CREATE_INDEX_PR")
+    assert release.release_options() == ("Release", False)
+    with pytest.raises(ValueError, match="explicit createIndexPr"):
+        release.index_pull_request(candidate[0], tmp_path / "receipt", tmp_path / "work", tmp_path / "prepared")
     release.github.assert_not_called()
 
 
@@ -435,10 +455,12 @@ def test_integration_queues_exact_candidate_once(candidate, tmp_path, monkeypatc
     record = tmp_path / "child.json"
     assert release.integrate(directory, record) == "901"
     payload = mocked.call_args_list[0].kwargs["data"]
-    assert payload["resources"]["repositories"]["self"] == {
-        "refName": value["sourceBranch"], "version": SOURCE_SHA,
-    }
-    assert payload["templateParameters"]["releaseBuildId"] == 900
+    assert mocked.call_args_list[0].args == ("build/builds",)
+    assert payload["definition"] == {"id": 147}
+    assert payload["sourceBranch"] == value["sourceBranch"]
+    assert payload["sourceVersion"] == SOURCE_SHA
+    assert payload["templateParameters"]["releaseBuildId"] == "900"
+    assert json.loads(payload["templateParameters"]["services"]) == release.INTEGRATION_PARAMETERS["services"]
     assert release.read(record)["producer"] == value["producer"]
 
 
@@ -614,6 +636,7 @@ def test_required_index_check_overrides_advisory_summary(candidate, tmp_path, mo
 
 @pytest.fixture
 def index_context(candidate, tmp_path, monkeypatch):
+    monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "True")
     directory, value = candidate
     published = public_release(value)
     monkeypatch.setattr(release, "find_release", Mock(return_value=published))
@@ -781,7 +804,7 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert pipeline["trigger"] == "none"
     assert pipeline["pr"] == "none"
     assert pipeline["parameters"][0]["default"] == "Plan"
-    assert {parameter["name"] for parameter in pipeline["parameters"]} == {"mode", "sourceBranch"}
+    assert {parameter["name"] for parameter in pipeline["parameters"]} == {"mode", "sourceBranch", "createIndexPr"}
     assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
         "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration", "Publish",
@@ -897,8 +920,13 @@ def test_production_publication_consumes_scanned_artifacts_without_source_checko
     assert "outputs" not in context
     assert [step["checkout"] for step in job["steps"] if "checkout" in step] == ["none"]
     scripts = [step["script"] for step in job["steps"] if "script" in step]
-    assert 'release-tooling/release_pipeline.py" publish' in scripts[-2]
-    assert 'release-tooling/release_pipeline.py" index' in scripts[-1]
+    assert 'release-tooling/release_pipeline.py" publish' in scripts[-1]
+    conditional = job["steps"][-1]
+    assert list(conditional) == ["${{ if parameters.createIndexPr }}"]
+    index = conditional["${{ if parameters.createIndexPr }}"][0]
+    assert 'release-tooling/release_pipeline.py" index' in index["script"]
+    assert index["env"]["RELEASE_CREATE_INDEX_PR"] == "${{ parameters.createIndexPr }}"
+    assert not any("INDEX_FORK_REPOSITORY" in step.get("env", {}) for step in job["steps"])
     assert all("--prepared" in script for script in scripts)
     assert "pip install" not in json.dumps(job)
     assert "git clone" not in json.dumps(job)

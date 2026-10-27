@@ -253,7 +253,13 @@ commit. Selected source branches must first receive the pipeline 147 migration
 | --- | --- |
 | `Plan` (default) | Governed onboarding and source-policy checks only. No live integration, release wheel, tag, release, or index PR. Managed agents/scanners may access their required services. |
 | `Validate` | Build and SBOM; full 12-way Python 3.10-3.13 / Ubuntu, Windows, Intel macOS unit and style matrix; security; command-table lint; required index compatibility; live pipeline 147 qualification. No publication. |
-| `Release` | The same mandatory gates, then public GitHub release and an index PR. Automation must run from upstream `dev`. |
+| `Release` | The same mandatory gates, then public GitHub release. Automation must run from upstream `dev`. |
+
+`createIndexPr` defaults to **false**. Select it only with `Release` to submit the
+published wheel to the extension index; `Plan` and `Validate` reject this option.
+GitHub-only publication needs no index fork configuration or fork-write permission.
+The optional index step requires the matching public release and verified assets,
+and never merges its PR. Both IoT CLI (161) and Operations CLI (165) use this contract.
 
 There is no skip-integration, continue-on-error, or manual GitHub `production`
 approval step in this path. Failed, canceled, partially successful and skipped
@@ -297,8 +303,9 @@ organization-mandated secret-scanning control.
    needs that lock.
 4. Create the protected variable group `aziotcli_release_publish`, authorized
    only for the reviewed release definition. Set secret `ReleaseGitHubToken`
-   to an organization-approved automation credential and `IndexForkRepository`
-   to its existing `owner/azure-cli-extensions` fork. Grant only the necessary
+   to an organization-approved automation credential. When opting into index
+   submission, set `IndexForkRepository` to its existing `owner/azure-cli-extensions`
+   fork. Grant only the necessary
    upstream IoT **Contents write**, fork **Contents write**, and index
    **Pull requests write** access. The GitHub checkout connection alone does not
    provide these capabilities. Credential policy, renewal, and expiry must cover
@@ -357,7 +364,7 @@ that index entry, the normalized prerelease classification, and the complete
 candidate identity alongside the reviewed stdlib-only publication script.
 Validate exercises this preparation without needing a GitHub publishing credential.
 
-After publication, the helper reads the current upstream index at an exact commit
+When `createIndexPr` is selected, after publication the helper reads the current upstream index at an exact commit
 through GitHub's API and appends the prepared candidate without removing prior
 versions. No source checkout, dependency installation, or azdev execution occurs
 in the production release job. The helper verifies the version/URL/hash and that

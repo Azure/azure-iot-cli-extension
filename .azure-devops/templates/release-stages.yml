@@ -11,6 +11,9 @@ parameters:
     type: string
     default: release/1.1.0-preview
     values: [dev, preview, release/1.1.0-preview]
+  - name: createIndexPr
+    type: boolean
+    default: false
 
 stages:
   - stage: Resolve
@@ -25,6 +28,11 @@ stages:
             inputs:
               versionSpec: "3.13"
               disableDownloadFromRegistry: true
+          - script: python scripts/release_pipeline.py options
+            displayName: Reject index submission outside Release mode
+            env:
+              RELEASE_MODE: ${{ parameters.mode }}
+              RELEASE_CREATE_INDEX_PR: ${{ parameters.createIndexPr }}
           - ${{ if eq(parameters.mode, 'Plan') }}:
               - script: python scripts/release_pipeline.py plan
                 displayName: Show nonpublishing onboarding plan
@@ -318,7 +326,7 @@ stages:
 
   - ${{ if eq(parameters.mode, 'Release') }}:
       - stage: Publish
-        displayName: Publish the qualified GitHub release and submit the index PR
+        displayName: Publish the qualified GitHub release
         dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility, Integration]
         condition: >-
           and(not(canceled()), eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
@@ -357,16 +365,21 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
-              - script: >-
-                  python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" index
-                  --directory "$(Pipeline.Workspace)/release-candidate"
-                  --record "$(Agent.TempDirectory)/publication/release.json"
-                  --work-dir "$(Agent.TempDirectory)/index-submission"
-                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
-                env:
-                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
-                  RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
-                  INDEX_FORK_REPOSITORY: $(IndexForkRepository)
-                  PYTHONNOUSERSITE: "1"
-                  PYTHONPATH: ""
+                  RELEASE_MODE: ${{ parameters.mode }}
+              - ${{ if parameters.createIndexPr }}:
+                  - script: >-
+                      python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" index
+                      --directory "$(Pipeline.Workspace)/release-candidate"
+                      --record "$(Agent.TempDirectory)/publication/release.json"
+                      --work-dir "$(Agent.TempDirectory)/index-submission"
+                      --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
+                    displayName: Submit the optional index PR for review; never merge
+                    env:
+                      RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                      RELEASE_SOURCE_COMMIT: $(sourceCommit)
+                      RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
+                      INDEX_FORK_REPOSITORY: $(IndexForkRepository)
+                      RELEASE_MODE: ${{ parameters.mode }}
+                      RELEASE_CREATE_INDEX_PR: ${{ parameters.createIndexPr }}
+                      PYTHONNOUSERSITE: "1"
+                      PYTHONPATH: ""
