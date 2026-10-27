@@ -193,6 +193,8 @@ def dps_evidence(folder, selection, ctx):
     summary = RETRY["read"](folder / "dps-phases.json")
     phase = selection["phase"]
     result, = summary["phases"]
+    if summary.get("error") or result.get("status") == "blocked":
+        raise ValueError("DPS phase controller failed; inspect dps-phases.json for error and ARM request diagnostics.")
     directory = folder / "dps-phases" / phase
     receipt = RETRY["read"](directory / "receipts/pytest.json")
     provenance = dps["FOCUSED"]["provenance"](selection)
@@ -327,9 +329,9 @@ def run(args):
         raise
 
 
-def reject(output, reason, *, recoverable=False, service=None, python=None, region=None):
+def reject(output, reason, *, recoverable=False, service=None, python=None, region=None, publish_summary=True):
     """Publish an explicit orchestration error, never successful test coverage."""
-    output = Path(output)
+    output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     RETRY["write"](output / "rejection.json", {
         "reason": reason, "qualifies": False, "recoverable": recoverable,
@@ -349,7 +351,8 @@ def reject(output, reason, *, recoverable=False, service=None, python=None, regi
         f"See the original attempt artifacts and task logs. {action}\n" + cleanup_report(output),
         encoding="utf-8",
     )
-    print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
+    if publish_summary:
+        print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
 
 
 def cleanup_report(output):
@@ -530,7 +533,7 @@ def main():
             phase(args.selection, args.output)
         except (ValueError, RuntimeError, OSError, KeyError, subprocess.SubprocessError) as error:
             detail = str(error) if isinstance(error, ValueError) else type(error).__name__
-            reject(args.output, detail, recoverable=True)
+            reject(args.output, detail, recoverable=True, publish_summary=False)
             raise
         return 0
     if args.command in ("gate", "coverage", "candidate"):
