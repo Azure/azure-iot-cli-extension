@@ -42,7 +42,8 @@ Release History
 * Retained enrollment, registration-state, certificate issuance, and operation-status recovery commands against the GA DPS APIs.
 * Marked the selected ADR/CMS, device-registration, and linked-Hub management features as stable. Unrelated existing preview commands retain their existing status.
 * Aligned supported-command defaults with ``release/1.1.0-preview``: new Hubs disable Hub-policy SAS unless ``--disable-local-auth false`` is specified; connection-string, SAS, and DPS linked-Hub creation commands default to automatic hostname selection. Classic hostname Entra access with an explicit resource group resolves ARM metadata; split hostnames and unscoped hostname-only access remain ARM-free.
-* DPS enrollment-group create/update redact keys by default; use ``--show-keys`` to include them. Existing show/list table formatting is retained. Linked-Hub updates reject identifiers without a mutation parameter.
+* DPS enrollment-group create/update redact keys by default; use ``--show-keys`` to include them. Help now accurately describes this default and the SAS hostname restrictions for connection strings. Linked-Hub updates reject identifiers without a mutation parameter.
+* DPS enrollment and enrollment-group show/list use the same explicit table columns as ``release/1.1.0-preview``, including ADR namespace and certificate-policy details. JSON/YAML output, key redaction, and explicit queries are unchanged.
 * DPS certificate verification and verification-code generation fetch the current certificate ETag when omitted, while preserving explicit ETags and explaining certificate read-permission failures.
 * New DPS enrollments and enrollment groups may inherit the DPS allocation policy while specifying ``--iot-hubs``. Individual enrollment creation rejects combining ``--iot-hubs`` with ``--iot-hub-host-name``.
 * Generic wait commands report expired timeouts as CLI errors rather than successful output.

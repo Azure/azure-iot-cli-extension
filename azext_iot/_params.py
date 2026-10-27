@@ -396,7 +396,7 @@ def load_arguments(self, _):
             "'classic' always uses the default hostname. "
             "'device' uses the device hostname (errors on non-GWv2 hubs). "
             "'service' uses the service hostname (errors on non-GWv2 hubs). "
-            "The 'device' and 'service' values cannot be combined with --connection-string; when "
+            "Only 'auto' can be used with --connection-string; when "
             "--connection-string is supplied, the SAS audience is derived "
             "from its HostName.",
         )
@@ -1383,8 +1383,7 @@ def load_arguments(self, _):
                 "show_keys",
                 options_list=["--show-keys", "--keys"],
                 arg_type=get_three_state_flag(),
-                help="Include symmetric key values in enrollment group results. "
-                + ("Hidden by default." if action == "show" else "Shown by default; use false to hide them."),
+                help="Include symmetric key values in enrollment group results. Hidden by default.",
             )
 
     with self.argument_context("iot dps enrollment-group compute-device-key") as context:

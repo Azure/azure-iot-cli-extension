@@ -22,11 +22,13 @@ from urllib.parse import urlsplit
 import pytest
 import responses
 import yaml
+import jmespath
 from azure.cli.core import AzCommandsLoader, MainCommandsLoader
 from azure.cli.core.commands.events import EVENT_INVOKER_PRE_LOAD_ARGUMENTS
 from azure.cli.core.mock import DummyCli
 from azure.cli.core.parser import AzCliCommandParser
 from azure.core.credentials import AccessToken
+from knack.output import CommandResultItem, format_json, format_table, format_yaml
 
 from azext_iot.common.utility import generate_key
 
@@ -520,10 +522,85 @@ def test_release_aligned_defaults_survive_native_argument_loading(management_com
     assert getattr(parsed, key) == expected
 
 
+@pytest.mark.parametrize("kind,id_field,id_column", [
+    ("enrollment", "registrationId", "RegistrationId"),
+    ("enrollment-group", "enrollmentGroupId", "EnrollmentGroupId"),
+])
+@pytest.mark.parametrize("action", ["show", "list"])
+@pytest.mark.parametrize("with_adr_fields", [False, True])
+def test_dps_table_output_contract(command_table, kind, id_field, id_column, action, with_adr_fields):
+    enrollment = {
+        id_field: "enrollment-id", "provisioningStatus": "enabled",
+        "attestation": {"type": "symmetricKey", "symmetricKey": {"primaryKey": "not-a-live-key"}},
+    }
+    expected = {id_column: "enrollment-id"}
+    if kind == "enrollment":
+        enrollment["deviceId"] = "device-id"
+        expected["DeviceId"] = "device-id"
+    for field, column, value in (
+        ("namespaceName", "Namespace", "namespace-name"),
+        ("certificateAuthorityName", "CertificateAuthority", "authority-name"),
+        ("certificatePolicyName", "CertificatePolicy", "policy-name"),
+    ):
+        if with_adr_fields:
+            enrollment[field] = value
+        expected[column] = value if with_adr_fields else None
+    expected["Status"] = "enabled"
+    result = [enrollment] if action == "list" else enrollment
+    original = deepcopy(result)
+    transformer = command_table[f"iot dps {kind} {action}"].table_transformer
+    assert isinstance(transformer, str)
+    assert jmespath.search(transformer, result) == ([expected] if action == "list" else expected)
+    item = CommandResultItem(result, table_transformer=transformer)
+    table = format_table(item)
+    assert "enrollment-id" in table and "enabled" in table
+    assert "not-a-live-key" not in table and "attestation" not in table
+    if with_adr_fields:
+        assert re.split(r"\s{2,}", table.splitlines()[0].strip()) == list(expected)
+        assert all(value in table for value in expected.values())
+    assert json.loads(format_json(item)) == original
+    assert yaml.safe_load(format_yaml(item)) == original
+    assert result == original
+
+
+@pytest.mark.parametrize("kind", ["enrollment", "enrollment-group"])
+def test_dps_table_output_accepts_empty_lists(command_table, kind):
+    transformer = command_table[f"iot dps {kind} list"].table_transformer
+    assert format_table(CommandResultItem([], table_transformer=transformer)).strip() == ""
+
+
 @pytest.mark.parametrize("kind", ["enrollment", "enrollment-group"])
 @pytest.mark.parametrize("action", ["show", "list"])
-def test_existing_dps_commands_retain_default_table_format(command_table, kind, action):
-    assert command_table[f"iot dps {kind} {action}"].table_transformer is None
+def test_dps_table_output_preserves_explicit_queries(command_table, kind, action):
+    transformer = command_table[f"iot dps {kind} {action}"].table_transformer
+    item = CommandResultItem({"Selected": "query-value"}, table_transformer=transformer, is_query_active=True)
+    assert format_table(item).splitlines()[0].strip() == "Selected"
+    assert "query-value" in format_table(item)
+
+
+@pytest.mark.parametrize("action", ["create", "update", "show"])
+def test_dps_group_help_describes_hidden_keys(loader, command_table, monkeypatch, action):
+    from azext_iot._help import helps
+
+    command = f"iot dps enrollment-group {action}"
+    monkeypatch.setattr(loader, "skip_applicability", True)
+    loader.load_arguments(command)
+    AzCommandsLoader.load_arguments(loader, command)
+    assert "Hidden by default." in command_table[command].arguments["show_keys"].options["help"]
+    if action != "show":
+        summary = yaml.safe_load(helps[command])["long-summary"]
+        assert "hidden by default. Use --show-keys to include" in summary
+        assert "shown by default" not in summary
+
+
+def test_sas_hostname_help_limits_connection_strings_to_auto(loader, command_table, monkeypatch):
+    command = "iot hub generate-sas-token"
+    monkeypatch.setattr(loader, "skip_applicability", True)
+    loader.load_arguments(command)
+    AzCommandsLoader.load_arguments(loader, command)
+    description = command_table[command].arguments["hostname_type"].options["help"]
+    assert "Only 'auto' can be used with --connection-string" in description
+    assert "from its HostName" in description
 
 
 @pytest.mark.parametrize("action", _DPS_CERTIFICATE_COMMANDS)

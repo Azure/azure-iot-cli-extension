@@ -1277,7 +1277,7 @@ helps[
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
-                  Symmetric key values are shown by default. Use --show-keys false to hide generated or supplied
+                  Symmetric key values are hidden by default. Use --show-keys to include generated or supplied
                   keys in the response; this does not change credentials submitted to the service.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
@@ -1332,7 +1332,7 @@ helps[
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
-                  Symmetric key values are shown by default. Use --show-keys false to hide them in the response.
+                  Symmetric key values are hidden by default. Use --show-keys to include them in the response.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
