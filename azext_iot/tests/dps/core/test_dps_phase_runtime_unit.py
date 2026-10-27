@@ -729,6 +729,59 @@ def test_role_grant_slow_lookup_reports_the_actual_failure_stage(scope, mocker, 
         assert not list(scope.glob("role-grant-*.json"))
 
 
+@pytest.mark.parametrize("create_attempted", [False, True])
+@pytest.mark.parametrize("elapsed", [100, 130])
+def test_role_verification_never_persists_a_late_success(scope, mocker, create_attempted, elapsed):
+    from azext_iot.tests import helpers
+
+    owned = _owned("hub").removeprefix(ARM)
+    clock = [0]
+    mocker.patch.object(runtime, "monotonic", side_effect=lambda: clock[0])
+    mocker.patch.object(runtime, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_A}
+
+    def read(**_kwargs):
+        if create_attempted and not create.called:
+            return []
+        clock[0] = elapsed
+        return [{"principalId": SUB_A}]
+
+    reads = mocker.patch.object(helpers, "get_role_assignments", side_effect=read)
+    with pytest.raises(runtime.ScopeError, match="verification bound"):
+        runtime.assign_role_assignment_once("role", owned, assignee_object_id=SUB_A, assignee_principal_type="ServicePrincipal")
+    assert reads.call_count == (2 if create_attempted else 1)
+    assert create.call_count == int(create_attempted)
+    records = list(scope.glob("role-grant-*.json"))
+    if create_attempted:
+        record = json.loads(records[0].read_text(encoding="utf-8"))
+        assert record["create_attempted"] is True
+        assert record["verified"] is False
+        assert record["principal_id"] == SUB_A
+    else:
+        assert not records
+
+
+def test_role_verification_never_reads_after_oversleep(scope, mocker):
+    from azext_iot.tests import helpers
+
+    clock = [0]
+    mocker.patch.object(runtime, "monotonic", side_effect=lambda: clock[0])
+    mocker.patch.object(runtime, "sleep", side_effect=lambda _: clock.__setitem__(0, 101))
+    reads = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    create = mocker.patch.object(helpers, "invoke_checked")
+    create.return_value.as_json.return_value = {"principalId": SUB_A}
+    with pytest.raises(runtime.ScopeError, match="lookups=1"):
+        runtime.assign_role_assignment_once(
+            "role", _owned("hub").removeprefix(ARM), assignee_object_id=SUB_A, assignee_principal_type="ServicePrincipal",
+        )
+    reads.assert_called_once()
+    create.assert_called_once()
+    record = json.loads(next(scope.glob("role-grant-*.json")).read_text(encoding="utf-8"))
+    assert record["verified"] is False
+    assert record["create_attempted"] is True
+
+
 @pytest.mark.parametrize("unlink_on_release", [False, True])
 def test_shared_hub_callers_reuse_verified_role_grant(scope, mocker, unlink_on_release):
     from azext_iot.tests import helpers
@@ -928,7 +981,7 @@ def test_role_grant_lock_wait_consumes_existing_visibility_budget(scope, mocker)
     assert clock[0] == 10  # Seven seconds waiting leaves three, not another ten.
     pause.assert_called_once_with(3)
     create.assert_called_once()
-    assert reads.call_count == 2
+    reads.assert_called_once()
 
 
 def test_role_grant_uuid_alias_reuses_resolved_principal_after_unverified_attempt(scope, mocker):

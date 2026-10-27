@@ -1001,6 +1001,53 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     assert any("role assignment list" in command and "hub-sami" in command for command in commands)
 
 
+def test_hub_rotation_current_wrapper_requires_exact_rotation_attribution():
+    from types import SimpleNamespace
+    from azure.core.exceptions import HttpResponseError
+
+    message = link_scenarios._HUB_ROTATION_CURRENT_MESSAGE
+    endpoint = _rotation_endpoint(message=message)
+    assert link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint)
+    chained = HttpResponseError("(LinkingFailed) Failed. (IdentityRotationUpdateFailed) " + message)
+    chained.error = SimpleNamespace(code="IdentityRotationUpdateFailed")
+    rolled_back = _rotation_endpoint("Succeeded", "UserAssigned")
+    assert link_scenarios._is_identity_rotation_authorization_failure(error=chained, endpoint=rolled_back)
+    for invalid in (message.replace("[400913]", "[400914]"), message + " Another failure.", message.replace("Hub", "DPS")):
+        assert not link_scenarios._is_identity_rotation_authorization_failure(
+            endpoint=_rotation_endpoint(message=invalid),
+        )
+    assert not link_scenarios._is_identity_rotation_authorization_failure(
+        endpoint=_rotation_endpoint(code="LinkInitiateFailed", message=message),
+    )
+    endpoint["error"] = {"code": "OtherFailure", "message": "different failure"}
+    assert not link_scenarios._is_identity_rotation_authorization_failure(error=chained, endpoint=endpoint)
+    mixed = HttpResponseError("(OtherFailure) Failed.\n(IdentityRotationUpdateFailed) " + message)
+    assert not link_scenarios._is_identity_rotation_authorization_failure(error=mixed, endpoint=rolled_back)
+
+
+@pytest.mark.parametrize("late_stage", ["sleep", "terminal-success"])
+def test_hub_rotation_deadline_rejects_oversleep_and_late_success(monkeypatch, late_stage):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", lambda _: setattr(clock, "now", 600.4))
+    monkeypatch.setattr(link_scenarios, "_assert_hub_sami_rotation_grants", lambda *_: None)
+
+    def terminal(*_args, **_kwargs):
+        if late_stage == "terminal-success":
+            clock.now = 600
+            return _rotation_endpoint("Succeeded", "SystemAssigned")
+        return _rotation_endpoint()
+
+    monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
+    scenario = Mock()
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(AssertionError, match="budget exhausted"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+
+
 def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_rollback(monkeypatch):
     from azure.cli.core.azclierror import AzureResponseError
     from azure.core.exceptions import HttpResponseError

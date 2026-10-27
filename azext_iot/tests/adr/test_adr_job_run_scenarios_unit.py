@@ -340,7 +340,7 @@ def test_missing_adu_smoke_never_cancels_owned_failed_runs(cli_scenario, resourc
 
     def create(**kwargs):
         name = kwargs["run_name"] or "run-generated"
-        value = _run("Failed", error={"code": "AduEndpointNotLinked"})
+        value = _run("Failed", error={"code": "SuEndpointNotLinked"})
         value["name"] = name
         owned[name] = value
         return value

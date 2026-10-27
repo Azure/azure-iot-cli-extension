@@ -104,6 +104,30 @@ def test_system_and_user_identity_share_one_budget(readiness):
     assert len(readiness.attempts) == 1
 
 
+@pytest.mark.parametrize("elapsed", [600, 601])
+def test_late_success_preserves_observer_completion_without_replaying(readiness, elapsed, caplog):
+    completed = []
+
+    @contextmanager
+    def observe(*_args):
+        yield {"rejected": False, "correlationId": "offline"}
+        completed.append("mutation recorded")
+
+    readiness.helper.observer.storage_endpoint_attempt = observe
+
+    def invoke(_command):
+        readiness.clock[0] = elapsed
+        return "successful mutation"
+
+    command = Mock(side_effect=invoke)
+    with pytest.raises(CLIInternalError, match="successful mutation will not be replayed"):
+        run(readiness, command)
+    assert completed == ["mutation recorded"]
+    command.assert_called_once()
+    assert readiness.sleeps == []
+    assert "Storage endpoint ready" not in caplog.text
+
+
 @pytest.mark.parametrize("error", [
     BadRequestError("IH400117 alone is insufficient"),
     CLIInternalError("nonzero exit"),

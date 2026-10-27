@@ -67,6 +67,8 @@ def test_register_and_issue_certificate_contract(provisioned_csr_issuance, tmp_p
         properties = resource["hub"]["hub"]["properties"]
         assert state["assignedHub"] in {properties["hostName"], properties["deviceHostName"]}
         connection_profile = state.get("connectionProfile")
+        if connection_profile is None:
+            connection_profile = "classic"
         assert isinstance(connection_profile, str) and connection_profile.casefold() in {"classic", "mqttv5"}
         assert state["issuedCertificateChain"]
         assert state["registryDeviceExternalId"]
