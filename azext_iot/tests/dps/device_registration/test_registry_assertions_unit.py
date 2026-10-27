@@ -18,6 +18,7 @@ from azure.core.exceptions import HttpResponseError
 from azure.core.pipeline.transport import HttpResponse, HttpTransport
 
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.dps import _csr_issuance as csr, _csr_registry as registry, _registry_assertions as assertions
 from azext_iot.tests.dps.device_registration import test_csr_registry_cleanup_unit as registry_tests
 
@@ -45,7 +46,13 @@ def case(wire, mocker, monkeypatch):
         profiles=[profile], capabilities=[capability], keys={"primary": 44, "secondary": 44},
         commands=[], failure=None, fail_on=None, action_error=None,
     )
-    monkeypatch.setattr(assertions, "METADATA_TIMEOUT", 0)
+    original_wait = assertions.wait_for_condition
+
+    def wait(*args, **kwargs):
+        kwargs.update(timeout=None, max_attempts=1)
+        return original_wait(*args, **kwargs)
+
+    monkeypatch.setattr(assertions, "wait_for_condition", wait)
 
     def invoke(command):
         args = shlex.split(command)
@@ -163,7 +170,6 @@ def test_metadata_readiness_is_bounded_and_does_not_mutate(case, kind):
 def test_metadata_readiness_only_polls_until_expected_profile_and_capability_are_ready(case, monkeypatch):
     clock, sleeps, calls = [0], [], {}
     original = case.invoke.side_effect
-    wait = assertions.wait_for_condition
     monkeypatch.setattr(assertions, "METADATA_TIMEOUT", 20)
 
     def pause(seconds):
@@ -171,7 +177,7 @@ def test_metadata_readiness_only_polls_until_expected_profile_and_capability_are
         clock[0] += seconds
 
     def timed_wait(fetch, condition, **kwargs):
-        return wait(fetch, condition, **kwargs, clock=lambda: clock[0], sleeper=pause)
+        return wait_for_condition(fetch, condition, **kwargs, clock=lambda: clock[0], sleeper=pause)
 
     def delayed(command):
         result = original(command)

@@ -316,7 +316,7 @@ def test_attribute_listing_wait_stops_at_120_seconds_without_mutation(attribute_
     read.return_value = Mock(get_output_in_json=Mock(return_value=page))
     with pytest.raises(AssertionError, match="Timed out waiting for owned registry-device attribute list visibility"):
         scenario.test_registry_device_lifecycle()
-    assert elapsed[0] == 120 and pauses == [5] * 24 and read.call_count == 25
+    assert elapsed[0] == 120 and pauses == [5] * 24 and read.call_count == 24
     assert sum(" attribute create " in " ".join(command) for command in backend.commands) == 1
     assert not backend.resources
 

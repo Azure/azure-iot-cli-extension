@@ -403,11 +403,16 @@ class LinkProvider(ADRProvider):
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
             self._rbac_manager().verify_many(requests, guard=deadline.remaining)
 
-        required = {assignment for request in original_requests or [] for _, assignment in required_assignments(request)}
+        required = [entry for request in original_requests or [] for entry in required_assignments(request)]
+        created = set(self._rbac.created) if self._rbac else set()
         return LinkRecovery(
             self, namespace, section, name, expected, budget, verify,
             authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
-            recent_grants=bool(self._rbac) and not required.isdisjoint(self._rbac.created),
+            recent_grants=any(assignment in created for _, assignment in required),
+            recent_inbound_grant=any(
+                rule.principal == "linked" and rule.scope == "namespace" and assignment in created
+                for rule, assignment in required
+            ),
         ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,

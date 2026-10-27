@@ -10,7 +10,7 @@ from copy import deepcopy
 import json
 from shlex import split
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
@@ -22,6 +22,7 @@ from azure.core.pipeline.transport import HttpTransport
 from azure.mgmt.authorization import AuthorizationManagementClient
 
 from azext_iot.adr.rbac import CONTRIBUTOR_ROLE, LINK_ROLE_IDS
+from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.dps import _csr_issuance as csr, _csr_registry as registry
 from azext_iot.tests.dps.device_registration import test_csr_issuance_fixture_unit as fixture_tests
 from azext_iot.tests.dps.device_registration.test_registry_assertions_unit import _Response
@@ -43,7 +44,7 @@ def owned(namespace_commands, resource, scope, mocker):
     original_wait = csr.wait_for_condition
 
     def wait(fetch, success, **kwargs):
-        kwargs["timeout"] = 0
+        kwargs.update(timeout=None, max_attempts=1)
         return original_wait(fetch, success, **kwargs)
 
     mocker.patch.object(csr, "wait_for_condition", side_effect=wait)
@@ -336,6 +337,28 @@ def test_grant_visibility_timeout_is_not_registration_permission(owned, mocker):
         csr._grant_namespace_self_role(owned.name)
     assert owned.backend.roles and not claim(owned)["verified"]
     assert len(owned.backend.commands) == 1
+
+
+def test_late_grant_visibility_preserves_unverified_claim_and_owned_cleanup(owned):
+    now = [0]
+
+    def wait(fetch, success, **kwargs):
+        def slow_read():
+            value = fetch()
+            now[0] += 2
+            return value
+
+        kwargs.update(timeout=1, clock=lambda: now[0])
+        return wait_for_condition(slow_read, success, **kwargs)
+
+    with patch.object(csr, "wait_for_condition", side_effect=wait), pytest.raises(
+        AssertionError, match="Azure Device Registry Administrator visibility",
+    ):
+        csr._grant_namespace_self_role(owned.name)
+    assert owned.backend.roles and not claim(owned)["verified"]
+    csr.delete_namespace(owned.name)
+    assert claim(owned)["deleted"] and not owned.backend.roles and not owned.backend.resources
+    assert sum(command.startswith("role assignment create ") for command in owned.backend.commands) == 1
 
 
 @pytest.mark.parametrize("materialized", [False, True])
