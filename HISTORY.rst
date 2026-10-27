@@ -6,6 +6,14 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**Shared command fixes**
+
+* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
+* DPS linked-Hub updates accept legacy key-based entries without an explicit authentication type, preserving unchanged fields and rejecting updates without mutation parameters.
+* ``az iot du update calculate-hash`` returns the supplied absolute file URI without resolving symlinks. File hashes and byte counts are unchanged.
+* Namespace-not-empty guidance includes registry-device deletion while retaining the other supported child-resource cleanup commands.
+* SAS token help clarifies that only automatic hostname selection can be used with a connection string.
+
 **DPS certificate and enrollment fixes**
 
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.

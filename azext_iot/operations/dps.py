@@ -971,7 +971,7 @@ def iot_dps_compute_device_key(
 
     return compute_device_key(
         primary_key=symmetric_key, registration_id=registration_id
-    )
+    ).decode("ascii")
 
 
 # DPS Connection strings
