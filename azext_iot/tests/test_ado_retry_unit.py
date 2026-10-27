@@ -254,6 +254,23 @@ def test_rejected_attempt_cannot_be_ignored_by_final_gate(tmp_path):
         pipeline.gate(tmp_path)
 
 
+@pytest.mark.parametrize("error", [None, {"type": "ResourceNotFoundError", "message": "private diagnostic"}])
+def test_dps_controller_failure_is_not_masked_by_missing_phase_files(tmp_path, error):
+    retry.write(tmp_path / "dps-phases.json", {"error": error, "phases": [{"status": "blocked"}]})
+    with pytest.raises(ValueError, match="DPS phase controller failed") as captured:
+        pipeline.dps_evidence(tmp_path, {"phase": "regular"}, CONTEXT)
+    assert "private diagnostic" not in str(captured.value)
+
+
+def test_child_rejection_keeps_evidence_without_forwarding_logging_commands(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    pipeline.reject("child", "Phase failed.", recoverable=True, publish_summary=False)
+    assert (tmp_path / "child/summary.md").is_file()
+    assert "##vso[" not in capsys.readouterr().out
+    pipeline.reject("parent", "Phase failed.", recoverable=True)
+    assert f"##vso[task.uploadsummary]{tmp_path / 'parent/summary.md'}" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("reported", [False, True])
 def test_real_incomplete_execution_report_is_failing_and_never_overwrites_results(tmp_path, reported):
     if reported:
