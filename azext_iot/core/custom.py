@@ -17,6 +17,7 @@ from azure.cli.core.azclierror import (
     ArgumentUsageError,
     BadRequestError,
     CLIInternalError,
+    ForbiddenError,
     InvalidArgumentValueError,
     ManualInterrupt,
     MutuallyExclusiveArgumentError,
@@ -34,7 +35,6 @@ from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
 from azext_iot.common.arm import (
-    adapt_modeless_lro_poller,
     get_resource_group,
     hub_description_for_write as _hub_description_for_write,
     hub_etag_arguments,
@@ -249,12 +249,10 @@ def iot_dps_create(
     if mi_system_assigned is not None or mi_user_assigned:
         dps_description["identity"] = _construct_identity_info(mi_system_assigned, mi_user_assigned)
 
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            provisioning_service_name=dps_name,
-            iot_dps_description=_drop_none_create_values(dps_description),
-        )
+    return client.iot_dps_resource.begin_create_or_update(
+        resource_group_name=resource_group_name,
+        provisioning_service_name=dps_name,
+        iot_dps_description=_drop_none_create_values(dps_description),
     )
 
 
@@ -311,10 +309,8 @@ def iot_dps_update(
 
 def iot_dps_delete(client, dps_name, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_delete(
-            resource_group_name=resource_group_name, provisioning_service_name=dps_name
-        )
+    return client.iot_dps_resource.begin_delete(
+        resource_group_name=resource_group_name, provisioning_service_name=dps_name
     )
 
 
@@ -841,8 +837,34 @@ def iot_dps_certificate_delete(client, dps_name, certificate_name, etag, resourc
     )
 
 
-def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resource_group_name=None):
+def _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag):
+    if etag is not None:
+        if not etag.strip():
+            raise InvalidArgumentValueError("--etag must not be empty.")
+        return etag
+    try:
+        certificate = iot_dps_certificate_get(client, dps_name, certificate_name, resource_group_name)
+    except HttpResponseError as error:
+        if error.status_code != 403:
+            raise
+        raise ForbiddenError(
+            f"Unable to fetch the certificate ETag: {error}\n"
+            "Supply --etag with the current ETag obtained from a previous certificate response or an authorized reader, "
+            "or resolve the certificate read failure. Automatic lookup requires "
+            "Microsoft.Devices/provisioningServices/certificates/read permission."
+        ) from error
+    current_etag = certificate.get("etag")
+    if not isinstance(current_etag, str) or not current_etag.strip() or current_etag == "*":
+        raise CLIInternalError(
+            "The certificate response did not contain a usable ETag. "
+            "Obtain the current ETag and supply it with --etag."
+        )
+    return current_etag
+
+
+def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     return client.dps_certificate.generate_verification_code(
         resource_group_name=resource_group_name,
         provisioning_service_name=dps_name,
@@ -852,11 +874,12 @@ def iot_dps_certificate_gen_code(client, dps_name, certificate_name, etag, resou
     )
 
 
-def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag, resource_group_name=None):
+def iot_dps_certificate_verify(client, dps_name, certificate_name, certificate_path, etag=None, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
+    etag = _resolve_dps_certificate_etag(client, dps_name, certificate_name, resource_group_name, etag)
     request = {"certificate": certificate}
     return client.dps_certificate.verify_certificate(
         resource_group_name=resource_group_name,
@@ -1247,12 +1270,10 @@ def iot_hub_create(
         for scope in identity_scopes:
             _create_role_assignment(cmd.cli_ctx, principal_id, identity_role=identity_role, identity_scope=scope)
 
-    create = adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_drop_none_create_values(_hub_description_for_write(hub_description)),
-            **hub_etag_arguments(existing_hub),
-        )
+    create = client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_drop_none_create_values(_hub_description_for_write(hub_description)),
+        **hub_etag_arguments(existing_hub),
     )
     if identity_role and identity_scopes:
         create.add_done_callback(identity_assignment)
@@ -1399,20 +1420,18 @@ def iot_hub_update(client, hub_name, parameters, resource_group_name=None, cmd=N
             remove_user_identities=remove_user_identities,
             cmd=cmd,
         )
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(parameters),
-            **hub_etag_arguments(parameters),
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name,
+        resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(parameters),
+        **hub_etag_arguments(parameters),
     )
 
 
 def iot_hub_delete(client, hub_name, resource_group_name=None):
     resource_group_name = _ensure_hub_resource_group_name(client, resource_group_name, hub_name)
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_delete(resource_group_name=resource_group_name, resource_name=hub_name)
+    return client.iot_hub_resource.begin_delete(
+        resource_group_name=resource_group_name, resource_name=hub_name
     )
 
 
@@ -1528,13 +1547,11 @@ def iot_hub_identity_assign(cmd, client, hub_name, system_identity=None, user_id
         else:
             hub["identity"]["type"] = IdentityType.user_assigned.value if hub["identity"].get("userAssignedIdentities") else IdentityType.none.value
 
-        poller = adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=resource_group_name,
-                resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub),
-                **hub_etag_arguments(hub),
-            )
+        poller = client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
         )
         return LongRunningOperation(cmd.cli_ctx)(poller)
 
@@ -1627,13 +1644,11 @@ def iot_hub_identity_remove(cmd, client, hub_name, system_identity=None, user_id
     hub["identity"] = hub_identity
     if not hub["identity"].get("userAssignedIdentities"):
         hub["identity"]["userAssignedIdentities"] = None
-    poller = adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub),
-            **hub_etag_arguments(hub),
-        )
+    poller = client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name,
+        resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub),
+        **hub_etag_arguments(hub),
     )
     lro = LongRunningOperation(cmd.cli_ctx)(poller)
     return lro["identity"]
@@ -1754,13 +1769,11 @@ def iot_hub_policy_create(cmd, client, hub_name, policy_name, permissions, resou
         raise CLIError("Policy {0} already existed.".format(policy_name))
     policies.append({"keyName": policy_name, "rights": rights})
     hub["properties"]["authorizationPolicies"] = policies
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=_get_resource_group_from_hub(hub),
-            resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub),
-            **hub_etag_arguments(hub),
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=_get_resource_group_from_hub(hub),
+        resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub),
+        **hub_etag_arguments(hub),
     )
 
 
@@ -1772,13 +1785,11 @@ def iot_hub_policy_delete(cmd, client, hub_name, policy_name, resource_group_nam
         raise CLIError("Policy {0} not found.".format(policy_name))
     updated_policies = [p for p in policies if p["keyName"].lower() != policy_name.lower()]
     hub["properties"]["authorizationPolicies"] = updated_policies
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=_get_resource_group_from_hub(hub),
-            resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub),
-            **hub_etag_arguments(hub),
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=_get_resource_group_from_hub(hub),
+        resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub),
+        **hub_etag_arguments(hub),
     )
 
 
@@ -1804,22 +1815,18 @@ def iot_hub_policy_key_renew(cmd, client, hub_name, policy_name, regenerate_key,
                              "secondaryKey": requested_policy[0]["secondaryKey"]})
     hub["properties"]["authorizationPolicies"] = updated_policies
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=_get_resource_group_from_hub(hub),
-                resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub),
-                **hub_etag_arguments(hub),
-            )
+        return client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
         )
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=_get_resource_group_from_hub(hub),
-                resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub),
-                **hub_etag_arguments(hub),
-            )
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
         )
     )
     return iot_hub_policy_get(client, hub_name, policy_name, resource_group_name)
@@ -1924,11 +1931,9 @@ def iot_hub_routing_endpoint_create(cmd, client, hub_name, endpoint_name, endpoi
              "identity": {"userAssignedIdentity": identity} if identity and identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY] else None}
         )
 
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -1969,11 +1974,9 @@ def iot_hub_routing_endpoint_delete(cmd, client, hub_name, endpoint_name=None, e
     resource_group_name = _ensure_hub_resource_group_name(client, resource_group_name, hub_name)
     hub = iot_hub_get(cmd, client, hub_name, resource_group_name)
     hub["properties"]["routing"]["endpoints"] = _delete_routing_endpoints(endpoint_name, endpoint_type, hub["properties"]["routing"]["endpoints"])
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -1988,11 +1991,9 @@ def iot_hub_route_create(cmd, client, hub_name, route_name, source_type, endpoin
          "condition": ('true' if condition is None else condition),
          "isEnabled": (True if enabled is None else enabled)}
     )
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -2024,11 +2025,9 @@ def iot_hub_route_delete(cmd, client, hub_name, route_name=None, source_type=Non
     if source_type:
         hub["properties"]["routing"]["routes"] = [route for route in hub["properties"]["routing"]["routes"]
                                           if route["source"].lower() != source_type.lower()]
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -2045,11 +2044,9 @@ def iot_hub_route_update(cmd, client, hub_name, route_name, source_type=None, en
         updated_route["isEnabled"] = updated_route["isEnabled"] if enabled is None else enabled
     else:
         raise CLIError("No route found.")
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -2092,11 +2089,9 @@ def iot_message_enrichment_create(cmd, client, hub_name, key, value, endpoints, 
     if hub["properties"]["routing"].get("enrichments") is None:
         hub["properties"]["routing"]["enrichments"] = []
     hub["properties"]["routing"]["enrichments"].append({"key": key, "value": value, "endpointNames": endpoints})
-    return adapt_modeless_lro_poller(
-        client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name,
-            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-        )
+    return client.iot_hub_resource.begin_create_or_update(
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
     )
 
 
@@ -2108,11 +2103,9 @@ def iot_message_enrichment_update(cmd, client, hub_name, key, value, endpoints, 
         to_update["key"] = key
         to_update["value"] = value
         to_update["endpointNames"] = endpoints
-        return adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-            )
+        return client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=resource_group_name, resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
         )
     raise CLIError('No message enrichment with that key exists')
 
@@ -2123,11 +2116,9 @@ def iot_message_enrichment_delete(cmd, client, hub_name, key, resource_group_nam
     to_remove = next((endpoint for endpoint in hub["properties"]["routing"]["enrichments"] if endpoint["key"] == key), None)
     if to_remove:
         hub["properties"]["routing"]["enrichments"].remove(to_remove)
-        return adapt_modeless_lro_poller(
-            client.iot_hub_resource.begin_create_or_update(
-                resource_group_name=resource_group_name, resource_name=hub_name,
-                iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
-            )
+        return client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=resource_group_name, resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub), **hub_etag_arguments(hub)
         )
     raise CLIError('No message enrichment with that key exists')
 
@@ -2144,16 +2135,12 @@ def iot_hub_manual_failover(cmd, client, hub_name, resource_group_name=None, no_
     failover_region = next(x["location"] for x in hub["properties"]["locations"] if x["role"].lower() == 'secondary')
     failover_input = {"failoverRegion": failover_region}
     if no_wait:
-        return adapt_modeless_lro_poller(
-            client.iot_hub.begin_manual_failover(
-                iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
-            )
+        return client.iot_hub.begin_manual_failover(
+            iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
         )
     LongRunningOperation(cmd.cli_ctx)(
-        adapt_modeless_lro_poller(
-            client.iot_hub.begin_manual_failover(
-                iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
-            )
+        client.iot_hub.begin_manual_failover(
+            iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
         )
     )
     return iot_hub_get(cmd, client, hub_name, resource_group_name)
@@ -2491,12 +2478,10 @@ def _dps_description_for_write(dps: dict) -> dict:
 
 
 def _put_dps(client, resource_group_name, dps_name, dps):
-    return adapt_modeless_lro_poller(
-        client.iot_dps_resource.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            provisioning_service_name=dps_name,
-            iot_dps_description=_dps_description_for_write(dps),
-        )
+    return client.iot_dps_resource.begin_create_or_update(
+        resource_group_name=resource_group_name,
+        provisioning_service_name=dps_name,
+        iot_dps_description=_dps_description_for_write(dps),
     )
 
 

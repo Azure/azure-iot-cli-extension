@@ -11,6 +11,7 @@ import pytest
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.iothub._integration_helpers import invoke_checked
 
 cli = EmbeddedCLI()
 MAX_HUB_RETRIES = 30
@@ -21,6 +22,75 @@ def generate_names(prefix: str = "", count: int = 1):
         prefix + generate_generic_id()[:32 - len(prefix)]
         for _ in range(count)
     ]
+
+
+@pytest.mark.hub_infrastructure(desired_tags="test=message_route")
+def test_route_data_schema_reference_round_trip(provisioned_only_iot_hubs_module):
+    iot_hub = provisioned_only_iot_hubs_module[0]["name"]
+    iot_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    route_name = generate_names(prefix="schema-route")[0]
+    reference = f"aio-sr://semantic-e2e/{route_name}:1"
+    replacement = f"aio-sr://semantic-e2e/{route_name}:2"
+    hub_scope = f"-n {iot_hub} -g {iot_rg}"
+    route_scope = f"{hub_scope} --rn {route_name}"
+    target = "iot hub message-route"
+    route_created = False
+
+    try:
+        result = invoke_checked(
+            cli,
+            f"{target} create {route_scope} --en events "
+            f"-t {RouteSourceType.DeviceMessages.value} "
+            f"--data-schema-ref {reference}",
+            description="Create Hub route with data schema reference",
+        )
+        route_created = True
+        routes = result.as_json()
+        assert next(route for route in routes if route["name"] == route_name)["dataSchema"] == reference
+
+        shown = invoke_checked(
+            cli,
+            f"{target} show {route_scope}",
+            description="Show Hub route with data schema reference",
+        ).as_json()
+        assert shown["dataSchema"] == reference
+
+        listed = invoke_checked(
+            cli,
+            f"{target} list {hub_scope}",
+            description="List Hub routes with data schema reference",
+        ).as_json()
+        assert next(route for route in listed if route["name"] == route_name)["dataSchema"] == reference
+
+        routes = invoke_checked(
+            cli,
+            f"{target} update {route_scope} --enabled false",
+            description="Update Hub route without changing data schema reference",
+        ).as_json()
+        updated = next(route for route in routes if route["name"] == route_name)
+        assert updated["dataSchema"] == reference
+        assert updated["isEnabled"] is False
+
+        routes = invoke_checked(
+            cli,
+            f"{target} update {route_scope} --data-schema-ref {replacement}",
+            description="Replace Hub route data schema reference",
+        ).as_json()
+        assert next(route for route in routes if route["name"] == route_name)["dataSchema"] == replacement
+
+        routes = invoke_checked(
+            cli,
+            f"{target} update {route_scope} --remove-data-schema-ref",
+            description="Remove Hub route data schema reference",
+        ).as_json()
+        assert "dataSchema" not in next(route for route in routes if route["name"] == route_name)
+    finally:
+        if route_created:
+            invoke_checked(
+                cli,
+                f"{target} delete {route_scope} -y",
+                description="Delete Hub route with data schema reference",
+            )
 
 
 @pytest.mark.hub_infrastructure(desired_tags="test=message_route")

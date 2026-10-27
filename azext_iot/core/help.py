@@ -13,6 +13,44 @@ from knack.help_files import helps
 # Help additions for core commands
 def patch_core_help():
 
+    helps["iot dps certificate generate-verification-code"] = """
+type: command
+short-summary: Generate a verification code for a certificate in an Azure IoT Hub Device Provisioning Service instance.
+long-summary: |
+    Use the verification code as the CN of a new certificate signed with the root certificate's private key.
+    If --etag is omitted, the current certificate ETag is fetched automatically. This requires certificate read permission.
+    Supply --etag to skip the read and operate only on that version. A concurrent change still causes the operation to fail.
+    To read an ETag explicitly, use 'az iot dps certificate show --dps-name MyDps -g MyResourceGroup
+    --name MyCertificate --query etag -o tsv'.
+examples:
+  - name: Generate a verification code using the automatically fetched ETag.
+    text: >
+        az iot dps certificate generate-verification-code --dps-name MyDps -g MyResourceGroup --name MyCertificate
+  - name: Generate a verification code using an explicitly supplied ETag.
+    text: >
+        az iot dps certificate generate-verification-code --dps-name MyDps -g MyResourceGroup
+        --name MyCertificate --etag AAAAAAAAAAA=
+"""
+
+    helps["iot dps certificate verify"] = """
+type: command
+short-summary: Verify a certificate in an Azure IoT Hub Device Provisioning Service instance.
+long-summary: |
+    Upload a verification certificate containing the code returned by generate-verification-code to prove possession.
+    If --etag is omitted, the current certificate ETag is fetched automatically. This requires certificate read permission.
+    Supply --etag to skip the read and operate only on that version. Use the ETag returned after generating the verification
+    code, or read the current ETag with certificate show; an earlier ETag may be stale.
+examples:
+  - name: Verify a certificate using the automatically fetched ETag.
+    text: >
+        az iot dps certificate verify --dps-name MyDps -g MyResourceGroup --name MyCertificate
+        --path /certificates/Verification.pem
+  - name: Verify a certificate using the ETag returned after generating its verification code.
+    text: >
+        az iot dps certificate verify --dps-name MyDps -g MyResourceGroup --name MyCertificate
+        --path /certificates/Verification.pem --etag AAAAAAAAAAA=
+"""
+
     # Resource creation is separate from canonical namespace linking.
     if "iot hub create" in helps:
         helps[

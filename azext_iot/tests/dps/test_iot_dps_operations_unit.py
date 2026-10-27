@@ -337,7 +337,7 @@ def test_symmetric_attestation_key_update_is_valid():
         ("static", None, None, None, None, RequiredArgumentMissingError),
         ("static", None, ["one", "two"], None, None, InvalidArgumentValueError),
         ("custom", None, None, None, None, RequiredArgumentMissingError),
-        (None, None, ["hub"], None, None, RequiredArgumentMissingError),
+        (None, "legacy-hub", ["hub"], None, None, MutuallyExclusiveArgumentError),
     ],
 )
 def test_allocation_policy_validation_errors(
@@ -361,6 +361,11 @@ def test_allocation_policy_uses_current_mapping():
     subject._validate_allocation_policy_for_enrollment(
         None, None, None, None, None, current_enrollment=current
     )
+
+
+@pytest.mark.parametrize("hubs", [None, ["hub"], ["hub1", "hub2"]])
+def test_allocation_policy_allows_inheriting_service_default(hubs):
+    subject._validate_allocation_policy_for_enrollment(None, None, hubs, None, None)
 
 
 def test_compute_device_key_paths(mocker):

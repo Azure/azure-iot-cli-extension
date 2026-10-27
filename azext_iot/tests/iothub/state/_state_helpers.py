@@ -746,13 +746,15 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     file_hub_name = file_hub["name"]
     assert len(file_certs) == len(arm_certs)
     for i in range(len(file_certs)):
-        # Remove hub names
+        # Remove hub names and the API version selected independently by ARM export.
         orig_certificate = file_certs[i]
         orig_certificate["dependsOn"][0] = orig_certificate["dependsOn"][0].replace(file_hub_name, "")
         orig_certificate["name"] = orig_certificate["name"].replace(file_hub_name, "")
+        orig_certificate.pop("apiVersion", None)
         dest_certificate = arm_certs[i]
         dest_certificate["dependsOn"][0] = dest_certificate["dependsOn"][0].replace(hub_name, "")
         dest_certificate["name"] = dest_certificate["name"].replace(hub_name, "")
+        dest_certificate.pop("apiVersion", None)
 
         assert orig_certificate == dest_certificate
 
@@ -795,13 +797,15 @@ def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str)
     dest_certs = dest_hub_info[1:]
     assert len(orig_certs) == len(dest_certs)
     for i in range(len(orig_certs)):
-        # Remove hub names
+        # Remove hub names and the API version selected independently by ARM export.
         orig_certificate = orig_certs[i]
         orig_certificate["dependsOn"][0] = orig_certificate["dependsOn"][0].replace(origin_hub_name, "")
         orig_certificate["name"] = orig_certificate["name"].replace(origin_hub_name, "")
+        orig_certificate.pop("apiVersion", None)
         dest_certificate = dest_certs[i]
         dest_certificate["dependsOn"][0] = dest_certificate["dependsOn"][0].replace(dest_hub_name, "")
         dest_certificate["name"] = dest_certificate["name"].replace(dest_hub_name, "")
+        dest_certificate.pop("apiVersion", None)
 
         assert orig_certificate == dest_certificate
 

@@ -116,7 +116,7 @@ def test_state_module_pools_own_distinct_resources_and_propagate_cleanup_failure
 
 
 @pytest.mark.parametrize("suite,phase,count", [
-    ("HubControl", "regular", 29),
+    ("HubControl", "regular", 31),
     ("HubData", "entra", 44),
 ])
 def test_hub_manifest_collection_preserves_isolated_state_groups(

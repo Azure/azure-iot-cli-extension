@@ -33,6 +33,75 @@ def generate_ep_names(count=1):
     return names
 
 
+def test_message_payload_format_round_trip(provisioned_identity_only_event_hub_with_hub_module):
+    iot_hub_objs, event_hub_obj = provisioned_identity_only_event_hub_with_hub_module
+    iot_hub_entry = iot_hub_objs[0]
+    iot_hub = iot_hub_entry["hub"]["name"]
+    iot_rg = iot_hub_entry["rg"]
+    eventhub_instance = event_hub_obj["eventhub"]["name"]
+    endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
+    endpoint_name = generate_ep_names()[0]
+    hub_scope = f"-n {iot_hub} -g {iot_rg}"
+    endpoint_scope = f"{hub_scope} --en {endpoint_name}"
+    target = "iot hub message-endpoint"
+    endpoint_created = False
+
+    try:
+        result = invoke_checked(
+            cli,
+            f"{target} create eventhub {endpoint_scope} --endpoint-uri {endpoint_uri} "
+            f"--entity-path {eventhub_instance} --identity [system] "
+            "--message-format DOObservationV1",
+            description="Create Hub endpoint with message payload format",
+        )
+        endpoint_created = True
+        created = result.as_json()
+        assert next(endpoint for endpoint in created["eventHubs"] if endpoint["name"] == endpoint_name)[
+            "messagePayloadFormat"
+        ] == "DOObservationV1"
+
+        shown = invoke_checked(
+            cli,
+            f"{target} show {endpoint_scope}",
+            description="Show Hub endpoint with message payload format",
+        ).as_json()
+        assert shown["messagePayloadFormat"] == "DOObservationV1"
+
+        listed = invoke_checked(
+            cli,
+            f"{target} list {hub_scope} --endpoint-type eventhub",
+            description="List Hub endpoints with message payload format",
+        ).as_json()
+        assert next(endpoint for endpoint in listed if endpoint["name"] == endpoint_name)[
+            "messagePayloadFormat"
+        ] == "DOObservationV1"
+
+        updated = invoke_checked(
+            cli,
+            f"{target} update eventhub {endpoint_scope} --entity-path {eventhub_instance}",
+            description="Update Hub endpoint without changing message payload format",
+        ).as_json()
+        assert next(endpoint for endpoint in updated["eventHubs"] if endpoint["name"] == endpoint_name)[
+            "messagePayloadFormat"
+        ] == "DOObservationV1"
+
+        updated = invoke_checked(
+            cli,
+            f"{target} update eventhub {endpoint_scope} --message-format None",
+            description="Reset Hub endpoint message payload format",
+        ).as_json()
+        assert next(endpoint for endpoint in updated["eventHubs"] if endpoint["name"] == endpoint_name)[
+            "messagePayloadFormat"
+        ] == "None"
+    finally:
+        if endpoint_created:
+            invoke_checked(
+                cli,
+                f"{target} delete {endpoint_scope} -y",
+                description="Delete Hub endpoint with message payload format",
+            )
+
+
 def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
     iot_hub_objs, event_hub_obj = provisioned_event_hub_with_identity_module
     iot_hub_entry = iot_hub_objs[0]

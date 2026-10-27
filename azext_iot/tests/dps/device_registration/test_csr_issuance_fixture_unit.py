@@ -120,11 +120,15 @@ class NamespaceCommands:
                 properties = {"provisioningState": "Succeeded"}
                 if label in ("root", "ica"):
                     properties["certificateAuthorityType"] = "Root" if label == "root" else "ICA"
+                elif label == "policy":
+                    properties["uuid"] = "policy-uuid"
                 body = {
                     "id": self.namespace_id + ("/" + suffix if suffix else ""),
                     "name": self.resource["namespace"] if label == "namespace" else args[args.index("-n") + 1],
-                    "properties": properties, "tags": record["tags"],
+                    "properties": properties,
                 }
+                if label != "policy":
+                    body["tags"] = record["tags"]
                 if label == "namespace":
                     body["identity"] = {"type": "SystemAssigned", "principalId": NAMESPACE_PRINCIPAL}
                 self.resources[label] = body
@@ -409,6 +413,20 @@ def test_uncertain_ica_submission_preserves_failure_and_cleans_persisted_child(n
     assert sum("delete -n issuingca" in command for command in namespace_commands.commands) == 1
 
 
+@pytest.mark.parametrize("failed", ["policy wait", "policy show"])
+def test_policy_follow_up_failure_preserves_error_and_cleans_created_resources(
+    namespace_commands, resource, scope, failed,
+):
+    namespace_commands.fail = failed
+    with pytest.raises(ForbiddenError, match="Injected service rejection"):
+        csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    receipt = json.loads((scope / "csr-child-policy.json").read_text(encoding="utf-8"))
+    assert receipt["uuid"] == "policy-uuid"
+    assert sum(failed in command for command in namespace_commands.commands) == 1
+    assert not namespace_commands.resources
+    assert not namespace_commands.roles
+
+
 @pytest.mark.parametrize("failed", ["iot dps identity assign", "iot adr ns link add", "create -n issuingca"])
 def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namespace_commands, resource, failed):
     namespace_commands.fail = failed
@@ -425,7 +443,10 @@ def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namesp
 @pytest.mark.parametrize("target", ["namespace", "root", "ica", "policy"])
 def test_cleanup_refuses_current_ownership_change(namespace_commands, resource, target):
     name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
-    namespace_commands.resources[target]["tags"] = {"runUid": "another-run"}
+    if target == "policy":
+        namespace_commands.resources[target]["properties"]["uuid"] = "replacement-policy"
+    else:
+        namespace_commands.resources[target]["tags"] = {"runUid": "another-run"}
     with pytest.raises(AssertionError, match="ownership|ownership change"):
         csr.delete_namespace(name)
     assert target in namespace_commands.resources

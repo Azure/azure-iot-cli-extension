@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Exercise handwritten DPS handlers against the real, synchronous retained preview SDK."""
+"""Exercise handwritten DPS handlers against the real, synchronous DPS 2026-11-01 SDK."""
 
 import base64
 from copy import deepcopy
@@ -75,7 +75,7 @@ def dps_resource():
 def assert_retained_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-06-01-preview"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-01"]
 
 
 @pytest.mark.parametrize(

@@ -475,6 +475,21 @@ def test_dependency_resources_explicitly_use_hub_location(mocker, provisioner, c
         assert f"--location {HUB_TEST_LOCATION}" in commands[0]
 
 
+def test_identity_only_event_hub_disables_local_auth_and_omits_sas(mocker):
+    invoke = mocker.patch.object(fixtures, "_invoke_fixture")
+    invoke.return_value.as_json.side_effect = [
+        {"name": "namespace"},
+        {"name": "eventhub", "id": "eventhub-id"},
+    ]
+
+    result = fixtures._identity_only_event_hub_provisioner()
+
+    commands = [call.args[0] for call in invoke.call_args_list]
+    assert "--disable-local-auth true" in commands[0]
+    assert all("authorization-rule" not in command for command in commands)
+    assert "connectionString" not in result
+
+
 def test_device_stream_raw_create_sets_policy_and_location(mocker):
     from azext_iot.tests.iothub.device_stream import test_iothub_device_stream_int as streams
 

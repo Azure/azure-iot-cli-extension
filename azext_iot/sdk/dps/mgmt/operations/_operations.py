@@ -49,7 +49,7 @@ def build_operations_list_request(**kwargs: Any) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -77,7 +77,7 @@ def build_dps_certificate_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -121,7 +121,7 @@ def build_dps_certificate_create_or_update_request(  # pylint: disable=name-too-
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -172,7 +172,7 @@ def build_dps_certificate_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/provisioningServices/{provisioningServiceName}/certificates/{certificateName}"
     path_format_arguments = {
@@ -226,7 +226,7 @@ def build_dps_certificate_list_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -269,7 +269,7 @@ def build_dps_certificate_generate_verification_code_request(  # pylint: disable
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -343,7 +343,7 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -407,7 +407,7 @@ def build_iot_dps_resource_get_operation_result_request(  # pylint: disable=name
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -437,7 +437,7 @@ def build_iot_dps_resource_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -471,7 +471,7 @@ def build_iot_dps_resource_create_or_update_request(  # pylint: disable=name-too
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -506,7 +506,7 @@ def build_iot_dps_resource_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -534,7 +534,7 @@ def build_iot_dps_resource_delete_request(
 ) -> HttpRequest:
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/provisioningServices/{provisioningServiceName}"
     path_format_arguments = {
@@ -557,7 +557,7 @@ def build_iot_dps_resource_list_by_resource_group_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -584,7 +584,7 @@ def build_iot_dps_resource_list_by_subscription_request(  # pylint: disable=name
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -610,7 +610,7 @@ def build_iot_dps_resource_list_valid_skus_request(  # pylint: disable=name-too-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -638,7 +638,7 @@ def build_iot_dps_resource_list_keys_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -666,7 +666,7 @@ def build_iot_dps_resource_list_keys_for_key_name_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -695,7 +695,7 @@ def build_iot_dps_resource_get_private_link_resources_request(  # pylint: disabl
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -724,7 +724,7 @@ def build_iot_dps_resource_list_private_link_resources_request(  # pylint: disab
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -756,7 +756,7 @@ def build_iot_dps_resource_get_private_endpoint_connection_request(  # pylint: d
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -794,7 +794,7 @@ def build_iot_dps_resource_create_or_update_private_endpoint_connection_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -830,7 +830,7 @@ def build_iot_dps_resource_delete_private_endpoint_connection_request(  # pylint
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -861,7 +861,7 @@ def build_iot_dps_resource_list_private_endpoint_connections_request(  # pylint:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -890,7 +890,7 @@ def build_iot_dps_resource_check_provisioning_service_name_availability_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: str = kwargs.pop("content_type")
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-11-01"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2549,6 +2549,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -4196,6 +4197,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -4355,6 +4357,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:

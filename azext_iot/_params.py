@@ -1110,7 +1110,8 @@ def load_arguments(self, _):
             arg_type=get_enum_type(AllocationType),
             help="Type of allocation policy to determine how a device is assigned to an IoT Hub. If not "
             "provided, the allocation policy will be the current allocation policy default set for the "
-            "Device Provisioning Service instance.",
+            "Device Provisioning Service instance, including when --iot-hubs is specified. "
+            "This is independent of the ADR certificate policy.",
             arg_group="Allocation Policy"
         )
         context.argument(
@@ -1375,6 +1376,31 @@ def load_arguments(self, _):
             "--adr-namespace and --adr-ca-name are also required.",
             arg_group="ADR Certificate Policy",
         )
+
+    for command in (
+        "iot dps enrollment create",
+        "iot dps enrollment update",
+        "iot dps enrollment-group create",
+        "iot dps enrollment-group update",
+    ):
+        with self.argument_context(command) as context:
+            context.argument(
+                "device_type_ref",
+                options_list=["--device-type-ref"],
+                help="Device type reference stored by DPS. "
+                "The CLI passes the value as provided without resolving it or validating its format.",
+                arg_group="Semantic Model",
+            )
+
+    for command in ("iot dps enrollment update", "iot dps enrollment-group update"):
+        with self.argument_context(command) as context:
+            context.argument(
+                "remove_device_type_ref",
+                options_list=["--remove-device-type-ref"],
+                arg_type=get_three_state_flag(),
+                help="Remove the device type reference stored by DPS.",
+                arg_group="Semantic Model",
+            )
 
     for action in ("create", "update", "show"):
         with self.argument_context(f"iot dps enrollment-group {action}") as context:

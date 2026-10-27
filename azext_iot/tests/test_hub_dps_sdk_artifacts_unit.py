@@ -15,7 +15,7 @@ from azure.core.credentials import AzureKeyCredential
     "namespace,client_name,version,kwargs",
     [
         ("iothub.mgmt", "IotHubClient", "2026-10-01-preview", {"subscription_id": "subscription"}),
-        ("dps.mgmt", "IotDpsClient", "2026-06-01-preview", {"subscription_id": "subscription"}),
+        ("dps.mgmt", "IotDpsClient", "2026-11-01", {"subscription_id": "subscription"}),
         ("dps.service", "ProvisioningServiceClient", "2026-11-02-preview", {"dps_name": "testdps"}),
         ("dps.device", "ProvisioningDeviceClient", "2026-11-02-preview", {}),
     ],

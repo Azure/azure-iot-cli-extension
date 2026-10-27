@@ -1151,6 +1151,11 @@ helps[
         --enrollment-id {enrollment_id} --attestation-type symmetrickey
         --adr-namespace {namespace_name} --adr-ca-name {ca_name}
         --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment with a device type reference.
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1207,6 +1212,15 @@ helps[
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
         --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[
@@ -1316,12 +1330,17 @@ helps[
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy custom --webhook-url {webhook_url}
         --api-version {api_version}
-    - name: Create an enrollment group with a custom Device Registry Namespace Certificate Policy specified.
+    - name: Create an enrollment group with an ADR certificate policy and selected hubs, inheriting the DPS allocation policy.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --allocation-policy hashed
+        --enrollment-id {enrollment_id} --iot-hubs {iot_hub_host_name}
         --adr-namespace {namespace_name} --adr-ca-name {ca_name}
         --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment group with a device type reference.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1366,6 +1385,15 @@ helps[
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
         --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[
