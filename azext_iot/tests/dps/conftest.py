@@ -6,15 +6,16 @@
 
 from contextlib import ExitStack
 from datetime import datetime, timezone
-from time import sleep, time
+from time import monotonic, sleep, time
 from typing import Dict, Iterator, Optional
+from urllib.parse import urlsplit
 import json
 import os
 import tempfile
 import uuid
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import CLIInternalError, ForbiddenError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from azure.mgmt.core.tools import parse_resource_id
 from filelock import FileLock
@@ -51,7 +52,8 @@ ENTITY_LOCATION = settings.env.azext_iot_dps_test_location or "westus"
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 # Polling usually returns in seconds; the deadline stays well above the old fixed 60s wait
 # plus a full confirmation streak so a slow propagation is never worse than before.
-ROLE_PROPAGATION_TIMEOUT_SECONDS = 300
+ASSIGNMENT_VISIBILITY_TIMEOUT_SECONDS = 300
+DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS = 300
 ROLE_PROPAGATION_POLL_SECONDS = 5
 DATA_PLANE_READY_CONFIRMATIONS = 3
 DPS_IDENTITY_SETTLE_SECONDS = 60
@@ -146,22 +148,88 @@ def _assign_fixture_role(**kwargs):
     return assign_role_assignment(**kwargs)
 
 
-def _wait_for_readiness(description, check, confirmations=1):
-    deadline = time() + ROLE_PROPAGATION_TIMEOUT_SECONDS
+def _readiness_http_error(error):
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, HttpResponseError):
+            return error
+        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+    return None
+
+
+def _data_plane_authorization_pending(error, role, name):
+    original = _readiness_http_error(error)
+    response = getattr(original, "response", None)
+    request = getattr(response, "request", None)
+    url = getattr(request, "url", "")
+    if not isinstance(url, str) or not url:
+        return False
+    target = urlsplit(url)
+    expected_path = "/enrollments/query" if role == DPS_USER_ROLE else "/devices/query"
+    if not (target.hostname or "").casefold().startswith(name.casefold() + ".") or target.path != expected_path:
+        return False
+    expected = (403, "403000") if role == DPS_USER_ROLE else (401, "401002")
+    return (getattr(original, "status_code", None), _readiness_service_code(original)) == expected
+
+
+def _readiness_service_code(original):
+    code = getattr(getattr(original, "error", None), "code", None)
+    if code is None:
+        response = getattr(original, "response", None)
+        if not callable(getattr(response, "json", None)):
+            return None
+        try:
+            body = response.json()
+            if isinstance(body, dict) and isinstance(body.get("Message"), str):
+                body = json.loads(body["Message"])
+            code = body.get("errorCode") if isinstance(body, dict) else None
+        except (ValueError, TypeError):
+            return None
+    return str(code) if code is not None else None
+
+
+def _readiness_diagnostic(error):
+    original = _readiness_http_error(error)
+    code = _readiness_service_code(original)
+    # Only known service codes and UUID correlation headers belong in diagnostics, never response bodies.
+    code = str(code) if str(code) in {"401002", "403000", "AuthorizationFailed"} else "unclassified"
+    headers = getattr(getattr(original, "response", None), "headers", {}) or {}
+    correlation = headers.get("x-ms-request-id") or headers.get("x-ms-correlation-request-id")
+    try:
+        correlation = str(uuid.UUID(correlation)) if isinstance(correlation, str) else "unavailable"
+    except ValueError:
+        correlation = "unavailable"
+    return f"type={type(error).__name__} code={code} correlationId={correlation}"
+
+
+def _wait_for_readiness(description, check, *, timeout, stage, confirmations=1, retry_error=None):
+    started = monotonic()
+    deadline = started + timeout
     streak = 0
-    while True:
+    last_error = None
+    observation = "not observed"
+    while monotonic() < deadline:
         try:
             streak = streak + 1 if check() else 0
-        except Exception:  # Polling deliberately hides transient authorization propagation bodies.
+            observation = f"consecutive_successes={streak}/{confirmations}"
+        except (HttpResponseError, UnauthorizedError, ForbiddenError) as error:
+            if retry_error is None or not retry_error(error):
+                raise
+            last_error = error
+            observation = _readiness_diagnostic(error)
             streak = 0
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
         if streak >= confirmations:
             return
-        remaining = deadline - time()
-        if remaining <= 0:
-            raise CLIInternalError(
-                f"{description} was not ready after {ROLE_PROPAGATION_TIMEOUT_SECONDS} seconds."
-            )
+        logger.info("Readiness pending: stage=%s elapsed=%.1fs %s", stage, monotonic() - started, observation)
         sleep(min(ROLE_PROPAGATION_POLL_SECONDS, remaining))
+    raise CLIInternalError(
+        f"{description} was not ready within {timeout} seconds. "
+        f"stage={stage} elapsed={monotonic() - started:.1f}s {observation}"
+    ) from last_error
 
 
 def _wait_for_current_user_data_plane(role: str, scope: str):
@@ -173,9 +241,17 @@ def _wait_for_current_user_data_plane(role: str, scope: str):
         command = f"iot hub device-identity list -n {name} -g {ENTITY_RG} --auth-type login"
     else:
         return
+
+    def authorized():
+        invoke_checked(cli, command, description="Caller data-plane readiness").as_json()
+        return True
+
     _wait_for_readiness(
         f"{role} data-plane authorization for '{name}'",
-        lambda: cli.invoke(command, capture_stderr=True).success(),
+        authorized,
+        timeout=DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS,
+        stage="data-plane-authorization",
+        retry_error=lambda error: _data_plane_authorization_pending(error, role, name),
         # One success may come from an already-refreshed front end; require a short stable streak.
         confirmations=DATA_PLANE_READY_CONFIRMATIONS,
     )
@@ -191,7 +267,10 @@ def _wait_for_assignment_visibility(role: str, scope: str, principal_id: str):
         )
         return any((assignment.get("principalId") or "").lower() == principal for assignment in assignments)
 
-    _wait_for_readiness(f"{role} assignment for principal '{principal_id}'", visible)
+    _wait_for_readiness(
+        f"{role} assignment for principal '{principal_id}'", visible,
+        timeout=ASSIGNMENT_VISIBILITY_TIMEOUT_SECONDS, stage="assignment-visibility",
+    )
 
 
 def _assign_current_user_role(role: str, scope: str):
@@ -540,17 +619,19 @@ def _link_hub(dps_name: str, iot_hub: Dict) -> str:
     hub_host_name = _hub_link_host_name(iot_hub)
     linked_hub = next((hub for hub in linked_hubs if hub["name"] == hub_host_name), None)
     if not linked_hub:
-        cli.invoke(
+        invoke_checked(
+            cli,
             f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
             f"--hub-name {iot_hub['name']} --hub-resource-group {iot_hub['rg']} "
             "--authentication-type SystemAssigned",
-            capture_stderr=True,
+            description="DPS linked-Hub creation",
         )
     elif linked_hub.get("authenticationType") != "SystemAssigned":
-        cli.invoke(
+        invoke_checked(
+            cli,
             f"iot dps linked-hub update --dps-name {dps_name} -g {ENTITY_RG} "
             f"--linked-hub {hub_host_name} --authentication-type SystemAssigned",
-            capture_stderr=True,
+            description="DPS linked-Hub update",
         )
     return hub_host_name
 
@@ -560,8 +641,10 @@ def _unlink_all_hubs(dps_name: str) -> None:
         "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
     ).as_json()
     for hub in linked_hubs:
-        cli.invoke(
-            f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}"
+        invoke_checked(
+            cli,
+            f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}",
+            description="DPS linked-Hub deletion",
         )
 
 

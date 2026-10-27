@@ -756,10 +756,22 @@ def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker
     assert events == ["assign", "ready", "settle"]
 
 
+def _data_role_error(role=dps_fixtures.DPS_USER_ROLE):
+    dps = role == dps_fixtures.DPS_USER_ROLE
+    error = _http_error(403 if dps else 401, "403000" if dps else "401002")
+    error.response = SimpleNamespace(
+        request=SimpleNamespace(url=(
+            "https://dps.azure-devices-provisioning.net/enrollments/query" if dps
+            else "https://dps.azure-devices.net/devices/query"
+        )),
+        headers={"x-ms-request-id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"},
+    )
+    return error
+
+
 @pytest.mark.parametrize("results,calls", [
     ([True, True, True], 3),
-    ([True, False, True, True, True], 5),
-    ([True, RuntimeError("403"), True, True, True], 5),
+    ([True, _data_role_error(), True, True, True], 5),
 ])
 def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, results, calls):
     probes = iter(results)
@@ -768,7 +780,7 @@ def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, resu
         value = next(probes)
         if isinstance(value, Exception):
             raise value
-        return SimpleNamespace(success=lambda: value)
+        return SimpleNamespace(success=lambda: value, as_json=lambda: [])
 
     cli = mocker.patch.object(dps_fixtures, "cli")
     cli.invoke.side_effect = probe
@@ -781,10 +793,104 @@ def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, resu
     assert sleep.call_count == calls - 1
 
 
-def test_readiness_deadline_is_never_tighter_than_the_old_fixed_wait():
-    # A late first success still needs its full confirmation streak before the deadline.
-    streak = (dps_fixtures.DATA_PLANE_READY_CONFIRMATIONS - 1) * dps_fixtures.ROLE_PROPAGATION_POLL_SECONDS
-    assert dps_fixtures.ROLE_PROPAGATION_TIMEOUT_SECONDS >= 2 * (60 + streak)
+@pytest.mark.parametrize("late_stage", ["call", "confirmation", "sleep"])
+def test_readiness_charges_calls_and_sleep_to_one_monotonic_deadline(mocker, late_stage):
+    clock = [0]
+    mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
+
+    def probe():
+        clock[0] += 101 if late_stage == "confirmation" else 300 if late_stage == "call" else 0
+        return late_stage != "sleep"
+
+    check = mocker.Mock(side_effect=probe)
+
+    def sleep(seconds):
+        clock[0] += 300 if late_stage == "sleep" else seconds
+
+    pause = mocker.patch.object(dps_fixtures, "sleep", side_effect=sleep)
+    with pytest.raises(CLIInternalError, match="stage=data-plane-authorization"):
+        dps_fixtures._wait_for_readiness(
+            "caller", check, timeout=300, stage="data-plane-authorization", confirmations=3,
+        )
+    assert check.call_count == (3 if late_stage == "confirmation" else 1)
+    assert pause.call_count == {"call": 0, "confirmation": 2, "sleep": 1}[late_stage]
+
+
+@pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
+def test_caller_readiness_only_retries_the_selected_data_plane_rejection(role):
+    error = _data_role_error(role)
+    assert dps_fixtures._data_plane_authorization_pending(error, role, "dps")
+    assert not dps_fixtures._data_plane_authorization_pending(error, role, "different-resource")
+    error.response.request.url = "https://management.azure.com/subscriptions/s"
+    assert not dps_fixtures._data_plane_authorization_pending(error, role, "dps")
+
+
+@pytest.mark.parametrize("error", [
+    RuntimeError("403"), _http_error(403, "AuthorizationFailed"), _http_error(404, "NotFound"),
+    _http_error(429, "TooManyRequests"), _http_error(500, "InternalError"), CLIInternalError("Malformed JSON"),
+])
+def test_caller_readiness_propagates_unexpected_failures_without_retry(mocker, error):
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.side_effect = error
+    pause = mocker.patch.object(dps_fixtures, "sleep")
+    with pytest.raises(type(error)) as raised:
+        dps_fixtures._wait_for_current_user_data_plane(
+            dps_fixtures.DPS_USER_ROLE, "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps",
+        )
+    assert raised.value is error
+    cli.invoke.assert_called_once()
+    pause.assert_not_called()
+
+
+@pytest.mark.parametrize("role,code", [(dps_fixtures.DPS_USER_ROLE, 403000), (dps_fixtures.HUB_USER_ROLE, 401002)])
+def test_readiness_recognizes_native_json_codes_through_cli_translation(role, code):
+    from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
+
+    original = _data_role_error(role)
+    original.error = None
+    original.response.json = lambda: {"Message": '{"errorCode":' + str(code) + ',"message":"private service body"}'}
+    translated = (ForbiddenError if role == dps_fixtures.DPS_USER_ROLE else UnauthorizedError)("private guidance")
+    translated.__cause__ = original
+    assert dps_fixtures._data_plane_authorization_pending(translated, role, "dps")
+    diagnostic = dps_fixtures._readiness_diagnostic(translated)
+    assert f"code={code}" in diagnostic
+    assert "private" not in diagnostic
+    original.response.json = lambda: {"Message": '{"errorCode":401003}'}
+    assert not dps_fixtures._data_plane_authorization_pending(translated, role, "dps")
+    original.response.json = lambda: {"Message": "malformed response"}
+    assert not dps_fixtures._data_plane_authorization_pending(translated, role, "dps")
+
+
+def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker):
+    error = _data_role_error()
+    error.message = "secret-response-body"
+    clock = [0]
+    mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
+    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    with pytest.raises(CLIInternalError) as raised:
+        dps_fixtures._wait_for_readiness(
+            "caller", mocker.Mock(side_effect=error), timeout=5, stage="data-plane-authorization",
+            retry_error=lambda value: dps_fixtures._data_plane_authorization_pending(value, dps_fixtures.DPS_USER_ROLE, "dps"),
+        )
+    assert raised.value.__cause__ is error
+    message = str(raised.value)
+    for expected in ("stage=data-plane-authorization", "elapsed=5.0s", "type=HttpResponseError", "code=403000",
+                     "correlationId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"):
+        assert expected in message
+    assert "secret-response-body" not in message
+
+
+def test_visibility_and_authorization_use_independent_budgets(mocker, monkeypatch):
+    monkeypatch.setattr(dps_fixtures, "ASSIGNMENT_VISIBILITY_TIMEOUT_SECONDS", 31)
+    monkeypatch.setattr(dps_fixtures, "DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS", 47)
+    wait = mocker.patch.object(dps_fixtures, "_wait_for_readiness")
+    dps_fixtures._wait_for_assignment_visibility("role", "/scope", "principal")
+    assert wait.call_args.kwargs["timeout"] == 31
+    dps_fixtures._wait_for_current_user_data_plane(
+        dps_fixtures.DPS_USER_ROLE, "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps",
+    )
+    assert wait.call_args.kwargs["timeout"] == 47
+    assert wait.call_args.kwargs["confirmations"] == 3
 
 
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
@@ -930,6 +1036,25 @@ def test_dps_fixture_uses_no_service_connection_strings(mocker, monkeypatch):
     assert result["connectionString"] is None
     assert result["iotHub"] is None
     cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["create", "update", "delete"])
+def test_dps_linked_hub_nonzero_exit_stops_setup_without_replay(mocker, operation):
+    linked = [] if operation == "create" else [{"name": "hub.test", "authenticationType": "KeyBased"}]
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.side_effect = [
+        SimpleNamespace(as_json=lambda: linked),
+        SimpleNamespace(success=lambda: False, error_code=2),
+    ]
+    mocker.patch.object(dps_fixtures, "_enable_dps_hub_identity")
+    with pytest.raises(CLIInternalError, match="failed with exit code 2"):
+        if operation == "delete":
+            dps_fixtures._unlink_all_hubs("dps")
+        else:
+            dps_fixtures._link_hub("dps", {
+                "name": "hub", "rg": "rg", "hub": {"properties": {"hostName": "hub.test"}},
+            })
+    assert cli.invoke.call_count == 2
 
 
 @pytest.mark.parametrize("local_auth_disabled", [None, False, True])

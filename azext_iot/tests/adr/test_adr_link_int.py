@@ -85,6 +85,14 @@ _HUB_IDENTITY_ROTATION_BACKOFFS = (30, 60, 120)
 _HUB_IDENTITY_ROTATION_BUDGET_SECONDS = 600
 _HUB_ROTATION_REJECTED_CHAIN = re.compile(r"\(IdentityRotationUpdateFailed\) " + _LINK_INITIATE_REJECTED.pattern)
 _HUB_ROTATION_REJECTED_MESSAGE = re.compile(r"(?:IdentityRotationUpdateFailed: )?" + _LINK_INITIATE_REJECTED.pattern)
+_HUB_ROTATION_CURRENT_MESSAGE = (
+    "The Hub link request was rejected. Contact support with the namespace resource "
+    "ID and the time of the request. Include the original request's correlation ID "
+    "if available. (Hub resource reported: [400913])"
+)
+_HUB_ROTATION_CURRENT_CHAIN = re.compile(
+    r"\(IdentityRotationUpdateFailed\) " + re.escape(_HUB_ROTATION_CURRENT_MESSAGE) + r"(?=$|\n)"
+)
 _TERMINAL_LINK_STATES = {"Succeeded", "Failed", "Canceled", "Cancelled"}
 
 
@@ -117,7 +125,7 @@ def _error_chain_text(error):
         if isinstance(code, str):
             texts.append(code)
         current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
-    return " ".join(texts)
+    return "\n".join(texts)
 
 
 def _structured_hub_rotation_rejection(endpoint):
@@ -128,12 +136,28 @@ def _structured_hub_rotation_rejection(endpoint):
         return False
     message = error.get("message")
     match = _HUB_ROTATION_REJECTED_MESSAGE.fullmatch(message) if isinstance(message, str) else None
-    return bool(error.get("code") == "IdentityRotationUpdateFailed" and match and match["service"] == "Hub")
+    return bool(error.get("code") == "IdentityRotationUpdateFailed" and (
+        (match and match["service"] == "Hub")
+        or message in (_HUB_ROTATION_CURRENT_MESSAGE, "IdentityRotationUpdateFailed: " + _HUB_ROTATION_CURRENT_MESSAGE)
+    ))
 
 
 def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     detail = _link_failure_detail(endpoint or {}) if endpoint else {}
+    properties = _link_properties(endpoint or {})
+    if properties.get("error") or any(
+        (properties.get(key) or {}).get("error") for key in ("status", "provisioningStatus")
+    ):
+        return False
+    if detail and (
+        properties.get("linkingState") != "Failed"
+        or detail.get("code") != "IdentityRotationUpdateFailed"
+        or set(detail) - {"code", "message"}
+    ):
+        return False
     chain = _error_chain_text(error) if error else ""
+    if set(re.findall(r"\(([A-Za-z][A-Za-z0-9]+)\)", chain)) - {"LinkingFailed", "IdentityRotationUpdateFailed"}:
+        return False
     text = " ".join(filter(None, [detail.get("code"), detail.get("message"), chain]))
     if "IdentityRotationUpdateFailed" not in text:
         return False
@@ -142,6 +166,7 @@ def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     rejected = _HUB_ROTATION_REJECTED_CHAIN.search(chain)
     return bool(
         (rejected and rejected["service"] == "Hub")
+        or _HUB_ROTATION_CURRENT_CHAIN.search(chain)
         or _structured_hub_rotation_rejection(endpoint)
         or "IH400913" in text
         or re.search(
@@ -216,7 +241,10 @@ def _update_hub_to_sami_with_recovery(
 
     def submit():
         # Bound the synchronous link wait so a slow mutation cannot outlive the recovery budget.
-        test_case.cmd(f"{update_cmd} --timeout {max(1, int(deadline - monotonic()))}")
+        timeout = int(deadline - monotonic())
+        if timeout < 1:
+            raise AssertionError("Hub identity rotation authorization recovery budget exhausted")
+        test_case.cmd(f"{update_cmd} --timeout {timeout}")
 
     first_error = None
     try:
@@ -231,8 +259,11 @@ def _update_hub_to_sami_with_recovery(
         endpoint = _wait_for_link_terminal(
             test_case, "hub", namespace_name, resource_group_name, endpoint_name, timeout=remaining,
         )
+        if monotonic() >= deadline:
+            break
         state, identity_type = _link_observation(endpoint)
         if state == "Succeeded" and identity_type == "SystemAssigned":
+            _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity)
             return endpoint
         recoverable = _is_identity_rotation_authorization_failure(error=first_error, endpoint=endpoint)
         if state not in {"Failed", "Succeeded"} or not recoverable:
@@ -248,6 +279,8 @@ def _update_hub_to_sami_with_recovery(
         if deadline - monotonic() <= sleep_for:
             break
         sleep(sleep_for)
+        if int(deadline - monotonic()) < 1:
+            break
         first_error = None
         try:
             submit()

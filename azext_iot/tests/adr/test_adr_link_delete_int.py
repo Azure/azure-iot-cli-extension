@@ -6,6 +6,7 @@
 
 from copy import deepcopy
 from time import sleep
+from urllib.parse import urlsplit
 
 import pytest
 from azure.cli.core.azclierror import AzureResponseError
@@ -31,6 +32,22 @@ from azext_iot.tests.adr.conftest import (
 )
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+
+
+def _assert_unlink_service_rejection(error, namespace_id):
+    if isinstance(error, ADRResourceStateError):
+        body = error.body
+        assert body.get("id", "").casefold() == namespace_id.casefold(), "Failure belongs to another namespace."
+        assert body.get("properties", {}).get("provisioningState") == "Failed", "Unlink did not reach a Failed state."
+        detail = body.get("error") or body.get("properties", {}).get("error") or {}
+        assert detail.get("code"), "Unlink failure did not include a structured service error."
+        return
+    response = getattr(error, "response", None)
+    request = getattr(response, "request", None)
+    assert error.status_code in (400, 409), f"Unexpected unlink HTTP failure: {error.status_code}"
+    assert getattr(request, "method", None) == "PUT", "Failure did not reject the namespace mutation."
+    assert urlsplit(request.url).path.casefold() == namespace_id.casefold(), "Failure belongs to another resource."
+    assert getattr(error.error, "code", None), "Unlink rejection did not include a structured service error."
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -64,8 +81,9 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
         assert not self._reader_assignments(principal, scope)
         with self.assertLogs("cli.azext_iot.adr", level="WARNING") as logs:
-            with pytest.raises((HttpResponseError, ADRResourceStateError)):
+            with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
                 self.cmd(f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes")
+        _assert_unlink_service_rejection(rejected.value, before["id"])
         assert any("Cannot confirm read access" in message for message in logs.output), logs.output
         assert not self._reader_assignments(principal, scope), "Unlink must not create Reader grants."
         after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
@@ -83,13 +101,15 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         command = (
             f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes --grant-reader"
         )
-        with pytest.raises((HttpResponseError, ADRResourceStateError)):
+        with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
             self.cmd(command)
+        _assert_unlink_service_rejection(rejected.value, before["id"])
         created = self._reader_assignments(principal, scope)
         assert len(created) == 1, "Explicit grant must be retained after service rejection."
         sleep(ROLE_PROPAGATION_DELAY)
-        with pytest.raises((HttpResponseError, ADRResourceStateError)):
+        with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
             self.cmd(command)
+        _assert_unlink_service_rejection(rejected.value, before["id"])
         assert self._reader_assignments(principal, scope) == created, "Retry must not duplicate the Reader assignment."
         after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         assert endpoint_name in after["properties"][section]["endpoints"]

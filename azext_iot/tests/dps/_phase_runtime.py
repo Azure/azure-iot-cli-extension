@@ -206,15 +206,24 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
     from azext_iot.tests import helpers
 
     visibility_error = None
+    lookups = 0
+    assignments = []
+    last_lookup_seconds = 0
+    timed = max_tries > 0 and wait > 0
     for attempt in range(max_tries + 1):
+        if timed and monotonic() >= deadline:
+            break
         # Native CLI resolves aliases and filters exact scope/role/principal.
         # Once create/readback supplies an object ID, all later reads use it.
         visibility = {"assignee_object_id": principal} if principal else {"assignee": assignee}
         lookup_started = monotonic()
+        lookups += 1
         assignments = helpers.get_role_assignments(
             scope=scope, role=role, fill_role_definition_name=False, fill_principal_name=False, **visibility,
         )
         last_lookup_seconds = monotonic() - lookup_started
+        if timed and monotonic() >= deadline:
+            break
         if any(
             not isinstance(value.get("principalId"), str) or not value["principalId"].strip()
             for value in assignments
@@ -249,7 +258,10 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
                 principal = resolved
                 record["principal_id"] = principal
                 receipts.write(name, record)
-        sleep(min(wait, max(0, deadline - monotonic())))
+        remaining = deadline - monotonic()
+        if timed and remaining <= 0:
+            break
+        sleep(min(wait, max(0, remaining)))
     reason = (
         "Owned role assignment was not visible before its read-only verification bound."
         if record.get("create_attempted") else
@@ -257,7 +269,7 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
     )
     elapsed = monotonic() - (deadline - max_tries * wait)
     raise ScopeError(
-        f"{reason} lookups={attempt + 1}, last_lookup_seconds={last_lookup_seconds:.3f}, "
+        f"{reason} lookups={lookups}, last_lookup_seconds={last_lookup_seconds:.3f}, "
         f"returned_assignments={len(assignments)}, elapsed_seconds={elapsed:.3f}, "
         f"create_attempted={record['create_attempted']}."
     ) from visibility_error

@@ -363,7 +363,7 @@ def setup_hub_controlplane_states(
         _regular_phase_observer(request), provisioned_iot_hubs_with_storage_user_module[0]["hub"].get("id"),
         provisioned_storage["storage"]["id"], storage_container,
     )
-    sleep(30)
+    sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
     suffix = "systemid" if use_system_endpoints else "userid"
     user_identity_parameter = "[system]" if use_system_endpoints else user_id

@@ -59,6 +59,7 @@ class StorageEndpointReadiness:
         attempts = 0
         while monotonic() < self.deadline:
             attempts += 1
+            succeeded = False
             with self.observer.storage_endpoint_attempt(
                 self.hub_id, self.storage_id, endpoint, self.container, identity, self.deadline,
             ) as attempt:
@@ -69,13 +70,20 @@ class StorageEndpointReadiness:
                         raise
                     last_error = error
                 else:
-                    logger.info(
-                        "Storage endpoint ready: endpoint=%s identity=%s attempts=%s elapsed=%.1fs grantVerifiedAge=%.1fs",
-                        endpoint, "system" if identity == "[system]" else "user", attempts,
-                        monotonic() - (self.deadline - STORAGE_READINESS_TIMEOUT),
-                        monotonic() - self.grants_verified_at,
+                    succeeded = True
+            if succeeded:
+                if monotonic() >= self.deadline:
+                    raise CLIInternalError(
+                        f"Storage endpoint '{endpoint}' completed after the shared "
+                        f"{STORAGE_READINESS_TIMEOUT}-second budget. The successful mutation will not be replayed."
                     )
-                    return result
+                logger.info(
+                    "Storage endpoint ready: endpoint=%s identity=%s attempts=%s elapsed=%.1fs grantVerifiedAge=%.1fs",
+                    endpoint, "system" if identity == "[system]" else "user", attempts,
+                    monotonic() - (self.deadline - STORAGE_READINESS_TIMEOUT),
+                    monotonic() - self.grants_verified_at,
+                )
+                return result
             remaining = self.deadline - monotonic()
             logger.warning(
                 "Storage authorization pending: endpoint=%s attempt=%s remaining=%.1fs grantVerifiedAge=%.1fs "

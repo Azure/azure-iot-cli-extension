@@ -244,6 +244,9 @@ def test_state_endpoint_roles_match_the_configured_identities(
     exit_code = 2 if failure_kind == "system_exit" else 7
 
     def invoke(args, out_file):
+        if client.invoke.call_count == 1:
+            assert assign.call_count == (7 if system_endpoints else 4)
+            wait.assert_called_once_with(120)
         failed = client.invoke.call_count - 1 == failed_command
         client.result.error = error if failed and failure_kind == "cli_error" else None
         if failed:
@@ -254,7 +257,7 @@ def test_state_endpoint_roles_match_the_configured_identities(
         return 0
 
     client.invoke = mocker.Mock(side_effect=invoke)
-    mocker.patch.object(fixtures, "sleep")
+    wait = mocker.patch.object(fixtures, "sleep")
     mocker.patch.object(fixtures, "create_self_signed_certificate", return_value={"certificate": "unused"})
     mocker.patch("builtins.open", mocker.mock_open())
     mocker.patch.object(fixtures.os.path, "isfile", return_value=True)

@@ -980,6 +980,26 @@ def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
     assert "ADR may reject removal" in caplog.text
 
 
+@pytest.mark.parametrize("status", [400, 409, 401, 403, 404, 412, 429, 500, 503])
+@pytest.mark.parametrize("method,resource", [("PUT", "ns"), ("GET", "ns"), ("PUT", "other")])
+def test_live_unlink_negative_requires_a_structured_namespace_mutation_rejection(status, method, resource):
+    from types import SimpleNamespace
+    from azext_iot.tests.adr.test_adr_link_delete_int import _assert_unlink_service_rejection
+
+    namespace_id = "/subscriptions/s/resourceGroups/g/providers/Microsoft.DeviceRegistry/namespaces/ns"
+    error = HttpResponseError("Synthetic rejection")
+    error.status_code = status
+    error.error = SimpleNamespace(code="SyntheticServiceRejection")
+    error.response = SimpleNamespace(request=SimpleNamespace(
+        method=method, url="https://management.azure.com" + namespace_id.removesuffix("ns") + resource,
+    ))
+    if status in (400, 409) and method == "PUT" and resource == "ns":
+        _assert_unlink_service_rejection(error, namespace_id)
+    else:
+        with pytest.raises(AssertionError):
+            _assert_unlink_service_rejection(error, namespace_id)
+
+
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("no_wait", [False, True])
 @pytest.mark.parametrize("option", [None, "--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
