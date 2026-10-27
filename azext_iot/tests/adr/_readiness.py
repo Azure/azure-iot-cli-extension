@@ -255,6 +255,12 @@ def _endpoint_settings(endpoint):
 def _read_authorization_failure(endpoint, endpoint_name):
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     error = status.get("error") or endpoint.get("error") or endpoint.get("linkingError") or {}
+    if any(other and other != error for other in (
+        endpoint.get("linkingError"), endpoint.get("error"),
+        (endpoint.get("status") or {}).get("error"),
+        (endpoint.get("provisioningStatus") or {}).get("error"),
+    )):
+        return False
     target = endpoint.get("resourceId")
     # Match the observed direction and exact target, not generic 403/Failed.
     messages = {
@@ -298,6 +304,7 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
     if (
         endpoint.get("linkingState") == "Failed"
         and error.get("code") == "ResourceMiNotAuthorized"
+        and not set(error) - {"code", "message"}
     ):
         return True
     message = error.get("message")
@@ -371,7 +378,7 @@ def _same_recovered_fresh_grant_failure(namespace, endpoint, expected):
         return False
     current = endpoint.get("linkingError") or {}
     if set(expected) == {"code"}:
-        return current.get("code") == expected["code"]
+        return current.get("code") == expected["code"] and not set(current) - {"code", "message"}
     return current == expected
 
 
@@ -404,10 +411,10 @@ def link_with_readiness(
     """Submit once, then recover only a persisted terminal authorization failure.
 
     Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
-    Bound authorization recovery hands off once to the operation-aware waited
-    update under the remaining deadline. Preview-only fresh-grant envelopes
-    retain no-wait recovery and require observed progress before another write.
-    All CLI/read errors propagate unchanged.
+    Bound failures hand off once to a waited production update. Fresh/redacted
+    failures retain asynchronous recovery because grant-creation evidence does
+    not cross CLI invocations. These updates require observed progress before
+    another write. All paths preserve the deadline and propagate CLI/read errors.
     """
     assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
     section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
@@ -439,8 +446,8 @@ def link_with_readiness(
     budget.call(scenario.cmd, command + " --no-wait")
     submitted_at = budget.clock()
     expected = _endpoint_settings(expected)
-    progressed = True
-    waited_recovery = False
+    progressed = True  # The initial add is never replayed.
+    handed_off = False
     retries = 0
     retry_at = None
     recovered_fresh_grant_error = None
@@ -483,7 +490,7 @@ def link_with_readiness(
             recovery_reason = _authorization_failure(
                 namespace, endpoint, binding, submitted_at=submitted_at, now=budget.clock(),
             )
-            if recovery_reason and progressed and not waited_recovery:
+            if recovery_reason and progressed and not handed_off:
                 if retry_at is None:
                     if recovery_reason == "fresh-grant":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
@@ -496,17 +503,18 @@ def link_with_readiness(
                         "properties": {section: {"endpoints": {endpoint_name: endpoint}}},
                     })
                     assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
-                    if recovery_reason == "fresh-grant":
+                    if binding.authorized_failure(endpoint):
+                        remaining = int(budget.end - budget.clock())
+                        assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
+                        budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
+                        handed_off = True
+                    else:
                         budget.call(scenario.cmd, recovery[0] + " --no-wait")
+                    if recovery_reason == "fresh-grant":
                         error = deepcopy(endpoint.get("linkingError"))
                         recovered_fresh_grant_error = (
                             {"code": error["code"]} if error.get("code") == "ResourceMiNotAuthorized" else error
                         )
-                    else:
-                        remaining = int(budget.end - budget.clock())
-                        assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
-                        budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
-                        waited_recovery = True
                     retries += 1
                     progressed = False
                     retry_at = None

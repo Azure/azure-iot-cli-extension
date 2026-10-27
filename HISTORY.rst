@@ -46,6 +46,7 @@ Release History
 
 **ADR bug fixes**
 
+* DPS namespace link add/update can recover the observed ``ResourceMiNotAuthorized`` / ``400315`` response when the current command created the required role assignments. Recovery retains the existing grant verification, identity checks, and two-retry propagation limit.
 * Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before permission checks or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection and rerun guidance.
 
 1.0.0b2 (Preview)
