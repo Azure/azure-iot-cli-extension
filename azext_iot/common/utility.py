@@ -18,7 +18,7 @@ import sys
 import re
 import hmac
 import hashlib
-from typing import Any, Optional, List, Dict
+from typing import TYPE_CHECKING, Any, MutableMapping, Optional, List, Dict
 from threading import Event, Thread
 from datetime import datetime, timezone
 from knack.log import get_logger
@@ -28,7 +28,14 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
 )
 
+from azext_iot.constants import LRO_POLL_RETRIES, LRO_POLL_WAIT_SEC
+
+if TYPE_CHECKING:
+    from azure.core.polling import LROPoller
+
 logger = get_logger(__name__)
+
+JSON = MutableMapping[str, Any]
 
 
 def parse_entity(entity, filter_none=False):
@@ -188,7 +195,7 @@ def process_toml_arg(path: str) -> Dict[str, Any]:
         )
 
 
-def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
+def shell_safe_json_parse(json_or_dict_string, preserve_order=False) -> Any:
     """Allows the passing of JSON or Python dictionary strings. This is needed because certain
     JSON strings in CMD shell are not received in main's argv. This allows the user to specify
     the alternative notation, which does not have this problem (but is technically not JSON)."""
@@ -729,3 +736,16 @@ def assemble_nargs_to_dict(hash_list: List[str]) -> Dict[str, str]:
                 key,
             )
     return result
+
+
+def wait_for_terminal_state(poller: "LROPoller", wait_sec: int = LRO_POLL_WAIT_SEC, **_) -> JSON:
+    from time import sleep
+
+    # resource client does not handle sigint well
+    counter = 0
+    while counter < LRO_POLL_RETRIES:
+        sleep(wait_sec)
+        counter = counter + 1
+        if poller.done():
+            break
+    return poller.result()

@@ -7,11 +7,13 @@
 OVERWRITE_FILE_MSG = "File {0} is not empty. Overwrite file? "
 FILE_NOT_EMPTY_ERROR = "Command aborted. Include the --replace flag to overwrite file."
 FILE_NOT_FOUND_ERROR = 'File {0} does not exist.'
-SAVE_STATE_FALLBACK_ERROR = (
-    "Could not write the exported hub state to {0}: {1}. To avoid losing the exported data, it was "
-    "written to {2} instead. Move or rename that file once the original destination is usable."
+STATE_FILE_READ_ERROR = "Cannot read Hub state file '{0}': {1}"
+INVALID_STATE_MSG = "Invalid Hub state at '{0}': {1}."
+BASIC_DEVICES_UNSUPPORTED_MSG = (
+    "Device state capture and restore are not supported for Basic-tier IoT Hubs: "
+    "the device listing is limited to 1000 identities and cannot guarantee a complete snapshot. "
+    "Select only supported aspects with --aspects."
 )
-SAVE_STATE_WRITE_ERROR = "Could not write the exported hub state to {0}: {1}. The exported data could not be preserved."
 LOGIN_WITH_ARM_ERROR = "Hub aspect 'arm' is not supported with connection string via --login."
 TARGET_HUB_NOT_FOUND_MSG = "Destination IoT Hub {0} was not found and cannot be created with current hub aspects."
 MISSING_RG_ON_CREATE_ERROR = "Please provide the resource group for the hub that will be created."
@@ -38,7 +40,7 @@ SAVE_ROUTE_FAIL_MSG = "Skipping route {0} because it relies on endpoint {1}."
 SAVE_FILE_UPLOAD_UAI_RETRIEVE_FAIL_MSG = "Skipping the file upload because it relies on user assigned identity {0}."
 SAVE_FILE_UPLOAD_RETRIEVE_FAIL_MSG = "Failed to retrieve permissions for file upload. Skipping the file upload."
 SAVE_ARM_DESC = "Saved ARM template."
-SAVE_ARM_DESC_RETRIEVE_FAIL_MSG = "Failed to retrieve ARM template. Skipping ARM template retrieval."
+SAVE_ARM_DESC_RETRIEVE_FAIL_MSG = "Failed to retrieve a complete ARM template. State capture has been aborted."
 SAVE_ARM_DESC_RETRIEVE_ERROR_MSG = SAVE_ARM_DESC_RETRIEVE_FAIL_MSG + " \nError Message: {0}"
 PRIVATE_ENDPOINT_WARNING_MSG = "Private endpoints for IoT Hub will be ignored for state import."
 CREATE_IOT_HUB_MSG = "Created IoT Hub {0}."
@@ -57,7 +59,7 @@ UPLOAD_EDGE_MODULE_MSG = "Failed to upload edge modules for the device {0}. Proc
 UPLOAD_DEVICE_RELATIONSHIP_MSG = "Failed to set parent-child relationship for the parent device {0} to the child device {1}. \
 Error Message: {2}"
 MISSING_HUB_ASPECTS_MSG = " Some hub aspects ({0}) were not uploaded because the necessary aspects were not found in the file."
-BAD_DEVICE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
+BAD_DEVICE_AUTHORIZATION_MSG = "Authorization type for device '{0}' not recognized."
 BAD_DEVICE_MODULE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
 SKIP_CONFIGURATION_DELETE_MSG = "Failed to retrieve configurations. Skipping configuration deletion."
 DELETE_CONFIGURATION_DESC = "Deleting configurations from destination hub"

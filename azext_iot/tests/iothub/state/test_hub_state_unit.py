@@ -15,39 +15,20 @@ from azure.cli.core.azclierror import (
 import azext_iot.iothub.providers.helpers.state_strings as constants
 
 from azext_iot.tests.conftest import generate_cs
-from azext_iot.iothub.providers.state import StateProvider, _endpoint_resource_name
-from azext_iot.sdk.iothub.service.models import Module
+from azext_iot.iothub.providers.state import _endpoint_resource_name
 
 hub_name = "hubname"
 hub_rg = "hubrg"
 resource_not_found_error = "Resource not found."
 
 
-def _build_device_twin(device_id="device1", auth_type="sas", include_thumbprint=True):
-    """Minimal device twin shaped like the output of `_iot_device_twin_list`."""
-    twin = {
-        "deviceId": device_id,
-        "authenticationType": auth_type,
-        "properties": {
-            "desired": {"$metadata": {}, "$version": 1},
-            "reported": {},
-        },
-    }
-    if include_thumbprint:
-        twin["x509Thumbprint"] = {
-            "primaryThumbprint": "AAAA",
-            "secondaryThumbprint": "BBBB",
-        }
-    return twin
-
-
 class TestHubStateExport:
-    def test_present_file_no_replace(self, fixture_cmd, fixture_ghcs, mocker):
+    def test_present_file_no_replace(self, fixture_cmd, fixture_ghcs, mocker, tmp_path):
         patched_prompt_y_n = mocker.patch("azext_iot.iothub.providers.state.prompt_y_n")
         patched_prompt_y_n.return_value = False
 
         # make a temporary file
-        fake_file = "fake_file.json"
+        fake_file = str(tmp_path / "fake_file.json")
         with open(fake_file, "w", encoding='utf-8') as f:
             f.write("Hello World")
 
@@ -95,10 +76,10 @@ class TestHubStateImport:
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
 
-    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs_resource_not_found_error):
+    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs_resource_not_found_error, tmp_path):
         hub_name = "someHub"
         # make a temporary file
-        fake_file = "fake_file.json"
+        fake_file = str(tmp_path / "fake_file.json")
         with open(fake_file, "w", encoding='utf-8') as f:
             f.write("{}")
 
@@ -109,7 +90,8 @@ class TestHubStateImport:
                 hub_name_or_hostname=hub_name,
                 resource_group_name="somerg"
             )
-        assert constants.HUB_NOT_CREATED_MSG.format(hub_name) == str(error.value)
+        assert "Invalid Hub state" in str(error.value)
+        assert "required field is missing" in str(error.value)
 
         if os.path.isfile(fake_file):
             os.remove(fake_file)
@@ -124,109 +106,6 @@ class TestHubStateMigrate:
                 orig_hub_login=generate_cs()
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
-
-
-class TestDownloadDevicesThumbprint:
-    """`state export` must not crash on twins that lack an x509Thumbprint (issue #746)."""
-
-    def _patch_device_calls(self, mocker, twins):
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_twin_list", return_value=twins
-        )
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_show",
-            return_value={"authentication": {"symmetricKey": {"primaryKey": "pk", "secondaryKey": "sk"}}},
-        )
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_module_list", return_value=[]
-        )
-
-    def test_missing_thumbprint_does_not_raise(self, mocker):
-        # a twin without the x509Thumbprint key previously raised KeyError: 'x509Thumbprint'
-        self._patch_device_calls(mocker, [_build_device_twin(include_thumbprint=False)])
-
-        provider = StateProvider.__new__(StateProvider)
-        devices = provider.download_devices(target={})
-
-        assert "device1" in devices
-        thumbprint = devices["device1"]["identity"]["authentication"]["x509Thumbprint"]
-        assert thumbprint == {"primaryThumbprint": None, "secondaryThumbprint": None}
-
-    def test_present_thumbprint_is_preserved(self, mocker):
-        self._patch_device_calls(mocker, [_build_device_twin(include_thumbprint=True)])
-
-        provider = StateProvider.__new__(StateProvider)
-        devices = provider.download_devices(target={})
-
-        thumbprint = devices["device1"]["identity"]["authentication"]["x509Thumbprint"]
-        assert thumbprint == {"primaryThumbprint": "AAAA", "secondaryThumbprint": "BBBB"}
-
-    @pytest.mark.parametrize(
-        "thumbprint, expected",
-        [
-            (None, {"primaryThumbprint": None, "secondaryThumbprint": None}),
-            ({}, {"primaryThumbprint": None, "secondaryThumbprint": None}),
-            ({"primaryThumbprint": "AAAA"}, {"primaryThumbprint": "AAAA", "secondaryThumbprint": None}),
-            ({"secondaryThumbprint": "BBBB"}, {"primaryThumbprint": None, "secondaryThumbprint": "BBBB"}),
-        ],
-    )
-    def test_partial_thumbprints_keep_import_compatible_shape(self, mocker, thumbprint, expected):
-        twin = _build_device_twin()
-        twin["x509Thumbprint"] = thumbprint
-        self._patch_device_calls(mocker, [twin])
-
-        devices = StateProvider.__new__(StateProvider).download_devices(target={})
-
-        assert devices["device1"]["identity"]["authentication"]["x509Thumbprint"] == expected
-
-    def test_mixed_devices_all_exported(self, mocker):
-        # one bad device must not abort the export of the rest
-        self._patch_device_calls(
-            mocker,
-            [
-                _build_device_twin(device_id="withThumbprint", include_thumbprint=True),
-                _build_device_twin(device_id="noThumbprint", include_thumbprint=False),
-            ],
-        )
-
-        provider = StateProvider.__new__(StateProvider)
-        devices = provider.download_devices(target={})
-
-        assert set(devices.keys()) == {"withThumbprint", "noThumbprint"}
-
-    @pytest.mark.parametrize("include_thumbprint", [False, True])
-    def test_modules_with_missing_optional_fields_are_exported(self, mocker, include_thumbprint):
-        self._patch_device_calls(mocker, [_build_device_twin()])
-        module = Module(module_id="module1", device_id="device1", managed_by="module-manager")
-        assert "connectionStateUpdatedTime" not in module.serialize()
-        assert "lastActivityTime" not in module.serialize()
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_module_list", return_value=[module]
-        )
-        authentication = {
-            "type": "sas",
-            "symmetricKey": {"primaryKey": "module-primary", "secondaryKey": "module-secondary"},
-        }
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_module_show",
-            return_value={"authentication": authentication},
-        )
-        module_twin = _build_device_twin(include_thumbprint=include_thumbprint)
-        module_twin.update({"moduleId": "module1", "etag": "module-etag", "version": 1, "tags": {"site": "factory"}})
-        module_twin["properties"]["desired"]["setting"] = "retained"
-        mocker.patch(
-            "azext_iot.iothub.providers.state._iot_device_module_twin_show", return_value=module_twin
-        )
-
-        provider = StateProvider.__new__(StateProvider)
-        devices = provider.download_devices(target={})
-
-        assert devices["device1"]["modules"] == {
-            "module1": {
-                "identity": {"managedBy": "module-manager", "authentication": authentication},
-                "twin": {"properties": {"desired": {"setting": "retained"}}, "tags": {"site": "factory"}},
-            }
-        }
 
 
 class TestEndpointHostNameParsing:

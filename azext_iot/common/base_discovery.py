@@ -5,12 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import ABC, abstractmethod
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
+from azext_iot.common.arm import get_resource_group, get_subscription_id
 from typing import Any, Dict, List
-from types import SimpleNamespace
 
 from azext_iot.common.utility import valid_hostname
 
@@ -61,6 +61,7 @@ class BaseDiscovery(ABC):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
+        self.last_resource_group = None
         self.resource_type = resource_type
         self.necessary_rights_set = necessary_rights_set
 
@@ -126,6 +127,31 @@ class BaseDiscovery(ABC):
 
         return policy_list
 
+    def resolve_resource_group(
+        self, resource: dict, fallback: str = None
+    ) -> str:
+        """Resolve ARM metadata without relying on legacy SDK-added fields."""
+        resource_group = get_resource_group(
+            resource,
+            fallback=fallback,
+            resource_label=getattr(self, "resource_type", None) or "resource",
+        )
+        self.last_resource_group = resource_group
+        return resource_group
+
+    def resolve_subscription_id(
+        self, resource: dict, fallback: str = None
+    ) -> str:
+        """Resolve a resource subscription from its ARM ID or caller context."""
+        subscription_id = get_subscription_id(
+            resource,
+            fallback=fallback or (
+                self.sub_id if self.sub_id != "unknown" else None
+            ),
+            resource_label=getattr(self, "resource_type", None) or "resource",
+        )
+        return subscription_id
+
     def find_resource(self, resource_name: str, rg: str = None):
         """
         Returns the resource with the given resource_name.
@@ -164,7 +190,7 @@ class BaseDiscovery(ABC):
 
         if resource_list:
             target = next(
-                (resource for resource in resource_list if resource_name.lower() == resource.name.lower()),
+                (resource for resource in resource_list if resource_name.lower() == resource["name"].lower()),
                 None
             )
             if target:
@@ -210,10 +236,10 @@ class BaseDiscovery(ABC):
         policy_list = self.get_policies(resource_name=resource_name, rg=rg)
 
         for policy in policy_list:
-            rights_set = set(policy.rights.split(", "))
+            rights_set = set(policy["rights"].split(", "))
             if self.necessary_rights_set.issubset(rights_set):
                 logger.info(
-                    "Using policy '%s' for %s interaction.", policy.key_name, self.resource_type
+                    "Using policy '%s' for %s interaction.", policy["keyName"], self.resource_type
                 )
                 return policy
 
@@ -291,16 +317,21 @@ class BaseDiscovery(ABC):
                 )
 
             resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+            resource_group_name = self.resolve_resource_group(
+                resource, fallback=resource_group_name
+            )
 
-            policy = SimpleNamespace()
-            policy.key_name = AuthenticationTypeDataplane.login.value
-            policy.primary_key = AuthenticationTypeDataplane.login.value
-            policy.secondary_key = AuthenticationTypeDataplane.login.value
+            policy = {
+                "keyName": AuthenticationTypeDataplane.login.value,
+                "primaryKey": AuthenticationTypeDataplane.login.value,
+                "secondaryKey": AuthenticationTypeDataplane.login.value,
+            }
 
             return self._build_target(
                 resource=resource,
                 policy=policy,
                 key_type="primary",
+                resource_group_name=resource_group_name,
                 **kwargs
             )
 
@@ -309,16 +340,21 @@ class BaseDiscovery(ABC):
         resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
         key_type = kwargs.get("key_type", "primary")
         policy_name = kwargs.get("policy_name", "auto")
-        rg = resource.additional_properties.get("resourcegroup")
+        resource_group_name = self.resolve_resource_group(
+            resource, fallback=resource_group_name
+        )
 
         resource_policy = self.find_policy(
-            resource_name=resource.name, rg=rg, policy_name=policy_name,
+            resource_name=resource["name"],
+            rg=resource_group_name,
+            policy_name=policy_name,
         )
 
         return self._build_target(
             resource=resource,
             policy=resource_policy,
             key_type=key_type,
+            resource_group_name=resource_group_name,
             **kwargs
         )
 
@@ -339,15 +375,18 @@ class BaseDiscovery(ABC):
         if resources:
             for resource in resources:
                 try:
+                    resolved_resource_group = self.resolve_resource_group(
+                        resource, fallback=resource_group_name
+                    )
                     targets.append(
                         self.get_target(
-                            resource_name=resource.name,
-                            resource_group_name=resource.additional_properties.get("resourcegroup"),
+                            resource_name=resource["name"],
+                            resource_group_name=resolved_resource_group,
                             **kwargs
                         )
                     )
-                except (HttpResponseError, ResourceNotFoundError) as e:
-                    logger.warning("Could not access %s. %s", resource.name, e)
+                except (HttpResponseError, ResourceNotFoundError, ForbiddenError, UnauthorizedError) as e:
+                    logger.warning("Could not access %s. %s", resource["name"], e)
 
         return targets
 

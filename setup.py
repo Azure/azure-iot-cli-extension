@@ -43,10 +43,10 @@ if not PACKAGE_NAME:
 # and azure-eventhub for telemetry monitoring.
 
 DEPENDENCIES = [
-    "azure-core>=1.31.0,<2.0.0",
+    "azure-core>=1.31.0,<1.40.0",
     "azure-mgmt-core>=1.5.0,<2.0.0",
     "azure-identity>=1.6.1,<1.18.0",
-    "azure-storage-blob>=12.14.0,<13.0.0",
+    "azure-storage-blob>=12.14.0,<12.30.0",
     "msrest>=0.6.21",
     "msrestazure>=0.6.3,<2.0.0",
     "jsonschema>=4.25,<5",
@@ -57,6 +57,7 @@ DEPENDENCIES = [
     "tqdm~=4.62",
     "treelib~=1.6",
     "packaging>=23.2",
+    "rich>=13.6,<14.0",
     "azure-eventhub~=5.15.0",
     # aiohttp is required by azure-eventhub for async AMQP over WebSocket transport (used when proxy is configured).
     # azure-eventhub does not include it as an extras dependency, so it must be declared explicitly.

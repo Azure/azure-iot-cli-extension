@@ -15,12 +15,12 @@ jobs:
       contents: write
     steps:
       - name: Download Wheel
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: azure-iot-cli-ext
           path: ./release
       - name: Setup python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.13"
       - name: Install and determine version
@@ -32,7 +32,7 @@ jobs:
           echo "version=$version" >> $GITHUB_ENV
           echo "tag=v$version" >> $GITHUB_ENV
       - name: Download SBOM
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: SBOM
           path: ./release/SBOM

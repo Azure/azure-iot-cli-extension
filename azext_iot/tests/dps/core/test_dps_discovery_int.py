@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azure.cli.testsdk.reverse_dependency import get_dummy_cli
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.tests.settings import Setting
@@ -18,16 +20,18 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     discovery = DPSDiscovery(cmd_shell)
 
     resource = discovery.find_resource(resource_name=dps_name)
-    assert resource.name == dps_name
+    assert resource["name"] == dps_name
 
-    auto_policy = discovery.find_policy(resource_name=dps_name, rg=dps_rg).as_dict()
+    # Policy/key metadata is read through ARM with the logged-in identity. It is
+    # still useful to test with disableLocalAuth=true; no service SAS request is made.
+    auto_policy = discovery.find_policy(resource_name=dps_name, rg=dps_rg)
     assert auto_policy
 
     # Assumption - Test DPS includes the vanilla provisioningserviceowner policy
     desired_policy = discovery.find_policy(
         resource_name=dps_name, rg=dps_rg, policy_name=desired_policy_name
-    ).as_dict()
-    assert desired_policy["key_name"] == desired_policy_name
+    )
+    assert desired_policy["keyName"] == desired_policy_name
 
     policies = discovery.get_policies(resource_name=dps_name, rg=dps_rg)
     assert len(policies)
@@ -40,20 +44,21 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     assert sub_dps
 
     filtered_sub_dps = [
-        dps for dps in sub_dps if dps.as_dict()["name"] == dps_name
+        dps for dps in sub_dps if dps["name"] == dps_name
     ]
     assert filtered_sub_dps
 
     rg_dpss = discovery.get_resources(rg=dps_rg)
     assert rg_dpss
 
-    filtered_rg_dpss = [dps for dps in rg_dpss if dps.as_dict()["name"] == dps_name]
+    filtered_rg_dpss = [dps for dps in rg_dpss if dps["name"] == dps_name]
     assert filtered_rg_dpss
 
     assert len(rg_dpss) <= len(sub_dps)
 
 
-def test_dps_targets(provisioned_iot_dps_no_hub_module):
+@pytest.mark.parametrize("auth_type", ["key", "login"])
+def test_dps_targets(provisioned_iot_dps_no_hub_module, auth_type):
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
     dps_host_name = provisioned_iot_dps_no_hub_module['dps']['properties']['serviceOperationsHostName']
@@ -61,7 +66,7 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     setattr(cmd_shell, "cli_ctx", get_dummy_cli())
     discovery = DPSDiscovery(cmd_shell)
 
-    auto_target = discovery.get_target(resource_name=dps_name)
+    auto_target = discovery.get_target(resource_name=dps_name, auth_type=auth_type)
     assert_target(auto_target, rg=dps_rg)
     connection_string = auto_target["cs"]
 
@@ -71,16 +76,20 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     cs_target2 = discovery.get_target(resource_name=None, login=connection_string)
     assert_target(cs_target2, True)
 
-    cs_target2 = discovery.get_target(resource_name=dps_host_name)
+    cs_target2 = discovery.get_target(resource_name=dps_host_name, auth_type=auth_type)
     assert_target(cs_target2, True)
 
-    auto_target = discovery.get_target(resource_name=dps_name, resource_group_name=dps_rg)
+    auto_target = discovery.get_target(resource_name=dps_name, resource_group_name=dps_rg, auth_type=auth_type)
     assert_target(auto_target, rg=dps_rg)
+    if auth_type == "login":
+        assert auto_target["policy"] == "login"
+        assert auto_target["cmd"] is cmd_shell
+        assert auto_target["entity"] == dps_host_name
 
-    sub_targets = discovery.get_targets()
+    sub_targets = discovery.get_targets(auth_type=auth_type)
     [assert_target(tar) for tar in sub_targets]
 
-    rg_targets = discovery.get_targets(resource_group_name=dps_rg)
+    rg_targets = discovery.get_targets(resource_group_name=dps_rg, auth_type=auth_type)
     [assert_target(tar, rg=dps_rg) for tar in rg_targets]
 
     assert len(rg_targets) <= len(sub_targets)

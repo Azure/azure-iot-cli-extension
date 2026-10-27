@@ -3,16 +3,118 @@
 Release History
 ===============
 
-Unreleased
-++++++++++
+1.1.0b1 (Preview)
++++++++++++++++++
 
-**IoT Hub updates**
+**DPS certificate and enrollment fixes**
 
-* Fixed ``az iot edge devices create`` accepting unsafe device Ids from ``--cfg`` or ``--device`` as file system path segments. Device Id validation and bundle path containment checks now run before device-specific filesystem operations.
+* Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
+* Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
 
-* Fixed ``az iot hub state export`` failing when device or module twins omit ``x509Thumbprint``, or module identities omit optional read-only fields. Device authentication, module authentication, and writable twin properties are preserved.
+**ADR unlink polling**
 
-* Hardened the final write in ``az iot hub state export`` with atomic replacement for regular files, preserving destination symlinks and streaming output to non-regular files. Regular-file output and recovery files are private to the current user (mode ``0600`` on POSIX). If writing a fully collected state fails, the command attempts a temporary recovery file and reports its path in an error. Failures during state collection are not recovered.
+* Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
+* Operation-status and final namespace GETs retain SDK retries for transient failures; retry suppression applies only to the initial namespace read and PUT.
+* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint, retains the unlink Reader grant, and does not retry the namespace PUT.
+
+**Wait command bug fixes**
+
+* Digital Twins, Device Update, and Device Registry schema, schema registry, and schema version generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
+
+**ADR bug fixes**
+
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
+
+1.0.0b2 (Preview)
++++++++++++++++++
+
+**ADR bug fixes**
+
+* Certificate policy create/update now accept ``--validity-days`` from 1 through 90, lowering the previous minimum of 7 days.
+* Namespace link add/update preserve the original service failure as the exception cause when recovery stops on a later state-validation error or timeout, unless the stopping error already has an exception cause or context.
+
+1.0.0b1 (Preview)
++++++++++++++++++
+
+**Known limitations**
+
+* Preview APIs support the Azure public cloud only. Hub, DPS, and ADR management requests use public ARM by default; set ``AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com`` to use the Central US EUAP (canary) ARM endpoint.
+* ``az iot adr ns link hub|dps|su remove`` submits the unlink and returns without waiting; inspect the namespace with ``az iot adr ns show`` afterward.
+* Link add/update automatically create the service role assignments that the link requires when the caller can create role assignments.
+
+**Hub/DPS SDK and command updates**
+
+* Updated modeless Hub management to ``2026-10-01-preview`` and DPS management to ``2026-06-01-preview``. Hub service/device REST clients use ``2026-11-01-preview`` and DPS service/device REST clients use ``2026-11-02-preview``.
+* Hub upserts preserve unspecified settings, partial identities, Fabric endpoints/routes, and identities selected by active ADR links.
+* DPS create requires positive integer ``--unit`` values (default 1). Generic capacity updates are validated before writes.
+* Hub query, messaging, C2D settlement, file upload, direct-method/digital-twin, configuration, and job commands use the new HTTP contract.
+* State export reads authoritative identities and twins. State import validates the state before replacing anything and preserves routing and authentication fields.
+* DPS enrollments support ``--adr-namespace``, ``--adr-ca-name``, and ``--adr-cert-policy-name``; passing all three as empty values clears the association. Unknown writable JSON fields are preserved.
+* DPS queries follow continuation tokens and honor ``--top`` (``-1`` remains unlimited).
+* DPS bulk target discovery warns about and skips resources whose keys or policies you cannot read; explicitly requested targets still report errors.
+* Device registration, with or without a CSR, uses REST. ``--csr`` / ``--csr-file-path`` accept PEM or base64 DER PKCS #10 requests. Issued certificate-chain JSON, operation status, and the Registry Device external ID are returned.
+* ``--timeout`` bounds the whole registration. On timeout, the accepted operation ID (when known) is shown for ``operation-status`` follow-up.
+* Transient registration failures are retried; a retried registration may issue an additional certificate.
+* Enrollment-group create/update/show hide symmetric keys unless ``--show-keys`` is passed.
+* Hub feedback monitoring reports AMQP transport failures, and device filtering keeps every matching record in a mixed feedback batch.
+* Hub feedback monitoring acknowledges consumed AMQP deliveries, including unrelated feedback, to prevent stalls while waiting for a specific message.
+
+**Azure Device Registry (ADR)**
+
+* Expanded ``az iot adr`` to 112 commands for namespaces, Registry Devices, certificate authorities and policies, groups, jobs and runs, namespace links, reports, and Software Updates. ADR and Update Instance management use ``2026-11-02-preview``.
+* ADR commands wait for completion by default; use ``--no-wait`` to return after submission and the matching ``wait`` command to track completion.
+* Added namespace identity show/assign/remove, legacy-asset migration, and update-compliance report generate/latest. Removing the namespace system-assigned identity is blocked while a DPS link exists.
+* Added certificate authority and policy management, including external ICA activation with ECC CSR-signing guidance and revoke-and-rotate. Policy validity can be 7 through 90 days.
+* Added ``az iot adr ns device`` (Registry Device) CRUD, wait, authentication, attributes, and capabilities. Symmetric keys are shown only by ``auth show-keys``.
+* Added group member list/count/refresh, ``SoftwareUpdate`` and ``OnboardingUpdate`` jobs, and job-run list/results/summary/cancel/delete.
+* Added Update Instance lifecycle and identity management, software-update import/stage/list/show/delete/hash/wait, file and device-class discovery, and v5 manifest initialization. Staging streams artifacts to Azure Storage instead of loading them into memory.
+* Added catalog provider/name/version discovery and import operation-status list/show. ``calculate-hash`` runs locally without Azure calls.
+* ``group delete`` is synchronous; ``--no-wait`` is accepted but has no effect.
+* ``su software-update wait --created`` / ``--updated`` complete as soon as the imported update exists; Software Updates have no ``provisioningState``.
+* ``report generate|latest --group-name`` resolves the group name to the group UUID that the service requires as ``reportTarget``.
+* AIO custom-location resources, assets, and discovered resources remain under ``az iot ops ns``.
+
+**Namespace links**
+
+* ``az iot adr ns link hub|dps|su add|update|show|list|wait|remove`` is the only way to link Hubs, DPS, and Software Updates to a namespace. Hub/DPS create/update and namespace create/update no longer accept link inputs.
+* Link add/update validate the target's existence, region, state, SKU, identity, endpoint name, cardinality, and DPS-before-Hub ordering before changing the namespace.
+* Link add/update create missing role assignments for callers who can create role assignments (for example Owner, User Access Administrator, or Role Based Access Control Administrator); other callers receive the exact commands to run. Hub, DPS, and SU links grant the namespace outbound identity Contributor on the target (plus IoT Hub Data Contributor on a Hub, or Device Update Administrator on an Update Instance). The linked resource's inbound identity receives Contributor (Hub, DPS) or Azure Device Registry Contributor (SU) on the namespace.
+* DPS links also grant the namespace system-assigned identity Azure Device Registry Administrator on the namespace for registry-device provisioning.
+* Managed-identity options are ``--system-assigned-mi`` / ``--user-assigned-mi``.
+* ``link hub|dps|su update`` retries a Failed link with its saved identity and settings.
+* ``link hub|dps|su remove`` removes only the namespace endpoint. Delete the linked resource first. The command grants the namespace outbound identity Reader on the linked resource's resource group if missing; the grant is kept after unlinking.
+* ``link dps show`` reports ``brownfieldHubsAvailable: false`` when the linked Hubs cannot be read.
+* A failed link add/update reports the error of the endpoint being linked, not an older failure on another endpoint.
+* When a link add/update PATCH loses its connection, the command never resubmits it: it re-reads the namespace, follows the change if the read shows it landed, and otherwise reports that the outcome is unknown with the commands to inspect it.
+* After a link add/update creates role assignments, a Hub/DPS ``LinkInitiateFailed`` "rejected the link request as invalid" (for example DPS 400315 while the grants propagate) is retried up to twice after 30 s and 60 s before failing.
+
+0.33.0b1 (Preview)
+++++++++++++++++++
+
+**API compatibility**
+
+* Regenerated the modeless synchronous DPS management SDK for ``2026-08-31`` and Device Registry management SDK for ``2026-04-01``.
+* Preserved the ``preview`` branch's IoT Hub management ``2026-05-01-preview``, IoT Hub service data ``2024-03-31``, and DPS service data ``2025-07-01-preview`` SDKs.
+* Restricted ``az iot adr ns`` to April-compatible namespace operations, migration, simple messaging configuration, and system-assigned identity management. Unsupported certificate, policy, device, registry-device, group, job, report, linking, and new ADR Software Updates command groups are not exposed.
+* Removed DPS namespace-association options because ``deviceRegistryNamespace`` is not part of the stable DPS contract. DPS linked-hub managed-identity authentication remains supported.
+* Removed the preview Certificate Management Service (CMS) command groups.
+* Raised the minimum supported Azure CLI core version from ``2.70.0`` to ``2.73.0``.
+* Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
+
+**IoT Hub Device Provisioning Service (DPS) updates**
+
+* Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
+
+**DPS bug fixes**
+
+* ``az iot dps linked-hub update`` no longer fails with ``(400309) hostName is required when connectionString is not provided`` when switching a pre-existing linked hub to ``SystemAssigned`` or ``UserAssigned`` authentication.
+
+* ``az iot dps linked-hub update --authentication-type KeyBased`` no longer raises ``KeyError: 'hostName'`` when refreshing the key of, or switching back to, one of those same links.
+
+**Authentication and diagnostics**
+
+* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
+* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
 
 0.31.0
 +++++++++++++++
@@ -28,6 +130,86 @@ Unreleased
 * Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
 
 * Updated the DPS control plane SDK to API version ``2026-08-31``.
+
+0.32.0b1 (Preview)
+++++++++++++++++++
+
+**IoT Hub updates**
+
+* IoT Hub management SDK regenerated to ``2026-05-01-preview``, which natively exposes the new ``eventStreams`` routing endpoint type.
+
+* Added Microsoft Fabric Eventstream as a routing endpoint type. The Fabric workspace, Eventstream item and Custom Endpoint source must be created in Fabric first; pass the source's ``sb://`` URI, entity path and the Fabric IDs into the new commands:
+
+  - ``az iot hub message-endpoint create fabric-eventstream`` registers the endpoint (identity-based authentication only; requires ``--endpoint-uri``, ``--entity-path``, ``--identity``, ``--workspace-id``, ``--eventstream-id`` and ``--source-id``).
+  - ``az iot hub message-endpoint update fabric-eventstream`` modifies an existing endpoint.
+  - ``az iot hub message-endpoint show --en <name>`` returns a ``fabric-eventstream`` endpoint by name (no type flag needed).
+  - ``az iot hub message-endpoint list`` includes ``fabric-eventstream`` endpoints in its output; pass ``--endpoint-type fabric-eventstream`` to filter to only this type.
+  - ``az iot hub message-endpoint delete`` removes ``fabric-eventstream`` endpoints by name (``--en``) or in bulk (``--endpoint-type fabric-eventstream``).
+
+0.31.0b3 (Preview)
++++++++++++++++
+
+**DPS updates**
+
+* Removed ``--hostname-type`` from ``az iot dps linked-hub update``. A linked hub's endpoint hostname (classic vs device) is now fixed at creation and can no longer be changed in place; to move a link to a different endpoint, create a new link at the desired endpoint and delete the old one. ``--hostname-type`` remains available on ``az iot dps linked-hub create``, and ``az iot dps linked-hub update`` continues to support ``--authentication-type``, ``--connection-string``, ``--user-assigned-identity``, ``--allocation-weight`` and ``--apply-allocation-policy``.
+
+0.31.0b2 (Preview)
++++++++++++++++
+
+**Bug fixes**
+
+* ``az iot edge devices create`` now writes the device-facing hostname (``deviceHostName``) into the generated ``config.toml`` on GWv2/TLS 1.3 hubs, so edge devices can connect. Classic hubs are unaffected.
+
+* ``az iot device simulate`` and ``az iot device send-d2c-message`` now connect over MQTT using the device-facing hostname on GWv2/TLS 1.3 hubs, fixing "not authorised" failures for x509 and symmetric-key devices. Classic hubs are unaffected.
+
+* ``az iot du account create`` no longer fails with ``TypeError: unhashable type: 'dict'`` when assigning a single user-assigned managed identity via ``--assign-identity``.
+
+* ``az iot hub device-identity connection-string show`` and ``az iot hub module-identity connection-string show`` now reject ``--hostname-type service``. Use ``auto``, ``device`` or ``classic`` instead.
+
+* ``az iot hub generate-sas-token`` gains a ``--hostname-type`` parameter to control the SAS token audience:
+
+  - Hub-level (no ``-d``) defaults to the service hostname.
+  - Device-level (``-d``) and module-level (``-d -m``) default to the device hostname.
+  - ``service``, ``device`` and ``classic`` are explicitly selectable.
+
+**DPS updates**
+
+* ``az iot dps linked-hub update`` can now switch a linked hub's endpoint and authentication type, enabling a single-step TLS 1.3 + managed-identity migration:
+
+  - ``--hub-name`` (preferred) or ``--linked-hub <full-hostname>`` identifies the entry to update. ``--hub-name`` resolves to the correct entry regardless of classic or device hostname; if the same hub is linked at multiple endpoints, the CLI errors with a clear disambiguation hint pointing to ``--linked-hub``.
+  - ``--hostname-type {auto, device, classic}`` switches the linked hub's endpoint hostname. For KeyBased links the existing connection string is rewritten in place, preserving the existing key.
+  - ``--authentication-type {KeyBased, SystemAssigned, UserAssigned}`` (with optional ``--user-assigned-identity`` / ``--connection-string``) switches the authentication type. When switching to KeyBased without ``--connection-string``, the hub key is auto-fetched via ``--hub-name``.
+  - Endpoint and authentication-type changes can be combined in a single call.
+
+0.31.0b1 (Preview)
++++++++++++++++
+
+**General updates**
+
+* This is a preview release adding TLS 1.3 support for IoT Hub and managed identity support for DPS linked hubs.
+* To install preview extensions, you will need to add the ``--allow-preview`` argument to ``az extension add/update`` commands.
+* New IoT Hub and DPS management SDKs targeting the ``2026-03-01-preview`` API version, which natively exposes ``deviceHostName``, ``serviceHostName`` and ``gatewayVersion`` on hubs and ``authenticationType``/``hostName`` on DPS linked-hub entries.
+
+**IoT Hub updates**
+
+* IoT Hub data-plane operations now communicate over the new service hostname (``<hub>.service.azure-devices.net``) on TLS 1.3-capable hubs, falling back to the classic hostname for V1 hubs. No user action required.
+
+* Added ``--hostname-type`` parameter to connection-string commands to control the hostname returned in output. Applies to ``az iot hub connection-string show``, ``az iot hub device-identity connection-string show`` and ``az iot hub module-identity connection-string show``:
+
+  - Default ``auto`` - uses the TLS 1.3 device hostname (``<hub>.device.azure-devices.net``) on GWv2 hubs, classic hostname on V1 hubs.
+  - ``classic`` - always uses ``<hub>.azure-devices.net``.
+  - ``device`` - uses the TLS 1.3 device hostname; errors if the hub is not GWv2.
+  - ``service`` - uses the TLS 1.3 service hostname (``<hub>.service.azure-devices.net``); errors if the hub is not GWv2.
+
+**DPS updates**
+
+* ``az iot dps linked-hub create`` now supports managed-identity authentication via new parameters:
+
+  - ``--authentication-type`` - ``KeyBased`` (default), ``SystemAssigned`` or ``UserAssigned``.
+  - ``--user-assigned-identity`` - required when ``--authentication-type`` is ``UserAssigned``.
+  - ``--hostname-type`` - ``auto`` (default, resolves to ``device`` when available, ``classic`` for V1 hubs), ``device`` or ``classic``. ``service`` is not supported for DPS linked-hub.
+
+* For managed-identity links, the linked hub's hostname is auto-resolved from the IoT Hub's ``deviceHostName`` (with classic fallback for V1 hubs). CLI validates that the appropriate identity type is enabled on the DPS resource before creating a managed-identity link.
 
 0.30.0
 +++++++++++++++
@@ -75,6 +257,47 @@ Unreleased
 **General updates**
 
 * Updated ``azure-iot-device`` dependency to ``>=2.15.0rc1,<3.0.0dev0`` for Windows platform compatibility.
+
+
+0.30.0b1 (Preview)
++++++++++++++++
+
+**General updates**
+
+* This is a preview release for IoT Hub Gen2 and Certificate Management using Azure Device Registry.
+* This release requires Azure CLI core version `2.67.0` or later.
+* To install preview extensions, you will need to add the `--allow-preview` argument to `az extension add/update` commands.
+* This release alters several existing IoT Hub and DPS commands from CLI core modules, namely control-plane create/update commands for Hub and DPS.
+* These commands will display the following expected warning when using this extension:
+
+  - `The behavior of this command has been altered by the following extension: azure-iot`
+
+**Azure Device Registry updates**
+
+* New command group `az iot adr ns` to manage Azure Device Registry namespaces, policies and credentials
+
+  - `az iot adr ns` to manage Device Registry namespaces.
+  - `az iot adr ns credential` to manage namespace credentials.
+  - `az iot adr ns policy` to manage namespace policies.
+
+* New management SDK using `2025-11-01-preview` API version.
+
+**IoT Hub updates**
+
+* New management SDK using `2025-08-01-preview` API version.
+* New Hub `Gen2` SKU to support ADR integration.
+* `Gen2` hub creation now supports linking an ADR namespace using `--ns-resource-id` and `--ns-identity-id` arguments.
+
+  - When linking an ADR namespace, our CLI will attempt to create role assignments for the ADR namespace to manage the Hub.
+  - `--skip-ns-ra` can be used to skip role assignment creation, or `--custom-ns-role-id` can be used to specify a custom role assignment.
+
+**DPS updates**
+
+* New management SDK using `2025-02-01-preview` and service SDK using `2025-07-01-preview` API versions.
+* DPS creation now supports linking an ADR namespace with `--ns-resource-id` and `--ns-identity-id` arguments.
+* Enrollment and enrollment-group commands now support configuring an ADR credential policy with the `--credential-policy-name` argument.
+* DPS now support both system and user assigned managed identities.
+
 
 0.28.0
 +++++++++++++++

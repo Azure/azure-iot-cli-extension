@@ -19,16 +19,21 @@ from azext_iot.monitor.utility import get_http_proxy_settings
 logger = get_logger(__name__)
 
 
+def _service_hostname(target):
+    return target.get("serviceHostName") or target["entity"]
+
+
 class AmqpBuilder:
     @classmethod
     def build_iothub_amqp_endpoint_from_target(cls, target, duration=360):
-        hub_name = target["entity"].split(".")[0]
+        hostname = _service_hostname(target)
+        hub_name = hostname.split(".")[0]
         user = "{}@sas.root.{}".format(target["policy"], hub_name)
         sas_token = SasTokenAuthentication(
-            target["entity"], target["policy"], target["primarykey"], duration
+            hostname, target["policy"], target["primarykey"], duration
         ).generate_sas_token()
         return url_encode_str(user) + ":{}@{}".format(
-            url_encode_str(sas_token), target["entity"]
+            url_encode_str(sas_token), hostname
         )
 
 
@@ -185,7 +190,7 @@ class EventTargetBuilder:
 
                 AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
 
-                hostname = target["entity"]
+                hostname = _service_hostname(target)
                 policy = target["policy"]
                 key = target["primarykey"]
                 token_duration = 360

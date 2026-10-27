@@ -77,6 +77,34 @@ az iot central app -h
 
 If this works, then you should now be able to make changes to the extension and have them reflected immediately in your az cli.
 
+## Index-compatible lint
+
+PR CI and the release workflow run a separate **Index compatibility** job on the
+same `azure-iot-cli-ext` wheel artifact as the existing linter. It uses a clean
+environment, Azure CLI `dev`, and the merged extension-index `main` configuration.
+It does not register this repository as an extension source or copy our local
+exclusions into the installed wheel. The existing required linter is unchanged.
+
+HIGH findings, setup errors, and an empty command selection make this advisory
+check red. MEDIUM-only findings produce warnings with a green check, matching
+azdev's exit policy. Keep `index-compatibility / Index compatibility` **non-required**
+in branch protection/rulesets. Do not mask failures with `continue-on-error`.
+The release approval and drafting jobs do not depend on this advisory job; the
+overall workflow can therefore be red even when the release path succeeds.
+
+Review the completed report before approving a release, especially pending
+upstream exemption PRs. A local-only exclusion is informational, not proof that
+an exemption is justified. Fix actual command/help defects; request narrowly
+scoped upstream exemptions only when the rule does not fit the command's contract.
+Unmerged upstream PRs are never used to declare compatibility.
+
+The job summary and `index-compatibility` artifact contain HIGH/MEDIUM findings,
+local-only exclusions, raw logs, exclusion snapshots, wheel hash, and resolved
+source/CLI/index commits and tool versions. The workflow currently mirrors
+index CI's Python 3.14 and azdev 0.2.13 setup; toolchain drift fails explicitly
+instead of silently claiming parity. Use **CI Build and Test**'s manual dispatch
+to rerun it on a branch without starting a release or accessing Azure resources.
+
 ## Unit and Integration Testing
 
 Tests are organized into folders by resource in `azext_iot\tests\`:
@@ -109,6 +137,46 @@ Execute the following command to run the IoT Hub unit tests:
 
 `pytest azext_iot/tests/iothub/ -k "_unit.py"`
 
+#### Parallel CI unit tests
+
+The GitHub integration precheck uses four balanced unit-test shards on
+Linux/Python 3.13. PR CI uses the same runner on Python 3.13 across Ubuntu,
+Windows, and macOS, plus Python 3.10 on Ubuntu: four combinations and 16 unit jobs.
+GitHub branch/tag pushes, manual runs, and release workflows retain all three operating
+systems and Python 3.10-3.13: twelve combinations and 48 unit jobs. The reusable
+workflow defaults to the full matrix; only the CI caller's `pull_request` event
+enables `pr-matrix`. Each combination runs all unit tests across four shards,
+with lint once per combination and a coverage gate for each. Each shard uses
+serial pytest, not xdist, and new unit files are included automatically.
+Shards must use the same Python major/minor version; runner patch versions may differ.
+PR aggregate gates retain the `test / Unit test <python> - <os>` names required
+by branch rules and fail if any shard or lint run fails.
+
+Feature-branch updates run GitHub CI through `pull_request`, without a duplicate
+push-triggered matrix. Push CI remains enabled for `dev`, `preview`,
+`1.1.0-preview`, `release/**`, and tags; manual dispatch is unchanged.
+
+Azure Pipelines Merge (pipeline 11) no longer repeats the unit suite. It retains
+wheel and software-manifest generation, the Azure CLI test SDK build, style and
+command-table lint, and Credential Scan. The four GitHub PR combinations are
+the PR unit gate; the former additional ADO unit combinations and tests against
+the unreleased CLI test SDK are no longer part of Merge validation. Full-matrix
+GitHub runs and other integration/unit pipelines are unchanged.
+
+Integration starts only after lint, all shards, and the `unit-test` gate pass.
+The gate checks complete, exactly-once case coverage and combines coverage into
+`coverage-unit`. Native reruns can reuse successful shards from the same run and
+commit, but incomplete newer attempts cannot fall back to older results.
+
+Shard results are published as `unit-shard-<number>-<attempt>`.
+PR CI uses `tox-unit-<os>-py<version>-<number>-<attempt>` to keep each combination
+separate from the others and from integration prechecks.
+Integration summaries use `unit-summary-<attempt>`; PR summaries use
+`tox-summary-<os>-py<version>-<attempt>`. Both include the completeness summary
+and `timings.json`; use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
+The shared runner accepts CI-neutral run, commit, and attempt inputs so Azure
+Pipelines can use the same implementation.
+
 ### Integration Tests
 
 Integration tests are run against Azure resources and depend on environment variables.
@@ -120,6 +188,33 @@ _Hub:_
 
 _DPS:_
 `pytest azext_iot/tests/dps/core/test_dps_discovery_int.py`
+
+Integration workflows run the full suite for each selected service. Use the
+existing service runners and their required Azure permissions; focused debug
+runs are partial coverage. Provisioning failures fail the run, and resource
+ownership and verified cleanup remain mandatory.
+See [integration workflow guidance](docs/tox-testing.md#integration-workflow-topology).
+
+The GitHub integration workflow's `regions` input accepts Azure public-region
+identifiers, such as `australiaeast` or `westeurope`, without a per-region allowlist;
+it defaults to `australiaeast`. The `arm-endpoint` input is `public` (default,
+`https://management.azure.com`) or `canary`; canary routing requires `centraluseuap`.
+Resource location and ARM routing are passed together through the full service
+run. Public ARM is not a region-derived hostname. Unsupported API or region
+operations fail rather than falling back to canary or changing the selected tests.
+
+Release-build integration tests explicitly select `australiaeast` with public ARM
+routing for all services on Python 3.10 and 3.13, retaining the existing test
+subscription and `cli-int-test-rg` resource group. The scheduled workflow also uses
+`australiaeast` with public ARM. Preview management commands default to public ARM;
+canary ARM is opt-in through
+`AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` and is
+exercised only by an explicit `arm-endpoint=canary` / `regions=centraluseuap`
+dispatch or the Azure DevOps centraluseuap pipeline.
+
+Scheduled integration tests are configured separately in
+`.github/workflows/int_test_schedule.yml` on the default branch (`dev`), not the
+release branch. Release-build settings do not change scheduled regions or cadence.
 
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`
@@ -338,8 +433,8 @@ organization-mandated secret-scanning control.
 6. Authorize this definition to read the shared 1ES template repository and use
    the managed pool; install/authorize the Microsoft Security DevOps extension.
    Keep the production classification, audited governance, template security
-   checks, and service-connection approvals intact. The integration waiter needs
-   the configured six-hour job budget. Mandatory organizational approvals are
+   checks, and service-connection approvals intact. Each integration waiter needs
+   its configured safe-window wait and seven-hour child budget. Mandatory organizational approvals are
    not bypassed; do not use breakglass or disable drift management to onboard.
 
 The release builds exactly one `release-candidate` artifact containing a wheel,
@@ -350,8 +445,8 @@ collection and the Windows-specific IoT device dependency; the SBOM executable
 is version- and SHA-256-pinned. Pipeline 147 receives `releaseBuildId`, validates
 the trusted producer/source/digest, and installs the same wheel rather than
 rebuilding it. The parent requests all DPS/Hub/ADR/ADU services on Python 3.10
-and 3.13, public ARM, `australiaeast`, requires the child to succeed, and verifies
-the retained child candidate artifact.
+and 3.13, using the explicit targets above, requires every cohort to succeed, and
+verifies each retained child candidate, including its original wheel and SBOM.
 
 Retain producer and child artifacts through qualification/recovery. A retried
 integration waiter looks for the uniquely owned child; it will not blindly

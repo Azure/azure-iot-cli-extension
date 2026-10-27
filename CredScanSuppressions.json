@@ -7,6 +7,16 @@
             "_justification": "Client device simulation requires a SAS key extracted from IoT Hub to be passed in MQTT lib."
         },
         {
+            "file": "azext_iot\\tests\\adr\\test_adr_command_log_unit.py",
+            "placeholder": "https://user:redactme@host/path",
+            "_justification": "CSCAN-GENERAL0060: synthetic URL userinfo used only to verify command redaction; not a service credential."
+        },
+        {
+            "file": "azext_iot\\tests\\dps\\core\\test_dps_phase_runtime_unit.py",
+            "placeholder": "eA==",
+            "_justification": "CSCAN-GENERAL0060: base64 of the single byte x in a mocked Hub key response; not a service credential."
+        },
+        {
             "file": "azext_iot\\tests\\iothub\\core\\test_iothub_discovery_unit.py",
             "placeholder": "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=",
             "_justification": "Completely made up IoT Hub policy key for unit test."

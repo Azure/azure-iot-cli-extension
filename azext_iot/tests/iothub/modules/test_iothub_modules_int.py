@@ -4,8 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from time import sleep
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
@@ -19,6 +21,9 @@ class TestIoTHubModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModules, self).__init__(test_case)
 
+    @pytest.mark.timeout(
+        900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
+    )
     def test_iothub_module_identity(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             for device_type in DEVICE_TYPES:
@@ -190,8 +195,18 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     query_checks.append(self.exists("[?moduleId=='$edgeAgent']"))
                     query_checks.append(self.exists("[?moduleId=='$edgeHub']"))
 
-                # wait for API to catch up before query
-                sleep(10)
+                expected_modules = module_ids + (["$edgeAgent", "$edgeHub"] if device_type == "edge" else [])
+                wait_for_query_ids(
+                    lambda: self.cmd(
+                        self.set_cmd_auth_type(
+                            f"iot hub query -n {self.host_name} -g {self.entity_rg} "
+                            f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
+                            auth_type=auth_phase,
+                        )
+                    ).get_output_in_json(),
+                    expected_modules,
+                    id_key="moduleId",
+                )
 
                 # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.
                 module_query_result = self.cmd(
@@ -301,10 +316,11 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             ).get_output_in_json()
             assert renew_result.get("policyKey") == "secondaryKey"
             # only one sas module, one result
+            assert len(renew_result["rotatedKeys"]) == 1
             device_result = renew_result["rotatedKeys"][0]
             assert device_result["id"] == device_ids[0]
             assert device_result["moduleId"] == module_ids[0]
-            assert not device_result["primaryKey"]
+            assert not device_result.get("primaryKey")
             assert device_result["secondaryKey"]
 
     def test_iothub_module_connection_string_show(self):
@@ -326,15 +342,6 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             f"-m {module_ids[1]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --am x509_ca"
         )
 
-        sym_cstring_pattern = (
-            f"HostName={self.entity_name}.azure-devices.net;DeviceId={device_ids[0]};"
-            f"ModuleId={module_ids[0]};SharedAccessKey=#"
-        )
-        cer_cstring_pattern = (
-            f"HostName={self.entity_name}.azure-devices.net;"
-            f"DeviceId={device_ids[0]};ModuleId={module_ids[1]};x509=true"
-        )
-
         for auth_phase in DATAPLANE_AUTH_TYPES:
             primary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
@@ -344,12 +351,12 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-            target_key = symmetric_key_module["authentication"]["symmetricKey"][
-                "primaryKey"
-            ]
-            target_sym_cstring = sym_cstring_pattern.replace("#", target_key)
-
-            assert target_sym_cstring == primary_key_cstring["connectionString"]
+            cs = primary_key_cstring["connectionString"]
+            target_key = symmetric_key_module["authentication"]["symmetricKey"]["primaryKey"]
+            assert f"DeviceId={device_ids[0]}" in cs
+            assert f"ModuleId={module_ids[0]}" in cs
+            assert f"SharedAccessKey={target_key}" in cs
+            assert cs.startswith(f"HostName={self.entity_name}")
 
             secondary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
@@ -359,12 +366,12 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-            target_key = symmetric_key_module["authentication"]["symmetricKey"][
-                "secondaryKey"
-            ]
-            target_sym_cstring = sym_cstring_pattern.replace("#", target_key)
-
-            assert target_sym_cstring == secondary_key_cstring["connectionString"]
+            cs = secondary_key_cstring["connectionString"]
+            target_key = symmetric_key_module["authentication"]["symmetricKey"]["secondaryKey"]
+            assert f"DeviceId={device_ids[0]}" in cs
+            assert f"ModuleId={module_ids[0]}" in cs
+            assert f"SharedAccessKey={target_key}" in cs
+            assert cs.startswith(f"HostName={self.entity_name}")
 
             x509_cstring = self.cmd(
                 self.set_cmd_auth_type(
@@ -374,7 +381,11 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-            assert cer_cstring_pattern == x509_cstring["connectionString"]
+            cs = x509_cstring["connectionString"]
+            assert f"DeviceId={device_ids[0]}" in cs
+            assert f"ModuleId={module_ids[1]}" in cs
+            assert "x509=true" in cs
+            assert cs.startswith(f"HostName={self.entity_name}")
 
     def test_iothub_module_generate_sas_token(self):
         device_count = 1
@@ -437,10 +448,117 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-        # Mixed case connection string
-        cstring = self.connection_string
+        # Obtain module credentials using Entra; offline SAS does not authenticate as a Hub policy.
+        cstring = self.cmd(
+            f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
         mixed_case_cstring = cstring.replace("HostName", "hostname", 1)
         self.cmd(
-            f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} --login {mixed_case_cstring}",
+            f"iot hub generate-sas-token --connection-string {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
+
+    def test_iothub_module_hostname_type_permutations(self):
+        """--hostname-type permutations for module-scope CS-show and SAS.
+
+        - `--hostname-type service` is rejected on CS-show
+        - `--hostname-type service` is accepted on SAS (caller opts in; audience targets service endpoint).
+        - On GWv2 hubs, auto (default) resolves to the device endpoint for both CS-show and SAS.
+        """
+        from urllib.parse import unquote
+
+        def extract_sr(sas_payload):
+            sas = sas_payload["sas"].replace("SharedAccessSignature ", "")
+            for part in sas.split("&"):
+                if part.startswith("sr="):
+                    return unquote(part[3:])
+            raise AssertionError(f"sas token had no sr= component: {sas}")
+
+        hub = self.cmd(
+            f"iot hub show -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json()
+        props = hub["properties"]
+        classic_hn = props["hostName"]
+        device_hn = props.get("deviceHostName")
+        service_hn = props.get("serviceHostName")
+        is_gwv2 = bool(device_hn)
+
+        device_id = self.generate_device_names(1)[0]
+        module_id = self.generate_device_names(1)[0]
+        self.cmd(
+            f"iot hub device-identity create -d {device_id} -n {self.entity_name} -g {self.entity_rg}"
+        )
+        self.cmd(
+            f"iot hub module-identity create -m {module_id} -d {device_id} -n {self.entity_name} -g {self.entity_rg}"
+        )
+
+        # module-identity connection-string show
+
+        self.cmd(
+            f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type service",
+            expect_failure=True,
+        )
+
+        # classic
+        cs_classic = self.cmd(
+            f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
+        ).get_output_in_json()["connectionString"]
+        assert f"HostName={classic_hn}" in cs_classic
+
+        if is_gwv2:
+            cs_device = self.cmd(
+                f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+            ).get_output_in_json()["connectionString"]
+            assert f"HostName={device_hn}" in cs_device
+
+            cs_auto = self.cmd(
+                f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg}",
+            ).get_output_in_json()["connectionString"]
+            assert f"HostName={device_hn}" in cs_auto
+
+        # generate-sas-token (module scope)
+        token = self.cmd(
+            f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        assert extract_sr(token) == f"{classic_hn}/devices/{device_id}/modules/{module_id}"
+
+        if is_gwv2:
+            token = self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == f"{device_hn}/devices/{device_id}/modules/{module_id}"
+
+            # service is selectable for module scope
+            token = self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type service",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == f"{service_hn}/devices/{device_id}/modules/{module_id}"
+
+            token = self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg}",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == f"{device_hn}/devices/{device_id}/modules/{module_id}"
+        else:
+            self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+                expect_failure=True,
+            )
+            self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type service",
+                expect_failure=True,
+            )

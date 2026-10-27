@@ -452,6 +452,8 @@ def calculate_hash(
     file_paths: List[str],
     hash_algo: str = ADUValidHashAlgorithmType.SHA256.value,
 ):
+    from pathlib import Path
+
     result = []
     for path in file_paths:
         file_metadata = DeviceUpdateDataManager.calculate_file_metadata(path)
@@ -460,7 +462,7 @@ def calculate_hash(
                 "bytes": file_metadata.bytes,
                 "hash": file_metadata.hash,
                 "hashAlgorithm": hash_algo,
-                "uri": file_metadata.path.as_uri(),
+                "uri": Path(file_metadata.path).resolve().as_uri(),
             }
         )
     return result
@@ -494,7 +496,7 @@ def stage_update(
     # ensuring we have credentials and a subscription.
     az_account_info = cli.invoke("account show").as_json()
     target_storage_sub = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
-    storage_manager = StorageAccountManager(subscription_id=target_storage_sub)
+    storage_manager = StorageAccountManager(cli_ctx=cmd.cli_ctx, subscription_id=target_storage_sub)
     blob_service_client = storage_manager.get_sas_blob_service_client(account_name=storage_account_name)
 
     try:

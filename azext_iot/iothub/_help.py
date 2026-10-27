@@ -417,6 +417,10 @@ def load_iothub_help():
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
+                       Selected Hub-state reads must succeed before the output file is written. Device state capture is
+                       not supported for Basic-tier hubs because a complete device snapshot cannot be guaranteed.
+                       Use --aspects arm to export only the ARM template of a Basic-tier hub.
+
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
         - name: Export the supported state of the specified hub to the specified file.
@@ -446,6 +450,11 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the import process.
+
+                       All selected aspects and their required restore fields are validated before --replace deletes
+                       destination state. Unselected aspects need not be present. Empty device maps and empty ADM/edge
+                       configuration groups are valid; a selected ARM template must contain the Hub resource.
+                       Device state restore is not supported for Basic-tier hubs.
 
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
@@ -483,6 +492,9 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the migration process.
+
+                       Selected source Hub-state reads and snapshot validation must succeed before destination state
+                       is deleted or recreated. Device state migration is not supported for Basic-tier hubs.
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
 
@@ -563,10 +575,10 @@ def load_iothub_help():
           - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
-          - name: Create an Event Hub endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
+          - name: Create an Event Hub endpoint using system assigned identity and Semantic Model DO Observation V1 formatting.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-              --entity-path {entity_path} --identity [system]
+              --entity-path {entity_path} --identity [system] --message-format DOObservationV1
           - name: Create an Event Hub endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
             text: >
               az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
@@ -699,6 +711,9 @@ def load_iothub_help():
           - name: Update a key-based Event Hub endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+          - name: Reset an Event Hub endpoint to preserve the original message payload.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --message-format None
     """
 
     helps[
@@ -781,6 +796,59 @@ def load_iothub_help():
           - name: Get all the endpoints of type "EventHub" from an IoT Hub.
             text: >
               az iot hub message-endpoint list -n {iothub_name} --endpoint-type eventhub
+          - name: Get all the endpoints of type "Fabric Eventstream" from an IoT Hub.
+            text: >
+              az iot hub message-endpoint list -n {iothub_name} --endpoint-type fabric-eventstream
+    """
+
+    helps[
+        "iot hub message-endpoint create fabric-eventstream"
+    ] = """
+        type: command
+        short-summary: Add a Microsoft Fabric Eventstream endpoint for an IoT Hub.
+        long-summary: |
+          The Fabric Custom Endpoint source (workspace, Eventstream item, and source) must be
+          created separately in Microsoft Fabric — via the Fabric portal or the `fab` CLI — before
+          running this command. Then take the source's connection details (sb:// endpoint URI,
+          entity path, and the workspace / eventstream / source GUIDs) and register them here.
+
+          This endpoint type supports identity-based authentication only. The hub must have a
+          managed identity assigned (system-assigned or user-assigned).
+
+        examples:
+          - name: Create a Fabric Eventstream endpoint using the hub's system-assigned identity.
+            text: >
+              az iot hub message-endpoint create fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+              --identity [system] --workspace-id {workspace_id} --eventstream-id {eventstream_id}
+              --source-id {source_id}
+          - name: Create a Fabric Eventstream endpoint using a user-assigned identity.
+            text: >
+              az iot hub message-endpoint create fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+              --identity {user_identity_resource_id} --workspace-id {workspace_id}
+              --eventstream-id {eventstream_id} --source-id {source_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update fabric-eventstream"
+    ] = """
+        type: command
+        short-summary: Update a Microsoft Fabric Eventstream endpoint for an IoT Hub.
+        long-summary: |
+          This endpoint type supports identity-based authentication only. To change the
+          underlying Fabric Custom Endpoint source, update --endpoint-uri and --entity-path
+          together with values from the new source.
+        examples:
+          - name: Update a Fabric Eventstream endpoint to a different user-assigned identity.
+            text: >
+              az iot hub message-endpoint update fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --identity {user_identity_resource_id}
+          - name: Update a Fabric Eventstream endpoint's Fabric metadata (display values).
+            text: >
+              az iot hub message-endpoint update fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --workspace-id {workspace_id} --eventstream-id {eventstream_id}
+              --source-id {source_id}
     """
 
     helps[
@@ -828,6 +896,74 @@ def load_iothub_help():
     """
 
     helps[
+        "iot hub topic-group"
+    ] = """
+        type: group
+        short-summary: Manage MQTT 5 topic groups for an IoT Hub.
+        long-summary: Topic groups are supported only for IoT Hubs using the MqttV5 connection profile.
+    """
+
+    helps[
+        "iot hub topic-group create"
+    ] = """
+        type: command
+        short-summary: Create an MQTT 5 topic group.
+        examples:
+          - name: Create a topic group with multiple topic templates.
+            text: >
+              az iot hub topic-group create -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates {topic_template_1} {topic_template_2}
+    """
+
+    helps[
+        "iot hub topic-group show"
+    ] = """
+        type: command
+        short-summary: Show an MQTT 5 topic group.
+        examples:
+          - name: Show a topic group.
+            text: >
+              az iot hub topic-group show -n {iothub_name} --topic-group-id {topic_group_id}
+    """
+
+    helps[
+        "iot hub topic-group list"
+    ] = """
+        type: command
+        short-summary: List MQTT 5 topic groups.
+        examples:
+          - name: List all topic groups.
+            text: >
+              az iot hub topic-group list -n {iothub_name}
+    """
+
+    helps[
+        "iot hub topic-group update"
+    ] = """
+        type: command
+        short-summary: Replace the topic templates of an MQTT 5 topic group.
+        examples:
+          - name: Replace the templates of a topic group.
+            text: >
+              az iot hub topic-group update -n {iothub_name} --topic-group-id {topic_group_id}
+              --topic-templates {topic_template_1} {topic_template_2}
+    """
+
+    helps[
+        "iot hub topic-group delete"
+    ] = """
+        type: command
+        short-summary: Delete one or all MQTT 5 topic groups.
+        examples:
+          - name: Delete a topic group.
+            text: >
+              az iot hub topic-group delete -n {iothub_name} --topic-group-id {topic_group_id}
+          - name: Delete all topic groups without prompting.
+            text: >
+              az iot hub topic-group delete -n {iothub_name} --all --yes
+    """
+
+    helps[
         "iot hub message-route create"
     ] = """
         type: command
@@ -839,6 +975,10 @@ def load_iothub_help():
           - name: Create a route for an IoT Hub with the built-in endpoint and source type "DeviceMessages".
             text: >
               az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name events --source DeviceMessages
+          - name: Create a route with a Semantic Model data schema reference.
+            text: >
+              az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name events --source DeviceMessages
+              --data-schema-ref aio-sr://example/schema:1
           - name: Create a disabled route for an IoT Hub with the given endpoint, source type "DigitalTwinChangeEvents" and custom condition.
             text: >
               az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name {endpoint_name} --source DigitalTwinChangeEvents
@@ -850,7 +990,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Update a route for an IoT Hub.
-        long-summary: You can change the source, endpoint, condition, or enabled state on the route.
+        long-summary: You can change the source, endpoint, condition, enabled state, or Semantic Model data schema reference on the route.
         examples:
           - name: Update a route to a given endpoint and source type "DeviceMessages".
             text: >
@@ -861,6 +1001,13 @@ def load_iothub_help():
           - name: Change a route's condition.
             text: >
               az iot hub message-route update -n {iothub_name} --route-name {route_name} --condition {condition}
+          - name: Replace a route's Semantic Model data schema reference.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name}
+              --data-schema-ref aio-sr://example/schema:2
+          - name: Remove a route's Semantic Model data schema reference.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name} --remove-data-schema-ref
     """
 
     helps[

@@ -75,6 +75,26 @@ class KeyType(Enum):
     secondary = "secondary"
 
 
+class HostnameType(Enum):
+    """
+    Type of hostname to use in connection strings.
+    """
+
+    AUTO = "auto"
+    CLASSIC = "classic"
+    DEVICE = "device"
+    SERVICE = "service"
+
+
+class GatewayVersion(Enum):
+    """
+    IoT Hub gateway version.
+    """
+
+    V1 = "V1"
+    V2 = "V2"
+
+
 class AttestationType(Enum):
     """
     Type of atestation (TMP or certificate based).

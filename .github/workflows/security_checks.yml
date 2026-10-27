@@ -1,7 +1,7 @@
 name: "[auto] Security Checks"
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: "0 6 * * *"
   push:
     branches:
       - dev
@@ -25,33 +25,33 @@ jobs:
       security-events: write
       contents: read
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      # Install dotnet, used by MSDO
-    - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-      with:
-        dotnet-version: |
-          5.0.x
-          6.0.x
+        # Install dotnet, used by MSDO
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: |
+            5.0.x
+            6.0.x
 
-      # Run analyzers
-    - name: Run Microsoft Security DevOps Analysis
-      uses: microsoft/security-devops-action@5b26a185ff02cf7c100778adeff0ebbf704ca144 # v1
-      id: msdo
-      env:
-        # file path to analyze
-        GDN_BANDIT_TARGET: 'azext_iot'
-        GDN_BANDIT_RECURSIVE: true
+        # Run analyzers
+      - name: Run Microsoft Security DevOps Analysis
+        uses: microsoft/security-devops-action@08976cb623803b1b36d7112d4ff9f59eae704de0 # v1.12.0
+        id: msdo
+        env:
+          # file path to analyze
+          GDN_BANDIT_TARGET: "azext_iot"
+          GDN_BANDIT_RECURSIVE: true
 
-      # Upload alerts to the Security tab
-    - name: Upload alerts to Security tab
-      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
-      with:
-        sarif_file: ${{ steps.msdo.outputs.sarifFile }}
+        # Upload alerts to the Security tab
+      - name: Upload alerts to Security tab
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: ${{ steps.msdo.outputs.sarifFile }}
 
-      # Upload alerts file as a workflow artifact
-    - name: Upload alerts artifact
-      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-      with:  
-        name: alerts
-        path: ${{ steps.msdo.outputs.sarifFile }}
+        # Upload alerts file as a workflow artifact
+      - name: Upload alerts artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: alerts
+          path: ${{ steps.msdo.outputs.sarifFile }}

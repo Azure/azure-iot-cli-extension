@@ -10,6 +10,7 @@ from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane
 from azext_iot.dps.models.dps_target import DPSTarget
+from azext_iot.dps.services._enrollment_errors import arm_authorization_context
 from azext_iot._factory import iot_service_provisioning_factory
 from typing import Any, Dict
 
@@ -21,6 +22,14 @@ PRIVILEDGED_ACCESS_RIGHTS_SET = set(
 
 
 class DPSDiscovery(BaseDiscovery):
+    def get_target(self, resource_name, resource_group_name=None, **kwargs):
+        with arm_authorization_context():
+            return super().get_target(resource_name, resource_group_name, **kwargs)
+
+    def find_resource(self, resource_name, rg=None):
+        with arm_authorization_context():
+            return super().find_resource(resource_name, rg)
+
     def __init__(self, cmd):
         super().__init__(
             cmd=cmd,
@@ -79,17 +88,20 @@ class DPSDiscovery(BaseDiscovery):
         # but that will be better served aligning with vNext pattern for DPS
         result = {}
         result["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
-            resource.properties.service_operations_host_name,
-            policy.key_name,
-            policy.primary_key if key_type == "primary" else policy.secondary_key,
+            resource["properties"]["serviceOperationsHostName"],
+            policy["keyName"],
+            policy["primaryKey"] if key_type == "primary" else policy["secondaryKey"],
         )
-        result["entity"] = resource.properties.service_operations_host_name
-        result["policy"] = policy.key_name
-        result["primarykey"] = policy.primary_key
-        result["secondarykey"] = policy.secondary_key
+        result["entity"] = resource["properties"]["serviceOperationsHostName"]
+        result["policy"] = policy["keyName"]
+        result["primarykey"] = policy["primaryKey"]
+        result["secondarykey"] = policy["secondaryKey"]
         result["subscription"] = self.sub_id
         result["cmd"] = self.cmd
-        result["idscope"] = resource.properties.id_scope
+        result["idscope"] = resource["properties"]["idScope"]
+        result["deviceHostName"] = resource["properties"].get(
+            "deviceProvisioningHostName"
+        )
 
         return result
 
@@ -97,4 +109,4 @@ class DPSDiscovery(BaseDiscovery):
         """Get the ID scope. Only needed for certain DPS operations."""
         return self.find_resource(
             resource_name=resource_name, rg=rg
-        ).properties.id_scope
+        )["properties"]["idScope"]

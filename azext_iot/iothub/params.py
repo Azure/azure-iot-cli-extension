@@ -9,7 +9,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
+from azext_iot.iothub.common import EncodingFormat, EndpointType, MessagePayloadFormat, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -487,6 +487,14 @@ def load_iothub_arguments(self, _):
                 options_list=["--connection-string", "-c"],
                 help="Connection string of the routing endpoint.",
             )
+            context.argument(
+                "message_format",
+                options_list=["--message-format"],
+                arg_type=get_enum_type(MessagePayloadFormat),
+                help="Message payload format delivered to the endpoint for Semantic Model integration. "
+                '"None" preserves the original payload; "DOObservationV1" requests backend formatting as '
+                "com.do.telemetry.observation.v1.",
+            )
 
         with self.argument_context(f"iot hub message-endpoint {endpoint_op} storage-container") as context:
             context.argument(
@@ -599,11 +607,92 @@ def load_iothub_arguments(self, _):
             "clear this property, set this to \"\""
         )
 
+    with self.argument_context("iot hub message-endpoint create fabric-eventstream") as context:
+        context.argument(
+            "workspace_id",
+            options_list=["--workspace-id", "--ws-id"],
+            help="The Fabric workspace Id. Required so the Azure Portal and Fabric Portal "
+            "can render this connection as a deep link to the specific Fabric workspace.",
+        )
+        context.argument(
+            "eventstream_id",
+            options_list=["--eventstream-id", "--es-id"],
+            help="The Fabric Eventstream Id. Required so the Azure Portal and Fabric Portal "
+            "can render this connection as a deep link to the specific Eventstream.",
+        )
+        context.argument(
+            "source_id",
+            options_list=["--source-id"],
+            help="The Fabric Custom Endpoint source Id. Required so the Azure Portal and Fabric "
+            "Portal can render this connection as a deep link to the specific source inside the Eventstream.",
+        )
+
+    with self.argument_context("iot hub message-endpoint update fabric-eventstream") as context:
+        context.argument(
+            "workspace_id",
+            options_list=["--workspace-id", "--ws-id"],
+            help="The Fabric workspace Id. Optional on update — only set if you want to overwrite "
+            "the existing value.",
+        )
+        context.argument(
+            "eventstream_id",
+            options_list=["--eventstream-id", "--es-id"],
+            help="The Fabric Eventstream Id. Optional on update — only set if you want to overwrite "
+            "the existing value.",
+        )
+        context.argument(
+            "source_id",
+            options_list=["--source-id"],
+            help="The Fabric Custom Endpoint source Id. Optional on update — only set if you want "
+            "to overwrite the existing value.",
+        )
+
     with self.argument_context("iot hub message-endpoint delete") as context:
         context.argument(
             "force",
             options_list=["--force", "-f"],
             help="Force delete the endpoint(s) and any routes and message enrichments associated.",
+        )
+
+    with self.argument_context("iot hub topic-group") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--hub-name", "-n"],
+            help="IoT Hub name.",
+            arg_group=None,
+        )
+        context.argument(
+            "topic_group_id",
+            options_list=["--topic-group-id"],
+            help="Customer-defined identifier of the topic group.",
+        )
+
+    for command_name in ("create", "update"):
+        with self.argument_context(f"iot hub topic-group {command_name}") as context:
+            context.argument("topic_group_id", required=True)
+            context.argument(
+                "topic_templates",
+                options_list=["--topic-templates"],
+                nargs="*",
+                required=True,
+                help=(
+                    "Provide one or more space-separated topic templates."
+                ),
+            )
+
+    with self.argument_context("iot hub topic-group show") as context:
+        context.argument("topic_group_id", required=True)
+
+    with self.argument_context("iot hub topic-group delete") as context:
+        context.argument(
+            "delete_all",
+            options_list=["--all"],
+            help="Delete all topic groups.",
+        )
+        context.argument(
+            "yes",
+            options_list=["--yes", "-y"],
+            help="Do not prompt for confirmation when deleting all topic groups.",
         )
 
     with self.argument_context("iot hub message-route") as context:
@@ -639,6 +728,28 @@ def load_iothub_arguments(self, _):
             arg_type=get_enum_type(RouteSourceType),
             options_list=["--source-type", "--type", "-t"],
             help="Source of the route.",
+        )
+
+    for command in (
+        "iot hub message-route create",
+        "iot hub message-route update",
+    ):
+        with self.argument_context(command) as context:
+            context.argument(
+                "data_schema_ref",
+                options_list=["--data-schema-ref"],
+                help=(
+                    "Data schema reference used for Semantic Model integration. "
+                    "Non-empty values are passed through as-is."
+                ),
+            )
+
+    with self.argument_context("iot hub message-route update") as context:
+        context.argument(
+            "remove_data_schema_ref",
+            options_list=["--remove-data-schema-ref"],
+            action="store_true",
+            help="Remove the Semantic Model data schema reference from the route.",
         )
 
     with self.argument_context("iot hub message-route test") as context:

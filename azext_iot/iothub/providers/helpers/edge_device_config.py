@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 """This module defines common values and functions for processing edge device configurations"""
 
-import re
 from pathlib import PurePath
 from os import getcwd
 from typing import Optional, List, Dict, Any
@@ -30,17 +29,12 @@ from azure.cli.core.azclierror import (
 )
 
 from azext_iot.operations.hub import _process_config_content
-from azext_iot.sdk.iothub.service.models import ConfigurationContent
+from azext_iot.iothub._payload import make_payload
 from knack.log import get_logger
 
 logger = get_logger(__name__)
 
 MAX_DEVICE_SCOPE_RETRIES = 5
-
-# Device IDs become file system path segments (bundle folders, certificate and archive names),
-# so they are restricted to the IoT Hub allowed character set and screened for path traversal.
-MAX_DEVICE_ID_LEN = 128
-DEVICE_ID_ALLOWED_PATTERN = re.compile(r"^[A-Za-z0-9\-.+%_#*?!(),:=@$']+$")
 
 DEVICE_CONFIG_SCHEMA_VALID_VERSIONS: Dict[str, Any] = {}
 
@@ -245,33 +239,6 @@ Pick a [supported OS]({EDGE_SUPPORTED_OS_LINK}) and follow the corresponding tut
 EDGE_ROOT_CERTIFICATE_SUBJECT = "Azure_IoT_CLI_Extension_Cert"
 
 
-def validate_edge_device_id(device_id: str) -> str:
-    """
-    Ensure a device Id supplied via config file or CLI argument is safe to use as a file system
-    path segment. Device Ids are used to name bundle folders, certificates and archives, so an
-    unvalidated value would allow writing to - or deleting - arbitrary locations on disk.
-    """
-    if not isinstance(device_id, str) or not device_id:
-        raise InvalidArgumentValueError(
-            "A device parameter is missing required attribute 'device_id'"
-        )
-    if len(device_id) > MAX_DEVICE_ID_LEN:
-        raise InvalidArgumentValueError(
-            f"Device Id {ascii(device_id)} is invalid, it must be at most {MAX_DEVICE_ID_LEN} characters long."
-        )
-    if not DEVICE_ID_ALLOWED_PATTERN.fullmatch(device_id):
-        raise InvalidArgumentValueError(
-            f"Device Id {ascii(device_id)} contains invalid characters. Device Ids may only contain "
-            "alphanumeric characters and the following symbols: - . + % _ # * ? ! ( ) , : = @ $ '"
-        )
-    # '.' is a legal device Id character, so relative traversal segments must be rejected explicitly.
-    if device_id in (".", "..") or PurePath(device_id).name != device_id:
-        raise InvalidArgumentValueError(
-            f"Device Id '{device_id}' is invalid, it cannot be used as a directory or file name."
-        )
-    return device_id
-
-
 def create_edge_device_config(
     hub_hostname: str,
     device_id: str,
@@ -449,7 +416,6 @@ def process_edge_devices_config_file_content(
             raise InvalidArgumentValueError(
                 "A device parameter is missing required attribute 'device_id'"
             )
-        validate_edge_device_id(device_id)
         deployment = device.get("deployment", None)
         if deployment:
             # relative path from config file to deployment.json
@@ -522,7 +488,7 @@ def try_parse_valid_deployment_config(deployment_path: str):
         processed_content = _process_config_content(
             deployment_content, config_type=ConfigType.edge
         )
-        return ConfigurationContent(**processed_content)
+        return make_payload("ConfigurationContent", **processed_content)
     except CLIInternalError:
         raise FileOperationError(
             f"Please ensure a deployment file exists at path: '{deployment_path}'"
@@ -575,7 +541,6 @@ def process_edge_devices_config_args(
             raise InvalidArgumentValueError(
                 "A device argument is missing required parameter 'id'"
             )
-        validate_edge_device_id(device_id)
         if all_devices.get(device_id, None):
             raise InvalidArgumentValueError(
                 f"Duplicate deviceId '{device_id}' detected"

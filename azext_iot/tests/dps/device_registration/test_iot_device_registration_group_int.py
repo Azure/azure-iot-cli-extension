@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import os
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -16,8 +17,10 @@ from azure.cli.core.azclierror import (
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType
-from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, clean_dps_dataplane
-from azext_iot.tests.dps.device_registration import check_hub_device, compare_registrations
+from azext_iot.tests.dps import DPS_SERVICE_AUTH_PARAMS
+from azext_iot.tests.dps.device_registration import (
+    check_hub_device, compare_registrations, register_fresh_generated_credential,
+)
 from azext_iot.tests.generators import generate_generic_id, generate_names
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
 from azext_iot.tests.test_utils import create_certificate
@@ -26,16 +29,16 @@ from azext_iot.tests.test_utils import create_certificate
 cli = EmbeddedCLI()
 
 
-def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases, request):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
-    hub_cstring = provisioned_iot_dps_module["hubConnectionString"]
+    hub = provisioned_iot_dps_module["iotHub"]
     id_scope = provisioned_iot_dps_module["dps"]["properties"]["idScope"]
-    clean_dps_dataplane(cli, dps_cstring)
 
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         group_id, device_id1, device_id2 = generate_names(count=3)
 
         # Enrollment needs to be created
@@ -77,7 +80,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         # Regular enrollment group
         keys = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create --group-id {group_id} --dps-name {dps_name} -g {dps_rg}",
+                f"iot dps enrollment-group create --group-id {group_id} --dps-name {dps_name} -g {dps_rg} --show-keys",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -98,7 +101,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["registrationId"] == device_id1
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
-        check_hub_device(cli, device_id1, "sas", hub_cstring)
+        check_hub_device(cli, device_id1, "sas", hub)
 
         # Recreate with group primary key, and use different provisioning host
         provisioning_host = f"{dps_name}.azure-devices-provisioning.net"
@@ -115,7 +118,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Use id scope - compute_key should work without login; group id is not needed
@@ -131,7 +134,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Recreate with computed device key (and id scope); group id is not needed for the registration
@@ -155,9 +158,10 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
-        check_hub_device(cli, device_id1, "sas", hub_cstring, key=device_key)
+        check_hub_device(cli, device_id1, "sas", hub, key=device_key)
+        device1_registration = registration["registrationState"]
 
         # Can register a second device within the same enrollment group
         registration = cli.invoke(
@@ -175,24 +179,12 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["registrationId"] == device_id2
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
-        check_hub_device(cli, device_id2, "sas", hub_cstring)
+        check_hub_device(cli, device_id2, "sas", hub)
 
-        # Can re-register a first device within the same enrollment group using a different key
-        registration = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {device_id1} "
-                f"--key {keys['secondaryKey']} --ck",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        ).as_json()
-        device1_registration = registration["registrationState"]
-        assert registration["operationId"]
-        assert registration["registrationState"]["assignedHub"] == hub_hostname
-        assert registration["registrationState"]["deviceId"] == device_id1
-        assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
-        assert registration["status"] == "assigned"
+        register_fresh_generated_credential(
+            cli, provisioned_iot_dps_module, "group", "secondaryKey", request,
+            auth_type=auth_phase, connection_string=dps_cstring,
+        )
 
         # Check for both registration from service side
         random_registration = cli.invoke(
@@ -244,7 +236,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
             )
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -254,24 +246,25 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         device1_registration = registration["registrationState"]
         assert registration["operationId"]
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id1
         assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
 
-def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
-    hub_cstring = provisioned_iot_dps_module["hubConnectionString"]
+    hub = provisioned_iot_dps_module["iotHub"]
     id_scope = provisioned_iot_dps_module["dps"]["properties"]["idScope"]
-    clean_dps_dataplane(cli, dps_cstring)
 
     fake_pass = "pass1234"
     root_name, devices = _prepare_x509_certificates_for_dps(
@@ -281,7 +274,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         device_passwords=[None, fake_pass]
     )
 
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         group_id = generate_names()
 
         # Enrollment needs to be created
@@ -335,7 +328,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         assert registration["registrationState"]["registrationId"] == devices[0][0]
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
-        check_hub_device(cli, devices[0][0], "selfSigned", hub_cstring, thumbprint=devices[0][1])
+        check_hub_device(cli, devices[0][0], "selfSigned", hub, thumbprint=devices[0][1])
 
         # Use id scope and host to register the second device with password
         provisioning_host = f"{dps_name}.azure-devices-provisioning.net"
@@ -355,7 +348,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         assert registration["registrationState"]["registrationId"] == devices[1][0]
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
-        check_hub_device(cli, devices[1][0], "selfSigned", hub_cstring, thumbprint=devices[1][1])
+        check_hub_device(cli, devices[1][0], "selfSigned", hub, thumbprint=devices[1][1])
 
         # Check registration from service side
         for i in range(len(devices)):
@@ -369,7 +362,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
             compare_registrations(registration_states[i], service_side)
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -378,12 +371,13 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         assert registration["operationId"]
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == devices[0][0]
         assert registration["registrationState"]["registrationId"] == devices[0][0]
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         cli.invoke(
@@ -395,14 +389,15 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         )
 
 
-def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+@pytest.mark.usefixtures("exclusive_iot_dps_no_hub")
+def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module, auth_phases):
     dps_name = provisioned_iot_dps_no_hub_module['name']
     dps_rg = provisioned_iot_dps_no_hub_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_no_hub_module["connectionString"]
     id_scope = provisioned_iot_dps_no_hub_module["dps"]["properties"]["idScope"]
-    clean_dps_dataplane(cli, dps_cstring)
 
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         group_id, device_id = generate_names(count=2)
 
         result = cli.invoke(
@@ -453,13 +448,13 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
             raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
 
 
-def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module, auth_phases):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
-    clean_dps_dataplane(cli, dps_cstring)
 
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         group_id, device_id = generate_names(count=2)
 
         result = cli.invoke(

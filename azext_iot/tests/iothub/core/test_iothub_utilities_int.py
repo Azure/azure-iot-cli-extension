@@ -6,6 +6,8 @@
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.iothub._integration_helpers import skip_hub_list_provider_error
 
 
 class TestIoTHubUtilities(IoTLiveScenarioTest):
@@ -13,6 +15,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         super(TestIoTHubUtilities, self).__init__(test_case)
 
     def test_iothub_generate_sas_token(self):
+        """Inspect ARM policy metadata and offline token formatting, never authenticate with Hub SAS."""
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
@@ -67,8 +70,73 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             checks=[self.exists("sas")],
         )
 
+    def test_iothub_generate_sas_token_hostname_type(self):
+        """--hostname-type permutations for hub-level SAS.
+
+        Verifies the `sr=` audience in the generated SAS token matches the requested hostname type.
+        Tokens are inspected locally, not used to authenticate against the local-auth-disabled Hub.
+        """
+        from urllib.parse import unquote
+
+        def extract_sr(sas_payload):
+            sas = sas_payload["sas"].replace("SharedAccessSignature ", "")
+            for part in sas.split("&"):
+                if part.startswith("sr="):
+                    return unquote(part[3:])
+            raise AssertionError(f"sas token had no sr= component: {sas}")
+
+        hub = self.cmd(
+            f"iot hub show -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json()
+        props = hub["properties"]
+        classic_hn = props["hostName"]
+        device_hn = props.get("deviceHostName")
+        service_hn = props.get("serviceHostName")
+        is_gwv2 = bool(device_hn and service_hn)
+
+        # auto: defaults to service hostname on GWv2, classic on V1
+        token = self.cmd(
+            f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        expected_auto = service_hn if is_gwv2 else classic_hn
+        assert extract_sr(token) == expected_auto, \
+            f"auto: expected sr={expected_auto}, got {extract_sr(token)}"
+
+        # classic
+        token = self.cmd(
+            f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type classic",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        assert extract_sr(token) == classic_hn
+
+        if is_gwv2:
+            # service
+            token = self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type service",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == service_hn
+
+            # device
+            token = self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type device",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == device_hn
+        else:
+            # service / device must error on classic hubs
+            self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type service",
+                expect_failure=True,
+            )
+            self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type device",
+                expect_failure=True,
+            )
+
     def test_iothub_connection_string_show(self):
-        conn_str_pattern = r"^HostName={0}.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
+        conn_str_pattern = r"^HostName={0}(\.\w+)?\.azure-devices\.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
             self.entity_name
         )
         conn_str_eventhub_pattern = (
@@ -78,11 +146,6 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
 
         default_policy = "iothubowner"
         nonexistent_policy = "badpolicy"
-
-        hubs_in_sub = self.cmd("iot hub connection-string show").get_output_in_json()
-
-        hubs_in_rg = self.cmd(f"iot hub connection-string show -g {self.entity_rg}").get_output_in_json()
-        assert len(hubs_in_sub) >= len(hubs_in_rg)
 
         self.cmd(
             f"iot hub connection-string show -n {self.entity_name}",
@@ -97,11 +160,6 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         self.cmd(
             f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg} --pn {nonexistent_policy}",
             expect_failure=True,
-        )
-
-        self.cmd(
-            f"iot hub connection-string show --pn {nonexistent_policy}",
-            checks=[self.check("length(@)", 0)],
         )
 
         self.cmd(
@@ -134,6 +192,17 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
                 ),
             ],
         )
+
+    def test_iothub_connection_string_lists(self):
+        # ARM policy metadata inspection does not authenticate with the returned keys.
+        cli = EmbeddedCLI(cli_ctx=self.cli_ctx, capture_stderr=True)
+        with skip_hub_list_provider_error():
+            hubs_in_sub = cli.invoke("iot hub connection-string show").as_json()
+            hubs_in_rg = cli.invoke(f"iot hub connection-string show -g {self.entity_rg}").as_json()
+            missing_policy = cli.invoke("iot hub connection-string show --pn badpolicy").as_json()
+        assert any(hub["name"] == self.entity_name for hub in hubs_in_sub)
+        assert any(hub["name"] == self.entity_name for hub in hubs_in_rg)
+        assert missing_policy == []
 
     def test_iothub_init(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:

@@ -26,6 +26,9 @@ helps[
 ] = """
     type: group
     short-summary: Manage entities in an Azure IoT Hub.
+    long-summary: |
+                  Preview APIs support the Azure public cloud only; management requests use public ARM by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to use canary ARM.
 """
 
 helps[
@@ -689,6 +692,12 @@ helps[
       text: >
         az iot hub generate-sas-token --connection-string
         'HostName=myhub.azure-devices.net;DeviceId=mydevice;ModuleId=mymodule;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Generate a device SAS token whose audience targets the device endpoint.
+      text: >
+        az iot hub generate-sas-token -d {device_id} -n {iothub_name} --hostname-type device
+    - name: Generate an IoT Hub SAS token whose audience explicitly targets the service endpoint.
+      text: >
+        az iot hub generate-sas-token -n {iothub_name} --hostname-type service
 """
 
 helps[
@@ -1047,6 +1056,9 @@ helps[
     type: group
     short-summary: Manage entities in an Azure IoT Hub Device Provisioning Service (DPS).
                    Augmented with the IoT extension.
+    long-summary: |
+                  Preview APIs support the Azure public cloud only; management requests use public ARM by default.
+                  Set `AZURE_IOT_ADR_ARM_ENDPOINT` to `https://centraluseuap.management.azure.com` to use canary ARM.
 """
 
 helps[
@@ -1133,6 +1145,17 @@ helps[
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type symmetrickey --allocation-policy custom
         --webhook-url {webhook_url} --api-version {api_version}
+    - name: Create an enrollment with a custom ADR Namespace Certificate Policy specified.
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey
+        --adr-namespace {namespace_name} --adr-ca-name {ca_name}
+        --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment with a device type reference.
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1183,6 +1206,21 @@ helps[
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
         --initial-twin-tags "{'version1':'2'}" --device-information "{'color':'red'}"
+    - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
+            to use a custom ADR Namespace Certificate Policy.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
+        --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment's device type reference.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[
@@ -1251,10 +1289,16 @@ helps[
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are hidden by default. Use --show-keys to include generated or supplied
+                  keys in the response; this does not change credentials submitted to the service.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
+    - name: Create a symmetric-key enrollment group and explicitly return its generated keys.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --show-keys
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
       text: >
@@ -1286,7 +1330,17 @@ helps[
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy custom --webhook-url {webhook_url}
         --api-version {api_version}
-
+    - name: Create an enrollment group with an ADR certificate policy and selected hubs, inheriting the DPS allocation policy.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --iot-hubs {iot_hub_host_name}
+        --adr-namespace {namespace_name} --adr-ca-name {ca_name}
+        --adr-cert-policy-name {policy_name}
+    - name: Create an enrollment group with a device type reference.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:1"
 """
 
 helps[
@@ -1295,6 +1349,7 @@ helps[
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are hidden by default. Use --show-keys to include them in the response.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
@@ -1324,6 +1379,21 @@ helps[
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --primary-key {new_primary_key} --etag AAAAAAAAAAA=
+    - name: Update enrollment group '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
+            to use a custom ADR Namespace Certificate Policy.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --adr-namespace {namespace_name}
+        --adr-ca-name {ca_name} --adr-cert-policy-name {my_policy}
+    - name: Replace an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id}
+        --device-type-ref "urn:example:thing-model:temperature-sensor:2"
+    - name: Remove an enrollment group's device type reference.
+      text: >
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --remove-device-type-ref
 """
 
 helps[

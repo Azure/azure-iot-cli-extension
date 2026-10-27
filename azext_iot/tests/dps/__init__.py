@@ -4,15 +4,19 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from knack.log import get_logger
 
 
 logger = get_logger(__name__)
-DATAPLANE_AUTH_TYPES = [
-    AuthenticationTypeDataplane.key.value,
-    AuthenticationTypeDataplane.login.value,
-    "cstring",
+# Service-policy SAS requires its own explicitly local-auth-enabled fixture phase.
+# Device symmetric-key/X.509 attestation is independent and remains in regular coverage.
+DPS_SERVICE_AUTH_PARAMS = [
+    pytest.param((AuthenticationTypeDataplane.key.value,), id="key", marks=pytest.mark.dps_service_sas),
+    pytest.param((AuthenticationTypeDataplane.login.value,), id="login"),
+    pytest.param(("cstring",), id="cstring", marks=pytest.mark.dps_service_sas),
 ]
 
 CERT_NAME = "aziotcli"
@@ -34,23 +38,3 @@ TEST_ENDORSEMENT_KEY = (
 )
 TEST_KEY_REGISTRATION_ID = "myarbitrarydeviceId"
 GENERATED_KEY = "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
-
-
-def clean_dps_dataplane(cli, dps_cstring):
-    # Individual Enrollments
-    enrollment_list = cli.invoke(
-        f"iot dps enrollment list --login {dps_cstring}"
-    ).as_json()
-    for enrollment in enrollment_list:
-        cli.invoke(
-            f"iot dps enrollment delete --login {dps_cstring} --eid {enrollment['registrationId']}"
-        )
-
-    # Enrollment Groups
-    enrollment_list = cli.invoke(
-        f"iot dps enrollment-group list --login {dps_cstring}"
-    ).as_json()
-    for enrollment in enrollment_list:
-        cli.invoke(
-            f"iot dps enrollment-group delete --login {dps_cstring} --eid {enrollment['enrollmentGroupId']}"
-        )
