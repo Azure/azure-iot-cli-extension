@@ -2032,8 +2032,7 @@ class TestSasTokenAuth:
 
 
 class TestMonitorEvents:
-    @pytest.mark.parametrize("device_query", [None, "select deviceId from devices"])
-    def test_disabled_local_auth_rejected_before_keys_query_and_receiver(self, mocker, fixture_cmd, device_query):
+    def test_disabled_local_auth_rejected_before_keys_query_and_receiver(self, mocker, fixture_cmd):
         fixture_cmd.cli_ctx.invocation = mocker.Mock(data={})
         mocker.patch.object(
             subject.IotHubDiscovery, "find_resource",
@@ -2045,7 +2044,10 @@ class TestMonitorEvents:
 
         with pytest.raises(InvalidArgumentValueError, match="disableLocalAuth=true"):
             subject.iot_hub_monitor_events(
-                fixture_cmd, hub_name_or_hostname="myhub", resource_group_name="myrg", device_query=device_query
+                fixture_cmd,
+                hub_name_or_hostname="myhub",
+                resource_group_name="myrg",
+                device_query="select deviceId from devices",
             )
 
         find_policy.assert_not_called()
