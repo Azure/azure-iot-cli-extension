@@ -148,15 +148,42 @@ def test_scenario_role_setup_uses_the_existing_propagation_budget(mocker):
 def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
     invoke = mocker.patch.object(fixtures.cli, "invoke")
     invoke.return_value.as_json.return_value = {"user": {"name": "principal"}}
-    assign = mocker.patch.object(fixtures, "assign_role_with_propagation")
+    assign = mocker.patch.object(fixtures, "assign_roles_with_propagation")
     fixtures.assign_iot_hub_dataplane_rbac_role([
         {"hub": {"id": ROLE_ARGS["scope"]}},
         {"name": "mid-test-hub"},
     ])
     assign.assert_called_once_with(
-        role=fixtures.USER_ROLE,
-        scope=ROLE_ARGS["scope"],
-        assignee="principal",
+        assignments=[{"role": fixtures.USER_ROLE, "scope": ROLE_ARGS["scope"], "assignee": "principal"}],
+        max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
+        wait=fixtures.ROLE_ASSIGNMENT_REFRESH_TIME,
+    )
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mocker, failed):
+    error = CLIInternalError("Storage grant could not be verified")
+    assign = mocker.patch.object(
+        fixtures, "assign_roles_with_propagation", side_effect=error if failed else None,
+    )
+    hubs = [{"hub": {"identity": {"principalId": "hub-system"}}}]
+    storage = {"storage": {"id": "storage-scope"}}
+    fixture = fixtures.provisioned_storage_with_identity_module.__wrapped__(
+        Mock(), {"principalId": "storage-user"}, hubs, storage,
+    )
+    if failed:
+        with pytest.raises(CLIInternalError) as raised:
+            next(fixture)
+        assert raised.value is error
+    else:
+        assert next(fixture) == (hubs, storage)
+        with pytest.raises(StopIteration):
+            next(fixture)
+    assign.assert_called_once_with(
+        assignments=[
+            {"role": "Storage Blob Data Contributor", "scope": "storage-scope", "assignee": principal}
+            for principal in ("hub-system", "storage-user")
+        ],
         max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
         wait=fixtures.ROLE_ASSIGNMENT_REFRESH_TIME,
     )
