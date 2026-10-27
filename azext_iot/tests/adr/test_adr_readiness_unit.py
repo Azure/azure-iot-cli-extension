@@ -468,6 +468,49 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     assert clock.now == 50
 
 
+@pytest.mark.parametrize("settings", [None, {}, {"availability": "Disabled"}, {"allocationWeight": 31}])
+def test_readiness_accepts_late_hub_settings_without_replaying_add(settings):
+    expected = _expected("hub")
+    expected.pop("provisioning")
+    if settings is not None:
+        expected["provisioning"] = deepcopy(settings)
+    failed = _namespace(expected=expected)
+    populated = {**expected, "provisioning": {
+        "availability": "Available", "allocationWeight": 1, **(settings or {}),
+    }}
+    succeeded = _namespace("Succeeded", "Succeeded", populated)
+    succeeded["properties"]["messaging"]["endpoints"]["secondary"].pop("linkingError")
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(None), _output(failed), _output(failed), _output(None), _output(succeeded),
+    ]
+    endpoint = _link(scenario, Clock(), expected)
+    assert endpoint["linkingState"] == "Succeeded"
+    assert endpoint["provisioning"] == populated["provisioning"]
+    commands = _commands(scenario)
+    assert sum(" add " in command for command in commands) == 1
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
+
+
+@pytest.mark.parametrize("changed", [
+    {}, {"availability": "Disabled", "allocationWeight": 1},
+    {"availability": "Available", "allocationWeight": 2},
+])
+def test_readiness_freezes_service_populated_hub_settings(changed):
+    expected = _expected("hub")
+    expected.pop("provisioning")
+    populated = {**expected, "provisioning": {"availability": "Available", "allocationWeight": 1}}
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(None), _output(_namespace("Updating", "InProgress", expected)),
+        _output(_namespace("Updating", "InProgress", populated)),
+        _output(_namespace("Succeeded", "Succeeded", {**expected, "provisioning": changed})),
+    ]
+    with pytest.raises(AssertionError, match="settings changed"):
+        _link(scenario, Clock(), expected)
+    assert not any(" update " in command for command in _commands(scenario))
+
+
 def _hub_data_read_message(host, context=""):
     return (
         f"The namespace's managed identity could not read the device count on hub '{host}'{context} because it lacks "
