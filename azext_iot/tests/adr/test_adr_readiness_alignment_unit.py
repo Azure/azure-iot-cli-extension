@@ -7,6 +7,7 @@
 """Offline proofs for qualified readiness using production permission binding."""
 
 from copy import deepcopy
+from itertools import permutations
 from types import SimpleNamespace
 from unittest.mock import Mock
 import shlex
@@ -417,12 +418,14 @@ def test_unbound_original_snapshot_cannot_start_a_mutation(missing):
     assert not scenario.writes and scenario.cmd.call_count == 1
 
 
-def test_stale_failure_does_not_replay_accepted_recovery_or_extend_deadline():
-    scenario = Scenario()
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+def test_stale_failure_does_not_replay_accepted_recovery_or_extend_deadline(kind):
+    scenario = Scenario(kind)
     scenario.states = ["Failed", "Failed"]
     with pytest.raises(AssertionError, match="recovery updates=1"):
         scenario.run(timeout=65)
     assert scenario.clock.now == 65 and len(scenario.writes) == 2
+    assert scenario.writes[1].endswith(" --timeout 55")
     assert max(scenario.clock.sleeps) == 10
 
 
@@ -441,8 +444,9 @@ def test_progress_allows_bounded_recovery_but_never_suppresses_persistent_failur
     assert all(command.endswith(" --no-wait") for command in scenario.writes)
 
 
-def test_progress_after_waited_recovery_never_replays_it_or_suppresses_persistent_failure():
-    scenario = Scenario()
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+def test_progress_after_waited_recovery_never_replays_it_or_suppresses_persistent_failure(kind):
+    scenario = Scenario(kind)
     scenario.states = (["InProgress"] + ["Failed"] * 4) * 30
     with pytest.raises(AssertionError, match="Timed out"):
         scenario.run(timeout=240)
@@ -497,6 +501,40 @@ def test_retried_dps_denial_cannot_hide_a_later_conflicting_error(conflict):
     with pytest.raises(AssertionError, match="Non-recoverable"):
         scenario.run()
     assert len(scenario.writes) == 2
+
+
+@pytest.mark.parametrize("primary,conflict", permutations(["linkingError", "error", "status", "provisioningStatus"], 2))
+@pytest.mark.parametrize("contextual", [False, True])
+def test_read_denial_cannot_hide_a_conflicting_error_envelope(primary, conflict, contextual):
+    scenario = Scenario()
+    target = scenario.expected["resourceId"]
+    if contextual:
+        host = target.rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
+        scenario.error = {"code": "AdrMiNotAuthorized", "message": (
+            f"The namespace's managed identity could not read the device count on hub '{host}' "
+            f"(endpoint '{scenario.name}' being linked, resource '{target}') "
+            "because it lacks IoT Hub data-plane read access. "
+            "Assign it a role that grants IoT Hub data-plane read (for example IoT Hub Data Reader) on the hub, "
+            "then resubmit the request."
+        )}
+    else:
+        scenario.error = {"message": (
+            f"The namespace's managed identity is not authorized to read the linked resource '{target}'. "
+            "Grant it read access on the resource, then resubmit the request."
+        )}
+
+    def transform(body):
+        endpoint = body["properties"][scenario.section]["endpoints"][scenario.name]
+        matching = endpoint.pop("linkingError")
+        for field, error in ((primary, matching), (conflict, {"code": "InvalidRequest", "message": "Unrelated failure"})):
+            endpoint[field] = {"status": "Failed", "error": error} if field in {"status", "provisioningStatus"} else error
+        return body
+
+    scenario.transform = transform
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+    assert len(scenario.writes) == 1
+    assert " add " in scenario.writes[0]
 
 
 def test_accepted_recovery_can_finish_after_four_minutes_without_replay():

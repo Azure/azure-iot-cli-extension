@@ -256,6 +256,12 @@ def _endpoint_settings(endpoint):
 def _read_authorization_failure(endpoint, endpoint_name):
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     error = status.get("error") or endpoint.get("error") or endpoint.get("linkingError") or {}
+    if any(other and other != error for other in (
+        endpoint.get("linkingError"), endpoint.get("error"),
+        (endpoint.get("status") or {}).get("error"),
+        (endpoint.get("provisioningStatus") or {}).get("error"),
+    )):
+        return False
     target = endpoint.get("resourceId")
     # Match the observed direction and exact target, not generic 403/Failed.
     messages = {
