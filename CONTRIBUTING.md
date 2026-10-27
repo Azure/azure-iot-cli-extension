@@ -122,11 +122,16 @@ controlled manual validation, not automatic production schedules.
 Edit the non-secret `ValidationProfiles` JSON in ADO Library group
 `iot-cli-integration-health` to change regional coverage without a GitHub PR.
 Its shape is `{"schema":1,"branches":{"refs/heads/preview":{"mon":PROFILE}}}`.
-Each profile has exactly `region` (one public Azure region), `pythonVersions`
+Each profile requires `region` (one Azure region), `pythonVersions`
 (a nonempty list selected from 3.10-3.13), and `services` (a nonempty list selected
 from DPS, HubControl, HubData, ADU, ADR). Add entries for every scheduled weekday
 using `mon` through `sun`; missing profiles fail instead of running defaults.
-Only authorized maintainers should edit this group.
+The optional `armEndpoint` is `public` by default. To qualify APIs available only
+on canary, explicitly select `"region":"centraluseuap","armEndpoint":"canary"`;
+other region/canary combinations are rejected. Keep public-preview profiles on
+their public region and endpoint. The resolved endpoint is frozen in the plan and
+passed to every service job; neither the SDK API version nor the target is silently
+changed. Only authorized maintainers should edit this group.
 
 Plan selects the actual queued branch and UTC day from ADO build metadata, records
 the source commit and configuration digest, and retains the resolved profile with

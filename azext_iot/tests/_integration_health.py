@@ -91,13 +91,22 @@ def selected(values, allowed, name):
 
 
 def validate(profile):
-    if not isinstance(profile, dict) or set(profile) != {"region", "pythonVersions", "services"}:
-        raise ValueError("IoT profile requires region, pythonVersions and services.")
+    required_keys = {"region", "pythonVersions", "services"}
+    if (not isinstance(profile, dict) or not required_keys <= set(profile)
+            or not set(profile) <= required_keys | {"armEndpoint"}):
+        raise ValueError("IoT profile requires region, pythonVersions and services, with optional armEndpoint.")
     region = profile["region"]
-    if not isinstance(region, str) or not re.fullmatch(r"[a-z0-9]{1,40}", region) or region == "centraluseuap":
-        raise ValueError("Health profiles require an explicit public Azure region.")
+    if not isinstance(region, str) or not re.fullmatch(r"[a-z0-9]{1,40}", region):
+        raise ValueError("Health profiles require an explicit Azure region.")
+    routing = profile.get("armEndpoint", "public")
+    endpoints = {"public": "https://management.azure.com", "canary": "https://centraluseuap.management.azure.com"}
+    if (not isinstance(routing, str) or routing not in endpoints
+            or region == "centraluseuap" and routing != "canary"):
+        raise ValueError("Select public or canary ARM explicitly; centraluseuap requires canary.")
     selected(profile["pythonVersions"], PYTHONS, "Python versions")
     selected(profile["services"], SERVICES, "services")
+    targets = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
+    return targets["target"](region, endpoints[routing])
 
 
 def resolve(history):
@@ -139,15 +148,15 @@ def admission(now=None, check_cleanup=True):
 
 def plan(output, history):
     value = resolve(history)
-    validate(value["profile"])
     profile = value["profile"]
+    target = validate(profile)
     planner = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_pipeline.py"))
     jobs = planner["plan"](profile["services"], profile["pythonVersions"], [profile["region"]],
-                           "https://management.azure.com")
+                           target["endpoint"])
     output.mkdir(parents=True, exist_ok=True)
     for name, document in (("health-profile.json", value), ("plan.json", jobs)):
         (output / name).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-    matrix = {f"py{version.replace('.', '')}_{profile['region']}": {"python": version, "region": profile["region"]}
+    matrix = {f"py{version.replace('.', '')}_{profile['region']}": {"python": version, **target}
               for version in profile["pythonVersions"]}
     print(f"##vso[task.setvariable variable=matrix;isOutput=true]{json.dumps(matrix)}")
     for service in sorted(SERVICES):

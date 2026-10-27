@@ -42,6 +42,20 @@ def test_profile_uses_queued_utc_day_and_pins_source(setup_health, tmp_path):
                       "endpoint": "https://management.azure.com", "minutes": 100}]
 
 
+def test_canary_profile_pins_endpoint_in_plan_and_job_matrix(setup_health, tmp_path, monkeypatch, capsys):
+    config, _ = setup_health
+    config["branches"]["refs/heads/dev"]["sat"].update(region="centraluseuap", armEndpoint="canary")
+    monkeypatch.setenv("VALIDATION_PROFILES", json.dumps(config))
+    health.plan(tmp_path / "output", tmp_path / "history")
+    expected_endpoint = "https://centraluseuap.management.azure.com"
+    jobs = json.loads((tmp_path / "output/plan.json").read_text())
+    assert jobs[0]["region"] == "centraluseuap" and jobs[0]["endpoint"] == expected_endpoint
+    matrix = json.loads(capsys.readouterr().out.splitlines()[0].split("]", 1)[1])
+    assert matrix == {"py313_centraluseuap": {
+        "python": "3.13", "region": "centraluseuap", "endpoint": expected_endpoint,
+    }}
+
+
 @pytest.mark.parametrize("field,value", [
     ("sourceVersion", "b" * 40), ("sourceBranch", "refs/heads/preview"),
     ("queueTime", "2026-10-17T20:00:00"), ("id", 124), ("definition", {"id": 999}),
@@ -56,7 +70,8 @@ def test_profile_rejects_wrong_source_and_ambiguous_time(setup_health, field, va
 @pytest.mark.parametrize("field,value", [
     ("region", "centraluseuap"), ("region", "eastus;echo x"), ("services", []),
     ("services", ["DPS", "DPS"]), ("services", ["Unknown"]), ("pythonVersions", ["3.9"]),
-    ("pythonVersions", "3.13"), ("command", "anything"),
+    ("pythonVersions", "3.13"), ("command", "anything"), ("armEndpoint", "canary"),
+    ("armEndpoint", "https://unapproved.invalid"), ("armEndpoint", "unknown"), ("armEndpoint", []),
 ])
 def test_profile_rejects_invalid_selections(setup_health, field, value):
     config, _ = setup_health
