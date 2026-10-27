@@ -165,9 +165,23 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
     assert result["linkingState"] == "Succeeded"
     assert len(scenario.writes) == 2
     assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
+    assert scenario.writes[1].endswith(" --no-wait")
     assert scenario.write_times == [0, 30]
     assert scenario.clock.sleeps == [10, 10, 10, 10]
     assert all(command.endswith(" --no-wait") for command in scenario.writes)
+
+
+@pytest.mark.parametrize("kind,error", [("dps", _resource_mi_rejection()), ("hub", _hub_commit_rejection())])
+def test_fresh_grant_recovery_retains_progress_guard_and_backoff(kind, error):
+    scenario = Scenario(kind)
+    scenario.error = error
+    scenario.states = ["Failed"] * 4 + ["InProgress"] + ["Failed"] * 100
+    with pytest.raises(AssertionError, match="Timed out"):
+        scenario.run(timeout=180)
+    assert scenario.write_times == [0, 30, 110]
+    assert all(command.endswith(" --no-wait") for command in scenario.writes)
+    assert sum(" add " in command for command in scenario.writes) == 1
+    assert scenario.clock.now == 180
 
 
 @pytest.mark.parametrize(("kind", "error"), [

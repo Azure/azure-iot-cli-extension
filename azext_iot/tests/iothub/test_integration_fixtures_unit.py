@@ -167,7 +167,7 @@ def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mo
     assign = mocker.patch.object(
         fixtures, "assign_roles_with_propagation", side_effect=error if failed else None,
     )
-    hubs = [{"hub": {"identity": {"principalId": "hub-system"}}}]
+    hubs = [{"hub": {"id": "hub-id", "identity": {"principalId": "hub-system"}}}]
     storage = {"storage": {"id": "storage-scope"}, "container": {"name": "container"}}
     observer = Mock() if managed else None
     mocker.patch.object(fixtures, "_regular_phase_observer", return_value=observer)
@@ -182,6 +182,9 @@ def test_storage_endpoint_fixture_waits_for_both_exact_grants_before_yielding(mo
         result = next(fixture)
         assert result[:2] == (hubs, storage)
         assert result[2].observer is observer
+        assert result[2].hub_id == "hub-id"
+        assert result[2].storage_id == "storage-scope"
+        assert result[2].container == "container"
         with pytest.raises(StopIteration):
             next(fixture)
     assign.assert_called_once_with(
