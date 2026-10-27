@@ -25,6 +25,7 @@ from azext_iot.adr.providers.report import ReportProvider
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient, operations
 from azext_iot import IoTExtCommandsLoader
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.schema import SchemaProvider, SchemaRegistryProvider
 
 
 SUBSCRIPTION = "00000000-0000-0000-0000-000000000000"
@@ -479,6 +480,48 @@ def wire_client():
         logging_enable=True,
     ) as client:
         yield client
+
+
+@pytest.mark.parametrize("kind,url,args", [
+    ("registry", SCHEMA_REGISTRY_URL, ("registry", "rg")),
+    ("schema", SCHEMA_URL, ("schema", "registry", "rg")),
+    ("version", SCHEMA_VERSION_URL, ("01", "schema", "registry", "rg")),
+])
+def test_schema_show_delete_wire_contract(wire_client, mocked_response, kind, url, args):
+    resource = {"id": url, "name": args[0], "properties": {}}
+    mocked_response.add("GET", url, json=resource)
+    mocked_response.add("DELETE", url, status=204)
+    provider_type = SchemaRegistryProvider if kind == "registry" else SchemaProvider
+    provider = provider_type(Mock(cli_ctx=Mock()), client=wire_client)
+    show = provider.show_version if kind == "version" else provider.show
+    delete = provider.delete_version if kind == "version" else provider.delete
+    assert show(*args) == resource
+    assert delete(*args) is None
+    assert [call.request.method for call in mocked_response.calls] == ["GET", "DELETE"]
+    for call in mocked_response.calls:
+        _assert_api_version(call.request)
+
+
+@pytest.mark.parametrize("kind,url,args", [
+    ("registry", SCHEMA_REGISTRY_URL.rsplit("/", 1)[0], ("rg",)),
+    (
+        "registry", f"https://management.azure.com/subscriptions/{SUBSCRIPTION}/providers/"
+        "Microsoft.DeviceRegistry/schemaRegistries", (),
+    ),
+    ("schema", f"{SCHEMA_REGISTRY_URL}/schemas", ("registry", "rg")),
+    ("version", f"{SCHEMA_URL}/schemaVersions", ("schema", "registry", "rg")),
+])
+def test_schema_lists_follow_all_pages(wire_client, mocked_response, kind, url, args):
+    next_url = f"{url}?api-version={API_VERSION}&$skipToken=next"
+    mocked_response.add("GET", url, json={"value": [{"name": "first"}], "nextLink": next_url})
+    mocked_response.add("GET", next_url, json={"value": [{"name": "second"}]})
+    provider_type = SchemaRegistryProvider if kind == "registry" else SchemaProvider
+    provider = provider_type(Mock(cli_ctx=Mock()), client=wire_client)
+    operation = provider.list_versions if kind == "version" else provider.list
+    assert operation(*args) == [{"name": "first"}, {"name": "second"}]
+    assert len(mocked_response.calls) == 2
+    _assert_api_version(mocked_response.calls[0].request)
+    assert mocked_response.calls[1].request.url == next_url
 
 
 def _assert_api_version(request):

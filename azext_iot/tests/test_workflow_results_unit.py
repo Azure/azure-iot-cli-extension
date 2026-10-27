@@ -63,6 +63,19 @@ def test_native_openssl_selection_is_scoped_to_macos(macos_openssl_step):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
+def test_native_openssl_selection_explains_missing_homebrew(tmp_path):
+    bash = shutil.which("bash")
+    assert bash
+    result = subprocess.run(
+        [bash, str(REPOSITORY_ROOT / "scripts/select-openssl.sh")],
+        env=dict(os.environ, PATH=str(tmp_path)), capture_output=True, text=True, timeout=20, check=False,
+    )
+    assert result.returncode == 1
+    assert "requires Homebrew on macOS with openssl@3 installed" in result.stderr
+    assert not result.stdout
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
 @pytest.mark.parametrize("capability", ["ready", "missing", "unsupported"])
 def test_native_openssl_selection_proves_capabilities_before_changing_path(macos_openssl_step, tmp_path, capability):
     provider, step = macos_openssl_step
