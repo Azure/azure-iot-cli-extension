@@ -31,11 +31,7 @@ from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
-from azext_iot.adr.providers.link_recovery import (
-    LinkRecovery,
-    _DPS_INBOUND_AUTHORIZATION_ERROR,
-    _namespace_identity,
-)
+from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.adr.topology import endpoint_settings_match
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
@@ -51,7 +47,7 @@ _OWNED_LINK_TYPES = {
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 _AUTHORIZATION_BACKOFFS = (30, 60, 120)
-_FRESH_DPS_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_FRESH_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
 _LINK_INITIATE_REJECTED = re.compile(
     r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
     r"Verify the endpoint configuration, then resubmit the request\."
@@ -291,26 +287,52 @@ def _read_authorization_failure(endpoint, endpoint_name):
 
 
 def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match observed DPS grant-propagation envelopes only within the fresh-grant window."""
+    """Match observed DPS authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "dps"
         or submitted_at is None
         or now is None
-        or now - submitted_at > _FRESH_DPS_GRANT_WINDOW
+        or now - submitted_at > _FRESH_GRANT_WINDOW
     ):
         return False
     error = endpoint.get("linkingError") or {}
+    if (
+        endpoint.get("linkingState") == "Failed"
+        and error.get("code") == "ResourceMiNotAuthorized"
+        and not set(error) - {"code", "message"}
+    ):
+        return True
     message = error.get("message")
     match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
     return bool(
         endpoint.get("linkingState") == "Failed"
-        and (
-            error == _DPS_INBOUND_AUTHORIZATION_ERROR
-            or (
-                error.get("code") == "LinkInitiateFailed"
-                and not set(error) - {"code", "message"}
-                and match and match["service"] == "DPS"
-            )
+        and error.get("code") == "LinkInitiateFailed"
+        and not set(error) - {"code", "message"}
+        and match
+        and match["service"] == "DPS"
+    )
+
+
+def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
+    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    if (
+        binding.kind != "hub"
+        or submitted_at is None
+        or now is None
+        or now - submitted_at > _FRESH_GRANT_WINDOW
+    ):
+        return False
+    error = endpoint.get("linkingError") or {}
+    expected_message = (
+        "The namespace's managed identity is not authorized to link the Hub resource. "
+        "Grant it access on the resource, then resubmit the request. "
+        "(Hub resource reported: [AuthorizationFailed])"
+    )
+    return (
+        endpoint.get("linkingState") == "Failed"
+        and error in (
+            {"code": "LinkInitiateFailed", "message": expected_message},
+            {"code": "LinkCommitFailed", "message": expected_message},
         )
     )
 
@@ -323,18 +345,36 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
     # Only the canonical structured linkingError may authorize the new retry.
     # Conflicting/alternate error envelopes must not be hidden by a matching one.
     error = endpoint.get("linkingError") or {}
-    if error.get("code") not in {"LinkInitiateFailed", "ResourceMiNotAuthorized"}:
+    fresh_grant_rejection = (
+        _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now)
+        or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
+    )
+    if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection:
         return "read" if _read_authorization_failure(endpoint, binding.name) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
         or (endpoint.get("provisioningStatus") or {}).get("error")
     ):
         return None
-    if binding.authorized_failure(endpoint):
+    if error.get("code") == "LinkInitiateFailed" and binding.authorized_failure(endpoint):
         return "bound-link-initiate"
-    if _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
-        return "fresh-dps-generic"
+    if fresh_grant_rejection:
+        return "fresh-grant"
     return None
+
+
+def _same_recovered_fresh_grant_failure(namespace, endpoint, expected):
+    properties = namespace["properties"]
+    if (
+        namespace.get("error") or properties.get("error")
+        or endpoint.get("error") or (endpoint.get("status") or {}).get("error")
+        or (endpoint.get("provisioningStatus") or {}).get("error")
+    ):
+        return False
+    current = endpoint.get("linkingError") or {}
+    if set(expected) == {"code"}:
+        return current.get("code") == expected["code"] and not set(current) - {"code", "message"}
+    return current == expected
 
 
 def link_hub_with_readiness(
@@ -366,9 +406,10 @@ def link_with_readiness(
     """Submit once, then recover only a persisted terminal authorization failure.
 
     Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
-    Recovery hands off once to the operation-aware, identity-preserving waited
-    update under the remaining deadline. Stale GETs cannot replay that update.
-    All CLI/read errors propagate unchanged.
+    Bound failures hand off once to a waited production update. Fresh/redacted
+    failures retain asynchronous recovery because grant-creation evidence does
+    not cross CLI invocations. These updates require observed progress before
+    another write. All paths preserve the deadline and propagate CLI/read errors.
     """
     assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
     section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
@@ -400,8 +441,11 @@ def link_with_readiness(
     budget.call(scenario.cmd, command + " --no-wait")
     submitted_at = budget.clock()
     expected = _endpoint_settings(expected)
+    progressed = True  # The initial add is never replayed.
+    handed_off = False
     retries = 0
     retry_at = None
+    recovered_fresh_grant_error = None
     while True:
         namespace = budget.call(scenario.cmd, show).get_output_in_json()
         assert _namespace_identity(namespace) == binding.namespace_identity, (
@@ -433,6 +477,7 @@ def link_with_readiness(
             _log(LogKind.RESULT, "%s link namespace and endpoint both Succeeded after %d recovery updates", label, retries)
             return {"name": endpoint_name, **endpoint}
         if ns_state in _ACTIVE_STATES or state in _ACTIVE_STATES:
+            progressed = True
             retry_at = None
         elif any(_link_state(other) in _ACTIVE_STATES for other in others):
             retry_at = None
@@ -440,9 +485,9 @@ def link_with_readiness(
             recovery_reason = _authorization_failure(
                 namespace, endpoint, binding, submitted_at=submitted_at, now=budget.clock(),
             )
-            if recovery_reason and not retries:
+            if recovery_reason and progressed and not handed_off:
                 if retry_at is None:
-                    if recovery_reason == "fresh-dps-generic":
+                    if recovery_reason == "fresh-grant":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
                     else:
                         delay = min(10 * (retries + 1), 30)
@@ -453,11 +498,26 @@ def link_with_readiness(
                         "properties": {section: {"endpoints": {endpoint_name: endpoint}}},
                     })
                     assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
-                    remaining = int(budget.end - budget.clock())
-                    assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
-                    budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
+                    if binding.authorized_failure(endpoint):
+                        remaining = int(budget.end - budget.clock())
+                        assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
+                        budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
+                        handed_off = True
+                    else:
+                        budget.call(scenario.cmd, recovery[0] + " --no-wait")
+                    if recovery_reason == "fresh-grant":
+                        error = deepcopy(endpoint.get("linkingError"))
+                        recovered_fresh_grant_error = (
+                            {"code": error["code"]} if error.get("code") == "ResourceMiNotAuthorized" else error
+                        )
                     retries += 1
+                    progressed = False
                     retry_at = None
+            elif (
+                recovered_fresh_grant_error is not None
+                and _same_recovered_fresh_grant_failure(namespace, endpoint, recovered_fresh_grant_error)
+            ):
+                pass
             elif not recovery_reason:
                 raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:

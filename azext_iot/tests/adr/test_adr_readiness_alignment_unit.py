@@ -4,19 +4,23 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Offline proofs for legacy no-wait readiness using production permission binding."""
+"""Offline proofs for qualified readiness using production permission binding."""
 
 from copy import deepcopy
+from types import SimpleNamespace
 from unittest.mock import Mock
+import shlex
 
 import pytest
 from azure.cli.core.azclierror import AzureResponseError
 
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
+from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.link_recovery import LinkRecovery
+from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
 from azext_iot.tests.adr import _readiness as readiness
 from azext_iot.tests.adr.test_adr_readiness_unit import Clock, DPS_ID, LINKS, NS_ID, UAMI_ID, _expected, _output
-from azext_iot.tests.adr.test_adr_link_initiate_recovery_unit import INBOUND_DENIAL
+from azext_iot.tests.adr.test_adr_link_initiate_recovery_unit import _harness
 
 
 # Observed Hub envelope in run 35353501504. The subscription/RG remain offline
@@ -94,10 +98,9 @@ class Scenario:
                 self.last_state = self.states.pop(0)
             return _output(self.body(self.last_state))
         assert " role " not in text
-        if " add " in text:
+        if " add " in text or " --no-wait" in text:
             assert text.endswith(" --no-wait")
         else:
-            assert "--no-wait" not in text
             assert int(text.rsplit(" --timeout ", 1)[1]) > 0
         assert f" link {self.kind} " in text
         assert " add " in text or " update " in text
@@ -129,10 +132,31 @@ def _generic_rejection(service="DPS", **extra):
     }
 
 
-@pytest.mark.parametrize("error", [_generic_rejection("DPS"), INBOUND_DENIAL])
-def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update(error):
+def _resource_mi_rejection(message=None):
+    return {
+        "code": "ResourceMiNotAuthorized",
+        "message": message or (
+            "DPS could not read the ADR namespace using its inbound identity used for this request. "
+            "Grant that identity namespace read access, allow time for a recent role assignment to "
+            "propagate, then resubmit the request. (DPS resource reported: [400315])"
+        ),
+    }
+
+
+def _hub_commit_rejection(message=None):
+    return {
+        "code": "LinkCommitFailed",
+        "message": message or (
+            "The namespace's managed identity is not authorized to link the Hub resource. "
+            "Grant it access on the resource, then resubmit the request. "
+            "(Hub resource reported: [AuthorizationFailed])"
+        ),
+    }
+
+
+def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
     scenario = Scenario("dps")
-    scenario.error = deepcopy(error)
+    scenario.error = _generic_rejection("DPS")
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()
@@ -142,15 +166,101 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
     assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
     assert scenario.write_times == [0, 30]
     assert scenario.clock.sleeps == [10, 10, 10, 10]
+    assert all(command.endswith(" --no-wait") for command in scenario.writes)
 
 
-@pytest.mark.parametrize("error", [_generic_rejection("DPS"), INBOUND_DENIAL])
+@pytest.mark.parametrize(("kind", "error"), [
+    pytest.param("dps", _resource_mi_rejection(), id="dps-resource-mi"),
+    pytest.param(
+        "dps",
+        _resource_mi_rejection("Updated server wording for the same authorization code."),
+        id="dps-message-change",
+    ),
+    pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
+    pytest.param("hub", {**_hub_commit_rejection(), "code": "LinkInitiateFailed"}, id="hub-link-initiate"),
+])
+def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
+    scenario = Scenario(kind)
+    scenario.error = error
+    scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
+
+    result = scenario.run()
+
+    assert result["linkingState"] == "Succeeded"
+    assert len(scenario.writes) == 2
+    assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
+    assert scenario.write_times == [0, 30]
+    assert all(command.endswith(" --no-wait") for command in scenario.writes)
+
+
+def test_retried_resource_mi_rejection_can_outlive_freshness_window():
+    scenario = Scenario("dps")
+    scenario.error = _resource_mi_rejection()
+    scenario.states = ["Failed", "Failed", "Failed", "Failed", "Failed", "Succeeded"]
+    original = scenario.command
+    advanced = [False]
+
+    def command(text):
+        if text == "iot adr ns show -n ns -g rg" and len(scenario.writes) == 2 and not advanced[0]:
+            scenario.error = _resource_mi_rejection("Updated server wording after the recovery update.")
+            scenario.clock.now = readiness._FRESH_GRANT_WINDOW + 1
+            advanced[0] = True
+        return original(text)
+
+    scenario.cmd.side_effect = command
+
+    result = scenario.run()
+
+    assert result["linkingState"] == "Succeeded"
+    assert len(scenario.writes) == 2
+
+
+@pytest.mark.parametrize(("kind", "error", "stale"), [
+    pytest.param("hub", _resource_mi_rejection(), False, id="dps-error-on-hub"),
+    pytest.param("dps", _hub_commit_rejection(), False, id="hub-error-on-dps"),
+    pytest.param(
+        "dps",
+        {**_resource_mi_rejection(), "code": "OtherAuthorizationFailure"},
+        False,
+        id="dps-altered-code",
+    ),
+    pytest.param(
+        "hub",
+        _hub_commit_rejection("The Hub link commit failed for another reason."),
+        False,
+        id="hub-altered-message",
+    ),
+    pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
+    pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+    pytest.param(
+        "dps", {**_resource_mi_rejection(), "details": [{"code": "OtherFailure"}]}, False, id="dps-extra-error",
+    ),
+])
+def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
+    scenario = Scenario(kind)
+    scenario.error = error
+    if stale:
+        original = scenario.command
+        advanced = [False]
+
+        def command(text):
+            if text == "iot adr ns show -n ns -g rg" and scenario.writes and not advanced[0]:
+                scenario.clock.now += readiness._FRESH_GRANT_WINDOW + 1
+                advanced[0] = True
+            return original(text)
+
+        scenario.cmd.side_effect = command
+
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+
+    assert len(scenario.writes) == 1
+
+
 @pytest.mark.parametrize("mutation", ["hub-service", "extra-detail", "stale-grant", "hub-link"])
-def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation, error):
+def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation):
     scenario = Scenario("hub" if mutation == "hub-link" else "dps")
-    scenario.error = deepcopy(error)
-    if mutation == "hub-service":
-        scenario.error["message"] = scenario.error["message"].replace("DPS", "Hub")
+    scenario.error = _generic_rejection("Hub" if mutation == "hub-service" else "DPS")
     if mutation == "extra-detail":
         scenario.error["details"] = [{"code": "IH400315"}]
     if mutation == "stale-grant":
@@ -160,7 +270,7 @@ def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation, error
 
         def command(text):
             if text == "iot adr ns show -n ns -g rg" and scenario.writes and not advanced[0]:
-                scenario.clock.now += readiness._FRESH_DPS_GRANT_WINDOW + 1
+                scenario.clock.now += readiness._FRESH_GRANT_WINDOW + 1
                 advanced[0] = True
             return original(text)
 
@@ -187,7 +297,7 @@ def test_observed_denial_recovers_only_exact_original_outbound_identity(mocker, 
     assert len(scenario.writes) == 2 and scenario.writes[1] == expected_update
     assert scenario.writes[0].endswith(" --no-wait")
     assert scenario.clock.now == 20 and scenario.original == snapshot
-    assert classifier.call_count == 2
+    assert classifier.call_count == 3
     run.assert_not_called()
 
 
@@ -316,6 +426,21 @@ def test_stale_failure_does_not_replay_accepted_recovery_or_extend_deadline():
     assert max(scenario.clock.sleeps) == 10
 
 
+def test_progress_allows_bounded_recovery_but_never_suppresses_persistent_failure():
+    scenario = Scenario()
+    scenario.error = {"message": (
+        f"The namespace's managed identity is not authorized to read the linked resource "
+        f"'{scenario.expected['resourceId']}'. Grant it read access on the resource, then resubmit the request."
+    )}
+    scenario.states = (["InProgress"] + ["Failed"] * 4) * 30
+    with pytest.raises(AssertionError, match="Timed out"):
+        scenario.run(timeout=240)
+    assert scenario.clock.now == 240
+    assert scenario.write_times == [0, 20, 80, 140, 190]
+    assert sum(" add " in command for command in scenario.writes) == 1
+    assert all(command.endswith(" --no-wait") for command in scenario.writes)
+
+
 def test_progress_after_waited_recovery_never_replays_it_or_suppresses_persistent_failure():
     scenario = Scenario()
     scenario.states = (["InProgress"] + ["Failed"] * 4) * 30
@@ -323,7 +448,55 @@ def test_progress_after_waited_recovery_never_replays_it_or_suppresses_persisten
         scenario.run(timeout=240)
     assert scenario.clock.now == 240
     assert scenario.write_times == [0, 20]
-    assert sum(" add " in command for command in scenario.writes) == 1
+    assert scenario.writes[0].endswith(" --no-wait")
+    assert scenario.writes[1].endswith(" --timeout 220")
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_waited_recovery_charges_remaining_deadline_and_preserves_errors(failure):
+    scenario = Scenario()
+    scenario.initial_read_cost = 0.25
+    original = scenario.command
+    error = AzureResponseError("Authoritative recovery operation failed")
+
+    def command(text):
+        if " update " in text:
+            assert text.endswith("--timeout 34")
+            scenario.clock.now += 35
+            if failure:
+                raise error
+        return original(text)
+
+    scenario.cmd.side_effect = command
+    with pytest.raises(AzureResponseError if failure else AssertionError) as caught:
+        scenario.run(timeout=45)
+    if failure:
+        assert caught.value is error
+    else:
+        assert "Timed out" in str(caught.value)
+    assert sum(" update " in call.args[0] for call in scenario.cmd.call_args_list) == 1
+    assert " update " in scenario.cmd.call_args_list[-1].args[0]
+
+
+@pytest.mark.parametrize("conflict", ["details", "alternate-error"])
+def test_retried_dps_denial_cannot_hide_a_later_conflicting_error(conflict):
+    scenario = Scenario("dps")
+    scenario.error = _resource_mi_rejection()
+    scenario.states = ["Failed"] * 10
+
+    def transform(body):
+        if len(scenario.writes) == 2:
+            endpoint = body["properties"][scenario.section]["endpoints"][scenario.name]
+            if conflict == "details":
+                endpoint["linkingError"]["details"] = [{"code": "OtherFailure"}]
+            else:
+                endpoint["error"] = {"code": "OtherFailure"}
+        return body
+
+    scenario.transform = transform
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+    assert len(scenario.writes) == 2
 
 
 def test_accepted_recovery_can_finish_after_four_minutes_without_replay():
@@ -350,3 +523,86 @@ def test_update_preflight_failure_is_not_swallowed_or_bypassed():
     with pytest.raises(AzureResponseError) as caught:
         scenario.run()
     assert caught.value is scenario.write_error and len(scenario.writes) == 1
+
+
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("kind,denial", [
+    ("hub", "bound"), ("dps", "bound"), ("hub", "read"), ("dps", "read"),
+    ("dps", "generic"), ("dps", "inbound"), ("hub", "redacted"),
+])
+def test_recovery_path_preserves_grant_evidence_boundary_between_commands(mocker, kind, denial, identity):
+    h = _harness(mocker, kind, identity)
+    if denial == "read":
+        h.denial = {"code": "AdrMiNotAuthorized", "message": (
+            f"The namespace's managed identity is not authorized to read the linked resource '{h.body['resourceId']}'. "
+            "Grant it read access on the resource, then resubmit the request."
+        )}
+    elif denial == "generic":
+        h.denial = _generic_rejection()
+    elif denial == "inbound":
+        h.denial = _resource_mi_rejection()
+    elif denial == "redacted":
+        h.denial = _hub_commit_rejection()
+    waited = denial in {"bound", "read"}
+    section = LINKS[kind][0]
+    pending_states = []
+    providers = [h.provider]
+    writes = []
+
+    def command(text):
+        if text == "iot adr ns show -n ns -g rg":
+            if pending_states:
+                state = pending_states.pop(0)
+                h.namespace["properties"]["provisioningState"] = "Updating" if state == "InProgress" else state
+                endpoint = h.namespace["properties"][section]["endpoints"][kind]
+                endpoint["linkingState"] = state
+                if state == "Failed":
+                    endpoint["linkingError"] = deepcopy(h.denial)
+                else:
+                    endpoint.pop("linkingError", None)
+            return _output(h.namespace)
+        writes.append(text)
+        if " add " in text:
+            assert text.endswith(" --no-wait")
+            h.run(no_wait=True)
+            pending_states[:] = ["Failed"]
+        else:
+            previous = h.provider
+            h.provider = LinkProvider(Mock(cli_ctx=Mock()), client=h.client)
+            h.provider._get_target = previous._get_target
+            h.provider._warn_if_hub_classically_linked = Mock()
+            h.provider._await_terminal = previous._await_terminal
+            h.provider._rbac = LinkRbacManager(Mock(), clock=h.clock.time, sleeper=h.clock.sleep)
+            h.provider._rbac._current_assignee_object_id = Mock(return_value="caller")
+            h.provider._rbac._caller_can_assign = Mock(return_value=True)
+            h.provider._rbac._invoke_json = Mock(side_effect=h.rbac)
+            providers.append(h.provider)
+            args = {key: value for key, value in h.args.items() if key in {
+                "namespace_name", "resource_group_name", "endpoint_name", "mi_system_assigned", "mi_user_assigned",
+            }}
+            if waited:
+                assert "--no-wait" not in text
+                timeout = int(shlex.split(text)[-1])
+                assert h.clock.now + timeout <= 600
+                getattr(h.provider, f"{kind}_update")(**args, timeout_sec=timeout, wait_sec=1)
+            else:
+                assert text.endswith(" --no-wait")
+                getattr(h.provider, f"{kind}_update")(**args, no_wait=True)
+                pending_states[:] = ["InProgress", "Failed"] if len(writes) == 2 else ["Succeeded"]
+        return _output(None)
+
+    identity_option = "--system-assigned-mi" if identity == "system" else f"--user-assigned-mi {UAMI_ID}"
+    add = (
+        f"iot adr ns link {kind} add --ns ns -g rg -n {kind} "
+        f"--{kind}-id {h.body['resourceId']} {identity_option}"
+    )
+    result = readiness.link_with_readiness(
+        SimpleNamespace(cmd=command), add, "ns", "rg", kind, h.body, link_kind=kind,
+        clock=h.clock.time, sleeper=h.clock.sleep,
+    )
+    assert result["linkingState"] == "Succeeded"
+    assert len(writes) == (2 if waited else 3)
+    assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 3
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert providers[0]._rbac.created
+    assert all(not provider._rbac.created for provider in providers[1:])

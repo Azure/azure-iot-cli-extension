@@ -502,7 +502,7 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     endpoint = _link(scenario, clock, expected, kind=link_kind)
     commands = _commands(scenario)
     assert commands[0] == _add(link_kind) + " --no-wait"
-    assert commands[4] == failed_link_recovery_commands(failed)[0] + " --timeout 580"
+    assert commands[4] == failed_link_recovery_commands(failed)[0] + " --no-wait"
     assert sum(" update " in command for command in commands) == 1
     assert endpoint["linkingState"] == "Succeeded"
     assert all(endpoint[key] == value for key, value in expected.items())
@@ -531,7 +531,7 @@ def test_readiness_accepts_late_hub_settings_without_replaying_add(settings):
     assert endpoint["provisioning"] == populated["provisioning"]
     commands = _commands(scenario)
     assert sum(" add " in command for command in commands) == 1
-    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --timeout 590"
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
 
 
 @pytest.mark.parametrize("changed", [
@@ -580,7 +580,8 @@ def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered(contextual)
     assert endpoint["linkingState"] == "Succeeded"
     commands = _commands(scenario)
     assert sum(" update " in command for command in commands) == 1
-    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --timeout 590"
+    suffix = " --timeout 590" if contextual else " --no-wait"
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + suffix
     assert all(endpoint[key] == value for key, value in expected.items())
 
 
@@ -645,7 +646,7 @@ def test_arm_id_casing_is_not_a_changed_link_target_or_identity(user_assigned, l
         _output(_namespace("Succeeded", "Succeeded", persisted, kind=link_kind)),
     ]
     result = _link(scenario, Clock(), expected, kind=link_kind)
-    assert _commands(scenario)[3] == failed_link_recovery_commands(failed)[0] + " --timeout 590"
+    assert _commands(scenario)[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
     assert all(result[key] == value for key, value in persisted.items())
 
 
@@ -693,7 +694,7 @@ def test_busy_and_successful_link_states_never_retry(ns_state, state, link_kind)
     assert not any(" update " in cmd for cmd in _commands(scenario))
 
 
-def test_stale_failure_cannot_replay_completed_waited_recovery(link_kind):
+def test_accepted_recovery_requires_progress_before_another_retry(link_kind):
     scenario = Mock()
     scenario.cmd.return_value = _output(_namespace(kind=link_kind))
     clock = Clock()
@@ -704,7 +705,7 @@ def test_stale_failure_cannot_replay_completed_waited_recovery(link_kind):
     assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
 
 
-def test_waited_recovery_is_not_replayed_even_after_active_reads(link_kind):
+def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind):
     scenario = Mock()
     clock = Clock()
     writes = []
@@ -725,9 +726,8 @@ def test_waited_recovery_is_not_replayed_even_after_active_reads(link_kind):
     with pytest.raises(AssertionError, match="Timed out"):
         _link(scenario, clock, kind=link_kind, timeout=180)
     assert clock.now == 180
-    assert writes == [1, 25]
-    assert max(clock.sleeps) == 10
-    assert _bounded_update_timeouts(scenario, failed_link_recovery_commands(_namespace(kind=link_kind))[0]) == [156]
+    assert writes == [1, 25, 70, 126]
+    assert max(clock.sleeps) == 10  # Actual GETs continue during 10/20/30s backoff.
 
 
 @pytest.mark.parametrize("failure", [False, True])
@@ -735,6 +735,9 @@ def test_waited_recovery_charges_remaining_deadline_and_preserves_errors(link_ki
     scenario = Mock()
     clock = Clock()
     error = AzureResponseError("Authoritative recovery operation failed")
+    namespace = _namespace(kind=link_kind)
+    section, _, name = LINKS[link_kind]
+    namespace["properties"][section]["endpoints"][name]["linkingError"]["code"] = "AdrMiNotAuthorized"
 
     def command(text):
         if " update " in text:
@@ -744,7 +747,7 @@ def test_waited_recovery_charges_remaining_deadline_and_preserves_errors(link_ki
                 raise error
             return _output(None)
         clock.now += 0.25
-        return _output(_namespace(kind=link_kind))
+        return _output(namespace)
 
     scenario.cmd.side_effect = command
     with pytest.raises(AzureResponseError if failure else AssertionError) as caught:
@@ -827,7 +830,7 @@ def test_recovery_commands_keep_exact_scope_and_no_permissions_shortcuts(link_ki
     assert update == [
         "az", "iot", "adr", "ns", "link", link_kind, "update", "-n", LINKS[link_kind][2],
         "--ns", "ns", "-g", "rg", "--subscription", "sub",
-        "--system-assigned-mi", "--timeout", "590",
+        "--system-assigned-mi", "--no-wait",
     ]
 
 
@@ -884,7 +887,7 @@ def test_native_namespace_get_drives_only_precise_link_recovery(mocked_response,
             assert not clock.sleeps
     writes = [cmd for cmd in _commands(scenario) if " add " in cmd or " update " in cmd]
     assert writes == [_add(link_kind) + " --no-wait"] + (
-        [failed_link_recovery_commands(failed)[0] + " --timeout 590"] if authorization_failure else []
+        [failed_link_recovery_commands(failed)[0] + " --no-wait"] if authorization_failure else []
     )
     assert len(mocked_response.calls) == (4 if authorization_failure else 1)
     assert all(call.request.method == "GET" and urlsplit(call.request.url).path == NS_ID
