@@ -37,14 +37,17 @@ The dedicated combined and SU scenarios instead use native command recovery with
 fresh service roles, explicit 1200-second mutation budgets, and no fixture repair.
 """
 
+from copy import deepcopy
 import os
 import re
 import shlex
 from time import monotonic, sleep
 from typing import Optional
+from urllib.parse import urlsplit
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, RequiredArgumentMissingError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from msrestazure.tools import parse_resource_id
 
 from azext_iot._factory import _ADR_DPS_API_VERSION
@@ -79,6 +82,8 @@ from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
+    endpoint_settings_match,
+    endpoint_update_body,
 )
 from azext_iot.adr.rbac import (
     CONTRIBUTOR_ROLE,
@@ -137,18 +142,23 @@ def _link_failure_detail(shown):
     return error if isinstance(error, dict) else {}
 
 
-def _error_chain_text(error):
+def _error_chain(error):
     seen = set()
-    texts = []
     current = error
     while current is not None and id(current) not in seen:
         seen.add(id(current))
+        yield current
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
+
+
+def _error_chain_text(error):
+    texts = []
+    for current in _error_chain(error):
         texts.append(str(current))
         detail = getattr(current, "error", None)
         code = detail.get("code") if isinstance(detail, dict) else getattr(detail, "code", None)
         if isinstance(code, str):
             texts.append(code)
-        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
     return "\n".join(texts)
 
 
@@ -208,6 +218,49 @@ def _show_link(test_case, link_kind, namespace_name, resource_group_name, endpoi
     ).get_output_in_json()
 
 
+def _current_rotation_rejection(error, namespace_id, endpoint_name):
+    chain = list(_error_chain(error))
+    if any(isinstance(value, (ServiceRequestError, ServiceResponseError)) for value in chain):
+        return False
+    subscription = namespace_id.split("/")[2]
+    for value in chain:
+        if not isinstance(value, HttpResponseError) or value.status_code != 200:
+            continue
+        response = value.response
+        request = getattr(response, "request", None)
+        if getattr(request, "method", None) != "GET" or not re.fullmatch(
+            rf"/subscriptions/{re.escape(subscription)}/providers/Microsoft\.DeviceRegistry/"
+            r"locations/[^/]+/(?:asyncOperationStatuses|operationStatuses)/[^/]+",
+            urlsplit(getattr(request, "url", "")).path, re.IGNORECASE,
+        ):
+            continue
+        if not callable(getattr(response, "json", None)):
+            return False
+        try:
+            body = response.json()
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(body, dict) or body.get("status") != "Failed":
+            return False
+        detail = body.get("error")
+        if not isinstance(detail, dict):
+            return False
+        if detail.get("code") == "LinkingFailed":
+            details = detail.get("details")
+            if set(detail) - {"code", "message", "details"} or not isinstance(details, list) or len(details) != 1:
+                return False
+            detail = details[0]
+        if not isinstance(detail, dict):
+            return False
+        detail = dict(detail)
+        if "target" in detail and detail.pop("target") != f"properties.messaging.endpoints[{endpoint_name}]":
+            return False
+        return _is_identity_rotation_authorization_failure(
+            endpoint={"linkingState": "Failed", "linkingError": detail},
+        )
+    return False
+
+
 def _wait_for_link_terminal(
     test_case, link_kind, namespace_name, resource_group_name, endpoint_name, *, timeout,
 ):
@@ -228,20 +281,33 @@ def _wait_for_link_terminal(
     )
 
 
-def _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity):
+def _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, baseline):
     properties = _link_properties(endpoint)
-    assert properties.get("resourceId", "").casefold() == hub_id.casefold(), properties
+    assert properties.get("resourceId", "").casefold() == hub_id.casefold(), "Hub rotation resourceId changed."
     identity = properties.get("inboundCallerIdentity") or {}
     identity_type = identity.get("type")
-    assert identity_type in {"SystemAssigned", "UserAssigned"}, properties
+    assert identity_type in {"SystemAssigned", "UserAssigned"}, "Hub rotation identity type changed."
     if identity_type == "UserAssigned":
-        assert identity.get("userAssignedIdentity", "").casefold() == previous_user_identity.casefold(), properties
+        assert identity.get("userAssignedIdentity", "").casefold() == previous_user_identity.casefold(), (
+            "Hub rotation user-assigned identity changed."
+        )
+    actual = endpoint_update_body(properties, {"type": "SystemAssigned"})
+    expected = endpoint_update_body(baseline, {"type": "SystemAssigned"})
+    for projection in (actual, expected):
+        for key in ("resourceId", "endpointType"):
+            if isinstance(projection.get(key), str):
+                projection[key] = projection[key].casefold()
+    assert endpoint_settings_match(actual, expected), "Hub rotation endpoint settings changed; recovery stopped."
 
 
-def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id):
+def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id, baseline):
     namespace = test_case.cmd(
         f"iot adr ns show -n {namespace_name} -g {resource_group_name}"
     ).get_output_in_json()
+    assert namespace["id"].casefold() == baseline["id"].casefold()
+    assert namespace["properties"]["provisioningState"] in {"Succeeded", "Failed"}, "Namespace mutation is still active."
+    assert namespace["identity"] == baseline["identity"], "Namespace identity changed during rotation."
+    assert namespace["properties"].get("outboundIdentity") == baseline["properties"].get("outboundIdentity")
     hub = test_case.cmd(
         f"iot hub show --ids {shlex.quote(hub_id)}"
     ).get_output_in_json()
@@ -262,20 +328,28 @@ def _update_hub_to_sami_with_recovery(
     test_case, update_cmd, namespace_name, resource_group_name, endpoint_name, hub_id, previous_user_identity,
 ):
     deadline = monotonic() + _HUB_IDENTITY_ROTATION_BUDGET_SECONDS
+    namespace = test_case.cmd(
+        f"iot adr ns show -n {namespace_name} -g {resource_group_name}"
+    ).get_output_in_json()
+    snapshot = deepcopy(namespace["properties"]["messaging"]["endpoints"][endpoint_name])
+    assert namespace["properties"]["provisioningState"] == "Succeeded"
+    assert _link_observation(snapshot) == ("Succeeded", "UserAssigned"), "Expected a healthy UAMI link before rotation."
+    _assert_hub_rotation_retry_safe(snapshot, hub_id, previous_user_identity, snapshot)
 
     def submit():
         # Bound the synchronous link wait so a slow mutation cannot outlive the recovery budget.
         timeout = int(deadline - monotonic())
         if timeout < 1:
             raise AssertionError("Hub identity rotation authorization recovery budget exhausted")
-        test_case.cmd(f"{update_cmd} --timeout {timeout}")
+        try:
+            test_case.cmd(f"{update_cmd} --timeout {timeout}")
+        except (HttpResponseError, AzureResponseError) as error:
+            if not _current_rotation_rejection(error, namespace["id"], endpoint_name):
+                raise
+            return error
+        return None
 
-    first_error = None
-    try:
-        submit()
-    except Exception as error:  # noqa: BLE001 - only recovered when persisted state proves the known race.
-        first_error = error
-
+    first_error = submit()
     for attempt in range(len(_HUB_IDENTITY_ROTATION_BACKOFFS) + 1):
         remaining = deadline - monotonic()
         if remaining <= 0:
@@ -287,17 +361,20 @@ def _update_hub_to_sami_with_recovery(
             break
         state, identity_type = _link_observation(endpoint)
         if state == "Succeeded" and identity_type == "SystemAssigned":
-            _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity)
+            _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, snapshot)
             return endpoint
-        recoverable = _is_identity_rotation_authorization_failure(error=first_error, endpoint=endpoint)
+        recoverable = first_error is not None and _is_identity_rotation_authorization_failure(
+            error=first_error, endpoint=endpoint,
+        )
         if state not in {"Failed", "Succeeded"} or not recoverable:
             if first_error is not None:
                 raise first_error
             raise AssertionError(f"Non-recoverable Hub identity rotation failure: {_link_failure_detail(endpoint)}")
         if attempt == len(_HUB_IDENTITY_ROTATION_BACKOFFS):
             break
-        _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity)
-        _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id)
+        _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, snapshot)
+        snapshot = deepcopy(_link_properties(endpoint))
+        _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id, namespace)
         sleep_for = _HUB_IDENTITY_ROTATION_BACKOFFS[attempt]
         # Never start another mutation that could not be observed within the recovery budget.
         if deadline - monotonic() <= sleep_for:
@@ -305,11 +382,7 @@ def _update_hub_to_sami_with_recovery(
         sleep(sleep_for)
         if int(deadline - monotonic()) < 1:
             break
-        first_error = None
-        try:
-            submit()
-        except Exception as error:  # noqa: BLE001 - recovered only with matching persisted failure evidence.
-            first_error = error
+        first_error = submit()
     raise AssertionError("Hub identity rotation authorization recovery budget exhausted") from first_error
 
 
