@@ -1769,12 +1769,15 @@ def iot_hub_policy_create(cmd, client, hub_name, policy_name, permissions, resou
         raise CLIError("Policy {0} already existed.".format(policy_name))
     policies.append({"keyName": policy_name, "rights": rights})
     hub["properties"]["authorizationPolicies"] = policies
-    return client.iot_hub_resource.begin_create_or_update(
-        resource_group_name=_get_resource_group_from_hub(hub),
-        resource_name=hub_name,
-        iot_hub_description=_hub_description_for_write(hub),
-        **hub_etag_arguments(hub),
+    LongRunningOperation(cmd.cli_ctx)(
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
+        )
     )
+    return iot_hub_policy_list(client, hub_name, _get_resource_group_from_hub(hub))
 
 
 def iot_hub_policy_delete(cmd, client, hub_name, policy_name, resource_group_name=None):
@@ -1785,12 +1788,15 @@ def iot_hub_policy_delete(cmd, client, hub_name, policy_name, resource_group_nam
         raise CLIError("Policy {0} not found.".format(policy_name))
     updated_policies = [p for p in policies if p["keyName"].lower() != policy_name.lower()]
     hub["properties"]["authorizationPolicies"] = updated_policies
-    return client.iot_hub_resource.begin_create_or_update(
-        resource_group_name=_get_resource_group_from_hub(hub),
-        resource_name=hub_name,
-        iot_hub_description=_hub_description_for_write(hub),
-        **hub_etag_arguments(hub),
+    LongRunningOperation(cmd.cli_ctx)(
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=_get_resource_group_from_hub(hub),
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
+        )
     )
+    return iot_hub_policy_list(client, hub_name, _get_resource_group_from_hub(hub))
 
 
 def iot_hub_policy_key_renew(cmd, client, hub_name, policy_name, regenerate_key, resource_group_name=None, no_wait=False):

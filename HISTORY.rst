@@ -6,6 +6,11 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**Hub bug fixes**
+
+* Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
+* Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
+
 **DPS certificate and enrollment fixes**
 
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.

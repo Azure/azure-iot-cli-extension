@@ -251,7 +251,7 @@ def _endpoint_settings(endpoint):
     return settings
 
 
-def _read_authorization_failure(endpoint):
+def _read_authorization_failure(endpoint, endpoint_name):
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     error = status.get("error") or endpoint.get("error") or endpoint.get("linkingError") or {}
     target = endpoint.get("resourceId")
@@ -264,12 +264,21 @@ def _read_authorization_failure(endpoint):
                        target or "", re.IGNORECASE)
     if hub:
         # Hub data-plane RBAC can lag its ARM assignment.
-        messages.add(
+        prefix = (
             f"The namespace's managed identity could not read the device count on hub "
-            f"'{hub[1].lower()}.service.azure-devices.net' because it lacks IoT Hub data-plane read access. "
+            f"'{hub[1].lower()}.service.azure-devices.net'"
+        )
+        suffix = (
+            " because it lacks IoT Hub data-plane read access. "
             "Assign it a role that grants IoT Hub data-plane read (for example IoT Hub Data Reader) on the hub, "
             "then resubmit the request."
         )
+        messages.add(prefix + suffix)
+        if error == {
+            "code": "AdrMiNotAuthorized",
+            "message": f"{prefix} (endpoint '{endpoint_name}' being linked, resource '{target}'){suffix}",
+        }:
+            return True
     # LinkInitiateFailed must always use the production principal/action/scope
     # binding, never this older message-only read-authorization compatibility path.
     return error.get("code") != "LinkInitiateFailed" and error.get("message") in messages
@@ -338,7 +347,7 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
         or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
     )
     if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection:
-        return "read" if _read_authorization_failure(endpoint) else None
+        return "read" if _read_authorization_failure(endpoint, binding.name) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
         or (endpoint.get("provisioningStatus") or {}).get("error")
@@ -394,9 +403,10 @@ def link_with_readiness(
     """Submit once, then recover only a persisted terminal authorization failure.
 
     Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
-    Recovery uses the existing identity-preserving update/preflight. After an
-    accepted update, stale Failed reads cannot trigger another write: observe
-    progress first, or Succeeded. All CLI/read errors propagate unchanged.
+    Bound authorization recovery hands off once to the operation-aware waited
+    update under the remaining deadline. Preview-only fresh-grant envelopes
+    retain no-wait recovery and require observed progress before another write.
+    All CLI/read errors propagate unchanged.
     """
     assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
     section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
@@ -415,8 +425,7 @@ def link_with_readiness(
     assert isinstance(namespace_id, str) and namespace_id.casefold().endswith(expected_path.casefold()), (
         "Namespace snapshot does not match the intended link scope"
     )
-    # Use only LinkRecovery's pure classifier/snapshot, never its mutation loop:
-    # this scenario deliberately exercises no-wait submission and GET readiness.
+    # The initial add still exercises no-wait submission and GET readiness.
     binding = LinkRecovery(
         provider=None, namespace=original, section=section, name=endpoint_name,
         expected=expected, budget=None, verify=None,
@@ -429,7 +438,8 @@ def link_with_readiness(
     budget.call(scenario.cmd, command + " --no-wait")
     submitted_at = budget.clock()
     expected = _endpoint_settings(expected)
-    progressed = True  # The initial add is never replayed.
+    progressed = True
+    waited_recovery = False
     retries = 0
     retry_at = None
     recovered_fresh_grant_error = None
@@ -470,7 +480,7 @@ def link_with_readiness(
             recovery_reason = _authorization_failure(
                 namespace, endpoint, binding, submitted_at=submitted_at, now=budget.clock(),
             )
-            if recovery_reason and progressed:
+            if recovery_reason and progressed and not waited_recovery:
                 if retry_at is None:
                     if recovery_reason == "fresh-grant":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
@@ -483,12 +493,17 @@ def link_with_readiness(
                         "properties": {section: {"endpoints": {endpoint_name: endpoint}}},
                     })
                     assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
-                    budget.call(scenario.cmd, recovery[0] + " --no-wait")
                     if recovery_reason == "fresh-grant":
+                        budget.call(scenario.cmd, recovery[0] + " --no-wait")
                         error = deepcopy(endpoint.get("linkingError"))
                         recovered_fresh_grant_error = (
                             {"code": error["code"]} if error.get("code") == "ResourceMiNotAuthorized" else error
                         )
+                    else:
+                        remaining = int(budget.end - budget.clock())
+                        assert remaining > 0, f"Timed out waiting for {budget.description}: {budget.observation}"
+                        budget.call(scenario.cmd, recovery[0] + f" --timeout {remaining}")
+                        waited_recovery = True
                     retries += 1
                     progressed = False
                     retry_at = None

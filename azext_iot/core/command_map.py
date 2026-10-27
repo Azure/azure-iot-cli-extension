@@ -18,12 +18,6 @@ ROUTE_DEPRECATION_INFO = 'IoT Extension (azure-iot) message-route command group 
 ENDPOINT_DEPRECATION_INFO = 'IoT Extension (azure-iot) message-endpoint command group (az iot hub message-endpoint)'
 
 
-class PolicyUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
-    def __call__(self, poller):
-        result = super().__call__(poller)
-        return result["properties"]["authorizationPolicies"]
-
-
 class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
     def __call__(self, poller):
         result = super().__call__(poller)
@@ -109,8 +103,8 @@ def load_core_commands(self, _):
     with self.command_group('iot hub policy', command_type=core_ops, client_factory=iot_hub_service_factory) as g:
         g.command('list', 'iot_hub_policy_list')
         g.show_command('show', 'iot_hub_policy_get')
-        g.command('create', 'iot_hub_policy_create', transform=PolicyUpdateResultTransform(self.cli_ctx))
-        g.command('delete', 'iot_hub_policy_delete', transform=PolicyUpdateResultTransform(self.cli_ctx))
+        g.command('create', 'iot_hub_policy_create')
+        g.command('delete', 'iot_hub_policy_delete')
         g.command('renew-key', 'iot_hub_policy_key_renew', supports_no_wait=True)
 
     # iot hub routing endpoint commands
