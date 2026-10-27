@@ -857,6 +857,18 @@ def test_su_recovery_supports_mixed_inbound_and_outbound_identity_types(mocker, 
     assert len(h.patches) == 2
 
 
+def test_hub_default_population_is_not_allowed_on_dps_endpoints(mocker):
+    h = Harness(mocker, "dps")
+    recovery = LinkRecovery(h.provider, h.namespace, "provisioning", "dps", h.body, None, None)
+    current = deepcopy(h.namespace)
+    endpoint = {**deepcopy(h.body), "linkingState": "InProgress"}
+    current["properties"].update(provisioningState="Updating", provisioning={"endpoints": {"dps": endpoint}})
+    recovery.inspect(current)
+    endpoint["provisioning"] = {"availability": "Available", "allocationWeight": 1}
+    with pytest.raises(AzureResponseError, match="changed"):
+        recovery.inspect(current)
+
+
 @pytest.mark.parametrize("change", ["delete", "target", "identity", "state"])
 def test_hub_recovery_requires_original_succeeded_dps_dependency(mocker, change):
     h = Harness(mocker, "hub")

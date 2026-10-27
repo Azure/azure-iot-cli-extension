@@ -59,7 +59,7 @@ class TestResolveLinkedHubHostname:
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub, "classic") == "hub.azure-devices.net"
 
-    def test_default_is_auto(self):
+    def test_default_uses_device_hostname_with_classic_fallback(self):
         hub = {"properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"}}
         assert _resolve_linked_hub_hostname(hub) == "hub.device.azure-devices.net"
         hub_v1 = {"properties": {"hostName": "hub.azure-devices.net"}}
