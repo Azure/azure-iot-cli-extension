@@ -240,9 +240,12 @@ Plan has passed on its Linux and Windows images; this does not qualify the
 full release matrix, integration run, or publication path. Keep the existing
 shared pool's images, defaults, and warm-agent allocation unchanged.
 
-Keep the pipeline
-definition on reviewed `dev`; `sourceBranch` independently selects `dev`,
-`preview`, or `release/1.1.0-preview`. The Resolve stage captures that branch's
+For publication, run the pipeline automation from reviewed `dev`;
+`sourceBranch` independently selects `dev`, `preview`, or `release/1.1.0-preview`.
+Nonpublishing `Plan` and `Validate` also accept feature branches, so migration
+changes can be qualified before merging. Feature-branch candidates cannot be
+published, even when the automation runs from `dev`.
+The Resolve stage captures the selected branch's
 latest commit once; no commit-SHA input is required. Every job uses that same
 source commit even if the branch advances, while receipts also record the separate automation
 commit. Selected source branches must first receive the pipeline 147 migration

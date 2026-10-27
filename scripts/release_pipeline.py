@@ -63,8 +63,10 @@ def commit(value):
 
 def branch(value):
     value = value.removeprefix("refs/heads/")
-    if value not in BRANCHES:
-        raise ValueError("Source branch is not an approved release source.")
+    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", value) or value.startswith("refs/")
+            or any(part in value for part in ("..", "//", "@{"))
+            or value.endswith(("/", ".", ".lock"))):
+        raise ValueError("Source must be a safe branch name, not a tag or revision expression.")
     return f"refs/heads/{value}"
 
 
@@ -414,6 +416,8 @@ def verify_integration_artifacts(directory, artifacts):
 
 
 def automation_allowed():
+    if branch(environment("RELEASE_SOURCE_BRANCH")).removeprefix("refs/heads/") not in BRANCHES:
+        raise ValueError("Publication requires an approved protected source branch.")
     if environment("BUILD_SOURCEBRANCH") != "refs/heads/dev":
         raise ValueError("Publication requires the reviewed release automation on dev, not a feature branch.")
     if environment("BUILD_REPOSITORY_NAME") != REPOSITORY:

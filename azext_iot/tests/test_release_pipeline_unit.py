@@ -94,19 +94,24 @@ def test_invalid_identifiers(value):
         release.identifier(value)
 
 
-@pytest.mark.parametrize("value", ["feature/test", "refs/tags/v1", "dev;echo bad", "dev\n"])
-def test_unapproved_source_branches(value):
+@pytest.mark.parametrize("value", [
+    "refs/tags/v1", "refs/pull/1/head", "dev;echo bad", "dev\n", "../dev", "dev//test", "dev.lock", "-dev",
+])
+def test_invalid_source_branches(value):
     with pytest.raises(ValueError):
         release.branch(value)
 
 
-def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys):
+@pytest.mark.parametrize("source", ["release/1.1.0-preview", "users/test/release-validation"])
+def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys, source):
     monkeypatch.setenv("RELEASE_MODE", "Plan")
+    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
     monkeypatch.delenv("RELEASE_GITHUB_TOKEN")
     monkeypatch.delenv("SYSTEM_ACCESSTOKEN", raising=False)
     monkeypatch.setattr(sys, "argv", ["release_pipeline.py", "plan"])
     release.main()
     result = json.loads(capsys.readouterr().out)
+    assert result["sourceBranch"] == "refs/heads/" + source
     assert result["integrationPipeline"] == 147
     assert "no qualification" in result["mode"]
     release.ado.assert_not_called()
@@ -132,9 +137,15 @@ def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkey
     release.github.assert_not_called()
 
 
-def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(candidate, tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("mode,source", [
+    ("Release", "release/1.1.0-preview"), ("Validate", "users/test/release-validation"),
+])
+def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
+        candidate, tmp_path, monkeypatch, capsys, mode, source):
+    monkeypatch.setenv("RELEASE_MODE", mode)
+    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
     repository = tmp_path / "source-repository"
-    release.subprocess.run(["git", "init", "--quiet", "--initial-branch=release/1.1.0-preview", str(repository)],
+    release.subprocess.run(["git", "init", "--quiet", "--initial-branch=" + source, str(repository)],
                            check=True)
     for relative in (
         ".azure-devops/templates/integration-service.yml", ".azure-devops/integration_tests.yml",
@@ -175,7 +186,20 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(candidat
     downstream = tmp_path / "downstream"
     assert release.checkout(downstream) == resolved
     assert (downstream / "scripts/select-openssl.sh").read_text(encoding="utf-8") == "releaseBuildId\n"
-    assert fetches == ["refs/heads/release/1.1.0-preview", resolved]
+    assert fetches == ["refs/heads/" + source, resolved]
+
+
+def test_feature_candidate_cannot_be_resolved_or_published_in_release_mode(candidate, tmp_path, monkeypatch):
+    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", "users/test/release-validation")
+    with pytest.raises(ValueError, match="protected source branch"):
+        release.checkout(tmp_path / "checkout", resolving=True)
+    assert not (tmp_path / "checkout").exists()
+    with pytest.raises(ValueError, match="protected source branch"):
+        release.publish(candidate[0], tmp_path / "release.json", tmp_path / "publication.json")
+    monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "true")
+    with pytest.raises(ValueError, match="protected source branch"):
+        release.index_pull_request(candidate[0], tmp_path / "receipt", tmp_path / "work", tmp_path / "publication.json")
+    release.github.assert_not_called()
 
 
 def test_downstream_checkout_requires_internal_resolved_commit(candidate, tmp_path, monkeypatch):
