@@ -391,12 +391,12 @@ def load_arguments(self, _):
             default=HostnameType.AUTO.value,
             is_preview=True,
             help="Type of hostname to use as the SAS token audience. "
-            "'auto' uses the device hostname for device/module-scoped tokens "
+            "'auto' (default) uses the device hostname for device/module-scoped tokens "
             "and the service hostname for hub-scoped tokens. "
             "'classic' always uses the default hostname. "
             "'device' uses the device hostname (errors on non-GWv2 hubs). "
             "'service' uses the service hostname (errors on non-GWv2 hubs). "
-            "This option cannot be combined with --connection-string; when "
+            "Only 'auto' can be used with --connection-string; when "
             "--connection-string is supplied, the SAS audience is derived "
             "from its HostName.",
         )

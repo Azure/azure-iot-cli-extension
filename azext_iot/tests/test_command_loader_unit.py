@@ -581,6 +581,31 @@ def test_namespace_device_command_names(command_table):
     assert not any(name.startswith("iot adr ns registry-device") for name in command_table)
 
 
+@pytest.mark.parametrize("action", ["create", "update", "show"])
+def test_dps_group_help_describes_hidden_keys(loader, command_table, monkeypatch, action):
+    from azext_iot._help import helps
+
+    command = f"iot dps enrollment-group {action}"
+    monkeypatch.setattr(loader, "skip_applicability", True)
+    loader.load_arguments(command)
+    AzCommandsLoader.load_arguments(loader, command)
+    assert "Hidden by default." in command_table[command].arguments["show_keys"].options["help"]
+    if action != "show":
+        summary = yaml.safe_load(helps[command])["long-summary"]
+        assert "hidden by default. Use --show-keys to include" in summary
+        assert "shown by default" not in summary
+
+
+def test_sas_hostname_help_limits_connection_strings_to_auto(loader, command_table, monkeypatch):
+    command = "iot hub generate-sas-token"
+    monkeypatch.setattr(loader, "skip_applicability", True)
+    loader.load_arguments(command)
+    AzCommandsLoader.load_arguments(loader, command)
+    description = command_table[command].arguments["hostname_type"].options["help"]
+    assert "Only 'auto' can be used with --connection-string" in description
+    assert "from its HostName" in description
+
+
 def test_command_table_loads(command_table):
     # The extension should register a non-trivial number of commands.
     assert command_table

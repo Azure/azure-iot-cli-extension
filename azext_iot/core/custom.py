@@ -686,7 +686,7 @@ def iot_dps_linked_hub_update(
         if authentication_type != IotHubAuthenticationType.KEY_BASED.value:
             target_entry["connectionString"] = ""
 
-    target_auth = target_entry["authenticationType"]
+    target_auth = target_entry.get("authenticationType", IotHubAuthenticationType.KEY_BASED.value)
     if connection_string and target_auth != IotHubAuthenticationType.KEY_BASED.value:
         raise MutuallyExclusiveArgumentError(
             "--connection-string only applies to KeyBased authentication. "

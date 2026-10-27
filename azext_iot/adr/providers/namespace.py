@@ -471,6 +471,7 @@ class NamespaceProvider(ADRProvider):
         raise AzureResponseError(
             f"{summary}\nNamespace deletion does not cascade. Delete the child resources "
             f"before retrying namespace deletion:\n"
+            f"  az iot adr ns device delete --ns {namespace_name} -g <rg> -n <device>\n"
             f"  az iot adr ns job run delete --ns {namespace_name} -g <rg> "
             f"--job-name <job> --run-name <run>\n"
             f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"

@@ -429,14 +429,39 @@ class TestLinkedHubUpdate:
         )
         assert existing_entries[0]["allocationWeight"] == 5
 
-    def test_no_mutation_params_errors(self, fixture_cmd, mock_deps):
-        """Identifier alone (no mutation flags) must error rather than issuing a no-op PUT
-        that could clobber concurrent changes."""
+    @pytest.mark.parametrize("legacy", [False, True])
+    def test_no_mutation_params_errors(self, fixture_cmd, mock_deps, existing_entries, legacy):
+        from copy import deepcopy
         from azext_iot.core.custom import iot_dps_linked_hub_update
+        if legacy:
+            existing_entries[0].pop("authenticationType")
+        original = deepcopy(existing_entries)
         with pytest.raises(RequiredArgumentMissingError, match="at least one update parameter"):
             iot_dps_linked_hub_update(
                 cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="myhub",
             )
+        assert existing_entries == original
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_not_called()
+
+    @pytest.mark.parametrize("changes,field,value", [
+        ({"allocation_weight": 7}, "allocationWeight", 7),
+        (
+            {"connection_string": "HostName=myhub.azure-devices.net;SharedAccessKeyName=service;SharedAccessKey=rotated"},
+            "connectionString", "HostName=myhub.azure-devices.net;SharedAccessKeyName=service;SharedAccessKey=rotated",
+        ),
+    ])
+    def test_legacy_keybased_link_updates(self, fixture_cmd, mock_deps, existing_entries, changes, field, value):
+        from copy import deepcopy
+        from azext_iot.core.custom import iot_dps_linked_hub_update
+
+        existing_entries[0].pop("authenticationType")
+        expected = deepcopy(existing_entries)
+        expected[0][field] = value
+        iot_dps_linked_hub_update(
+            cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="myhub", **changes,
+        )
+        assert existing_entries == expected
+        mock_deps.iot_dps_resource.begin_create_or_update.assert_called_once()
 
     def test_keybased_refresh_preserves_existing_policy(self, fixture_cmd, mock_deps, existing_entries, mocker):
         """Re-fetching the key on a KeyBased link must reuse the EXISTING policy (e.g., 'service'
