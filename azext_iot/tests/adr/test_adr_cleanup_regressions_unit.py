@@ -8,7 +8,7 @@ import shlex
 import sys
 import traceback
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
@@ -17,7 +17,7 @@ from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from knack.util import CLIError
 
-from azext_iot.tests.adr import test_adr_certificate_authority_int as ca_scenario
+from azext_iot.tests.adr import _helpers as helpers, test_adr_certificate_authority_int as ca_scenario
 from azext_iot.tests.adr import test_adr_registry_device_int as registry_scenario
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
@@ -307,8 +307,10 @@ def test_absence_wait_requires_actual_absence_and_does_not_retry_read_errors():
     assert scenario.cmd.call_count == 2
 
     scenario.cmd = Mock(return_value=Mock())
-    with pytest.raises(AssertionError, match="resource is still readable"):
-        wait_for_resource_absent(scenario, "show child", timeout=0)
+    with patch.object(helpers.time, "monotonic", side_effect=[0, 0, 1]), pytest.raises(
+        AssertionError, match="resource is still readable",
+    ):
+        wait_for_resource_absent(scenario, "show child", timeout=1)
 
     for status in (403, 502):
         error = HttpResponseError(message="ResourceNotFound 404")
@@ -413,10 +415,13 @@ class CertificateScenario:
 @pytest.fixture(params=["allowed", "absent", "persisted-rejection"])
 def certificate_scenario(monkeypatch, request):
     monkeypatch.setattr(ca_scenario, "generate_adr_namespace_name", lambda: "owned-namespace")
-    monkeypatch.setattr(
-        ca_scenario, "wait_for_resource_absent",
-        lambda test, command: wait_for_resource_absent(test, command, timeout=0, interval=0),
-    )
+    original_wait = helpers.wait_for_condition
+
+    def wait(*args, **kwargs):
+        kwargs.update(timeout=None, max_attempts=1)
+        return original_wait(*args, **kwargs)
+
+    monkeypatch.setattr(helpers, "wait_for_condition", wait)
     return CertificateScenario(request.param)
 
 

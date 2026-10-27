@@ -131,7 +131,7 @@ class LinkRecovery:
 
     def __init__(
         self, provider, namespace, section, name, expected, budget, verify, *,
-        authorization_request=None, recent_grants=False,
+        authorization_request=None, recent_grants=False, recent_inbound_grant=False,
     ):
         self.provider, self.section, self.name = provider, section, name
         self.kind = {"provisioning": "dps", "messaging": "hub"}[section]
@@ -139,6 +139,7 @@ class LinkRecovery:
         self.namespace_identity = _namespace_identity(namespace)
         self.authorization_request = deepcopy(authorization_request)
         self.recent_grants, self.retries = recent_grants, 0
+        self.recent_inbound_grant = recent_inbound_grant
         self.snapshot = None
         previous = ((namespace.get("properties") or {}).get(section) or {}).get("endpoints", {}).get(name)
         self.previous = _normalized(endpoint_update_body(previous)) if isinstance(previous, dict) else None
@@ -234,7 +235,7 @@ class LinkRecovery:
         if not self.recent_grants or self.retries >= PROPAGATION_RETRIES:
             return False
         if self.kind == "dps" and error == _DPS_INBOUND_AUTHORIZATION_ERROR:
-            return True
+            return self.recent_inbound_grant
         message = error.get("message")
         match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
         return bool(

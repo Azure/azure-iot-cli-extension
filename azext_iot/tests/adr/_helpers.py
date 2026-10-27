@@ -290,7 +290,7 @@ def wait_for_condition(
     last_value = None
     last_error = None
 
-    while True:
+    while deadline is None or clock() < deadline:
         attempts += 1
         try:
             value = fetch()
@@ -302,7 +302,9 @@ def wait_for_condition(
             last_value = value
             last_error = None
             if is_success(value):
-                return value
+                if deadline is None or clock() < deadline:
+                    return value
+                break
             if is_terminal_failure and is_terminal_failure(value):
                 detail = describe(value) if describe else type(value).__name__
                 raise AssertionError(
@@ -315,26 +317,24 @@ def wait_for_condition(
         )
         time_exhausted = deadline is not None and clock() >= deadline
         if attempts_exhausted or time_exhausted:
-            if last_error is not None:
-                detail = f"last error: {last_error}"
-            elif last_value is not None:
-                observation = (
-                    describe(last_value)
-                    if describe
-                    else type(last_value).__name__
-                )
-                detail = f"last observation: {observation}"
-            else:
-                detail = "no observation"
-            raise AssertionError(
-                f"Timed out waiting for {description} after {attempts} "
-                f"attempt(s) ({detail})."
-            )
+            break
 
         sleep_for = interval
         if deadline is not None:
             sleep_for = min(interval, max(0, deadline - clock()))
         sleeper(sleep_for)
+
+    if last_error is not None:
+        detail = f"last error: {last_error}"
+    elif last_value is not None:
+        observation = describe(last_value) if describe else type(last_value).__name__
+        detail = f"last observation: {observation}"
+    else:
+        detail = "no observation"
+    raise AssertionError(
+        f"Timed out waiting for {description} after {attempts} "
+        f"attempt(s) ({detail})."
+    )
 
 
 def wait_for_resource_succeeded(

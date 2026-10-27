@@ -431,6 +431,39 @@ def test_dps_inbound_denial_has_bounded_recovery(mocker):
     assert h.clock.delays == [30, 60]
 
 
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("fresh_principal", ["namespace", "linked", "namespace_system"])
+def test_dps_inbound_denial_requires_its_own_fresh_grant(mocker, identity, fresh_principal):
+    planned = _harness(mocker, "dps", identity, "update")
+    planned.outcomes = ["success"]
+    planned.run()
+    request = next(iter(planned.provider._link_requests.values()))[0]
+
+    h = _harness(mocker, "dps", identity, "update")
+    fresh = []
+    for rule, assignment in required_assignments(request):
+        if rule.principal == fresh_principal:
+            fresh.append(assignment)
+        else:
+            principal, role, scope = assignment
+            h.assignments.append({
+                "principalId": principal, "scope": scope,
+                "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[role],
+            })
+    h.denial = deepcopy(INBOUND_DENIAL)
+    if fresh_principal == "linked":
+        result = h.run(timeout_sec=300, wait_sec=1)
+        assert result["properties"]["provisioning"]["endpoints"]["dps"]["linkingState"] == "Succeeded"
+        assert len(h.patches) == 2
+        assert h.clock.delays == [30]
+    else:
+        with pytest.raises(ADRResourceStateError, match="ResourceMiNotAuthorized"):
+            h.run(timeout_sec=300, wait_sec=1)
+        assert len(h.patches) == 1
+        assert not h.clock.delays
+    assert h.created == fresh
+
+
 @pytest.mark.parametrize("mutation", ["hub", "old-grants", "other-grants", "code", "message", "details"])
 def test_dps_inbound_denial_does_not_broaden_recovery(mocker, mutation):
     h = _harness(mocker, "hub" if mutation == "hub" else "dps", action="update")

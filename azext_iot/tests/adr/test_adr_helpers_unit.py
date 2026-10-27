@@ -276,7 +276,11 @@ def test_resource_not_found_error_recognizes_only_hub_show_absence(message, expe
 def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
     observations = iter([{"state": "Creating"}, {"state": "Succeeded"}])
     sleeps = []
-    clock_values = iter([0, 0, 1, 1])
+    now = [0]
+
+    def sleep(delay):
+        sleeps.append(delay)
+        now[0] += delay
 
     result = wait_for_condition(
         lambda: next(observations),
@@ -285,8 +289,8 @@ def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
         timeout=5,
         interval=1,
         describe=lambda value: f"state={value['state']}",
-        clock=lambda: next(clock_values),
-        sleeper=sleeps.append,
+        clock=lambda: now[0],
+        sleeper=sleep,
     )
 
     assert result == {"state": "Succeeded"}
@@ -324,7 +328,7 @@ def test_wait_for_condition_reports_last_retryable_error():
 
 
 def test_wait_for_condition_reports_elapsed_timeout():
-    clock_values = iter([0, 2])
+    clock_values = iter([0, 0, 2])
     with pytest.raises(AssertionError, match="last observation: state=Creating"):
         wait_for_condition(
             lambda: {"state": "Creating"},
@@ -336,6 +340,68 @@ def test_wait_for_condition_reports_elapsed_timeout():
             clock=lambda: next(clock_values),
             sleeper=lambda _: None,
         )
+
+
+@pytest.mark.parametrize("elapsed", [1, 2])
+def test_wait_for_condition_rejects_late_write_success_without_replay(elapsed):
+    now = [0]
+
+    def submit():
+        now[0] = elapsed
+        return {"state": "Succeeded"}
+
+    write, cleanup_resource = Mock(side_effect=submit), Mock()
+    with pytest.raises(AssertionError, match="Timed out.*last observation: state=Succeeded"):
+        with CleanupLedger() as cleanup:
+            cleanup.register("owned fixture", cleanup_resource)
+            wait_for_condition(
+                write, lambda value: value["state"] == "Succeeded",
+                description="owned fixture creation", timeout=1,
+                describe=lambda value: f"state={value['state']}", clock=lambda: now[0],
+            )
+    write.assert_called_once()
+    cleanup_resource.assert_called_once()
+
+
+@pytest.mark.parametrize("oversleep", [0, 0.25])
+def test_wait_for_condition_never_fetches_at_or_after_deadline(oversleep):
+    now, delays = [0], []
+    fetch = Mock(side_effect=[False, True])
+
+    def sleep(delay):
+        delays.append(delay)
+        now[0] += delay + oversleep
+
+    with pytest.raises(AssertionError, match="Timed out.*after 1 attempt"):
+        wait_for_condition(
+            fetch, bool, description="readiness", timeout=1, interval=5,
+            clock=lambda: now[0], sleeper=sleep,
+        )
+    fetch.assert_called_once()
+    assert delays == [1]
+
+
+def test_wait_for_condition_does_not_fetch_with_an_expired_budget():
+    fetch = Mock(return_value=True)
+    with pytest.raises(AssertionError, match="after 0 attempt"):
+        wait_for_condition(fetch, bool, description="readiness", timeout=0, clock=lambda: 0)
+    fetch.assert_not_called()
+
+
+def test_wait_for_condition_preserves_late_permanent_error():
+    now = [0]
+    failure = RuntimeError("permanent failure")
+
+    def fetch():
+        now[0] = 2
+        raise failure
+
+    with pytest.raises(RuntimeError) as raised:
+        wait_for_condition(
+            fetch, bool, description="readiness", timeout=1,
+            clock=lambda: now[0], is_retryable_error=lambda _error: False,
+        )
+    assert raised.value is failure
 
 
 def test_wait_for_materialized_resources_retries_empty_collection():
@@ -378,8 +444,10 @@ def test_wait_for_listed_resource_times_out_without_skipping():
     test = Mock()
     test.cmd.return_value.get_output_in_json.return_value = [{"name": "old"}]
 
-    with pytest.raises(AssertionError, match="expected resource absent"):
-        wait_for_listed_resource(test, "list resources", "new", timeout=0)
+    with patch.object(subject.time, "monotonic", side_effect=[0, 0, 1]), pytest.raises(
+        AssertionError, match="expected resource absent",
+    ):
+        wait_for_listed_resource(test, "list resources", "new", timeout=1)
     test.cmd.assert_called_once_with("list resources")
 
 
