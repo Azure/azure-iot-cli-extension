@@ -11,7 +11,9 @@ import pytest
 from azure.core.credentials import AzureKeyCredential
 
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
-from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
+from azext_iot.sdk.deviceupdate.duregistry import (
+    DeviceRegistrySoftwareUpdateMgmtClient,
+)
 from azext_iot.sdk.deviceupdate.duregistrydata import (
     DeviceRegistrySoftwareUpdateClient,
 )
@@ -53,11 +55,13 @@ def test_preview_control_client_names_versions_and_operation_groups():
         ),
         (
             IotDpsClient(credential, subscription, endpoint),
-            "2026-06-01-preview",
+            "2026-11-01",
             ("iot_dps_resource", "dps_certificate"),
         ),
         (
-            DeviceUpdateClient(credential, subscription, endpoint),
+            DeviceRegistrySoftwareUpdateMgmtClient(
+                credential, subscription, endpoint
+            ),
             "2026-11-02-preview",
             ("update_instances",),
         ),

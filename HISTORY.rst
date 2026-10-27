@@ -3,6 +3,28 @@
 Release History
 ===============
 
+1.1.0b1 (Preview)
++++++++++++++++++
+
+**DPS certificate and enrollment fixes**
+
+* Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
+* Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
+
+**ADR unlink polling**
+
+* Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
+* Operation-status and final namespace GETs retain SDK retries for transient failures; retry suppression applies only to the initial namespace read and PUT.
+* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint, retains the unlink Reader grant, and does not retry the namespace PUT.
+
+**Wait command bug fixes**
+
+* Digital Twins, Device Update, and Device Registry schema, schema registry, and schema version generic wait commands now report an error and exit nonzero when their condition times out, instead of returning successful empty JSON. Wait conditions and polling behavior are unchanged.
+
+**ADR bug fixes**
+
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
+
 1.0.0b2 (Preview)
 +++++++++++++++++
 

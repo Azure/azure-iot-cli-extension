@@ -6,7 +6,11 @@
 
 from typing import Optional
 from knack.log import get_logger
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import (
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
+    ResourceNotFoundError,
+)
 from azure.cli.core.commands import LongRunningOperation
 from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.iothub.common import RouteSourceType
@@ -15,6 +19,18 @@ from azure.core.exceptions import HttpResponseError
 
 
 logger = get_logger(__name__)
+
+
+def _validate_data_schema_ref(
+    data_schema_ref: Optional[str] = None,
+    remove_data_schema_ref: bool = False,
+):
+    if data_schema_ref is not None and remove_data_schema_ref:
+        raise MutuallyExclusiveArgumentError(
+            "--data-schema-ref and --remove-data-schema-ref cannot be used together."
+        )
+    if data_schema_ref == "":
+        raise InvalidArgumentValueError("--data-schema-ref cannot be empty.")
 
 
 class MessageRoute(IoTHubProvider):
@@ -33,16 +49,19 @@ class MessageRoute(IoTHubProvider):
         endpoint_name: str,
         enabled: bool = True,
         condition: str = "true",
+        data_schema_ref: Optional[str] = None,
     ):
-        self.hub_resource["properties"]["routing"]["routes"].append(
-            {
-                "source": source_type,
-                "name": route_name,
-                "endpointNames": endpoint_name.split(),
-                "condition": condition,
-                "isEnabled": enabled
-            }
-        )
+        _validate_data_schema_ref(data_schema_ref)
+        route = {
+            "source": source_type,
+            "name": route_name,
+            "endpointNames": endpoint_name.split(),
+            "condition": condition,
+            "isEnabled": enabled,
+        }
+        if data_schema_ref is not None:
+            route["dataSchema"] = data_schema_ref
+        self.hub_resource["properties"]["routing"]["routes"].append(route)
 
         try:
             return self._begin_hub_update()
@@ -56,12 +75,19 @@ class MessageRoute(IoTHubProvider):
         endpoint_name: Optional[str] = None,
         enabled: Optional[bool] = None,
         condition: Optional[str] = None,
+        data_schema_ref: Optional[str] = None,
+        remove_data_schema_ref: bool = False,
     ):
+        _validate_data_schema_ref(data_schema_ref, remove_data_schema_ref)
         route = self.show(route_name=route_name)
         route["source"] = route["source"] if source_type is None else source_type
         route["endpointNames"] = route["endpointNames"] if endpoint_name is None else endpoint_name.split()
         route["condition"] = route["condition"] if condition is None else condition
         route["isEnabled"] = route["isEnabled"] if enabled is None else enabled
+        if data_schema_ref is not None:
+            route["dataSchema"] = data_schema_ref
+        elif remove_data_schema_ref:
+            route.pop("dataSchema", None)
 
         try:
             return self._begin_hub_update()

@@ -6,9 +6,11 @@
 
 import pytest
 from azure.cli.core.azclierror import (
-    BadRequestError, InvalidArgumentValueError, RequiredArgumentMissingError, ResourceNotFoundError,
+    BadRequestError, CLIInternalError, ForbiddenError, InvalidArgumentValueError,
+    RequiredArgumentMissingError, ResourceNotFoundError,
 )
 from azure.core import MatchConditions
+from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 
 from azext_iot.core import custom
@@ -42,6 +44,57 @@ def test_certificate_operations_use_preview_contract(mocker, preview_mgmt, kind,
     result = getattr(custom, f"iot_{kind}_certificate_{action}")(client, kind, **arguments)
     assert result is method.return_value
     method.assert_called_once_with(**expected)
+
+
+@pytest.mark.parametrize("action", ["gen_code", "verify"])
+@pytest.mark.parametrize("status", [401, 403, 404, 429, 500])
+def test_dps_certificate_etag_read_failure_does_not_write(mocker, preview_mgmt, action, status):
+    _, client, _, _, _ = preview_mgmt
+    error = HttpResponseError(message="Certificate read failed")
+    error.status_code = status
+    client.dps_certificate.get.side_effect = error
+    mocker.patch.object(custom, "open_certificate", return_value="proof-pem")
+    arguments = {"certificate_path": "proof.pem"} if action == "verify" else {}
+
+    with pytest.raises(ForbiddenError if status == 403 else HttpResponseError) as raised:
+        getattr(custom, f"iot_dps_certificate_{action}")(client, "dps", "cert", **arguments)
+
+    if status == 403:
+        assert "Certificate read failed" in str(raised.value)
+        assert "--etag" in str(raised.value)
+        assert "Microsoft.Devices/provisioningServices/certificates/read" in str(raised.value)
+        assert raised.value.__cause__ is error
+    else:
+        assert raised.value is error
+    client.dps_certificate.get.assert_called_once_with(
+        resource_group_name="rg", provisioning_service_name="dps", certificate_name="cert",
+    )
+    client.dps_certificate.generate_verification_code.assert_not_called()
+    client.dps_certificate.verify_certificate.assert_not_called()
+
+
+@pytest.mark.parametrize("action", ["gen_code", "verify"])
+@pytest.mark.parametrize("certificate", [{}, {"etag": None}, {"etag": ""}, {"etag": " "}, {"etag": "*"}, {"etag": 1}])
+def test_dps_certificate_missing_etag_does_not_write(mocker, preview_mgmt, action, certificate):
+    _, client, _, _, _ = preview_mgmt
+    client.dps_certificate.get.return_value = certificate
+    mocker.patch.object(custom, "open_certificate", return_value="proof-pem")
+    arguments = {"certificate_path": "proof.pem"} if action == "verify" else {}
+    with pytest.raises(CLIInternalError, match="usable ETag.*--etag"):
+        getattr(custom, f"iot_dps_certificate_{action}")(client, "dps", "cert", **arguments)
+    client.dps_certificate.generate_verification_code.assert_not_called()
+    client.dps_certificate.verify_certificate.assert_not_called()
+
+
+@pytest.mark.parametrize("action", ["gen_code", "verify"])
+@pytest.mark.parametrize("etag", ["", " "])
+def test_dps_certificate_empty_explicit_etag_does_not_read_or_write(mocker, preview_mgmt, action, etag):
+    _, client, _, _, _ = preview_mgmt
+    mocker.patch.object(custom, "open_certificate", return_value="proof-pem")
+    arguments = {"certificate_path": "proof.pem"} if action == "verify" else {}
+    with pytest.raises(InvalidArgumentValueError, match="--etag must not be empty"):
+        getattr(custom, f"iot_dps_certificate_{action}")(client, "dps", "cert", etag=etag, **arguments)
+    assert not client.dps_certificate.mock_calls
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])

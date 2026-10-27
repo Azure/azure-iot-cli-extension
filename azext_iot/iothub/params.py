@@ -9,7 +9,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
+from azext_iot.iothub.common import EncodingFormat, EndpointType, MessagePayloadFormat, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -487,6 +487,14 @@ def load_iothub_arguments(self, _):
                 options_list=["--connection-string", "-c"],
                 help="Connection string of the routing endpoint.",
             )
+            context.argument(
+                "message_format",
+                options_list=["--message-format"],
+                arg_type=get_enum_type(MessagePayloadFormat),
+                help="Message payload format delivered to the endpoint for Semantic Model integration. "
+                '"None" preserves the original payload; "DOObservationV1" requests backend formatting as '
+                "com.do.telemetry.observation.v1.",
+            )
 
         with self.argument_context(f"iot hub message-endpoint {endpoint_op} storage-container") as context:
             context.argument(
@@ -720,6 +728,28 @@ def load_iothub_arguments(self, _):
             arg_type=get_enum_type(RouteSourceType),
             options_list=["--source-type", "--type", "-t"],
             help="Source of the route.",
+        )
+
+    for command in (
+        "iot hub message-route create",
+        "iot hub message-route update",
+    ):
+        with self.argument_context(command) as context:
+            context.argument(
+                "data_schema_ref",
+                options_list=["--data-schema-ref"],
+                help=(
+                    "Data schema reference used for Semantic Model integration. "
+                    "Non-empty values are passed through as-is."
+                ),
+            )
+
+    with self.argument_context("iot hub message-route update") as context:
+        context.argument(
+            "remove_data_schema_ref",
+            options_list=["--remove-data-schema-ref"],
+            action="store_true",
+            help="Remove the Semantic Model data schema reference from the route.",
         )
 
     with self.argument_context("iot hub message-route test") as context:

@@ -141,6 +141,11 @@ class EndpointType(Enum):
         return list(map(lambda c: c.value, cls))
 
 
+class MessagePayloadFormat(Enum):
+    None_ = "None"
+    DOObservationV1 = "DOObservationV1"
+
+
 class HubAspects(Enum):
     """
     Hub aspects to import or export.

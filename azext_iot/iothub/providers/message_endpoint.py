@@ -76,6 +76,7 @@ class MessageEndpoint(IoTHubProvider):
         partition_key_name: Optional[str] = None,
         partition_key_template: Optional[str] = None,
         identity: Optional[str] = None,
+        message_format: Optional[str] = None,
         workspace_id: Optional[str] = None,
         eventstream_id: Optional[str] = None,
         source_id: Optional[str] = None,
@@ -115,6 +116,8 @@ class MessageEndpoint(IoTHubProvider):
             "endpointUri": endpoint_uri,
             "identity": endpoint_identity
         }
+        if message_format is not None:
+            new_endpoint["messagePayloadFormat"] = message_format
         fetch_connection_string = identity is None and not connection_string
 
         endpoints = self.hub_resource["properties"]["routing"]["endpoints"]
@@ -256,6 +259,8 @@ class MessageEndpoint(IoTHubProvider):
                 "eventStreamId": eventstream_id,
                 "sourceId": source_id,
             }
+            if message_format is not None:
+                es_endpoint["messagePayloadFormat"] = message_format
             endpoints["eventStreams"].append(es_endpoint)
 
         try:
@@ -281,6 +286,7 @@ class MessageEndpoint(IoTHubProvider):
         partition_key_name: Optional[str] = None,
         partition_key_template: Optional[str] = None,
         identity: Optional[str] = None,
+        message_format: Optional[str] = None,
         workspace_id: Optional[str] = None,
         eventstream_id: Optional[str] = None,
         source_id: Optional[str] = None,
@@ -303,6 +309,8 @@ class MessageEndpoint(IoTHubProvider):
         if endpoint_uri:
             # Handle this later with cosmos db connection string parsing
             original_endpoint["endpointUri"] = endpoint_uri
+        if message_format is not None:
+            original_endpoint["messagePayloadFormat"] = message_format
 
         # Identity/Connection String schenanigans
         # If Identity and Connection String args are provided, Identity wins

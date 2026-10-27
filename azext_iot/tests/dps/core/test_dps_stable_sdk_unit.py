@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Retained wire tests against the real, synchronous June DPS management SDK."""
+"""Retained wire tests against the real, synchronous DPS 2026-11-01 management SDK."""
 
 import base64
 from copy import deepcopy
@@ -62,7 +62,7 @@ def dps_resource():
 def assert_stable_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-06-01-preview"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-01"]
 
 
 @pytest.mark.parametrize(
@@ -267,6 +267,42 @@ def test_certificate_stale_etag_raises_sdk_error(stable_client, mocked_response)
     with pytest.raises(ResourceModifiedError, match="etag is stale"):
         custom.iot_dps_certificate_delete(stable_client, "test-dps", "test-cert", '"stale"', "test-rg")
     assert mocked_response.calls[0].request.headers["If-Match"] == '"stale"'
+    assert_stable_requests(mocked_response)
+
+
+@pytest.mark.parametrize("action,suffix", [("gen_code", "generateVerificationCode"), ("verify", "verify")])
+@pytest.mark.parametrize("etag", [None, '"explicit-etag"', "*"])
+@pytest.mark.parametrize("status", [200, 412])
+def test_certificate_verification_optional_etag_wire_contract(
+    stable_client, mocked_response, mocker, action, suffix, etag, status,
+):
+    current_etag = '"current-etag"'
+    if etag is None:
+        mocked_response.add("GET", CERTIFICATE_URL, json={"name": "test-cert", "etag": current_etag})
+    response = (
+        {"name": "test-cert", "etag": '"new-etag"', "properties": {"isVerified": True}}
+        if status == 200 else {"error": {"code": "PreconditionFailed", "message": "Certificate changed."}}
+    )
+    mocked_response.add("POST", f"{CERTIFICATE_URL}/{suffix}", status=status, json=response)
+    mocker.patch.object(custom, "open_certificate", return_value=CERTIFICATE)
+    arguments = {"resource_group_name": "test-rg", "etag": etag}
+    if action == "verify":
+        arguments["certificate_path"] = "proof.pem"
+    handler = getattr(custom, f"iot_dps_certificate_{action}")
+
+    if status == 412:
+        with pytest.raises(ResourceModifiedError, match="Certificate changed"):
+            handler(stable_client, "test-dps", "test-cert", **arguments)
+    else:
+        assert handler(stable_client, "test-dps", "test-cert", **arguments) == response
+
+    assert [call.request.method for call in mocked_response.calls] == (
+        ["GET", "POST"] if etag is None else ["POST"]
+    )
+    request = mocked_response.calls[-1].request
+    assert request.headers["If-Match"] == (current_etag if etag is None else etag)
+    if action == "verify":
+        assert json.loads(request.body) == {"certificate": CERTIFICATE}
     assert_stable_requests(mocked_response)
 
 
