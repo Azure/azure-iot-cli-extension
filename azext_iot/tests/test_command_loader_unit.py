@@ -257,7 +257,7 @@ def identity_update_cli(mocker, monkeypatch):
     policy_key = generate_key()
     state = SimpleNamespace(
         cli=cli, discovery=discovery, custom_update=custom_update, oauth=oauth, requests=[],
-        symmetric_keys=symmetric_keys,
+        symmetric_keys=symmetric_keys, data_hosts={"hub.unit.invalid"},
         resource={
             "deviceId": "device", "etag": "original", "status": "enabled", "statusReason": "original",
             "capabilities": {"iotEdge": False},
@@ -287,7 +287,7 @@ def identity_update_cli(mocker, monkeypatch):
                 "keyName": "owner", "primaryKey": policy_key, "secondaryKey": policy_key,
                 "rights": "RegistryWrite, ServiceConnect, DeviceConnect",
             }]})
-        assert urlsplit(request.url).netloc in ("hub.unit.invalid", "hub.service.azure-devices.net")
+        assert urlsplit(request.url).netloc in state.data_hosts
         assert path == "/devices/device"
         assert "api-version=2026-11-01-preview" in request.url
         if request.method == "PUT":
@@ -324,6 +324,7 @@ def test_connection_string_invocation_keeps_split_entra_targets_arm_free(
     identity_update_cli, endpoint, group_args, hostname_type,
 ):
     runtime = identity_update_cli
+    runtime.data_hosts = {"hub.service.azure-devices.net"}
     code, result, output = runtime.invoke([
         "-n", f"hub.{endpoint}.azure-devices.net", "-d", "device",
         "--auth-type", "login", "--ht", hostname_type, *group_args,

@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+from pathlib import Path
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -40,7 +42,10 @@ def test_safe_integration_manifest_collection_keeps_its_existing_collection_path
     assert pytest_pycollect_makeitem(SimpleNamespace(config=config), "LiveScenarioTest", LiveScenarioTest) is None
 
 
-def test_real_pytest_collection_never_constructs_live_classes_in_unit_modules(tmp_path):
+def test_real_pytest_collection_never_constructs_live_classes_in_unit_modules(tmp_path, monkeypatch):
+    outer_report = tmp_path / "outer-results.xml"
+    outer_report.write_text("outer report", encoding="utf-8")
+    monkeypatch.setenv("PYTEST_ADDOPTS", f"--junitxml={outer_report}")
     module = tmp_path / "test_constructor_unit.py"
     module.write_text(
         "from azure.cli.testsdk import LiveScenarioTest\n"
@@ -56,16 +61,21 @@ def test_real_pytest_collection_never_constructs_live_classes_in_unit_modules(tm
     )
     script = f"""
 import sys
-sys.path[:0] = {sys.path!r}
+sys.path[:0] = {[str(Path(__file__).resolve().parents[2]), *sys.path]!r}
 import pytest
 from azext_iot.tests.conftest import pytest_pycollect_makeitem
 class Guard:
     pytest_pycollect_makeitem = staticmethod(pytest_pycollect_makeitem)
 raise SystemExit(pytest.main([
     "-q", {str(module)!r}, "--rootdir", {str(tmp_path)!r}, "--confcutdir", {str(tmp_path)!r},
-    "-o", "python_files=*_unit.py",
+    "-o", "python_files=*_unit.py", "-p", "no:cacheprovider",
 ], plugins=[Guard()]))
 """
-    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=60, check=False)
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        env=dict(os.environ, PYTEST_ADDOPTS="", PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"),
+        capture_output=True, text=True, timeout=60, check=False,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
+    assert outer_report.read_text(encoding="utf-8") == "outer report"
