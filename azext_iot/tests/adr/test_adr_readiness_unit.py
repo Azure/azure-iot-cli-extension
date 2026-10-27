@@ -645,6 +645,36 @@ def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind
     assert max(clock.sleeps) == 10  # Actual GETs continue during 10/20/30s backoff.
 
 
+@pytest.mark.parametrize("failure", [False, True])
+def test_waited_recovery_charges_remaining_deadline_and_preserves_errors(link_kind, failure):
+    scenario = Mock()
+    clock = Clock()
+    error = AzureResponseError("Authoritative recovery operation failed")
+    namespace = _namespace(kind=link_kind)
+    section, _, name = LINKS[link_kind]
+    namespace["properties"][section]["endpoints"][name]["linkingError"]["code"] = "AdrMiNotAuthorized"
+
+    def command(text):
+        if " update " in text:
+            assert text.endswith("--timeout 34")
+            clock.now += 35
+            if failure:
+                raise error
+            return _output(None)
+        clock.now += 0.25
+        return _output(namespace)
+
+    scenario.cmd.side_effect = command
+    with pytest.raises(AzureResponseError if failure else AssertionError) as caught:
+        _link(scenario, clock, kind=link_kind, timeout=45)
+    if failure:
+        assert caught.value is error
+    else:
+        assert "Timed out" in str(caught.value)
+    assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
+    assert " update " in _commands(scenario)[-1]
+
+
 @pytest.mark.parametrize("field,value", [
     ("resourceId", HUB_ID + "-other"),
     ("inboundCallerIdentity", {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}),
