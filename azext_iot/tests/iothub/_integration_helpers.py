@@ -13,7 +13,7 @@ from time import monotonic, sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
+from azure.cli.core.azclierror import BadRequestError, CLIInternalError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
@@ -36,7 +36,58 @@ _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-pre
 # https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
 QUERY_VISIBILITY_TIMEOUT = 30 * 60
 STORAGE_ROLE_PROPAGATION_SECONDS = 180
+STORAGE_READINESS_TIMEOUT = 600
+STORAGE_READINESS_INTERVAL = 30
 logger = get_logger(__name__)
+
+
+class StorageEndpointReadiness:
+    """One elapsed-time budget for an owned Hub's Storage endpoint setup."""
+
+    def __init__(self, observer, hub_id, storage_id, container):
+        self.observer, self.hub_id, self.storage_id, self.container = observer, hub_id, storage_id, container
+        self.grants_verified_at = monotonic()
+        self.deadline = None
+
+    def invoke(self, invoke, command, *, endpoint, identity):
+        if self.observer is None:
+            # Unmanaged callers retain their existing single-submit behavior.
+            return invoke(command)
+        if self.deadline is None:
+            self.deadline = monotonic() + STORAGE_READINESS_TIMEOUT
+        last_error = None
+        attempts = 0
+        while monotonic() < self.deadline:
+            attempts += 1
+            with self.observer.storage_endpoint_attempt(
+                self.hub_id, self.storage_id, endpoint, self.container, identity, self.deadline,
+            ) as attempt:
+                try:
+                    result = invoke(command)
+                except BadRequestError as error:
+                    if not attempt["rejected"]:
+                        raise
+                    last_error = error
+                else:
+                    logger.info(
+                        "Storage endpoint ready: endpoint=%s identity=%s attempts=%s elapsed=%.1fs grantVerifiedAge=%.1fs",
+                        endpoint, "system" if identity == "[system]" else "user", attempts,
+                        monotonic() - (self.deadline - STORAGE_READINESS_TIMEOUT),
+                        monotonic() - self.grants_verified_at,
+                    )
+                    return result
+            remaining = self.deadline - monotonic()
+            logger.warning(
+                "Storage authorization pending: endpoint=%s attempt=%s remaining=%.1fs grantVerifiedAge=%.1fs "
+                "code=IH400117 correlationId=%s",
+                endpoint, attempts, max(0, remaining), monotonic() - self.grants_verified_at, attempt["correlationId"],
+            )
+            if remaining > 0:
+                sleep(min(STORAGE_READINESS_INTERVAL, remaining))
+        raise CLIInternalError(
+            f"Storage endpoint '{endpoint}' authorization was not ready within the shared "
+            f"{STORAGE_READINESS_TIMEOUT}-second budget ({attempts} attempts for this endpoint)."
+        ) from last_error
 
 
 def is_not_found(error):

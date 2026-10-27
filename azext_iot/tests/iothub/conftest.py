@@ -27,7 +27,7 @@ from azext_iot.tests.settings import (
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
 from azext_iot.tests.iothub._integration_helpers import (
     STORAGE_ROLE_PROPAGATION_SECONDS, assert_hub_policy, assign_role_with_propagation,
-    assign_roles_with_propagation, invoke_checked, is_not_found
+    assign_roles_with_propagation, invoke_checked, is_not_found, StorageEndpointReadiness
 )
 from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
@@ -359,6 +359,10 @@ def setup_hub_controlplane_states(
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
+    storage_readiness = StorageEndpointReadiness(
+        _regular_phase_observer(request), provisioned_iot_hubs_with_storage_user_module[0]["hub"].get("id"),
+        provisioned_storage["storage"]["id"], storage_container,
+    )
     sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
     suffix = "systemid" if use_system_endpoints else "userid"
@@ -383,10 +387,12 @@ def setup_hub_controlplane_states(
         f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json"
     )
 
-    _invoke_fixture(
+    storage_readiness.invoke(
+        _invoke_fixture,
         f"iot hub message-endpoint create storage-container --en storagecontainer-{suffix} -g {hub_rg} -n {hub_name} "
         f"--identity {user_identity_parameter} --endpoint-uri {storage_endpoint_uri} --container {storage_container} "
-        "-b 350 -w 250 --encoding json"
+        "-b 350 -w 250 --encoding json",
+        endpoint=f"storagecontainer-{suffix}", identity=user_identity_parameter,
     )
 
     _invoke_fixture(
@@ -657,17 +663,22 @@ def provisioned_storage_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
     user_id = provisioned_user_identity_module["principalId"]
-    # ARM visibility is not effective storage access. Apply the existing
-    # post-grant grace period; endpoint errors remain failures, never replays.
+    observer = _regular_phase_observer(request)
+    # Only the owned controller can prove a rejection safe to retry. Legacy
+    # direct-pytest callers retain their fixed grace and single submission.
     assign_roles_with_propagation(
         assignments=[
             {"role": role, "scope": scope, "assignee": principal}
             for principal in (hub_principal_id, user_id)
         ],
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
-        wait=STORAGE_ROLE_PROPAGATION_SECONDS,
+        wait=0 if observer else STORAGE_ROLE_PROPAGATION_SECONDS,
     )
-    yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
+    readiness = StorageEndpointReadiness(
+        observer, provisioned_iot_hubs_with_user_module[0]["hub"].get("id"), scope,
+        provisioned_storage_module["container"]["name"],
+    )
+    yield provisioned_iot_hubs_with_user_module, provisioned_storage_module, readiness
 
 
 @pytest.fixture(scope="module")

@@ -11,14 +11,14 @@ from types import SimpleNamespace
 import pytest
 from azure.cli.core.azclierror import BadRequestError, CLIInternalError
 
-from azext_iot.tests.iothub._integration_helpers import STORAGE_ROLE_PROPAGATION_SECONDS
+from azext_iot.tests.iothub._integration_helpers import STORAGE_READINESS_TIMEOUT, StorageEndpointReadiness
 from azext_iot.tests.iothub.message_endpoint import test_iothub_message_endpoint_int as subject
 
 
-def test_storage_lifecycle_budget_includes_both_fixture_propagation_waits():
+def test_storage_lifecycle_budget_includes_the_shared_readiness_window():
     marks = [mark for mark in subject.test_iot_storage_endpoint_lifecycle.pytestmark if mark.name == "timeout"]
     assert len(marks) == 1
-    assert marks[0].args == (900 + 2 * STORAGE_ROLE_PROPAGATION_SECONDS,)
+    assert marks[0].args == (900 + STORAGE_READINESS_TIMEOUT,)
     assert marks[0].kwargs == {"func_only": False}
 
 
@@ -87,6 +87,7 @@ def storage_scenario(mocker):
             "storage": {"primaryEndpoints": {"blob": "https://offline.blob.core.windows.net/"}},
             "container": {"name": "container"},
         },
+        StorageEndpointReadiness(None, "owned-hub", "owned-storage", "container"),
     )
     return scenario
 
