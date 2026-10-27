@@ -86,9 +86,9 @@ class Clock:
 
 def _http(
     status=404, code="ResourceNotFound", method="GET", error_type=HttpResponseError,
-    resource_id=NS_ID + "/registryDevices/device",
+    resource_id=NS_ID + "/registryDevices/device", message=None,
 ):
-    error = error_type(message=f"({code}) synthetic service error")
+    error = error_type(message=message or f"({code}) synthetic service error")
     error.status_code = status
     error.error = SimpleNamespace(code=code)
     error.response = SimpleNamespace(
@@ -940,6 +940,7 @@ def _rotation_endpoint(state="Failed", identity_type="UserAssigned", *, code="Id
         identity["userAssignedIdentity"] = UAMI_ID
     endpoint = {
         "resourceId": HUB_ID,
+        "endpointType": IOT_HUB_ENDPOINT_TYPE,
         "linkingState": state,
         "inboundCallerIdentity": identity,
     }
@@ -992,6 +993,32 @@ _HUB_REJECTED = (
 )
 
 
+def _rotation_namespace():
+    return {
+        "id": NS_ID, "identity": {"principalId": "namespace-principal"},
+        "properties": {
+            "provisioningState": "Succeeded",
+            "messaging": {"endpoints": {"secondary": _rotation_endpoint("Succeeded", "UserAssigned")}},
+        },
+    }
+
+
+def _rotation_rejection(message=None):
+    message = message or link_scenarios._HUB_ROTATION_CURRENT_MESSAGE
+    error = _http(200, "LinkingFailed", resource_id=(
+        "/subscriptions/sub/providers/Microsoft.DeviceRegistry/locations/centraluseuap/asyncOperationStatuses/rotation"
+    ), message="(LinkingFailed) Failed. (IdentityRotationUpdateFailed) " + message)
+    error.response.json = lambda: {
+        "status": "Failed", "error": {
+            "code": "LinkingFailed", "message": "Failed.",
+            "details": [{
+                "code": "IdentityRotationUpdateFailed", "message": message, "target": "properties.messaging.endpoints[secondary]",
+            }],
+        },
+    }
+    return error
+
+
 def test_hub_rotation_rejection_requires_structural_or_attributed_evidence():
     from azure.core.exceptions import HttpResponseError
 
@@ -1019,9 +1046,10 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
     roles = [{"id": "role"}]
     responses = [
-        _output(None),
+        _output(_rotation_namespace()),
+        _rotation_rejection(),
         _output(_rotation_endpoint()),
-        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output(_rotation_namespace()),
         _output({"identity": {"principalId": "hub-sami"}}),
         _output(roles),
         _output(roles),
@@ -1067,7 +1095,51 @@ def test_hub_rotation_current_wrapper_requires_exact_rotation_attribution():
     assert not link_scenarios._is_identity_rotation_authorization_failure(error=mixed, endpoint=rolled_back)
 
 
-@pytest.mark.parametrize("late_stage", ["sleep", "terminal-success"])
+@pytest.mark.parametrize("route", ["asyncOperationStatuses", "operationStatuses"])
+@pytest.mark.parametrize("message", [_HUB_REJECTED, link_scenarios._HUB_ROTATION_CURRENT_MESSAGE])
+def test_hub_rotation_requires_real_sdk_terminal_rejection(mocked_response, route, message):
+    from azure.mgmt.core.polling.arm_polling import ARMPolling
+
+    status_url = f"https://management.azure.com/subscriptions/sub/providers/Microsoft.DeviceRegistry/locations/eastus/{route}/op"
+    mocked_response.add(
+        "PUT", "https://management.azure.com" + NS_ID, status=201,
+        json={"properties": {"provisioningState": "Accepted"}}, headers={"Azure-AsyncOperation": status_url},
+    )
+    mocked_response.add("GET", status_url, json=_rotation_rejection(message).response.json())
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    with DeviceRegistryMgmtClient(credential, "sub", retry_total=0, polling_interval=0) as client:
+        with pytest.raises(HttpResponseError) as raised:
+            client.namespaces.begin_create_or_replace("rg", "ns", {"location": "eastus"}, polling=ARMPolling(0)).result()
+    assert link_scenarios._current_rotation_rejection(raised.value, NS_ID, "secondary")
+    assert link_scenarios._is_identity_rotation_authorization_failure(
+        error=raised.value, endpoint=_rotation_endpoint("Succeeded", "UserAssigned"),
+    )
+    assert not link_scenarios._current_rotation_rejection(raised.value, NS_ID.replace("/sub/", "/other/"), "secondary")
+    assert not link_scenarios._current_rotation_rejection(raised.value, NS_ID, "other")
+
+
+@pytest.mark.parametrize("invalid", ["transport", "status", "method", "route", "mixed-detail"])
+def test_hub_rotation_rejects_unproven_current_attempt(invalid):
+    from azure.core.exceptions import ServiceResponseError
+
+    error = _rotation_rejection()
+    if invalid == "transport":
+        error.__cause__ = ServiceResponseError("Response lost")
+    elif invalid == "status":
+        error.status_code = 400
+    elif invalid == "method":
+        error.response.request.method = "PUT"
+    elif invalid == "route":
+        error.response.request.url = "https://management.azure.com" + NS_ID
+    else:
+        body = error.response.json()
+        body["error"]["details"].append({"code": "OtherFailure", "message": "Unrelated."})
+        error.response.json = lambda: body
+    assert not link_scenarios._current_rotation_rejection(error, NS_ID, "secondary")
+
+
+@pytest.mark.parametrize("late_stage", ["baseline", "sleep", "terminal-success"])
 def test_hub_rotation_deadline_rejects_oversleep_and_late_success(monkeypatch, late_stage):
     clock = Clock()
     monkeypatch.setattr(link_scenarios, "monotonic", clock)
@@ -1082,26 +1154,29 @@ def test_hub_rotation_deadline_rejects_oversleep_and_late_success(monkeypatch, l
 
     monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
     scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), _rotation_rejection() if late_stage == "sleep" else _output(None),
+    ]
+    if late_stage == "baseline":
+        def slow_baseline(_command):
+            clock.now = 600
+            return _output(_rotation_namespace())
+        scenario.cmd.side_effect = slow_baseline
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
     with pytest.raises(AssertionError, match="budget exhausted"):
         link_scenarios._update_hub_to_sami_with_recovery(
             scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
         )
-    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+    assert _bounded_update_timeouts(scenario, update_cmd) == ([] if late_stage == "baseline" else [600])
 
 
 def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_rollback(monkeypatch):
     from azure.cli.core.azclierror import AzureResponseError
-    from azure.core.exceptions import HttpResponseError
 
     clock = Clock()
     monkeypatch.setattr(link_scenarios, "monotonic", clock)
     monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
-    service_error = HttpResponseError(
-        "(LinkingFailed) One or more endpoints failed to link. (IdentityRotationUpdateFailed) "
-        "The Hub resource rejected the link request as invalid. "
-        "Verify the endpoint configuration, then resubmit the request."
-    )
+    service_error = _rotation_rejection(_HUB_REJECTED)
     product_error = AzureResponseError(
         "Link target, type, inbound identity or settings changed; recovery stopped."
     )
@@ -1110,9 +1185,10 @@ def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_roll
     roles = [{"id": "role"}]
     scenario = Mock()
     scenario.cmd.side_effect = [
+        _output(_rotation_namespace()),
         product_error,
         _output(_rotation_endpoint("Succeeded", "UserAssigned")),
-        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output(_rotation_namespace()),
         _output({"identity": {"principalId": "hub-sami"}}),
         _output(roles),
         _output(roles),
@@ -1145,7 +1221,9 @@ def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):
     monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
     monkeypatch.setattr(link_scenarios, "_assert_hub_sami_rotation_grants", lambda *_: None)
     scenario = Mock()
-    scenario.cmd.return_value = _output(None)
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), _rotation_rejection(), _rotation_rejection(), _rotation_rejection(),
+    ]
 
     with pytest.raises(AssertionError, match="budget exhausted"):
         link_scenarios._update_hub_to_sami_with_recovery(
@@ -1169,7 +1247,7 @@ def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
     changed["resourceId"] = HUB_ID + "-other"
     scenario = Mock()
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
-    scenario.cmd.side_effect = [_output(None), _output(changed)]
+    scenario.cmd.side_effect = [_output(_rotation_namespace()), _rotation_rejection(), _output(changed)]
 
     with pytest.raises(AssertionError, match="resourceId"):
         link_scenarios._update_hub_to_sami_with_recovery(
@@ -1177,9 +1255,60 @@ def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
         )
 
     assert _commands(scenario) == [
+        "iot adr ns show -n ns -g rg",
         update_cmd + " --timeout 600",
         "iot adr ns link hub show --ns ns -g rg -n secondary",
     ]
+
+
+@pytest.mark.parametrize("failure", ["uncertain", "drift", "keyerror", "success"])
+def test_hub_rotation_never_uses_stale_failure_to_replay_an_unproven_write(monkeypatch, failure):
+    from azure.core.exceptions import ServiceResponseError
+
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    error = {
+        "uncertain": AzureResponseError("Outcome unknown"),
+        "drift": AzureResponseError("Settings changed; recovery stopped"),
+        "keyerror": KeyError("unexpected"),
+        "success": None,
+    }[failure]
+    if failure == "uncertain":
+        error.__cause__ = ServiceResponseError("Connection lost")
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), error or _output(None), _output(_rotation_endpoint()),
+    ]
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(type(error) if error else AssertionError) as raised:
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    if error:
+        assert raised.value is error
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+    assert not clock.sleeps
+
+
+@pytest.mark.parametrize("state,identity", [("Failed", "UserAssigned"), ("Succeeded", "SystemAssigned")])
+def test_hub_rotation_preserves_pre_submit_settings_on_retry_and_success(monkeypatch, state, identity):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    baseline = _rotation_namespace()
+    baseline["properties"]["messaging"]["endpoints"]["secondary"]["provisioning"] = {"allocationWeight": 2}
+    changed = _rotation_endpoint(state, identity)
+    changed["provisioning"] = {"allocationWeight": 3}
+    scenario = Mock()
+    scenario.cmd.side_effect = [_output(baseline), _rotation_rejection(), _output(changed)]
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(AssertionError, match="endpoint settings changed"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+    assert not clock.sleeps
 
 
 @pytest.mark.parametrize("failure", [

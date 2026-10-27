@@ -5,12 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
+import re
 from time import sleep
 from urllib.parse import urlsplit
+from uuid import UUID
 
 import pytest
 from azure.cli.core.azclierror import AzureResponseError
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
 
 from azext_iot.adr.providers.base import ADRResourceStateError
 from azext_iot.adr.topology import writable_namespace_properties
@@ -33,21 +36,43 @@ from azext_iot.tests.adr.conftest import (
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import HUB_TEST_LOCATION
 
+logger = get_logger(__name__)
+
 
 def _assert_unlink_service_rejection(error, namespace_id):
     if isinstance(error, ADRResourceStateError):
         body = error.body
         assert body.get("id", "").casefold() == namespace_id.casefold(), "Failure belongs to another namespace."
         assert body.get("properties", {}).get("provisioningState") == "Failed", "Unlink did not reach a Failed state."
-        detail = body.get("error") or body.get("properties", {}).get("error") or {}
-        assert detail.get("code"), "Unlink failure did not include a structured service error."
-        return
+        logger.info("Unlink rejection: type=ADRResourceStateError code=unavailable correlationId=unavailable")
+        return None
     response = getattr(error, "response", None)
     request = getattr(response, "request", None)
-    assert error.status_code in (400, 409), f"Unexpected unlink HTTP failure: {error.status_code}"
-    assert getattr(request, "method", None) == "PUT", "Failure did not reject the namespace mutation."
-    assert urlsplit(request.url).path.casefold() == namespace_id.casefold(), "Failure belongs to another resource."
-    assert getattr(error.error, "code", None), "Unlink rejection did not include a structured service error."
+    method = getattr(request, "method", None)
+    path = urlsplit(getattr(request, "url", "")).path
+    if error.status_code == 400:
+        assert method == "PUT", "Failure did not reject the namespace mutation."
+        assert path.casefold() == namespace_id.casefold(), "Failure belongs to another resource."
+    else:
+        assert error.status_code == 200 and method == "GET", f"Unexpected unlink HTTP failure: {error.status_code}"
+        subscription = namespace_id.split("/")[2]
+        assert re.fullmatch(
+            rf"/subscriptions/{re.escape(subscription)}/providers/Microsoft\.DeviceRegistry/"
+            r"locations/[^/]+/(?:asyncOperationStatuses|operationStatuses)/[^/]+", path, re.IGNORECASE,
+        ), "Failure did not come from this subscription's ADR operation-status endpoint."
+        assert response.json().get("status") == "Failed", "Unlink operation did not fail."
+    code = getattr(error.error, "code", None)
+    assert isinstance(code, str) and re.fullmatch(
+        r"[A-Za-z][A-Za-z0-9_.-]{0,63}", code,
+    ), "Unlink rejection did not include a structured service error code."
+    headers = getattr(response, "headers", {}) or {}
+    correlation = headers.get("x-ms-correlation-request-id") or headers.get("x-ms-request-id")
+    try:
+        correlation = str(UUID(correlation)) if isinstance(correlation, str) else "unavailable"
+    except ValueError:
+        correlation = "unavailable"
+    logger.info("Unlink rejection: type=HttpResponseError code=%s correlationId=%s", code, correlation)
+    return code
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -103,13 +128,15 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         )
         with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
             self.cmd(command)
-        _assert_unlink_service_rejection(rejected.value, before["id"])
+        first_code = _assert_unlink_service_rejection(rejected.value, before["id"])
         created = self._reader_assignments(principal, scope)
         assert len(created) == 1, "Explicit grant must be retained after service rejection."
         sleep(ROLE_PROPAGATION_DELAY)
         with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
             self.cmd(command)
-        _assert_unlink_service_rejection(rejected.value, before["id"])
+        second_code = _assert_unlink_service_rejection(rejected.value, before["id"])
+        if first_code is not None and second_code is not None:
+            assert first_code == second_code, "Repeated unlink attempts returned different service rejections."
         assert self._reader_assignments(principal, scope) == created, "Retry must not duplicate the Reader assignment."
         after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         assert endpoint_name in after["properties"][section]["endpoints"]

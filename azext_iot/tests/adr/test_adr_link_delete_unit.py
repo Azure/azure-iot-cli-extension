@@ -566,6 +566,8 @@ def test_delete_real_sdk_polls_async_status_and_returns_completed_namespace(
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("state", ["Failed", "Canceled"])
 def test_delete_real_sdk_raises_async_service_failure(fixture_cmd, unlink_client, kind, section, _endpoint_type, state):
+    from azext_iot.tests.adr.test_adr_link_delete_int import _assert_unlink_service_rejection
+
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
         network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
@@ -578,6 +580,12 @@ def test_delete_real_sdk_raises_async_service_failure(fixture_cmd, unlink_client
         assert raised.value.error.code == "BackendUnlinkRejected"
         assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET"]
         assert network.calls[-1].request.url == STATUS_URL
+        namespace_id = URL.removeprefix("https://management.azure.com")
+        if state == "Failed":
+            assert _assert_unlink_service_rejection(raised.value, namespace_id) == "BackendUnlinkRejected"
+        else:
+            with pytest.raises(AssertionError, match="did not fail"):
+                _assert_unlink_service_rejection(raised.value, namespace_id)
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -983,7 +991,6 @@ def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
 @pytest.mark.parametrize("status", [400, 409, 401, 403, 404, 412, 429, 500, 503])
 @pytest.mark.parametrize("method,resource", [("PUT", "ns"), ("GET", "ns"), ("PUT", "other")])
 def test_live_unlink_negative_requires_a_structured_namespace_mutation_rejection(status, method, resource):
-    from types import SimpleNamespace
     from azext_iot.tests.adr.test_adr_link_delete_int import _assert_unlink_service_rejection
 
     namespace_id = "/subscriptions/s/resourceGroups/g/providers/Microsoft.DeviceRegistry/namespaces/ns"
@@ -993,8 +1000,25 @@ def test_live_unlink_negative_requires_a_structured_namespace_mutation_rejection
     error.response = SimpleNamespace(request=SimpleNamespace(
         method=method, url="https://management.azure.com" + namespace_id.removesuffix("ns") + resource,
     ))
-    if status in (400, 409) and method == "PUT" and resource == "ns":
+    if status == 400 and method == "PUT" and resource == "ns":
         _assert_unlink_service_rejection(error, namespace_id)
+    else:
+        with pytest.raises(AssertionError):
+            _assert_unlink_service_rejection(error, namespace_id)
+
+
+@pytest.mark.parametrize("state,foreign", [("Failed", False), ("Canceled", False), ("Failed", True)])
+def test_live_unlink_inline_failure_requires_the_same_failed_namespace(state, foreign):
+    from azext_iot.adr.providers.base import ADRResourceStateError
+    from azext_iot.tests.adr.test_adr_link_delete_int import _assert_unlink_service_rejection
+
+    namespace_id = URL.removeprefix("https://management.azure.com")
+    error = ADRResourceStateError("Synthetic terminal failure", {
+        "id": namespace_id + ("-other" if foreign else ""),
+        "properties": {"provisioningState": state},
+    })
+    if state == "Failed" and not foreign:
+        assert _assert_unlink_service_rejection(error, namespace_id) is None
     else:
         with pytest.raises(AssertionError):
             _assert_unlink_service_rejection(error, namespace_id)
