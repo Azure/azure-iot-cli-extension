@@ -6,6 +6,7 @@
 
 import base64
 from copy import deepcopy
+from datetime import datetime, timezone
 import importlib.util
 import json
 import os
@@ -37,6 +38,7 @@ def candidate(tmp_path, monkeypatch):
         "RELEASE_SOURCE_BRANCH": "release/1.1.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
+        "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "public",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -53,6 +55,7 @@ def candidate(tmp_path, monkeypatch):
     value = {
         "schema": 1, "repository": release.REPOSITORY, "sourceBranch": "refs/heads/release/1.1.0-preview",
         "sourceCommit": SOURCE_SHA, "producer": {"definition": "150", "build": "900", "commit": AUTOMATION_SHA},
+        "cohorts": release.integration_cohorts(),
         "wheel": {"file": filename, "sha256": release.digest(directory / filename), "version": "1.1.0b1"},
         "sbom": {"file": "SBOM.zip", "sha256": release.digest(directory / "SBOM.zip")},
     }
@@ -67,15 +70,16 @@ def candidate(tmp_path, monkeypatch):
     return directory, value
 
 
-def integration_build(value, result="succeeded"):
+def integration_build(value, result="succeeded", cohort="public"):
     return {
         "id": 901, "definition": {"id": 147}, "project": {"id": PROJECT},
         "repository": {"id": release.REPOSITORY, "type": "GitHub"},
         "sourceVersion": value["sourceCommit"], "sourceBranch": value["sourceBranch"],
         "status": "completed", "result": result,
         "templateParameters": {
-            **release.INTEGRATION_PARAMETERS, "services": '[\r\n  "DPS/Hub/ADR/ADU"\r\n]',
-            "pythonVersions": '["3.10", "3.13"]', "releaseBuildId": value["producer"]["build"],
+            **release.integration_parameters(value, cohort),
+            "services": json.dumps(value["cohorts"][cohort]["services"], indent=2),
+            "pythonVersions": '["3.10", "3.13"]',
         },
     }
 
@@ -271,8 +275,11 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
         release.verify_candidate(directory)
 
 
-def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(candidate, tmp_path, monkeypatch):
+@pytest.mark.parametrize("target", ["public", "canary"])
+def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
+        candidate, tmp_path, monkeypatch, capsys, target):
     directory, value = candidate
+    monkeypatch.setenv("RELEASE_DPS_TARGET", target)
     source = tmp_path / "source"
     dist = source / "dist"
     manifest = dist / "_manifest/spdx_2.2/manifest.spdx.json"
@@ -285,9 +292,30 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(candidate,
     generated = release.create_candidate(source, output)
     assert generated["wheel"] == value["wheel"]
     assert generated["producer"] == value["producer"]
+    assert generated["cohorts"] == release.integration_cohorts(target)
+    matrix = json.loads(capsys.readouterr().out.splitlines()[-1].split("]", 1)[1])
+    assert set(matrix) == set(generated["cohorts"])
     with zipfile.ZipFile(output / "SBOM.zip") as archive:
         assert archive.read("_manifest/spdx_2.2/manifest.spdx.json") == manifest.read_bytes()
     assert release.verify_candidate(output) == generated
+
+
+@pytest.mark.parametrize("change", ["missing", "python", "endpoint", "omitted"])
+def test_candidate_rejects_missing_or_tampered_target_cohorts(candidate, monkeypatch, change):
+    directory, value = candidate
+    monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
+    value["cohorts"] = release.integration_cohorts()
+    if change == "missing":
+        del value["cohorts"]["dps_canary"]
+    elif change == "python":
+        value["cohorts"]["dps_canary"]["pythonVersions"].remove("3.10")
+    elif change == "endpoint":
+        value["cohorts"]["public"]["armEndpoint"] = "canary"
+    else:
+        del value["cohorts"]
+    release.write(directory / "candidate.json", value)
+    with pytest.raises(ValueError, match="cohort inventory"):
+        release.verify_candidate(directory)
 
 
 @pytest.mark.parametrize("url", [
@@ -471,9 +499,81 @@ def test_duplicate_child_ownership_rejected(candidate, monkeypatch):
         release.existing_integration(value)
 
 
+@pytest.mark.parametrize("duplicate", [None, "dps_canary", "public", "unexpected"])
+def test_mixed_target_children_are_matched_by_exact_scope(candidate, monkeypatch, duplicate):
+    _, value = candidate
+    value["cohorts"] = release.integration_cohorts("canary")
+    monkeypatch.setenv("RELEASE_COHORT", "dps_canary")
+    dps = integration_build(value, cohort="dps_canary")
+    public = {**integration_build(value), "id": 902}
+    builds = [public, dps]
+    if duplicate in value["cohorts"]:
+        builds.append(integration_build(value, cohort=duplicate))
+    elif duplicate == "unexpected":
+        public["templateParameters"]["armEndpoint"] = "canary"
+    monkeypatch.setattr(release, "ado", Mock(side_effect=[
+        {"definition": {"id": 150}, "sourceVersion": AUTOMATION_SHA, "queueTime": "2026-10-08T00:00:00Z"},
+        {"value": builds},
+    ]))
+    if duplicate:
+        with pytest.raises(ValueError, match="Multiple children|unexpected release cohort"):
+            release.existing_integration(value)
+    else:
+        assert release.existing_integration(value) == dps
+
+
+@pytest.mark.parametrize("cohort", ["dps_canary", "public"])
+def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monkeypatch, cohort):
+    directory, value = candidate
+    monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
+    monkeypatch.setenv("RELEASE_COHORT", cohort)
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
+    value["cohorts"] = release.integration_cohorts()
+    release.write(directory / "candidate.json", value)
+    build = integration_build(value, cohort=cohort)
+    monkeypatch.setattr(release, "existing_integration", Mock(return_value=build))
+    mocked = Mock(return_value=build)
+    monkeypatch.setattr(release, "ado", mocked)
+    assert release.integrate(directory, tmp_path / "child.json") == "901"
+    mocked.assert_called_once_with("build/builds/901")
+    assert release.read(tmp_path / "child.json")["cohort"] == cohort
+
+
+@pytest.mark.parametrize("hour,minute,seconds", [
+    (5, 0, 0), (5, 1, 8 * 3600 + 29 * 60), (12, 59, 31 * 60),
+    (13, 0, 1800), (13, 29, 60), (13, 30, 0), (23, 0, 0),
+])
+def test_iot_release_admission_reserves_cleanup_and_child_budget(hour, minute, seconds):
+    now = datetime(2026, 10, 28, hour, minute, tzinfo=timezone.utc)
+    assert release.safe_queue_delay(now) == seconds
+
+
+def test_admission_waits_for_safe_window_and_actual_cleanup_and_health(candidate, monkeypatch):
+    monkeypatch.setattr(release, "safe_queue_delay", Mock(side_effect=[60, 0, 0, 0]))
+    monkeypatch.setattr(release.time, "sleep", Mock())
+    mocked = Mock(side_effect=[
+        {"value": [{"definition": {"id": 166}}]}, {"value": [{"definition": {"id": 109}}]}, {"value": []},
+    ])
+    monkeypatch.setattr(release, "ado", mocked)
+    release.admit_integration()
+    assert release.time.sleep.call_count == 3
+    assert all("definitions=109%2C147%2C166" in call.args[0] and not call.kwargs
+               for call in mocked.call_args_list)
+
+
+def test_admission_timeout_never_queues_resources(candidate, monkeypatch):
+    monkeypatch.setattr(release, "safe_queue_delay", Mock(return_value=60))
+    monkeypatch.setattr(release.time, "monotonic", Mock(side_effect=[0, 9 * 3600]))
+    with pytest.raises(TimeoutError, match="no child was queued"):
+        release.admit_integration()
+    release.ado.assert_not_called()
+
+
 def test_integration_queues_exact_candidate_once(candidate, tmp_path, monkeypatch):
     directory, value = candidate
     monkeypatch.setattr(release, "existing_integration", Mock(return_value=None))
+    admitted = Mock()
+    monkeypatch.setattr(release, "admit_integration", admitted)
     mocked = Mock(side_effect=[{"id": 901}, integration_build(value)])
     monkeypatch.setattr(release, "ado", mocked)
     record = tmp_path / "child.json"
@@ -486,6 +586,7 @@ def test_integration_queues_exact_candidate_once(candidate, tmp_path, monkeypatc
     assert payload["templateParameters"]["releaseBuildId"] == "900"
     assert json.loads(payload["templateParameters"]["services"]) == release.INTEGRATION_PARAMETERS["services"]
     assert release.read(record)["producer"] == value["producer"]
+    admitted.assert_called_once_with()
 
 
 def test_retry_reattaches_without_queuing(candidate, tmp_path, monkeypatch):
@@ -542,16 +643,31 @@ def test_cancellation_rejects_other_parent_receipt(candidate, tmp_path):
     release.ado.assert_not_called()
 
 
-def test_integration_artifact_proof_requires_original_bytes_and_manifest(candidate, tmp_path):
+def test_cancellation_rejects_another_cohort_of_the_same_parent(candidate, tmp_path):
+    directory, value = candidate
+    record = tmp_path / "child.json"
+    release.write(record, {"id": "901", "producer": value["producer"], "cohort": "dps_canary"})
+    with pytest.raises(ValueError, match="another release"):
+        release.cancel_integration(record, directory)
+    release.ado.assert_not_called()
+
+
+@pytest.mark.parametrize("asset", ["wheel", "sbom", "cohorts"])
+def test_integration_artifact_proof_requires_original_bytes_and_manifest(candidate, tmp_path, asset):
     directory, value = candidate
     artifacts = tmp_path / "artifacts"
     wheel_dir = artifacts / "integration-wheel-1"
     wheel_dir.mkdir(parents=True)
     (wheel_dir / value["wheel"]["file"]).write_bytes((directory / value["wheel"]["file"]).read_bytes())
+    (wheel_dir / "SBOM.zip").write_bytes((directory / "SBOM.zip").read_bytes())
     release.write(wheel_dir / "candidate.json", value)
     release.verify_integration_artifacts(directory, artifacts)
-    (wheel_dir / value["wheel"]["file"]).write_bytes(b"rebuilt")
-    with pytest.raises(ValueError, match="exact release candidate"):
+    if asset == "cohorts":
+        value["cohorts"] = release.integration_cohorts("canary")
+        release.write(wheel_dir / "candidate.json", value)
+    else:
+        (wheel_dir / value[asset]["file"]).write_bytes(b"rebuilt")
+    with pytest.raises(ValueError, match="exact release candidate|provenance"):
         release.verify_integration_artifacts(directory, artifacts)
 
 
@@ -828,7 +944,9 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert pipeline["trigger"] == "none"
     assert pipeline["pr"] == "none"
     assert pipeline["parameters"][0]["default"] == "Plan"
-    assert {parameter["name"] for parameter in pipeline["parameters"]} == {"mode", "sourceBranch", "createIndexPr"}
+    assert {parameter["name"] for parameter in pipeline["parameters"]} == {
+        "mode", "sourceBranch", "createIndexPr", "dpsTarget",
+    }
     assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
         "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration", "Publish",
@@ -918,6 +1036,19 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
             assert "ReleaseGitHubToken" not in json.dumps(stage)
     assert "refs/heads/dev" in stages["Publish"]["condition"]
     assert stages["Publish"]["variables"][0] == {"group": "aziotcli_release_publish"}
+
+
+def test_yaml_runs_every_frozen_target_cohort_serially():
+    pipeline, stages = all_stages()
+    assert pipeline["variables"]["RELEASE_DPS_TARGET"] == "${{ parameters.dpsTarget }}"
+    job = stages["Integration"]["jobs"][0]
+    assert job["strategy"] == {
+        "matrix": "$[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]", "maxParallel": 1,
+    }
+    assert job["timeoutInMinutes"] >= 9 * 60 + 7 * 60
+    assert "$(cohort)" in job["templateContext"]["outputs"][0]["artifact"]
+    scripts = [step for step in job["steps"] if "script" in step]
+    assert all(step["env"]["RELEASE_COHORT"] == "$(cohort)" for step in scripts)
 
 
 def test_yaml_extends_official_template_without_governance_bypasses():

@@ -75,7 +75,8 @@ stages:
                   python scripts/release_pipeline.py candidate
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Build.ArtifactStagingDirectory)/release-candidate"
-                displayName: Record exact source, producer, version and asset digests
+                name: candidate
+                displayName: Record exact source, producer, targets, version and asset digests
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -268,13 +269,16 @@ stages:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: Integration
-            timeoutInMinutes: 360
+            timeoutInMinutes: 1080
             cancelTimeoutInMinutes: 5
+            strategy:
+              matrix: $[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]
+              maxParallel: 1
             templateContext:
               outputs:
                 - output: pipelineArtifact
                   path: $(Agent.TempDirectory)/integration-run.json
-                  artifact: release-integration-$(System.JobAttempt)
+                  artifact: release-integration-$(cohort)-$(System.JobAttempt)
                   isProduction: false
                   condition: always()
             steps:
@@ -293,6 +297,7 @@ stages:
                   --record "$(Agent.TempDirectory)/integration-run.json"
                 displayName: Queue or reattach to the exact child and require Succeeded
                 env:
+                  RELEASE_COHORT: $(cohort)
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -310,6 +315,7 @@ stages:
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --work-dir "$(Agent.TempDirectory)/integration-artifacts"
                 env:
+                  RELEASE_COHORT: $(cohort)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - script: >-
@@ -319,6 +325,7 @@ stages:
                 displayName: Cancel only this release's child on interruption or failure
                 condition: or(failed(), canceled())
                 env:
+                  RELEASE_COHORT: $(cohort)
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)

@@ -18,6 +18,14 @@ parameters:
     displayName: Submit an extension-index PR after GitHub publication (Release only)
     type: boolean
     default: false
+  - name: dpsTarget
+    displayName: DPS qualification target (other services always use public australiaeast)
+    type: string
+    default: public
+    values: [public, canary]
+
+variables:
+  RELEASE_DPS_TARGET: ${{ parameters.dpsTarget }}
 
 resources:
   repositories:

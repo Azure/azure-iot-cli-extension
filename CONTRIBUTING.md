@@ -264,6 +264,20 @@ GitHub-only publication needs no index fork configuration or fork-write permissi
 The optional index step requires the matching public release and verified assets,
 and never merges its PR. Both IoT CLI (161) and Operations CLI (165) use this contract.
 
+`dpsTarget` defaults to `public`: all services run in `australiaeast` on public ARM.
+For a source whose DPS API is deployed only to canary, explicitly select `canary`.
+This freezes two required, serial pipeline 147 cohorts into the same candidate:
+DPS in `centraluseuap` on canary ARM, and HubControl/HubData/ADU/ADR in
+`australiaeast` on public ARM. Both cohorts test Python 3.10 and 3.13 using the
+identical wheel, source commit, and SBOM. Canary qualification does not prove a
+public API rollout. No SDK version or endpoint is silently changed.
+
+Each child waits for eight hours of headroom before the daily 13:00 UTC cleanup,
+a 30-minute post-cleanup buffer, and no active cleanup/147/166 run. Waiting creates
+no Azure resources and is bounded to nine hours; qualification can span safe
+windows. Job retries reattach only to their exact parent/cohort, reject duplicate
+or altered scopes, and never blindly queue another child.
+
 There is no skip-integration, continue-on-error, or manual GitHub `production`
 approval step in this path. Failed, canceled, partially successful and skipped
 dependencies cannot qualify publication. Index compatibility retains upstream's

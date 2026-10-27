@@ -8,6 +8,8 @@
 
 import argparse
 import base64
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from email.parser import Parser
 import hashlib
 import json
@@ -258,11 +260,15 @@ def create_candidate(source, directory):
         "schema": 1, "repository": REPOSITORY,
         "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")), "sourceCommit": source_commit,
         "producer": producer(),
+        "cohorts": integration_cohorts(),
         "wheel": {"file": wheel.name, "sha256": digest(wheel), "version": wheel_metadata(wheel)},
         "sbom": {"file": "SBOM.zip", "sha256": digest(directory / "SBOM.zip")},
     }
     write(directory / "candidate.json", value)
     verify_candidate(directory)
+    print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
+        key: {"cohort": key} for key in value["cohorts"]
+    }), flush=True)
     return value
 
 
@@ -273,6 +279,8 @@ def verify_candidate(directory):
             or value["sourceBranch"] != branch(environment("RELEASE_SOURCE_BRANCH"))
             or value["sourceCommit"] != commit(environment("RELEASE_SOURCE_COMMIT"))):
         raise ValueError("Candidate provenance does not match this release run and source.")
+    if value.get("cohorts") != integration_cohorts():
+        raise ValueError("Candidate cohort inventory does not match the complete requested qualification.")
     wheel = value["wheel"]
     if not re.fullmatch(r"azure_iot-[A-Za-z0-9_.+!-]+\.whl", wheel["file"]):
         raise ValueError("Unsafe candidate wheel name.")
@@ -296,7 +304,24 @@ def verify_candidate(directory):
     return value
 
 
-def validate_integration(build, candidate):
+def integration_cohorts(target=None):
+    target = target or environment("RELEASE_DPS_TARGET")
+    public = deepcopy(INTEGRATION_PARAMETERS)
+    if target == "public":
+        return {"public": public}
+    if target != "canary":
+        raise ValueError("DPS target must be public or canary.")
+    dps = {**deepcopy(public), "services": ["DPS"], "regions": "centraluseuap", "armEndpoint": "canary"}
+    public["services"] = ["HubControl", "HubData", "ADU", "ADR"]
+    return {"dps_canary": dps, "public": public}
+
+
+def integration_parameters(candidate, cohort=None):
+    key = cohort or environment("RELEASE_COHORT")
+    return dict(candidate["cohorts"][key], releaseBuildId=candidate["producer"]["build"])
+
+
+def validate_integration(build, candidate, cohort=None):
     parameters = build.get("templateParameters")
     if isinstance(parameters, str):
         parameters = json.loads(parameters)
@@ -305,7 +330,7 @@ def validate_integration(build, candidate):
         if isinstance(parameters.get(key), str):
             parameters[key] = json.loads(parameters[key])
     parameters["releaseBuildId"] = identifier(parameters.get("releaseBuildId"))
-    expected = dict(INTEGRATION_PARAMETERS, releaseBuildId=candidate["producer"]["build"])
+    expected = integration_parameters(candidate, cohort)
     repository = build["repository"]
     if (build["definition"]["id"] != 147 or repository.get("id") != REPOSITORY
             or repository.get("type") != "GitHub" or repository.get("name") not in (None, REPOSITORY)
@@ -327,17 +352,26 @@ def existing_integration(candidate) -> dict | None:
     builds = ado("build/builds?" + query)["value"]
     if len(builds) >= 1000:
         raise ValueError("Too many child builds to prove unique ownership; inspect pipeline 147 before retrying.")
-    matches = []
+    matches = {key: [] for key in candidate["cohorts"]}
     for build in builds:
         parameters = build.get("templateParameters", {})
         if isinstance(parameters, str):
             parameters = json.loads(parameters)
         if str(parameters.get("releaseBuildId", "")) == candidate["producer"]["build"]:
-            validate_integration(build, candidate)
-            matches.append(build)
-    if len(matches) > 1:
+            scopes = []
+            for key in candidate["cohorts"]:
+                try:
+                    validate_integration(build, candidate, key)
+                    scopes.append(key)
+                except ValueError:
+                    continue
+            if len(scopes) != 1:
+                raise ValueError("An owned child has an unexpected release cohort or source.")
+            matches[scopes[0]].append(build)
+    if any(len(builds) > 1 for builds in matches.values()):
         raise ValueError("Multiple children reference this release; resolve the duplicate cohorts before proceeding.")
-    return matches[0] if matches else None
+    selected = matches[environment("RELEASE_COHORT")]
+    return selected[0] if selected else None
 
 
 def cancel_integration(record, directory):
@@ -347,10 +381,11 @@ def cancel_integration(record, directory):
         if existing is None:
             print("No child of this release was found; no cancellation request was sent.", flush=True)
             return
-        run = {"id": identifier(existing.get("id")), "producer": candidate["producer"]}
+        run = {"id": identifier(existing.get("id")), "producer": candidate["producer"],
+               "cohort": environment("RELEASE_COHORT")}
     else:
         run = read(record)
-    if run["producer"] != candidate["producer"]:
+    if run["producer"] != candidate["producer"] or run["cohort"] != environment("RELEASE_COHORT"):
         raise ValueError("Refusing to cancel a child owned by another release.")
     build = ado(f"build/builds/{identifier(run['id'])}")
     validate_integration(build, candidate)
@@ -359,23 +394,51 @@ def cancel_integration(record, directory):
         print(f"Requested cancellation of pipeline 147 build {run['id']}.", flush=True)
 
 
-def integrate(directory, record, timeout=19800):
+def safe_queue_delay(now=None):
+    now = now or datetime.now(timezone.utc)
+    cleanup = now.replace(hour=13, minute=0, second=0, microsecond=0)
+    if cleanup <= now < cleanup + timedelta(minutes=30):
+        return (cleanup + timedelta(minutes=30) - now).total_seconds()
+    if cleanup <= now:
+        cleanup += timedelta(days=1)
+    if cleanup - now < timedelta(hours=8):
+        return (cleanup + timedelta(minutes=30) - now).total_seconds()
+    return 0
+
+
+def admit_integration():
+    deadline = time.monotonic() + 9 * 3600
+    query = urlencode({
+        "definitions": "109,147,166", "statusFilter": "inProgress,notStarted,postponed,cancelling", "$top": 100,
+    })
+    while True:
+        delay = safe_queue_delay()
+        if not delay and not ado("build/builds?" + query)["value"]:
+            return
+        if time.monotonic() >= deadline:
+            raise TimeoutError("No safe IoT integration window within nine hours; no child was queued.")
+        print("Waiting without Azure resources for cleanup headroom and an idle IoT pipeline family.", flush=True)
+        time.sleep(min(60, delay or 60))
+
+
+def integrate(directory, record, timeout=25200):
     candidate = verify_candidate(directory)
     payload = {
         "definition": {"id": 147}, "sourceBranch": candidate["sourceBranch"],
         "sourceVersion": candidate["sourceCommit"],
         "templateParameters": {
             key: value if isinstance(value, str) else json.dumps(value)
-            for key, value in dict(INTEGRATION_PARAMETERS, releaseBuildId=candidate["producer"]["build"]).items()
+            for key, value in integration_parameters(candidate).items()
         },
     }
     run = existing_integration(candidate)
     if run is None:
         if int(os.environ.get("SYSTEM_JOBATTEMPT", "1")) != 1:
             raise ValueError("No child found on a retried job; do not risk requeuing an uncertain prior request.")
+        admit_integration()
         run = ado("build/builds", method="POST", data=payload)
     run_id = identifier(run["id"])
-    write(record, {"id": run_id, "producer": candidate["producer"]})
+    write(record, {"id": run_id, "producer": candidate["producer"], "cohort": environment("RELEASE_COHORT")})
     print(f"##vso[task.setvariable variable=integrationBuildId]{run_id}", flush=True)
     print(f"Integration: https://dev.azure.com/azureiotdevxp/aziotcli/_build/results?buildId={run_id}", flush=True)
 
@@ -411,8 +474,13 @@ def verify_integration_artifacts(directory, artifacts):
     if not wheels or any(digest(path) != candidate["wheel"]["sha256"] for path in wheels):
         raise ValueError("Integration did not retain the exact release candidate wheel.")
     manifests = list(artifacts.glob("integration-wheel-*/candidate.json"))
-    if not manifests or any(read(path) != candidate for path in manifests):
+    if ({path.parent for path in manifests} != {path.parent for path in wheels}
+            or any(read(path) != candidate for path in manifests)):
         raise ValueError("Integration candidate provenance is missing or differs from the release.")
+    sboms = list(artifacts.glob("integration-wheel-*/SBOM.zip"))
+    if ({path.parent for path in sboms} != {path.parent for path in wheels}
+            or any(digest(path) != candidate["sbom"]["sha256"] for path in sboms)):
+        raise ValueError("Integration did not retain the exact release candidate SBOM.")
 
 
 def automation_allowed():
@@ -732,6 +800,7 @@ def main():
             "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")),
             "mode": "Plan only; governed onboarding; no qualification, release, tag, or index PR.",
             "integrationPipeline": 147, "unitMatrix": "Python 3.10-3.13 on Ubuntu, Windows and macOS",
+            "cohorts": integration_cohorts(),
         }, indent=2))
     elif args.operation in ("resolve", "checkout"):
         checkout(args.source, resolving=args.operation == "resolve")
