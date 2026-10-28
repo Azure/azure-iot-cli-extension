@@ -112,7 +112,7 @@ stages:
                 - output: pipelineArtifact
                   path: $(Agent.TempDirectory)/release-source/dist
                   artifact: release-runtime-linux
-                  isProduction: false
+                  isProduction: true
             steps:
               - template: release-source.yml
                 parameters:
@@ -145,7 +145,7 @@ stages:
                 - output: pipelineArtifact
                   path: $(Agent.TempDirectory)/windows-runtime
                   artifact: release-runtime-windows
-                  isProduction: false
+                  isProduction: true
             steps:
               - template: release-source.yml
                 parameters:

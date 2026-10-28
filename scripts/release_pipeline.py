@@ -314,22 +314,26 @@ def runtime_receipt(source, directory, inventory):
     if not any(r["relationshipType"] == "DEPENDS_ON" and r["spdxElementId"] in package_ids
                and r["relatedSpdxElement"] in package_ids for r in manifest["relationships"]):
         raise ValueError("SBOM has no resolved dependency graph; source-only fallback is not sufficient.")
+    if (directory / "runtime-sbom").exists():
+        raise ValueError("The attested runtime SBOM directory already exists.")
     write(directory / "_manifest/runtime-provenance.json", {
         "sourceCommit": selected, "platform": sys.platform,
         "pythonVersion": ".".join(str(value) for value in sys.version_info[:3]),
         "wheel": {"file": wheels[0].name, "sha256": digest(wheels[0])},
         "manifestSha256": digest(directory / "_manifest/spdx_2.2/manifest.spdx.json"),
     })
+    # 1ES regenerates the top-level _manifest when publishing governed artifacts.
+    (directory / "_manifest").rename(directory / "runtime-sbom")
 
 
 def verify_runtime(directory, platform):
-    value = read(directory / "_manifest/runtime-provenance.json")
+    value = read(directory / "runtime-sbom/runtime-provenance.json")
     wheel = value["wheel"]
     if (value["sourceCommit"] != commit(environment("RELEASE_SOURCE_COMMIT"))
             or value["platform"] != platform or Path(wheel["file"]).name != wheel["file"]
             or not re.fullmatch(r"azure_iot-[A-Za-z0-9_.+!-]+\.whl", wheel["file"])
             or digest(directory / wheel["file"]) != wheel["sha256"]
-            or digest(directory / "_manifest/spdx_2.2/manifest.spdx.json") != value["manifestSha256"]):
+            or digest(directory / "runtime-sbom/spdx_2.2/manifest.spdx.json") != value["manifestSha256"]):
         raise ValueError("Runtime SBOM provenance or asset digest mismatch.")
     return value
 
@@ -354,8 +358,10 @@ def assemble_runtime(source, directory):
     if left["wheel"] != right["wheel"]:
         raise ValueError("Both platform SBOMs must describe the exact same wheel.")
     output = source / "dist"
-    shutil.copytree(linux, output)
-    shutil.copytree(windows / "_manifest", output / "_manifest/windows")
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copyfile(linux / left["wheel"]["file"], output / left["wheel"]["file"])
+    shutil.copytree(linux / "runtime-sbom", output / "_manifest")
+    shutil.copytree(windows / "runtime-sbom", output / "_manifest/windows")
 
 
 def create_candidate(source, directory):
