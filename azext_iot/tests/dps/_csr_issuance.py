@@ -146,7 +146,8 @@ def _delete_owned_namespace(name, record):
             try:
                 # Each deliberate attempt is fenced independently; accepted or uncertain writes are never replayed.
                 with runtime.owned_write(name, "DELETE"):
-                    budget.call(invoke, f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y --no-wait")
+                    # GET 404 can precede LRO completion and its target unlink notifications.
+                    budget.call(invoke, f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
             except HttpResponseError as error:
                 if retries >= len(NAMESPACE_DELETE_BACKOFFS):
                     raise

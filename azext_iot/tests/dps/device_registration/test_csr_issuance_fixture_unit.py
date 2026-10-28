@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import responses
-from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ForbiddenError, ResourceNotFoundError
 from azure.cli.core.commands.arm import show_exception_handler
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
@@ -31,6 +31,7 @@ from knack.query import CLIQuery
 from knack.util import CommandResultItem
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 from azext_iot.tests.adr.test_adr_readiness_unit import Clock
@@ -232,6 +233,56 @@ def namespace_delete(namespace_commands, resource, mocker):
     return SimpleNamespace(name=name, backend=namespace_commands, clock=clock, record=csr.receipts._owned(name))
 
 
+@pytest.mark.parametrize("outcome", ["completed", "failed", "timeout"])
+def test_namespace_delete_waits_for_terminal_lro_even_when_resource_is_absent(namespace_delete, scope, mocker, outcome):
+    owned = namespace_delete
+    completed_receipt = scope / "deleted-csrns.json"
+    poller = mocker.Mock()
+    if outcome == "timeout":
+        poller.done.return_value = False
+    else:
+        poller.done.side_effect = [False, True]
+
+    def result():
+        assert not completed_receipt.exists()
+        if outcome == "failed":
+            raise HttpResponseError("Namespace DELETE operation failed")
+
+    poller.result.side_effect = result
+    client = mocker.Mock()
+
+    def begin_delete(**_kwargs):
+        owned.backend.resources.pop("namespace")
+        return poller
+
+    client.namespaces.begin_delete.side_effect = begin_delete
+    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=client)
+    provider = NamespaceProvider(SimpleNamespace(cli_ctx=csr.fixtures.cli.az_cli))
+
+    def invoke(command):
+        return provider.delete(
+            namespace_name=owned.name, resource_group_name="rg",
+            no_wait="--no-wait" in shlex.split(command),
+            sleeper=owned.clock.sleep, clock=owned.clock, wait_sec=10,
+        )
+
+    invoke_command = mocker.patch.object(csr, "invoke", side_effect=invoke)
+    if outcome == "completed":
+        csr._delete_owned_namespace(owned.name, owned.record)
+    else:
+        error = HttpResponseError if outcome == "failed" else AzureResponseError
+        with pytest.raises(error, match="operation failed|Timed out"):
+            csr._delete_owned_namespace(owned.name, owned.record)
+    invoke_command.assert_called_once()
+    client.namespaces.begin_delete.assert_called_once_with(resource_group_name="rg", namespace_name=owned.name)
+    assert completed_receipt.exists() == (outcome == "completed")
+    if outcome == "timeout":
+        assert owned.clock.now == 600
+        poller.result.assert_not_called()
+    else:
+        poller.result.assert_called_once()
+
+
 @responses.activate
 @pytest.mark.parametrize("outcome", ["recovered", "persistent", "deadline", "lost-response", "server-error"])
 def test_owned_namespace_delete_retries_only_explicit_throttle_with_real_sdk(namespace_delete, scope, mocker, outcome):
@@ -253,8 +304,10 @@ def test_owned_namespace_delete_retries_only_explicit_throttle_with_real_sdk(nam
         with DeviceRegistryMgmtClient(credential, SUB, base_url=csr.receipts.target()["endpoint"]) as client:
             def invoke(command):
                 if command.startswith("iot adr ns delete "):
-                    assert command.endswith(" --no-wait")
-                    client.namespaces.begin_delete(resource_group_name="rg", namespace_name=owned.name, polling=False)
+                    assert "--no-wait" not in shlex.split(command)
+                    client.namespaces.begin_delete(
+                        resource_group_name="rg", namespace_name=owned.name, polling=False,
+                    ).result()
                 return owned.backend(command)
             mocker.patch.object(csr, "invoke", side_effect=invoke)
             if outcome == "recovered":
