@@ -155,6 +155,65 @@ def _hub_commit_rejection(message=None):
     }
 
 
+def _outbound_denial(principal=DENIED):
+    return {
+        "code": "AdrMiNotAuthorized",
+        "message": (
+            f"The namespace's outbound managed identity (principal ID {principal}) is not authorized to perform "
+            "'Microsoft.Devices/IotHubs/linkInitiate/action' on the Hub resource. ADR retried the request. "
+            "If you granted access recently, allow up to 10 minutes for it to take effect. "
+            "Otherwise grant the permission on the resource. Then resubmit the request."
+        ),
+    }
+
+
+@pytest.mark.parametrize("finish", ["succeeded", "persistent", "preflight-error", "conflicting-error"])
+def test_outbound_hub_denial_uses_guarded_native_recovery_and_remaining_budget(finish):
+    scenario = Scenario()
+    scenario.error = _outbound_denial()
+    scenario.states = ["Failed", "Failed", "Succeeded"] if finish == "succeeded" else ["Failed"] * 100
+    original = scenario.command
+
+    def command(text):
+        if text == "iot adr ns show -n ns -g rg" and scenario.writes and scenario.clock.now == 0:
+            scenario.clock.now = 208
+        return original(text)
+
+    scenario.cmd.side_effect = command
+    if finish == "preflight-error":
+        scenario.write_error = AzureResponseError("Required service role cannot be verified")
+    elif finish == "conflicting-error":
+        def conflict(body):
+            body["properties"][scenario.section]["endpoints"][scenario.name]["error"] = {"code": "OtherFailure"}
+            return body
+        scenario.transform = conflict
+
+    if finish == "succeeded":
+        assert scenario.run()["linkingState"] == "Succeeded"
+    else:
+        with pytest.raises(AzureResponseError if finish == "preflight-error" else AssertionError):
+            scenario.run()
+    assert len(scenario.writes) == (1 if finish in {"preflight-error", "conflicting-error"} else 2)
+    if len(scenario.writes) == 2:
+        assert scenario.writes[1].endswith(" --timeout 382")
+        assert " update " in scenario.writes[1]
+    if finish == "persistent":
+        assert scenario.clock.now == 600
+
+
+@pytest.mark.parametrize("change", ["principal", "action", "details"])
+def test_outbound_hub_denial_does_not_authorize_unbound_or_compound_recovery(change):
+    scenario = Scenario()
+    scenario.error = _outbound_denial(OTHER if change == "principal" else DENIED)
+    if change == "action":
+        scenario.error["message"] = scenario.error["message"].replace("/linkInitiate/action", "/write")
+    elif change == "details":
+        scenario.error["details"] = [{"code": "OtherFailure"}]
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+    assert len(scenario.writes) == 1
+
+
 def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
     scenario = Scenario("dps")
     scenario.error = _generic_rejection("DPS")
@@ -580,7 +639,7 @@ def test_update_preflight_failure_is_not_swallowed_or_bypassed():
 @pytest.mark.parametrize("identity", ["system", "user"])
 @pytest.mark.parametrize("kind,denial", [
     ("hub", "bound"), ("dps", "bound"), ("hub", "read"), ("dps", "read"),
-    ("dps", "generic"), ("dps", "inbound"), ("hub", "redacted"),
+    ("dps", "generic"), ("dps", "inbound"), ("hub", "redacted"), ("hub", "outbound"),
 ])
 def test_recovery_path_preserves_grant_evidence_boundary_between_commands(mocker, kind, denial, identity):
     h = _harness(mocker, kind, identity)
@@ -595,7 +654,9 @@ def test_recovery_path_preserves_grant_evidence_boundary_between_commands(mocker
         h.denial = _resource_mi_rejection()
     elif denial == "redacted":
         h.denial = _hub_commit_rejection()
-    waited = denial in {"bound", "read"}
+    elif denial == "outbound":
+        h.denial = _outbound_denial(readiness.resolve_namespace_outbound_principal(h.namespace))
+    waited = denial in {"bound", "read", "outbound"}
     section = LINKS[kind][0]
     pending_states = []
     providers = [h.provider]
