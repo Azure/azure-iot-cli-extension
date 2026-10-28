@@ -461,16 +461,17 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                         self._owned_group_readers = {}
                     claim = self._owned_group_readers.get(path.casefold())
                     if claim is None:
-                        claim = {**binding, "request": request}
+                        claim = {**binding, "request": request, "statuses": []}
                         self._owned_group_readers[path.casefold()] = claim
                     else:
                         # The SDK retries the same request; a new request must not adopt its ownership.
                         assert claim["request"] is request, "Refusing a different request for an owned Reader ID."
                         assert all(claim[key] == value for key, value in binding.items()), "Reader retry binding changed."
-                        claim.pop("status", None)
+                    # A rejected retry cannot disprove an earlier successful or uncertain write.
+                    claim["statuses"].append(0)
             response = original(transport, request, **kwargs)
             if claim is not None:
-                claim["status"] = response.status_code
+                claim["statuses"][-1] = response.status_code
             return response
 
         with patch.object(RequestsTransport, "send", send):
@@ -482,8 +483,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         for key, claim in list(grants.items()):
             if claim["principalId"].casefold() != principal:
                 continue
-            status = claim.get("status", 0)
-            if 400 <= status < 500 and status != 408:
+            if all(400 <= status < 500 and status != 408 for status in claim["statuses"]):
                 del grants[key]
                 continue
 

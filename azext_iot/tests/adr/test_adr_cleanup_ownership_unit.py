@@ -15,6 +15,7 @@ from azure.core.pipeline import Pipeline
 from azure.core.pipeline.policies import RetryPolicy
 from azure.core.pipeline.transport import HttpRequest, RequestsTransport
 from knack.util import CLIError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper, is_resource_not_found_error, LINK_ROLE_IDS, READER_ROLE
 
@@ -113,7 +114,63 @@ def test_reader_recorder_preserves_sdk_retry_and_rejects_another_request(status)
                 pipeline.run(other)
     assert len(responses.calls) == 2
     assert len(helper._owned_group_readers) == 1
-    assert helper._owned_group_readers[path.casefold()]["status"] == 201
+    assert helper._owned_group_readers[path.casefold()]["statuses"] == [status, 201]
+
+
+@responses.activate
+@pytest.mark.parametrize("statuses,reconcile", [
+    ((503, 403), True),
+    ((408, 403), True),
+    ((None, 403), True),
+    ((503, 429, 403), True),
+    ((429, 403), False),
+])
+def test_reader_cleanup_reconciles_earlier_uncertain_attempt_after_rejected_retry(mocker, statuses, reconcile):
+    helper = ADRFullInfraHelper()
+    principal = "11111111-2222-3333-4444-555555555555"
+    resource = ("identity", "owned", "rg")
+    helper._owned_principals = {resource: principal}
+    group = "/subscriptions/sub/resourceGroups/rg"
+    role = {
+        "id": group + "/providers/Microsoft.Authorization/roleAssignments/role-id",
+        "name": "role-id", "scope": group, "principalId": principal,
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "/subscriptions/sub/providers/Microsoft.Authorization/roleDefinitions/"
+        + LINK_ROLE_IDS[READER_ROLE],
+    }
+    url = "https://management.azure.com" + role["id"]
+    for status in statuses:
+        if status is None:
+            responses.add("PUT", url, body=RequestsConnectionError("response lost"))
+        else:
+            responses.add("PUT", url, status=status, json={})
+    with helper.record_group_reader_assignments():
+        with Pipeline(transport=RequestsTransport(), policies=[RetryPolicy(retry_total=2, retry_backoff_factor=0)]) as pipeline:
+            request = HttpRequest("PUT", url)
+            request.set_json_body({"properties": {
+                key: role[key] for key in ("principalId", "principalType", "roleDefinitionId")
+            }})
+            assert pipeline.run(request).http_response.status_code == 403
+    assert len(responses.calls) == len(statuses)
+    roles = [role]
+
+    def command(text):
+        if text.startswith("role assignment delete"):
+            roles.clear()
+        return SimpleNamespace(get_output_in_json=lambda: list(roles))
+
+    helper.cmd = Mock(side_effect=command)
+    mocker.patch.object(helper, "_resource_is_absent", return_value=False)
+    helper._delete_owned_resource(*resource)
+    lookup = (
+        f"role assignment list --scope {group} --assignee-object-id {principal} "
+        "--fill-principal-name false --subscription sub"
+    )
+    expected = [
+        call(lookup), call(f"role assignment delete --ids {role['id']} --subscription sub"), call(lookup),
+    ] if reconcile else []
+    assert helper.cmd.call_args_list == [*expected, call("identity delete -n owned -g rg")]
+    assert not helper._owned_group_readers
 
 
 def _assert_lookup_cannot_claim_resource(error, expected_type=None):
