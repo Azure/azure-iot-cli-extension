@@ -207,11 +207,11 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
-        no_wait=False, skip_rbac_check=False, grant_reader=False,
+        no_wait=False, no_rbac_check=False, grant_reader=False,
     ):
-        if skip_rbac_check and grant_reader:
+        if no_rbac_check and grant_reader:
             raise MutuallyExclusiveArgumentError(
-                "--grant-reader cannot be combined with --no-rbac-check (or its alias --skip-rbac-check)."
+                "--grant-reader cannot be combined with --no-rbac-check."
             )
         logger.warning("%s", HUB_UNLINK_WARNING if section == "messaging" else UNLINK_WARNING)
         namespace, etag = self.client.namespaces.get(
@@ -247,7 +247,7 @@ class LinkProvider(ADRProvider):
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
         resource["properties"] = properties
-        if not skip_rbac_check:
+        if not no_rbac_check:
             self._check_unlink_permissions(namespace, endpoint, section, grant_reader=grant_reader)
         try:
             poller = self.client.namespaces.begin_create_or_replace(
@@ -337,29 +337,29 @@ class LinkProvider(ADRProvider):
 
     def hub_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
     def dps_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
     def su_remove(
         self, endpoint_name: str, namespace_name: str, resource_group_name: str,
-        no_wait: bool = False, skip_rbac_check: bool = False, grant_reader: bool = False,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
     ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
-            no_wait=no_wait, skip_rbac_check=skip_rbac_check, grant_reader=grant_reader,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
     def _patch_link(

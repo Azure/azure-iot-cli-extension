@@ -243,9 +243,9 @@ def test_delete_preflight_failure_warns_and_continues(fixture_cmd, unlink_rbac, 
     pytest.param({"id": "invalid"}, id="object"),
     pytest.param(True, id="boolean"),
 ])
-@pytest.mark.parametrize("skip", [False, True])
+@pytest.mark.parametrize("no_rbac_check", [False, True])
 def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
-    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, resource_id, skip,
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, resource_id, no_rbac_check,
 ):
     source = namespace()
     source["properties"][section]["endpoints"]["primary"]["resourceId"] = resource_id
@@ -255,23 +255,23 @@ def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
         network.put(URL, json=completed)
 
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
-            "primary", "ns", "rg", skip_rbac_check=skip,
+            "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
 
         assert result == completed
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
         assert "primary" not in json.loads(network.calls[1].request.body)["properties"][section]["endpoints"]
-        assert ("did not include a string resourceId" in caplog.text) is (not skip)
-        assert ("Continuing without changing role assignments" in caplog.text) is (not skip)
+        assert ("did not include a string resourceId" in caplog.text) is (not no_rbac_check)
+        assert ("Continuing without changing role assignments" in caplog.text) is (not no_rbac_check)
         unlink_rbac.check_unlink_read_access.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("prefix", ["", "/subscriptions/sub", "/resourceGroups/rg"])
-@pytest.mark.parametrize("skip", [False, True])
+@pytest.mark.parametrize("no_rbac_check", [False, True])
 def test_delete_real_sdk_unscoped_resource_id_is_advisory(
-    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, prefix, skip,
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, prefix, no_rbac_check,
 ):
     source = namespace()
     source["properties"][section]["endpoints"]["primary"]["resourceId"] = f"{prefix}/providers/{_endpoint_type}/primary"
@@ -280,7 +280,7 @@ def test_delete_real_sdk_unscoped_resource_id_is_advisory(
         network.get(URL, json=source, headers={"ETag": ETAG})
         network.put(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
-            "primary", "ns", "rg", skip_rbac_check=skip,
+            "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
         assert result == completed
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
@@ -288,8 +288,8 @@ def test_delete_real_sdk_unscoped_resource_id_is_advisory(
         body = json.loads(network.calls[1].request.body)
         assert "primary" not in body["properties"][section]["endpoints"]
         assert body["identity"]["userAssignedIdentities"] == {UAMI: {}}
-    assert ("resource-group-scoped ARM resource ID" in caplog.text) is (not skip)
-    assert ("Continuing without changing role assignments" in caplog.text) is (not skip)
+    assert ("resource-group-scoped ARM resource ID" in caplog.text) is (not no_rbac_check)
+    assert ("Continuing without changing role assignments" in caplog.text) is (not no_rbac_check)
     unlink_rbac.check_unlink_read_access.assert_not_called()
 
 
@@ -306,17 +306,17 @@ def test_delete_real_sdk_unscoped_resource_id_is_advisory(
     pytest.param([], id="empty-list"),
     pytest.param([{"id": UAMI}], id="list-of-objects"),
 ])
-@pytest.mark.parametrize("outbound_type,state,skip", [
+@pytest.mark.parametrize("outbound_type,state,no_rbac_check", [
     pytest.param("UserAssigned", "Succeeded", False, id="user-advisory"),
-    pytest.param("UserAssigned", "Succeeded", True, id="user-skip"),
+    pytest.param("UserAssigned", "Succeeded", True, id="user-no-rbac-check"),
     pytest.param("SystemAssigned", "Succeeded", False, id="system-advisory"),
-    pytest.param("SystemAssigned", "Succeeded", True, id="system-skip"),
+    pytest.param("SystemAssigned", "Succeeded", True, id="system-no-rbac-check"),
     pytest.param("UserAssigned", "Failed", False, id="failed-link"),
     pytest.param("SystemAssigned", "LinkedResourceDeleted", False, id="deleted-resource"),
 ])
 def test_delete_real_sdk_rejects_malformed_identity_containers_before_preflight(
     fixture_cmd, unlink_client, unlink_rbac, mocker, caplog,
-    kind, section, _endpoint_type, field, value, outbound_type, state, skip,
+    kind, section, _endpoint_type, field, value, outbound_type, state, no_rbac_check,
 ):
     source = namespace()
     source["properties"]["outboundIdentity"]["type"] = outbound_type
@@ -331,7 +331,7 @@ def test_delete_real_sdk_rejects_malformed_identity_containers_before_preflight(
     with responses.RequestsMock() as network:
         network.get(URL, json=source, headers={"ETag": ETAG})
         with pytest.raises(AzureResponseError, match="attached identities cannot be safely preserved") as error:
-            getattr(provider, kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+            getattr(provider, kind + "_remove")("primary", "ns", "rg", no_rbac_check=no_rbac_check)
         assert field in str(error.value)
         assert [call.request.method for call in network.calls] == ["GET"]
     assert source == original
@@ -341,14 +341,14 @@ def test_delete_real_sdk_rejects_malformed_identity_containers_before_preflight(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("skip", [False, True])
-def test_delete_rejects_non_string_attached_identity_keys(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, skip):
+@pytest.mark.parametrize("no_rbac_check", [False, True])
+def test_delete_rejects_non_string_attached_identity_keys(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, no_rbac_check):
     source = namespace()
     source["identity"]["userAssignedIdentities"] = {123: {}}
     client = Mock()
     client.namespaces.get.return_value = (source, ETAG)
     with pytest.raises(AzureResponseError, match="identity.userAssignedIdentities"):
-        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", no_rbac_check=no_rbac_check)
     client.namespaces.begin_create_or_replace.assert_not_called()
     unlink_rbac.check_unlink_read_access.assert_not_called()
 
@@ -374,9 +374,9 @@ def test_delete_rejects_non_string_attached_identity_keys(fixture_cmd, unlink_rb
         id="multiple-attachments",
     ),
 ])
-@pytest.mark.parametrize("skip", [False, True])
+@pytest.mark.parametrize("no_rbac_check", [False, True])
 def test_delete_real_sdk_preserves_supported_identity_shapes(
-    fixture_cmd, unlink_client, kind, section, _endpoint_type, identity, expected, skip,
+    fixture_cmd, unlink_client, kind, section, _endpoint_type, identity, expected, no_rbac_check,
 ):
     source = namespace()
     source["identity"] = identity
@@ -387,7 +387,7 @@ def test_delete_real_sdk_preserves_supported_identity_shapes(
         network.get(URL, json=source, headers={"ETag": ETAG})
         network.put(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
-            "primary", "ns", "rg", skip_rbac_check=skip,
+            "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
         assert result == completed
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
@@ -408,14 +408,14 @@ def test_delete_real_sdk_preserves_supported_identity_shapes(
     pytest.param("attached-details", True, id="attached-details-boolean"),
     pytest.param("outbound", ["bad-outbound"], id="outbound-identity-list"),
 ])
-@pytest.mark.parametrize("state,skip", [
+@pytest.mark.parametrize("state,no_rbac_check", [
     pytest.param("Succeeded", False, id="advisory"),
-    pytest.param("Succeeded", True, id="explicit-skip"),
+    pytest.param("Succeeded", True, id="no-rbac-check"),
     pytest.param("Failed", False, id="failed-link"),
     pytest.param("LinkedResourceDeleted", False, id="deleted-resource"),
 ])
 def test_delete_real_sdk_malformed_identity_is_advisory(
-    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, field, value, state, skip,
+    fixture_cmd, unlink_client, unlink_rbac, caplog, kind, section, _endpoint_type, field, value, state, no_rbac_check,
 ):
     source = namespace()
     source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
@@ -431,7 +431,7 @@ def test_delete_real_sdk_malformed_identity_is_advisory(
         network.get(URL, json=source, headers={"ETag": ETAG})
         network.put(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
-            "primary", "ns", "rg", skip_rbac_check=skip,
+            "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
         assert result == completed
         assert source == original
@@ -441,8 +441,8 @@ def test_delete_real_sdk_malformed_identity_is_advisory(
         assert "primary" not in body["properties"][section]["endpoints"]
         assert body["properties"]["outboundIdentity"] == source["properties"]["outboundIdentity"]
         assert body["identity"] == {"type": source["identity"]["type"], "userAssignedIdentities": {UAMI: {}}}
-        assert ("Could not verify" in caplog.text) is (state == "Succeeded" and not skip)
-        assert ("Continuing without changing role assignments" in caplog.text) is (state == "Succeeded" and not skip)
+        assert ("Could not verify" in caplog.text) is (state == "Succeeded" and not no_rbac_check)
+        assert ("Continuing without changing role assignments" in caplog.text) is (state == "Succeeded" and not no_rbac_check)
         unlink_rbac.check_unlink_read_access.assert_not_called()
 
 
@@ -541,23 +541,23 @@ def test_delete_conflict_warns_and_preserves_original_exception(
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("no_wait", [False, True])
-@pytest.mark.parametrize("skip", [False, True])
+@pytest.mark.parametrize("no_rbac_check", [False, True])
 @pytest.mark.parametrize("grant_reader", [False, True])
 def test_delete_command_handler_forwards_selectors_and_flags(
-    mocker, kind, section, _endpoint_type, no_wait, skip, grant_reader,
+    mocker, kind, section, _endpoint_type, no_wait, no_rbac_check, grant_reader,
 ):
     provider_type = mocker.patch.object(commands_link, "LinkProvider")
     handler = getattr(commands_link, f"adr_link_{kind}_remove")
     cmd, client = Mock(), Mock()
     assert handler(
-        cmd, client, "primary", "ns", "rg", no_wait=no_wait, skip_rbac_check=skip, grant_reader=grant_reader,
+        cmd, client, "primary", "ns", "rg", no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
     ) is getattr(
         provider_type.return_value, kind + "_remove",
     ).return_value
     provider_type.assert_called_once_with(cmd, client=client)
     getattr(provider_type.return_value, kind + "_remove").assert_called_once_with(
         endpoint_name="primary", namespace_name="ns", resource_group_name="rg",
-        no_wait=no_wait, skip_rbac_check=skip, grant_reader=grant_reader,
+        no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
     )
 
 
@@ -930,15 +930,15 @@ def test_delete_rejects_composite_and_wait_options(offline_cli, kind, option):
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("state", ["Succeeded", "Failed", "LinkedResourceDeleted"])
-@pytest.mark.parametrize("skip", [False, True])
+@pytest.mark.parametrize("no_rbac_check", [False, True])
 def test_delete_warning_explains_state_and_hub_prerequisites(
-    fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, state, skip,
+    fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, state, no_rbac_check,
 ):
     source = namespace()
     source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
     client = Mock()
     client.namespaces.get.return_value = (source, ETAG)
-    getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", skip_rbac_check=skip)
+    getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", no_rbac_check=no_rbac_check)
     assert "For a Succeeded link, delete the linked resource first" in caplog.text
     assert "Failed links do not require the linked resource to be deleted." in caplog.text
     assert ("EndpointUsedByNestedDevices" in caplog.text) is (kind == "hub")
@@ -946,13 +946,13 @@ def test_delete_warning_explains_state_and_hub_prerequisites(
     if kind == "hub":
         assert "Hub endpoints, including Failed links" in caplog.text
         assert "Deleting the IoT Hub does not clear these references." in caplog.text
-    assert unlink_rbac.check_unlink_read_access.call_count == (state == "Succeeded" and not skip)
+    assert unlink_rbac.check_unlink_read_access.call_count == (state == "Succeeded" and not no_rbac_check)
     client.namespaces.begin_create_or_replace.assert_called_once()
 
 
 @pytest.mark.parametrize("state", ["Succeeded", "Failed"])
-@pytest.mark.parametrize("skip", [False, True])
-def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, unlink_client, caplog, state, skip):
+@pytest.mark.parametrize("no_rbac_check", [False, True])
+def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, unlink_client, caplog, state, no_rbac_check):
     source = namespace()
     source["properties"]["messaging"]["endpoints"]["primary"]["linkingState"] = state
     with responses.RequestsMock() as network:
@@ -961,7 +961,7 @@ def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, u
             "code": "EndpointUsedByNestedDevices", "message": "Registry Devices still reference this Hub endpoint.",
         }})
         with pytest.raises(HttpResponseError) as raised:
-            LinkProvider(fixture_cmd, client=unlink_client).hub_remove("primary", "ns", "rg", skip_rbac_check=skip)
+            LinkProvider(fixture_cmd, client=unlink_client).hub_remove("primary", "ns", "rg", no_rbac_check=no_rbac_check)
         assert raised.value.status_code == 400
         assert raised.value.error.code == "EndpointUsedByNestedDevices"
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
@@ -1057,8 +1057,8 @@ def test_live_unlink_inline_failure_requires_the_same_failed_namespace(state, fo
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("no_wait", [False, True])
-@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
-def test_delete_real_cli_rbac_skip_is_independent_of_yes_and_no_wait(
+@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--grant-reader"])
+def test_delete_real_cli_no_rbac_check_is_independent_of_yes_and_no_wait(
     offline_cli, mocker, unlink_rbac, kind, section, _endpoint_type, no_wait, option,
 ):
     mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=(namespace(), ETAG))
@@ -1073,7 +1073,7 @@ def test_delete_real_cli_rbac_skip_is_independent_of_yes_and_no_wait(
     if no_wait:
         args.append("--no-wait")
     assert offline_cli.invoke(args, out_file=output) == 0
-    if option in ("--no-rbac-check", "--skip-rbac-check"):
+    if option == "--no-rbac-check":
         unlink_rbac.check_unlink_read_access.assert_not_called()
     else:
         unlink_rbac.check_unlink_read_access.assert_called_once_with(
@@ -1084,23 +1084,23 @@ def test_delete_real_cli_rbac_skip_is_independent_of_yes_and_no_wait(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-def test_delete_skip_rbac_check_does_not_bypass_etag_or_endpoint_validation(
+def test_delete_no_rbac_check_does_not_bypass_etag_or_endpoint_validation(
     fixture_cmd, unlink_rbac, kind, section, _endpoint_type,
 ):
     client = Mock()
     client.namespaces.get.return_value = (namespace(), None)
     provider = LinkProvider(fixture_cmd, client=client)
     with pytest.raises(AzureResponseError, match="usable ETag"):
-        getattr(provider, kind + "_remove")("primary", "ns", "rg", skip_rbac_check=True)
+        getattr(provider, kind + "_remove")("primary", "ns", "rg", no_rbac_check=True)
     client.namespaces.get.return_value = (namespace(), ETAG)
     with pytest.raises(ResourceNotFoundError):
-        getattr(provider, kind + "_remove")("missing", "ns", "rg", skip_rbac_check=True)
+        getattr(provider, kind + "_remove")("missing", "ns", "rg", no_rbac_check=True)
     unlink_rbac.check_unlink_read_access.assert_not_called()
     client.namespaces.begin_create_or_replace.assert_not_called()
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-@pytest.mark.parametrize("option", ["--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
+@pytest.mark.parametrize("option", ["--no-rbac-check", "--grant-reader"])
 def test_delete_permission_flags_do_not_bypass_confirmation(offline_cli, mocker, kind, option):
     confirm = mocker.patch("azure.cli.core.commands.AzCliCommand._user_confirmed", return_value=False)
     provider = mocker.patch.object(commands_link, "LinkProvider")
@@ -1117,15 +1117,14 @@ def test_delete_permission_flags_do_not_bypass_confirmation(offline_cli, mocker,
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-@pytest.mark.parametrize("option", ["--no-rbac-check", "--skip-rbac-check"])
-def test_delete_real_cli_rejects_conflicting_permission_flags(offline_cli, mocker, unlink_rbac, caplog, kind, option):
+def test_delete_real_cli_rejects_conflicting_permission_flags(offline_cli, mocker, unlink_rbac, caplog, kind):
     get = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get")
     put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace")
     assert offline_cli.invoke([
         "iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns", "-g", "rg",
-        "--yes", option, "--grant-reader",
+        "--yes", "--no-rbac-check", "--grant-reader",
     ]) != 0
-    assert "cannot be combined" in caplog.text
+    assert "--grant-reader cannot be combined with --no-rbac-check." in caplog.text
     get.assert_not_called()
     put.assert_not_called()
     unlink_rbac.check_unlink_read_access.assert_not_called()

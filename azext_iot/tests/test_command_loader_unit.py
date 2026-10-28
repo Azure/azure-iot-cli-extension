@@ -601,14 +601,23 @@ def test_link_delete_is_registered(command_table, kind):
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--skip-rbac-check", "--grant-reader"])
+@pytest.mark.parametrize("option", [None, "--no-rbac-check", "--grant-reader"])
 def test_link_remove_permission_flags_parser(management_command_parser, kind, option):
     args = ["iot", "adr", "ns", "link", kind, "remove", *_NAMESPACE_ARGUMENTS, "-n", "primary"]
     if option:
         args.append(option)
     parsed = management_command_parser.parse_args(args)
-    assert bool(parsed.skip_rbac_check) is (option in ("--no-rbac-check", "--skip-rbac-check"))
+    assert bool(parsed.no_rbac_check) is (option == "--no-rbac-check")
     assert bool(parsed.grant_reader) is (option == "--grant-reader")
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+def test_link_remove_rejects_unsupported_rbac_flag(management_command_parser, kind):
+    with pytest.raises(SystemExit) as error:
+        management_command_parser.parse_args([
+            "iot", "adr", "ns", "link", kind, "remove", *_NAMESPACE_ARGUMENTS, "-n", "primary", "--skip-rbac-check",
+        ])
+    assert error.value.code == 2
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)

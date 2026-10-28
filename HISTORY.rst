@@ -14,12 +14,12 @@ Release History
 **ADR unlink permission checks**
 
 * Namespace ``link hub|dps|su remove`` now defaults to a state-aware, read-only advisory permission check instead of creating Reader assignments or blocking on preflight failures. ``LinkedResourceDeleted`` and ``Failed`` endpoints skip the check. ``Succeeded`` endpoints check the outbound identity's read-grant evidence at the linked resource's resource group, or subscription when that group is confirmed deleted.
-* By default, missing access, unavailable checks, malformed linked resource IDs and other endpoint states warn and continue, leaving ADR authoritative. Added ``--no-rbac-check`` with ``--skip-rbac-check`` as an alias; ``--yes`` still skips only confirmation. Custom roles, conditions, group membership and deny assignments are not fully evaluated.
+* By default, missing access, unavailable checks, malformed linked resource IDs and other endpoint states warn and continue, leaving ADR authoritative. Added ``--no-rbac-check``; ``--yes`` still skips only confirmation. Custom roles, conditions, group membership and deny assignments are not fully evaluated.
 * Malformed outbound identity metadata and resource-group response deserialization failures warn and continue during advisory preflight; namespace write and polling errors still propagate.
-* Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--skip-rbac-check``. Valid identity assignments are preserved.
+* Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--no-rbac-check``. Valid identity assignments are preserved.
 * Unlink guidance limits target deletion to ``Succeeded`` links and explains that Hub endpoints, including failed links, require clearing Registry Device IoT Hub capability references first.
 * Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed by default.
-* Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check`` or its alias. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
+* Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check``. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
 
 **Shared command fixes**
 
