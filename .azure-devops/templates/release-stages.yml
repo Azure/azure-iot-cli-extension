@@ -153,6 +153,8 @@ stages:
               - template: release-feed.yml
               - download: current
                 artifact: release-runtime-linux
+              - script: python -m pip install packaging
+                displayName: Install runtime SBOM validation dependency from the authenticated feed
               - script: >-
                   python scripts/release_pipeline.py windows-runtime
                   --source "$(Agent.TempDirectory)/release-source"
