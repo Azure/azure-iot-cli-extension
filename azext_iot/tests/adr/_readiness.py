@@ -342,6 +342,22 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
     )
 
 
+def _outbound_hub_authorization_failure(endpoint, binding):
+    request = binding.authorization_request or {}
+    principal = request.get("namespace_principal_id")
+    if binding.kind != "hub" or not principal:
+        return False
+    return endpoint.get("linkingError") == {
+        "code": "AdrMiNotAuthorized",
+        "message": (
+            f"The namespace's outbound managed identity (principal ID {principal}) is not authorized to perform "
+            "'Microsoft.Devices/IotHubs/linkInitiate/action' on the Hub resource. ADR retried the request. "
+            "If you granted access recently, allow up to 10 minutes for it to take effect. "
+            "Otherwise grant the permission on the resource. Then resubmit the request."
+        ),
+    }
+
+
 def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, now=None):
     """Keep the legacy read shape; share the production linkInitiate classifier."""
     properties = namespace["properties"]
@@ -354,7 +370,8 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
         _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now)
         or _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now)
     )
-    if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection:
+    outbound_denial = _outbound_hub_authorization_failure(endpoint, binding)
+    if error.get("code") != "LinkInitiateFailed" and not fresh_grant_rejection and not outbound_denial:
         return "read" if _read_authorization_failure(endpoint, binding.name) else None
     if (
         endpoint.get("error") or (endpoint.get("status") or {}).get("error")
@@ -363,6 +380,8 @@ def _authorization_failure(namespace, endpoint, binding, *, submitted_at=None, n
         return None
     if error.get("code") == "LinkInitiateFailed" and binding.authorized_failure(endpoint):
         return "bound-link-initiate"
+    if outbound_denial and binding.authorized_failure(endpoint):
+        return "bound-authorization"
     if fresh_grant_rejection:
         return "fresh-grant"
     return None

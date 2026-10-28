@@ -243,7 +243,7 @@ class ScopedTransport(HttpTransport):
                 journal["readerGrant"] = reader_binding
             receipts.write(f"mutation-{fence['receipt']}.json", journal, exclusive=True)
         response = self.inner.send(request, **kwargs)
-        if fence and reader_binding is not None:
+        if fence and (reader_binding is not None or request.method == "DELETE"):
             receipts.write(f"mutation-{fence['receipt']}.json", {**journal, "responseStatus": response.status_code})
         return response
 
