@@ -4,7 +4,8 @@ parameters:
   - name: service
     type: string
   - name: pythonVersions
-    type: object
+    # Object parameters coerce version identifiers such as 3.10 to 3.1.
+    type: string
   - name: regions
     type: object
 
@@ -25,7 +26,7 @@ stages:
         strategy:
           maxParallel: 1
           matrix:
-            ${{ each python in parameters.pythonVersions }}:
+            ${{ each python in split(parameters.pythonVersions, ' ') }}:
               ${{ each region in parameters.regions }}:
                 ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
                   python: ${{ python }}

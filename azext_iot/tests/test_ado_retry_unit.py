@@ -384,7 +384,7 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
     assert stages == [{each: [{
         "template": "templates/integration-service.yml",
         "parameters": {
-            "service": "${{ service }}", "pythonVersions": "${{ parameters.pythonVersions }}",
+            "service": "${{ service }}", "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             "regions": "${{ split(parameters.regions, ',') }}",
         },
     }]}]

@@ -214,7 +214,7 @@ stages:
               - template: templates/integration-service.yml
                 parameters:
                   service: ${{ service }}
-                  pythonVersions: ${{ parameters.pythonVersions }}
+                  pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
                   regions: ${{ split(parameters.regions, ',') }}
       - stage: Qualify
         displayName: Verify all expected cases and publish coverage
