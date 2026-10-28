@@ -148,6 +148,63 @@ stages:
                 inputs:
                   packageType: sdk
                   version: 6.0.x
+              - task: UseDotNet@2
+                displayName: Install .NET 8 runtime for MSDO AntiMalware
+                inputs:
+                  packageType: runtime
+                  version: 8.0.x
+              - pwsh: |
+                  $ErrorActionPreference = 'Stop'
+                  $update = Join-Path $env:AGENT_TEMPDIRECTORY "defender-signatures-$env:SYSTEM_JOBATTEMPT.exe"
+                  if (Test-Path $update) { throw "Defender update staging path already exists." }
+                  Invoke-WebRequest 'https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' -OutFile $update
+                  $signature = Get-AuthenticodeSignature $update
+                  if ($signature.Status -ne 'Valid' -or
+                      $signature.SignerCertificate.Subject -notmatch '(^|,\s*)O=Microsoft Corporation(,|$)') {
+                    throw "The Defender update does not have a trusted Microsoft signature."
+                  }
+                  $process = Start-Process -FilePath $update -Wait -PassThru
+                  if ($process.ExitCode -ne 0) { throw "Defender update failed with exit code $($process.ExitCode)." }
+                  Get-MpComputerStatus | Select-Object AntivirusSignatureVersion, AntivirusSignatureLastUpdated
+                name: updateDefender
+                displayName: Install signed Microsoft Defender security intelligence
+                timeoutInMinutes: 5
+              - pwsh: |
+                  $ErrorActionPreference = 'Stop'
+                  $id = 'microsoft.security.devops.cli.win-x64'
+                  $version = '0.215.0'
+                  # SHA-512 published in the NuGet catalog for this exact package version.
+                  $expectedHash = 'B314D6DDA33FA08B3BD9629787B900E8BBF4B08B923D23B32E2FF1DFE64D2E9C7DB8862BB1B9016E7E918A6CDE4CB9CF0C52A83E5CC335AE485BB8B3E7AB7431'
+                  if ([string]::IsNullOrWhiteSpace($env:SYSTEM_ACCESSTOKEN) -or $env:SYSTEM_ACCESSTOKEN.Contains('$(')) {
+                      throw 'The pipeline job token is required to stage MSDO.'
+                  }
+                  $destination = Join-Path $env:AGENT_TEMPDIRECTORY "msdo-$version-$env:SYSTEM_JOBATTEMPT"
+                  if (Test-Path -LiteralPath $destination) { throw 'MSDO staging must use a fresh directory.' }
+                  New-Item -ItemType Directory -Path $destination | Out-Null
+                  $archive = Join-Path $destination "$id.$version.zip"
+                  $feed = 'https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/nuget/v3/flat2'
+                  Invoke-WebRequest "$feed/$id/$version/$id.$version.nupkg" -OutFile $archive `
+                      -Headers @{Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"} -TimeoutSec 120
+                  $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash
+                  if ($actualHash -cne $expectedHash) { throw 'MSDO package digest differs from the pinned publisher digest.' }
+                  Expand-Archive -LiteralPath $archive -DestinationPath $destination
+                  $manifests = @(Get-ChildItem -LiteralPath $destination -Filter '*.nuspec' -File)
+                  if ($manifests.Count -ne 1) { throw 'Expected exactly one MSDO package manifest.' }
+                  [xml]$manifest = Get-Content -LiteralPath $manifests[0].FullName -Raw
+                  if ($manifest.package.metadata.id -ine $id -or $manifest.package.metadata.version -cne $version) {
+                      throw 'MSDO package identity or version differs from the pinned package.'
+                  }
+                  $tools = Join-Path $destination 'tools'
+                  if (-not (Test-Path -LiteralPath (Join-Path $tools 'guardian.cmd') -PathType Leaf)) {
+                      throw 'The verified MSDO package does not contain its Windows launcher.'
+                  }
+                  Write-Host "Staged MSDO $version from the approved feed; SHA512=$actualHash"
+                  Write-Host "##vso[task.setvariable variable=directory;isOutput=true]$tools"
+                  Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                name: stageMsdo
+                displayName: Stage the pinned MSDO engine from the authenticated package feed
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               - task: MicrosoftSecurityDevOps@1
                 displayName: Run the existing security tool suite; fail on high findings
                 inputs:
@@ -155,6 +212,9 @@ stages:
                   publish: true
                   artifactName: release-security-$(System.JobAttempt)
                 env:
+                  MSDO_DIRECTORY: $(stageMsdo.directory)
+                  MSDO_FILEPATH: $(stageMsdo.directory)/guardian.cmd
+                  MSDO_VERSION: $(stageMsdo.version)
                   GDN_BANDIT_TARGET: $(Build.SourcesDirectory)/azext_iot
                   GDN_BANDIT_RECURSIVE: "true"
                   BUILD_SOURCEVERSION: $(sourceCommit)
