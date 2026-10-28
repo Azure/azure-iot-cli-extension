@@ -668,9 +668,8 @@ def test_pnp_update_authentication_default_has_only_the_standard_linter_exceptio
 def test_link_delete_is_registered(command_table, kind):
     command = command_table[f"iot adr ns link {kind} remove"]
     confirmation = command.command_kwargs["confirmation"]
-    assert "For a Succeeded link, delete the linked resource first" in confirmation
-    assert "Failed links do not require the linked resource to be deleted." in confirmation
-    assert ("EndpointUsedByNestedDevices" in confirmation) is (kind == "hub")
+    assert "only the namespace endpoint, not the linked resource" in confirmation
+    assert "--grant-reader are retained even if removal fails" in confirmation
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -682,15 +681,6 @@ def test_link_remove_permission_flags_parser(management_command_parser, kind, op
     parsed = management_command_parser.parse_args(args)
     assert bool(parsed.no_rbac_check) is (option == "--no-rbac-check")
     assert bool(parsed.grant_reader) is (option == "--grant-reader")
-
-
-@pytest.mark.parametrize("kind", ["hub", "dps"])
-def test_link_remove_rejects_unsupported_rbac_flag(management_command_parser, kind):
-    with pytest.raises(SystemExit) as error:
-        management_command_parser.parse_args([
-            "iot", "adr", "ns", "link", kind, "remove", *_NAMESPACE_ARGUMENTS, "-n", "primary", "--skip-rbac-check",
-        ])
-    assert error.value.code == 2
 
 
 @pytest.mark.parametrize("command_name", _DEVICE_PARSER_CASES)

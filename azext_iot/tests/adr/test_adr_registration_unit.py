@@ -14,8 +14,7 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
-    HUB_UNLINK_WARNING,
-    UNLINK_WARNING,
+    UNLINK_CONFIRMATION,
     adr_link_ops,
     adr_link_wait_ops,
     adr_schema_ops,
@@ -170,10 +169,9 @@ def test_2026_command_surface_is_registered():
         assert commands[f"{group} create"][2] == {}
         assert f"{group} update" not in commands
     for endpoint in ("hub", "dps"):
-        warning = HUB_UNLINK_WARNING if endpoint == "hub" else UNLINK_WARNING
         assert commands[f"iot adr ns link {endpoint} remove"] == (
             "command", f"adr_link_{endpoint}_remove",
-            {"confirmation": warning + " Continue?", "supports_no_wait": True},
+            {"confirmation": UNLINK_CONFIRMATION + " Continue?", "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands
@@ -613,29 +611,29 @@ def test_help_surface_matches_ga_commands():
     assert "iot adr ns su device-class update" not in helps
 
 
-def test_unlink_help_explains_prerequisites_and_manual_read_access():
+def test_unlink_help_explains_prerequisites_and_permission_options():
     load_adr_help()
     for kind in ("hub", "dps"):
         help_text = " ".join(yaml.safe_load(helps[f"iot adr ns link {kind} remove"])["long-summary"].split())
         assert "For a Succeeded link, delete the linked" in help_text
         assert "Failed links do not require the linked resource to be deleted." in help_text
-        assert "For Succeeded links, ADR confirms deletion by reading the target as the namespace outbound identity." in help_text
-        assert "scope that survives deletion" in help_text
-        assert "Target-scoped roles granted by link add do not provide this parent-scope access." in help_text
-        assert "exact Reader assignment command" in help_text
-        assert "subscription-scoped grants are broader" in help_text
+        assert "namespace outbound identity needs read access to the linked resource's resource group" in help_text
+        assert "or subscription if that group was deleted" in help_text
+        assert "Checks are advisory by default" in help_text
         assert "several minutes to take effect" in help_text
-        assert "By default, no role assignments are created or removed." in help_text
-        assert "Use --no-rbac-check to bypass only this advisory check, not ADR authorization" in help_text
+        assert "continues without changing role assignments" in help_text
+        assert "--no-rbac-check skips only the advisory check, not ADR authorization" in help_text
+        assert "--yes skips only confirmation" in help_text
         assert "Reader setup failures stop removal" in help_text
-        assert "no subscription grant is created" in help_text
-        assert "Assignments are retained after successful removal or any failure, including HTTP 412." in help_text
-        assert "--no-wait does not skip Reader setup" in help_text
-        assert "not ADR authorization" in help_text
+        assert "resource group, never its subscription" in help_text
+        assert "Reader covers all resources in that group" in help_text
+        assert "Requested assignments are retained even if removal fails" in help_text
+        assert "--no-wait returns after submission but does not skip Reader setup" in help_text
+        assert "cannot be combined with --no-rbac-check" in help_text
+        assert "#adr-link-troubleshooting" in help_text
         assert ("EndpointUsedByNestedDevices" in help_text) is (kind == "hub")
-        assert ("az iot adr ns device delete" in help_text) is (kind == "hub")
         if kind == "hub":
-            assert "Hub endpoints, including Failed links" in help_text
+            assert "any Hub endpoint, including Failed links" in help_text
             assert "Deleting the IoT Hub does not clear these references." in help_text
 
 

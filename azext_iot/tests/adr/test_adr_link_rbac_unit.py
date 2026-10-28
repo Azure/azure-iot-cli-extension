@@ -249,7 +249,6 @@ def test_unlink_unconfirmed_read_access_warns_without_grants(unlink_resource_cli
     manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg")
     assert "Cannot confirm read access" in caplog.text
     assert "Continuing without changing role assignments" in caplog.text
-    assert "custom roles, group membership and deny assignments" in caplog.text
     assert "--no-rbac-check" in caplog.text
     command = next(line for line in caplog.text.splitlines() if line.startswith("az role assignment create "))
     assert shlex.split(command) == [
@@ -406,7 +405,7 @@ def test_unlink_grant_denied_caller_gets_manual_command_without_writes(mocker, u
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
     manager.cli.invoke.return_value = _result([])
     mocker.patch.object(manager, "_caller_can_assign", return_value=False)
-    with pytest.raises(AzureResponseError, match="not assigned a role that can create role assignments") as raised:
+    with pytest.raises(AzureResponseError, match="signed-in identity cannot create role assignments") as raised:
         manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
     assert f"--role 'Reader' --scope '{target_rg}' --subscription 'target-sub'" in str(raised.value)
     assert manager.cli.invoke.call_count == 1
@@ -1282,7 +1281,7 @@ def test_rbac_creation_failure_lists_remaining_commands(mocker):
 
 
 def test_rbac_creation_race_reuses_assignment_created_by_another_actor(mocker, caplog):
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+    caplog.set_level(logging.DEBUG)
     cli = MagicMock()
     cli.invoke.side_effect = [
         _result([]),
@@ -1309,7 +1308,8 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(mocker, c
         if "role assignment create" in call.args[0]
     ]
     assert len(creates) == 2
-    completed = caplog.text.split("Completed these role-assignment creation requests")[1]
+    assert "Created 1 role assignment(s)" in caplog.text
+    completed = caplog.text.split("Created role assignments:")[1]
     assert "principalId=dps-principal" in completed
     assert "principalId=ns-principal" not in completed
 
@@ -1416,7 +1416,7 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     mocker.patch.object(manager, "_assignment_exists", return_value=False)
     mocker.patch.object(manager, "_caller_can_assign", return_value=True)
     mocker.patch.object(manager, "_wait_for_assignments")
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+    caplog.set_level(logging.INFO)
     target = TARGET_SCOPE.replace("/sub/", "/target-sub/")
     namespace = NS_SCOPE.replace("/sub/", "/namespace-sub/")
 
@@ -1436,9 +1436,9 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
 
     assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type]) - 1  # No DPS/Hub pair in this request.
     assert caplog.text.count("before updating the namespace") == 1
-    assert "Completed these role-assignment creation requests" in caplog.text
+    assert f"Created {invoke.call_count} role assignment(s)" in caplog.text
     assert "service authorization may still need time to propagate" in caplog.text
-    assert f"namespace outbound MI -> Contributor on {link_type.upper()}" in caplog.text
+    assert caplog.text.count(f"namespace outbound MI -> Contributor on {link_type.upper()}") == 1
     role = "Azure Device Registry Contributor"
     assert f"{link_type.upper()} selected inbound MI -> {role} on namespace" in caplog.text
     assert "principalId=ns-principal" in caplog.text

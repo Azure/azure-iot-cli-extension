@@ -225,20 +225,23 @@ def test_hub_add_requires_dps_first(fixture_link_provider):
     fixture_link_provider.client.namespaces.begin_update.assert_not_called()
 
 
-def test_hub_add_rejects_eleventh_hub_before_preflight(fixture_link_provider):
+@pytest.mark.parametrize("linking_state", ["Succeeded", "Failed"])
+def test_hub_add_rejects_eleventh_hub_before_preflight(fixture_link_provider, linking_state):
     fixture_link_provider.client.namespaces.get.return_value = _namespace(
         dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)},
         hubs={
-            f"hub-{index}": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID)
+            f"hub-{index}": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID, linkingState=linking_state)
             for index in range(10)
         },
     )
 
-    with pytest.raises(ArgumentUsageError, match="maximum of 10"):
+    with pytest.raises(ArgumentUsageError, match="maximum of 10") as raised:
         fixture_link_provider.hub_add(
             "hub-11", "namespace", "rg", HUB_ID
         )
     fixture_link_provider._preflight_link.assert_not_called()
+    assert "Delete the target first for Succeeded links, not Failed links." in str(raised.value)
+    assert "Clear Registry Device IoT Hub capability references" in str(raised.value)
 
 
 def test_hub_update_surface_is_identity_only():
@@ -522,12 +525,13 @@ def test_dps_add_treats_whitespace_uami_as_missing(fixture_link_provider):
         )
 
 
-def test_dps_add_rejects_second_endpoint(fixture_link_provider):
+@pytest.mark.parametrize("linking_state", ["Succeeded", "Failed"])
+def test_dps_add_rejects_second_endpoint(fixture_link_provider, linking_state):
     fixture_link_provider.client.namespaces.get.return_value = _namespace(
-        dps={"existing": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)}
+        dps={"existing": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID, linkingState=linking_state)}
     )
 
-    with pytest.raises(ArgumentUsageError, match="already has a linked DPS"):
+    with pytest.raises(ArgumentUsageError, match="already has a linked DPS") as raised:
         fixture_link_provider.dps_add(
             "second",
             "namespace",
@@ -536,6 +540,7 @@ def test_dps_add_rejects_second_endpoint(fixture_link_provider):
             mi_system_assigned=True,
         )
     fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+    assert "Delete the target first for Succeeded links, not Failed links." in str(raised.value)
 
 
 def test_dps_update_show_and_list_named_objects(

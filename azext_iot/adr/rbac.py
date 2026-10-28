@@ -40,17 +40,17 @@ PERMISSIONS_API_VERSION = "2022-04-01"
 ROLE_ASSIGNMENTS_WRITE_ACTION = "Microsoft.Authorization/roleAssignments/write"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
-UNLINK_WARNING = (
+UNLINK_CONFIRMATION = (
     "This removes only the namespace endpoint, not the linked resource. "
-    "For a Succeeded link, delete the linked resource first; ADR uses the namespace outbound identity to verify deletion. "
-    "Failed links do not require the linked resource to be deleted. "
-    "Permission checks are advisory by default; no role assignments are changed unless --grant-reader is specified. "
     "Reader assignments requested with --grant-reader are retained even if removal fails."
 )
+UNLINK_WARNING = (
+    "For a Succeeded link, delete the linked resource first. "
+    "Failed links do not require the linked resource to be deleted."
+)
 HUB_UNLINK_WARNING = UNLINK_WARNING + (
-    " Hub endpoints, including Failed links, cannot be removed while Registry Devices have IoT Hub capabilities "
-    "referencing the endpoint (EndpointUsedByNestedDevices). Clear these references first, for example by deleting "
-    "the referencing Registry Devices with 'az iot adr ns device delete'. Deleting the IoT Hub does not clear these references."
+    " Clear Registry Device IoT Hub capability references before removing any Hub endpoint, including Failed links "
+    "(EndpointUsedByNestedDevices). Deleting the IoT Hub does not clear these references."
 )
 NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE = (
     "DPS links additionally require the namespace system-assigned identity, "
@@ -753,19 +753,16 @@ class LinkRbacManager:
                 strict=True,
             )
             logger.warning(
-                "Reader assignment setup completed. New assignments can take several minutes to take effect; "
-                "if ADR rejects removal before access propagates, rerun the remove command later. "
-                "Assignment visibility is not an effective-access guarantee."
+                "Reader setup completed. New assignments can take several minutes to take effect; "
+                "if ADR rejects removal, wait for propagation and retry."
             )
             return
         logger.warning(
             "Cannot confirm read access for namespace outbound principalId=%s at scope=%s. "
-            "The advisory check recognizes unconditional Reader, Contributor and Owner assignments, "
-            "including inherited grants; custom roles, group membership and deny assignments are not fully evaluated. "
             "Continuing without changing role assignments; ADR may reject removal. "
             "If read access is missing, an authorized principal can grant Reader with:\n%s\n"
             "Reader grants read access to all resources within this scope. "
-            "New assignments can take several minutes to take effect; retry removal after propagation if ADR rejects it. "
+            "New assignments can take several minutes to take effect. "
             "Use --no-rbac-check to skip only this advisory check, not ADR authorization.",
             namespace_principal_id, scope,
             self._manual_commands([assignment]),
@@ -787,12 +784,9 @@ class LinkRbacManager:
         if unauthorized_scopes:
             scopes_text = ", ".join(unauthorized_scopes)
             raise AzureResponseError(
-                "Missing link role assignments, and the signed-in principal is "
-                "not assigned a role that can create role assignments (for "
-                "example Owner, User Access Administrator, or Role Based Access "
-                "Control Administrator) at every required scope "
-                f"({scopes_text}). No link mutation was submitted. "
-                "Run these exact remediation commands as an authorized principal:\n"
+                "Missing link role assignments. The signed-in identity cannot create role assignments "
+                f"at these scopes: {scopes_text}. No link mutation was submitted. "
+                "Ask an authorized identity to run:\n"
                 f"{commands}"
             )
 
@@ -839,9 +833,12 @@ class LinkRbacManager:
                 ) from error
         self.created.extend(created)
         if created:
-            logger.warning(
-                "Completed these role-assignment creation requests "
-                "(service authorization may still need time to propagate):\n%s",
+            logger.info(
+                "Created %d role assignment(s); service authorization may still need time to propagate.",
+                len(created),
+            )
+            logger.debug(
+                "Created role assignments:\n%s",
                 self._assignment_summary(created, descriptions),
             )
         self._wait_for_assignments(created, strict=strict)

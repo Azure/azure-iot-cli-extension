@@ -941,9 +941,8 @@ def test_delete_warning_explains_state_and_hub_prerequisites(
     assert "For a Succeeded link, delete the linked resource first" in caplog.text
     assert "Failed links do not require the linked resource to be deleted." in caplog.text
     assert ("EndpointUsedByNestedDevices" in caplog.text) is (kind == "hub")
-    assert ("az iot adr ns device delete" in caplog.text) is (kind == "hub")
     if kind == "hub":
-        assert "Hub endpoints, including Failed links" in caplog.text
+        assert "any Hub endpoint, including Failed links" in caplog.text
         assert "Deleting the IoT Hub does not clear these references." in caplog.text
     assert unlink_rbac.check_unlink_read_access.call_count == (state == "Succeeded" and not no_rbac_check)
     client.namespaces.begin_create_or_replace.assert_called_once()
@@ -965,7 +964,7 @@ def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, u
         assert raised.value.error.code == "EndpointUsedByNestedDevices"
         assert [call.request.method for call in network.calls] == ["GET", "PUT"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
-    assert "az iot adr ns device delete" in caplog.text
+    assert "Clear Registry Device IoT Hub capability references" in caplog.text
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -1108,10 +1107,8 @@ def test_delete_permission_flags_do_not_bypass_confirmation(offline_cli, mocker,
          option],
     ) != 0
     confirm.assert_called_once()
-    assert "no role assignments are changed" in confirm.call_args.args[0]
-    assert "For a Succeeded link, delete the linked resource first" in confirm.call_args.args[0]
-    assert "Failed links do not require the linked resource to be deleted." in confirm.call_args.args[0]
-    assert ("EndpointUsedByNestedDevices" in confirm.call_args.args[0]) is (kind == "hub")
+    assert "only the namespace endpoint, not the linked resource" in confirm.call_args.args[0]
+    assert "--grant-reader are retained even if removal fails" in confirm.call_args.args[0]
     provider.assert_not_called()
 
 
