@@ -39,4 +39,8 @@ parameters:
 
 extends:
   template: templates/integration-pipeline.yml
-  parameters: ${{ parameters }}
+  parameters:
+    ${{ each pair in parameters }}:
+      ${{ if ne(pair.key, 'pythonVersions') }}:
+        ${{ pair.key }}: ${{ pair.value }}
+    pythonVersions: ${{ join(' ', parameters.pythonVersions) }}

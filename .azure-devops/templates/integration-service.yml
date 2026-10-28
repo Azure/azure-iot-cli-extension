@@ -7,7 +7,7 @@ parameters:
   - name: service
     type: string
   - name: pythonVersions
-    type: object
+    type: string
   - name: regions
     type: object
 
@@ -39,7 +39,7 @@ stages:
             matrix: $[ stageDependencies.Plan.Plan.outputs['health.matrix'] ]
           ${{ if not(parameters.health) }}:
             matrix:
-              ${{ each python in parameters.pythonVersions }}:
+              ${{ each python in split(parameters.pythonVersions, ' ') }}:
                 ${{ each region in parameters.regions }}:
                   ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
                     python: ${{ python }}

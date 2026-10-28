@@ -15,8 +15,9 @@ parameters:
     default: [DPS/Hub/ADR/ADU]
   - name: pythonVersions
     displayName: Python versions
-    type: object
-    default: ['3.13']
+    # Object parameters coerce version identifiers such as 3.10 to 3.1.
+    type: string
+    default: '3.13'
   - name: regions
     displayName: Azure regions (comma-separated, without spaces)
     type: string
@@ -79,7 +80,7 @@ stages:
                 displayName: Validate exact matrix before Azure access
                 env:
                   SERVICES: ${{ replace(variables.servicesCsv, ',', ' ') }}
-                  VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
+                  VERSIONS: ${{ parameters.pythonVersions }}
                   REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
                   ENDPOINT: $(endpoint)
               - publish: plan.json
