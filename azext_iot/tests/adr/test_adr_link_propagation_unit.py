@@ -174,17 +174,21 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1  # Shared RG Reader is deduplicated.
     assert len(h.assignments) == len(h.created)  # recovery verifies, never grants again
     inbound_principal = "target-user" if identity == "user" else "target-principal"
     outbound_principal = "namespace-user" if identity == "user" else "namespace-principal"
     principals = {
         "namespace": outbound_principal, "namespace_system": "namespace-principal", "linked": inbound_principal,
     }
-    assert h.created == [
-        (principals[rule.principal], rule.role, KINDS[kind][2] if rule.scope == "target" else NS_ID)
+    scopes = {
+        "target": KINDS[kind][2], "namespace": NS_ID,
+        "namespace_group": "/subscriptions/sub/resourceGroups/rg", "target_group": "/subscriptions/sub/resourceGroups/rg",
+    }
+    assert h.created == list(dict.fromkeys(
+        (principals[rule.principal], rule.role, scopes[rule.scope])
         for rule in LINK_ROLE_MATRIX[kind]
-    ]
+    ))
 
 
 @pytest.mark.parametrize("action", ["add", "update"])
@@ -437,7 +441,7 @@ def test_recovery_rbac_is_read_only_and_fail_closed(mocker, failure):
     with pytest.raises(AzureResponseError):
         h.run()
     assert len(h.patches) == 1
-    assert len(h.created) == 3
+    assert len(h.created) == 5
     assert not h.clock.delays
 
 
@@ -881,6 +885,6 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
                 assert h.clock.now == 120
     assert patch_times == expected_patches
     assert bodies == [{"properties": {"provisioning": {"endpoints": {"dps": h.body}}}}] * len(patch_times)
-    assert len(h.created) == 3
+    assert len(h.created) == 5
     assert all(at < 120 for _, at in requests)
     assert len(mocked_response.calls) == len(requests)  # No Graph or extra requests.

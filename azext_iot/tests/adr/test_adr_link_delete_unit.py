@@ -89,6 +89,36 @@ def namespace():
     }
 
 
+@pytest.mark.parametrize("grant_reader", [False, True])
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+def test_live_unlink_scenarios_preserve_the_native_reader(mocker, grant_reader, kind, section, _endpoint_type):
+    import logging
+    from azext_iot.adr.providers.base import ADRResourceStateError
+    from azext_iot.tests.adr import test_adr_link_delete_int as scenarios
+
+    scenario = scenarios.TestADRLinkDelete("test_adr_link_hub_dps_delete")
+    before = namespace()
+    reader = mocker.patch.object(scenario, "_reader_assignments", return_value=[{"id": "native-reader"}])
+    cleanup = mocker.patch.object(scenario, "addCleanup")
+    mocker.patch.object(scenarios, "sleep")
+
+    def command(text):
+        if " remove " in text:
+            logging.getLogger("cli.azext_iot.adr").info("Observed a read-capable role assignment")
+            raise ADRResourceStateError("Live target cannot be removed", before)
+        assert text.startswith("iot adr ns show ")
+        return Mock(get_output_in_json=lambda: deepcopy(before))
+
+    scenario.cmd = Mock(side_effect=command)
+    if grant_reader:
+        scenario._assert_requested_reader_retained("ns", kind, section, "primary")
+    else:
+        scenario._assert_live_target_removal_rejected("ns", kind, section, "primary")
+    assert reader.call_count == (3 if grant_reader else 2)
+    cleanup.assert_not_called()
+    assert not any("role assignment create" in item.args[0] for item in scenario.cmd.call_args_list)
+
+
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("identity", ["mixed", "system", "user"])
 @pytest.mark.parametrize("grant_reader", [False, True])

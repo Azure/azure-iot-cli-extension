@@ -655,6 +655,6 @@ def test_recovery_path_preserves_grant_evidence_boundary_between_commands(mocker
     assert result["linkingState"] == "Succeeded"
     assert len(writes) == (2 if waited else 3)
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 3
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1
     assert providers[0]._rbac.created
     assert all(not provider._rbac.created for provider in providers[1:])

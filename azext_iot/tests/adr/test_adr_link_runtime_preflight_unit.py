@@ -236,7 +236,7 @@ def test_rbac_manager_is_created_lazily():
 @pytest.mark.parametrize("outbound_uami", [False, True])
 @pytest.mark.parametrize("inbound_uami", [False, True])
 @pytest.mark.parametrize("authorized", [False, True])
-def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
+def test_dps_runtime_grants_self_access_to_selected_outbound_identity(
     mocker, operation, outbound_uami, inbound_uami, authorized,
 ):
     provider = _provider()
@@ -276,19 +276,23 @@ def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
     invoke("dps", "ns", "ns-rg", no_wait=True, **kwargs)
     outbound = "namespace-user" if outbound_uami else "namespace-principal"
     inbound = "hub-user" if inbound_uami else "hub-system"
-    assert [call.args[0] for call in grants.call_args_list] == [
-        f"role assignment create --assignee-object-id '{outbound}' "
-        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{dps_id}'",
-        f"role assignment create --assignee-object-id '{inbound}' "
-        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{NS_ID}'",
-        "role assignment create --assignee-object-id 'namespace-principal' "
-        f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' --scope '{NS_ID}'",
+    expected = [
+        (outbound, "Contributor", dps_id),
+        (inbound, "Azure Device Registry Contributor", NS_ID),
+        (inbound, "Reader", NS_ID),
+        (outbound, "Azure Device Registry Administrator", NS_ID),
+        (outbound, "Reader", "/subscriptions/ns-sub/resourceGroups/ns-rg"),
+        (outbound, "Reader", "/subscriptions/target-sub/resourceGroups/target-rg"),
     ]
-    assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "ns-sub", "ns-sub"]
-    visible.assert_called_once_with([
-        (outbound, "Contributor", dps_id), (inbound, "Contributor", NS_ID),
-        ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
-    ], strict=False)
+    assert [call.args[0] for call in grants.call_args_list] == [
+        f"role assignment create --assignee-object-id '{principal}' "
+        f"--assignee-principal-type ServicePrincipal --role '{role}' --scope '{scope}'"
+        for principal, role, scope in expected
+    ]
+    assert [call.kwargs["subscription"] for call in grants.call_args_list] == [
+        "target-sub", "ns-sub", "ns-sub", "ns-sub", "ns-sub", "target-sub",
+    ]
+    visible.assert_called_once_with(expected, strict=False)
     provider.client.namespaces.begin_update.assert_called_once()
 
 
