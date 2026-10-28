@@ -658,15 +658,15 @@ def load_adr_help():
     New role assignments can take several minutes to take effect; if ADR rejects removal
     immediately after a grant, retry after propagation.
     Custom roles, conditions, group membership and deny assignments are not fully evaluated.
-    By default, no role assignments are created or removed. Use --no-rbac-check (alias --skip-rbac-check) to bypass only this
+    By default, no role assignments are created or removed. Use --no-rbac-check to bypass only this
     advisory check, not ADR authorization; --yes skips confirmation but does not skip permission checking.
     For Succeeded links, --grant-reader explicitly requests missing Reader access for the namespace outbound
     identity at the linked resource's resource group, not the namespace's resource group.
     It reuses recognized read grants and requires permission to create role assignments when access is missing.
     Reader setup failures stop removal. If the target resource group is deleted and no recognized
     subscription read grant exists, removal stops with a manual command; no subscription grant is created.
-    Other endpoint states never receive Reader grants. --grant-reader cannot be combined with --no-rbac-check
-    or --skip-rbac-check. Assignments are retained after successful removal or any failure, including HTTP 412.
+    Other endpoint states never receive Reader grants. --grant-reader cannot be combined with --no-rbac-check.
+    Assignments are retained after successful removal or any failure, including HTTP 412.
     By default, the command waits up to 600 seconds for the namespace update and reports
     asynchronous service errors. Use --no-wait to return after submission instead.
     --no-wait does not skip Reader setup or its assignment-visibility wait.

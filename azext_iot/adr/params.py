@@ -572,7 +572,7 @@ def load_adr_arguments(self, _):
     for kind in ("hub", "dps"):
         with self.argument_context(f"iot adr ns link {kind} remove") as context:
             context.argument(
-                "skip_rbac_check", options_list=["--no-rbac-check", "--skip-rbac-check"], action="store_true",
+                "no_rbac_check", options_list=["--no-rbac-check"], action="store_true",
                 help="Skip the advisory outbound-identity read-permission check. "
                      "Does not bypass confirmation, ETag validation or ADR service validation. "
                      "Cannot be combined with --grant-reader.",
