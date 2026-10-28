@@ -132,7 +132,13 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     namespace = _namespace(section, endpoint_type, identity)
     if kind == "hub":
         namespace["properties"]["provisioning"] = {
-            "endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}},
+            "endpoints": {"dps": {
+                "endpointType": DPS_ENDPOINT_TYPE,
+                "resourceId": (
+                    "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps"
+                ),
+                "inboundCallerIdentity": {"type": "SystemAssigned"},
+            }},
         }
         namespace["properties"][section]["endpoints"]["primary"]["provisioning"] = {
             "availability": "Available", "allocationWeight": 2,
@@ -165,6 +171,8 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     update_args = identity_args if repeat_identity else {}
     getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **update_args)
     extra = {"namespace_system_principal_id": "namespace-principal"} if kind == "dps" else {}
+    if kind == "hub":
+        extra.update(dps_principal_id="target-system", hub_scopes=(target_id.lower(),))
     provider._rbac.ensure.assert_called_once_with(
         link_type=kind, namespace_scope=NS_ID, target_scope=target_id,
         namespace_principal_id="namespace-principal",
@@ -199,7 +207,11 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     endpoint.pop("linkingState")
     endpoint[state_field] = "fAiLeD" if state_field == "linkingState" else {"status": "Failed"}
     endpoint["provisioning"] = {"availability": "Unavailable", "allocationWeight": 0}
-    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}}}
+    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
+        "endpointType": DPS_ENDPOINT_TYPE,
+        "resourceId": "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps",
+        "inboundCallerIdentity": {"type": "SystemAssigned"},
+    }}}
     original = deepcopy(namespace)
     command = split(failed_link_recovery_commands(namespace)[0])
     assert command[-2:] == ["--subscription", "ns-sub"]
@@ -207,6 +219,7 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     provider.client.namespaces.get.return_value = namespace
     provider._get_target = Mock(return_value={
         "location": "centraluseuap", "sku": {"name": "S1"}, "properties": {"provisioningState": "Succeeded"},
+        "identity": {"type": "SystemAssigned", "principalId": "dps-principal"},
     })
     provider._rbac = Mock(created=[])
     provider._warn_if_hub_classically_linked = Mock()

@@ -92,6 +92,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
         RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
         RoleRule("namespace", READER_ROLE, "namespace_group"),
         RoleRule("namespace", READER_ROLE, "target_group"),
+        RoleRule("dps", HUB_DATA_ROLE, "hubs"),
     ),
     "dps": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
@@ -100,6 +101,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
         RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
         RoleRule("namespace", READER_ROLE, "namespace_group"),
         RoleRule("namespace", READER_ROLE, "target_group"),
+        RoleRule("dps", HUB_DATA_ROLE, "hubs"),
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
@@ -301,11 +303,13 @@ def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
         "linked": f"{link_type.upper()} selected inbound MI",
+        "dps": "DPS selected MI",
     }
     scopes = {
         "namespace": "namespace", "target": link_type.upper(),
         "namespace_group": "namespace resource group",
         "target_group": f"{link_type.upper()} resource group",
+        "hubs": "linked IoT Hubs",
     }
     return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
 
@@ -327,6 +331,7 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
         "namespace": request["namespace_principal_id"],
         "linked": request.get("linked_principal_id"),
         "namespace_system": request.get("namespace_system_principal_id"),
+        "dps": request.get("dps_principal_id"),
     }
     if request["link_type"] == "dps" and not principals["namespace_system"]:
         raise AzureResponseError(
@@ -341,9 +346,10 @@ def required_assignments(request: dict):
     """Yield (rule, (principal_id, role, scope)) for every assignment a link request needs."""
     principals = _request_principals(request)
     scopes = {
-        "namespace": request["namespace_scope"], "target": request["target_scope"],
-        "namespace_group": _resource_group_scope(request["namespace_scope"]),
-        "target_group": _resource_group_scope(request["target_scope"]),
+        "namespace": (request["namespace_scope"],), "target": (request["target_scope"],),
+        "namespace_group": (_resource_group_scope(request["namespace_scope"]),),
+        "target_group": (_resource_group_scope(request["target_scope"]),),
+        "hubs": request.get("hub_scopes", ()),
     }
     seen = set()
     for rule in LINK_ROLE_MATRIX[request["link_type"]]:
@@ -351,11 +357,12 @@ def required_assignments(request: dict):
         # Hub inbound identity is optional. There is no principal to grant
         # in that direction when the endpoint omits it.
         if principal_id:
-            assignment = (principal_id, rule.role, scopes[rule.scope])
-            key = _assignment_key(assignment)
-            if key not in seen:
-                seen.add(key)
-                yield rule, assignment
+            for scope in scopes[rule.scope]:
+                assignment = (principal_id, rule.role, scope)
+                key = _assignment_key(assignment)
+                if key not in seen:
+                    seen.add(key)
+                    yield rule, assignment
 
 
 class LinkRbacManager:
@@ -640,6 +647,8 @@ class LinkRbacManager:
         linked_principal_id: Optional[str],
         *,
         namespace_system_principal_id: Optional[str] = None,
+        dps_principal_id: Optional[str] = None,
+        hub_scopes: Tuple[str, ...] = (),
     ) -> None:
         self.ensure_many(
             [
@@ -650,6 +659,8 @@ class LinkRbacManager:
                     "namespace_principal_id": namespace_principal_id,
                     "linked_principal_id": linked_principal_id,
                     "namespace_system_principal_id": namespace_system_principal_id,
+                    "dps_principal_id": dps_principal_id,
+                    "hub_scopes": hub_scopes,
                 }
             ]
         )

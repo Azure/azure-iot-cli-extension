@@ -872,7 +872,9 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
             assert f"--scope '{NS_ID}'" in text
             return _output([{"id": "self-role"}] if dps_readiness.called else [])
         if text.startswith("iot dps show "):
-            return _output({"id": DPS_ID})
+            return _output({"id": DPS_ID, "identity": {
+                "principalId": "dps-system", "userAssignedIdentities": {UAMI_ID: {"principalId": "dps-user"}},
+            }})
         if text.startswith("iot adr ns link dps wait "):
             return _output(None)
         raise RuntimeError("stop after DPS readiness")
@@ -1432,8 +1434,10 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         link_scenarios, "link_hub_with_readiness", lambda *_args: events.append("hub ready"),
     )
     dps_shows = []
+    grant_deleted = False
 
     def command(text, expect_failure=False, **_):
+        nonlocal grant_deleted
         events.append(text)
         if "linked-hub" in text:
             raise AssertionError("The namespace-linked DPS Hub list is read-only")
@@ -1442,12 +1446,25 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         if text.startswith("iot adr ns show "):
             return _output({"id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
+            if "--role 'IoT Hub Data Contributor'" in text:
+                assert "--assignee-object-id dps-user" in text
+                assert f"--scope '{HUB_ID}'" in text
+                return _output([{"id": "owned-grant", "scope": HUB_ID, "principalId": "dps-user"}]
+                               if "hub ready" in events and not grant_deleted else [])
             assert "--assignee-object-id namespace-system" in text
             assert "--role 'Azure Device Registry Administrator'" in text
             assert f"--scope '{NS_ID}'" in text
             return _output([{"id": "self-role"}] if "dps ready" in events else [])
+        if text == "role assignment delete --ids owned-grant":
+            grant_deleted = True
+            return _output(None)
+        if text.startswith("iot adr ns link hub update "):
+            grant_deleted = False
+            return _output(None)
         if text.startswith("iot dps show "):
-            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
+            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}, "identity": {
+                "principalId": "dps-system", "userAssignedIdentities": {UAMI_ID: {"principalId": "dps-user"}},
+            }})
         if text.startswith("rest "):
             assert shlex.split(text) == [
                 "rest", "--method", "get", "--url",

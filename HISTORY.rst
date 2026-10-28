@@ -23,6 +23,7 @@ Release History
 
 **Shared command fixes**
 
+* Hub/DPS namespace linking now automatically grants the selected DPS identity IoT Hub Data Contributor on the associated Hubs, including link updates and DPS identity rotation. Existing assignments are reused and historical grants are retained.
 * **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
 * DPS linked-Hub updates accept legacy key-based entries without an explicit authentication type, preserving unchanged fields and rejecting updates without mutation parameters.
 * ``az iot du update calculate-hash`` and the shared ``az iot adr ns su software-update calculate-hash`` helper return the supplied absolute file URI without resolving symlinks. File hashes and byte counts are unchanged.
