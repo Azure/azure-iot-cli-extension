@@ -122,13 +122,13 @@ stages:
                   python scripts/release_pipeline.py build
                   --source "$(Agent.TempDirectory)/release-source"
                   --work-dir "$(Agent.TempDirectory)"
-                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
                 displayName: Build the release wheel and resolve its native Linux runtime SBOM
               - script: >-
                   python scripts/release_pipeline.py runtime-receipt
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Agent.TempDirectory)/release-source/dist"
-                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
                 displayName: Require a complete resolved dependency graph and attest the Linux wheel
                 env:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -158,7 +158,7 @@ stages:
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Pipeline.Workspace)/release-runtime-linux"
                   --work-dir "$(Agent.TempDirectory)"
-                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
                 displayName: Resolve and attest Windows dependencies of the unchanged Linux-built wheel
                 env:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)

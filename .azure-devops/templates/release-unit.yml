@@ -55,7 +55,7 @@ jobs:
       - script: >-
           python scripts/release_pipeline.py unit-constraints
           --source "$(Agent.TempDirectory)/release-source"
-          --directory "$(Build.SourcesDirectory)/.release-dependencies"
+          --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
         displayName: Keep extension dependencies compatible with the selected Azure CLI
       - script: >-
           tox run --skip-pkg-install
@@ -66,7 +66,7 @@ jobs:
       - script: >-
           python scripts/release_pipeline.py unit-inventory
           --source "$(Agent.TempDirectory)/release-source"
-          --directory "$(Build.SourcesDirectory)/.release-dependencies"
+          --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
         displayName: Verify the tested dependency environment and expose its native scan inventory
       - task: PublishTestResults@2
         condition: always()
