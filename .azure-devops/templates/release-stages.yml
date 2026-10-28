@@ -52,6 +52,7 @@ stages:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: Build
+            dependsOn: [BuildLinux, BuildWindows]
             timeoutInMinutes: 45
             templateContext:
               outputs:
@@ -66,11 +67,17 @@ stages:
                 parameters:
                   sourceBranch: ${{ parameters.sourceBranch }}
               - template: release-feed.yml
+              - download: current
+                artifact: release-runtime-linux
+              - download: current
+                artifact: release-runtime-windows
               - script: >-
-                  python scripts/release_pipeline.py build
+                  python scripts/release_pipeline.py assemble-runtime
                   --source "$(Agent.TempDirectory)/release-source"
-                  --work-dir "$(Agent.TempDirectory)"
-                displayName: Build wheel and runtime SBOM using the authenticated package feed
+                  --directory "$(Pipeline.Workspace)"
+                displayName: Combine native platform SBOMs for the exact same release wheel
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - script: >-
                   python scripts/release_pipeline.py candidate
                   --source "$(Agent.TempDirectory)/release-source"
@@ -84,7 +91,8 @@ stages:
                   set -euo pipefail
                   python -m venv "$AGENT_TEMPDIRECTORY/publication-venv"
                   source "$AGENT_TEMPDIRECTORY/publication-venv/bin/activate"
-                  python -m pip install azdev==0.2.13 packaging
+                  python -m pip install azdev==0.2.13 packaging "editorconfig>=0.12.2"
+                  python -m pip check
                   python scripts/release_pipeline.py prepare-publication \
                     --directory "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-candidate" \
                     --prepared "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling" \
@@ -96,6 +104,64 @@ stages:
                   AZURE_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azure-config
                   AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azdev-config
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
+
+          - job: BuildLinux
+            timeoutInMinutes: 45
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/release-source/dist
+                  artifact: release-runtime-linux
+                  isProduction: false
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - script: >-
+                  python scripts/release_pipeline.py build
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --work-dir "$(Agent.TempDirectory)"
+                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                displayName: Build the release wheel and resolve its native Linux runtime SBOM
+              - script: >-
+                  python scripts/release_pipeline.py runtime-receipt
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Agent.TempDirectory)/release-source/dist"
+                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                displayName: Require a complete resolved dependency graph and attest the Linux wheel
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+
+          - job: BuildWindows
+            dependsOn: BuildLinux
+            timeoutInMinutes: 45
+            pool:
+              name: iotupx-1espt-release-probe
+              image: iotupx-1espt-windows2025
+              os: windows
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/windows-runtime
+                  artifact: release-runtime-windows
+                  isProduction: false
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - download: current
+                artifact: release-runtime-linux
+              - script: >-
+                  python scripts/release_pipeline.py windows-runtime
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Pipeline.Workspace)/release-runtime-linux"
+                  --work-dir "$(Agent.TempDirectory)"
+                  --inventory "$(Build.SourcesDirectory)/.release-runtime"
+                displayName: Resolve and attest Windows dependencies of the unchanged Linux-built wheel
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
       - stage: Unit
         displayName: Full release unit and style matrix
@@ -215,6 +281,7 @@ stages:
                   MSDO_DIRECTORY: $(stageMsdo.directory)
                   MSDO_FILEPATH: $(stageMsdo.directory)/guardian.cmd
                   MSDO_VERSION: $(stageMsdo.version)
+                  CKV_SKIP_PACKAGE_UPDATE_CHECK: "true"
                   GDN_BANDIT_TARGET: $(Build.SourcesDirectory)/azext_iot
                   GDN_BANDIT_RECURSIVE: "true"
                   BUILD_SOURCEVERSION: $(sourceCommit)
@@ -243,7 +310,8 @@ stages:
                   python -m venv "$AGENT_TEMPDIRECTORY/lint-venv"
                   source "$AGENT_TEMPDIRECTORY/lint-venv/bin/activate"
                   cd "$SOURCE"
-                  python -m pip install azdev==0.2.13
+                  python -m pip install azdev==0.2.13 "editorconfig>=0.12.2"
+                  python -m pip check
                   git clone --quiet --depth=1 --branch dev https://github.com/Azure/azure-cli.git \
                     "$AGENT_TEMPDIRECTORY/azure-cli"
                   azdev setup -c "$AGENT_TEMPDIRECTORY/azure-cli" -r "$SOURCE"
@@ -298,7 +366,8 @@ stages:
                   git clone --quiet --depth=1 --branch main https://github.com/Azure/azure-cli-extensions.git \
                     "$COMPAT_ROOT/azure-cli-extensions"
                   python -m pip install --upgrade pip
-                  python -m pip install azdev==0.2.13 build wheel
+                  python -m pip install azdev==0.2.13 build wheel "editorconfig>=0.12.2"
+                  python -m pip check
                   azdev setup -c "$COMPAT_ROOT/azure-cli" -r "$COMPAT_ROOT/azure-cli-extensions"
                   python "$BUILD_SOURCESDIRECTORY/scripts/release_pipeline.py" index-check \
                     --source "$SOURCE" --directory "$CANDIDATE" --work-dir "$COMPAT_ROOT"

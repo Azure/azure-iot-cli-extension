@@ -204,7 +204,41 @@ def configure_feed():
     print("Using only the authenticated aziotcli/pip feed; alternate indexes and pip configuration are disabled.")
 
 
-def build_candidate(source, work_dir):
+def unit_dependencies(source, directory, check=False):
+    venv = source / ".tox/python-azcur-unit"
+    python = str(venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    env = feed_environment()
+    if not check:
+        subprocess.run([python, "-m", "pip", "check"], env=env, check=True)
+        constraints = subprocess.check_output([
+            python, "-c",
+            "from importlib.metadata import requires\nfrom packaging.requirements import Requirement\n"
+            "for name in ('azure-cli', 'azure-cli-core'):\n"
+            "    for value in requires(name):\n"
+            "        requirement = Requirement(value)\n"
+            "        requirement.extras.clear()\n"
+            "        print(requirement)\n",
+        ], env=env, text=True)
+        directory.mkdir(parents=True, exist_ok=False)
+        path = directory / "cli-constraints.txt"
+        path.write_text(constraints, encoding="utf-8")
+        print(f"##vso[task.setvariable variable=PIP_CONSTRAINT]{path.resolve()}", flush=True)
+        return
+    site = Path(subprocess.check_output(
+        [python, "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"], text=True).strip())
+    target = site / "azure-cli-extensions/azure-iot"
+    if not target.is_dir():
+        raise ValueError("The tested extension dependency directory is missing.")
+    env["PYTHONPATH"] = str(target)
+    subprocess.run([python, "-m", "pip", "check"], env=env, check=True)
+    requirements = subprocess.check_output(
+        [python, "-m", "pip", "freeze", "--path", str(target)], env=env, text=True)
+    if not re.search(r"(?m)^azure-iot(?:==| @ )", requirements):
+        raise ValueError("The tested extension is missing from its dependency inventory.")
+    (directory / "requirements.txt").write_text(requirements, encoding="utf-8")
+
+
+def build_candidate(source, work_dir, inventory=None):
     build_env = feed_environment()
 
     def run(args):
@@ -215,27 +249,113 @@ def build_candidate(source, work_dir):
     wheels = list((source / "dist").glob("*.whl"))
     if len(wheels) != 1:
         raise ValueError("Build must produce exactly one wheel.")
-    wheel = wheels[0]
+    runtime_sbom(wheels[0], work_dir, inventory or work_dir / "runtime-inventory")
+
+
+def runtime_sbom(wheel, work_dir, inventory):
+    build_env = feed_environment()
+
+    def run(args):
+        subprocess.run(args, cwd=wheel.parent, env=build_env, check=True)
+
     venv = work_dir / "sbom-venv"
     run([sys.executable, "-m", "venv", str(venv)])
-    python = str(venv / "bin/python")
+    python = str(venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
     run([python, "-m", "pip", "install", str(wheel)])
-    requirements = source / "dist/requirements.txt"
+    run([python, "-m", "pip", "check"])
+    inventory.mkdir(parents=True, exist_ok=False)
+    requirements = inventory / "requirements.txt"
     requirements.write_text(subprocess.check_output(
-        [python, "-m", "pip", "freeze"], cwd=source, env=build_env, text=True)
-        + "\nazure-iot-device>=2.15.0rc1,<3.0.0dev0\n", encoding="utf-8")
-    tool = work_dir / "sbom-tool"
+        [python, "-m", "pip", "freeze"], env=build_env, text=True), encoding="utf-8")
+    platform = "win-x64.exe" if os.name == "nt" else "linux-x64"
+    tool = work_dir / ("sbom-tool.exe" if os.name == "nt" else "sbom-tool")
     subprocess.run([
         "curl", "--fail", "--location", "--proto", "=https", "--tlsv1.2",
-        "https://github.com/microsoft/sbom-tool/releases/download/v4.1.5/sbom-tool-linux-x64",
+        f"https://github.com/microsoft/sbom-tool/releases/download/v4.1.5/sbom-tool-{platform}",
         "--output", str(tool),
     ], check=True)
-    if digest(tool) != "bf5d4f99bc98c119d549d08fc02ae92598a7a42772f17317c01031a92632e05b":
+    expected = ("625767b371b7fdd58f40f618b8a86da0247a33c89e419039c86b4edba1dad4b5" if os.name == "nt"
+                else "bf5d4f99bc98c119d549d08fc02ae92598a7a42772f17317c01031a92632e05b")
+    if digest(tool) != expected:
         raise ValueError("SBOM tool digest does not match the pinned release.")
     tool.chmod(0o700)
-    run([str(tool), "generate", "-b", "dist", "-bc", "dist", "-pn", "Azure IoT CLI Extension",
+    run([str(tool), "generate", "-b", str(wheel.parent), "-bc", str(inventory), "-pn", "Azure IoT CLI Extension",
          "-pv", wheel_metadata(wheel), "-ps", "Microsoft"])
-    requirements.unlink()
+
+
+def runtime_receipt(source, directory, inventory):
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    selected = commit(environment("RELEASE_SOURCE_COMMIT"))
+    if command(["git", "rev-parse", "HEAD"], source) != selected:
+        raise ValueError("Runtime inventory source differs from the selected commit.")
+    wheels = list(directory.glob("*.whl"))
+    if len(wheels) != 1:
+        raise ValueError("Runtime inventory requires exactly one wheel.")
+    manifest = read(directory / "_manifest/spdx_2.2/manifest.spdx.json")
+    packages = {(canonicalize_name(p["name"]), p.get("versionInfo")) for p in manifest["packages"]}
+    expected = set()
+    for line in (inventory / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        requirement = Requirement(line)
+        if requirement.url:
+            if canonicalize_name(requirement.name) != "azure-iot":
+                raise ValueError("Unexpected direct-URL runtime dependency.")
+            continue
+        pins = list(requirement.specifier)
+        if len(pins) != 1 or pins[0].operator != "==":
+            raise ValueError("Runtime dependency inventory must contain exact installed versions.")
+        expected.add((canonicalize_name(requirement.name), pins[0].version))
+    if not expected or not expected.issubset(packages):
+        raise ValueError("SBOM omitted installed runtime dependencies.")
+    package_ids = {p["SPDXID"] for p in manifest["packages"] if p["SPDXID"] != "SPDXRef-RootPackage"}
+    if not any(r["relationshipType"] == "DEPENDS_ON" and r["spdxElementId"] in package_ids
+               and r["relatedSpdxElement"] in package_ids for r in manifest["relationships"]):
+        raise ValueError("SBOM has no resolved dependency graph; source-only fallback is not sufficient.")
+    write(directory / "_manifest/runtime-provenance.json", {
+        "sourceCommit": selected, "platform": sys.platform,
+        "pythonVersion": ".".join(str(value) for value in sys.version_info[:3]),
+        "wheel": {"file": wheels[0].name, "sha256": digest(wheels[0])},
+        "manifestSha256": digest(directory / "_manifest/spdx_2.2/manifest.spdx.json"),
+    })
+
+
+def verify_runtime(directory, platform):
+    value = read(directory / "_manifest/runtime-provenance.json")
+    wheel = value["wheel"]
+    if (value["sourceCommit"] != commit(environment("RELEASE_SOURCE_COMMIT"))
+            or value["platform"] != platform or Path(wheel["file"]).name != wheel["file"]
+            or not re.fullmatch(r"azure_iot-[A-Za-z0-9_.+!-]+\.whl", wheel["file"])
+            or digest(directory / wheel["file"]) != wheel["sha256"]
+            or digest(directory / "_manifest/spdx_2.2/manifest.spdx.json") != value["manifestSha256"]):
+        raise ValueError("Runtime SBOM provenance or asset digest mismatch.")
+    return value
+
+
+def windows_runtime(source, directory, work_dir, inventory):
+    if sys.platform != "win32":
+        raise ValueError("Windows runtime dependencies must be resolved on Windows.")
+    value = verify_runtime(directory, "linux")
+    output = work_dir / "windows-runtime"
+    output.mkdir(parents=True, exist_ok=False)
+    wheel = output / value["wheel"]["file"]
+    shutil.copyfile(directory / wheel.name, wheel)
+    runtime_sbom(wheel, work_dir, inventory)
+    runtime_receipt(source, output, inventory)
+
+
+def assemble_runtime(source, directory):
+    linux = directory / "release-runtime-linux"
+    windows = directory / "release-runtime-windows"
+    left = verify_runtime(linux, "linux")
+    right = verify_runtime(windows, "win32")
+    if left["wheel"] != right["wheel"]:
+        raise ValueError("Both platform SBOMs must describe the exact same wheel.")
+    output = source / "dist"
+    shutil.copytree(linux, output)
+    shutil.copytree(windows / "_manifest", output / "_manifest/windows")
 
 
 def create_candidate(source, directory):
@@ -785,12 +905,15 @@ def main():
     parser.add_argument("operation", choices=[
         "options", "plan", "resolve", "checkout", "build", "candidate", "verify", "integrate", "cancel",
         "verify-integration", "index-check", "feed-environment", "prepare-publication", "publish", "index",
+        "unit-constraints", "unit-inventory",
+        "runtime-receipt", "windows-runtime", "assemble-runtime",
     ])
     parser.add_argument("--source", type=Path)
     parser.add_argument("--directory", type=Path)
     parser.add_argument("--record", type=Path)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--prepared", type=Path)
+    parser.add_argument("--inventory", type=Path)
     args = parser.parse_args()
     if args.operation == "options":
         mode, create_index_pr = release_options()
@@ -807,7 +930,15 @@ def main():
     elif args.operation == "candidate":
         create_candidate(args.source, args.directory)
     elif args.operation == "build":
-        build_candidate(args.source, args.work_dir)
+        build_candidate(args.source, args.work_dir, args.inventory)
+    elif args.operation in ("unit-constraints", "unit-inventory"):
+        unit_dependencies(args.source, args.directory, check=args.operation == "unit-inventory")
+    elif args.operation == "runtime-receipt":
+        runtime_receipt(args.source, args.directory, args.inventory)
+    elif args.operation == "windows-runtime":
+        windows_runtime(args.source, args.directory, args.work_dir, args.inventory)
+    elif args.operation == "assemble-runtime":
+        assemble_runtime(args.source, args.directory)
     elif args.operation == "feed-environment":
         configure_feed()
     elif args.operation == "prepare-publication":

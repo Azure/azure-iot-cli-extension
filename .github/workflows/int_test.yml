@@ -2,7 +2,7 @@ name: Integration Tests
 run-name: "Integration Tests (${{ inputs.regions || 'australiaeast' }})"
 
 on:
-  # Reusable workflow trigger — called programmatically by other workflows (e.g. release_workflow.yml)
+  # Reusable workflow trigger - called programmatically by other workflows (e.g. release_workflow.yml)
   workflow_call:
     inputs:
       test-services:
@@ -42,7 +42,7 @@ on:
         required: true
       AZURE_SUBSCRIPTION_ID:
         required: true
-  # Manual trigger — run from GitHub Actions UI with checkbox/input controls
+  # Manual trigger - run from GitHub Actions UI with checkbox/input controls
   workflow_dispatch:
     inputs:
       testDPS:
@@ -196,7 +196,7 @@ jobs:
           echo "Python versions: $python_versions"
           echo "Regions: $regions"
 
-          # --- Build JSON matrix: service × python × region ---
+          # --- Build JSON matrix: service x python x region ---
           matrix="["
           first=true
 
@@ -260,14 +260,14 @@ jobs:
             exit 1
           fi
           echo ""
-          echo "┌──────────────────────────────────────────────────────────┐"
+          echo "+----------------------------------------------------------+"
           title="Test Matrix: $job_count job(s)"
-          printf "│  %-56s│\n" "$title"
-          echo "├───────────┬─────────┬──────────────┬─────────────────────┤"
-          echo "│  Service  │ Python  │    Region    │  Timeout            │"
-          echo "├───────────┼─────────┼──────────────┼─────────────────────┤"
-          echo "$matrix" | jq -r '.[] | "│  \(.service)\(" " * ([1, 9 - (.service | length)] | max))│ \(.python)\(" " * (8 - (.python | length)))│  \(.region)\(" " * ([1, 12 - (.region | length)] | max))│  \(.timeout) min\(" " * (19 - ((.timeout | tostring) + " min" | length)))│"'
-          echo "└───────────┴─────────┴──────────────┴─────────────────────┘"
+          printf "|  %-56s|\n" "$title"
+          echo "+-----------+---------+--------------+---------------------+"
+          echo "|  Service  | Python  |    Region    |  Timeout            |"
+          echo "+-----------+---------+--------------+---------------------+"
+          echo "$matrix" | jq -r '.[] | "|  \(.service)\(" " * ([1, 9 - (.service | length)] | max))| \(.python)\(" " * (8 - (.python | length)))|  \(.region)\(" " * ([1, 12 - (.region | length)] | max))|  \(.timeout) min\(" " * (19 - ((.timeout | tostring) + " min" | length)))|"'
+          echo "+-----------+---------+--------------+---------------------+"
           echo ""
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
@@ -645,8 +645,8 @@ jobs:
             coverage report
             coverage html --directory ./htmlcov
           else
-            echo "No coverage files found — skipping combine/report."
-            echo "### ⚠️ No coverage data collected" >> $GITHUB_STEP_SUMMARY
+            echo "No coverage files found - skipping combine/report."
+            echo "### WARNING: No coverage data collected" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: "Upload combined coverage artifact"

@@ -53,11 +53,21 @@ jobs:
           -x "testenv:lint.pass_env+=PIP_*"
         workingDirectory: $(Agent.TempDirectory)/release-source
       - script: >-
+          python scripts/release_pipeline.py unit-constraints
+          --source "$(Agent.TempDirectory)/release-source"
+          --directory "$(Build.SourcesDirectory)/.release-dependencies"
+        displayName: Keep extension dependencies compatible with the selected Azure CLI
+      - script: >-
           tox run --skip-pkg-install
           -x "testenv:python-azcur-unit.pass_env+=PIP_*"
           -x "testenv:lint.pass_env+=PIP_*"
         displayName: Run existing clean, lint, serial unit and coverage environments
         workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: >-
+          python scripts/release_pipeline.py unit-inventory
+          --source "$(Agent.TempDirectory)/release-source"
+          --directory "$(Build.SourcesDirectory)/.release-dependencies"
+        displayName: Verify the tested dependency environment and expose its native scan inventory
       - task: PublishTestResults@2
         condition: always()
         inputs:
