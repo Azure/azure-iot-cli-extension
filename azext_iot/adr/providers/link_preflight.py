@@ -16,10 +16,13 @@ from azure.cli.core.azclierror import (
 )
 from azure.core.exceptions import HttpResponseError
 
+from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
+from azext_iot.adr.providers.link_helpers import parse_hub_resource_id
 from azext_iot.adr.rbac import (
     resolve_linked_resource_principal,
     resolve_namespace_outbound_principal,
 )
+from azext_iot.adr.topology import DPS_CAP_EXCEEDED_MSG, endpoint_is_type, get_endpoints
 
 
 @dataclass(frozen=True)
@@ -145,3 +148,42 @@ def preflight_target(
         manager = rbac_manager() if callable(rbac_manager) else rbac_manager
         manager.ensure(**request)
     return target
+
+
+def add_dps_hub_role_requirements(request: dict, namespace: dict, lookup_dps: Callable) -> None:
+    """Bind the selected DPS principal to the Hub scopes in this link plan."""
+    kind = request["link_type"]
+    if kind not in ("hub", "dps"):
+        return
+    hub_scopes = (
+        [request["target_scope"]] if kind == "hub" else [
+            endpoint.get("resourceId")
+            for endpoint in get_endpoints(namespace, "messaging").values()
+            if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE)
+        ]
+    )
+    if not hub_scopes:
+        return
+    for scope in hub_scopes:
+        parse_hub_resource_id(scope)
+
+    principal = request["linked_principal_id"]
+    if kind == "hub":
+        endpoints = [
+            endpoint for endpoint in get_endpoints(namespace, "provisioning").values()
+            if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE)
+        ]
+        if not endpoints:
+            return
+        if len(endpoints) != 1:
+            raise InvalidArgumentValueError(DPS_CAP_EXCEEDED_MSG)
+        endpoint = endpoints[0]
+        principal = resolve_linked_resource_principal(
+            lookup_dps(endpoint.get("resourceId")), endpoint.get("inboundCallerIdentity"), "DPS",
+        )
+    if not principal:
+        raise AzureResponseError(
+            "The linked DPS must select an attached managed identity before granting access to IoT Hubs."
+        )
+    request["dps_principal_id"] = principal
+    request["hub_scopes"] = tuple(sorted({scope.rstrip("/").lower() for scope in hub_scopes}))

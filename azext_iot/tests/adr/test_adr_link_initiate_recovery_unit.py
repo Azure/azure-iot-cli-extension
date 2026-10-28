@@ -103,7 +103,7 @@ def test_exact_link_initiate_authorization_recovers_with_verified_original_roles
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1  # Shared RG Reader is deduplicated; no recovery grants.
+    assert len(h.created) == (7 if kind == "hub" else 5)  # No recovery grants.
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -350,7 +350,7 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
         result = h.run(timeout_sec=120, wait_sec=1)
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert patches == [{"properties": {section: {"endpoints": {kind: h.body}}}}] * 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1
+    assert len(h.created) == (7 if kind == "hub" else 5)
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -366,7 +366,7 @@ def test_generic_rejection_after_fresh_grants_is_retried_while_they_propagate(mo
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1
+    assert len(h.created) == (7 if kind == "hub" else 5)
 
 
 def test_generic_rejection_retries_are_bounded(mocker):
@@ -418,7 +418,25 @@ def test_dps_inbound_denial_recovers_only_after_verifying_fresh_grants(mocker, i
     assert h.patches == [{"provisioning": {"endpoints": {"dps": h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX["dps"]) - 1
+    assert len(h.created) == 5
+
+
+def test_new_dps_hub_grant_is_not_fresh_namespace_authorization_evidence(mocker):
+    h = _harness(mocker, "hub", action="update")
+    h.outcomes = ["success"]
+    h.run()
+    h.assignments[:] = [
+        assignment for assignment in h.assignments
+        if not (assignment["principalId"] == "target-principal" and assignment["scope"] == HUB_ID.lower())
+    ]
+    h.provider._rbac.created.clear()
+    h.patches.clear()
+    h.denial = _rejected("hub")
+    h.outcomes = ["initiate"]
+    with pytest.raises(ADRResourceStateError):
+        h.run()
+    assert len(h.patches) == 1
+    assert h.provider._rbac.created == [("target-principal", "IoT Hub Data Contributor", HUB_ID.lower())]
 
 
 def test_dps_inbound_denial_has_bounded_recovery(mocker):

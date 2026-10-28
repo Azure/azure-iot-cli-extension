@@ -139,6 +139,7 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
             ("namespace", "Azure Device Registry Administrator", "namespace"),
             ("namespace", "Reader", "namespace_group"),
             ("namespace", "Reader", "target_group"),
+            ("dps", "IoT Hub Data Contributor", "hubs"),
         ],
         "dps": [
             ("namespace", "Contributor", "target"),
@@ -147,6 +148,7 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
             ("namespace", "Azure Device Registry Administrator", "namespace"),
             ("namespace", "Reader", "namespace_group"),
             ("namespace", "Reader", "target_group"),
+            ("dps", "IoT Hub Data Contributor", "hubs"),
         ],
 
     }
@@ -1432,7 +1434,7 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
         namespace_system_principal_id="ns-system",
     )
 
-    assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type])
+    assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type]) - 1  # No DPS/Hub pair in this request.
     assert caplog.text.count("before updating the namespace") == 1
     assert "Completed these role-assignment creation requests" in caplog.text
     assert "service authorization may still need time to propagate" in caplog.text
@@ -1620,6 +1622,19 @@ def test_shared_rg_reader_is_deduplicated_across_case_insensitive_link_scopes(mo
     ]
     assert sum(call.args == ("outbound-uami", ADR_ADMINISTRATOR_ROLE, NS_SCOPE)
                for call in lookup.call_args_list) == 1
+    manager.cli.invoke.assert_not_called()
+
+
+def test_shared_namespace_and_dps_identity_reuses_hub_data_grant(mocker):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    lookup = mocker.patch.object(manager, "_assignment_exists", return_value=True)
+    manager.ensure(
+        "hub", NS_SCOPE, TARGET_SCOPE, "shared-principal", None,
+        dps_principal_id="SHARED-PRINCIPAL", hub_scopes=(TARGET_SCOPE.lower(),),
+    )
+    assert [call.args for call in lookup.call_args_list if call.args[1] == HUB_DATA_ROLE] == [
+        ("shared-principal", HUB_DATA_ROLE, TARGET_SCOPE),
+    ]
     manager.cli.invoke.assert_not_called()
 
 

@@ -502,7 +502,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
                     f"--location {TEST_LOCATION} --disable-local-auth true "
-                    f"--user-assigned-mi {identity_resource_id}"
+                    f"--system-assigned-mi --user-assigned-mi {identity_resource_id}"
                 )
                 _log(LogKind.CMD, "az %s", cmd)
                 self.create_owned_resource(cmd, kind="dps", name=dps_name, resource_group=rg)
@@ -510,6 +510,12 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
 
                 dps_show = self.cmd(f"iot dps show --name {dps_name} -g {rg}").get_output_in_json()
                 dps_id = dps_show["id"]
+                dps_system_principal = dps_show["identity"]["principalId"]
+                dps_user_principal = next(
+                    details["principalId"] for resource_id, details in
+                    dps_show["identity"]["userAssignedIdentities"].items()
+                    if resource_id.casefold() == identity_resource_id.casefold()
+                )
                 _log(LogKind.RESULT, "dps_id=%s", dps_id)
                 namespace = self.cmd(
                     f"iot adr ns show -n {namespace_name} -g {rg}"
@@ -586,6 +592,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     hub_cmd, kind="hub", name=secondary_hub, resource_group=rg,
                 ).get_output_in_json()
                 hub_id = hub["id"]
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=False)
                 hub_identity_types = {
                     identity_type.strip()
                     for identity_type in (hub.get("identity", {}).get("type") or "").split(",")
@@ -623,6 +630,24 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--ns {namespace_name} -g {rg}"
                 )
                 _log(LogKind.OK, "Hub link '%s' created (UAMI)", secondary_endpoint)
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=True)
+
+            with timed_step("Repair only the owned DPS-to-Hub assignment through Hub update"):
+                assignments = self.cmd(
+                    f"role assignment list --assignee-object-id {dps_user_principal} "
+                    f"--role 'IoT Hub Data Contributor' --scope '{hub_id}' --fill-principal-name false"
+                ).get_output_in_json()
+                exact = [assignment for assignment in assignments
+                         if assignment["scope"].casefold() == hub_id.casefold()
+                         and assignment["principalId"].casefold() == dps_user_principal.casefold()]
+                assert len(exact) == 1, "Expected exactly one owned DPS-to-Hub assignment."
+                self.cmd(f"role assignment delete --ids {shlex.quote(exact[0]['id'])}")
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=False)
+                self.cmd(
+                    f"iot adr ns link hub update --ns {namespace_name} -g {rg} "
+                    f"-n {secondary_endpoint} --user-assigned-mi {identity_resource_id}"
+                )
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=True)
 
             with timed_step("Step 4 ❯ link hub show / list (single entry)"):
                 shown = self.cmd(
@@ -788,6 +813,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                         "--system-assigned-mi false --disable-local-auth true"
                     )
                 _log(LogKind.OK, "Hub link '%s' created (SAMI)", tertiary_endpoint)
+                _assert_service_roles(
+                    self, [(dps_user_principal, "IoT Hub Data Contributor", tertiary_hub_id)], present=True,
+                )
 
             with timed_step("Step 6 ❯ link hub list (multi-hub, both endpoints)"):
                 listed = self.cmd(
@@ -872,6 +900,17 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Rotated UAMI → SAMI")
 
             with timed_step("Step 9 ❯ link dps update (rotate identity)"):
+                roles = [(dps_system_principal, "IoT Hub Data Contributor", scope)
+                         for scope in (hub_id, tertiary_hub_id)]
+                _assert_service_roles(self, roles, present=False)
+                self.cmd(
+                    f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
+                    f"-n {dps_endpoint} --system-assigned-mi"
+                )
+                _wait_for_linking_succeeded(
+                    self, "dps", namespace_name, rg, dps_endpoint, expected_identity_type="SystemAssigned",
+                )
+                _assert_service_roles(self, roles, present=True)
                 update_cmd = (
                     f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
                     f"-n {dps_endpoint} --user-assigned-mi {identity_resource_id}"
@@ -886,7 +925,12 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     dps_endpoint,
                     expected_identity_type="UserAssigned",
                 )
-                _log(LogKind.OK, "DPS link identity rotated (idempotent)")
+                _assert_service_roles(self, roles, present=True)
+                _assert_service_roles(
+                    self, [(dps_user_principal, "IoT Hub Data Contributor", scope)
+                           for scope in (hub_id, tertiary_hub_id)], present=True,
+                )
+                _log(LogKind.OK, "DPS identity rotated UAMI to SAMI and back; existing grants retained")
 
             _log(LogKind.OK, "Link lifecycle passed")
 
@@ -979,6 +1023,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                     (namespace_principal, "Reader", namespace["id"].split("/providers/")[0]),
                     (namespace_principal, "Contributor", hub_id),
                     (namespace_principal, "IoT Hub Data Contributor", hub_id),
+                    (identity["principalId"], "IoT Hub Data Contributor", hub_id),
                 )
                 _assert_service_roles(self, roles, present=False)
                 _log(LogKind.OK, "Fresh targets ready; no endpoints or required service-role assignments exist")

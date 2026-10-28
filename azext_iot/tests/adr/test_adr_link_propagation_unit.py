@@ -174,7 +174,7 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1  # Shared RG Reader is deduplicated.
+    assert len(h.created) == (7 if kind == "hub" else 5)
     assert len(h.assignments) == len(h.created)  # recovery verifies, never grants again
     inbound_principal = "target-user" if identity == "user" else "target-principal"
     outbound_principal = "namespace-user" if identity == "user" else "namespace-principal"
@@ -185,10 +185,41 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
         "target": KINDS[kind][2], "namespace": NS_ID,
         "namespace_group": "/subscriptions/sub/resourceGroups/rg", "target_group": "/subscriptions/sub/resourceGroups/rg",
     }
-    assert h.created == list(dict.fromkeys(
+    expected = list(dict.fromkeys(
         (principals[rule.principal], rule.role, scopes[rule.scope])
-        for rule in LINK_ROLE_MATRIX[kind]
+        for rule in LINK_ROLE_MATRIX[kind] if rule.principal != "dps"
     ))
+    if kind == "hub":
+        expected.append((inbound_principal, "IoT Hub Data Contributor", HUB_ID.lower()))
+    assert h.created == expected
+
+
+@pytest.mark.parametrize("change", ["grant", "principal", "hub-scope"])
+def test_dps_hub_recovery_stops_when_cross_service_grant_plan_changes(mocker, change):
+    h = Harness(mocker, "dps", action="update")
+    h.namespace["properties"]["messaging"] = {"endpoints": {"hub": {
+        "endpointType": KINDS["hub"][1], "resourceId": HUB_ID,
+    }}}
+
+    def drift():
+        if not h.patches:
+            return
+        if change == "grant":
+            h.assignments[:] = [
+                assignment for assignment in h.assignments
+                if not (assignment["principalId"] == "target-principal"
+                        and assignment["scope"] == HUB_ID.lower())
+            ]
+        elif change == "principal":
+            h.target["identity"]["principalId"] = "replacement-dps"
+        else:
+            h.namespace["properties"]["messaging"]["endpoints"]["hub"]["resourceId"] = HUB_ID + "-other"
+
+    h.get_hook = drift
+    with pytest.raises(AzureResponseError, match="Recovery stopped|principal or scope changed"):
+        h.run()
+    assert len(h.patches) == 1
+    assert len(h.created) == 6
 
 
 @pytest.mark.parametrize("action", ["add", "update"])

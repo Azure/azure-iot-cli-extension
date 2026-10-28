@@ -49,6 +49,7 @@ from azext_iot.adr.providers.link_persistence import (
 )
 from azext_iot.adr.providers.link_preflight import (
     TargetLookup,
+    add_dps_hub_role_requirements,
     get_target,
     preflight_target,
 )
@@ -139,6 +140,10 @@ class LinkProvider(ADRProvider):
             lookup=lambda parsed_id, _: self._get_target(parsed_id, strategy),
             rbac_manager=self._rbac_manager,
             rbac_requests=requests,
+        )
+        add_dps_hub_role_requirements(
+            requests[0], namespace,
+            lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
         )
         self._link_requests[(link_type, target_resource_id.casefold())] = deepcopy(requests)
         if rbac_requests is not None:
@@ -374,6 +379,12 @@ class LinkProvider(ADRProvider):
                 strategy=strategy, lookup=lambda parsed, _: deadline.call(self._get_target, parsed, strategy),
                 rbac_manager=self._rbac_manager, rbac_requests=requests,
             )
+            add_dps_hub_role_requirements(
+                requests[0], current,
+                lambda resource_id: deadline.call(
+                    self._get_target, _parse_dps_resource_id(resource_id), _DPS_TARGET,
+                ),
+            )
             deadline.remaining()
             if requests != original_requests:
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
@@ -384,7 +395,7 @@ class LinkProvider(ADRProvider):
         return LinkRecovery(
             self, namespace, section, name, expected, budget, verify,
             authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
-            recent_grants=any(assignment in created for _, assignment in required),
+            recent_grants=any(rule.principal != "dps" and assignment in created for rule, assignment in required),
             recent_inbound_grant=any(
                 rule.principal == "linked" and rule.scope == "namespace" and assignment in created
                 for rule, assignment in required
@@ -814,9 +825,15 @@ class LinkProvider(ADRProvider):
             strategy=_DPS_TARGET,
             rbac_requests=rbac_requests,
         )
+        hub_plan = deepcopy(existing)
+        properties = hub_plan.get("properties") or {}
+        provisioning = properties.get("provisioning") or {}
+        provisioning["endpoints"] = {**(provisioning.get("endpoints") or {}), dps_endpoint_name: dps_body}
+        properties["provisioning"] = provisioning
+        hub_plan["properties"] = properties
         hub = self._preflight_link(
             link_type="hub",
-            namespace=existing,
+            namespace=hub_plan,
             target_resource_id=hub_resource_id,
             inbound_identity=hub_body.get("inboundCallerIdentity"),
             parsed=parsed_hub,

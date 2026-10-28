@@ -21,6 +21,7 @@ Release History
 * Added GA schema registry, schema, and schema-version management and wait commands.
 * Certificate policies accept validity periods from 1 to 90 days. Link-recovery failures preserve the original service error as their cause.
 * Retained automatic service-role preflight, DPS-first combined linking, bounded readiness/recovery, and terminal-operation failure handling.
+* Hub/DPS namespace linking now automatically grants the selected DPS identity IoT Hub Data Contributor on the associated Hubs, including link updates and DPS identity rotation. Existing assignments are reused and historical grants are retained.
 * Recognize the explicit DPS inbound-identity authorization response during fresh role propagation, retaining verified grants, identity-preserving updates, and the existing two-retry limit.
 * Namespace link removal requires a strong, quoted response ETag before permission checks or writes and protects concurrent changes with If-Match. It waits for completion and surfaces asynchronous failures by default; ``--no-wait`` returns after submission. HTTP 412 retains the original error and provides retry guidance without automatically retrying the write.
 * Compared with the preview release branch, certificate policies do not accept ``--location`` or ``--tags``; update validity with ``--validity-days``. Namespace ``--observability-enabled`` is not available in the selected GA contract.
