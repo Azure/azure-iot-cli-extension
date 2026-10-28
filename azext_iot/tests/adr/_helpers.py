@@ -6,12 +6,15 @@
 
 """Shared helpers for ADR integration tests that require Azure infrastructure."""
 
+from contextlib import contextmanager
 import json
 import re
 import shlex
 import sys
 import time
 from typing import Callable, Dict, Optional, TypeVar
+from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
 from azure.cli.testsdk.exceptions import CliExecutionError
@@ -22,6 +25,7 @@ from azure.core.exceptions import (
     ServiceRequestError,
     ServiceResponseError,
 )
+from azure.core.pipeline.transport import RequestsTransport
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
@@ -33,6 +37,7 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+from azext_iot.adr.rbac import LINK_ROLE_IDS, READER_ROLE
 
 
 ROLE_PROPAGATION_DELAY = 30
@@ -422,7 +427,99 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         if not hasattr(self, "_owned_resources"):
             self._owned_resources = {}
         self._owned_resources[(kind, name, resource_group)] = None
-        return self.cmd(command)
+        result = self.cmd(command)
+        if kind in {"namespace", "identity"}:
+            resource = result.get_output_in_json()
+            principal = resource.get("identity", {}).get("principalId") if kind == "namespace" else resource.get("principalId")
+            if isinstance(principal, str) and principal:
+                if not hasattr(self, "_owned_principals"):
+                    self._owned_principals = {}
+                self._owned_principals[(kind, name, resource_group)] = principal.casefold()
+        return result
+
+    @contextmanager
+    def record_group_reader_assignments(self):
+        original = RequestsTransport.send
+
+        def send(transport, request, **kwargs):
+            path = urlsplit(request.url).path
+            match = re.fullmatch(
+                r"(/subscriptions/[^/]+/resourceGroups/[^/]+)/providers/Microsoft.Authorization/roleAssignments/([^/]+)",
+                path, re.IGNORECASE,
+            )
+            claim = None
+            if request.method == "PUT" and match:
+                properties = json.loads(request.body)["properties"]
+                if (
+                    properties.get("principalId", "").casefold() in getattr(self, "_owned_principals", {}).values()
+                    and properties.get("roleDefinitionId", "").rsplit("/", 1)[-1].casefold() == LINK_ROLE_IDS[READER_ROLE]
+                ):
+                    binding = {
+                        "id": path, "name": match[2], "scope": match[1],
+                        **{key: properties[key] for key in ("principalId", "principalType", "roleDefinitionId")},
+                    }
+                    if not hasattr(self, "_owned_group_readers"):
+                        self._owned_group_readers = {}
+                    claim = self._owned_group_readers.get(path.casefold())
+                    if claim is None:
+                        claim = {**binding, "request": request}
+                        self._owned_group_readers[path.casefold()] = claim
+                    else:
+                        # The SDK retries the same request; a new request must not adopt its ownership.
+                        assert claim["request"] is request, "Refusing a different request for an owned Reader ID."
+                        assert all(claim[key] == value for key, value in binding.items()), "Reader retry binding changed."
+                        claim.pop("status", None)
+            response = original(transport, request, **kwargs)
+            if claim is not None:
+                claim["status"] = response.status_code
+            return response
+
+        with patch.object(RequestsTransport, "send", send):
+            yield
+
+    def _cleanup_group_readers(self, resource):
+        principal = getattr(self, "_owned_principals", {}).get(resource)
+        grants = getattr(self, "_owned_group_readers", {})
+        for key, claim in list(grants.items()):
+            if claim["principalId"].casefold() != principal:
+                continue
+            status = claim.get("status", 0)
+            if 400 <= status < 500 and status != 408:
+                del grants[key]
+                continue
+
+            def fetch():
+                assignments = self.cmd(
+                    f"role assignment list --scope {shlex.quote(claim['scope'])} "
+                    f"--assignee-object-id {shlex.quote(claim['principalId'])} --fill-principal-name false "
+                    f"--subscription {shlex.quote(claim['scope'].split('/')[2])}"
+                ).get_output_in_json()
+                assert isinstance(assignments, list), "Malformed Reader cleanup readback."
+                matches = [item for item in assignments if item["id"].casefold() == claim["id"].casefold()]
+                assert len(matches) <= 1, "Duplicate Reader cleanup readback."
+                if matches:
+                    assert all(
+                        matches[0].get(field, "").casefold() == claim[field].casefold()
+                        for field in ("id", "name", "scope", "principalId", "principalType", "roleDefinitionId")
+                    ), "Owned RG Reader binding changed."
+                    return matches[0]
+                return None
+
+            if not claim.get("delete_attempted"):
+                wait_for_condition(
+                    fetch, lambda value: value is not None, description="owned RG Reader create reconciliation",
+                    timeout=300, interval=5, is_retryable_error=lambda _error: False,
+                )
+                claim["delete_attempted"] = True
+                self.cmd(
+                    f"role assignment delete --ids {shlex.quote(claim['id'])} "
+                    f"--subscription {shlex.quote(claim['scope'].split('/')[2])}"
+                )
+            wait_for_condition(
+                fetch, lambda value: value is None, description="owned RG Reader deletion",
+                timeout=300, interval=5, is_retryable_error=lambda _error: False,
+            )
+            del grants[key]
 
     def setup_full_infra(
         self,
@@ -539,6 +636,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         return resource_is_absent(self, f"{command} show {arguments}", description=kind)
 
     def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
+        self._cleanup_group_readers((kind, name, resource_group))
         if self._resource_is_absent(kind, name, resource_group):
             return
         command = self._RESOURCE_COMMANDS[kind]

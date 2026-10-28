@@ -9,10 +9,14 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
+import responses
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ServiceRequestError
+from azure.core.pipeline import Pipeline
+from azure.core.pipeline.policies import RetryPolicy
+from azure.core.pipeline.transport import HttpRequest, RequestsTransport
 from knack.util import CLIError
 
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper, is_resource_not_found_error
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, is_resource_not_found_error, LINK_ROLE_IDS, READER_ROLE
 
 
 def _http_error(status=None, code=None):
@@ -21,6 +25,95 @@ def _http_error(status=None, code=None):
     if code:
         error.error = SimpleNamespace(code=code)
     return error
+
+
+@pytest.mark.parametrize("outcome", ["created", "uncertain", "conflict", "foreign", "binding-changed"])
+def test_owned_identity_cleanup_tracks_only_its_native_rg_reader(mocker, outcome):
+    helper = ADRFullInfraHelper()
+    principal = "11111111-2222-3333-4444-555555555555"
+    resource = ("identity", "owned", "rg")
+    result = Mock()
+    result.get_output_in_json.return_value = {"principalId": principal}
+    helper.cmd = Mock(side_effect=[_http_error(404, "ResourceNotFound"), result])
+    helper.create_owned_resource("identity create -n owned -g rg", kind="identity", name="owned", resource_group="rg")
+    assert helper._owned_principals[resource] == principal
+    group = "/subscriptions/sub/resourceGroups/rg"
+    role = {
+        "id": group + "/providers/Microsoft.Authorization/roleAssignments/role-id",
+        "name": "role-id", "scope": group, "principalId": principal if outcome != "foreign" else "someone-else",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "/subscriptions/sub/providers/Microsoft.Authorization/roleDefinitions/"
+        + LINK_ROLE_IDS[READER_ROLE],
+    }
+    request = HttpRequest("PUT", "https://management.azure.com" + role["id"])
+    request.set_json_body({"properties": {key: role[key] for key in ("principalId", "principalType", "roleDefinitionId")}})
+    send = mocker.patch.object(RequestsTransport, "send", return_value=SimpleNamespace(
+        status_code=409 if outcome == "conflict" else 201,
+    ))
+    if outcome == "uncertain":
+        send.side_effect = ServiceRequestError("response lost")
+        with pytest.raises(ServiceRequestError), helper.record_group_reader_assignments():
+            RequestsTransport().send(request)
+    else:
+        with helper.record_group_reader_assignments():
+            RequestsTransport().send(request)
+    mocker.patch("azext_iot.tests.adr._helpers.time.sleep")
+    roles = [dict(role), {**role, "id": role["id"] + "-preexisting", "name": "preexisting"}]
+    if outcome == "binding-changed":
+        roles[0]["principalId"] = "replacement"
+    commands = []
+
+    def command(text):
+        commands.append(text)
+        output = Mock()
+        if text.startswith("role assignment list"):
+            output.get_output_in_json.return_value = list(roles)
+        elif text.startswith("role assignment delete"):
+            assert role["id"] in text and "-preexisting" not in text
+            roles.pop(0)
+        return output
+
+    helper.cmd = Mock(side_effect=command)
+    mocker.patch.object(helper, "_resource_is_absent", return_value=False)
+    if outcome == "binding-changed":
+        with pytest.raises(AssertionError, match="binding changed"):
+            helper._delete_owned_resource(*resource)
+        assert not any(" delete " in command for command in commands)
+    else:
+        helper._delete_owned_resource(*resource)
+        deletes = [command for command in commands if " delete " in command]
+        assert deletes[-1] == "identity delete -n owned -g rg"
+        assert len(deletes) == (1 if outcome in {"conflict", "foreign"} else 2)
+    assert roles[-1]["name"] == "preexisting"
+
+
+@responses.activate
+@pytest.mark.parametrize("status", [429, 503])
+def test_reader_recorder_preserves_sdk_retry_and_rejects_another_request(status):
+    helper = ADRFullInfraHelper()
+    principal = "11111111-2222-3333-4444-555555555555"
+    helper._owned_principals = {("identity", "owned", "rg"): principal}
+    path = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Authorization/roleAssignments/role-id"
+    url = "https://management.azure.com" + path
+    body = {"properties": {
+        "principalId": principal, "principalType": "ServicePrincipal",
+        "roleDefinitionId": "/subscriptions/sub/providers/Microsoft.Authorization/roleDefinitions/"
+        + LINK_ROLE_IDS[READER_ROLE],
+    }}
+    responses.add("PUT", url, status=status, json={})
+    responses.add("PUT", url, status=201, json={})
+    with helper.record_group_reader_assignments():
+        with Pipeline(transport=RequestsTransport(), policies=[RetryPolicy(retry_total=1, retry_backoff_factor=0)]) as pipeline:
+            request = HttpRequest("PUT", url)
+            request.set_json_body(body)
+            assert pipeline.run(request).http_response.status_code == 201
+            other = HttpRequest("PUT", url)
+            other.set_json_body(body)
+            with pytest.raises(AssertionError, match="different request"):
+                pipeline.run(other)
+    assert len(responses.calls) == 2
+    assert len(helper._owned_group_readers) == 1
+    assert helper._owned_group_readers[path.casefold()]["status"] == 201
 
 
 def _assert_lookup_cannot_claim_resource(error, expected_type=None):

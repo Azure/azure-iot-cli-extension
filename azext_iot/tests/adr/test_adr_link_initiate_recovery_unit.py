@@ -103,7 +103,7 @@ def test_exact_link_initiate_authorization_recovers_with_verified_original_roles
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])  # No new recovery grants.
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1  # Shared RG Reader is deduplicated; no recovery grants.
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -183,7 +183,7 @@ def test_link_initiate_recovery_still_rejects_drift_before_second_patch(mocker, 
     with pytest.raises(AzureResponseError):
         h.run()
     assert len(h.patches) == 1
-    assert len(h.created) == len(LINK_ROLE_MATRIX["hub"])
+    assert len(h.created) == len(LINK_ROLE_MATRIX["hub"]) - 1
 
 
 def test_repeated_link_initiate_denial_uses_original_deadline_and_backoff(mocker):
@@ -357,7 +357,7 @@ def test_generated_sdk_namespace_status_binds_link_initiate_denial(mocker, mocke
         result = h.run(timeout_sec=120, wait_sec=1)
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert patches == [{"properties": {section: {"endpoints": {kind: h.body}}}}] * 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -373,7 +373,7 @@ def test_generic_rejection_after_fresh_grants_is_retried_while_they_propagate(mo
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1
 
 
 def test_generic_rejection_retries_are_bounded(mocker):
@@ -426,7 +426,7 @@ def test_dps_inbound_denial_recovers_only_after_verifying_fresh_grants(mocker, i
     assert h.patches == [{"provisioning": {"endpoints": {"dps": h.body}}}] * 2
     assert h.clock.delays == [30]
     assert verify.call_count == 2
-    assert len(h.created) == len(LINK_ROLE_MATRIX["dps"])
+    assert len(h.created) == len(LINK_ROLE_MATRIX["dps"]) - 1
 
 
 def test_dps_inbound_denial_has_bounded_recovery(mocker):

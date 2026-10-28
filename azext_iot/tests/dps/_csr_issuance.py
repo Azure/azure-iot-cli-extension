@@ -250,12 +250,59 @@ def _remove_namespace_self_role(name):
     receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "deleted": True})
 
 
+def _remove_namespace_group_reader_roles(name, namespace):
+    record = receipts._owned(name)  # pylint: disable=protected-access
+    directory = receipts.settings()[0]
+    for path in directory.glob("mutation-*.json"):
+        journal = json.loads(path.read_text(encoding="utf-8"))
+        binding = journal.get("readerGrant")
+        if not binding or journal.get("method") != "PUT" or binding.get("namespaceId") != record["id"]:
+            continue
+        assert all(journal.get(key) == record[key] for key in ("run_uid", "subscription", "phase"))
+        if runtime.reader_creation_rejected(journal):
+            continue
+        assert namespace is not None or journal.get("readerDeleted"), (
+            "Namespace disappeared before its owned RG Reader cleanup."
+        )
+        scope = f"/subscriptions/{record['subscription']}/resourceGroups/{record['resource_group']}"
+        principal = _namespace_sami(namespace) if namespace is not None else str(UUID(binding["principalId"]))
+        assert binding == {"namespaceId": record["id"], "principalId": principal, "scope": scope}
+        assignment_name = str(UUID(journal["id"].rsplit("/", 1)[-1]))
+        expected = {
+            "id": scope + "/providers/Microsoft.Authorization/roleAssignments/" + assignment_name,
+            "name": assignment_name, "scope": scope, "principalId": binding["principalId"],
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": (
+                f"/subscriptions/{record['subscription']}/providers/Microsoft.Authorization/"
+                f"roleDefinitions/{runtime.GROUP_READER_ROLE_ID}"
+            ),
+        }
+        assert journal["id"].casefold() == expected["id"].casefold()
+        with _auth_client_factory(fixtures.cli.az_cli, scope=scope) as client:
+            if not journal.get("readerDeleteAttempted"):
+                wait_for_condition(
+                    lambda: _get_namespace_role(client, expected), lambda value: value is not None,
+                    description="uncertain native RG Reader creation reconciliation", timeout=300, interval=5,
+                    is_retryable_error=lambda _error: False,
+                )
+            if _get_namespace_role(client, expected) is not None:
+                assert not journal.get("readerDeleted"), "Completed namespace RG Reader assignment reappeared."
+                if not journal.get("readerDeleteAttempted"):
+                    journal["readerDeleteAttempted"] = True
+                    receipts.write(path.name, journal)
+                    with runtime.owned_namespace_group_reader(namespace):
+                        invoke(f"role assignment delete --ids {quote(expected['id'])} --subscription {record['subscription']}")
+                _wait_arm_absent(lambda: _get_namespace_role(client, expected), "owned namespace RG Reader absence")
+        receipts.write(path.name, {**journal, "readerDeleted": True})
+
+
 def delete_namespace(name):
     from azext_iot.tests.dps._csr_registry import cleanup_registry_devices
 
     current = find_namespace(name)
     if current is None:
         _remove_namespace_self_role(name)
+        _remove_namespace_group_reader_roles(name, None)
         return
     record = _require_owned(name, current)
     cleanup_registry_devices(record)
@@ -290,6 +337,7 @@ def delete_namespace(name):
             invoke(f"{command} delete {arguments} -y")
         _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
     _remove_namespace_self_role(name)
+    _remove_namespace_group_reader_roles(name, current)
     if receipts.before_delete(name, find_namespace(name)):
         with runtime.owned_write(name, "DELETE"):
             invoke(f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
@@ -319,15 +367,15 @@ def _create_namespace(run_uid, kind, dps, hub):
             ).as_json()
             assert (identity["identity"] if kind_name == "dps" else identity)["principalId"]
 
-        # Journal the fixture-owned grant first so automatic link RBAC reuses it.
-        role_ready_at = _grant_namespace_self_role(name)
-        linked = invoke(
-            f"iot adr ns link add --ns {name} -g {fixtures.ENTITY_RG} "
-            f"--dps-endpoint-name dps --dps-id {dps['dps']['id']} --dps-system-assigned-mi "
-            f"--hub-endpoint-name hub --hub-id {hub['hub']['id']} --hub-system-assigned-mi "
-            f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
-        ).as_json()
+        with runtime.owned_namespace_group_reader(namespace):
+            linked = invoke(
+                f"iot adr ns link add --ns {name} -g {fixtures.ENTITY_RG} "
+                f"--dps-endpoint-name dps --dps-id {dps['dps']['id']} --dps-system-assigned-mi "
+                f"--hub-endpoint-name hub --hub-id {hub['hub']['id']} --hub-system-assigned-mi "
+                f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
+            ).as_json()
         _assert_linked(linked, dps, hub)
+        role_ready_at = monotonic() + NAMESPACE_ROLE_PROPAGATION_SECONDS
 
         record = receipts._owned(name)  # pylint: disable=protected-access
         for label, command, arguments, child_path, options in _children(name):

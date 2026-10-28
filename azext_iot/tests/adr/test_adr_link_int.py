@@ -86,6 +86,7 @@ from azext_iot.adr.topology import (
     endpoint_update_body,
 )
 from azext_iot.adr.rbac import (
+    ADR_CONTRIBUTOR_ROLE,
     CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
     LinkRbacManager,
@@ -311,14 +312,18 @@ def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_n
     hub = test_case.cmd(
         f"iot hub show --ids {shlex.quote(hub_id)}"
     ).get_output_in_json()
-    namespace_principal = namespace["identity"]["principalId"]
+    namespace_principal = resolve_namespace_outbound_principal(namespace)
     hub_principal = hub["identity"]["principalId"]
     _assert_service_roles(
         test_case,
         [
             (namespace_principal, CONTRIBUTOR_ROLE, hub_id),
             (namespace_principal, HUB_DATA_ROLE, hub_id),
-            (hub_principal, CONTRIBUTOR_ROLE, namespace["id"]),
+            (hub_principal, ADR_CONTRIBUTOR_ROLE, namespace["id"]),
+            (hub_principal, "Reader", namespace["id"]),
+            (namespace_principal, "Azure Device Registry Administrator", namespace["id"]),
+            (namespace_principal, "Reader", namespace["id"].split("/providers/")[0]),
+            (namespace_principal, "Reader", hub_id.split("/providers/")[0]),
         ],
         present=True,
     )
@@ -387,7 +392,7 @@ def _update_hub_to_sami_with_recovery(
 
 
 def _assert_service_roles(test_case, roles, *, present):
-    for principal, role, scope in roles:
+    for principal, role, scope in dict.fromkeys(roles):
         assignments = test_case.cmd(
             f"role assignment list --assignee-object-id {principal} "
             f"--role '{role}' --scope '{scope}' --include-inherited --fill-principal-name false"
@@ -580,7 +585,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"iot adr ns show -n {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 self_role = (
-                    namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"],
+                    resolve_namespace_outbound_principal(namespace), "Azure Device Registry Administrator", namespace["id"],
                 )
                 _assert_service_roles(self, [self_role], present=False)
 
@@ -1038,8 +1043,10 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 namespace_principal = resolve_namespace_outbound_principal(namespace)
                 roles = (
                     (namespace_principal, "Contributor", dps_id),
-                    (identity["principalId"], "Contributor", namespace["id"]),
-                    (namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"]),
+                    (identity["principalId"], "Azure Device Registry Contributor", namespace["id"]),
+                    (identity["principalId"], "Reader", namespace["id"]),
+                    (namespace_principal, "Azure Device Registry Administrator", namespace["id"]),
+                    (namespace_principal, "Reader", namespace["id"].split("/providers/")[0]),
                     (namespace_principal, "Contributor", hub_id),
                     (namespace_principal, "IoT Hub Data Contributor", hub_id),
                 )
@@ -1303,6 +1310,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     (namespace_principal_id, "Contributor", su_id),
                     (namespace_principal_id, "Device Update Administrator", su_id),
                     (identity_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                    (identity_principal_id, "Reader", ns["id"]),
+                    (namespace_principal_id, "Azure Device Registry Administrator", ns["id"]),
+                    (namespace_principal_id, "Reader", ns["id"].split("/providers/")[0]),
+                    (namespace_principal_id, "Reader", su_id.split("/providers/")[0]),
                 )
                 if is_owned_su:
                     _assert_service_roles(self, roles, present=False)
@@ -1436,7 +1447,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Step 4 > link su update (rotate identity UAMI to SAMI)"):
                 if is_owned_su:
                     _assert_service_roles(
-                        self, [(sami_principal_id, "Azure Device Registry Contributor", ns["id"])], present=False,
+                        self, [(sami_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                               (sami_principal_id, "Reader", ns["id"])], present=False,
                     )
                 update_cmd = (
                     f"iot adr ns link su update --ns {namespace_name} -g {rg} "
@@ -1453,7 +1465,11 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     self,
                     [(namespace_principal_id, "Contributor", su_id),
                      (namespace_principal_id, "Device Update Administrator", su_id),
-                     (sami_principal_id, "Azure Device Registry Contributor", ns["id"])],
+                     (sami_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                     (sami_principal_id, "Reader", ns["id"]),
+                     (namespace_principal_id, "Azure Device Registry Administrator", ns["id"]),
+                     (namespace_principal_id, "Reader", ns["id"].split("/providers/")[0]),
+                     (namespace_principal_id, "Reader", su_id.split("/providers/")[0])],
                     present=True,
                 )
                 assert _identity_type(shown) == "SystemAssigned", (

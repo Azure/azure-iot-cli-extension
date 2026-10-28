@@ -865,7 +865,7 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
 
     def command(text, **_):
         if text.startswith("iot adr ns show "):
-            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+            return _output({"id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
             assert "--assignee-object-id namespace-system" in text
             assert "--role 'Azure Device Registry Administrator'" in text
@@ -953,7 +953,7 @@ _HUB_REJECTED = (
 
 def _rotation_namespace():
     return {
-        "id": NS_ID, "identity": {"principalId": "namespace-principal"},
+        "id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-principal"},
         "properties": {
             "provisioningState": "Succeeded",
             "messaging": {"endpoints": {"secondary": _rotation_endpoint("Succeeded", "UserAssigned")}},
@@ -996,22 +996,26 @@ def test_hub_rotation_rejection_requires_structural_or_attributed_evidence():
     assert link_scenarios._is_identity_rotation_authorization_failure(error=attributed, endpoint=rolled_back)
 
 
-def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch):
+@pytest.mark.parametrize("outbound_user", [False, True])
+def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch, outbound_user):
     clock = Clock()
     monkeypatch.setattr(link_scenarios, "monotonic", clock)
     monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
     scenario = Mock()
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
     roles = [{"id": "role"}]
+    namespace = _rotation_namespace()
+    if outbound_user:
+        namespace["identity"]["userAssignedIdentities"] = {UAMI_ID: {"principalId": "namespace-user"}}
+        namespace["identity"]["type"] = "SystemAssigned, UserAssigned"
+        namespace["properties"]["outboundIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
     responses = [
-        _output(_rotation_namespace()),
+        _output(namespace),
         _rotation_rejection(),
         _output(_rotation_endpoint()),
-        _output(_rotation_namespace()),
+        _output(namespace),
         _output({"identity": {"principalId": "hub-sami"}}),
-        _output(roles),
-        _output(roles),
-        _output(roles),
+        *[_output(roles) for _ in range(6)],
         _output(None),
         _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
     ]
@@ -1027,6 +1031,8 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     assert _bounded_update_timeouts(scenario, update_cmd) == [600, 570]
     assert update_cmd not in commands
     assert any("role assignment list" in command and "hub-sami" in command for command in commands)
+    outbound = "namespace-user" if outbound_user else "namespace-principal"
+    assert sum(f"--assignee-object-id {outbound} " in command for command in commands) == 4
 
 
 def test_hub_rotation_current_wrapper_requires_exact_rotation_attribution():
@@ -1148,9 +1154,7 @@ def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_roll
         _output(_rotation_endpoint("Succeeded", "UserAssigned")),
         _output(_rotation_namespace()),
         _output({"identity": {"principalId": "hub-sami"}}),
-        _output(roles),
-        _output(roles),
-        _output(roles),
+        *[_output(roles) for _ in range(6)],
         _output(None),
         _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
     ]
@@ -1436,7 +1440,7 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         if text.startswith("iot adr ns identity show "):
             return _output({"type": "SystemAssigned", "principalId": "namespace-system"})
         if text.startswith("iot adr ns show "):
-            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+            return _output({"id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
             assert "--assignee-object-id namespace-system" in text
             assert "--role 'Azure Device Registry Administrator'" in text

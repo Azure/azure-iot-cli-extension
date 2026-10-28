@@ -105,13 +105,14 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         principal = resolve_namespace_outbound_principal(before)
         scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
-        assert not self._reader_assignments(principal, scope)
-        with self.assertLogs("cli.azext_iot.adr", level="WARNING") as logs:
+        native_reader = self._reader_assignments(principal, scope)
+        assert len(native_reader) == 1, "Native link setup must establish RG Reader."
+        with self.assertLogs("cli.azext_iot.adr", level="INFO") as logs:
             with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
                 self.cmd(f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes")
         _assert_unlink_service_rejection(rejected.value, before["id"])
-        assert any("Cannot confirm read access" in message for message in logs.output), logs.output
-        assert not self._reader_assignments(principal, scope), "Unlink must not create Reader grants."
+        assert any("Observed a read-capable role assignment" in message for message in logs.output), logs.output
+        assert self._reader_assignments(principal, scope) == native_reader, "Unlink must not change Reader grants."
         after = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         assert endpoint_name in after["properties"][section]["endpoints"]
         assert after["tags"] == before["tags"]
@@ -122,8 +123,8 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         assert endpoint["linkingState"] == "Succeeded", endpoint
         principal = resolve_namespace_outbound_principal(before)
         scope = endpoint["resourceId"].split("/providers/")[0]
-        assert not self._reader_assignments(principal, scope)
-        self.addCleanup(self._cleanup_reader, principal, scope)
+        native_reader = self._reader_assignments(principal, scope)
+        assert len(native_reader) == 1, "Native link setup must establish RG Reader."
         command = (
             f"iot adr ns link {kind} remove --ns {namespace_name} -g {TEST_RG} -n {endpoint_name} --yes --grant-reader"
         )
@@ -131,7 +132,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             self.cmd(command)
         first_code = _assert_unlink_service_rejection(rejected.value, before["id"])
         created = self._reader_assignments(principal, scope)
-        assert len(created) == 1, "Explicit grant must be retained after service rejection."
+        assert created == native_reader, "--grant-reader must reuse the native grant after service rejection."
         sleep(ROLE_PROPAGATION_DELAY)
         with pytest.raises((HttpResponseError, ADRResourceStateError)) as rejected:
             self.cmd(command)

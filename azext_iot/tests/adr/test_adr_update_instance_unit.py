@@ -61,6 +61,7 @@ def update_instance_provider():
         "adr_update_instance_service_factory"
     ) as factory:
         client = Mock()
+        client.update_instances.get.return_value = {}
         factory.return_value = client
         provider = UpdateInstanceProvider(Mock(cli_ctx=Mock()))
         yield provider
@@ -342,11 +343,11 @@ def test_create_resolves_location_and_supports_no_wait(
     poller.result.assert_not_called()
 
 
-def test_create_continues_when_unavailable_name_is_absent_from_requested_group(update_instance_provider):
+def test_create_without_name_check_when_instance_is_absent(update_instance_provider):
     error = HttpResponseError(message="not found")
     error.status_code = 404
     operations = update_instance_provider.client.update_instances
-    operations.check_name_availability.return_value = {"nameAvailable": False}
+    operations.check_name_availability.side_effect = AssertionError("Creation must not require name-check permission.")
     operations.get.side_effect = error
 
     assert update_instance_provider.create(
@@ -360,21 +361,20 @@ def test_create_continues_when_unavailable_name_is_absent_from_requested_group(u
     )
 
 
+@pytest.mark.parametrize("status", [403, 429, 503])
 def test_create_propagates_existing_instance_lookup_error(
-    update_instance_provider,
+    update_instance_provider, status,
 ):
     error = HttpResponseError(message="service unavailable")
-    error.status_code = 503
+    error.status_code = status
     operations = update_instance_provider.client.update_instances
-    operations.check_name_availability.return_value = {
-        "nameAvailable": False
-    }
     operations.get.side_effect = error
 
     with pytest.raises(HttpResponseError, match="service unavailable"):
         update_instance_provider.create(INSTANCE, RG)
 
     operations.begin_create.assert_not_called()
+    operations.check_name_availability.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -413,9 +413,7 @@ def test_create_upsert_preserves_unspecified_identity_tags_and_state(
     if identity is not None:
         current["identity"] = identity
     operations = update_instance_provider.client.update_instances
-    operations.check_name_availability.return_value = {
-        "nameAvailable": False
-    }
+    operations.check_name_availability.side_effect = AssertionError("Upsert must read the instance directly.")
     operations.get.return_value = current
     operations.begin_create.return_value.result.return_value = {
         "name": INSTANCE
@@ -452,9 +450,6 @@ def test_create_upsert_blocks_replacing_active_identity(
         "Microsoft.DeviceUpdate/updateInstances/test-update-instance"
     )
     operations = update_instance_provider.client.update_instances
-    operations.check_name_availability.return_value = {
-        "nameAvailable": False
-    }
     operations.get.return_value = {
         "id": instance_id,
         "location": "centraluseuap",

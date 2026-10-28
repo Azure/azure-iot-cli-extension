@@ -133,7 +133,7 @@ def test_existing_setup_consumes_propagation_floor(namespace_commands, resource,
         csr.sleep.assert_called_once_with(remaining)
     else:
         csr.sleep.assert_not_called()
-    assert sum(command.startswith("role assignment create ") for command in namespace_commands.commands) == 1
+    assert not any(command.startswith("role assignment create ") for command in namespace_commands.commands)
 
 
 def test_grant_reads_fresh_owned_namespace_identity_and_cannot_replay(owned, mocker):

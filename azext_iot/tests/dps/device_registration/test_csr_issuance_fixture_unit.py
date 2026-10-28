@@ -221,6 +221,73 @@ def test_real_sdk_absence_probes_complete_setup_and_dependency_ordered_cleanup(a
     ]
 
 
+def test_issuance_setup_relies_on_native_link_self_grant(namespace_commands, resource, mocker):
+    pregrant = mocker.patch.object(csr, "_grant_namespace_self_role", side_effect=AssertionError("Fixture pregrant forbidden"))
+    csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    pregrant.assert_not_called()
+    assert sum("iot adr ns link add " in command for command in namespace_commands.commands) == 1
+    assert not any(command.startswith("role assignment create ") for command in namespace_commands.commands)
+
+
+def _native_reader_journal(scope, backend, name, status):
+    group = f"/subscriptions/{SUB}/resourceGroups/rg"
+    assignment = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+    role = {
+        "id": group + "/providers/Microsoft.Authorization/roleAssignments/" + assignment,
+        "name": assignment, "scope": group, "principalId": NAMESPACE_PRINCIPAL, "principalType": "ServicePrincipal",
+        "roleDefinitionId": f"/subscriptions/{SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+        + csr.runtime.GROUP_READER_ROLE_ID,
+    }
+    backend.roles[role["id"]] = role
+    payload = {
+        "id": role["id"], "method": "PUT", "readerGrant": {
+            "namespaceId": backend.namespace_id, "scope": group, "principalId": NAMESPACE_PRINCIPAL,
+        },
+    }
+    if status is not None:
+        payload["responseStatus"] = status
+    csr.receipts.write("mutation-reader.json", payload, exclusive=True)
+    return role
+
+
+@pytest.mark.parametrize("status", [201, None, 504])
+def test_native_reader_cleanup_reconciles_exact_grant_before_namespace_delete(
+    namespace_commands, resource, scope, status,
+):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    role = _native_reader_journal(scope, namespace_commands, name, status)
+    csr.delete_namespace(name)
+    assert not namespace_commands.roles
+    assert json.loads((scope / "mutation-reader.json").read_text())["readerDeleted"]
+    deletes = [command for command in namespace_commands.commands if " delete " in command]
+    assert role["id"] in deletes[-2]
+    assert deletes[-1].startswith("iot adr ns delete")
+    csr.delete_namespace(name)  # Completed cleanup is verified, not replayed.
+    assert sum(command.startswith("role assignment delete") for command in namespace_commands.commands) == 1
+
+
+@pytest.mark.parametrize("failure", ["principal-changed", "uncertain-absent", "duplicate"])
+def test_native_reader_cleanup_never_adopts_another_grant_or_drops_uncertain_ownership(
+    namespace_commands, resource, scope, mocker, failure,
+):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    role = _native_reader_journal(scope, namespace_commands, name, 409 if failure == "duplicate" else None)
+    if failure == "uncertain-absent":
+        namespace_commands.roles.clear()
+        mocker.patch.object(csr, "wait_for_condition", side_effect=AssertionError("Uncertain write remains unresolved"))
+    else:
+        role["principalId"] = SUB
+    if failure == "duplicate":
+        csr.delete_namespace(name)
+        assert role["id"] in namespace_commands.roles
+    else:
+        with pytest.raises(AssertionError):
+            csr._remove_namespace_group_reader_roles(name, namespace_commands.resources["namespace"])
+        assert "namespace" in namespace_commands.resources
+        assert not json.loads((scope / "mutation-reader.json").read_text()).get("readerDeleted")
+    assert not any(command.startswith("role assignment delete") for command in namespace_commands.commands)
+
+
 def test_real_arm_show_handler_exits_on_sdk_404_but_scoped_probe_returns_absent(arm_commands, resource, mocker):
     mocker.patch("azure.cli.core.azclierror.ResourceNotFoundError.send_telemetry")
     with pytest.raises(HttpResponseError) as missing:
@@ -311,17 +378,15 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     mutations = [command for command in namespace_commands.commands if any(
         action in command for action in (" create ", " assign ", " add ")
     )]
-    assert len(mutations) == 8
+    assert len(mutations) == 7
     assert "iot dps identity assign" in mutations[1]
     assert "iot hub identity assign" in mutations[2]
-    assert mutations[3].startswith("role assignment create ")
-    assert f'--assignee-object-id "{NAMESPACE_PRINCIPAL}"' in mutations[3]
-    assert mutations[4].startswith("iot adr ns link add ")
-    assert "--timeout 1200 --interval 10" in mutations[4]
-    assert "--dps-system-assigned-mi" in mutations[4] and "--hub-system-assigned-mi" in mutations[4]
-    assert "--type Root" in mutations[5]
-    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[6]
-    assert "--validity-days 30" in mutations[7]
+    assert mutations[3].startswith("iot adr ns link add ")
+    assert "--timeout 1200 --interval 10" in mutations[3]
+    assert "--dps-system-assigned-mi" in mutations[3] and "--hub-system-assigned-mi" in mutations[3]
+    assert "--type Root" in mutations[4]
+    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[5]
+    assert "--validity-days 30" in mutations[6]
     assert sum(" wait " in command for command in namespace_commands.commands) == 3
     assert not any("linked-hub" in command for command in mutations)
     assert json.loads((scope / "created-csrns.json").read_text())["create_completed"]
@@ -329,7 +394,7 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     deletes = [command for command in namespace_commands.commands if " delete " in command]
     assert ["role" if command.startswith("role ") else "policy" if " policy " in command else "ica" if "issuingca" in command
             else "root" if "rootca" in command else "namespace" for command in deletes] == [
-        "policy", "ica", "root", "role", "namespace",
+        "policy", "ica", "root", "namespace",
     ]
     assert json.loads((scope / "deleted-csrns.json").read_text())["delete_completed"]
     assert not namespace_commands.resources
@@ -403,8 +468,7 @@ def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namesp
     assert sum(failed in command for command in namespace_commands.commands) == 1
     assert not namespace_commands.resources
     assert not namespace_commands.roles
-    if failed == "iot adr ns link add":
-        assert sum("role assignment delete" in command for command in namespace_commands.commands) == 1
+    assert not any("role assignment delete" in command for command in namespace_commands.commands)
     assert not any("link update" in command for command in namespace_commands.commands)
 
 

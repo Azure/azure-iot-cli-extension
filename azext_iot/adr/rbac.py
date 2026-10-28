@@ -87,23 +87,51 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     "hub": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
         RoleRule("namespace", HUB_DATA_ROLE, "target"),
-        RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
     ),
     "dps": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
-        RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
-        RoleRule("namespace_system", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
         RoleRule("namespace", ADU_ADMINISTRATOR_ROLE, "target"),
         RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
     ),
 }
 
 
 def _normalized_id(resource_id: str) -> str:
     return (resource_id or "").rstrip("/").casefold()
+
+
+def _resource_group_scope(resource_id: str) -> str:
+    parts = resource_id.rstrip("/").split("/") if isinstance(resource_id, str) else []
+    if (
+        len(parts) < 5 or parts[0] or parts[1].casefold() != "subscriptions"
+        or not parts[2] or parts[3].casefold() != "resourcegroups" or not parts[4]
+    ):
+        raise InvalidArgumentValueError(
+            f"A resource-group-scoped ARM resource ID is required for link RBAC: '{resource_id}'."
+        )
+    return "/".join(parts[:5])
+
+
+def _assignment_key(assignment: Tuple[str, str, str]) -> Tuple[str, str, str]:
+    principal, role, scope = assignment
+    return _normalized_id(principal), role, _normalized_id(scope)
 
 
 def _assignment_scope_applies(assignment_scope: str, scope: str, *, inherited_at_scope: bool = False) -> bool:
@@ -272,10 +300,13 @@ def resolve_linked_resource_principal(
 def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
-        "namespace_system": "namespace system-assigned MI",
         "linked": f"{link_type.upper()} selected inbound MI",
     }
-    scopes = {"namespace": "namespace", "target": link_type.upper()}
+    scopes = {
+        "namespace": "namespace", "target": link_type.upper(),
+        "namespace_group": "namespace resource group",
+        "target_group": f"{link_type.upper()} resource group",
+    }
     return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
 
 
@@ -300,7 +331,8 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
     if request["link_type"] == "dps" and not principals["namespace_system"]:
         raise AzureResponseError(
             "DPS link RBAC requires the namespace system-assigned principalId "
-            "for registry-device provisioning. Verify the namespace identity and retry."
+            "to remain enabled. Self-access is granted to the selected outbound identity. "
+            "Verify the namespace identity and retry."
         )
     return principals
 
@@ -308,13 +340,22 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
 def required_assignments(request: dict):
     """Yield (rule, (principal_id, role, scope)) for every assignment a link request needs."""
     principals = _request_principals(request)
-    scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
+    scopes = {
+        "namespace": request["namespace_scope"], "target": request["target_scope"],
+        "namespace_group": _resource_group_scope(request["namespace_scope"]),
+        "target_group": _resource_group_scope(request["target_scope"]),
+    }
+    seen = set()
     for rule in LINK_ROLE_MATRIX[request["link_type"]]:
         principal_id = principals.get(rule.principal)
         # Hub inbound identity is optional. There is no principal to grant
         # in that direction when the endpoint omits it.
         if principal_id:
-            yield rule, (principal_id, rule.role, scopes[rule.scope])
+            assignment = (principal_id, rule.role, scopes[rule.scope])
+            key = _assignment_key(assignment)
+            if key not in seen:
+                seen.add(key)
+                yield rule, assignment
 
 
 class LinkRbacManager:
@@ -414,15 +455,16 @@ class LinkRbacManager:
         Conditions are not proof of unconditional service access. Missing or
         conditional grants stop recovery; this method never creates assignments.
         """
+        seen = set()
         for request in requests:
-            principals = _request_principals(request)
-            scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
-            for rule in LINK_ROLE_MATRIX[request["link_type"]]:
-                principal = principals[rule.principal]
-                if not principal:
+            for _, assignment in required_assignments(request):
+                key = _assignment_key(assignment)
+                if key in seen:
                     continue
+                seen.add(key)
+                principal, role, scope = assignment
                 guard()
-                exists = self._assignment_exists(principal, rule.role, scopes[rule.scope], strict=True)
+                exists = self._assignment_exists(principal, role, scope, strict=True)
                 guard()
                 if not exists:
                     guidance = (
@@ -433,8 +475,8 @@ class LinkRbacManager:
                         else ""
                     )
                     raise AzureResponseError(
-                        f"Cannot confirm unconditional {rule.role} for principalId={principal} "
-                        f"at scope={scopes[rule.scope]}. Recovery stopped without another namespace mutation. "
+                        f"Cannot confirm unconditional {role} for principalId={principal} "
+                        f"at scope={scope}. Recovery stopped without another namespace mutation. "
                         "Verify the required service-role assignment; no broader roles or caller data access were granted."
                         f"{guidance}"
                     )
@@ -616,6 +658,7 @@ class LinkRbacManager:
         """Authorize a complete atomic link plan before creating any assignment."""
         missing = []
         descriptions = {}
+        seen = set()
         for request in requests:
             link_type = request["link_type"]
             if link_type not in LINK_ROLE_MATRIX:
@@ -623,7 +666,11 @@ class LinkRbacManager:
                     f"Unsupported link type '{link_type}' for RBAC preflight."
                 )
             for rule, assignment in required_assignments(request):
-                if assignment not in missing and not self._assignment_exists(*assignment):
+                key = _assignment_key(assignment)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not self._assignment_exists(*assignment):
                     missing.append(assignment)
                     descriptions[assignment] = _format_role_requirement(link_type, rule)
 

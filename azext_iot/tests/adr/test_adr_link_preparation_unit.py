@@ -539,18 +539,22 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
     } else 2
     assert len(native_commands) == expected_calls
     if failure is None:
-        assert role_observations == [
-            ("namespace-sami", "Contributor", su_id, False),
-            ("namespace-sami", "Device Update Administrator", su_id, False),
-            ("su-uami", "Azure Device Registry Contributor", namespace_id, False),
-            ("namespace-sami", "Contributor", su_id, True),
-            ("namespace-sami", "Device Update Administrator", su_id, True),
-            ("su-uami", "Azure Device Registry Contributor", namespace_id, True),
-            ("su-sami", "Azure Device Registry Contributor", namespace_id, False),
-            ("namespace-sami", "Contributor", su_id, True),
-            ("namespace-sami", "Device Update Administrator", su_id, True),
-            ("su-sami", "Azure Device Registry Contributor", namespace_id, True),
+        initial = [
+            ("namespace-sami", "Contributor", su_id),
+            ("namespace-sami", "Device Update Administrator", su_id),
+            ("su-uami", "Azure Device Registry Contributor", namespace_id),
+            ("su-uami", "Reader", namespace_id),
+            ("namespace-sami", "Azure Device Registry Administrator", namespace_id),
+            ("namespace-sami", "Reader", "/subscriptions/sub/resourceGroups/rg"),
         ]
+        rotated = [(("su-sami" if principal == "su-uami" else principal), role, scope)
+                   for principal, role, scope in initial]
+        assert role_observations == (
+            [(*role, False) for role in initial] + [(*role, True) for role in initial]
+            + [("su-sami", "Azure Device Registry Contributor", namespace_id, False),
+               ("su-sami", "Reader", namespace_id, False)]
+            + [(*role, True) for role in rotated]
+        )
         report_commands = [
             item.args[0] for item in scenario.cmd.call_args_list
             if item.args[0].startswith("iot adr ns report ")

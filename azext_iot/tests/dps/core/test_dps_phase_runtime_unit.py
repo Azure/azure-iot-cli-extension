@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
 import requests
@@ -71,6 +72,50 @@ def _owned(kind):
     group = os.environ[receipts.RESOURCE_GROUP_ENV]
     receipts.before_create("owned", group, UID, kind)
     return receipts.target()["endpoint"] + f"/subscriptions/{SUB_B}/resourceGroups/{group}/providers/{resource_type(kind)}/owned"
+
+
+@responses.activate
+@pytest.mark.parametrize("change", ["none", "principal", "role", "group", "no-context", "unowned-delete"])
+def test_native_group_reader_is_narrowly_authorized_and_journaled(scope, change):
+    namespace_url = _owned("csrns")
+    record = receipts._owned("owned")
+    principal = "11111111-2222-3333-4444-555555555555"
+    namespace = {
+        "id": urlsplit(namespace_url).path, "name": "owned", "tags": record["tags"],
+        "identity": {"type": "SystemAssigned", "principalId": principal},
+    }
+    group = f"/subscriptions/{SUB_B}/resourceGroups/group"
+    assignment_id = group + "/providers/Microsoft.Authorization/roleAssignments/66666666-7777-8888-9999-aaaaaaaaaaaa"
+    body = {"properties": {
+        "principalId": SUB_A if change == "principal" else principal, "principalType": "ServicePrincipal",
+        "roleDefinitionId": f"/subscriptions/{SUB_B}/providers/Microsoft.Authorization/roleDefinitions/"
+        + (SUB_A if change == "role" else runtime.GROUP_READER_ROLE_ID),
+    }}
+    url = ARM + (assignment_id.replace("/group/", "/foreign/") if change == "group" else assignment_id)
+    method = "DELETE" if change == "unowned-delete" else "PUT"
+    request = HttpRequest(method, url)
+    request.set_json_body(body)
+    responses.add(method, url, status=201, json={})
+    context = nullcontext() if change == "no-context" else runtime.owned_namespace_group_reader(namespace)
+    with runtime.activate(SUB_B), context:
+        client = _client("adr_service_factory")
+        with nullcontext() if change == "none" else pytest.raises(runtime.ScopeError):
+            client.send_request(request)
+    assert len(responses.calls) == (1 if change == "none" else 0)
+    journals = [json.loads(path.read_text()) for path in scope.glob("mutation-*.json")]
+    if change == "none":
+        assert len(journals) == 1
+        assert journals[0]["readerGrant"] == {
+            "namespaceId": namespace["id"], "principalId": principal, "scope": group,
+        }
+        assert journals[0]["responseStatus"] == 201
+        responses.add("DELETE", url, status=204)
+        with runtime.activate(SUB_B), runtime.owned_namespace_group_reader(namespace):
+            _client("adr_service_factory").send_request(HttpRequest("DELETE", url))
+        assert len(responses.calls) == 2
+    else:
+        assert not journals
+    assert runtime._GROUP_READER.get() is None
 
 
 @pytest.mark.parametrize("determinant", [False, True])
