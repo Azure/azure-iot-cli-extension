@@ -409,7 +409,7 @@ stages:
                   path: $(Agent.TempDirectory)/integration-run.json
                   artifact: release-integration-$(cohort)-$(System.JobAttempt)
                   isProduction: false
-                  condition: always()
+                  condition: and(always(), ne(variables['integrationBuildId'], ''))
             steps:
               - checkout: self
                 clean: true
