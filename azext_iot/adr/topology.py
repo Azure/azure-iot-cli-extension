@@ -23,25 +23,25 @@ DPS_REQUIRED_MSG = (
 )
 
 DPS_CAP_EXCEEDED_MSG = (
-    "Namespace already has a linked DPS. Only one DPS may be linked per namespace. "
-    "Use 'az iot adr ns link dps update' to change its identity or retry a Failed link, "
-    "not to change the target DPS. To remove the existing link, delete the linked DPS first, "
-    "then run 'az iot adr ns link dps remove'."
+    "Namespace already has a linked DPS; only one is allowed. "
+    "Use 'az iot adr ns link dps update' to change its identity or retry a Failed link. "
+    "To change the target, remove the existing link with 'az iot adr ns link dps remove'. "
+    "Delete the target first for Succeeded links, not Failed links."
 )
 
 SU_CAP_EXCEEDED_MSG = (
-    "Namespace already has a linked Software Updates instance; only one may be "
-    "linked per namespace. Use 'az iot adr ns link su update' to modify the "
-    "existing link's identity or retry a Failed link, not to change its target. "
-    "To remove the existing link, delete the linked Update Instance first, "
-    "then run 'az iot adr ns link su remove'."
+    "Namespace already has a linked Software Updates instance; only one is allowed. "
+    "Use 'az iot adr ns link su update' to change its identity or retry a Failed link. "
+    "To change the target, remove the existing link with 'az iot adr ns link su remove'. "
+    "Delete the target first for Succeeded links, not Failed links."
 )
 
 HUB_CAP_EXCEEDED_MSG = (
     "Namespace already has the maximum of 10 linked IoT Hubs. "
-    "Use 'az iot adr ns link hub update' to retry an existing Failed link. "
-    "To remove the existing link, delete the linked IoT Hub first, "
-    "then run 'az iot adr ns link hub remove'."
+    "Use 'az iot adr ns link hub update' to retry a Failed link, or "
+    "'az iot adr ns link hub remove' to free an endpoint. "
+    "Delete the target first for Succeeded links, not Failed links. "
+    "Clear Registry Device IoT Hub capability references before removing any Hub endpoint."
 )
 
 

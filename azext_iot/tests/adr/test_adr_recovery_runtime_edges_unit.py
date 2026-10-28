@@ -291,8 +291,7 @@ def test_assignment_visibility_has_only_early_success_or_bounded_timeout_exits(o
     assert all(call.args[0].startswith("role assignment list ") for call in cli.invoke.call_args_list)
 
 
-def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_wait(mocker, caplog):
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_wait(mocker):
     cli = Mock()
     clock = Clock()
     manager = LinkRbacManager(Mock(), cli=cli, clock=clock.time, sleeper=clock.sleep)
@@ -329,7 +328,7 @@ def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_w
     ]
     assert reads == raced * 2  # Initial preflight then one race verification per role.
     assert not clock.delays
-    assert "Completed these role-assignment creation requests" not in caplog.text
+    assert not manager.created
     token.assert_not_called()
 
 
