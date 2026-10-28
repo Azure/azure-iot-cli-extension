@@ -105,6 +105,47 @@ index CI's Python 3.14 and azdev 0.2.13 setup; toolchain drift fails explicitly
 instead of silently claiming parity. Use **CI Build and Test**'s manual dispatch
 to rerun it on a branch without starting a release or accessing Azure resources.
 
+## Integration Health in Azure Pipelines
+
+**Azure IoT CLI - Integration Health** uses `.azure-devops/integration-health.yml`
+and the same pipeline template as manual pipeline 147. Health always runs live
+integration; dry runs and release-candidate selection remain in 147.
+
+Manage days, UTC start times, and branch filters under the pipeline's **Triggers >
+Scheduled** settings. Do not also add YAML schedules: UI schedules override them.
+Select the option to run even without source changes. The entrypoint and shared
+implementation must exist on each selected branch before enabling its schedule.
+The proposed cadence is weekdays at 14:17 UTC on `preview` and Saturdays at 14:17
+UTC on `dev`, after the existing 13:00 UTC cleanup. Migration branches are for
+controlled manual validation, not automatic production schedules.
+
+Edit the non-secret `ValidationProfiles` JSON in ADO Library group
+`iot-cli-integration-health` to change regional coverage without a GitHub PR.
+Its shape is `{"schema":1,"branches":{"refs/heads/preview":{"mon":PROFILE}}}`.
+Each profile requires `region` (one Azure region), `pythonVersions`
+(a nonempty list selected from 3.10-3.13), and `services` (a nonempty list selected
+from DPS, HubControl, HubData, ADU, ADR). Add entries for every scheduled weekday
+using `mon` through `sun`; missing profiles fail instead of running defaults.
+The optional `armEndpoint` is `public` by default. To qualify APIs available only
+on canary, explicitly select `"region":"centraluseuap","armEndpoint":"canary"`;
+other region/canary combinations are rejected. Keep public-preview profiles on
+their public region and endpoint. The resolved endpoint is frozen in the plan and
+passed to every service job; neither the SDK API version nor the target is silently
+changed. Only authorized maintainers should edit this group.
+
+Plan selects the actual queued branch and UTC day from ADO build metadata, records
+the source commit and configuration digest, and retains the resolved profile with
+`integration-plan-*`. Rerunning jobs uses the original profile, not current Library
+values. The immutable candidate and existing result/coverage gates remain in use.
+Health profiles are selected coverage, not a substitute for release qualification.
+Admission coordinates current Health and 147 runs; the Health cleanup window
+reserves seven hours. This is a preflight, not an atomic resource lock.
+
+Use the Health definition for dashboard status and integration-test trends, filtering
+out unit results. Inspect the saved profile for region, branch, and Python coverage;
+an old green run does not prove a later scheduled profile ran. Keep schedules disabled
+until the intended profile has completed and conflicting GitHub schedules are retired.
+
 ## Unit and Integration Testing
 
 Tests are organized into folders by resource in `azext_iot\tests\`:

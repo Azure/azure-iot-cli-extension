@@ -55,6 +55,9 @@ def plan(services, versions, regions, endpoint, diagnostic=False):
 
 
 def admission():
+    if os.environ.get("INTEGRATION_HEALTH_COORDINATION") == "true":
+        health = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_health.py"))
+        health["admission"](check_cleanup=os.environ.get("INTEGRATION_HEALTH") == "true")
     import requests
     with requests.get(
         "https://api.github.com/repos/Azure/azure-iot-cli-extension/actions/workflows/int_test.yml/runs",

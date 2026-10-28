@@ -1,10 +1,13 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
 parameters:
+  - name: health
+    type: boolean
+    default: false
   - name: service
     type: string
   - name: pythonVersions
-    type: object
+    type: string
   - name: regions
     type: object
 
@@ -15,21 +18,32 @@ stages:
       - Build
       - Lint
       - Unit
-    condition: |
-      and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
-          eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+      - ${{ if parameters.health }}:
+          - Plan
+    ${{ if not(parameters.health) }}:
+      condition: |
+        and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
+            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+    ${{ if parameters.health }}:
+      condition: |
+        and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
+            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'),
+            eq(dependencies.Plan.outputs['Plan.health.${{ parameters.service }}'], 'true'))
     jobs:
       - job: Tests
         timeoutInMinutes: 360
         cancelTimeoutInMinutes: 15
         strategy:
           maxParallel: 1
-          matrix:
-            ${{ each python in parameters.pythonVersions }}:
-              ${{ each region in parameters.regions }}:
-                ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
-                  python: ${{ python }}
-                  region: ${{ region }}
+          ${{ if parameters.health }}:
+            matrix: $[ stageDependencies.Plan.Plan.outputs['health.matrix'] ]
+          ${{ if not(parameters.health) }}:
+            matrix:
+              ${{ each python in split(parameters.pythonVersions, ' ') }}:
+                ${{ each region in parameters.regions }}:
+                  ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
+                    python: ${{ python }}
+                    region: ${{ region }}
         steps:
           - checkout: self
             clean: true
@@ -84,6 +98,8 @@ stages:
               HISTORY: $(Pipeline.Workspace)/history
               PYTHONPATH: $(Build.SourcesDirectory)
               AZEXT_IOT_CI_AUTH: ado
+              INTEGRATION_HEALTH_COORDINATION: 'true'
+              INTEGRATION_HEALTH: ${{ lower(parameters.health) }}
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions

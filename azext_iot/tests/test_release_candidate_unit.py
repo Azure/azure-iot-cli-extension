@@ -97,14 +97,14 @@ def set_field(value, path, replacement):
 
 
 def test_external_mode_is_default_off_and_normal_build_is_unchanged():
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
+    entry = yaml.safe_load((ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text(encoding="utf-8"))
     parameter = next(item for item in entry["parameters"] if item["name"] == "releaseBuildId")
     assert parameter["type"] == "number" and parameter["default"] == 0
     stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     steps = next(stage for stage in stages if stage.get("stage") == "Build")["jobs"][0]["steps"]
     assert len(steps) == 2
     assert steps[0]["${{ if eq(parameters.releaseBuildId, 0) }}"] == [
-        {"template": "templates/setup-python.yml", "parameters": {"pythonVersion": "3.13"}},
+        {"template": "setup-python.yml", "parameters": {"pythonVersion": "3.13"}},
         {"bash": "python -m build --wheel", "displayName": "Build the immutable test candidate"},
         {"publish": "dist", "artifact": "integration-wheel-$(System.JobAttempt)"},
     ]

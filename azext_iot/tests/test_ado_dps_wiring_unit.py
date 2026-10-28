@@ -113,7 +113,9 @@ def test_ado_callers_do_not_supply_the_canary_owned_controller_contract():
     assert call["parameters"]["path"] == "azext_iot/tests/dps"
     entry = (ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8")
     assert "templates/trigger-tests.yml" not in entry
-    assert "templates/integration-service.yml" in entry
+    assert "templates/integration-pipeline.yml" in entry
+    implementation = (ROOT / ".azure-devops/templates/integration-pipeline.yml").read_text(encoding="utf-8")
+    assert "template: integration-service.yml" in implementation
 
 
 def _execute(tmp_path, overrides=None, exit_code=0):
