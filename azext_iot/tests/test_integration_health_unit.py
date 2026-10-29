@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
-from datetime import datetime, timezone
 import json
 from unittest.mock import Mock
 
@@ -105,25 +104,6 @@ def test_rerun_uses_original_profile_not_library_changes(setup_health, tmp_path,
     (directory / "health-profile.json").write_text(json.dumps(value))
     with pytest.raises(ValueError, match="history"):
         health.resolve(tmp_path)
-
-
-@pytest.mark.parametrize("definition", [
-    {"id": 147, "name": "manual"}, {"id": 170, "name": "Azure IoT CLI - Integration Health"},
-])
-def test_admission_checks_both_pipeline_definitions(setup_health, monkeypatch, definition):
-    monkeypatch.setattr(health, "ado_get", Mock(return_value={"value": [{"id": 999, "definition": definition}]}))
-    with pytest.raises(ValueError, match="Another IoT"):
-        health.admission()
-
-
-def test_cleanup_window_and_unrelated_runs(setup_health, monkeypatch):
-    monkeypatch.setattr(health, "ado_get", Mock(return_value={
-        "value": [{"id": 999, "definition": {"id": 164, "name": "ops"}}],
-    }))
-    health.admission(datetime(2026, 10, 17, 20, tzinfo=timezone.utc))
-    with pytest.raises(ValueError, match="13:00"):
-        health.admission(datetime(2026, 10, 17, 10, tzinfo=timezone.utc))
-    health.admission(datetime(2026, 10, 17, 10, tzinfo=timezone.utc), check_cleanup=False)
 
 
 def test_health_entrypoint_always_executes_shared_live_pipeline():

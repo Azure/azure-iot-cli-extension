@@ -138,8 +138,8 @@ the source commit and configuration digest, and retains the resolved profile wit
 `integration-plan-*`. Rerunning jobs uses the original profile, not current Library
 values. The immutable candidate and existing result/coverage gates remain in use.
 Health profiles are selected coverage, not a substitute for release qualification.
-Admission coordinates current Health and 147 runs; the Health cleanup window
-reserves seven hours. This is a preflight, not an atomic resource lock.
+Health and 147 do not block one another or reserve time before scheduled cleanup.
+Azure resource failures are reported directly; there is no live-run admission guard.
 
 Use the Health definition for dashboard status and integration-test trends, filtering
 out unit results. Inspect the saved profile for region, branch, and Python coverage;
@@ -400,27 +400,23 @@ deliberate-failure diagnostic remains an offline unit regression in
 Before enabling live use, the pipeline owner must authorize the existing
 `aziotcli-sp-prime` connection and `aziotcli_test_primary` variable group for 147,
 allow its build identity to read current-run artifacts/builds and request the
-connection's job-scoped OIDC token, and configure an **exclusive lock check** on
-the shared variable group (the YAML uses sequential lock behavior). Keep access
+connection's job-scoped OIDC token. Do not configure an exclusive lock check on
+the shared integration resources. Keep access
 restricted; do not grant every pipeline access. WIF renewal updates CLI credential
 caches without rewriting the account profile.
 
 Service stages have no dependencies on one another; available ADO parallel-job
-capacity and resource checks can still queue jobs. In particular, a shared
-exclusive lock can serialize otherwise-independent stages; YAML dependencies do
-not override that check, and this change does not reconfigure it. Python/region matrix legs within
+and agent capacity can still queue jobs. Python/region matrix legs within
 each service remain serialized. Resource ownership and cleanup remain with the
 existing service fixtures and Hub/DPS phase controllers. The ADR/ADU retry plugin
 records test execution metadata only: it does not intercept HTTP requests or add
 a resource-inventory gate. ADR/ADU fixture-reported setup/teardown/cleanup failures
 remain non-retryable without independent cleanup proof; Hub/DPS require their
 existing ownership and cleanup evidence before rerunning an affected phase.
-Admission still rejects active GitHub integration runs. It does not inspect other
-ADO builds or enforce a fixed cleanup-time exclusion, and there are no
-merge-pipeline/revision exceptions. The daily 13:00 UTC cleanup job is unchanged
-and can still delete shared test resources during a run. Coordinate competing
-ADO/GitHub live runs and scheduled cleanup operationally; this preflight is not
-an atomic lock or a subscription quota reservation.
+Live execution has no overlap, cleanup-window or quota/capacity admission guard.
+Other ADO/GitHub runs do not block it. Azure quota, subscription and resource-group
+failures surface normally. The daily 13:00 UTC cleanup job is unchanged and can
+still delete shared test resources during a run.
 ADU also creates IoT Hubs. Keep original artifacts until all retries and final
 qualification finish.
 

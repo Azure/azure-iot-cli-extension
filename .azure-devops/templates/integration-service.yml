@@ -98,8 +98,6 @@ stages:
               HISTORY: $(Pipeline.Workspace)/history
               PYTHONPATH: $(Build.SourcesDirectory)
               AZEXT_IOT_CI_AUTH: ado
-              INTEGRATION_HEALTH_COORDINATION: 'true'
-              INTEGRATION_HEALTH: ${{ lower(parameters.health) }}
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions

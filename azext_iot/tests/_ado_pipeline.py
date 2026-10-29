@@ -54,21 +54,6 @@ def plan(services, versions, regions, endpoint, diagnostic=False):
     return jobs
 
 
-def admission():
-    if os.environ.get("INTEGRATION_HEALTH_COORDINATION") == "true":
-        health = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_health.py"))
-        health["admission"](check_cleanup=os.environ.get("INTEGRATION_HEALTH") == "true")
-    import requests
-    with requests.get(
-        "https://api.github.com/repos/Azure/azure-iot-cli-extension/actions/workflows/int_test.yml/runs",
-        params={"status": "in_progress", "per_page": 1}, timeout=(10, 30), allow_redirects=False,
-    ) as response:
-        if response.status_code != 200:
-            raise RuntimeError("GitHub live-run admission could not be checked.")
-        if response.json()["total_count"]:
-            raise ValueError("A GitHub integration run is active.")
-
-
 def context(service, python, region, endpoint, wheel, diagnostic):
     wheels = list(Path(wheel).rglob("*.whl"))
     if len(wheels) != 1:
@@ -412,8 +397,6 @@ def run_attempt(args, output):
     previous = {sig: signal.signal(sig, lambda *_: cancel.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     auth = None
     try:
-        if not args.diagnostic:
-            admission()
         if not args.diagnostic:
             command = [sys.executable, str(ROOT / "azext_iot/tests/_refresh_ci_auth.py")]
             subprocess.run(command, check=True, timeout=180)

@@ -7,7 +7,7 @@
 """Resolve editable ADO health profiles into immutable branch/day execution plans."""
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -125,25 +125,6 @@ def resolve(history):
         raise ValueError("ValidationProfiles must contain valid JSON.") from None
     build = ado_get(f"builds/{producer['build']}?api-version=7.1")
     return choose(configuration, build, producer)
-
-
-def admission(now=None, check_cleanup=True):
-    current = identity()
-    runs = ado_get("builds?statusFilter=inProgress,notStarted&$top=100&api-version=7.1")["value"]
-    if len(runs) >= 100:
-        raise ValueError("Too many active builds to establish IoT admission.")
-    for run in runs:
-        family = run["definition"]["id"] == 147 or run["definition"]["name"] == "Azure IoT CLI - Integration Health"
-        if family and str(run["id"]) != current["build"]:
-            raise ValueError("Another IoT integration or health run is active or queued.")
-    if not check_cleanup:
-        return
-    now = now or datetime.now(timezone.utc)
-    cleanup = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    if cleanup <= now:
-        cleanup += timedelta(days=1)
-    if cleanup - now < timedelta(hours=7):
-        raise ValueError("Insufficient time before the 13:00 UTC resource-group cleanup.")
 
 
 def plan(output, history):
