@@ -411,8 +411,7 @@ organization-mandated secret-scanning control.
    **View builds**, **View build pipeline** and **Stop builds** on 147 as needed;
    grant 147 read access to the producer build/artifacts. Restrict permissions to
    these pipelines. Same-project orchestration uses `System.AccessToken`, not an
-   ADO PAT. Do not hold a parent exclusive lock while waiting for a child that
-   needs that lock.
+   ADO PAT. Do not configure exclusive locks on shared integration resources.
 4. Create the protected variable group `aziotcli_release_publish`, authorized
    only for the reviewed release definition. Set secret `ReleaseGitHubToken`
    to an organization-approved automation credential. When opting into index
@@ -451,7 +450,9 @@ verifies each retained child candidate, including its original wheel and SBOM.
 Retain producer and child artifacts through qualification/recovery. A retried
 integration waiter looks for the uniquely owned child; it will not blindly
 queue another cohort. A failed child must be recovered through 147's existing
-recovery procedure, or a new release run started after cleanup/admission checks.
+recovery procedure, or a new release run started. The release parent queues new
+children without waiting for other live runs or a scheduled-cleanup window.
+Azure quota, subscription and resource-group failures surface normally.
 Cancellation requests target only that release's child. Agent loss or an
 uncertain queue response can still require operator inspection: check pipeline
 147 and cleanup ownership before starting another run. Do not rebuild or replace

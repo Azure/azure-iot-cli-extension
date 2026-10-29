@@ -540,41 +540,15 @@ def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monk
     assert release.read(tmp_path / "child.json")["cohort"] == cohort
 
 
-@pytest.mark.parametrize("hour,minute,seconds", [
-    (5, 0, 0), (5, 1, 8 * 3600 + 29 * 60), (12, 59, 31 * 60),
-    (13, 0, 1800), (13, 29, 60), (13, 30, 0), (23, 0, 0),
-])
-def test_iot_release_admission_reserves_cleanup_and_child_budget(hour, minute, seconds):
-    now = datetime(2026, 10, 28, hour, minute, tzinfo=timezone.utc)
-    assert release.safe_queue_delay(now) == seconds
-
-
-def test_admission_waits_for_safe_window_and_actual_cleanup_and_health(candidate, monkeypatch):
-    monkeypatch.setattr(release, "safe_queue_delay", Mock(side_effect=[60, 0, 0, 0]))
-    monkeypatch.setattr(release.time, "sleep", Mock())
-    mocked = Mock(side_effect=[
-        {"value": [{"definition": {"id": 166}}]}, {"value": [{"definition": {"id": 109}}]}, {"value": []},
-    ])
-    monkeypatch.setattr(release, "ado", mocked)
-    release.admit_integration()
-    assert release.time.sleep.call_count == 3
-    assert all("definitions=109%2C147%2C166" in call.args[0] and not call.kwargs
-               for call in mocked.call_args_list)
-
-
-def test_admission_timeout_never_queues_resources(candidate, monkeypatch):
-    monkeypatch.setattr(release, "safe_queue_delay", Mock(return_value=60))
-    monkeypatch.setattr(release.time, "monotonic", Mock(side_effect=[0, 9 * 3600]))
-    with pytest.raises(TimeoutError, match="no child was queued"):
-        release.admit_integration()
-    release.ado.assert_not_called()
-
-
-def test_integration_queues_exact_candidate_once(candidate, tmp_path, monkeypatch):
+@pytest.mark.parametrize("hour", [8, 13])
+def test_integration_queues_exact_candidate_once_without_admission(candidate, tmp_path, monkeypatch, hour):
     directory, value = candidate
     monkeypatch.setattr(release, "existing_integration", Mock(return_value=None))
-    admitted = Mock()
-    monkeypatch.setattr(release, "admit_integration", admitted)
+    monkeypatch.setattr(
+        release, "datetime", Mock(now=Mock(return_value=datetime(2026, 10, 29, hour, tzinfo=timezone.utc))),
+        raising=False,
+    )
+    monkeypatch.setattr(release.time, "sleep", Mock(side_effect=AssertionError("Unexpected admission wait")))
     mocked = Mock(side_effect=[{"id": 901}, integration_build(value)])
     monkeypatch.setattr(release, "ado", mocked)
     record = tmp_path / "child.json"
@@ -587,7 +561,9 @@ def test_integration_queues_exact_candidate_once(candidate, tmp_path, monkeypatc
     assert payload["templateParameters"]["releaseBuildId"] == "900"
     assert json.loads(payload["templateParameters"]["services"]) == release.INTEGRATION_PARAMETERS["services"]
     assert release.read(record)["producer"] == value["producer"]
-    admitted.assert_called_once_with()
+    assert mocked.call_count == 2
+    assert mocked.call_args_list[1].args == ("build/builds/901",)
+    release.time.sleep.assert_not_called()
 
 
 def test_retry_reattaches_without_queuing(candidate, tmp_path, monkeypatch):

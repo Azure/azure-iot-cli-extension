@@ -9,7 +9,6 @@
 import argparse
 import base64
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
 from email.parser import Parser
 import hashlib
 import json
@@ -520,33 +519,6 @@ def cancel_integration(record, directory):
         print(f"Requested cancellation of pipeline 147 build {run['id']}.", flush=True)
 
 
-def safe_queue_delay(now=None):
-    now = now or datetime.now(timezone.utc)
-    cleanup = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    if cleanup <= now < cleanup + timedelta(minutes=30):
-        return (cleanup + timedelta(minutes=30) - now).total_seconds()
-    if cleanup <= now:
-        cleanup += timedelta(days=1)
-    if cleanup - now < timedelta(hours=8):
-        return (cleanup + timedelta(minutes=30) - now).total_seconds()
-    return 0
-
-
-def admit_integration():
-    deadline = time.monotonic() + 9 * 3600
-    query = urlencode({
-        "definitions": "109,147,166", "statusFilter": "inProgress,notStarted,postponed,cancelling", "$top": 100,
-    })
-    while True:
-        delay = safe_queue_delay()
-        if not delay and not ado("build/builds?" + query)["value"]:
-            return
-        if time.monotonic() >= deadline:
-            raise TimeoutError("No safe IoT integration window within nine hours; no child was queued.")
-        print("Waiting without Azure resources for cleanup headroom and an idle IoT pipeline family.", flush=True)
-        time.sleep(min(60, delay or 60))
-
-
 def integrate(directory, record, timeout=25200):
     candidate = verify_candidate(directory)
     payload = {
@@ -561,7 +533,6 @@ def integrate(directory, record, timeout=25200):
     if run is None:
         if int(os.environ.get("SYSTEM_JOBATTEMPT", "1")) != 1:
             raise ValueError("No child found on a retried job; do not risk requeuing an uncertain prior request.")
-        admit_integration()
         run = ado("build/builds", method="POST", data=payload)
     run_id = identifier(run["id"])
     write(record, {"id": run_id, "producer": candidate["producer"], "cohort": environment("RELEASE_COHORT")})
