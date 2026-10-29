@@ -7,6 +7,7 @@
 """Owned, sequential DPS-only capacity qualification; never submit live capacity above one."""
 
 from contextlib import ExitStack, contextmanager
+from functools import partial
 from time import time
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -16,6 +17,8 @@ from azure.cli.core.azclierror import InvalidArgumentValueError
 from azure.core.pipeline.transport import RequestsTransport
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests import _cleanup_handoff as handoff
+from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
 from azext_iot.tests.dps import conftest as fixtures
 from azext_iot.tests.helpers import invoke_checked
@@ -94,4 +97,11 @@ def test_dps_unit_capacity_owned_lifecycle(request):
                     description="Unrelated owned DPS update",
                 ).as_json()
                 assert updated["sku"]["capacity"] == 1 and updated["tags"]["unitValidation"] == "passed"
-        assert fixtures._find_dps_by_name(name) is None
+        # Admission allows one sequential allocation; accepted deletion does not release that slot.
+        wait_for_condition(
+            partial(fixtures._find_dps_by_name, name), lambda resource: resource is None,
+            description="owned DPS capacity allocation absence", timeout=600, interval=10,
+            is_retryable_error=lambda _error: False,
+        )
+        if handoff.enabled():
+            _phase_receipts.after_delete(name)

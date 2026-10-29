@@ -34,9 +34,10 @@ def test_capacity_request_observer_is_read_only(mocker):
     transport.close()
 
 
-@pytest.mark.parametrize("regression", [False, True])
-def test_capacity_live_lifecycle_is_sequential_and_cleans_unexpected_allocation(mocker, regression):
+@pytest.mark.parametrize("regression,delayed_cleanup", [(False, False), (False, True), (True, False)])
+def test_capacity_live_lifecycle_is_sequential_and_cleans_unexpected_allocation(mocker, regression, delayed_cleanup):
     resources, commands, deleted, events = {}, [], [], []
+    pending = {}
     uid = "a" * 32
     cli = SimpleNamespace(output="")
     mocker.patch.object(scenario, "EmbeddedCLI", return_value=cli)
@@ -45,9 +46,21 @@ def test_capacity_live_lifecycle_is_sequential_and_cleans_unexpected_allocation(
     mocker.patch.object(scenario.fixtures, "_get_run_uid", return_value=uid)
     mocker.patch.object(scenario.fixtures, "ENTITY_RG", "rg")
     mocker.patch.object(scenario.fixtures, "ENTITY_LOCATION", "centraluseuap")
-    mocker.patch.object(scenario.fixtures, "_find_dps_by_name", side_effect=lambda name: deepcopy(resources.get(name)))
+
+    def find(name):
+        if name in pending:
+            pending[name] -= 1
+            if not pending[name]:
+                resources.pop(name)
+                del pending[name]
+        return deepcopy(resources.get(name))
+
+    mocker.patch.object(scenario.fixtures, "_find_dps_by_name", side_effect=find)
+    sleeper = mocker.patch("azext_iot.tests.adr._helpers.time.sleep")
+    mocker.patch.object(scenario.handoff, "enabled", return_value=delayed_cleanup)
     receipt = mocker.patch.object(scenario._phase_receipts, "before_create")
     created = mocker.patch.object(scenario._phase_receipts, "after_create")
+    completed = mocker.patch.object(scenario._phase_receipts, "after_delete")
     mocker.patch.object(scenario._phase_runtime, "owned_write", side_effect=lambda *_: nullcontext())
 
     @contextmanager
@@ -59,7 +72,10 @@ def test_capacity_live_lifecycle_is_sequential_and_cleans_unexpected_allocation(
 
     def cleanup(name, *_):
         deleted.append(name)
-        resources.pop(name, None)
+        if delayed_cleanup:
+            pending[name] = 2
+        else:
+            resources.pop(name, None)
 
     mocker.patch.object(scenario.fixtures, "_cleanup_created_resource", side_effect=cleanup)
 
@@ -98,3 +114,4 @@ def test_capacity_live_lifecycle_is_sequential_and_cleans_unexpected_allocation(
         assert creates[0].endswith("--unit 0") and creates[1].endswith("--unit 1")
         assert creates[2].endswith("--unit -1") and "--unit" not in creates[3]
     assert not resources
+    assert completed.call_count == sleeper.call_count == (2 if delayed_cleanup else 0)

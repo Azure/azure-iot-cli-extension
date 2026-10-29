@@ -49,6 +49,28 @@ def test_receipts_are_optional_without_orchestration(monkeypatch):
     assert receipts.before_delete("name")
 
 
+@pytest.mark.parametrize("kind", ["dps", "hub"])
+def test_handoff_records_acceptance_without_claiming_deletion(receipt_directory, monkeypatch, mocker, kind):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    monkeypatch.setenv(handoff.ENV, str(receipt_directory / "cleanup-receipts"))
+    receipt_kind = "h" if kind == "dps" else kind
+    receipts.before_create("owned", "group", UID, receipt_kind)
+    owned = receipts._owned("owned")
+    resource = {**owned, "properties": {"provisioningState": "Succeeded"}}
+    mocker.patch.object(fixtures, f"_find_{kind}_by_name", return_value=resource)
+    name = "iot_hub_service_factory" if kind == "hub" else "iot_service_provisioning_factory"
+    factory = mocker.patch.object(fixtures, name)
+    client = factory.return_value.__enter__.return_value
+    getattr(fixtures, f"_delete_{kind}")("owned")
+    operation = client.iot_hub_resource if kind == "hub" else client.iot_dps_resource
+    assert operation.begin_delete.call_args.kwargs["polling"] is False
+    operation.begin_delete.return_value.result.assert_not_called()
+    assert not (receipt_directory / f"deleted-{receipt_kind}.json").exists()
+    assert json.loads((receipt_directory / f"delete-accepted-{receipt_kind}.json").read_text())["delete_accepted"]
+    assert handoff.summary(receipt_directory)[0]["status"] == "accepted"
+
+
 @pytest.mark.parametrize("region", ["australiaeast", "westeurope", "centraluseuap"])
 @pytest.mark.parametrize("location", [None, "westus2", "requested"])
 def test_public_creation_and_cleanup_require_exact_resource_location(receipt_directory, monkeypatch, location, region):

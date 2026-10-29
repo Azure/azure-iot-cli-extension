@@ -13,6 +13,7 @@ import sys
 import time
 from typing import Callable, Dict, Optional, TypeVar
 
+from azure.cli.core import AzCli
 from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
 from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import (
@@ -31,8 +32,10 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
     _log,
     timed_step,
 )
-from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
+from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION, TEST_SUBSCRIPTION
+from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+from azext_iot.tests._ado_retry import CleanupFailure, InfrastructureFailure
 
 
 ROLE_PROPAGATION_DELAY = 30
@@ -98,6 +101,7 @@ class CleanupLedger:
         self._completed.add(label)
 
     def cleanup(self) -> list:
+        primary_error = sys.exc_info()[1]
         failures = []
         pending = []
         while self._actions:
@@ -106,7 +110,7 @@ class CleanupLedger:
             try:
                 unresolved = [dependency for dependency in dependencies if dependency not in self._completed]
                 if unresolved:
-                    raise AssertionError(
+                    raise InfrastructureFailure(
                         f"Dependent cleanup has not completed: {', '.join(unresolved)}"
                     )
                 cleanup()
@@ -116,17 +120,23 @@ class CleanupLedger:
                 _log(LogKind.WARN, "Cleanup failed for %s: %s", label, error)
             else:
                 self._completed.add(label)
-                _log(LogKind.RESULT, "Cleanup completed for %s", label)
+                message = ("Cleanup callback finished for %s; see submission status"
+                           if handoff.enabled() else "Cleanup completed for %s")
+                _log(LogKind.RESULT, message, label)
         self._actions.extend(reversed(pending))
+        if failures and primary_error is not None:
+            primary_error._iot_cleanup_failed = True  # pylint: disable=protected-access
         return failures
 
     def __exit__(self, exception_type, _exception, _traceback):
         failures = self.cleanup()
+        if failures and _exception is not None:
+            _exception._iot_cleanup_failed = True  # pylint: disable=protected-access
         if failures and exception_type is None:
             detail = ", ".join(
                 f"{label}: {error}" for label, error in failures
             )
-            raise AssertionError(f"ADR cleanup failed: {detail}")
+            raise CleanupFailure(f"ADR cleanup failed: {detail}")
         return False
 
 
@@ -246,7 +256,7 @@ def resource_is_absent(test, show_command: str, *, description: str = "resource"
     except SystemExit as error:
         if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
             return True
-        raise AssertionError(f"{description} lookup exited with code {error.code}") from error
+        raise InfrastructureFailure(f"{description} lookup exited with code {error.code}") from error
     except (HttpResponseError, CloudError, CLIError) as error:
         if not is_resource_not_found_error(error, ambient_context=ambient_context):
             raise
@@ -305,7 +315,7 @@ def wait_for_condition(
                 return value
             if is_terminal_failure and is_terminal_failure(value):
                 detail = describe(value) if describe else type(value).__name__
-                raise AssertionError(
+                raise InfrastructureFailure(
                     f"{description} reached a terminal failure after "
                     f"{attempts} attempt(s) ({detail})."
                 )
@@ -326,7 +336,7 @@ def wait_for_condition(
                 detail = f"last observation: {observation}"
             else:
                 detail = "no observation"
-            raise AssertionError(
+            raise InfrastructureFailure(
                 f"Timed out waiting for {description} after {attempts} "
                 f"attempt(s) ({detail})."
             )
@@ -405,6 +415,8 @@ def wait_for_listed_resource(
 class ADRFullInfraHelper(RoleAssignmentHelper):
     """Setup and teardown for tests linking an ADR namespace to an IoT Hub."""
 
+    cli_ctx: AzCli  # Provided by the live scenario through the MRO.
+
     _RESOURCE_COMMANDS = {
         "namespace": "iot adr ns",
         "dps": "iot dps",
@@ -418,7 +430,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         if kind not in self._RESOURCE_COMMANDS:
             raise ValueError(f"Unsupported test-owned resource kind: {kind}")
         if not self._resource_is_absent(kind, name, resource_group):
-            raise AssertionError(f"Refusing to overwrite existing {kind} '{name}' in '{resource_group}'.")
+            raise InfrastructureFailure(f"Refusing to overwrite existing {kind} '{name}' in '{resource_group}'.")
         if not hasattr(self, "_owned_resources"):
             self._owned_resources = {}
         self._owned_resources[(kind, name, resource_group)] = None
@@ -551,7 +563,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         except SystemExit as error:
             if error.code == 3 and is_resource_not_found_error(error, ambient_context=ambient_context):
                 return
-            raise AssertionError(f"{kind} delete exited with code {error.code}") from error
+            raise InfrastructureFailure(f"{kind} delete exited with code {error.code}") from error
         except (HttpResponseError, CloudError, CLIError) as error:
             if not is_resource_not_found_error(error, ambient_context=ambient_context):
                 raise
@@ -566,7 +578,41 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         self._cleanup_owned_resources(resources)
 
     def _cleanup_owned_resource(self, resource):
+        if handoff.enabled():
+            kind, name, group = resource
+            resource_type = {
+                "namespace": "Microsoft.DeviceRegistry/namespaces",
+                "dps": "Microsoft.Devices/provisioningServices", "hub": "Microsoft.Devices/IotHubs",
+                "su": "Microsoft.DeviceUpdate/updateInstances", "identity": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            }[kind]
+            resource_id = f"/subscriptions/{TEST_SUBSCRIPTION}/resourceGroups/{group}/providers/{resource_type}/{name}"
+            handoff.cleanup(resource_id, lambda: self._handoff_owned_resource(resource, resource_id), accepted=False)
+            return
         self._delete_owned_resource(*resource)
+        self._owned_resources.pop(resource, None)
+
+    def _handoff_owned_resource(self, resource, resource_id):
+        from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
+
+        kind, name, group = resource
+        if self._resource_is_absent(kind, name, group):
+            handoff.record(resource_id, "absent")
+        else:
+            with handoff.submission(resource_id):
+                if kind == "hub":
+                    with iot_hub_service_factory(self.cli_ctx, subscription_id=TEST_SUBSCRIPTION) as hub_client:
+                        hub_client.iot_hub_resource.begin_delete(
+                            resource_group_name=group, resource_name=name, polling=False, retry_total=0,
+                        )
+                elif kind == "dps":
+                    with iot_service_provisioning_factory(self.cli_ctx, subscription_id=TEST_SUBSCRIPTION) as dps_client:
+                        dps_client.iot_dps_resource.begin_delete(
+                            resource_group_name=group, provisioning_service_name=name, polling=False, retry_total=0,
+                        )
+                else:
+                    arguments = f"-n {shlex.quote(name)} -g {shlex.quote(group)}"
+                    options = " --yes --no-wait" if kind in ("namespace", "su") else ""
+                    self.cmd(f"{self._RESOURCE_COMMANDS[kind]} delete {arguments}{options}")
         self._owned_resources.pop(resource, None)
 
     def _cleanup_owned_resources(self, resources):
@@ -584,4 +630,4 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         failures = ledger.cleanup()
         if failures and sys.exc_info()[0] is None:
             detail = ", ".join(f"{label}: {error}" for label, error in failures)
-            raise AssertionError(f"ADR cleanup failed: {detail}") from failures[0][1]
+            raise CleanupFailure(f"ADR cleanup failed: {detail}") from failures[0][1]

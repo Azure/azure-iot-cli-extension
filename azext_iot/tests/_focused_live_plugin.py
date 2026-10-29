@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""DPS debug selection guard, loaded explicitly before initial conftests."""
+"""Exact DPS debug/attempt selection, loaded explicitly before initial conftests."""
 
 import os
 from pathlib import Path
@@ -25,10 +25,12 @@ def pytest_load_initial_conftests(early_config, parser, args):
         raise pytest.UsageError(str(error)) from error
     if debug is None:
         raise pytest.UsageError("The focused DPS plugin requires an explicit controller debug selection.")
-    validate_args(early_config, tuple(debug["requestedNodes"]), early=True)
+    parallel = "attempt" in debug and phase != "local-auth-toggle"
+    validate_args(early_config, tuple(debug["requestedNodes"]), early=True, parallel=parallel)
     folder = os.getenv("azext_iot_dps_phase_receipts")
     uid = os.getenv("azext_iot_dps_run_uid", "")
     if not folder or not Path(folder).is_absolute() or not re.fullmatch(r"[0-9a-f]{32}", uid):
         raise pytest.UsageError("Focused DPS requires a controller receipt directory and run UID.")
-    runtime = PhaseReceipt("DPS", phase, debug["requestedNodes"], Path(folder) / "pytest.json", uid, debug=debug)
+    runtime = PhaseReceipt("DPS", phase, debug["requestedNodes"], Path(folder) / "pytest.json", uid,
+                           debug=debug, parallel=parallel)
     early_config.pluginmanager.register(runtime, "dps-focused-receipt")

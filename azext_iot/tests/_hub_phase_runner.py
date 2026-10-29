@@ -47,6 +47,8 @@ CLEANUP = HUB_CI_BUDGETS["HubControl"]["phases"][0]["cleanup_minutes"] * 60
 RESERVE = HUB_CI_BUDGETS["HubControl"]["reserve_minutes"] * 60
 FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 TARGETS = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
+RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
+HANDOFF = runpy.run_path(str(ROOT / "azext_iot/tests/_cleanup_handoff.py"))
 
 
 def selection():
@@ -78,17 +80,35 @@ def runner_seconds(suite, budgets):
     return sum(runtime + cleanup_seconds(suite, phase) for phase, runtime in budgets) + reserve
 
 
-def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
+def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None, allow_failures=False):
     errors = []
+    expected_errors = []
+    if allow_failures and receipt.get("exitstatus") == 1:
+        expected_errors = ["phase incomplete or pytest failed"]
+        expected_errors.extend(
+            "required node did not pass exactly once with successful teardown: " + node
+            for node in expected if receipt.get("reports", {}).get(node) != {
+                stage: ["passed"] for stage in ("setup", "call", "teardown")
+            }
+        )
     if (receipt.get("schemaVersion") != 1 or receipt.get("suite") != suite or receipt.get("phase") != phase
             or receipt.get("runId") != run_id or receipt.get("finished") is not True
-            or receipt.get("exitstatus") != 0 or receipt.get("errors")
+            or receipt.get("exitstatus") not in ((0, 1) if allow_failures else (0,))
+            or receipt.get("errors") != expected_errors
             or receipt.get("expected") != expected or receipt.get("collected") != expected
             or len(set(expected)) != len(expected) or not FOCUSED["matches"](receipt, debug)):
         errors.append("phase identity, completion or exact collection failed")
     reports = receipt.get("reports", {})
-    if set(reports) != set(expected) or any(
-        reports.get(node) != {stage: ["passed"] for stage in ("setup", "call", "teardown")} for node in expected
+    if allow_failures:
+        try:
+            RETRY["outcomes"](receipt, allow_fixture_failures=True)
+        except ValueError as error:
+            errors.append(str(error))
+    elif set(reports) != set(expected) or any(
+        set(reports.get(node, {})) != {"setup", "call", "teardown"}
+        or reports[node].get("setup") != ["passed"] or reports[node].get("teardown") != ["passed"]
+        or reports[node].get("call") not in ((["passed"], ["failed"]) if allow_failures else (["passed"],))
+        for node in expected
     ):
         errors.append("every required node must pass once including setup/teardown; skips forbidden")
     return errors
@@ -97,8 +117,8 @@ def phase_errors(receipt, expected, suite, phase, run_id, *, debug=None):
 def write_junit(receipt, expected, path):
     """Publish only manifest identities and outcomes, never captured output or tracebacks."""
     suite = ET.Element("testsuite", name="hub-" + receipt["phase"], tests=str(len(expected)))
-    if receipt.get("mode") == "debug":
-        suite.set("mode", "debug")
+    if receipt.get("mode") in ("debug", "attempt"):
+        suite.set("mode", receipt["mode"])
     failures = 0
     for node in expected:
         module, _, name = node.rpartition("::")
@@ -114,15 +134,15 @@ def write_junit(receipt, expected, path):
     os.chmod(path, 0o600)
 
 
-def sas_errors(data, expected, *, debug=None, region="centraluseuap", endpoint=None):
+def sas_errors(data, expected, *, debug=None, region="centraluseuap", endpoint=None, handoff=False):
     """Validate existing SAS evidence without changing its membership/receipt format."""
-    errors = sas_cleanup_errors(data, debug=debug, region=region, endpoint=endpoint)
+    errors = sas_cleanup_errors(data, debug=debug, region=region, endpoint=endpoint, handoff=handoff)
     if sorted(data.get("passed", [])) != sorted(expected):
         errors.append("SAS required cases did not pass")
     return errors
 
 
-def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=None):
+def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=None, handoff=False):
     """Validate owned resource absence independently of test outcomes."""
     owned = helper(region, endpoint)
     errors = []
@@ -133,8 +153,8 @@ def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=Non
             or set(ids) != {"hub", "storage", "container", "role"}
             or not all(owned["scope_id"](value) for value in ids.values())
             or len(set(value.casefold() for value in ids.values())) != 4
-            or sorted(data.get("absent", [])) != sorted(ids)
-            or data.get("cleanupFailures") != {} or not FOCUSED["matches"](data, debug)):
+            or not handoff and (sorted(data.get("absent", [])) != sorted(ids) or data.get("cleanupFailures") != {})
+            or not FOCUSED["matches"](data, debug)):
         errors.append("invalid SAS ownership or cleanup")
     if ids:
         prefix = f"/subscriptions/{owned['SUBSCRIPTION']}/resourceGroups/{owned['GROUP']}/providers/"
@@ -157,13 +177,15 @@ def sas_cleanup_errors(data, *, debug=None, region="centraluseuap", endpoint=Non
            or m.split(" ", 1)[-1] not in allowed for m in mutations):
         errors.append("SAS mutation outside exact owned manifest")
     if not required.issubset(mutations) or any(
-        not isinstance(status, int) or not 200 <= status < 300 for status in statuses.values()
+        not isinstance(status, int) or not 200 <= status < 300
+        for mutation, status in statuses.items() if not handoff or not mutation.startswith("DELETE ")
     ):
         errors.append("SAS creation/mutation not confirmed")
     return errors
 
 
-def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
+def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None, attempt=False, allow_failures=False,
+                        handoff=False):
     """Pure JSON gate, no pytest/Azure imports. Return {passed: bool, errors: list}.
 
     Load with runpy.run_path(path) to bypass Azure-dependent package __init__ files.
@@ -171,12 +193,18 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
     """
     errors = []
     try:
+        if (allow_failures or handoff) and not attempt:
+            raise ValueError("Only ADO attempt evaluation may accept failed test stages with verified cleanup.")
         output = Path(result_dir)
         summary = read_json(output / "hub-phases.json")
         suite = summary["suite"]
-        requested = summary.get("debug", {})
+        requested = summary.get("attemptSelection" if attempt else "debug", {})
         request = FOCUSED["select"](suite, requested.get("phase"), requested.get("requestedNodes")) if debug else {}
-        if debug and (not isinstance(request, dict) or request != requested):
+        if attempt:
+            request = FOCUSED["attempt"](suite, requested.get("phase"), requested.get("requestedNodes"),
+                                         requested.get("attempt"))
+        mode = "attempt" if attempt else "debug"
+        if (debug or attempt) and (not isinstance(request, dict) or request != requested):
             raise ValueError("Invalid debug provenance")
         names = (request["phase"],) if request else selection()["phases"](suite)
         results = summary["phases"]
@@ -187,9 +215,12 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
         if (summary.get("schemaVersion") != 1
                 or (summary.get("subscription"), summary.get("resourceGroup"), summary.get("region"),
                     summary.get("endpoint")) != (owned["SUBSCRIPTION"], owned["GROUP"], owned["REGION"], owned["ARM"])
-                or summary.get("status") != ("debug-passed" if debug else "passed")
+                or summary.get("status") not in (
+                    (mode + "-passed", mode + "-failed") if attempt and allow_failures
+                    else ((mode + "-passed" if debug or attempt else "passed"),))
                 or not FOCUSED["matches"](summary, request) or summary.get("cancelled") is not False
-                or summary.get("finished") is not True or [p["name"] for p in results] != list(names)):
+                or summary.get("finished") is not True or summary.get("errorType")
+                or [p["name"] for p in results] != list(names)):
             errors.append("incomplete, cancelled, duplicate or missing phase execution")
         if len({p["runId"] for p in results}) != len(results) or any(not p["runId"] for p in results):
             errors.append("missing/duplicate phase run identity")
@@ -200,33 +231,48 @@ def evaluate_hub_phases(result_dir, *, debug=False, region=None, endpoint=None):
                 errors.append("unexpected phase")
                 continue
             expected = request["requestedNodes"] if request else list(selection()["nodes"](suite, name))
-            errors.extend(phase_errors(read_json(output / name / "pytest.json"), expected, suite, name, run_id,
-                                       debug=request))
+            receipt = read_json(output / name / "pytest.json")
+            errors.extend(phase_errors(receipt, expected, suite, name, run_id,
+                                       debug=request, allow_failures=allow_failures))
             junit = ET.parse(output / name / "junit.xml").getroot()
             cases = list(junit.iter("testcase"))
             if ([case.get("classname", "") + "::" + case.get("name", "") for case in cases] != expected
-                    or any(list(case) for case in cases) or junit.get("mode", "full") != ("debug" if debug else "full")):
+                    or any(list(case) for case in cases) and not allow_failures
+                    or junit.get("mode", "full") != (mode if debug or attempt else "full")):
                 errors.append("missing or unsuccessful sanitized JUnit coverage")
-            if (result.get("status") != "passed" or result.get("exit_code") != 0
+            if allow_failures and any(
+                [child.tag for child in case] != (
+                    [] if receipt.get("reports", {}).get(node) == {
+                        stage: ["passed"] for stage in ("setup", "call", "teardown")
+                    } else ["error"]
+                ) for case, node in zip(cases, expected)
+            ):
+                errors.append("JUnit outcomes disagree with phase receipts")
+            if (result.get("status") not in (("passed", "failed") if allow_failures else ("passed",))
+                    or result.get("exit_code") != receipt.get("exitstatus")
                     or result.get("timed_out") is not False or result.get("interrupted") is not False
+                    or result.get("errorType")
                     or not FOCUSED["matches"](result, request)):
                 errors.append("phase execution failed")
             cleanup = read_json(output / name / "cleanup.json")
             evidence = read_json(output / name / "ownership.json")
             if name == "sas":
-                errors.extend(sas_errors(evidence, expected, debug=request, **target))
+                passed = [node for node in expected if receipt.get("reports", {}).get(node, {}).get("call") == ["passed"]]
+                errors.extend(sas_errors(evidence, passed if allow_failures else expected, debug=request,
+                                         handoff=handoff, **target))
                 ids = sorted(value.casefold() for value in evidence["ids"].values())
                 if result.get("sasRunUid") != evidence.get("runUid"):
                     errors.append("SAS receipt identity mismatch")
             else:
-                errors.extend(owned["ownership_errors"](evidence, run_id, name))
+                errors.extend(owned["ownership_errors"](evidence, run_id, name, allow_pending_cleanup=handoff))
                 ids = sorted(evidence["resources"])
                 children = sorted(owned["descendants"](evidence))
-                if (cleanup.get("descendantIds") != children or cleanup.get("absentDescendantIds") != children):
+                if not handoff and (cleanup.get("descendantIds") != children or cleanup.get("absentDescendantIds") != children):
                     errors.append("owned descendant resource absence not proven")
-            if (cleanup.get("runId") != run_id or cleanup.get("complete") is not True
-                    or cleanup.get("ownedIds") != ids or cleanup.get("absentIds") != ids
-                    or cleanup.get("errors") != []):
+            if (cleanup.get("runId") != run_id or cleanup.get("ownedIds") != ids
+                    or handoff and cleanup.get("mode") != "handoff"
+                    or not handoff and (cleanup.get("complete") is not True
+                                        or cleanup.get("absentIds") != ids or cleanup.get("errors") != [])):
                 errors.append("owned resource absence not proven")
             if known_ids.intersection(ids):
                 errors.append("authentication phases reused resources")
@@ -294,22 +340,30 @@ def command(suite, phase, *, debug=None, folder=None):
     ]
 
 
-def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="centraluseuap", endpoint=None):
+def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="centraluseuap", endpoint=None, handoff=False):
     owned = helper(region, endpoint)
     arm.deadline = deadline
     # Only structurally valid receipts may authorize even reconciliation reads.
-    errors = owned["ownership_errors"](evidence, run_id, phase)
-    if errors and set(errors) <= {"unresolved mutation; no replay permitted", "unreconciled asynchronous acceptance"}:
+    errors = owned["ownership_errors"](evidence, run_id, phase, allow_pending_cleanup=handoff)
+    if not handoff and errors and set(errors) <= {
+        "unresolved mutation; no replay permitted", "unreconciled asynchronous acceptance",
+    }:
         owned["reconcile"](arm, evidence, deadline, lambda: owned["write"](path, evidence))
         errors = owned["ownership_errors"](evidence, run_id, phase)
     ids = sorted(evidence.get("resources", {}))
     result = {"runId": run_id, "ownedIds": ids, "absentIds": [], "errors": errors, "complete": False,
               "descendantIds": [], "absentDescendantIds": []}
+    if handoff:
+        result["mode"] = "handoff"
     # Never replay a possibly accepted mutation, even when the latest GET is 404.
     if errors:
+        if handoff:
+            for resource_id in ids:
+                HANDOFF["record"](resource_id, "pending", "OwnershipUnresolved")
         return result
     arm.deadline = deadline
-    for resource_id in ids:
+
+    def cleanup_one(resource_id):
         record = evidence["resources"][resource_id]
         api = record["apiVersion"]
         status, resource = arm.request("GET", resource_id, api)
@@ -318,8 +372,17 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
             or resource.get("tags", {}).get(owned["OWNER_TAG"]) != run_id
         ):
             result["errors"].append("Cleanup target ownership changed; no delete permitted")
-            continue
+            if handoff:
+                HANDOFF["record"](resource_id, "failed", "OwnershipChanged")
+            return
         deleted = any(m["method"] == "DELETE" and m["id"] == resource_id for m in record["mutations"])
+        if handoff and (status == 404 or deleted):
+            if status == 404:
+                result["absentIds"].append(resource_id)
+            accepted = any(m["method"] == "DELETE" and m["id"] == resource_id and m["status"] in (200, 202, 204)
+                           for m in record["mutations"])
+            HANDOFF["record"](resource_id, "absent" if status == 404 else "accepted" if accepted else "pending")
+            return
         if status != 404 and not deleted:
             # Persist intent BEFORE sending; a crash/timeout never permits a second DELETE.
             record["mutations"].append({"method": "DELETE", "id": resource_id, "apiVersion": api, "status": None})
@@ -331,7 +394,12 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
             owned["write"](path, evidence)
             if status not in (200, 202, 204, 404):
                 result["errors"].append("Cleanup delete failed; no replay permitted")
-                continue
+                if handoff:
+                    HANDOFF["record"](resource_id, "failed", "DeleteRejected")
+                return
+            if handoff:
+                HANDOFF["record"](resource_id, "absent" if status == 404 else "accepted")
+                return
         while time.monotonic() < deadline:
             status, _ = arm.request("GET", resource_id, api)
             if status == 404:
@@ -340,8 +408,15 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
                 result["absentIds"].append(resource_id)
                 break
             time.sleep(min(5, max(0, deadline - time.monotonic())))
+    for resource_id in ids:
+        if handoff:
+            HANDOFF["cleanup"](resource_id, lambda resource_id=resource_id: cleanup_one(resource_id), accepted=False)
+        else:
+            cleanup_one(resource_id)
     children = owned["descendants"](evidence)
     result["descendantIds"] = sorted(children)
+    if handoff:
+        return result
     for resource_id in sorted(children):
         status, _ = arm.request("GET", resource_id, children[resource_id])
         if status == 404:
@@ -376,8 +451,15 @@ def combine_coverage(output, phase_names, destination=None, *, run_process=subpr
 
 
 def run(suite, subscription, group, region, output, arm=None, execute=None, base=None, *,
-        debug_phase=None, debug_nodes=None, endpoint=None):
+        debug_phase=None, debug_nodes=None, endpoint=None, attempt_selection=None):
     debug = FOCUSED["select"](suite, debug_phase, debug_nodes)
+    if attempt_selection:
+        if debug:
+            raise ValueError("Debug and ADO attempt selection cannot be combined.")
+        debug = FOCUSED["attempt"](suite, attempt_selection["phase"], attempt_selection["requestedNodes"],
+                                   attempt_selection["attempt"])
+        if debug != attempt_selection:
+            raise ValueError("Attempt selection does not match this checkout.")
     sys.path.insert(0, str(ROOT))
     from azext_iot.tests._dps_phase_runner import child, require_linux, write_json
     require_linux()
@@ -387,6 +469,7 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         raise ValueError("Controller is restricted to the authorized integration scope")
     output = Path(output).resolve()
     base = dict(os.environ if base is None else base)
+    handoff = bool(attempt_selection and HANDOFF["enabled"]())
     # Children use phase-local databases; the combined result goes where the caller publishes it.
     coverage_destination = Path(base.pop("COVERAGE_FILE", None) or ROOT / ".coverage").resolve()
     budgets = tuple(value for value in BUDGETS[suite] if not debug or value[0] == debug["phase"])
@@ -488,24 +571,28 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 if phase == "sas":
                     with summary_lock:
                         result["sasRunUid"] = evidence["runUid"]
-                    errors = sas_cleanup_errors(evidence, debug=debug, **target)
+                    errors = sas_cleanup_errors(evidence, debug=debug, handoff=handoff, **target)
                     ids = sorted(value.casefold() for value in evidence["ids"].values())
                     cleanup = {"runId": result["runId"], "complete": not errors, "errors": errors,
                                "ownedIds": ids, "absentIds": ids if not errors else []}
+                    if handoff:
+                        cleanup.update(mode="handoff", complete=False,
+                                       absentIds=sorted(evidence["ids"][key].casefold() for key in evidence["absent"]))
                 else:
                     cleanup = cleanup_regular(current, evidence, result["runId"], phase,
-                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json", **target)
+                                              min(deadline, execution["cleanup_deadline"]), folder / "ownership.json",
+                                              handoff=handoff, **target)
                     write_json(folder / "ownership.json", evidence)
                 receipt = read_json(folder / "pytest.json")
                 expected = debug["requestedNodes"] if debug else list(selection()["nodes"](suite, phase))
                 write_junit(receipt, expected, folder / "junit.xml")
                 receipt_errors = phase_errors(receipt, expected, suite, phase, result["runId"], debug=debug)
                 if phase == "sas":
-                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug, **target))
+                    receipt_errors.extend(sas_errors(evidence, expected, debug=debug, handoff=handoff, **target))
                 with summary_lock:
                     result["receiptErrors"] = receipt_errors
                     result["status"] = "passed" if (
-                        not receipt_errors and cleanup["complete"] and execution["exit_code"] == 0
+                        not receipt_errors and (cleanup["complete"] or handoff) and execution["exit_code"] == 0
                         and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
                     ) else "failed"
             except Exception as error:  # Never serialize credential-bearing exception messages.
@@ -549,13 +636,17 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
         summary["errorType"] = type(error).__name__
     finally:
         if debug:
-            summary["status"] = "debug-passed" if summary["status"] == "passed" else "debug-failed"
+            mode = "attempt" if attempt_selection else "debug"
+            summary["status"] = mode + ("-passed" if summary["status"] == "passed" else "-failed")
         summary["cancelled"] = cancel.is_set()
         summary["finished"] = True
         save_summary()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
-    return 0 if evaluate_hub_phases(output, debug=bool(debug), **target)["passed"] else 1
+    result = evaluate_hub_phases(
+        output, debug=bool(debug) and not attempt_selection, attempt=bool(attempt_selection), **target,
+    )
+    return 0 if result["passed"] else 1
 
 
 def main():
