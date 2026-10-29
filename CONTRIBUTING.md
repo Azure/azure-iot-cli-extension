@@ -105,47 +105,6 @@ index CI's Python 3.14 and azdev 0.2.13 setup; toolchain drift fails explicitly
 instead of silently claiming parity. Use **CI Build and Test**'s manual dispatch
 to rerun it on a branch without starting a release or accessing Azure resources.
 
-## Integration Health in Azure Pipelines
-
-**Azure IoT CLI - Integration Health** uses `.azure-devops/integration-health.yml`
-and the same pipeline template as manual pipeline 147. Health always runs live
-integration; dry runs and release-candidate selection remain in 147.
-
-Manage days, UTC start times, and branch filters under the pipeline's **Triggers >
-Scheduled** settings. Do not also add YAML schedules: UI schedules override them.
-Select the option to run even without source changes. The entrypoint and shared
-implementation must exist on each selected branch before enabling its schedule.
-The proposed cadence is weekdays at 14:17 UTC on `preview` and Saturdays at 14:17
-UTC on `dev`, after the existing 13:00 UTC cleanup. Migration branches are for
-controlled manual validation, not automatic production schedules.
-
-Edit the non-secret `ValidationProfiles` JSON in ADO Library group
-`iot-cli-integration-health` to change regional coverage without a GitHub PR.
-Its shape is `{"schema":1,"branches":{"refs/heads/preview":{"mon":PROFILE}}}`.
-Each profile requires `region` (one Azure region), `pythonVersions`
-(a nonempty list selected from 3.10-3.13), and `services` (a nonempty list selected
-from DPS, HubControl, HubData, ADU, ADR). Add entries for every scheduled weekday
-using `mon` through `sun`; missing profiles fail instead of running defaults.
-The optional `armEndpoint` is `public` by default. To qualify APIs available only
-on canary, explicitly select `"region":"centraluseuap","armEndpoint":"canary"`;
-other region/canary combinations are rejected. Keep public-preview profiles on
-their public region and endpoint. The resolved endpoint is frozen in the plan and
-passed to every service job; neither the SDK API version nor the target is silently
-changed. Only authorized maintainers should edit this group.
-
-Plan selects the actual queued branch and UTC day from ADO build metadata, records
-the source commit and configuration digest, and retains the resolved profile with
-`integration-plan-*`. Rerunning jobs uses the original profile, not current Library
-values. The immutable candidate and existing result/coverage gates remain in use.
-Health profiles are selected coverage, not a substitute for release qualification.
-Health and 147 do not block one another or reserve time before scheduled cleanup.
-Azure resource failures are reported directly; there is no live-run admission guard.
-
-Use the Health definition for dashboard status and integration-test trends, filtering
-out unit results. Inspect the saved profile for region, branch, and Python coverage;
-an old green run does not prove a later scheduled profile ran. Keep schedules disabled
-until the intended profile has completed and conflicting GitHub schedules are retired.
-
 ## Unit and Integration Testing
 
 Tests are organized into folders by resource in `azext_iot\tests\`:
@@ -400,23 +359,27 @@ deliberate-failure diagnostic remains an offline unit regression in
 Before enabling live use, the pipeline owner must authorize the existing
 `aziotcli-sp-prime` connection and `aziotcli_test_primary` variable group for 147,
 allow its build identity to read current-run artifacts/builds and request the
-connection's job-scoped OIDC token. Do not configure an exclusive lock check on
-the shared integration resources. Keep access
+connection's job-scoped OIDC token, and configure an **exclusive lock check** on
+the shared variable group (the YAML uses sequential lock behavior). Keep access
 restricted; do not grant every pipeline access. WIF renewal updates CLI credential
 caches without rewriting the account profile.
 
 Service stages have no dependencies on one another; available ADO parallel-job
-and agent capacity can still queue jobs. Python/region matrix legs within
+capacity and resource checks can still queue jobs. In particular, a shared
+exclusive lock can serialize otherwise-independent stages; YAML dependencies do
+not override that check, and this change does not reconfigure it. Python/region matrix legs within
 each service remain serialized. Resource ownership and cleanup remain with the
 existing service fixtures and Hub/DPS phase controllers. The ADR/ADU retry plugin
 records test execution metadata only: it does not intercept HTTP requests or add
 a resource-inventory gate. ADR/ADU fixture-reported setup/teardown/cleanup failures
 remain non-retryable without independent cleanup proof; Hub/DPS require their
 existing ownership and cleanup evidence before rerunning an affected phase.
-Live execution has no overlap, cleanup-window or quota/capacity admission guard.
-Other ADO/GitHub runs do not block it. Azure quota, subscription and resource-group
-failures surface normally. The daily 13:00 UTC cleanup job is unchanged and can
-still delete shared test resources during a run.
+Admission still rejects active GitHub integration runs. It does not inspect other
+ADO builds or enforce a fixed cleanup-time exclusion, and there are no
+merge-pipeline/revision exceptions. The daily 13:00 UTC cleanup job is unchanged
+and can still delete shared test resources during a run. Coordinate competing
+ADO/GitHub live runs and scheduled cleanup operationally; this preflight is not
+an atomic lock or a subscription quota reservation.
 ADU also creates IoT Hubs. Keep original artifacts until all retries and final
 qualification finish.
 
