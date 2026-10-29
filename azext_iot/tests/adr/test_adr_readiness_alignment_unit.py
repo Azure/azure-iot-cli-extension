@@ -146,6 +146,16 @@ def _hub_commit_rejection(message=None):
     }
 
 
+def _hub_read_rejection(target):
+    return {
+        "code": "AdrMiNotAuthorized",
+        "message": (
+            f"The namespace's managed identity is not authorized to read the linked resource '{target}'. "
+            "Grant it read access on the resource, then resubmit the request."
+        ),
+    }
+
+
 def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
     scenario = Scenario("dps")
     scenario.error = _generic_rejection("DPS")
@@ -169,10 +179,11 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
         id="dps-message-change",
     ),
     pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
+    pytest.param("hub", _hub_read_rejection, id="hub-adr-mi-read"),
 ])
 def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = error(scenario.expected["resourceId"]) if callable(error) else error
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()

@@ -333,7 +333,7 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
 
 
 def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    """Match observed Hub authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "hub"
         or submitted_at is None
@@ -342,6 +342,12 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
     ):
         return False
     error = endpoint.get("linkingError") or {}
+    if (
+        endpoint.get("linkingState") == "Failed"
+        and error.get("code") == "AdrMiNotAuthorized"
+        and _read_authorization_failure(endpoint)
+    ):
+        return True
     expected_message = (
         "The namespace's managed identity is not authorized to link the Hub resource. "
         "Grant it access on the resource, then resubmit the request. "
