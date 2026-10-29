@@ -89,7 +89,7 @@ def test_reference_create_and_update_preserve_wire(service, group):
     created = getattr(dps, prefix + "_create")(
         None, enrollment_id="test", primary_key=KEY, adr_namespace=REFERENCES["namespaceName"],
         adr_ca_name=REFERENCES["certificateAuthorityName"],
-        credential_policy_name=REFERENCES["certificatePolicyName"], **args
+        adr_certificate_policy_name=REFERENCES["certificatePolicyName"], **args
     )
     expected = deepcopy(record)
     if group:
@@ -101,7 +101,7 @@ def test_reference_create_and_update_preserve_wire(service, group):
     assert "credentialPolicyName" not in body
     service.get(f"https://{HOST}/{path}/test", json=record)
     service.post(f"https://{HOST}/{path}/test/attestationmechanism", json=record["attestation"])
-    getattr(dps, prefix + "_update")(None, enrollment_id="test", credential_policy_name="replacement", etag='"etag"')
+    getattr(dps, prefix + "_update")(None, enrollment_id="test", adr_certificate_policy_name="replacement", etag='"etag"')
     updated = json.loads(service.calls[-1].request.body)
     assert service.calls[-1].request.headers["If-Match"] == '"etag"'
     assert updated["namespaceName"] == REFERENCES["namespaceName"]
@@ -115,7 +115,7 @@ def test_reference_create_and_update_preserve_wire(service, group):
     assert "createdDateTimeUtc" not in updated
     assert "lastUpdatedDateTimeUtc" not in updated
     getattr(dps, prefix + "_update")(
-        None, enrollment_id="test", adr_namespace="", adr_ca_name="", credential_policy_name=""
+        None, enrollment_id="test", adr_namespace="", adr_ca_name="", adr_certificate_policy_name=""
     )
     assert not REFERENCES.keys() & json.loads(service.calls[-1].request.body).keys()
 
@@ -283,7 +283,7 @@ def test_update_retains_info_only_x509_certificates_on_wire(service, mocker, gro
     expected = deepcopy(certificates)
     kwargs = {"provisioning_status": "disabled"}
     if action == "reference":
-        kwargs["credential_policy_name"] = "replacement-policy"
+        kwargs["adr_certificate_policy_name"] = "replacement-policy"
     elif action.startswith("replace-"):
         side = action.split("-", 1)[1]
         kwargs["certificate_path" if side == "primary" else "secondary_certificate_path"] = "replacement.pem"

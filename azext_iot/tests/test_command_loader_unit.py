@@ -1047,7 +1047,11 @@ def hub_dps_parser():
     names = [
         f"iot dps {kind} {action}"
         for kind in ("enrollment", "enrollment-group") for action in ("create", "update")
-    ] + ["iot device registration create", "iot device registration operation-status"]
+    ] + [
+        "iot device registration create", "iot device registration operation-status",
+        "iot dps enrollment-group compute-device-key",
+        *[f"iot dps enrollment-group registration {action}" for action in ("list", "show", "delete")],
+    ]
     loader.command_table = {name: loader.command_table[name] for name in names}
     cli_ctx.raise_event(EVENT_INVOKER_PRE_LOAD_ARGUMENTS, commands_loader=loader)
     for name in names:
@@ -1056,6 +1060,21 @@ def hub_dps_parser():
     parser = AzCliCommandParser(cli_ctx=cli_ctx)
     parser.load_command_table(loader)
     return parser
+
+
+@pytest.mark.parametrize("command,arguments,expected", [
+    (
+        "compute-device-key", ["--key", "a2V5", "--registration-id", "device"],
+        {"symmetric_key": "a2V5", "registration_id": "device"},
+    ),
+    ("registration list", ["--dps-name", "dps", "--enrollment-id", "group"], {"enrollment_id": "group"}),
+    ("registration show", ["--dps-name", "dps", "--registration-id", "device"], {"registration_id": "device"}),
+    ("registration delete", ["--dps-name", "dps", "--registration-id", "device"], {"registration_id": "device"}),
+])
+def test_dps_enrollment_group_command_arguments(hub_dps_parser, command, arguments, expected):
+    parsed = hub_dps_parser.parse_args(["iot", "dps", "enrollment-group", *command.split(), *arguments])
+    for name, value in expected.items():
+        assert getattr(parsed, name) == value
 
 
 @pytest.mark.parametrize("kind", ["enrollment", "enrollment-group"])

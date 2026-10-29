@@ -2641,7 +2641,6 @@ def iot_device_export(  # pragma: no cover
     blob_container_name: str = None,
     storage_account_name: str = None,
     include_keys: bool = False,
-    storage_authentication_type: str = None,
     identity: str = None,
     resource_group_name: str = None,
     login=None,
@@ -2651,14 +2650,6 @@ def iot_device_export(  # pragma: no cover
         blob_container_uri = _generate_blob_container_uri(
             cmd, storage_account_name, blob_container_name, identity
         )
-    if storage_authentication_type is not None:
-        logger.warning(
-            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided. "
-        )
-        logger.warning(
-            "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
-        )
-
     export_job_properties = _create_export_import_job_properties(
         job_type=JobType.exportDevices.value,
         output_blob_container_uri=blob_container_uri,
@@ -2684,7 +2675,6 @@ def iot_device_import(  # pragma: no cover
     output_blob_container_uri: str = None,
     output_blob_container_name: str = None,
     output_storage_account_name: str = None,
-    storage_authentication_type: str = None,
     resource_group_name: str = None,
     identity: str = None,
     login=None,
@@ -2698,14 +2688,6 @@ def iot_device_import(  # pragma: no cover
         output_blob_container_uri = _generate_blob_container_uri(
             cmd, output_storage_account_name, output_blob_container_name, identity
         )
-    if storage_authentication_type is not None:
-        logger.warning(
-            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided. "
-        )
-        logger.warning(
-            "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
-        )
-
     import_job_properties = _create_export_import_job_properties(
         job_type=JobType.importDevices.value,
         input_blob_container_uri=input_blob_container_uri,
@@ -2734,7 +2716,6 @@ def iot_hub_monitor_events(
     resource_group_name=None,
     yes=False,
     properties=None,
-    repair=False,
     login=None,
     content_type=None,
     device_query=None,
@@ -2754,7 +2735,6 @@ def iot_hub_monitor_events(
             resource_group_name=resource_group_name,
             yes=yes,
             properties=properties,
-            repair=repair,
             login=login,
             content_type=content_type,
             device_query=device_query,
@@ -2771,7 +2751,6 @@ def iot_hub_monitor_feedback(  # pragma: no cover
     device_id=None,
     yes=False,
     wait_on_id=None,
-    repair=False,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -2823,7 +2802,6 @@ def _iot_hub_monitor_events(  # pragma: no cover
     resource_group_name=None,
     yes=False,
     properties=None,
-    repair=False,
     login=None,
     content_type=None,
     device_query=None,
@@ -2831,7 +2809,7 @@ def _iot_hub_monitor_events(  # pragma: no cover
     transport=None,
 ):
     (enqueued_time, properties, timeout, output, message_count) = init_monitoring(
-        cmd, timeout, properties, enqueued_time, repair, yes, message_count
+        cmd, timeout, properties, enqueued_time, yes, message_count
     )
 
     device_ids = {}
