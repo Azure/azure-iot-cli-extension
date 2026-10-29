@@ -370,15 +370,16 @@ def test_build_uses_native_feed_without_azure_token_retrieval(candidate, tmp_pat
     dist = source / "dist"
     dist.mkdir(parents=True)
     (dist / value["wheel"]["file"]).write_bytes((directory / value["wheel"]["file"]).read_bytes())
-    (tmp_path / "sbom-tool").touch()
+    (tmp_path / ("sbom-tool.exe" if os.name == "nt" else "sbom-tool")).touch()
     secret = "offline-placeholder"
     token_command = Mock(side_effect=AssertionError("Azure token retrieval must not be used"))
     monkeypatch.setattr(release, "command", token_command)
     run = Mock()
     monkeypatch.setattr(release.subprocess, "run", run)
     monkeypatch.setattr(release.subprocess, "check_output", Mock(return_value="runtime-dependency==1.0\n"))
-    monkeypatch.setattr(release, "digest", Mock(
-        return_value="bf5d4f99bc98c119d549d08fc02ae92598a7a42772f17317c01031a92632e05b"))
+    monkeypatch.setattr(release, "digest", Mock(return_value=(
+        "625767b371b7fdd58f40f618b8a86da0247a33c89e419039c86b4edba1dad4b5" if os.name == "nt"
+        else "bf5d4f99bc98c119d549d08fc02ae92598a7a42772f17317c01031a92632e05b")))
     release.build_candidate(source, tmp_path)
     token_command.assert_not_called()
     for call in run.call_args_list:
