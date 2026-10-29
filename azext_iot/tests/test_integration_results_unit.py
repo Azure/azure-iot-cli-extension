@@ -225,6 +225,7 @@ def _record_step():
 def test_record_step_reads_utf8_workflow_under_windows_default_encoding(tmp_path, monkeypatch, newline):
     relative = ".github/workflows/int_test.yml"
     source = (ROOT / relative).read_text(encoding="utf-8")
+    source = "# UTF-8 probe: \u2510\n" + source
     workflow = tmp_path / relative
     workflow.parent.mkdir(parents=True)
     workflow.write_bytes(source.replace("\n", newline).encode("utf-8"))
@@ -236,7 +237,7 @@ def test_record_step_reads_utf8_workflow_under_windows_default_encoding(tmp_path
 
     monkeypatch.setattr(Path, "read_text", windows_read_text)
     monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
-    # The actual workflow contains box-drawing text that CP1252 cannot decode.
+    # Keep the encoding probe independent of the production workflow's presentation.
     with pytest.raises(UnicodeDecodeError):
         workflow.read_text()
     step = _record_step()
