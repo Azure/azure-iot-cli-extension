@@ -307,9 +307,6 @@ iot dps enrollment-group list:
 iot dps enrollment-group registration list:
   rule_exclusions:
     - no_ids_for_list_commands
-iot dps registration list:
-  rule_exclusions:
-    - no_ids_for_list_commands
 iot hub message-endpoint list:
   rule_exclusions:
     - no_ids_for_list_commands

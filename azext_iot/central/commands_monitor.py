@@ -26,7 +26,6 @@ def validate_messages(
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
-    repair=False,
     properties=None,
     yes=False,
     max_messages=10,
@@ -42,7 +41,6 @@ def validate_messages(
         timeout=timeout,
         properties=properties,
         enqueued_time=enqueued_time,
-        repair=repair,
         yes=yes,
     )
     common_parser_args = CommonParserArguments(
@@ -81,7 +79,6 @@ def monitor_events(
     consumer_group="$Default",
     timeout=300,
     enqueued_time=None,
-    repair=False,
     properties=None,
     yes=False,
     token=None,
@@ -93,7 +90,6 @@ def monitor_events(
         timeout=timeout,
         properties=properties,
         enqueued_time=enqueued_time,
-        repair=repair,
         yes=yes,
     )
     common_parser_args = CommonParserArguments(

@@ -2063,7 +2063,6 @@ class TestMonitorEvents:
                     resource_group_name="myrg",
                     yes=True,
                     properties="sys anno app",
-                    repair=True,
                     login=mock_target["cs"],
                 )
             )
@@ -2084,7 +2083,6 @@ class TestMonitorEvents:
             resource_group_name=req["resource_group_name"],
             yes=req["yes"],
             properties=req["properties"],
-            repair=req["repair"],
             login=req["login"],
         )
 
@@ -2102,7 +2100,6 @@ class TestMonitorEvents:
             "resource_group_name",
             "yes",
             "properties",
-            "repair",
         ]
 
         assert "interface" not in monitor_events_args

@@ -18,7 +18,6 @@ def create_req_monitor_events(
     resource_group_name=None,
     yes=False,
     properties=None,
-    repair=False,
     login=None,
     content_type=None,
     enqueued_time=None,
@@ -35,7 +34,6 @@ def create_req_monitor_events(
         "enqueued_time": enqueued_time,
         "yes": yes,
         "properties": properties,
-        "repair": repair,
         "login": login,
     }
 

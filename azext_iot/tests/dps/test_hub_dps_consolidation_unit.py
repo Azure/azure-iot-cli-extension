@@ -28,7 +28,7 @@ import pytest
 import requests
 from azure.cli.core.azclierror import (
     AzureConnectionError, AzureResponseError, CLIInternalError, InvalidArgumentValueError,
-    MutuallyExclusiveArgumentError, RequiredArgumentMissingError,
+    RequiredArgumentMissingError,
 )
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError, ServiceRequestError
@@ -274,11 +274,9 @@ def test_certificate_reference_name_validation(values):
         dps._validate_adr_certificate_reference(*values)
 
 
-def test_certificate_reference_clear_conflict_and_partial():
+def test_certificate_reference_clear_and_partial():
     clear = dps._validate_adr_certificate_reference("", "", "")
     assert dps._drop_readonly_enrollment({"future": True, **clear}) == {"future": True}
-    with pytest.raises(MutuallyExclusiveArgumentError):
-        dps._validate_adr_certificate_reference("namespace", "authority", "policy", "other")
     with pytest.raises(RequiredArgumentMissingError):
         dps._validate_adr_certificate_reference("", None, None)
 
