@@ -6,15 +6,16 @@ parameters:
 
 steps:
   - checkout: self
+    displayName: Checkout source
     clean: true
     persistCredentials: false
   - task: UsePythonVersion@0
-    displayName: Select cached bootstrap Python without downloading packages
+    displayName: Select Python
     inputs:
       versionSpec: "3.13"
       disableDownloadFromRegistry: true
   - script: python scripts/release_pipeline.py checkout --source "$(Agent.TempDirectory)/release-source"
-    displayName: Check out the exact qualified source, separate from pipeline code
+    displayName: Checkout candidate
     env:
       RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
       RELEASE_SOURCE_COMMIT: $(sourceCommit)

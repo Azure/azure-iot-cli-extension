@@ -1070,7 +1070,8 @@ def test_every_release_dependency_install_uses_native_feed_authentication():
     _, stages = all_stages()
     feed = yaml.safe_load((ROOT / ".azure-devops/templates/release-feed.yml").read_text(encoding="utf-8"))
     assert feed["steps"][0] == {
-        "task": "PipAuthenticate@1", "inputs": {"artifactFeeds": "aziotcli/pip", "onlyAddExtraIndex": False},
+        "task": "PipAuthenticate@1", "displayName": "Authenticate feed",
+        "inputs": {"artifactFeeds": "aziotcli/pip", "onlyAddExtraIndex": False},
     }
     for name in ("Build", "CommandLint", "IndexCompatibility"):
         steps = stages[name]["jobs"][0]["steps"]

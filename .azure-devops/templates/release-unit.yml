@@ -9,6 +9,7 @@ parameters:
 
 jobs:
   - job: Unit${{ parameters.platform }}
+    displayName: ${{ parameters.platform }} $(python)
     timeoutInMinutes: 90
     strategy:
       matrix:
@@ -37,42 +38,45 @@ jobs:
           sourceBranch: ${{ parameters.sourceBranch }}
       - template: release-feed.yml
       - task: UsePythonVersion@0
-        displayName: Select matrix Python using the authenticated feed for bootstrap packages
+        displayName: Select Python
         inputs:
           versionSpec: $(python)
       - ${{ if eq(parameters.platform, 'MacOS') }}:
           - bash: |
               source scripts/select-openssl.sh
               echo "##vso[task.prependpath]$openssl_bin"
-            displayName: Select capability-checked OpenSSL 3 on macOS
+            displayName: Select OpenSSL
             workingDirectory: $(Agent.TempDirectory)/release-source
       - script: python -m pip install tox
+        displayName: Install tox
       - script: >-
           tox run --notest
           -x "testenv:python-azcur-unit.pass_env+=PIP_*"
           -x "testenv:lint.pass_env+=PIP_*"
+        displayName: Prepare tests
         workingDirectory: $(Agent.TempDirectory)/release-source
       - script: >-
           python scripts/release_pipeline.py unit-constraints
           --source "$(Agent.TempDirectory)/release-source"
           --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
-        displayName: Keep extension dependencies compatible with the selected Azure CLI
+        displayName: Resolve dependencies
       - script: >-
           tox run --skip-pkg-install
           -x "testenv:python-azcur-unit.pass_env+=PIP_*"
           -x "testenv:lint.pass_env+=PIP_*"
-        displayName: Run existing clean, lint, serial unit and coverage environments
+        displayName: Run unit and lint
         workingDirectory: $(Agent.TempDirectory)/release-source
       - script: >-
           python scripts/release_pipeline.py unit-inventory
           --source "$(Agent.TempDirectory)/release-source"
           --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
-        displayName: Verify the tested dependency environment and expose its native scan inventory
+        displayName: Record dependencies
       - task: PublishTestResults@2
+        displayName: Publish results
         condition: always()
         inputs:
           testResultsFormat: JUnit
           testResultsFiles: $(Agent.TempDirectory)/release-source/junit/test-iotext-unit.xml
-          testRunTitle: ${{ parameters.platform }} Python $(python)
+          testRunTitle: ${{ parameters.platform }} $(python)
           failTaskOnFailedTests: true
           failTaskOnMissingResultsFile: true

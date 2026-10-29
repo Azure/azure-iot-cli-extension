@@ -2,12 +2,12 @@
 
 parameters:
   - name: mode
-    displayName: Plan checks governance; Validate runs live tests; Release also publishes
+    displayName: Mode
     type: string
     default: Plan
     values: [Plan, Validate, Release]
   - name: sourceBranch
-    displayName: Candidate branch containing pipeline 147 migration (feature branches are Plan/Validate only)
+    displayName: Source branch
     type: string
     default: release/1.1.0-preview
   - name: createIndexPr
@@ -16,31 +16,34 @@ parameters:
 
 stages:
   - stage: Resolve
-    displayName: Freeze source and validate prerequisites
+    displayName: Plan
     jobs:
       - job: Resolve
+        displayName: Plan
         steps:
           - checkout: self
+            displayName: Checkout source
             clean: true
             persistCredentials: false
           - task: UsePythonVersion@0
+            displayName: Select Python
             inputs:
               versionSpec: "3.13"
               disableDownloadFromRegistry: true
           - script: python scripts/release_pipeline.py options
-            displayName: Reject index submission outside Release mode
+            displayName: Check options
             env:
               RELEASE_MODE: ${{ parameters.mode }}
               RELEASE_CREATE_INDEX_PR: ${{ parameters.createIndexPr }}
           - ${{ if eq(parameters.mode, 'Plan') }}:
               - script: python scripts/release_pipeline.py plan
-                displayName: Show nonpublishing onboarding plan
+                displayName: Show plan
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
           - ${{ if ne(parameters.mode, 'Plan') }}:
               - script: python scripts/release_pipeline.py resolve --source "$(Agent.TempDirectory)/release-source"
                 name: source
-                displayName: Resolve and verify the immutable source
+                displayName: Resolve source
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_MODE: ${{ parameters.mode }}
@@ -52,6 +55,7 @@ stages:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: Build
+            displayName: Package
             dependsOn: [BuildLinux, BuildWindows]
             timeoutInMinutes: 45
             templateContext:
@@ -68,14 +72,16 @@ stages:
                   sourceBranch: ${{ parameters.sourceBranch }}
               - template: release-feed.yml
               - download: current
+                displayName: Download artifacts
                 artifact: release-runtime-linux
               - download: current
+                displayName: Download artifacts
                 artifact: release-runtime-windows
               - script: >-
                   python scripts/release_pipeline.py assemble-runtime
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Pipeline.Workspace)"
-                displayName: Combine native platform SBOMs for the exact same release wheel
+                displayName: Combine SBOMs
                 env:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - script: >-
@@ -83,7 +89,7 @@ stages:
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Build.ArtifactStagingDirectory)/release-candidate"
                 name: candidate
-                displayName: Record exact source, producer, targets, version and asset digests
+                displayName: Record candidate
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -97,7 +103,7 @@ stages:
                     --directory "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-candidate" \
                     --prepared "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling" \
                     --work-dir "$AGENT_TEMPDIRECTORY/publication-preparation"
-                displayName: Prepare official azdev index metadata and governed publication inputs
+                displayName: Prepare publication
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -106,6 +112,7 @@ stages:
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
 
           - job: BuildLinux
+            displayName: Linux build
             timeoutInMinutes: 45
             templateContext:
               outputs:
@@ -123,17 +130,18 @@ stages:
                   --source "$(Agent.TempDirectory)/release-source"
                   --work-dir "$(Agent.TempDirectory)"
                   --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
-                displayName: Build the release wheel and resolve its native Linux runtime SBOM
+                displayName: Build wheel and SBOM
               - script: >-
                   python scripts/release_pipeline.py runtime-receipt
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Agent.TempDirectory)/release-source/dist"
                   --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
-                displayName: Require a complete resolved dependency graph and attest the Linux wheel
+                displayName: Check SBOM
                 env:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
           - job: BuildWindows
+            displayName: Windows SBOM
             dependsOn: BuildLinux
             timeoutInMinutes: 45
             pool:
@@ -152,21 +160,22 @@ stages:
                   sourceBranch: ${{ parameters.sourceBranch }}
               - template: release-feed.yml
               - download: current
+                displayName: Download artifacts
                 artifact: release-runtime-linux
               - script: python -m pip install packaging
-                displayName: Install runtime SBOM validation dependency from the authenticated feed
+                displayName: Install dependencies
               - script: >-
                   python scripts/release_pipeline.py windows-runtime
                   --source "$(Agent.TempDirectory)/release-source"
                   --directory "$(Pipeline.Workspace)/release-runtime-linux"
                   --work-dir "$(Agent.TempDirectory)"
                   --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
-                displayName: Resolve and attest Windows dependencies of the unchanged Linux-built wheel
+                displayName: Build Windows SBOM
                 env:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
       - stage: Unit
-        displayName: Full release unit and style matrix
+        displayName: Unit
         dependsOn: Resolve
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
@@ -204,7 +213,7 @@ stages:
                   git checkout --detach "$env:SOURCE_COMMIT"
                   if ($LASTEXITCODE -ne 0) { throw "Cannot select the qualified security checkout." }
                   if ((git rev-parse HEAD) -ne $env:SOURCE_COMMIT) { throw "Security source mismatch." }
-                displayName: Put the qualified source at the native scanner's repository root
+                displayName: Prepare scan
                 env:
                   SOURCE: $(Agent.TempDirectory)/release-source
                   SOURCE_COMMIT: $(sourceCommit)
@@ -217,7 +226,7 @@ stages:
                   packageType: sdk
                   version: 6.0.x
               - task: UseDotNet@2
-                displayName: Install .NET 8 runtime for MSDO AntiMalware
+                displayName: Install .NET
                 inputs:
                   packageType: runtime
                   version: 8.0.x
@@ -235,7 +244,7 @@ stages:
                   if ($process.ExitCode -ne 0) { throw "Defender update failed with exit code $($process.ExitCode)." }
                   Get-MpComputerStatus | Select-Object AntivirusSignatureVersion, AntivirusSignatureLastUpdated
                 name: updateDefender
-                displayName: Install signed Microsoft Defender security intelligence
+                displayName: Update Defender
                 timeoutInMinutes: 5
               - pwsh: |
                   $ErrorActionPreference = 'Stop'
@@ -270,13 +279,14 @@ stages:
                   Write-Host "##vso[task.setvariable variable=directory;isOutput=true]$tools"
                   Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
                 name: stageMsdo
-                displayName: Stage the pinned MSDO engine from the authenticated package feed
+                displayName: Install scanners
                 env:
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               - task: MicrosoftSecurityDevOps@1
-                displayName: Run the existing security tool suite; fail on high findings
+                displayName: Run security scans
                 inputs:
                   break: true
+                  displayName: Publish results
                   publish: true
                   artifactName: release-security-$(System.JobAttempt)
                 env:
@@ -290,11 +300,13 @@ stages:
                   BUILD_SOURCEBRANCH: refs/heads/${{ parameters.sourceBranch }}
 
       - stage: CommandLint
+        displayName: CLI lint
         dependsOn: [Resolve, Build]
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: CommandLint
+            displayName: CLI lint
             timeoutInMinutes: 45
             steps:
               - template: release-source.yml
@@ -302,8 +314,10 @@ stages:
                   sourceBranch: ${{ parameters.sourceBranch }}
               - template: release-feed.yml
               - download: current
+                displayName: Download artifacts
                 artifact: release-candidate
               - script: python scripts/release_pipeline.py verify --directory "$(Pipeline.Workspace)/release-candidate"
+                displayName: Check candidate
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -321,7 +335,7 @@ stages:
                   cp linter_exclusions.yml "$AZURE_EXTENSION_DIR/azure-iot/"
                   cp .pylintrc pylintrc
                   azdev linter --include-whl-extensions azure-iot --min-severity medium
-                displayName: Run the existing release command-table linter
+                displayName: Run CLI lint
                 env:
                   SOURCE: $(Agent.TempDirectory)/release-source
                   CANDIDATE: $(Pipeline.Workspace)/release-candidate
@@ -330,12 +344,13 @@ stages:
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/lint-extensions
 
       - stage: IndexCompatibility
-        displayName: Required external-wheel index compatibility
+        displayName: Index check
         dependsOn: [Resolve, Build]
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: IndexCompatibility
+            displayName: Index check
             timeoutInMinutes: 45
             templateContext:
               outputs:
@@ -350,10 +365,11 @@ stages:
                   sourceBranch: ${{ parameters.sourceBranch }}
               - template: release-feed.yml
               - task: UsePythonVersion@0
-                displayName: Select index Python using the authenticated feed for bootstrap packages
+                displayName: Select Python
                 inputs:
                   versionSpec: "3.14"
               - download: current
+                displayName: Download artifacts
                 artifact: release-candidate
               - bash: |
                   set -euo pipefail
@@ -373,7 +389,7 @@ stages:
                   azdev setup -c "$COMPAT_ROOT/azure-cli" -r "$COMPAT_ROOT/azure-cli-extensions"
                   python "$BUILD_SOURCESDIRECTORY/scripts/release_pipeline.py" index-check \
                     --source "$SOURCE" --directory "$CANDIDATE" --work-dir "$COMPAT_ROOT"
-                displayName: Reuse the provenance-checking index linter as a mandatory gate
+                displayName: Run index check
                 env:
                   SOURCE: $(Agent.TempDirectory)/release-source
                   CANDIDATE: $(Pipeline.Workspace)/release-candidate
@@ -389,7 +405,7 @@ stages:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
       - stage: Integration
-        displayName: Qualify the same wheel through pipeline 147
+        displayName: Integration
         dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility]
         condition: >-
           and(not(canceled()), eq(dependencies.Resolve.result, 'Succeeded'),
@@ -400,6 +416,7 @@ stages:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: Integration
+            displayName: $(cohort)
             timeoutInMinutes: 1080
             cancelTimeoutInMinutes: 5
             strategy:
@@ -414,25 +431,29 @@ stages:
                   condition: and(always(), ne(variables['integrationBuildId'], ''))
             steps:
               - checkout: self
+                displayName: Checkout source
                 clean: true
                 persistCredentials: false
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: "3.13"
                   disableDownloadFromRegistry: true
               - download: current
+                displayName: Download artifacts
                 artifact: release-candidate
               - script: >-
                   python scripts/release_pipeline.py integrate
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/integration-run.json"
-                displayName: Queue or reattach to the exact child and require Succeeded
+                displayName: Run integration
                 env:
                   RELEASE_COHORT: $(cohort)
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - task: DownloadPipelineArtifact@2
+                displayName: Download artifacts
                 inputs:
                   buildType: specific
                   project: $(System.TeamProjectId)
@@ -445,6 +466,7 @@ stages:
                   python scripts/release_pipeline.py verify-integration
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --work-dir "$(Agent.TempDirectory)/integration-artifacts"
+                displayName: Check integration
                 env:
                   RELEASE_COHORT: $(cohort)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
@@ -453,7 +475,7 @@ stages:
                   python scripts/release_pipeline.py cancel
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/integration-run.json"
-                displayName: Cancel only this release's child on interruption or failure
+                displayName: Cancel integration
                 condition: or(failed(), canceled())
                 env:
                   RELEASE_COHORT: $(cohort)
@@ -463,7 +485,7 @@ stages:
 
   - ${{ if eq(parameters.mode, 'Release') }}:
       - stage: Publish
-        displayName: Publish the qualified GitHub release
+        displayName: Publish
         dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility, Integration]
         condition: >-
           and(not(canceled()), eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
@@ -490,6 +512,7 @@ stages:
             steps:
               - checkout: none
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: "3.13"
                   disableDownloadFromRegistry: true
@@ -498,6 +521,7 @@ stages:
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/publication/release.json"
                   --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
+                displayName: Publish release
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -510,7 +534,7 @@ stages:
                       --record "$(Agent.TempDirectory)/publication/release.json"
                       --work-dir "$(Agent.TempDirectory)/index-submission"
                       --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
-                    displayName: Submit the optional index PR for review; never merge
+                    displayName: Create index PR
                     env:
                       RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                       RELEASE_SOURCE_COMMIT: $(sourceCommit)

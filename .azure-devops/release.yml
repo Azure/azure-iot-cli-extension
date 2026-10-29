@@ -2,24 +2,24 @@
 
 trigger: none
 pr: none
-name: release-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-release-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode
-    displayName: Plan checks governance; Validate runs live tests; Release also publishes
+    displayName: Mode
     type: string
     default: Plan
     values: [Plan, Validate, Release]
   - name: sourceBranch
-    displayName: Candidate branch containing pipeline 147 migration (feature branches are Plan/Validate only)
+    displayName: Source branch
     type: string
     default: release/1.1.0-preview
   - name: createIndexPr
-    displayName: Submit an extension-index PR after GitHub publication (Release only)
+    displayName: Create index PR
     type: boolean
     default: false
   - name: dpsTarget
-    displayName: DPS qualification target (other services always use public australiaeast)
+    displayName: DPS target
     type: string
     default: public
     values: [public, canary]
