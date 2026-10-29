@@ -2,13 +2,13 @@
 
 trigger: none
 pr: none
-name: integration-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-integration-$(Date:yyyyMMdd).$(Rev:r)
 pool:
   vmImage: ubuntu-24.04
 
 parameters:
   - name: mode
-    displayName: Run mode
+    displayName: Mode
     type: string
     default: Integration tests
     values: [Dry run, Integration tests]
@@ -23,16 +23,16 @@ parameters:
     default: ['3.13']
     values: ['3.10', '3.11', '3.12', '3.13']
   - name: regions
-    displayName: Azure regions (comma-separated, without spaces)
+    displayName: Regions (CSV)
     type: string
     default: australiaeast
   - name: armEndpoint
-    displayName: ARM routing (canary requires centraluseuap)
+    displayName: ARM endpoint
     type: string
     default: public
     values: [public, canary]
   - name: releaseBuildId
-    displayName: Release candidate build ID (0 builds from source)
+    displayName: Release build ID
     type: number
     default: 0
 
