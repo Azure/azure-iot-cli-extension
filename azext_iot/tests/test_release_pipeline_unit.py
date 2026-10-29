@@ -1003,7 +1003,9 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
     security = stages["Security"]["jobs"][0]["steps"]
     assert any("git checkout --detach" in step.get("pwsh", "") for step in security)
     scanner = next(step for step in security if step.get("task") == "MicrosoftSecurityDevOps@1")
-    assert scanner["inputs"]["break"] is True
+    assert scanner["inputs"] == {
+        "break": True, "publish": True, "artifactName": "release-security-$(System.JobAttempt)",
+    }
     integration = stages["Integration"]["jobs"][0]["steps"]
     download = next(step for step in integration if step.get("task") == "DownloadPipelineArtifact@2")
     assert download["inputs"]["pipelineId"] == "$(integrationBuildId)"

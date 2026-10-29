@@ -286,7 +286,6 @@ stages:
                 displayName: Run security scans
                 inputs:
                   break: true
-                  displayName: Publish results
                   publish: true
                   artifactName: release-security-$(System.JobAttempt)
                 env:
