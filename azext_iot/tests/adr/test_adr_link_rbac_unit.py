@@ -15,13 +15,16 @@ from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+import responses
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
 )
 from azure.cli.core.cloud import AZURE_CHINA_CLOUD, AZURE_PUBLIC_CLOUD, AZURE_US_GOV_CLOUD
 from azure.core.credentials import AccessToken
+from azure.core.exceptions import HttpResponseError, ServiceRequestError
 from azure.mgmt.authorization import AuthorizationManagementClient
+from azure.mgmt.resource import ResourceManagementClient
 
 from azext_iot.adr.rbac import (
     ADR_ADMINISTRATOR_ROLE,
@@ -33,6 +36,7 @@ from azext_iot.adr.rbac import (
     LinkRbacManager,
     OWNER_ROLE,
     READER_ROLE,
+    UNLINK_READ_ROLE_IDS,
     _assignment_scope_applies,
     _scope_subscription,
     format_role_requirements,
@@ -41,6 +45,7 @@ from azext_iot.adr.rbac import (
 )
 from azext_iot.adr.endpoints import get_adr_arm_endpoint
 
+UNLINK_PRINCIPAL_ID = "abcdef01-2345-6789-abcd-0123456789ab"
 NS_SCOPE = (
     "/subscriptions/sub/resourceGroups/rg/providers/"
     "Microsoft.DeviceRegistry/namespaces/ns"
@@ -129,29 +134,46 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
         "hub": [
             ("namespace", "Contributor", "target"),
             ("namespace", "IoT Hub Data Contributor", "target"),
-            ("linked", "Contributor", "namespace"),
+            ("linked", "Azure Device Registry Contributor", "namespace"),
+            ("linked", "Reader", "namespace"),
+            ("namespace", "Azure Device Registry Administrator", "namespace"),
+            ("namespace", "Reader", "namespace_group"),
+            ("namespace", "Reader", "target_group"),
+            ("dps", "IoT Hub Data Contributor", "hubs"),
         ],
         "dps": [
             ("namespace", "Contributor", "target"),
-            ("linked", "Contributor", "namespace"),
-            ("namespace_system", "Azure Device Registry Administrator", "namespace"),
+            ("linked", "Azure Device Registry Contributor", "namespace"),
+            ("linked", "Reader", "namespace"),
+            ("namespace", "Azure Device Registry Administrator", "namespace"),
+            ("namespace", "Reader", "namespace_group"),
+            ("namespace", "Reader", "target_group"),
+            ("dps", "IoT Hub Data Contributor", "hubs"),
         ],
         "su": [
             ("namespace", "Contributor", "target"),
             ("namespace", "Device Update Administrator", "target"),
             ("linked", "Azure Device Registry Contributor", "namespace"),
+            ("linked", "Reader", "namespace"),
+            ("namespace", "Azure Device Registry Administrator", "namespace"),
+            ("namespace", "Reader", "namespace_group"),
+            ("namespace", "Reader", "target_group"),
         ],
     }
     assert ADR_CONTRIBUTOR_ROLE == "Azure Device Registry Contributor"
     assert LINK_ROLE_IDS[ADU_ADMINISTRATOR_ROLE] == "02ca0879-e8e4-47a5-a61e-5c618b76e64a"
     assert LINK_ROLE_IDS[ADR_ADMINISTRATOR_ROLE] == "12675fd7-7f59-493f-9201-f7944860a2f1"
-    assert "namespace system-assigned MI -> Azure Device Registry Administrator on namespace" in (
+    assert "namespace outbound MI -> Azure Device Registry Administrator on namespace" in (
         format_role_requirements("dps")
     )
     assert format_role_requirements("su") == (
         "namespace outbound MI -> Contributor on SU; "
         "namespace outbound MI -> Device Update Administrator on SU; "
-        "SU selected inbound MI -> Azure Device Registry Contributor on namespace"
+        "SU selected inbound MI -> Azure Device Registry Contributor on namespace; "
+        "SU selected inbound MI -> Reader on namespace; "
+        "namespace outbound MI -> Azure Device Registry Administrator on namespace; "
+        "namespace outbound MI -> Reader on namespace resource group; "
+        "namespace outbound MI -> Reader on SU resource group"
     )
     assert all(
         rule.principal != "signed_in_user"
@@ -171,117 +193,331 @@ def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
     assert _scope_subscription("/") is None
 
 
+@pytest.fixture
+def unlink_resource_client(mocker):
+    factory = mocker.patch("azure.cli.core.commands.client_factory.get_mgmt_service_client")
+    client = factory.return_value.__enter__.return_value
+    client.resource_groups.get.return_value.id = "/subscriptions/target-sub/resourceGroups/target-rg"
+    mocker.patch("azext_iot._factory._get_canary_credential_scopes", return_value=["https://management.azure.com/.default"])
+    return factory
+
+
+def _unlink_assignment(**kwargs):
+    return {
+        "principalId": UNLINK_PRINCIPAL_ID,
+        "scope": "/subscriptions/target-sub/resourceGroups/target-rg",
+        "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[READER_ROLE],
+        **kwargs,
+    }
+
+
 @pytest.mark.parametrize("scope", [
     "/subscriptions/target-sub/resourceGroups/target-rg",
     "/subscriptions/target-sub",
     "/providers/Microsoft.Management/managementGroups/ancestor",
 ])
-def test_unlink_reader_reuses_inherited_grants_without_caller_privileges(mocker, token_profile, scope):
-    sleeper = MagicMock()
-    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=sleeper)
+@pytest.mark.parametrize("role_id", sorted(UNLINK_READ_ROLE_IDS))
+@pytest.mark.parametrize("grant_reader", [False, True])
+def test_unlink_recognizes_read_capable_inherited_grants_without_writes(
+    mocker, token_profile, unlink_resource_client, caplog, scope, role_id, grant_reader,
+):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=MagicMock())
     target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
-    manager.cli.invoke.return_value = _result([{
-        "principalId": "outbound-mi", "scope": scope,
-        "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[READER_ROLE],
-    }])
-    caller = mocker.patch.object(manager, "_caller_can_assign")
-    manager.ensure_unlink_reader("outbound-mi", target_rg)
-    command = manager.cli.invoke.call_args.args[0]
-    assert "--role 'Reader'" in command
-    assert f"--scope '{target_rg}'" in command
+    manager.cli.invoke.return_value = _result([_unlink_assignment(
+        scope=scope.upper(), principalId=UNLINK_PRINCIPAL_ID.upper(),
+        roleDefinitionId="/providers/Microsoft.Authorization/roleDefinitions/" + role_id.upper(),
+    )])
+    create = mocker.patch.object(manager, "_ensure_assignments", side_effect=AssertionError("Unexpected RBAC write"))
+    with caplog.at_level(logging.INFO):
+        manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=grant_reader)
+    command = shlex.split(manager.cli.invoke.call_args.args[0])
+    assert command[:3] == ["role", "assignment", "list"]
+    assert command[command.index("--assignee-object-id") + 1] == UNLINK_PRINCIPAL_ID
+    assert command[command.index("--scope") + 1] == target_rg
+    assert "--role" not in command
     assert "--include-inherited" in command
     assert manager.cli.invoke.call_args.kwargs == {"subscription": "target-sub"}
     assert manager.cli.invoke.call_count == 1
-    token_profile.return_value.get_raw_token.assert_not_called()
-    caller.assert_not_called()
-    sleeper.assert_not_called()
-
-
-@pytest.mark.parametrize("authorized", [True, False])
-@pytest.mark.parametrize("existing_scope", [None, TARGET_SCOPE, "/subscriptions/other"])
-def test_unlink_reader_creates_only_rg_reader_or_returns_exact_remediation(
-    mocker, caplog, authorized, existing_scope,
-):
-    sleeper = MagicMock()
-    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=sleeper)
-    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
-    assignment = {
-        "principalId": "outbound-mi", "scope": existing_scope or target_rg,
-        "roleDefinitionId": "/providers/Microsoft.Authorization/roleDefinitions/" + LINK_ROLE_IDS[READER_ROLE],
+    assert unlink_resource_client.call_args.kwargs == {
+        "subscription_id": "target-sub", "base_url": get_adr_arm_endpoint(),
+        "credential_scopes": ["https://management.azure.com/.default"],
     }
-    manager.cli.invoke.side_effect = [
-        _result([assignment] if existing_scope else []), _result(assignment), _result([{
-            **assignment, "scope": target_rg,
-        }]),
+    assert "not an effective-access guarantee" in caplog.text
+    assert "Cannot confirm" not in caplog.text
+    assert "az role assignment create" not in caplog.text
+    token_profile.return_value.get_raw_token.assert_not_called()
+    create.assert_not_called()
+    manager._sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("assignments", [
+    [], [_unlink_assignment(scope=TARGET_SCOPE)], [_unlink_assignment(scope="/subscriptions/other")],
+    [_unlink_assignment(scope="/subscriptions/target-sub/resourceGroups/target-rg-other")],
+    [_unlink_assignment(principalId="someone-else")], [_unlink_assignment(principalId=None)],
+    [_unlink_assignment(roleDefinitionId="/roles/custom-reader")],
+    [_unlink_assignment(roleDefinitionId="/roles/" + LINK_ROLE_IDS[HUB_DATA_ROLE])],
+    [_unlink_assignment(condition="@Resource[...] StringEquals 'value'")],
+    [_unlink_assignment(conditionVersion="2.0")],
+    [_unlink_assignment(scope=None)], [_unlink_assignment(roleDefinitionId=None)], [{}],
+])
+def test_unlink_unconfirmed_read_access_warns_without_grants(unlink_resource_client, caplog, assignments):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=MagicMock())
+    manager.cli.invoke.return_value = _result(assignments)
+    manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg")
+    assert "Cannot confirm read access" in caplog.text
+    assert "Continuing without changing role assignments" in caplog.text
+    assert "--no-rbac-check" in caplog.text
+    command = next(line for line in caplog.text.splitlines() if line.startswith("az role assignment create "))
+    assert shlex.split(command) == [
+        "az", "role", "assignment", "create", "--assignee-object-id", UNLINK_PRINCIPAL_ID,
+        "--assignee-principal-type", "ServicePrincipal", "--role", "Reader",
+        "--scope", "/subscriptions/target-sub/resourceGroups/target-rg", "--subscription", "target-sub",
     ]
-    caller = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
-    if authorized:
-        manager.ensure_unlink_reader("outbound-mi", target_rg)
-        commands = [call.args[0] for call in manager.cli.invoke.call_args_list]
-        assert len(commands) == 3
-        assert commands[1] == (
-            "role assignment create --assignee-object-id 'outbound-mi' "
-            "--assignee-principal-type ServicePrincipal --role 'Reader' "
-            f"--scope '{target_rg}'"
+    assert "If read access is missing" in caplog.text
+    assert "Reader grants read access to all resources within this scope." in caplog.text
+    assert "several minutes to take effect" in caplog.text
+    assert "not ADR authorization" in caplog.text
+    assert manager.cli.invoke.call_count == 1
+    assert not manager.created
+    manager._sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"value": []}, [None], ["assignment"]])
+@pytest.mark.parametrize("grant_reader", [False, True])
+def test_unlink_malformed_role_lookup_is_reported(unlink_resource_client, payload, grant_reader):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    manager.cli.invoke.return_value = _result(payload)
+    with pytest.raises(AzureResponseError, match="Malformed role-assignment"):
+        manager.check_unlink_read_access(
+            UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg", grant_reader=grant_reader,
         )
-        assert "namespace outbound MI -> Reader" in caplog.text
-        assert "propagate" in caplog.text
-        sleeper.assert_called_once_with(30)
-    else:
-        with pytest.raises(AzureResponseError, match="No link mutation") as error:
-            manager.ensure_unlink_reader("outbound-mi", target_rg)
-        assert "--role 'Reader'" in str(error.value)
-        assert f"--scope '{target_rg}' --subscription 'target-sub'" in str(error.value)
-        assert manager.cli.invoke.call_count == 1
-        sleeper.assert_not_called()
-    caller.assert_called_once_with("caller-object-id", target_rg)
-    assert all(call.kwargs["subscription"] == "target-sub" for call in manager.cli.invoke.call_args_list)
+    assert manager.cli.invoke.call_count == 1
 
 
-def test_unlink_reader_lookup_failure_does_not_attempt_grants(mocker):
+@pytest.mark.parametrize("group", [None, SimpleNamespace(), SimpleNamespace(id=None), SimpleNamespace(id="/wrong/group")])
+@pytest.mark.parametrize("grant_reader", [False, True])
+def test_unlink_incomplete_group_lookup_does_not_fall_back(unlink_resource_client, group, grant_reader):
+    unlink_resource_client.return_value.__enter__.return_value.resource_groups.get.return_value = group
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    manager.cli.invoke.side_effect = AzureResponseError("cannot read role assignments")
-    create = mocker.patch.object(manager, "_ensure_assignments")
-    with pytest.raises(AzureResponseError, match="cannot read role assignments") as error:
-        manager.ensure_unlink_reader("outbound-mi", "/subscriptions/sub/resourceGroups/rg")
-    assert "recreate it before retrying" not in str(error.value)
-    assert "Unlink Reader setup did not complete" in str(error.value)
-    assert "No namespace PUT or broader subscription-level grant" in str(error.value)
-    create.assert_not_called()
+    with pytest.raises(AzureResponseError, match="expected resource group"):
+        manager.check_unlink_read_access(
+            UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg", grant_reader=grant_reader,
+        )
+    manager.cli.invoke.assert_not_called()
 
 
-def test_unlink_reader_missing_resource_group_includes_recreate_advice(mocker):
+@pytest.mark.parametrize("error", [ServiceRequestError("offline"), AzureResponseError("No subscription access")])
+@pytest.mark.parametrize("grant_reader", [False, True])
+def test_unlink_group_lookup_failure_does_not_fall_back(unlink_resource_client, error, grant_reader):
+    unlink_resource_client.return_value.__enter__.return_value.resource_groups.get.side_effect = error
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    manager.cli.invoke.side_effect = AzureResponseError(
-        "(ResourceGroupNotFound) Resource group 'rg' could not be found."
+    with pytest.raises(type(error)) as raised:
+        manager.check_unlink_read_access(
+            UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg", grant_reader=grant_reader,
+        )
+    assert raised.value is error
+    manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("status,code,fallback", [
+    (404, "ResourceGroupNotFound", True),
+    (404, "ResourceNotFound", False),
+    (404, "NotFound", False),
+    (403, "AuthorizationFailed", False),
+    (403, "ResourceGroupNotFound", False),
+    (429, "TooManyRequests", False),
+    (500, "InternalServerError", False),
+])
+@pytest.mark.parametrize("endpoint", ["https://management.azure.com", "https://centraluseuap.management.azure.com"])
+@pytest.mark.parametrize("has_grant", [False, True])
+def test_unlink_real_group_lookup_falls_back_only_for_confirmed_deleted_rg(
+    mocker, monkeypatch, unlink_resource_client, caplog, status, code, fallback, endpoint, has_grant,
+):
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", endpoint)
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    credential = MagicMock()
+    credential.get_token.return_value = AccessToken("offline", 9999999999)
+    client = ResourceManagementClient(credential, "target-sub", base_url=endpoint, retry_total=0)
+    unlink_resource_client.return_value = client
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    manager.cli.invoke.return_value = _result(
+        [_unlink_assignment(scope="/subscriptions/target-sub")] if has_grant else [],
     )
-    create = mocker.patch.object(manager, "_ensure_assignments")
+    with responses.RequestsMock() as network, caplog.at_level(logging.INFO):
+        network.get(endpoint + target_rg.replace("/resourceGroups/", "/resourcegroups/"), status=status, json={
+            "error": {"code": code, "message": "The text mentions ResourceGroupNotFound regardless of actual error code."},
+        })
+        if fallback:
+            manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg)
+            command = shlex.split(manager.cli.invoke.call_args.args[0])
+            assert command[command.index("--scope") + 1] == "/subscriptions/target-sub"
+            assert manager.cli.invoke.call_args.kwargs == {"subscription": "target-sub"}
+            assert ("not an effective-access guarantee" in caplog.text) is has_grant
+            if not has_grant:
+                remediation = next(
+                    line for line in caplog.text.splitlines() if line.startswith("az role assignment create ")
+                )
+                assert shlex.split(remediation) == [
+                    "az", "role", "assignment", "create", "--assignee-object-id", UNLINK_PRINCIPAL_ID,
+                    "--assignee-principal-type", "ServicePrincipal", "--role", "Reader",
+                    "--scope", "/subscriptions/target-sub", "--subscription", "target-sub",
+                ]
+                assert "Reader grants read access to all resources within this scope." in caplog.text
+            else:
+                assert "az role assignment create" not in caplog.text
+            assert manager.cli.invoke.call_count == 1
+            assert not manager.created
+        else:
+            with pytest.raises(HttpResponseError) as raised:
+                manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg)
+            assert raised.value.status_code == status
+            assert raised.value.error.code == code
+            manager.cli.invoke.assert_not_called()
+            assert "az role assignment create" not in caplog.text
+        assert len(network.calls) == 1
 
-    with pytest.raises(AzureResponseError, match="ResourceGroupNotFound") as error:
-        manager.ensure_unlink_reader(
-            "outbound-mi", "/subscriptions/sub/resourceGroups/rg"
-        )
 
-    assert "'/subscriptions/sub/resourceGroups/rg' to exist" in str(error.value)
-    assert "recreate it before retrying" in str(error.value)
-    assert "No namespace PUT or broader subscription-level grant" in str(error.value)
-    create.assert_not_called()
-
-
-def test_unlink_reader_404_without_resource_group_code_uses_generic_failure(mocker):
+def test_unlink_role_lookup_failure_is_reported_without_writes(unlink_resource_client):
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    not_found = AzureResponseError("role assignment scope was not found")
-    not_found.status_code = 404
-    manager.cli.invoke.side_effect = not_found
-    create = mocker.patch.object(manager, "_ensure_assignments")
+    manager.cli.invoke.return_value = _result({"error": "cannot list roles"}, success=False)
+    with pytest.raises(AzureResponseError, match="cannot list roles"):
+        manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, "/subscriptions/target-sub/resourceGroups/target-rg")
+    assert manager.cli.invoke.call_count == 1
+    assert not manager.created
 
-    with pytest.raises(AzureResponseError, match="did not complete") as error:
-        manager.ensure_unlink_reader(
-            "outbound-mi", "/subscriptions/sub/resourceGroups/rg"
+
+def test_unlink_grant_creates_only_target_rg_reader_and_reuses_it(
+    mocker, unlink_resource_client, token_profile, caplog,
+):
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock(), sleeper=MagicMock())
+    allowed = mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    manager.cli.invoke.side_effect = [
+        _result([]), _result({"id": "created-reader"}),
+        _result([_unlink_assignment()]), _result([_unlink_assignment()]),
+    ]
+    manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    allowed.assert_called_once_with("caller-object-id", target_rg)
+    assert token_profile.return_value.get_raw_token.call_args.kwargs["subscription"] == "target-sub"
+    assert manager.created == [(UNLINK_PRINCIPAL_ID, READER_ROLE, target_rg)]
+    commands = [shlex.split(call.args[0]) for call in manager.cli.invoke.call_args_list]
+    assert [command[:3] for command in commands] == [
+        ["role", "assignment", "list"], ["role", "assignment", "create"],
+        ["role", "assignment", "list"], ["role", "assignment", "list"],
+    ]
+    assert commands[1] == [
+        "role", "assignment", "create", "--assignee-object-id", UNLINK_PRINCIPAL_ID,
+        "--assignee-principal-type", "ServicePrincipal", "--role", "Reader", "--scope", target_rg,
+    ]
+    assert all(call.kwargs == {"subscription": "target-sub"} for call in manager.cli.invoke.call_args_list)
+    assert "all resources in that resource group" in caplog.text
+    assert "retained after removal, including if removal fails" in caplog.text
+    assert "several minutes to take effect" in caplog.text
+    manager._sleep.assert_not_called()
+
+
+def test_unlink_grant_denied_caller_gets_manual_command_without_writes(mocker, unlink_resource_client):
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    manager.cli.invoke.return_value = _result([])
+    mocker.patch.object(manager, "_caller_can_assign", return_value=False)
+    with pytest.raises(AzureResponseError, match="signed-in identity cannot create role assignments") as raised:
+        manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    assert f"--role 'Reader' --scope '{target_rg}' --subscription 'target-sub'" in str(raised.value)
+    assert manager.cli.invoke.call_count == 1
+    assert not manager.created
+
+
+@pytest.mark.parametrize("evidence,success", [
+    ([_unlink_assignment()], True), ([{}], False), ({"value": []}, False),
+    ([_unlink_assignment(principalId="other")], False),
+    ([_unlink_assignment(conditionVersion="2.0")], False),
+    ([_unlink_assignment(scope="/subscriptions/other")], False),
+])
+def test_unlink_grant_creation_race_requires_valid_reader_evidence(
+    mocker, unlink_resource_client, evidence, success,
+):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    manager.cli.invoke.side_effect = [
+        _result([]), _result({"error": "RoleAssignmentExists"}, success=False), _result(evidence),
+    ]
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    if success:
+        manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    else:
+        with pytest.raises(AzureResponseError, match="Automatic link RBAC setup failed"):
+            manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    assert manager.cli.invoke.call_count == 3
+    assert not manager.created
+
+
+@pytest.mark.parametrize("evidence", [[], [{}], {"value": []}, [_unlink_assignment(conditionVersion="2.0")]])
+def test_unlink_grant_visibility_timeout_retains_created_reader(mocker, unlink_resource_client, evidence):
+    now = [0]
+
+    def sleep_for(delay):
+        now[0] += delay
+
+    manager = LinkRbacManager(
+        MagicMock(), cli=MagicMock(), clock=lambda: now[0], sleeper=sleep_for, propagation_timeout=3,
+    )
+    mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    manager.cli.invoke.side_effect = [
+        _result([]), _result({"id": "created-reader"}), *[_result(evidence) for _ in range(3)],
+    ]
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    with pytest.raises(AzureResponseError, match="No namespace mutation was submitted"):
+        manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+    assert now[0] == 3
+    assert manager.created == [(UNLINK_PRINCIPAL_ID, READER_ROLE, target_rg)]
+    assert manager.cli.invoke.call_count == 5
+
+
+@pytest.mark.parametrize("has_grant", [False, True])
+@pytest.mark.parametrize("endpoint", ["https://management.azure.com", "https://centraluseuap.management.azure.com"])
+def test_unlink_grant_deleted_rg_never_creates_subscription_assignment(
+    monkeypatch, unlink_resource_client, has_grant, endpoint,
+):
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", endpoint)
+    target_rg = "/subscriptions/target-sub/resourceGroups/target-rg"
+    credential = MagicMock()
+    credential.get_token.return_value = AccessToken("offline", 9999999999)
+    unlink_resource_client.return_value = ResourceManagementClient(
+        credential, "target-sub", base_url=endpoint, retry_total=0,
+    )
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    manager.cli.invoke.return_value = _result(
+        [_unlink_assignment(scope="/subscriptions/target-sub")] if has_grant else [],
+    )
+    with responses.RequestsMock() as network:
+        network.get(endpoint + target_rg.replace("/resourceGroups/", "/resourcegroups/"), status=404, json={
+            "error": {"code": "ResourceGroupNotFound", "message": "group deleted"},
+        })
+        if has_grant:
+            manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+        else:
+            with pytest.raises(AzureResponseError, match="never creates subscription-scoped assignments") as raised:
+                manager.check_unlink_read_access(UNLINK_PRINCIPAL_ID, target_rg, grant_reader=True)
+            assert "Endpoint removal was not submitted" in str(raised.value)
+            assert "--scope '/subscriptions/target-sub' --subscription 'target-sub'" in str(raised.value)
+        assert len(network.calls) == 1
+    assert manager.cli.invoke.call_count == 1
+    assert manager.cli.invoke.call_args.args[0].startswith("role assignment list ")
+    assert not manager.created
+
+
+@pytest.mark.parametrize("principal", ["outbound-mi", "x' --assignee-object-id 'other-sp", "bad\nprincipal", " ", None, 123])
+def test_unlink_grant_rejects_invalid_principal_before_lookups(unlink_resource_client, principal):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    with pytest.raises(AzureResponseError, match="principalId"):
+        manager.check_unlink_read_access(
+            principal, "/subscriptions/target-sub/resourceGroups/target-rg", grant_reader=True,
         )
-
-    assert "recreate it before retrying" not in str(error.value)
-    create.assert_not_called()
+    unlink_resource_client.assert_not_called()
+    manager.cli.invoke.assert_not_called()
+    assert not manager.created
 
 
 @pytest.mark.parametrize("assignment_scope,trusted,expected", [
@@ -540,7 +776,7 @@ def test_namespace_system_identity_message_uses_placeholders_without_resource_id
 
 def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     cli = MagicMock()
-    cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(3)]
+    cli.invoke.return_value = _result([{"id": "existing"}])
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
     manager.ensure(
@@ -548,7 +784,7 @@ def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     )
 
     commands = [call.args[0] for call in cli.invoke.call_args_list]
-    assert len(commands) == 3
+    assert len(commands) == 6
     assert all("--include-inherited" in command for command in commands)
     assert all("--all" not in command for command in commands)
     assert all(
@@ -797,12 +1033,12 @@ def test_caller_can_assign_follows_permissions_next_link():
 
 def test_hub_without_inbound_identity_skips_reverse_assignment():
     cli = MagicMock()
-    cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(2)]
+    cli.invoke.return_value = _result([{"id": "existing"}])
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
     manager.ensure("hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", None)
 
-    assert cli.invoke.call_count == 2
+    assert cli.invoke.call_count == 4
 
 
 def test_rbac_authorized_caller_creates_only_missing_assignments(mocker):
@@ -810,7 +1046,10 @@ def test_rbac_authorized_caller_creates_only_missing_assignments(mocker):
     cli.invoke.side_effect = [
         _result([]),  # namespace -> Contributor target
         _result([{"id": "existing-data-role"}]),
-        _result([]),  # linked -> Contributor namespace
+        _result([]),  # linked -> ADR Contributor namespace
+        _result([{"id": "existing-inbound-reader"}]),
+        _result([{"id": "existing-self-admin"}]),
+        _result([{"id": "existing-rg-reader"}]),
         _result({"id": "created-target"}),
         _result({"id": "created-namespace"}),
         _result([{"id": "visible-target"}]),
@@ -837,11 +1076,7 @@ def test_rbac_authorized_caller_creates_only_missing_assignments(mocker):
 
 def test_rbac_unauthorized_fails_with_exact_remediation_before_create(mocker):
     cli = MagicMock()
-    cli.invoke.side_effect = [
-        _result([]),
-        _result([]),
-        _result([]),
-    ]
+    cli.invoke.return_value = _result([])
     manager = LinkRbacManager(MagicMock(), cli=cli)
     privilege = mocker.patch.object(manager, "_caller_can_assign", return_value=False)
 
@@ -856,14 +1091,14 @@ def test_rbac_unauthorized_fails_with_exact_remediation_before_create(mocker):
     assert "--assignee-object-id 'ns-principal'" in message
     assert "--assignee-object-id 'dps-principal'" in message
     assert (
-        "--assignee-object-id 'ns-system' --assignee-principal-type ServicePrincipal "
+        "--assignee-object-id 'ns-principal' --assignee-principal-type ServicePrincipal "
         f"--role 'Azure Device Registry Administrator' --scope '{NS_SCOPE}'"
     ) in message
     assert not any(
         "role assignment create" in call.args[0]
         for call in cli.invoke.call_args_list
     )
-    assert privilege.call_count == 2
+    assert privilege.call_count == 3
 
 
 def test_atomic_rbac_plan_checks_every_service_before_any_assignment(mocker, token_profile):
@@ -873,7 +1108,7 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment(mocker, tok
 
     def acquire_token(**_):
         # Both service plans must be read before checking caller privileges.
-        assert cli.invoke.call_count == 6
+        assert cli.invoke.call_count == 9
         return ("Bearer", _access_token("reader-object-id"), {}), "sub", "tenant"
 
     raw_token.side_effect = acquire_token
@@ -907,21 +1142,15 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment(mocker, tok
     commands = [call.args[0] for call in cli.invoke.call_args_list]
     assert raw_token.call_args_list[0].kwargs == {"subscription": "sub", "resource": None}
     assert not any("role assignment create" in command for command in commands)
-    assert privilege.call_count == 3
+    assert privilege.call_count == 4
 
 
-def test_su_creates_exact_three_service_grants_without_graph(token_profile, mocker):
+def test_su_creates_exact_service_grants_without_graph(token_profile, mocker):
     cli = MagicMock()
     cli.invoke.side_effect = [
-        _result([]),
-        _result([]),
-        _result([]),
-        _result({"id": "created-1"}),
-        _result({"id": "created-2"}),
-        _result({"id": "created-3"}),
-        _result([{"id": "visible-1"}]),
-        _result([{"id": "visible-2"}]),
-        _result([{"id": "visible-3"}]),
+        *[_result([]) for _ in range(6)],
+        *[_result({"id": f"created-{index}"}) for index in range(6)],
+        *[_result([{"id": f"visible-{index}"}]) for index in range(6)],
     ]
     network = mocker.patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network/Graph"))
     cli_ctx = SimpleNamespace(cloud=AZURE_PUBLIC_CLOUD)
@@ -949,9 +1178,15 @@ def test_su_creates_exact_three_service_grants_without_graph(token_profile, mock
         f"--assignee-principal-type ServicePrincipal --role 'Device Update Administrator' --scope '{target}'",
         "role assignment create --assignee-object-id 'su-principal' "
         f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' --scope '{NS_SCOPE}'",
+        "role assignment create --assignee-object-id 'su-principal' "
+        f"--assignee-principal-type ServicePrincipal --role 'Reader' --scope '{NS_SCOPE}'",
+        "role assignment create --assignee-object-id 'ns-principal' "
+        f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' --scope '{NS_SCOPE}'",
+        "role assignment create --assignee-object-id 'ns-principal' "
+        "--assignee-principal-type ServicePrincipal --role 'Reader' --scope '/subscriptions/sub/resourceGroups/rg'",
     ]
     assert all("--fill-principal-name false" in command for command in commands if " list " in command)
-    assert privilege.call_count == 2
+    assert privilege.call_count == 3
     network.assert_not_called()
 
 
@@ -976,7 +1211,7 @@ def test_su_missing_registry_role_is_scoped_and_privilege_gated(mocker, authoriz
             f"--scope '{NS_SCOPE}'",
             subscription="sub",
         )
-        wait.assert_called_once_with([("su-principal", "Azure Device Registry Contributor", NS_SCOPE)])
+        wait.assert_called_once_with([("su-principal", "Azure Device Registry Contributor", NS_SCOPE)], strict=False)
     else:
         with pytest.raises(AzureResponseError, match="Azure Device Registry Contributor"):
             manager.ensure("su", NS_SCOPE, scope, "ns-principal", "su-principal")
@@ -987,16 +1222,12 @@ def test_su_missing_registry_role_is_scoped_and_privilege_gated(mocker, authoriz
 
 def test_su_existing_roles_need_neither_token_nor_graph(token_profile, mocker):
     cli = MagicMock()
-    cli.invoke.side_effect = [
-        _result([{"id": "existing"}]),
-        _result([{"id": "existing"}]),
-        _result([{"id": "existing"}]),
-    ]
+    cli.invoke.return_value = _result([{"id": "existing"}])
     network = mocker.patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network/Graph"))
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
     manager.ensure("su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal")
-    assert cli.invoke.call_count == 3
+    assert cli.invoke.call_count == 6
     token_profile.assert_not_called()
     network.assert_not_called()
 
@@ -1026,7 +1257,7 @@ def test_su_adds_only_missing_admin_at_target_scope(mocker, authorized, cross_su
             f"--role 'Device Update Administrator' --scope '{target}'",
             subscription=subscription,
         )
-        wait.assert_called_once_with([("ns-principal", ADU_ADMINISTRATOR_ROLE, target)])
+        wait.assert_called_once_with([("ns-principal", ADU_ADMINISTRATOR_ROLE, target)], strict=False)
     else:
         with pytest.raises(AzureResponseError, match="No link mutation was submitted") as raised:
             manager.ensure("su", NS_SCOPE, target, "ns-principal", "su-principal")
@@ -1057,8 +1288,8 @@ def test_recovery_skips_absent_optional_hub_principal(mocker):
         "link_type": "hub", "namespace_scope": NS_SCOPE, "target_scope": TARGET_SCOPE,
         "namespace_principal_id": "namespace", "linked_principal_id": None,
     }], guard=guard)
-    assert exists.call_count == 2
-    assert guard.call_count == 4
+    assert exists.call_count == 4
+    assert guard.call_count == 8
     manager.cli.invoke.assert_not_called()
 
 
@@ -1076,16 +1307,16 @@ def test_su_recovery_failure_names_update_command(mocker):
     manager.cli.invoke.assert_not_called()
 
 
-def test_su_all_assignment_creation_races_reuse_existing_grants(mocker, caplog):
+def test_su_all_assignment_creation_races_reuse_existing_grants(mocker):
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    mocker.patch.object(manager, "_assignment_exists", side_effect=[False] * 3 + [True] * 3)
+    mocker.patch.object(manager, "_assignment_exists", side_effect=[False] * 6 + [True] * 6)
     mocker.patch.object(manager, "_caller_can_assign", return_value=True)
     invoke = mocker.patch.object(manager, "_invoke_json", side_effect=AzureResponseError("RoleAssignmentExists"))
     wait = mocker.patch.object(manager, "_wait_for_assignments")
     manager.ensure("su", NS_SCOPE, TARGET_SCOPE, "namespace", "su")
-    assert invoke.call_count == 3
-    wait.assert_called_once_with([])
-    assert "Completed these role-assignment creation requests" not in caplog.text
+    assert invoke.call_count == 6
+    wait.assert_called_once_with([], strict=False)
+    assert not manager.created
 
 
 def test_role_scope_helpers_reject_empty_scopes_and_handle_tenant_scope():
@@ -1196,11 +1427,7 @@ def test_su_assignment_lookup_failure_stops_before_grants(mocker):
 
 def test_missing_current_assignee_stops_before_privilege_checks(token_profile):
     cli = MagicMock()
-    cli.invoke.side_effect = [
-        _result([]),
-        _result([]),
-        _result([]),
-    ]
+    cli.invoke.return_value = _result([])
     token_profile.return_value.get_raw_token.return_value = (
         ("Bearer", "not-a-jwt", {}), "sub", "tenant"
     )
@@ -1218,7 +1445,9 @@ def test_rbac_creation_failure_lists_remaining_commands(mocker):
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
+        _result([{"id": "existing-inbound-reader"}]),
         _result([{"id": "existing-self-role"}]),
+        _result([{"id": "existing-rg-reader"}]),
         RuntimeError("authorization changed"),
         _result([]),
     ]
@@ -1234,12 +1463,14 @@ def test_rbac_creation_failure_lists_remaining_commands(mocker):
 
 
 def test_rbac_creation_race_reuses_assignment_created_by_another_actor(mocker, caplog):
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+    caplog.set_level(logging.DEBUG)
     cli = MagicMock()
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
+        _result([{"id": "existing-inbound-reader"}]),
         _result([{"id": "existing-self-role"}]),
+        _result([{"id": "existing-rg-reader"}]),
         RuntimeError("assignment already exists"),
         _result([{"id": "raced-assignment"}]),
         _result({"id": "created-second"}),
@@ -1259,7 +1490,8 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor(mocker, c
         if "role assignment create" in call.args[0]
     ]
     assert len(creates) == 2
-    completed = caplog.text.split("Completed these role-assignment creation requests")[1]
+    assert "Created 1 role assignment(s)" in caplog.text
+    completed = caplog.text.split("Created role assignments:")[1]
     assert "principalId=dps-principal" in completed
     assert "principalId=ns-principal" not in completed
 
@@ -1366,7 +1598,7 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
     mocker.patch.object(manager, "_assignment_exists", return_value=False)
     mocker.patch.object(manager, "_caller_can_assign", return_value=True)
     mocker.patch.object(manager, "_wait_for_assignments")
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+    caplog.set_level(logging.INFO)
     target = TARGET_SCOPE.replace("/sub/", "/target-sub/")
     namespace = NS_SCOPE.replace("/sub/", "/namespace-sub/")
 
@@ -1384,20 +1616,19 @@ def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, l
         namespace_system_principal_id="ns-system",
     )
 
-    assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type])
+    assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type]) - (link_type in ("hub", "dps"))
     assert caplog.text.count("before updating the namespace") == 1
-    assert "Completed these role-assignment creation requests" in caplog.text
+    assert f"Created {invoke.call_count} role assignment(s)" in caplog.text
     assert "service authorization may still need time to propagate" in caplog.text
-    assert f"namespace outbound MI -> Contributor on {link_type.upper()}" in caplog.text
-    role = "Azure Device Registry Contributor" if link_type == "su" else "Contributor"
+    assert caplog.text.count(f"namespace outbound MI -> Contributor on {link_type.upper()}") == 1
+    role = "Azure Device Registry Contributor"
     assert f"{link_type.upper()} selected inbound MI -> {role} on namespace" in caplog.text
     assert "principalId=ns-principal" in caplog.text
     assert "principalId=linked-principal" in caplog.text
-    if link_type == "dps":
-        assert "namespace system-assigned MI -> Azure Device Registry Administrator on namespace" in caplog.text
-        assert "principalId=ns-system" in caplog.text
+    assert "namespace outbound MI -> Azure Device Registry Administrator on namespace" in caplog.text
+    assert "principalId=ns-system" not in caplog.text
     if link_type == "su":
-        assert invoke.call_count == 3
+        assert invoke.call_count == 7
         assert "namespace outbound MI -> Device Update Administrator on SU" in caplog.text
         assert "ADU first-party" not in caplog.text
     assert "caller-object-id" not in caplog.text
@@ -1445,7 +1676,7 @@ def test_partial_assignment_failure_reports_completed_and_remaining_requests(moc
     assert "principalId=ns-principal" in completed
     assert "principalId=dps-principal" not in completed
     assert "--assignee-object-id 'dps-principal'" in remaining
-    assert "--assignee-object-id 'ns-principal'" not in remaining
+    assert "--role 'Azure Device Registry Administrator'" in remaining
     assert raised.value.__cause__ is error
     wait.assert_not_called()
 
@@ -1496,7 +1727,7 @@ def test_dps_rbac_cannot_skip_missing_namespace_system_principal(operation, prin
 @pytest.mark.parametrize("existing,authorized", [(True, False), (False, True), (False, False)])
 def test_dps_self_role_is_exact_reused_and_privilege_gated(mocker, existing, authorized):
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
-    assignment = ("namespace-system", ADR_ADMINISTRATOR_ROLE, NS_SCOPE)
+    assignment = ("namespace-outbound", ADR_ADMINISTRATOR_ROLE, NS_SCOPE)
     mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
     lookup = mocker.patch.object(
         manager, "_assignment_exists", side_effect=lambda *args: existing or args != assignment,
@@ -1511,8 +1742,8 @@ def test_dps_self_role_is_exact_reused_and_privilege_gated(mocker, existing, aut
     else:
         with pytest.raises(AzureResponseError, match="Azure Device Registry Administrator") as error:
             manager.ensure(*args, **kwargs)
-        assert "--assignee-object-id 'namespace-system'" in str(error.value)
-        assert "--assignee-object-id 'namespace-outbound'" not in str(error.value)
+        assert "--assignee-object-id 'namespace-outbound'" in str(error.value)
+        assert "--assignee-object-id 'namespace-system'" not in str(error.value)
     assert assignment in [call.args for call in lookup.call_args_list]
     if existing:
         privilege.assert_not_called()
@@ -1520,11 +1751,11 @@ def test_dps_self_role_is_exact_reused_and_privilege_gated(mocker, existing, aut
         privilege.assert_called_once_with("caller", NS_SCOPE)
     if authorized and not existing:
         invoke.assert_called_once_with(
-            "role assignment create --assignee-object-id 'namespace-system' "
+            "role assignment create --assignee-object-id 'namespace-outbound' "
             "--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' "
             f"--scope '{NS_SCOPE}'", subscription="sub",
         )
-        wait.assert_called_once_with([assignment])
+        wait.assert_called_once_with([assignment], strict=False)
     else:
         invoke.assert_not_called()
         wait.assert_not_called()
@@ -1548,6 +1779,69 @@ def test_recovery_verifies_namespace_self_role_without_granting(mocker, present)
     else:
         with pytest.raises(AzureResponseError, match="Azure Device Registry Administrator"):
             manager.verify_many([request], guard=guard)
-    lookup.assert_any_call("namespace-system", ADR_ADMINISTRATOR_ROLE, NS_SCOPE, strict=True)
-    assert guard.call_count == 6
+    lookup.assert_any_call("outbound-uami", ADR_ADMINISTRATOR_ROLE, NS_SCOPE, strict=True)
+    assert guard.call_count == (10 if present else 8)
     manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["ensure_many", "verify_many"])
+def test_shared_rg_reader_is_deduplicated_across_case_insensitive_link_scopes(mocker, operation):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    lookup = mocker.patch.object(manager, "_assignment_exists", return_value=True)
+    request = {
+        "link_type": "hub", "namespace_scope": NS_SCOPE, "target_scope": TARGET_SCOPE.upper() + "/",
+        "namespace_principal_id": "outbound-uami", "linked_principal_id": "hub-principal",
+    }
+    other = {**request, "target_scope": TARGET_SCOPE + "-other", "linked_principal_id": "other-hub"}
+    kwargs = {"guard": MagicMock()} if operation == "verify_many" else {}
+    getattr(manager, operation)([request, other], **kwargs)
+
+    reads = [call.args for call in lookup.call_args_list if call.args[1] == READER_ROLE]
+    assert reads == [
+        ("hub-principal", READER_ROLE, NS_SCOPE),
+        ("outbound-uami", READER_ROLE, "/subscriptions/sub/resourceGroups/rg"),
+        ("other-hub", READER_ROLE, NS_SCOPE),
+    ]
+    assert sum(call.args == ("outbound-uami", ADR_ADMINISTRATOR_ROLE, NS_SCOPE)
+               for call in lookup.call_args_list) == 1
+    manager.cli.invoke.assert_not_called()
+
+
+def test_shared_namespace_and_dps_identity_reuses_hub_data_grant(mocker):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    lookup = mocker.patch.object(manager, "_assignment_exists", return_value=True)
+    manager.ensure(
+        "hub", NS_SCOPE, TARGET_SCOPE, "shared-principal", None,
+        dps_principal_id="SHARED-PRINCIPAL", hub_scopes=(TARGET_SCOPE.lower(),),
+    )
+    assert [call.args for call in lookup.call_args_list if call.args[1] == HUB_DATA_ROLE] == [
+        ("shared-principal", HUB_DATA_ROLE, TARGET_SCOPE),
+    ]
+    manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("authorized", [True, False])
+def test_cross_subscription_rg_reader_requires_parent_scope_permission_before_any_write(mocker, authorized):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    target_group = "/subscriptions/other-sub/resourceGroups/other-rg"
+    target = target_group + "/providers/Microsoft.Devices/IotHubs/hub"
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    mocker.patch.object(manager, "_assignment_exists", side_effect=lambda *args: args[-1] != target_group)
+    permission = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    invoke = mocker.patch.object(manager, "_invoke_json")
+    wait = mocker.patch.object(manager, "_wait_for_assignments")
+    if authorized:
+        manager.ensure("hub", NS_SCOPE, target, "outbound-uami", None)
+        invoke.assert_called_once_with(
+            "role assignment create --assignee-object-id 'outbound-uami' "
+            f"--assignee-principal-type ServicePrincipal --role 'Reader' --scope '{target_group}'",
+            subscription="other-sub",
+        )
+        wait.assert_called_once_with([("outbound-uami", READER_ROLE, target_group)], strict=False)
+    else:
+        with pytest.raises(AzureResponseError, match="No link mutation") as error:
+            manager.ensure("hub", NS_SCOPE, target, "outbound-uami", None)
+        assert f"--scope '{target_group}' --subscription 'other-sub'" in str(error.value)
+        invoke.assert_not_called()
+        wait.assert_not_called()
+    permission.assert_called_once_with("caller", target_group)

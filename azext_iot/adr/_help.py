@@ -723,9 +723,13 @@ def load_adr_help():
     Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    To unlink, delete the linked resource first, then run link hub/dps/su remove to remove
-    its endpoint from the namespace. Remove does not delete or check the linked resource
+    For a Succeeded link, delete the linked resource before running link hub/dps/su remove.
+    Failed links do not require deleting the linked resource. Hub endpoints in any state
+    also require clearing Registry Device IoT Hub capability references; see link hub remove --help.
+    Remove does not delete or check the linked resource; it removes only the namespace endpoint
     and waits for the namespace update to complete unless --no-wait is specified.
+    Remove performs a state-aware advisory permission check without changing role assignments by default.
+    Use --grant-reader to explicitly request missing Reader access at the linked resource's resource group.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
     After add/update --no-wait, use link hub/dps/su wait to track completion.
     After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
@@ -743,26 +747,41 @@ def load_adr_help():
   """
 
     for kind, resource in (("hub", "IoT Hub"), ("dps", "DPS"), ("su", "Software Updates instance")):
+        hub_prerequisite = (
+            "\n    Clear Registry Device IoT Hub capability references before removing any Hub endpoint,"
+            "\n    including Failed links (EndpointUsedByNestedDevices)."
+            "\n    Deleting the IoT Hub does not clear these references."
+            if kind == "hub" else ""
+        )
         helps[f"iot adr ns link {kind} remove"] = f"""
   type: command
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
-    Delete the linked {resource} first; this command removes only the namespace endpoint.
-    The namespace outbound identity needs Reader on the linked resource's resource group.
-    A missing grant is created when you can create role assignments; it is kept after unlinking.
-    Keep that resource group until the unlink completes.
-    By default, the command waits up to 600 seconds for the namespace update and reports
-    asynchronous service errors. Use --no-wait to return after submission instead.
-    After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
-    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
-    Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
-    A conflict reports guidance to inspect the namespace and rerun the command against its latest state.
-    Any Reader grant created during preflight is retained after a conflict.
+    This command removes only the namespace endpoint, not the linked {resource}.
+    For a Succeeded link, delete the linked {resource} first.
+    Failed links do not require the linked resource to be deleted.{hub_prerequisite}
+    For Succeeded links, the namespace outbound identity needs read access to the linked resource's
+    resource group, or subscription if that group was deleted. Checks are advisory by default:
+    uncertain access warns and continues without changing role assignments; ADR validates removal.
+    --no-rbac-check skips only the advisory check, not ADR authorization. --yes skips only confirmation.
+    For Succeeded links, --grant-reader requests missing Reader access at the linked resource's
+    resource group, never its subscription. Reader covers all resources in that group.
+    It requires role-assignment permission and cannot be combined with --no-rbac-check.
+    Reader setup failures stop removal. Requested assignments are retained even if removal fails
+    and can take several minutes to take effect; retry after propagation if ADR rejects removal.
+    The command waits up to 600 seconds. --no-wait returns after submission but does not skip Reader setup.
+    After --no-wait or a timeout, inspect completion with 'az iot adr ns show' before retrying.
+    For permission-check limitations, deleted resource groups and concurrent updates, see:
+    https://github.com/Azure/azure-iot-cli-extension/blob/release/1.1.0-preview/README.md#adr-link-troubleshooting
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
+    - name: Remove an endpoint without the advisory permission check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-rbac-check
+    - name: Grant missing resource-group Reader access before removing a Succeeded endpoint
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --grant-reader
   """
 
     helps[
@@ -873,8 +892,8 @@ def load_adr_help():
   short-summary: Manage DPS links (provisioning endpoints) on a Device Registry namespace.
   long-summary: |
     Only one DPS may be linked per namespace today. Links live on the namespace, not on the
-    DPS resource. After deleting the DPS resource, run link dps remove to remove its
-    namespace endpoint.
+    DPS resource. Run link dps remove to remove its namespace endpoint. For a Succeeded
+    link, delete the DPS resource first; Failed links do not require deleting it.
   """
 
     helps[
@@ -887,9 +906,10 @@ def load_adr_help():
     Rejected if the namespace already has a linked DPS (one DPS per namespace).
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided.
     Required service-to-service roles: {format_role_requirements("dps")}.
-    The namespace must also have a system-assigned identity. It receives Azure Device Registry
-    Administrator on its own namespace for registry-device provisioning, even when the
-    namespace outbound identity is user-assigned. No role is granted to the signed-in caller;
+    The namespace must also have a system-assigned identity enabled. Azure Device Registry
+    Administrator on the namespace is granted to the selected outbound identity: SAMI when
+    system-assigned outbound is selected, or the selected UAMI otherwise.
+    No role is granted to the signed-in caller;
     DPS enrollment management with --auth-type login requires separate DPS data-plane access.
     The command reuses inherited assignments and creates only missing assignments when run by
     a caller who can create role assignments (for example Owner, User Access Administrator,
@@ -920,8 +940,8 @@ def load_adr_help():
     Update checks target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
-    DPS preflight also ensures the namespace system-assigned identity has Azure Device Registry
-    Administrator on its own namespace, independently of the namespace outbound identity.
+    DPS preflight retains the namespace system-assigned identity prerequisite, but grants
+    Azure Device Registry Administrator on the namespace to its selected outbound identity.
     ARM assignment visibility does not guarantee that the linked service already honors access.
     Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
@@ -1005,7 +1025,7 @@ def load_adr_help():
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
-    These are exactly three service-to-service grants. Device Update Administrator enables
+    Identical resource-group Reader grants are deduplicated. Device Update Administrator enables
     namespace-initiated ADU data-plane operations, including report generation; ARM Contributor
     alone does not grant data-plane access. The configured namespace outbound identity
     and the selected Update Instance inbound identity each support SAMI or an attached UAMI.

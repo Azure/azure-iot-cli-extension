@@ -37,14 +37,17 @@ The dedicated combined and SU scenarios instead use native command recovery with
 fresh service roles, explicit 1200-second mutation budgets, and no fixture repair.
 """
 
+from copy import deepcopy
 import os
 import re
 import shlex
 from time import monotonic, sleep
 from typing import Optional
+from urllib.parse import urlsplit
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, RequiredArgumentMissingError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from msrestazure.tools import parse_resource_id
 
 from azext_iot._factory import _ADR_DPS_API_VERSION
@@ -79,8 +82,11 @@ from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
+    endpoint_settings_match,
+    endpoint_update_body,
 )
 from azext_iot.adr.rbac import (
+    ADR_CONTRIBUTOR_ROLE,
     CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
     LinkRbacManager,
@@ -109,6 +115,14 @@ _HUB_IDENTITY_ROTATION_BACKOFFS = (30, 60, 120)
 _HUB_IDENTITY_ROTATION_BUDGET_SECONDS = 600
 _HUB_ROTATION_REJECTED_CHAIN = re.compile(r"\(IdentityRotationUpdateFailed\) " + _LINK_INITIATE_REJECTED.pattern)
 _HUB_ROTATION_REJECTED_MESSAGE = re.compile(r"(?:IdentityRotationUpdateFailed: )?" + _LINK_INITIATE_REJECTED.pattern)
+_HUB_ROTATION_CURRENT_MESSAGE = (
+    "The Hub link request was rejected. Contact support with the namespace resource "
+    "ID and the time of the request. Include the original request's correlation ID "
+    "if available. (Hub resource reported: [400913])"
+)
+_HUB_ROTATION_CURRENT_CHAIN = re.compile(
+    r"\(IdentityRotationUpdateFailed\) " + re.escape(_HUB_ROTATION_CURRENT_MESSAGE) + r"(?=$|\n)"
+)
 _TERMINAL_LINK_STATES = {"Succeeded", "Failed", "Canceled", "Cancelled"}
 
 
@@ -129,19 +143,24 @@ def _link_failure_detail(shown):
     return error if isinstance(error, dict) else {}
 
 
-def _error_chain_text(error):
+def _error_chain(error):
     seen = set()
-    texts = []
     current = error
     while current is not None and id(current) not in seen:
         seen.add(id(current))
+        yield current
+        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
+
+
+def _error_chain_text(error):
+    texts = []
+    for current in _error_chain(error):
         texts.append(str(current))
         detail = getattr(current, "error", None)
         code = detail.get("code") if isinstance(detail, dict) else getattr(detail, "code", None)
         if isinstance(code, str):
             texts.append(code)
-        current = current.__cause__ or (None if current.__suppress_context__ else current.__context__)
-    return " ".join(texts)
+    return "\n".join(texts)
 
 
 def _structured_hub_rotation_rejection(endpoint):
@@ -152,12 +171,28 @@ def _structured_hub_rotation_rejection(endpoint):
         return False
     message = error.get("message")
     match = _HUB_ROTATION_REJECTED_MESSAGE.fullmatch(message) if isinstance(message, str) else None
-    return bool(error.get("code") == "IdentityRotationUpdateFailed" and match and match["service"] == "Hub")
+    return bool(error.get("code") == "IdentityRotationUpdateFailed" and (
+        (match and match["service"] == "Hub")
+        or message in (_HUB_ROTATION_CURRENT_MESSAGE, "IdentityRotationUpdateFailed: " + _HUB_ROTATION_CURRENT_MESSAGE)
+    ))
 
 
 def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     detail = _link_failure_detail(endpoint or {}) if endpoint else {}
+    properties = _link_properties(endpoint or {})
+    if properties.get("error") or any(
+        (properties.get(key) or {}).get("error") for key in ("status", "provisioningStatus")
+    ):
+        return False
+    if detail and (
+        properties.get("linkingState") != "Failed"
+        or detail.get("code") != "IdentityRotationUpdateFailed"
+        or set(detail) - {"code", "message"}
+    ):
+        return False
     chain = _error_chain_text(error) if error else ""
+    if set(re.findall(r"\(([A-Za-z][A-Za-z0-9]+)\)", chain)) - {"LinkingFailed", "IdentityRotationUpdateFailed"}:
+        return False
     text = " ".join(filter(None, [detail.get("code"), detail.get("message"), chain]))
     if "IdentityRotationUpdateFailed" not in text:
         return False
@@ -166,6 +201,7 @@ def _is_identity_rotation_authorization_failure(*, error=None, endpoint=None):
     rejected = _HUB_ROTATION_REJECTED_CHAIN.search(chain)
     return bool(
         (rejected and rejected["service"] == "Hub")
+        or _HUB_ROTATION_CURRENT_CHAIN.search(chain)
         or _structured_hub_rotation_rejection(endpoint)
         or "IH400913" in text
         or re.search(
@@ -181,6 +217,49 @@ def _show_link(test_case, link_kind, namespace_name, resource_group_name, endpoi
         f"iot adr ns link {link_kind} show --ns {namespace_name} "
         f"-g {resource_group_name} -n {endpoint_name}"
     ).get_output_in_json()
+
+
+def _current_rotation_rejection(error, namespace_id, endpoint_name):
+    chain = list(_error_chain(error))
+    if any(isinstance(value, (ServiceRequestError, ServiceResponseError)) for value in chain):
+        return False
+    subscription = namespace_id.split("/")[2]
+    for value in chain:
+        if not isinstance(value, HttpResponseError) or value.status_code != 200:
+            continue
+        response = value.response
+        request = getattr(response, "request", None)
+        if getattr(request, "method", None) != "GET" or not re.fullmatch(
+            rf"/subscriptions/{re.escape(subscription)}/providers/Microsoft\.DeviceRegistry/"
+            r"locations/[^/]+/(?:asyncOperationStatuses|operationStatuses)/[^/]+",
+            urlsplit(getattr(request, "url", "")).path, re.IGNORECASE,
+        ):
+            continue
+        if not callable(getattr(response, "json", None)):
+            return False
+        try:
+            body = response.json()
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(body, dict) or body.get("status") != "Failed":
+            return False
+        detail = body.get("error")
+        if not isinstance(detail, dict):
+            return False
+        if detail.get("code") == "LinkingFailed":
+            details = detail.get("details")
+            if set(detail) - {"code", "message", "details"} or not isinstance(details, list) or len(details) != 1:
+                return False
+            detail = details[0]
+        if not isinstance(detail, dict):
+            return False
+        detail = dict(detail)
+        if "target" in detail and detail.pop("target") != f"properties.messaging.endpoints[{endpoint_name}]":
+            return False
+        return _is_identity_rotation_authorization_failure(
+            endpoint={"linkingState": "Failed", "linkingError": detail},
+        )
+    return False
 
 
 def _wait_for_link_terminal(
@@ -203,31 +282,48 @@ def _wait_for_link_terminal(
     )
 
 
-def _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity):
+def _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, baseline):
     properties = _link_properties(endpoint)
-    assert properties.get("resourceId", "").casefold() == hub_id.casefold(), properties
+    assert properties.get("resourceId", "").casefold() == hub_id.casefold(), "Hub rotation resourceId changed."
     identity = properties.get("inboundCallerIdentity") or {}
     identity_type = identity.get("type")
-    assert identity_type in {"SystemAssigned", "UserAssigned"}, properties
+    assert identity_type in {"SystemAssigned", "UserAssigned"}, "Hub rotation identity type changed."
     if identity_type == "UserAssigned":
-        assert identity.get("userAssignedIdentity", "").casefold() == previous_user_identity.casefold(), properties
+        assert identity.get("userAssignedIdentity", "").casefold() == previous_user_identity.casefold(), (
+            "Hub rotation user-assigned identity changed."
+        )
+    actual = endpoint_update_body(properties, {"type": "SystemAssigned"})
+    expected = endpoint_update_body(baseline, {"type": "SystemAssigned"})
+    for projection in (actual, expected):
+        for key in ("resourceId", "endpointType"):
+            if isinstance(projection.get(key), str):
+                projection[key] = projection[key].casefold()
+    assert endpoint_settings_match(actual, expected), "Hub rotation endpoint settings changed; recovery stopped."
 
 
-def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id):
+def _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id, baseline):
     namespace = test_case.cmd(
         f"iot adr ns show -n {namespace_name} -g {resource_group_name}"
     ).get_output_in_json()
+    assert namespace["id"].casefold() == baseline["id"].casefold()
+    assert namespace["properties"]["provisioningState"] in {"Succeeded", "Failed"}, "Namespace mutation is still active."
+    assert namespace["identity"] == baseline["identity"], "Namespace identity changed during rotation."
+    assert namespace["properties"].get("outboundIdentity") == baseline["properties"].get("outboundIdentity")
     hub = test_case.cmd(
         f"iot hub show --ids {shlex.quote(hub_id)}"
     ).get_output_in_json()
-    namespace_principal = namespace["identity"]["principalId"]
+    namespace_principal = resolve_namespace_outbound_principal(namespace)
     hub_principal = hub["identity"]["principalId"]
     _assert_service_roles(
         test_case,
         [
             (namespace_principal, CONTRIBUTOR_ROLE, hub_id),
             (namespace_principal, HUB_DATA_ROLE, hub_id),
-            (hub_principal, CONTRIBUTOR_ROLE, namespace["id"]),
+            (hub_principal, ADR_CONTRIBUTOR_ROLE, namespace["id"]),
+            (hub_principal, "Reader", namespace["id"]),
+            (namespace_principal, "Azure Device Registry Administrator", namespace["id"]),
+            (namespace_principal, "Reader", namespace["id"].split("/providers/")[0]),
+            (namespace_principal, "Reader", hub_id.split("/providers/")[0]),
         ],
         present=True,
     )
@@ -237,17 +333,28 @@ def _update_hub_to_sami_with_recovery(
     test_case, update_cmd, namespace_name, resource_group_name, endpoint_name, hub_id, previous_user_identity,
 ):
     deadline = monotonic() + _HUB_IDENTITY_ROTATION_BUDGET_SECONDS
+    namespace = test_case.cmd(
+        f"iot adr ns show -n {namespace_name} -g {resource_group_name}"
+    ).get_output_in_json()
+    snapshot = deepcopy(namespace["properties"]["messaging"]["endpoints"][endpoint_name])
+    assert namespace["properties"]["provisioningState"] == "Succeeded"
+    assert _link_observation(snapshot) == ("Succeeded", "UserAssigned"), "Expected a healthy UAMI link before rotation."
+    _assert_hub_rotation_retry_safe(snapshot, hub_id, previous_user_identity, snapshot)
 
     def submit():
         # Bound the synchronous link wait so a slow mutation cannot outlive the recovery budget.
-        test_case.cmd(f"{update_cmd} --timeout {max(1, int(deadline - monotonic()))}")
+        timeout = int(deadline - monotonic())
+        if timeout < 1:
+            raise AssertionError("Hub identity rotation authorization recovery budget exhausted")
+        try:
+            test_case.cmd(f"{update_cmd} --timeout {timeout}")
+        except (HttpResponseError, AzureResponseError) as error:
+            if not _current_rotation_rejection(error, namespace["id"], endpoint_name):
+                raise
+            return error
+        return None
 
-    first_error = None
-    try:
-        submit()
-    except Exception as error:  # noqa: BLE001 - only recovered when persisted state proves the known race.
-        first_error = error
-
+    first_error = submit()
     for attempt in range(len(_HUB_IDENTITY_ROTATION_BACKOFFS) + 1):
         remaining = deadline - monotonic()
         if remaining <= 0:
@@ -255,33 +362,37 @@ def _update_hub_to_sami_with_recovery(
         endpoint = _wait_for_link_terminal(
             test_case, "hub", namespace_name, resource_group_name, endpoint_name, timeout=remaining,
         )
+        if monotonic() >= deadline:
+            break
         state, identity_type = _link_observation(endpoint)
         if state == "Succeeded" and identity_type == "SystemAssigned":
+            _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, snapshot)
             return endpoint
-        recoverable = _is_identity_rotation_authorization_failure(error=first_error, endpoint=endpoint)
+        recoverable = first_error is not None and _is_identity_rotation_authorization_failure(
+            error=first_error, endpoint=endpoint,
+        )
         if state not in {"Failed", "Succeeded"} or not recoverable:
             if first_error is not None:
                 raise first_error
             raise AssertionError(f"Non-recoverable Hub identity rotation failure: {_link_failure_detail(endpoint)}")
         if attempt == len(_HUB_IDENTITY_ROTATION_BACKOFFS):
             break
-        _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity)
-        _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id)
+        _assert_hub_rotation_retry_safe(endpoint, hub_id, previous_user_identity, snapshot)
+        snapshot = deepcopy(_link_properties(endpoint))
+        _assert_hub_sami_rotation_grants(test_case, namespace_name, resource_group_name, hub_id, namespace)
         sleep_for = _HUB_IDENTITY_ROTATION_BACKOFFS[attempt]
         # Never start another mutation that could not be observed within the recovery budget.
         if deadline - monotonic() <= sleep_for:
             break
         sleep(sleep_for)
-        first_error = None
-        try:
-            submit()
-        except Exception as error:  # noqa: BLE001 - recovered only with matching persisted failure evidence.
-            first_error = error
+        if int(deadline - monotonic()) < 1:
+            break
+        first_error = submit()
     raise AssertionError("Hub identity rotation authorization recovery budget exhausted") from first_error
 
 
 def _assert_service_roles(test_case, roles, *, present):
-    for principal, role, scope in roles:
+    for principal, role, scope in dict.fromkeys(roles):
         assignments = test_case.cmd(
             f"role assignment list --assignee-object-id {principal} "
             f"--role '{role}' --scope '{scope}' --include-inherited --fill-principal-name false"
@@ -461,7 +572,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
                     f"--location {TEST_LOCATION} --disable-local-auth true "
-                    f"--user-assigned-mi {identity_resource_id}"
+                    f"--system-assigned-mi --user-assigned-mi {identity_resource_id}"
                 )
                 _log(LogKind.CMD, "az %s", cmd)
                 self.create_owned_resource(cmd, kind="dps", name=dps_name, resource_group=rg)
@@ -469,12 +580,18 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
 
                 dps_show = self.cmd(f"iot dps show --name {dps_name} -g {rg}").get_output_in_json()
                 dps_id = dps_show["id"]
+                dps_system_principal = dps_show["identity"]["principalId"]
+                dps_user_principal = next(
+                    details["principalId"] for resource_id, details in
+                    dps_show["identity"]["userAssignedIdentities"].items()
+                    if resource_id.casefold() == identity_resource_id.casefold()
+                )
                 _log(LogKind.RESULT, "dps_id=%s", dps_id)
                 namespace = self.cmd(
                     f"iot adr ns show -n {namespace_name} -g {rg}"
                 ).get_output_in_json()
                 self_role = (
-                    namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"],
+                    resolve_namespace_outbound_principal(namespace), "Azure Device Registry Administrator", namespace["id"],
                 )
                 _assert_service_roles(self, [self_role], present=False)
 
@@ -545,6 +662,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     hub_cmd, kind="hub", name=secondary_hub, resource_group=rg,
                 ).get_output_in_json()
                 hub_id = hub["id"]
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=False)
                 hub_identity_types = {
                     identity_type.strip()
                     for identity_type in (hub.get("identity", {}).get("type") or "").split(",")
@@ -582,6 +700,24 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--ns {namespace_name} -g {rg}"
                 )
                 _log(LogKind.OK, "Hub link '%s' created (UAMI)", secondary_endpoint)
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=True)
+
+            with timed_step("Repair only the owned DPS-to-Hub assignment through Hub update"):
+                assignments = self.cmd(
+                    f"role assignment list --assignee-object-id {dps_user_principal} "
+                    f"--role 'IoT Hub Data Contributor' --scope '{hub_id}' --fill-principal-name false"
+                ).get_output_in_json()
+                exact = [assignment for assignment in assignments
+                         if assignment["scope"].casefold() == hub_id.casefold()
+                         and assignment["principalId"].casefold() == dps_user_principal.casefold()]
+                assert len(exact) == 1, "Expected exactly one owned DPS-to-Hub assignment."
+                self.cmd(f"role assignment delete --ids {shlex.quote(exact[0]['id'])}")
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=False)
+                self.cmd(
+                    f"iot adr ns link hub update --ns {namespace_name} -g {rg} "
+                    f"-n {secondary_endpoint} --user-assigned-mi {identity_resource_id}"
+                )
+                _assert_service_roles(self, [(dps_user_principal, "IoT Hub Data Contributor", hub_id)], present=True)
 
             with timed_step("Step 4 ❯ link hub show / list (single entry)"):
                 shown = self.cmd(
@@ -747,6 +883,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                         "--system-assigned-mi false --disable-local-auth true"
                     )
                 _log(LogKind.OK, "Hub link '%s' created (SAMI)", tertiary_endpoint)
+                _assert_service_roles(
+                    self, [(dps_user_principal, "IoT Hub Data Contributor", tertiary_hub_id)], present=True,
+                )
 
             with timed_step("Step 6 ❯ link hub list (multi-hub, both endpoints)"):
                 listed = self.cmd(
@@ -831,6 +970,17 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Rotated UAMI → SAMI")
 
             with timed_step("Step 9 ❯ link dps update (rotate identity)"):
+                roles = [(dps_system_principal, "IoT Hub Data Contributor", scope)
+                         for scope in (hub_id, tertiary_hub_id)]
+                _assert_service_roles(self, roles, present=False)
+                self.cmd(
+                    f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
+                    f"-n {dps_endpoint} --system-assigned-mi"
+                )
+                _wait_for_linking_succeeded(
+                    self, "dps", namespace_name, rg, dps_endpoint, expected_identity_type="SystemAssigned",
+                )
+                _assert_service_roles(self, roles, present=True)
                 update_cmd = (
                     f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
                     f"-n {dps_endpoint} --user-assigned-mi {identity_resource_id}"
@@ -845,7 +995,12 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     dps_endpoint,
                     expected_identity_type="UserAssigned",
                 )
-                _log(LogKind.OK, "DPS link identity rotated (idempotent)")
+                _assert_service_roles(self, roles, present=True)
+                _assert_service_roles(
+                    self, [(dps_user_principal, "IoT Hub Data Contributor", scope)
+                           for scope in (hub_id, tertiary_hub_id)], present=True,
+                )
+                _log(LogKind.OK, "DPS identity rotated UAMI to SAMI and back; existing grants retained")
 
             _log(LogKind.OK, "Link lifecycle passed")
 
@@ -932,10 +1087,13 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 namespace_principal = resolve_namespace_outbound_principal(namespace)
                 roles = (
                     (namespace_principal, "Contributor", dps_id),
-                    (identity["principalId"], "Contributor", namespace["id"]),
-                    (namespace["identity"]["principalId"], "Azure Device Registry Administrator", namespace["id"]),
+                    (identity["principalId"], "Azure Device Registry Contributor", namespace["id"]),
+                    (identity["principalId"], "Reader", namespace["id"]),
+                    (namespace_principal, "Azure Device Registry Administrator", namespace["id"]),
+                    (namespace_principal, "Reader", namespace["id"].split("/providers/")[0]),
                     (namespace_principal, "Contributor", hub_id),
                     (namespace_principal, "IoT Hub Data Contributor", hub_id),
+                    (identity["principalId"], "IoT Hub Data Contributor", hub_id),
                 )
                 _assert_service_roles(self, roles, present=False)
                 _log(LogKind.OK, "Fresh targets ready; no endpoints or required service-role assignments exist")
@@ -1197,6 +1355,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     (namespace_principal_id, "Contributor", su_id),
                     (namespace_principal_id, "Device Update Administrator", su_id),
                     (identity_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                    (identity_principal_id, "Reader", ns["id"]),
+                    (namespace_principal_id, "Azure Device Registry Administrator", ns["id"]),
+                    (namespace_principal_id, "Reader", ns["id"].split("/providers/")[0]),
+                    (namespace_principal_id, "Reader", su_id.split("/providers/")[0]),
                 )
                 if is_owned_su:
                     _assert_service_roles(self, roles, present=False)
@@ -1330,7 +1492,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Step 4 > link su update (rotate identity UAMI to SAMI)"):
                 if is_owned_su:
                     _assert_service_roles(
-                        self, [(sami_principal_id, "Azure Device Registry Contributor", ns["id"])], present=False,
+                        self, [(sami_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                               (sami_principal_id, "Reader", ns["id"])], present=False,
                     )
                 update_cmd = (
                     f"iot adr ns link su update --ns {namespace_name} -g {rg} "
@@ -1347,7 +1510,11 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     self,
                     [(namespace_principal_id, "Contributor", su_id),
                      (namespace_principal_id, "Device Update Administrator", su_id),
-                     (sami_principal_id, "Azure Device Registry Contributor", ns["id"])],
+                     (sami_principal_id, "Azure Device Registry Contributor", ns["id"]),
+                     (sami_principal_id, "Reader", ns["id"]),
+                     (namespace_principal_id, "Azure Device Registry Administrator", ns["id"]),
+                     (namespace_principal_id, "Reader", ns["id"].split("/providers/")[0]),
+                     (namespace_principal_id, "Reader", su_id.split("/providers/")[0])],
                     present=True,
                 )
                 assert _identity_type(shown) == "SystemAssigned", (

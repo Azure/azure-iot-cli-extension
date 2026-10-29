@@ -17,10 +17,11 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import responses
-from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ForbiddenError, ResourceNotFoundError
 from azure.cli.core.commands.arm import show_exception_handler
 from azure.core.credentials import AccessToken
-from azure.core.exceptions import HttpResponseError, ServiceRequestError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.core.pipeline.transport import HttpRequest
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_private_key
 from cryptography.x509.oid import NameOID
@@ -30,8 +31,10 @@ from knack.query import CLIQuery
 from knack.util import CommandResultItem
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+from azext_iot.tests.adr.test_adr_readiness_unit import Clock
 from azext_iot.tests.dps import _csr_issuance as csr, _phase, _phase_manifest as manifest
 from azext_iot.tests.dps._csr import temporary_csr
 from azext_iot.tests.dps.device_registration import test_iot_device_registration_int as scenario
@@ -221,6 +224,247 @@ def test_real_sdk_absence_probes_complete_setup_and_dependency_ordered_cleanup(a
     ]
 
 
+@pytest.fixture
+def namespace_delete(namespace_commands, resource, mocker):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    clock = Clock()
+    mocker.patch.object(csr, "monotonic", clock)
+    mocker.patch.object(csr, "sleep", clock.sleep)
+    return SimpleNamespace(name=name, backend=namespace_commands, clock=clock, record=csr.receipts._owned(name))
+
+
+@pytest.mark.parametrize("outcome", ["completed", "failed", "timeout"])
+def test_namespace_delete_waits_for_terminal_lro_even_when_resource_is_absent(namespace_delete, scope, mocker, outcome):
+    owned = namespace_delete
+    completed_receipt = scope / "deleted-csrns.json"
+    poller = mocker.Mock()
+    if outcome == "timeout":
+        poller.done.return_value = False
+    else:
+        poller.done.side_effect = [False, True]
+
+    def result():
+        assert not completed_receipt.exists()
+        if outcome == "failed":
+            raise HttpResponseError("Namespace DELETE operation failed")
+
+    poller.result.side_effect = result
+    client = mocker.Mock()
+
+    def begin_delete(**_kwargs):
+        owned.backend.resources.pop("namespace")
+        return poller
+
+    client.namespaces.begin_delete.side_effect = begin_delete
+    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=client)
+    provider = NamespaceProvider(SimpleNamespace(cli_ctx=csr.fixtures.cli.az_cli))
+
+    def invoke(command):
+        return provider.delete(
+            namespace_name=owned.name, resource_group_name="rg",
+            no_wait="--no-wait" in shlex.split(command),
+            sleeper=owned.clock.sleep, clock=owned.clock, wait_sec=10,
+        )
+
+    invoke_command = mocker.patch.object(csr, "invoke", side_effect=invoke)
+    if outcome == "completed":
+        csr._delete_owned_namespace(owned.name, owned.record)
+    else:
+        error = HttpResponseError if outcome == "failed" else AzureResponseError
+        with pytest.raises(error, match="operation failed|Timed out"):
+            csr._delete_owned_namespace(owned.name, owned.record)
+    invoke_command.assert_called_once()
+    client.namespaces.begin_delete.assert_called_once_with(resource_group_name="rg", namespace_name=owned.name)
+    assert completed_receipt.exists() == (outcome == "completed")
+    if outcome == "timeout":
+        assert owned.clock.now == 600
+        poller.result.assert_not_called()
+    else:
+        poller.result.assert_called_once()
+
+
+@responses.activate
+@pytest.mark.parametrize("outcome", ["recovered", "persistent", "deadline", "lost-response", "server-error"])
+def test_owned_namespace_delete_retries_only_explicit_throttle_with_real_sdk(namespace_delete, scope, mocker, outcome):
+    owned = namespace_delete
+    url = csr.receipts.target()["endpoint"] + owned.record["id"]
+    if outcome == "lost-response":
+        from requests.exceptions import ReadTimeout
+        responses.add(responses.DELETE, url, body=ReadTimeout("Response lost after DELETE"))
+    else:
+        for _ in range(4 if outcome == "persistent" else 1):
+            responses.add(
+                responses.DELETE, url, status=503 if outcome == "server-error" else 429,
+                headers={"Retry-After": "900" if outcome == "deadline" else "20"}, json={},
+            )
+    if outcome == "recovered":
+        responses.add(responses.DELETE, url, status=204)
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 9999999999))
+    with csr.runtime.activate(SUB):
+        with DeviceRegistryMgmtClient(credential, SUB, base_url=csr.receipts.target()["endpoint"]) as client:
+            def invoke(command):
+                if command.startswith("iot adr ns delete "):
+                    assert "--no-wait" not in shlex.split(command)
+                    client.namespaces.begin_delete(
+                        resource_group_name="rg", namespace_name=owned.name, polling=False,
+                    ).result()
+                return owned.backend(command)
+            mocker.patch.object(csr, "invoke", side_effect=invoke)
+            if outcome == "recovered":
+                csr.delete_namespace(owned.name)
+            else:
+                error = (
+                    AssertionError if outcome == "deadline"
+                    else ServiceResponseError if outcome == "lost-response" else HttpResponseError
+                )
+                with pytest.raises(error):
+                    csr.delete_namespace(owned.name)
+    attempts = sorted(
+        (json.loads(path.read_text()) for path in scope.glob("mutation-*.json")),
+        key=lambda value: value["recorded_at"],
+    )
+    assert len(attempts) == len(responses.calls) == (2 if outcome == "recovered" else 4 if outcome == "persistent" else 1)
+    assert all(value["method"] == "DELETE" and value["id"] == owned.record["id"] for value in attempts)
+    if outcome == "recovered":
+        assert [value["responseStatus"] for value in attempts] == [429, 204]
+        assert owned.clock.sleeps == [20, 10]
+    elif outcome == "persistent":
+        assert owned.clock.sleeps == [20, 30, 60]
+    elif outcome == "deadline":
+        assert owned.clock.now == 600
+    assert (scope / "deleted-csrns.json").exists() == (outcome == "recovered")
+
+
+def _delete_throttle(record, *, method="DELETE", suffix="", endpoint=None, retry_after="10"):
+    error = HttpResponseError("Explicit DELETE throttle")
+    error.status_code = 429
+    error.response = SimpleNamespace(
+        status_code=429,
+        request=HttpRequest(method, (endpoint or csr.receipts.target()["endpoint"]) + record["id"] + suffix),
+        headers={"Retry-After": retry_after},
+    )
+    return error
+
+
+@pytest.mark.parametrize("change", ["owner", "location", "deleting", "absent", "accepted"])
+def test_namespace_delete_rechecks_ownership_and_never_replays_accepted_write(namespace_delete, scope, mocker, change):
+    owned = namespace_delete
+    error = _delete_throttle(owned.record)
+    attempts = []
+
+    def invoke(command):
+        assert command.startswith("iot adr ns delete ")
+        attempts.append(command)
+        if change != "accepted":
+            raise error
+
+    def sleep(delay):
+        owned.clock.sleep(delay)
+        current = owned.backend.resources.get("namespace")
+        if change == "owner":
+            current["tags"] = {**current["tags"], "runUid": "foreign"}
+        elif change == "location":
+            current["location"] = "westus"
+        elif change == "absent" or owned.clock.now >= 20:
+            owned.backend.resources.pop("namespace", None)
+        elif change == "deleting":
+            current["properties"]["provisioningState"] = "Deleting"
+
+    mocker.patch.object(csr, "invoke", side_effect=invoke)
+    mocker.patch.object(csr, "sleep", side_effect=sleep)
+    if change in {"owner", "location"}:
+        with pytest.raises(AssertionError, match="ownership|location"):
+            csr._delete_owned_namespace(owned.name, owned.record)
+    else:
+        csr._delete_owned_namespace(owned.name, owned.record)
+    assert len(attempts) == 1
+    assert (scope / "deleted-csrns.json").exists() == (change not in {"owner", "location"})
+
+
+@pytest.mark.parametrize("change", ["poll-get", "target", "endpoint", "invalid-header"])
+def test_namespace_delete_does_not_retry_unbound_or_invalid_throttle(namespace_delete, scope, mocker, change):
+    owned = namespace_delete
+    error = _delete_throttle(
+        owned.record, method="GET" if change == "poll-get" else "DELETE",
+        suffix="-other" if change == "target" else "",
+        endpoint="https://management.azure.com" if change == "endpoint" else None,
+        retry_after="invalid" if change == "invalid-header" else "10",
+    )
+    invoke = mocker.patch.object(csr, "invoke", side_effect=error)
+    with pytest.raises(HttpResponseError) as caught:
+        csr._delete_owned_namespace(owned.name, owned.record)
+    assert caught.value is error
+    assert invoke.call_count == 1 and not owned.clock.sleeps
+    assert not (scope / "deleted-csrns.json").exists()
+
+
+def test_issuance_setup_relies_on_native_link_self_grant(namespace_commands, resource, mocker):
+    pregrant = mocker.patch.object(csr, "_grant_namespace_self_role", side_effect=AssertionError("Fixture pregrant forbidden"))
+    csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    pregrant.assert_not_called()
+    assert sum("iot adr ns link add " in command for command in namespace_commands.commands) == 1
+    assert not any(command.startswith("role assignment create ") for command in namespace_commands.commands)
+
+
+def _native_reader_journal(scope, backend, name, status):
+    group = f"/subscriptions/{SUB}/resourceGroups/rg"
+    assignment = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+    role = {
+        "id": group + "/providers/Microsoft.Authorization/roleAssignments/" + assignment,
+        "name": assignment, "scope": group, "principalId": NAMESPACE_PRINCIPAL, "principalType": "ServicePrincipal",
+        "roleDefinitionId": f"/subscriptions/{SUB}/providers/Microsoft.Authorization/roleDefinitions/"
+        + csr.runtime.GROUP_READER_ROLE_ID,
+    }
+    backend.roles[role["id"]] = role
+    payload = {
+        "id": role["id"], "method": "PUT", "readerGrant": {
+            "namespaceId": backend.namespace_id, "scope": group, "principalId": NAMESPACE_PRINCIPAL,
+        },
+    }
+    if status is not None:
+        payload["responseStatus"] = status
+    csr.receipts.write("mutation-reader.json", payload, exclusive=True)
+    return role
+
+
+@pytest.mark.parametrize("status", [201, None, 504])
+def test_native_reader_cleanup_reconciles_exact_grant_before_namespace_delete(
+    namespace_commands, resource, scope, status,
+):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    role = _native_reader_journal(scope, namespace_commands, name, status)
+    csr.delete_namespace(name)
+    assert not namespace_commands.roles
+    assert json.loads((scope / "mutation-reader.json").read_text())["readerDeleted"]
+    deletes = [command for command in namespace_commands.commands if " delete " in command]
+    assert role["id"] in deletes[-2]
+    assert deletes[-1].startswith("iot adr ns delete")
+    csr.delete_namespace(name)  # Completed cleanup is verified, not replayed.
+    assert sum(command.startswith("role assignment delete") for command in namespace_commands.commands) == 1
+
+
+@pytest.mark.parametrize("failure", ["principal-changed", "uncertain-absent", "duplicate"])
+def test_native_reader_cleanup_never_adopts_another_grant_or_drops_uncertain_ownership(
+    namespace_commands, resource, scope, mocker, failure,
+):
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    role = _native_reader_journal(scope, namespace_commands, name, 409 if failure == "duplicate" else None)
+    if failure == "uncertain-absent":
+        namespace_commands.roles.clear()
+        mocker.patch.object(csr, "wait_for_condition", side_effect=AssertionError("Uncertain write remains unresolved"))
+    else:
+        role["principalId"] = SUB
+    if failure == "duplicate":
+        csr.delete_namespace(name)
+        assert role["id"] in namespace_commands.roles
+    else:
+        with pytest.raises(AssertionError):
+            csr._remove_namespace_group_reader_roles(name, namespace_commands.resources["namespace"])
+        assert "namespace" in namespace_commands.resources
+        assert not json.loads((scope / "mutation-reader.json").read_text()).get("readerDeleted")
+    assert not any(command.startswith("role assignment delete") for command in namespace_commands.commands)
+
+
 def test_real_arm_show_handler_exits_on_sdk_404_but_scoped_probe_returns_absent(arm_commands, resource, mocker):
     mocker.patch("azure.cli.core.azclierror.ResourceNotFoundError.send_telemetry")
     with pytest.raises(HttpResponseError) as missing:
@@ -311,17 +555,15 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     mutations = [command for command in namespace_commands.commands if any(
         action in command for action in (" create ", " assign ", " add ")
     )]
-    assert len(mutations) == 8
+    assert len(mutations) == 7
     assert "iot dps identity assign" in mutations[1]
     assert "iot hub identity assign" in mutations[2]
-    assert mutations[3].startswith("role assignment create ")
-    assert f'--assignee-object-id "{NAMESPACE_PRINCIPAL}"' in mutations[3]
-    assert mutations[4].startswith("iot adr ns link add ")
-    assert "--timeout 1200 --interval 10" in mutations[4]
-    assert "--dps-system-assigned-mi" in mutations[4] and "--hub-system-assigned-mi" in mutations[4]
-    assert "--type Root" in mutations[5]
-    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[6]
-    assert "--validity-days 30" in mutations[7]
+    assert mutations[3].startswith("iot adr ns link add ")
+    assert "--timeout 1200 --interval 10" in mutations[3]
+    assert "--dps-system-assigned-mi" in mutations[3] and "--hub-system-assigned-mi" in mutations[3]
+    assert "--type Root" in mutations[4]
+    assert "--issuer-type Microsoft --issuer-ca-name rootca" in mutations[5]
+    assert "--validity-days 30" in mutations[6]
     assert sum(" wait " in command for command in namespace_commands.commands) == 3
     assert not any("linked-hub" in command for command in mutations)
     assert json.loads((scope / "created-csrns.json").read_text())["create_completed"]
@@ -329,7 +571,7 @@ def test_setup_uses_dedicated_pair_native_dps_first_and_ready_service_issuer(nam
     deletes = [command for command in namespace_commands.commands if " delete " in command]
     assert ["role" if command.startswith("role ") else "policy" if " policy " in command else "ica" if "issuingca" in command
             else "root" if "rootca" in command else "namespace" for command in deletes] == [
-        "policy", "ica", "root", "role", "namespace",
+        "policy", "ica", "root", "namespace",
     ]
     assert json.loads((scope / "deleted-csrns.json").read_text())["delete_completed"]
     assert not namespace_commands.resources
@@ -403,8 +645,7 @@ def test_setup_failure_is_not_repaired_and_cleans_only_attempted_children(namesp
     assert sum(failed in command for command in namespace_commands.commands) == 1
     assert not namespace_commands.resources
     assert not namespace_commands.roles
-    if failed == "iot adr ns link add":
-        assert sum("role assignment delete" in command for command in namespace_commands.commands) == 1
+    assert not any("role assignment delete" in command for command in namespace_commands.commands)
     assert not any("link update" in command for command in namespace_commands.commands)
 
 
@@ -707,8 +948,8 @@ def test_real_scenario_uses_fresh_enrollment_secret_free_commands_and_cleanup(
     pytest.param({"connectionProfile": "mqttv5"}, True, id="mqtt-lowercase"),
     pytest.param({"connectionProfile": "MQTTV5"}, True, id="mqtt-uppercase"),
     pytest.param({"connectionProfile": "mQtTv5"}, True, id="mqtt-mixed-case"),
-    pytest.param({}, False, id="missing"),
-    pytest.param({"connectionProfile": None}, False, id="null"),
+    pytest.param({}, True, id="missing"),
+    pytest.param({"connectionProfile": None}, True, id="null"),
     pytest.param({"connectionProfile": ""}, False, id="empty"),
     pytest.param({"connectionProfile": "Unknown"}, False, id="unknown"),
     pytest.param({"connectionProfile": "MqttV6"}, False, id="unknown-version"),

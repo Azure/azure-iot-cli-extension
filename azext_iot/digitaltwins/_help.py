@@ -129,17 +129,6 @@ def load_digitaltwins_help():
             az dt wait -n {instance_name} --custom "publicNetworkAccess=='Enabled'"
     """
 
-    helps["dt reset"] = """
-        type: command
-        short-summary: Reset an existing Digital Twins instance by deleting associated
-            assets. Currently only supports deleting models and twins.
-
-        examples:
-        - name: Reset all assets for a Digital Twins instance.
-          text: >
-            az dt reset -n {instance_name}
-    """
-
     helps["dt data-history"] = """
         type: group
         short-summary: Manage and configure data history.

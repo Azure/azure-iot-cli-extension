@@ -19,7 +19,7 @@ import sys
 from time import monotonic, sleep
 from unittest.mock import patch
 from urllib.parse import urlsplit
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from azure.core.exceptions import HttpResponseError
@@ -33,6 +33,8 @@ from azext_iot.tests.dps import _phase
 _WRITE = ContextVar("owned_dps_fixture_write", default=None)
 _COMMAND = ContextVar("dps_cli_command_writes", default=None)
 _LINK_COMMAND = ContextVar("dps_native_adr_link_command", default=False)
+_GROUP_READER = ContextVar("owned_namespace_group_reader", default=None)
+GROUP_READER_ROLE_ID = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
 _FENCE = "_dps_arm_write_fence"
 _READ_ACTIONS = {"listkeys", "checknameavailability", "checkprovisioningservicenameavailability"}
 
@@ -80,10 +82,86 @@ def _require_owned_path(path):
     raise ScopeError("ARM mutation requires an owned resource or child scope in this phase's receipts.")
 
 
+@contextmanager
+def owned_namespace_group_reader(namespace):
+    """Authorize only the owned namespace SAMI's Reader grant on this phase's RG."""
+    record = receipts._owned(namespace["name"])  # pylint: disable=protected-access
+    config = receipts.settings()
+    if (
+        not record or record["kind"] != "csrns" or record["run_uid"] != config[1]
+        or record["subscription"] != config[2] or record["phase"] != _phase.get_phase()
+        or namespace["id"].casefold() != record["id"].casefold()
+        or any(namespace.get("tags", {}).get(key) != value for key, value in record["tags"].items())
+        or namespace.get("properties", {}).get("outboundIdentity", {}).get("type", "SystemAssigned") != "SystemAssigned"
+        or "systemassigned" not in {part.strip().casefold() for part in namespace["identity"]["type"].split(",")}
+    ):
+        raise ScopeError("Group Reader requires a currently owned namespace.")
+    binding = {
+        "namespaceId": record["id"],
+        "principalId": str(UUID(namespace["identity"]["principalId"])),
+        "scope": f"/subscriptions/{config[2]}/resourceGroups/{config[3]}",
+    }
+    token = _GROUP_READER.set(binding)
+    try:
+        yield
+    finally:
+        _GROUP_READER.reset(token)
+
+
+def reader_creation_rejected(journal):
+    status = journal.get("responseStatus", 0)
+    return 400 <= status < 500 and status != 408
+
+
+def _group_reader_binding(request):
+    binding = _GROUP_READER.get()
+    path = urlsplit(request.url).path
+    if not binding:
+        return None
+    prefix = binding["scope"] + "/providers/Microsoft.Authorization/roleAssignments/"
+    if not path.casefold().startswith(prefix.casefold()):
+        return None
+    UUID(path[len(prefix):])
+    if request.method == "PUT":
+        properties = json.loads(request.body)["properties"]
+        if (
+            properties.get("principalId", "").casefold() != binding["principalId"].casefold()
+            or properties.get("roleDefinitionId", "").casefold() != (
+                f"/subscriptions/{receipts.settings()[2]}/providers/Microsoft.Authorization/"
+                f"roleDefinitions/{GROUP_READER_ROLE_ID}"
+            ).casefold()
+            or properties.get("principalType") != "ServicePrincipal"
+            or properties.get("condition") or properties.get("conditionVersion")
+        ):
+            raise ScopeError("Only unconditional Reader for the owned namespace SAMI is authorized at RG scope.")
+    elif request.method == "DELETE":
+        journals = (
+            json.loads(receipt.read_text(encoding="utf-8"))
+            for receipt in receipts.settings()[0].glob("mutation-*.json")
+        )
+        if not any(
+            item.get("method") == "PUT" and item.get("id", "").casefold() == path.casefold()
+            and item.get("readerGrant") == binding and item.get("run_uid") == receipts.settings()[1]
+            and not reader_creation_rejected(item) and not item.get("readerDeleted")
+            for item in journals
+        ):
+            raise ScopeError("Group Reader deletion requires this phase's exact native-create journal.")
+    else:
+        raise ScopeError("Unsupported group Reader mutation.")
+    return binding
+
+
+def _require_owned_request(request):
+    binding = _group_reader_binding(request)
+    if binding is None:
+        _require_owned_path(urlsplit(request.url).path)
+    return binding
+
+
 class OwnedRetryPolicy(RetryPolicy):
     def send(self, request):
         if _is_write(request.http_request):
-            _require_owned_path(urlsplit(request.http_request.url).path)
+            _require_owned_request(request.http_request)
             # A new PipelineContext is created for each SDK operation. Keeping
             # the fence on that context also catches policies above RetryPolicy
             # that re-enter it. A later deliberate operation has a fresh context.
@@ -119,13 +197,14 @@ class ScopedTransport(HttpTransport):
     def send(self, request, **kwargs):
         fence = kwargs.pop(_FENCE, None)
         url = urlsplit(request.url)
+        reader_binding = None
         if (url.scheme != "https" or url.netloc != urlsplit(self.target["endpoint"]).netloc
                 or not url.path.lower().startswith(f"/subscriptions/{self.subscription}/".lower())):
             raise ScopeError("Orchestrated DPS management requests require the explicit subscription and authorized ARM.")
         if request.method == "POST" and url.path.lower().endswith("/register"):
             raise ScopeError("Orchestrated DPS fixtures must not register resource providers.")
         if _is_write(request):
-            _require_owned_path(url.path)
+            reader_binding = _require_owned_request(request)
             if request.method in ("PUT", "PATCH"):
                 body = json.loads(request.body) if request.body else {}
                 if "location" in body and not receipts.location_matches(body):
@@ -157,10 +236,16 @@ class ScopedTransport(HttpTransport):
         if fence:
             # Include generated role-assignment IDs without recording keys,
             # tokens, request bodies, or signed URL query parameters.
-            receipts.write(f"mutation-{fence['receipt']}.json", {
+            journal = {
                 "id": url.path, "method": request.method, "transport_attempted": True,
-            }, exclusive=True)
-        return self.inner.send(request, **kwargs)
+            }
+            if reader_binding is not None:
+                journal["readerGrant"] = reader_binding
+            receipts.write(f"mutation-{fence['receipt']}.json", journal, exclusive=True)
+        response = self.inner.send(request, **kwargs)
+        if fence and (reader_binding is not None or request.method == "DELETE"):
+            receipts.write(f"mutation-{fence['receipt']}.json", {**journal, "responseStatus": response.status_code})
+        return response
 
 
 class _RoleAssignmentPending(Exception):
@@ -206,15 +291,24 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
     from azext_iot.tests import helpers
 
     visibility_error = None
+    lookups = 0
+    assignments = []
+    last_lookup_seconds = 0
+    timed = max_tries > 0 and wait > 0
     for attempt in range(max_tries + 1):
+        if timed and monotonic() >= deadline:
+            break
         # Native CLI resolves aliases and filters exact scope/role/principal.
         # Once create/readback supplies an object ID, all later reads use it.
         visibility = {"assignee_object_id": principal} if principal else {"assignee": assignee}
         lookup_started = monotonic()
+        lookups += 1
         assignments = helpers.get_role_assignments(
             scope=scope, role=role, fill_role_definition_name=False, fill_principal_name=False, **visibility,
         )
         last_lookup_seconds = monotonic() - lookup_started
+        if timed and monotonic() >= deadline:
+            break
         if any(
             not isinstance(value.get("principalId"), str) or not value["principalId"].strip()
             for value in assignments
@@ -249,7 +343,10 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
                 principal = resolved
                 record["principal_id"] = principal
                 receipts.write(name, record)
-        sleep(min(wait, max(0, deadline - monotonic())))
+        remaining = deadline - monotonic()
+        if timed and remaining <= 0:
+            break
+        sleep(min(wait, max(0, remaining)))
     reason = (
         "Owned role assignment was not visible before its read-only verification bound."
         if record.get("create_attempted") else
@@ -257,7 +354,7 @@ def _verify_role_assignment(role, scope, assignee, principal, command, name, rec
     )
     elapsed = monotonic() - (deadline - max_tries * wait)
     raise ScopeError(
-        f"{reason} lookups={attempt + 1}, last_lookup_seconds={last_lookup_seconds:.3f}, "
+        f"{reason} lookups={lookups}, last_lookup_seconds={last_lookup_seconds:.3f}, "
         f"returned_assignments={len(assignments)}, elapsed_seconds={elapsed:.3f}, "
         f"create_attempted={record['create_attempted']}."
     ) from visibility_error

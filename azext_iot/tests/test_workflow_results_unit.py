@@ -63,6 +63,19 @@ def test_native_openssl_selection_is_scoped_to_macos(macos_openssl_step):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
+def test_native_openssl_selection_explains_missing_homebrew(tmp_path):
+    bash = shutil.which("bash")
+    assert bash
+    result = subprocess.run(
+        [bash, str(REPOSITORY_ROOT / "scripts/select-openssl.sh")],
+        env=dict(os.environ, PATH=str(tmp_path)), capture_output=True, text=True, timeout=20, check=False,
+    )
+    assert result.returncode == 1
+    assert "requires Homebrew on macOS with openssl@3 installed" in result.stderr
+    assert not result.stdout
+
+
+@pytest.mark.skipif(os.name != "posix", reason="The macOS dependency-selection step requires a POSIX shell.")
 @pytest.mark.parametrize("capability", ["ready", "missing", "unsupported"])
 def test_native_openssl_selection_proves_capabilities_before_changing_path(macos_openssl_step, tmp_path, capability):
     provider, step = macos_openssl_step
@@ -622,11 +635,12 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 30
+        assert len(nodes) == 31
         assert {
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_su_delete",
+            "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_unlink_missing_rg_advisory",
             "test_adr_schema_int.py::TestADRSemanticModelLifecycle::"
             "test_schema_registry_models_and_device_reference_lifecycle",
         } <= nodes
@@ -697,14 +711,14 @@ def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, s
     assert any("Hub phase evidence" in error for error in errors)
 
 
-def test_hub_data_manifest_preserves_exact_eight_sas_nodes_and_normal_auth_default():
+def test_hub_data_manifest_preserves_exact_sas_nodes_and_normal_auth_default():
     from azext_iot.tests.iothub._sas_phase import NODES
     from azext_iot.tests._hub_suite_manifest import nodes, phases
     content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
     assert tuple(nodes("HubData", "sas")) == NODES
-    assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert phases("HubData") == ("entra-state-config", "entra-devices-protocol", "entra-identities", "sas")
     assert sum(len(nodes("HubData", phase)) for phase in phases("HubData") if phase.startswith("entra-")) == 44
-    assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 31
+    assert sum(len(nodes("HubControl", phase)) for phase in phases("HubControl")) == 36
     assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content
 
 

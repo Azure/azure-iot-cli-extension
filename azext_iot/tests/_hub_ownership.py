@@ -9,6 +9,8 @@
 import hashlib
 import json
 import os
+from contextlib import contextmanager
+from copy import deepcopy
 from pathlib import Path
 import re
 import runpy
@@ -44,10 +46,34 @@ ROUTE_REJECTION_NODE = (
 ENDPOINT_REJECTION_NODE = (
     "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::test_iot_endpoint_force_delete"
 )
+FAILOVER_NODE = (
+    "azext_iot/tests/iothub/core/test_iothub_command_happy_paths_int.py::"
+    "TestHubCommandHappyPaths::test_manual_failover"
+)
+STORAGE_READINESS_NODES = frozenset({
+    "azext_iot/tests/iothub/message_endpoint/test_iothub_message_endpoint_int.py::test_iot_storage_endpoint_lifecycle",
+    *(
+        "azext_iot/tests/iothub/state/test_hub_state_int.py::" + name
+        for name in (
+            "test_migrate_controlplane", "test_migrate_controlplane_with_create",
+            "test_export_import_controlplane", "test_export_import_controlplane_with_create",
+        )
+    ),
+})
+STORAGE_ROLE_ID = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 
 
 def regular_phase(phase):
     return phase == "regular" or (isinstance(phase, str) and phase.startswith("regular-"))
+
+
+def planned_action(target, action, node):
+    if action in ("generateverificationcode", "verify"):
+        return re.search(r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+$", target) is not None
+    return (
+        action == "failover" and node == FAILOVER_NODE
+        and re.search(r"/microsoft.devices/iothubs/[^/]+$", target) is not None
+    )
 
 
 def planned_root(resource_id):
@@ -78,13 +104,53 @@ def literal_tree(value):
 
 
 def expected_rejection(mutation):
-    return (
+    return storage_readiness_rejection(mutation) or (
         mutation.get("status") == 400 and mutation.get("method") == "PUT"
         and (mutation.get("validation"), mutation.get("node")) in (
             ("missing-route-endpoint", ROUTE_REJECTION_NODE),
             ("referenced-endpoint-removal", ENDPOINT_REJECTION_NODE),
         ) and bool(mutation.get("fingerprint"))
     )
+
+
+def storage_readiness_rejection(mutation):
+    proof = mutation.get("storageReadiness", {})
+    storage = proof.get("storageId", "")
+    return (
+        mutation.get("status") == 400 and mutation.get("method") == "PUT"
+        and mutation.get("node") in STORAGE_READINESS_NODES
+        and proof.get("hubId") == mutation.get("id")
+        and scope_id(storage) and "/providers/microsoft.storage/storageaccounts/" in storage
+        and proof.get("grantId", "").startswith(storage + "/providers/microsoft.authorization/roleassignments/")
+        and bool(proof.get("principalId")) and bool(proof.get("endpoint"))
+        and proof.get("code") == "IH400117" and proof.get("unchanged") is True
+        and bool(re.fullmatch(r"[0-9a-f]{64}", proof.get("before", "")))
+        and proof.get("before") == proof.get("after")
+        and bool(mutation.get("fingerprint")) and proof.get("fingerprint") == mutation["fingerprint"]
+    )
+
+
+def storage_permission_rejection(resource, endpoint):
+    if not isinstance(resource, dict):
+        return None
+    error = resource.get("error", resource)
+    if (not isinstance(error, dict) or error.get("code") not in (400117, "400117")
+            or error.get("httpStatusCode", 400) != 400 or not isinstance(error.get("message"), str)):
+        return None
+    prefix = (
+        f"Cannot establish connection using the provided credentials. endpointName:{endpoint}, "
+        "exceptionMessage:This request is not authorized to perform this operation using this permission. "
+        "If you contact a support representative please include this correlation identifier: "
+    )
+    match = re.fullmatch(
+        re.escape(prefix) + r"([0-9a-fA-F-]{36}), timestamp: [0-9 :TZ.-]+, errorcode: IH400117\.",
+        error["message"],
+    )
+    return match[1] if match else None
+
+
+def resource_fingerprint(resource):
+    return hashlib.sha256(json.dumps(resource, sort_keys=True).encode()).hexdigest()
 
 
 def routing_rejection(node, routing, previous):
@@ -149,11 +215,20 @@ def _arm_read_location(url):
         parsed = urlsplit(url)
     except ValueError as error:
         raise OwnershipError("Unplanned ARM polling URL") from error
-    if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
-            or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
-            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
-            or any(part in (".", "..") for part in parsed.path.split("/")[1:])):
-        raise OwnershipError("Unplanned ARM polling URL")
+    checks = (
+        ("scheme", parsed.scheme == "https"),
+        ("origin", parsed.netloc in ("management.azure.com", urlsplit(ARM).netloc)),
+        ("subscription", parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")),
+        ("fragment", not parsed.fragment),
+        ("path", bool(re.fullmatch(r"/[A-Za-z0-9_.()=/-]+", parsed.path))),
+        ("segments", not any(part in (".", "..") for part in parsed.path.split("/")[1:])),
+    )
+    invalid = [name for name, valid in checks if not valid]
+    if invalid:
+        if "path" in invalid:
+            codes = sorted({f"U+{ord(char):04X}" for char in re.sub(r"[A-Za-z0-9_.()=/-]", "", parsed.path)})
+            invalid.append("pathCharacterCodes=" + ",".join(codes))
+        raise OwnershipError("Unplanned ARM polling URL: " + "; ".join(invalid))
     return parsed
 
 
@@ -240,6 +315,24 @@ def observe_poll(data, url, status, resource, headers=None):
                     observe_get(data, mutation["id"], status, resource)
 
 
+def empty_failover_result(data, url):
+    """A void final Location response is not an empty resource/status document."""
+    parsed = _arm_read_location(url)
+    key = _polling_fingerprint(parsed)
+    path = parsed.path.casefold()
+    if path in data["resources"] or any(
+        path == mutation["id"]
+        for record in data["resources"].values() for mutation in record["mutations"]
+    ):
+        return False
+    return any(
+        mutation.get("action") == "failover" and mutation.get("status") == 202
+        and mutation.get("polling", {}).get("azure-asyncoperation")
+        and key == mutation.get("polling", {}).get("location")
+        for record in data["resources"].values() for mutation in record["mutations"]
+    )
+
+
 def request_body(raw):
     """Decode JSON or the CLI policy's single unquoted envelope template key.
 
@@ -305,6 +398,8 @@ def observe_get(data, resource_id, status, resource):
                 mutation["pollingFailed"] = True
             if mutation.get("pollingFailed"):
                 confirmed = False
+            elif mutation.get("action") == "failover" and not mutation.get("pollingSucceeded"):
+                confirmed = False
             elif mutation["method"] == "DELETE":
                 confirmed = status == 404
             else:
@@ -323,17 +418,17 @@ def observe_get(data, resource_id, status, resource):
         record["uncertain"] = any(mutation_uncertain(record, m) for m in record["mutations"])
 
 
-def reconcile(arm, data, deadline, save):
+def reconcile(arm, data, deadline, save, *, interval=1):
     """Bounded GET-only reconciliation; never repeat a mutation."""
     previous = arm.deadline
     arm.deadline = min(previous or float("inf"), deadline)
     try:
-        _reconcile(arm, data, arm.deadline, save)
+        _reconcile(arm, data, arm.deadline, save, interval=interval)
     finally:
         arm.deadline = previous
 
 
-def _reconcile(arm, data, deadline, save):
+def _reconcile(arm, data, deadline, save, *, interval=1):
     for record in data["resources"].values():
         if not record.get("uncertain"):
             continue
@@ -375,7 +470,7 @@ def _reconcile(arm, data, deadline, save):
                 return
         pending = targets()
         if pending:
-            time.sleep(min(1, max(0, deadline - time.monotonic())))
+            time.sleep(min(interval, max(0, deadline - time.monotonic())))
 
 
 class OwnershipError(RuntimeError):
@@ -449,11 +544,13 @@ def ownership_errors(data, run_id, phase):
                 errors.append("mutation outside owned resource tree")
             if expected_rejection(mutation) and (target != resource_id or mutation is mutations[0]):
                 errors.append("invalid expected validation rejection")
-            if mutation.get("method") == "POST" and (
-                mutation.get("action") not in ("generateverificationcode", "verify")
-                or re.search(r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+$", target) is None
+            if mutation.get("method") == "POST" and not planned_action(
+                target, mutation.get("action"), mutation.get("node"),
             ):
                 errors.append("unplanned owned ARM action")
+            if (mutation.get("action") == "failover" and mutation.get("reconciled")
+                    and not mutation.get("pollingSucceeded")):
+                errors.append("uncorrelated failover completion")
     if data.get("violations"):
         errors.append("ownership boundary violation")
     return errors
@@ -582,6 +679,7 @@ class Observer:
             pass
         self.original_send = self.original_subscription = self.original_retry_send = None
         self.current_node = None
+        self.storage_attempt = None
         self.deployment_plans = set()
         self.save()
 
@@ -610,6 +708,93 @@ class Observer:
             self.reject("Observed resource no longer has this phase's ownership tag")
         self.save()
         return status, resource
+
+    @contextmanager
+    def storage_endpoint_attempt(self, hub_id, storage_id, endpoint, container, identity, deadline):
+        from azext_iot.tests.helpers import get_role_assignments
+
+        with self.lock:
+            if time.monotonic() >= deadline:
+                raise OwnershipError("Storage readiness deadline exhausted before submission")
+            if self.storage_attempt is not None or self.current_node not in STORAGE_READINESS_NODES:
+                self.reject("Storage readiness requires an explicit eligible node and exclusive scope")
+            hub_id, storage_id = hub_id.casefold(), storage_id.casefold()
+            hub = self.require_owned_reference(hub_id, "microsoft.devices/iothubs")
+            storage = self.require_owned_reference(storage_id, "microsoft.storage/storageaccounts")
+            if (hub.get("properties", {}).get("provisioningState") != "Succeeded"
+                    or hub.get("properties", {}).get("state") != "Active"):
+                self.reject("Storage readiness requires an active, settled Hub")
+            if identity == "[system]":
+                if "SystemAssigned" not in (hub.get("identity", {}).get("type") or ""):
+                    self.reject("Storage readiness requires the Hub system identity")
+                principal = hub.get("identity", {}).get("principalId")
+            else:
+                identities = hub.get("identity", {}).get("userAssignedIdentities", {})
+                if identity.casefold() not in {value.casefold() for value in identities}:
+                    self.reject("Storage readiness identity is not attached to the owned Hub")
+                user = self.require_owned_reference(identity, "microsoft.managedidentity/userassignedidentities")
+                principal = user.get("properties", {}).get("principalId")
+            if not principal:
+                self.reject("Storage readiness requires the actual managed identity principal")
+            grants = get_role_assignments(
+                scope=storage_id, role=STORAGE_ROLE_ID, fill_role_definition_name=False, fill_principal_name=False,
+            )
+            grant = next((
+                item for item in grants
+                if item.get("principalId", "").casefold() == principal.casefold()
+                and item.get("scope", "").casefold() == storage_id
+                and item.get("roleDefinitionId", "").casefold().endswith("/" + STORAGE_ROLE_ID)
+                and item.get("id", "").casefold().startswith(
+                    storage_id + "/providers/microsoft.authorization/roleassignments/"
+                ) and not item.get("condition")
+            ), None)
+            if not grant:
+                self.reject("Storage readiness requires a verified unconditional exact-scope data grant")
+            attempt = {
+                "hubId": hub_id, "storageId": storage_id, "endpoint": endpoint, "container": container,
+                "identity": identity, "principalId": principal, "grantId": grant["id"].casefold(),
+                "uri": storage.get("properties", {}).get("primaryEndpoints", {}).get("blob"),
+                "before": resource_fingerprint(hub),
+                "deadline": deadline, "rejected": False, "submitted": False,
+            }
+            if not attempt["uri"]:
+                self.reject("Owned Storage account did not return a Blob endpoint")
+            self.storage_attempt = attempt
+        try:
+            yield attempt
+            if not attempt["submitted"]:
+                self.reject("Storage readiness command did not submit the expected endpoint")
+        finally:
+            with self.lock:
+                self.storage_attempt = None
+
+    def _prepare_storage_attempt(self, method, resource_id, body, previous, fingerprint):
+        from azext_iot.common.arm import hub_description_for_write
+
+        attempt = self.storage_attempt
+        if time.monotonic() >= attempt["deadline"]:
+            raise OwnershipError("Storage readiness deadline exhausted before submission")
+        if method != "PUT" or resource_id != attempt["hubId"] or attempt["submitted"]:
+            self.reject("Storage readiness may submit only its exact endpoint PUT before the deadline")
+        if resource_fingerprint(previous) != attempt["before"]:
+            self.reject("Hub identity or configuration changed after grant verification")
+        old = previous.get("properties", {}).get("routing", {}).get("endpoints", {}).get("storageContainers", [])
+        proposed = body.get("properties", {}).get("routing", {}).get("endpoints", {}).get("storageContainers", [])
+        added = [item for item in proposed if item.get("name") == attempt["endpoint"]]
+        identity = None if attempt["identity"] == "[system]" else {"userAssignedIdentity": attempt["identity"]}
+        if (any(item.get("name") == attempt["endpoint"] for item in old) or len(added) != 1
+                or [item for item in proposed if item not in added] != old
+                or added[0].get("authenticationType") != "identityBased"
+                or added[0].get("identity") != identity
+                or added[0].get("endpointUri") != attempt["uri"]
+                or added[0].get("containerName") != attempt["container"]
+                or added[0].get("connectionString")):
+            self.reject("Storage readiness PUT is not the intended new identity-based endpoint")
+        unchanged = deepcopy(body)
+        unchanged["properties"]["routing"]["endpoints"]["storageContainers"] = old
+        if unchanged != hub_description_for_write(previous):
+            self.reject("Storage readiness PUT changes unrelated Hub configuration")
+        attempt.update(fingerprint=fingerprint, submitted=True)
 
     def prepare(self, method, resource_id, api, body):
         """Return the owning root; called under the transport lock before send."""
@@ -687,11 +872,36 @@ class Observer:
             else:
                 del canonical["tags"]
         fingerprint = hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
-        if any(m.get("fingerprint") == fingerprint and m["method"] == method and m["id"] == resource_id
-               and (m.get("status") == 400 or pending_mutation(m)) for m in roots[root]["mutations"]):
+        repeated = [
+            m for m in roots[root]["mutations"]
+            if m.get("fingerprint") == fingerprint and m["method"] == method and m["id"] == resource_id
+            and (m.get("status") == 400 or pending_mutation(m))
+        ]
+        if repeated and (
+            self.storage_attempt is None or any(not storage_readiness_rejection(m) for m in repeated)
+        ):
             self.reject("Rejected or accepted asynchronous operation cannot be replayed")
+        if self.storage_attempt is not None:
+            if not roots[root]["resolved"]:
+                self.reject("Storage readiness cannot create a Hub")
+            self._prepare_storage_attempt(method, resource_id, body, resource, fingerprint)
+            if any(
+                m["storageReadiness"]["before"] != self.storage_attempt["before"]
+                or m["fingerprint"] != fingerprint
+                for m in roots[root]["mutations"]
+                if storage_readiness_rejection(m)
+                and m["storageReadiness"]["endpoint"] == self.storage_attempt["endpoint"]
+            ):
+                self.reject("Storage readiness cannot replay after a changed Hub snapshot or request")
         mutation = {"method": method, "id": resource_id, "apiVersion": api, "status": None,
                     "fingerprint": fingerprint, "node": self.current_node}
+        if self.storage_attempt is not None:
+            mutation["storageAttempt"] = {
+                "endpoint": self.storage_attempt["endpoint"],
+                "identityKind": "system" if self.storage_attempt["identity"] == "[system]" else "user",
+                "startedAt": time.time(),
+                "remainingSeconds": self.storage_attempt["deadline"] - time.monotonic(),
+            }
         if (root == resource_id and roots[root]["resolved"] and method == "PUT"
                 and "/iothubs/" in root and self.current_node in (ROUTE_REJECTION_NODE, ENDPOINT_REJECTION_NODE)):
             validation = routing_rejection(
@@ -827,6 +1037,7 @@ class Observer:
         if (status != 200 or resource.get("id", "").casefold() != target
                 or resource.get("tags", {}).get(OWNER_TAG) != self.data["runId"]):
             self.reject("Referenced root ownership changed")
+        return resource
 
     def require_owned_export(self, resource_id):
         target = resource_id.casefold()
@@ -901,6 +1112,8 @@ class Observer:
         record = self.data["resources"][root]
         mutation = record["mutations"][-1]
         mutation["status"] = status
+        if "storageAttempt" in mutation:
+            mutation["storageAttempt"]["responseAt"] = time.time()
         if status in (200, 201, 202):
             try:
                 polling = response_polling(mutation, headers, resource, self.data["runId"])
@@ -919,6 +1132,24 @@ class Observer:
         # 202 is an unresolved acceptance until an exact resource GET observes it.
         if record["mutations"][-1]["method"] == "PUT" and status in (200, 201):
             record["resolved"] = True
+        attempt = self.storage_attempt
+        if attempt and attempt["submitted"] and root == attempt["hubId"] and status == 400:
+            correlation = storage_permission_rejection(resource, attempt["endpoint"])
+            if correlation and not any(
+                key.casefold() in ("location", "azure-asyncoperation", "operation-location") for key in (headers or {})
+            ):
+                read_status, current = self._read(root, record["apiVersion"])
+                if read_status != 200 or resource_fingerprint(current) != attempt["before"]:
+                    self.reject("Rejected Storage endpoint changed the Hub; no replay permitted")
+                mutation["storageReadiness"] = {
+                    key: attempt[key] for key in (
+                        "hubId", "storageId", "endpoint", "principalId", "grantId", "before", "fingerprint",
+                    )
+                }
+                mutation["storageReadiness"].update(
+                    after=resource_fingerprint(current), unchanged=True, code="IH400117", correlationId=correlation,
+                )
+                attempt.update(rejected=True, correlationId=correlation)
         self.save()
 
     def install(self):
@@ -936,7 +1167,9 @@ class Observer:
             parsed = urlsplit(http.url)
             method = http.method.upper()
             mutation = method in ("PUT", "PATCH", "DELETE") or (
-                method == "POST" and parsed.path.casefold().rstrip("/").endswith(("/generateverificationcode", "/verify"))
+                method == "POST" and parsed.path.casefold().rstrip("/").endswith(
+                    ("/generateverificationcode", "/verify", "/failover")
+                )
             )
             if parsed.hostname in ARM_HOSTS and mutation:
                 # urllib3's adapter is below Azure Core's retry loop. Disable
@@ -990,26 +1223,33 @@ class Observer:
                 if method == "POST" and action == "validate" and "/microsoft.resources/deployments/" in action_root:
                     owner.validate_deployment(action_root, body)
                     readonly = True
-                certificate_action = (
-                    method == "POST" and re.search(
-                        r"/microsoft.devices/iothubs/[^/]+/certificates/[^/]+/(generateverificationcode|verify)$",
-                        resource_id,
-                    ) is not None
+                owned_action = method == "POST" and planned_action(
+                    action_root, action, owner.current_node,
                 )
+                if owned_action and action == "failover":
+                    resource = owner.require_owned_reference(action_root, "microsoft.devices/iothubs")
+                    secondaries = {
+                        location["location"].casefold()
+                        for location in resource.get("properties", {}).get("locations", [])
+                        if location.get("role", "").casefold() == "secondary"
+                    }
+                    if (set(body) != {"failoverRegion"} or not isinstance(body["failoverRegion"], str)
+                            or body["failoverRegion"].casefold() not in secondaries):
+                        owner.reject("Failover requires the owned Hub's configured secondary region")
                 if method == "POST" and not resource_id.endswith((
                     "/listkeys", "/listconnectionstrings", "/checknameavailability",
-                )) and not certificate_action and not readonly:
+                )) and not owned_action and not readonly:
                     owner.reject("Unplanned ARM action")
                 root = None
                 deployed = None
-                if method in ("PUT", "PATCH", "DELETE") or certificate_action:
-                    target = resource_id.rsplit("/", 1)[0] if certificate_action else resource_id
+                if method in ("PUT", "PATCH", "DELETE") or owned_action:
+                    target = action_root if owned_action else resource_id
                     if method == "PUT" and "/microsoft.resources/deployments/" in resource_id:
                         root, hub_root, count = owner.prepare_deployment(resource_id, api, body)
                         deployed = hub_root, count
                     else:
                         root = owner.prepare(method, target, api, body)
-                    if certificate_action:
+                    if owned_action:
                         owner.data["resources"][root]["mutations"][-1]["action"] = resource_id.rsplit("/", 1)[1]
                         owner.save()
                     if len(owner.data["resources"][root]["mutations"]) == 1:
@@ -1040,7 +1280,11 @@ class Observer:
                     owner.save()
                 if method == "GET":
                     try:
-                        resource = response.json() if response.status_code == 200 else None
+                        resource = None
+                        if response.status_code == 200 and (
+                            response.content or not empty_failover_result(owner.data, request.url)
+                        ):
+                            resource = response.json()
                         if parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/"):
                             observe_poll(owner.data, request.url, response.status_code, resource, response.headers)
                         observe_get(owner.data, resource_id, response.status_code, resource)

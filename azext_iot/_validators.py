@@ -33,7 +33,7 @@ def mode2_iot_login_handler(cmd, namespace):
                 # support offline az iot hub generate-sas-token
                 offline = args['connection_string']
             elif 'symmetric_key' in args:
-                # support offline az iot dps compute-device-keys
+                # support offline az iot dps enrollment-group compute-device-key
                 offline = args['symmetric_key']
             elif 'id_scope' in args:
                 offline = args['id_scope']

@@ -87,9 +87,9 @@ class Clock:
 
 def _http(
     status=404, code="ResourceNotFound", method="GET", error_type=HttpResponseError,
-    resource_id=NS_ID + "/jobs/job",
+    resource_id=NS_ID + "/jobs/job", message=None,
 ):
-    error = error_type(message=f"({code}) synthetic service error")
+    error = error_type(message=message or f"({code}) synthetic service error")
     error.status_code = status
     error.error = SimpleNamespace(code=code)
     error.response = SimpleNamespace(
@@ -468,18 +468,65 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     assert clock.now == 50
 
 
-def _hub_data_read_message(host):
+@pytest.mark.parametrize("settings", [None, {}, {"availability": "Disabled"}, {"allocationWeight": 31}])
+def test_readiness_accepts_late_hub_settings_without_replaying_add(settings):
+    expected = _expected("hub")
+    expected.pop("provisioning")
+    if settings is not None:
+        expected["provisioning"] = deepcopy(settings)
+    failed = _namespace(expected=expected)
+    populated = {**expected, "provisioning": {
+        "availability": "Available", "allocationWeight": 1, **(settings or {}),
+    }}
+    succeeded = _namespace("Succeeded", "Succeeded", populated)
+    succeeded["properties"]["messaging"]["endpoints"]["secondary"].pop("linkingError")
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(None), _output(failed), _output(failed), _output(None), _output(succeeded),
+    ]
+    endpoint = _link(scenario, Clock(), expected)
+    assert endpoint["linkingState"] == "Succeeded"
+    assert endpoint["provisioning"] == populated["provisioning"]
+    commands = _commands(scenario)
+    assert sum(" add " in command for command in commands) == 1
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
+
+
+@pytest.mark.parametrize("changed", [
+    {}, {"availability": "Disabled", "allocationWeight": 1},
+    {"availability": "Available", "allocationWeight": 2},
+])
+def test_readiness_freezes_service_populated_hub_settings(changed):
+    expected = _expected("hub")
+    expected.pop("provisioning")
+    populated = {**expected, "provisioning": {"availability": "Available", "allocationWeight": 1}}
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(None), _output(_namespace("Updating", "InProgress", expected)),
+        _output(_namespace("Updating", "InProgress", populated)),
+        _output(_namespace("Succeeded", "Succeeded", {**expected, "provisioning": changed})),
+    ]
+    with pytest.raises(AssertionError, match="settings changed"):
+        _link(scenario, Clock(), expected)
+    assert not any(" update " in command for command in _commands(scenario))
+
+
+def _hub_data_read_message(host, context=""):
     return (
-        f"The namespace's managed identity could not read the device count on hub '{host}' because it lacks "
+        f"The namespace's managed identity could not read the device count on hub '{host}'{context} because it lacks "
         "IoT Hub data-plane read access. Assign it a role that grants IoT Hub data-plane read "
         "(for example IoT Hub Data Reader) on the hub, then resubmit the request."
     )
 
 
-def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered():
+@pytest.mark.parametrize("contextual", [False, True])
+def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered(contextual):
     expected = _expected("hub")
     host = expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
-    failed = _namespace(expected=expected, message=_hub_data_read_message(host))
+    context = f" (endpoint 'secondary' being linked, resource '{HUB_ID}')" if contextual else ""
+    failed = _namespace(expected=expected, message=_hub_data_read_message(host, context))
+    if contextual:
+        failed["properties"]["messaging"]["endpoints"]["secondary"]["linkingError"]["code"] = "AdrMiNotAuthorized"
     scenario = Mock()
     scenario.cmd.side_effect = [
         _output(None), _output(failed), _output(failed), _output(None),
@@ -489,19 +536,54 @@ def test_hub_data_plane_read_failure_for_the_linked_hub_is_recovered():
     endpoint = _link(scenario, Clock(), expected)
 
     assert endpoint["linkingState"] == "Succeeded"
-    assert sum(" update " in command for command in _commands(scenario)) == 1
+    commands = _commands(scenario)
+    assert sum(" update " in command for command in commands) == 1
+    suffix = " --timeout 590" if contextual else " --no-wait"
+    assert commands[3] == failed_link_recovery_commands(failed)[0] + suffix
+    assert all(endpoint[key] == value for key, value in expected.items())
 
 
+@pytest.mark.parametrize("contextual", [False, True])
 @pytest.mark.parametrize("kind,host", [("hub", "otherhub.service.azure-devices.net"), ("dps", None)])
-def test_hub_data_plane_read_failure_is_bound_to_the_linked_hub(kind, host):
+def test_hub_data_plane_read_failure_is_bound_to_the_linked_hub(kind, host, contextual):
     expected = _expected(kind)
     host = host or expected["resourceId"].rsplit("/", 1)[1].lower() + ".service.azure-devices.net"
-    message = _hub_data_read_message(host)
+    context = f" (endpoint '{LINKS[kind][2]}' being linked, resource '{expected['resourceId']}')" if contextual else ""
+    message = _hub_data_read_message(host, context)
+    failed = _namespace(expected=expected, message=message, kind=kind)
+    if contextual:
+        section, _, name = LINKS[kind]
+        failed["properties"][section]["endpoints"][name]["linkingError"]["code"] = "AdrMiNotAuthorized"
     scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), _output(_namespace(expected=expected, message=message, kind=kind))]
+    scenario.cmd.side_effect = [_output(None), _output(failed)]
 
     with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure"):
         _link(scenario, Clock(), expected, kind=kind)
+
+    assert scenario.cmd.call_count == 2
+
+
+@pytest.mark.parametrize("mutation", ["endpoint", "resource", "code", "details", "suffix"])
+def test_contextual_hub_read_failure_requires_exact_endpoint_resource_and_error(mutation):
+    name = "other-endpoint" if mutation == "endpoint" else "secondary"
+    target = HUB_ID.replace("/rg/", "/other-rg/") if mutation == "resource" else HUB_ID
+    message = _hub_data_read_message(
+        "hub.service.azure-devices.net", f" (endpoint '{name}' being linked, resource '{target}')"
+    )
+    failed = _namespace(message=message)
+    error = failed["properties"]["messaging"]["endpoints"]["secondary"]["linkingError"]
+    error["code"] = "AdrMiNotAuthorized"
+    if mutation == "code":
+        error["code"] = "AuthorizationFailed"
+    elif mutation == "details":
+        error["details"] = [{"code": "OtherFailure"}]
+    elif mutation == "suffix":
+        error["message"] += " Another failure occurred."
+    scenario = Mock()
+    scenario.cmd.side_effect = [_output(None), _output(failed)]
+
+    with pytest.raises(AssertionError, match="Non-recoverable Hub link failure"):
+        _link(scenario, Clock())
 
     assert scenario.cmd.call_count == 2
 
@@ -604,6 +686,36 @@ def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind
     assert clock.now == 180
     assert writes == [1, 25, 70, 126]
     assert max(clock.sleeps) == 10  # Actual GETs continue during 10/20/30s backoff.
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_waited_recovery_charges_remaining_deadline_and_preserves_errors(link_kind, failure):
+    scenario = Mock()
+    clock = Clock()
+    error = AzureResponseError("Authoritative recovery operation failed")
+    namespace = _namespace(kind=link_kind)
+    section, _, name = LINKS[link_kind]
+    namespace["properties"][section]["endpoints"][name]["linkingError"]["code"] = "AdrMiNotAuthorized"
+
+    def command(text):
+        if " update " in text:
+            assert text.endswith("--timeout 34")
+            clock.now += 35
+            if failure:
+                raise error
+            return _output(None)
+        clock.now += 0.25
+        return _output(namespace)
+
+    scenario.cmd.side_effect = command
+    with pytest.raises(AzureResponseError if failure else AssertionError) as caught:
+        _link(scenario, clock, kind=link_kind, timeout=45)
+    if failure:
+        assert caught.value is error
+    else:
+        assert "Timed out" in str(caught.value)
+    assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
+    assert " update " in _commands(scenario)[-1]
 
 
 @pytest.mark.parametrize("field,value", [
@@ -753,14 +865,16 @@ def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(
 
     def command(text, **_):
         if text.startswith("iot adr ns show "):
-            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+            return _output({"id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
             assert "--assignee-object-id namespace-system" in text
             assert "--role 'Azure Device Registry Administrator'" in text
             assert f"--scope '{NS_ID}'" in text
             return _output([{"id": "self-role"}] if dps_readiness.called else [])
         if text.startswith("iot dps show "):
-            return _output({"id": DPS_ID})
+            return _output({"id": DPS_ID, "identity": {
+                "principalId": "dps-system", "userAssignedIdentities": {UAMI_ID: {"principalId": "dps-user"}},
+            }})
         if text.startswith("iot adr ns link dps wait "):
             return _output(None)
         raise RuntimeError("stop after DPS readiness")
@@ -786,6 +900,7 @@ def _rotation_endpoint(state="Failed", identity_type="UserAssigned", *, code="Id
         identity["userAssignedIdentity"] = UAMI_ID
     endpoint = {
         "resourceId": HUB_ID,
+        "endpointType": IOT_HUB_ENDPOINT_TYPE,
         "linkingState": state,
         "inboundCallerIdentity": identity,
     }
@@ -838,6 +953,32 @@ _HUB_REJECTED = (
 )
 
 
+def _rotation_namespace():
+    return {
+        "id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-principal"},
+        "properties": {
+            "provisioningState": "Succeeded",
+            "messaging": {"endpoints": {"secondary": _rotation_endpoint("Succeeded", "UserAssigned")}},
+        },
+    }
+
+
+def _rotation_rejection(message=None):
+    message = message or link_scenarios._HUB_ROTATION_CURRENT_MESSAGE
+    error = _http(200, "LinkingFailed", resource_id=(
+        "/subscriptions/sub/providers/Microsoft.DeviceRegistry/locations/centraluseuap/asyncOperationStatuses/rotation"
+    ), message="(LinkingFailed) Failed. (IdentityRotationUpdateFailed) " + message)
+    error.response.json = lambda: {
+        "status": "Failed", "error": {
+            "code": "LinkingFailed", "message": "Failed.",
+            "details": [{
+                "code": "IdentityRotationUpdateFailed", "message": message, "target": "properties.messaging.endpoints[secondary]",
+            }],
+        },
+    }
+    return error
+
+
 def test_hub_rotation_rejection_requires_structural_or_attributed_evidence():
     from azure.core.exceptions import HttpResponseError
 
@@ -857,21 +998,26 @@ def test_hub_rotation_rejection_requires_structural_or_attributed_evidence():
     assert link_scenarios._is_identity_rotation_authorization_failure(error=attributed, endpoint=rolled_back)
 
 
-def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch):
+@pytest.mark.parametrize("outbound_user", [False, True])
+def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(monkeypatch, outbound_user):
     clock = Clock()
     monkeypatch.setattr(link_scenarios, "monotonic", clock)
     monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
     scenario = Mock()
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
     roles = [{"id": "role"}]
+    namespace = _rotation_namespace()
+    if outbound_user:
+        namespace["identity"]["userAssignedIdentities"] = {UAMI_ID: {"principalId": "namespace-user"}}
+        namespace["identity"]["type"] = "SystemAssigned, UserAssigned"
+        namespace["properties"]["outboundIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
     responses = [
-        _output(None),
+        _output(namespace),
+        _rotation_rejection(),
         _output(_rotation_endpoint()),
-        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output(namespace),
         _output({"identity": {"principalId": "hub-sami"}}),
-        _output(roles),
-        _output(roles),
-        _output(roles),
+        *[_output(roles) for _ in range(6)],
         _output(None),
         _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
     ]
@@ -887,20 +1033,116 @@ def test_hub_rotation_recovery_reissues_same_update_after_grants_are_visible(mon
     assert _bounded_update_timeouts(scenario, update_cmd) == [600, 570]
     assert update_cmd not in commands
     assert any("role assignment list" in command and "hub-sami" in command for command in commands)
+    outbound = "namespace-user" if outbound_user else "namespace-principal"
+    assert sum(f"--assignee-object-id {outbound} " in command for command in commands) == 4
+
+
+def test_hub_rotation_current_wrapper_requires_exact_rotation_attribution():
+    from types import SimpleNamespace
+    from azure.core.exceptions import HttpResponseError
+
+    message = link_scenarios._HUB_ROTATION_CURRENT_MESSAGE
+    endpoint = _rotation_endpoint(message=message)
+    assert link_scenarios._is_identity_rotation_authorization_failure(endpoint=endpoint)
+    chained = HttpResponseError("(LinkingFailed) Failed. (IdentityRotationUpdateFailed) " + message)
+    chained.error = SimpleNamespace(code="IdentityRotationUpdateFailed")
+    rolled_back = _rotation_endpoint("Succeeded", "UserAssigned")
+    assert link_scenarios._is_identity_rotation_authorization_failure(error=chained, endpoint=rolled_back)
+    for invalid in (message.replace("[400913]", "[400914]"), message + " Another failure.", message.replace("Hub", "DPS")):
+        assert not link_scenarios._is_identity_rotation_authorization_failure(
+            endpoint=_rotation_endpoint(message=invalid),
+        )
+    assert not link_scenarios._is_identity_rotation_authorization_failure(
+        endpoint=_rotation_endpoint(code="LinkInitiateFailed", message=message),
+    )
+    endpoint["error"] = {"code": "OtherFailure", "message": "different failure"}
+    assert not link_scenarios._is_identity_rotation_authorization_failure(error=chained, endpoint=endpoint)
+    mixed = HttpResponseError("(OtherFailure) Failed.\n(IdentityRotationUpdateFailed) " + message)
+    assert not link_scenarios._is_identity_rotation_authorization_failure(error=mixed, endpoint=rolled_back)
+
+
+@pytest.mark.parametrize("route", ["asyncOperationStatuses", "operationStatuses"])
+@pytest.mark.parametrize("message", [_HUB_REJECTED, link_scenarios._HUB_ROTATION_CURRENT_MESSAGE])
+def test_hub_rotation_requires_real_sdk_terminal_rejection(mocked_response, route, message):
+    from azure.mgmt.core.polling.arm_polling import ARMPolling
+
+    status_url = f"https://management.azure.com/subscriptions/sub/providers/Microsoft.DeviceRegistry/locations/eastus/{route}/op"
+    mocked_response.add(
+        "PUT", "https://management.azure.com" + NS_ID, status=201,
+        json={"properties": {"provisioningState": "Accepted"}}, headers={"Azure-AsyncOperation": status_url},
+    )
+    mocked_response.add("GET", status_url, json=_rotation_rejection(message).response.json())
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    with DeviceRegistryMgmtClient(credential, "sub", retry_total=0, polling_interval=0) as client:
+        with pytest.raises(HttpResponseError) as raised:
+            client.namespaces.begin_create_or_replace("rg", "ns", {"location": "eastus"}, polling=ARMPolling(0)).result()
+    assert link_scenarios._current_rotation_rejection(raised.value, NS_ID, "secondary")
+    assert link_scenarios._is_identity_rotation_authorization_failure(
+        error=raised.value, endpoint=_rotation_endpoint("Succeeded", "UserAssigned"),
+    )
+    assert not link_scenarios._current_rotation_rejection(raised.value, NS_ID.replace("/sub/", "/other/"), "secondary")
+    assert not link_scenarios._current_rotation_rejection(raised.value, NS_ID, "other")
+
+
+@pytest.mark.parametrize("invalid", ["transport", "status", "method", "route", "mixed-detail"])
+def test_hub_rotation_rejects_unproven_current_attempt(invalid):
+    from azure.core.exceptions import ServiceResponseError
+
+    error = _rotation_rejection()
+    if invalid == "transport":
+        error.__cause__ = ServiceResponseError("Response lost")
+    elif invalid == "status":
+        error.status_code = 400
+    elif invalid == "method":
+        error.response.request.method = "PUT"
+    elif invalid == "route":
+        error.response.request.url = "https://management.azure.com" + NS_ID
+    else:
+        body = error.response.json()
+        body["error"]["details"].append({"code": "OtherFailure", "message": "Unrelated."})
+        error.response.json = lambda: body
+    assert not link_scenarios._current_rotation_rejection(error, NS_ID, "secondary")
+
+
+@pytest.mark.parametrize("late_stage", ["baseline", "sleep", "terminal-success"])
+def test_hub_rotation_deadline_rejects_oversleep_and_late_success(monkeypatch, late_stage):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", lambda _: setattr(clock, "now", 600.4))
+    monkeypatch.setattr(link_scenarios, "_assert_hub_sami_rotation_grants", lambda *_: None)
+
+    def terminal(*_args, **_kwargs):
+        if late_stage == "terminal-success":
+            clock.now = 600
+            return _rotation_endpoint("Succeeded", "SystemAssigned")
+        return _rotation_endpoint()
+
+    monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), _rotation_rejection() if late_stage == "sleep" else _output(None),
+    ]
+    if late_stage == "baseline":
+        def slow_baseline(_command):
+            clock.now = 600
+            return _output(_rotation_namespace())
+        scenario.cmd.side_effect = slow_baseline
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(AssertionError, match="budget exhausted"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    assert _bounded_update_timeouts(scenario, update_cmd) == ([] if late_stage == "baseline" else [600])
 
 
 def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_rollback(monkeypatch):
     from azure.cli.core.azclierror import AzureResponseError
-    from azure.core.exceptions import HttpResponseError
 
     clock = Clock()
     monkeypatch.setattr(link_scenarios, "monotonic", clock)
     monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
-    service_error = HttpResponseError(
-        "(LinkingFailed) One or more endpoints failed to link. (IdentityRotationUpdateFailed) "
-        "The Hub resource rejected the link request as invalid. "
-        "Verify the endpoint configuration, then resubmit the request."
-    )
+    service_error = _rotation_rejection(_HUB_REJECTED)
     product_error = AzureResponseError(
         "Link target, type, inbound identity or settings changed; recovery stopped."
     )
@@ -909,13 +1151,12 @@ def test_hub_rotation_recovery_retries_chained_hub_rejection_after_identity_roll
     roles = [{"id": "role"}]
     scenario = Mock()
     scenario.cmd.side_effect = [
+        _output(_rotation_namespace()),
         product_error,
         _output(_rotation_endpoint("Succeeded", "UserAssigned")),
-        _output({"id": NS_ID, "identity": {"principalId": "namespace-principal"}}),
+        _output(_rotation_namespace()),
         _output({"identity": {"principalId": "hub-sami"}}),
-        _output(roles),
-        _output(roles),
-        _output(roles),
+        *[_output(roles) for _ in range(6)],
         _output(None),
         _output(_rotation_endpoint("Succeeded", "SystemAssigned")),
     ]
@@ -944,7 +1185,9 @@ def test_hub_rotation_recovery_never_resubmits_after_its_budget(monkeypatch):
     monkeypatch.setattr(link_scenarios, "_wait_for_link_terminal", terminal)
     monkeypatch.setattr(link_scenarios, "_assert_hub_sami_rotation_grants", lambda *_: None)
     scenario = Mock()
-    scenario.cmd.return_value = _output(None)
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), _rotation_rejection(), _rotation_rejection(), _rotation_rejection(),
+    ]
 
     with pytest.raises(AssertionError, match="budget exhausted"):
         link_scenarios._update_hub_to_sami_with_recovery(
@@ -968,7 +1211,7 @@ def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
     changed["resourceId"] = HUB_ID + "-other"
     scenario = Mock()
     update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
-    scenario.cmd.side_effect = [_output(None), _output(changed)]
+    scenario.cmd.side_effect = [_output(_rotation_namespace()), _rotation_rejection(), _output(changed)]
 
     with pytest.raises(AssertionError, match="resourceId"):
         link_scenarios._update_hub_to_sami_with_recovery(
@@ -976,9 +1219,60 @@ def test_hub_rotation_recovery_rejects_changed_target_before_retry(monkeypatch):
         )
 
     assert _commands(scenario) == [
+        "iot adr ns show -n ns -g rg",
         update_cmd + " --timeout 600",
         "iot adr ns link hub show --ns ns -g rg -n secondary",
     ]
+
+
+@pytest.mark.parametrize("failure", ["uncertain", "drift", "keyerror", "success"])
+def test_hub_rotation_never_uses_stale_failure_to_replay_an_unproven_write(monkeypatch, failure):
+    from azure.core.exceptions import ServiceResponseError
+
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    error = {
+        "uncertain": AzureResponseError("Outcome unknown"),
+        "drift": AzureResponseError("Settings changed; recovery stopped"),
+        "keyerror": KeyError("unexpected"),
+        "success": None,
+    }[failure]
+    if failure == "uncertain":
+        error.__cause__ = ServiceResponseError("Connection lost")
+    scenario = Mock()
+    scenario.cmd.side_effect = [
+        _output(_rotation_namespace()), error or _output(None), _output(_rotation_endpoint()),
+    ]
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(type(error) if error else AssertionError) as raised:
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    if error:
+        assert raised.value is error
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+    assert not clock.sleeps
+
+
+@pytest.mark.parametrize("state,identity", [("Failed", "UserAssigned"), ("Succeeded", "SystemAssigned")])
+def test_hub_rotation_preserves_pre_submit_settings_on_retry_and_success(monkeypatch, state, identity):
+    clock = Clock()
+    monkeypatch.setattr(link_scenarios, "monotonic", clock)
+    monkeypatch.setattr(link_scenarios, "sleep", clock.sleep)
+    baseline = _rotation_namespace()
+    baseline["properties"]["messaging"]["endpoints"]["secondary"]["provisioning"] = {"allocationWeight": 2}
+    changed = _rotation_endpoint(state, identity)
+    changed["provisioning"] = {"allocationWeight": 3}
+    scenario = Mock()
+    scenario.cmd.side_effect = [_output(baseline), _rotation_rejection(), _output(changed)]
+    update_cmd = "iot adr ns link hub update --ns ns -g rg -n secondary --system-assigned-mi"
+    with pytest.raises(AssertionError, match="endpoint settings changed"):
+        link_scenarios._update_hub_to_sami_with_recovery(
+            scenario, update_cmd, "ns", "rg", "secondary", HUB_ID, UAMI_ID,
+        )
+    assert _bounded_update_timeouts(scenario, update_cmd) == [600]
+    assert not clock.sleeps
 
 
 @pytest.mark.parametrize("failure", [
@@ -1140,22 +1434,37 @@ def test_link_lifecycle_reads_dps_projection_without_classic_hub_mutation(
         link_scenarios, "link_hub_with_readiness", lambda *_args: events.append("hub ready"),
     )
     dps_shows = []
+    grant_deleted = False
 
     def command(text, expect_failure=False, **_):
+        nonlocal grant_deleted
         events.append(text)
         if "linked-hub" in text:
             raise AssertionError("The namespace-linked DPS Hub list is read-only")
         if text.startswith("iot adr ns identity show "):
             return _output({"type": "SystemAssigned", "principalId": "namespace-system"})
         if text.startswith("iot adr ns show "):
-            return _output({"id": NS_ID, "identity": {"principalId": "namespace-system"}})
+            return _output({"id": NS_ID, "identity": {"type": "SystemAssigned", "principalId": "namespace-system"}})
         if text.startswith("role assignment list "):
+            if "--role 'IoT Hub Data Contributor'" in text:
+                assert "--assignee-object-id dps-user" in text
+                assert f"--scope '{HUB_ID}'" in text
+                return _output([{"id": "owned-grant", "scope": HUB_ID, "principalId": "dps-user"}]
+                               if "hub ready" in events and not grant_deleted else [])
             assert "--assignee-object-id namespace-system" in text
             assert "--role 'Azure Device Registry Administrator'" in text
             assert f"--scope '{NS_ID}'" in text
             return _output([{"id": "self-role"}] if "dps ready" in events else [])
+        if text == "role assignment delete --ids owned-grant":
+            grant_deleted = True
+            return _output(None)
+        if text.startswith("iot adr ns link hub update "):
+            grant_deleted = False
+            return _output(None)
         if text.startswith("iot dps show "):
-            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}})
+            return _output({"id": DPS_ID, "properties": {"iotHubs": registered_hubs}, "identity": {
+                "principalId": "dps-system", "userAssignedIdentities": {UAMI_ID: {"principalId": "dps-user"}},
+            }})
         if text.startswith("rest "):
             assert shlex.split(text) == [
                 "rest", "--method", "get", "--url",

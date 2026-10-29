@@ -14,6 +14,7 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
+    UNLINK_CONFIRMATION,
     adr_link_ops,
     adr_link_wait_ops,
     adr_schema_ops,
@@ -242,7 +243,8 @@ def test_2026_command_surface_is_registered():
     )
     for endpoint in ("hub", "dps", "su"):
         assert commands[f"iot adr ns link {endpoint} remove"] == (
-            "command", f"adr_link_{endpoint}_remove", {"confirmation": True, "supports_no_wait": True},
+            "command", f"adr_link_{endpoint}_remove",
+            {"confirmation": UNLINK_CONFIRMATION + " Continue?", "supports_no_wait": True},
         )
         assert hasattr(commands_link, f"adr_link_{endpoint}_remove")
         assert f"iot adr ns link {endpoint} delete" not in commands
@@ -589,10 +591,13 @@ def test_load_adr_arguments():
         )
         for command in arguments
     )
-    assert not any(
-        command.startswith("iot adr ns link") and command.endswith(" remove")
-        for command in arguments
-    )
+    for kind in ("hub", "dps", "su"):
+        remove_arguments = arguments[f"iot adr ns link {kind} remove"]
+        assert set(remove_arguments) == {"no_rbac_check", "grant_reader"}
+        assert remove_arguments["no_rbac_check"]["options_list"] == ["--no-rbac-check"]
+        assert remove_arguments["no_rbac_check"]["action"] == "store_true"
+        assert remove_arguments["grant_reader"]["options_list"] == ["--grant-reader"]
+        assert remove_arguments["grant_reader"]["action"] == "store_true"
 
     for command in (
         "iot adr ns wait",
@@ -819,7 +824,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
     su_help = " ".join(helps["iot adr ns link su add"].split())
     assert "namespace outbound MI -> Contributor on SU" in su_help
     assert "SU selected inbound MI -> Azure Device Registry Contributor on namespace" in su_help
-    assert "exactly three service-to-service grants" in su_help
+    assert "Identical resource-group Reader grants are deduplicated" in su_help
     assert "namespace outbound MI -> Device Update Administrator on SU" in su_help
     assert "Device Update Administrator" in helps["iot adr ns link su update"]
     assert "No ADU first-party service principal or Microsoft Graph lookup is required" in su_help
@@ -845,6 +850,32 @@ def test_help_surface_matches_2026_commands_and_su_type():
         command.startswith("iot adr ns su update") for command in helps
     )
     assert "iot adr ns su device-class update" not in helps
+
+
+def test_unlink_help_explains_prerequisites_and_permission_options():
+    load_adr_help()
+    for kind in ("hub", "dps", "su"):
+        help_text = " ".join(yaml.safe_load(helps[f"iot adr ns link {kind} remove"])["long-summary"].split())
+        assert "For a Succeeded link, delete the linked" in help_text
+        assert "Failed links do not require the linked resource to be deleted." in help_text
+        assert "namespace outbound identity needs read access to the linked resource's resource group" in help_text
+        assert "or subscription if that group was deleted" in help_text
+        assert "Checks are advisory by default" in help_text
+        assert "several minutes to take effect" in help_text
+        assert "continues without changing role assignments" in help_text
+        assert "--no-rbac-check skips only the advisory check, not ADR authorization" in help_text
+        assert "--yes skips only confirmation" in help_text
+        assert "Reader setup failures stop removal" in help_text
+        assert "resource group, never its subscription" in help_text
+        assert "Reader covers all resources in that group" in help_text
+        assert "Requested assignments are retained even if removal fails" in help_text
+        assert "--no-wait returns after submission but does not skip Reader setup" in help_text
+        assert "cannot be combined with --no-rbac-check" in help_text
+        assert "#adr-link-troubleshooting" in help_text
+        assert ("EndpointUsedByNestedDevices" in help_text) is (kind == "hub")
+        if kind == "hub":
+            assert "any Hub endpoint, including Failed links" in help_text
+            assert "Deleting the IoT Hub does not clear these references." in help_text
 
 
 def test_job_run_delete_help_does_not_require_cancellation():

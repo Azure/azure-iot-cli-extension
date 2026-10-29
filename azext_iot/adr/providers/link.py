@@ -12,12 +12,14 @@ from typing import Optional
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     AzureResponseError,
+    MutuallyExclusiveArgumentError,
     ResourceNotFoundError,
 )
-from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
+from azure.core.exceptions import DeserializationError, HttpResponseError, ServiceRequestError, ServiceResponseError
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
+from msrestazure.tools import parse_resource_id
 from azext_iot.common.arm import sanitize_arm_identity
 
 from azext_iot._factory import (
@@ -52,12 +54,15 @@ from azext_iot.adr.providers.link_persistence import (
 )
 from azext_iot.adr.providers.link_preflight import (
     TargetLookup,
+    add_dps_hub_role_requirements,
     get_target,
     preflight_target,
 )
 from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.rbac import LinkRbacManager, required_assignments, resolve_namespace_outbound_principal
+from azext_iot.adr.rbac import (
+    HUB_UNLINK_WARNING, LinkRbacManager, UNLINK_WARNING, required_assignments, resolve_namespace_outbound_principal,
+)
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -149,6 +154,10 @@ class LinkProvider(ADRProvider):
             rbac_manager=self._rbac_manager,
             rbac_requests=requests,
         )
+        add_dps_hub_role_requirements(
+            requests[0], namespace,
+            lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
+        )
         self._link_requests[(link_type, target_resource_id.casefold())] = deepcopy(requests)
         if rbac_requests is not None:
             rbac_requests.extend(requests)
@@ -198,8 +207,13 @@ class LinkProvider(ADRProvider):
 
     def _remove_endpoint(
         self, endpoint_name, namespace_name, resource_group_name, section, endpoint_type, display_name,
-        no_wait=False,
+        no_wait=False, no_rbac_check=False, grant_reader=False,
     ):
+        if no_rbac_check and grant_reader:
+            raise MutuallyExclusiveArgumentError(
+                "--grant-reader cannot be combined with --no-rbac-check."
+            )
+        logger.warning("%s", HUB_UNLINK_WARNING if section == "messaging" else UNLINK_WARNING)
         namespace, etag = self.client.namespaces.get(
             resource_group_name=resource_group_name, namespace_name=namespace_name, retry_total=0,
             cls=lambda response, resource, _: (resource, response.http_response.headers.get("ETag")),
@@ -213,21 +227,28 @@ class LinkProvider(ADRProvider):
                 "Endpoint removal was not submitted because concurrent changes cannot be protected."
             )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
-        parse_target = {
-            "messaging": _parse_hub_resource_id,
-            "provisioning": _parse_dps_resource_id,
-            "updating": _parse_su_resource_id,
-        }[section]
-        target = parse_target(endpoint.get("resourceId"))
-        self._rbac_manager().ensure_unlink_reader(
-            resolve_namespace_outbound_principal(namespace),
-            f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
-        )
+        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
+        if "identity" in namespace:
+            identity = namespace["identity"]
+            if identity is not None and not isinstance(identity, dict):
+                raise AzureResponseError(
+                    "The namespace response identity must be an object or null. "
+                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
+                )
+            attached = identity.get("userAssignedIdentities") if identity else None
+            if attached is not None and (
+                not isinstance(attached, dict) or any(not isinstance(identity_id, str) for identity_id in attached)
+            ):
+                raise AzureResponseError(
+                    "The namespace response identity.userAssignedIdentities must be an object with string keys or null. "
+                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
+                )
+            resource["identity"] = sanitize_arm_identity(identity)
         properties = writable_namespace_properties(namespace["properties"])
         del properties[section]["endpoints"][endpoint_name]
-        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
         resource["properties"] = properties
-        resource["identity"] = sanitize_arm_identity(namespace["identity"])
+        if not no_rbac_check:
+            self._check_unlink_permissions(namespace, endpoint, section, grant_reader=grant_reader)
         try:
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
@@ -248,28 +269,97 @@ class LinkProvider(ADRProvider):
             if error.status_code == 412:
                 logger.warning(
                     "Namespace '%s' changed before endpoint removal (HTTP 412). "
-                    "Inspect the namespace with 'az iot adr ns show' and rerun the remove command. "
-                    "Any Reader grant created during preflight is retained.",
+                    "Inspect the namespace with 'az iot adr ns show' and rerun the remove command.",
                     namespace_name,
                 )
             raise
 
-    def hub_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+    def _check_unlink_permissions(self, namespace, endpoint, section, *, grant_reader=False):
+        state = endpoint.get("linkingState")
+        if state in ("LinkedResourceDeleted", "Failed"):
+            logger.info("Skipping permission check for endpoint linkingState '%s'.", state)
+            return
+        if state != "Succeeded":
+            logger.warning(
+                "Endpoint linkingState is '%s'; permission preflight is unavailable for this state. "
+                "Continuing without changing role assignments; ADR decides whether removal is allowed.",
+                state,
+            )
+            return
+        try:
+            resource_id = endpoint.get("resourceId")
+            if not isinstance(resource_id, str):
+                raise AzureResponseError("The linked endpoint did not include a string resourceId.")
+            parsed_id = parse_resource_id(resource_id.strip())
+            if not all(parsed_id.get(field) for field in ("subscription", "resource_group", "name")):
+                raise AzureResponseError("The linked endpoint resourceId must be a resource-group-scoped ARM resource ID.")
+            outbound = namespace["properties"].get("outboundIdentity")
+            if outbound is None:
+                outbound = {}
+            if not isinstance(outbound, dict):
+                raise AzureResponseError("The namespace outboundIdentity must be an object.")
+            if str(outbound.get("type") or "SystemAssigned").casefold() == "userassigned":
+                if not isinstance(outbound.get("userAssignedIdentity"), str):
+                    raise AzureResponseError("The outbound userAssignedIdentity must be a string resource ID.")
+                identity = namespace.get("identity") or {}
+                if not isinstance(identity, dict):
+                    raise AzureResponseError("The namespace identity must be an object.")
+                attached = identity.get("userAssignedIdentities") or {}
+                if not isinstance(attached, dict) or any(
+                    not isinstance(identity_id, str) or (details is not None and not isinstance(details, dict))
+                    for identity_id, details in attached.items()
+                ):
+                    raise AzureResponseError("The attached user-assigned identity metadata is malformed.")
+            parse_target = {
+                "messaging": _parse_hub_resource_id,
+                "provisioning": _parse_dps_resource_id,
+                "updating": _parse_su_resource_id,
+            }[section]
+            target = parse_target(resource_id)
+            self._rbac_manager().check_unlink_read_access(
+                resolve_namespace_outbound_principal(namespace),
+                f"/subscriptions/{target['subscription_id']}/resourceGroups/{target['resource_group_name']}",
+                grant_reader=grant_reader,
+            )
+        except (CLIError, HttpResponseError, ServiceRequestError, ServiceResponseError, DeserializationError) as error:
+            if grant_reader:
+                raise AzureResponseError(
+                    "Reader setup could not be completed; endpoint removal was not submitted. "
+                    "Any role assignments already created are retained. "
+                    f"Detail: {error}"
+                ) from error
+            logger.warning(
+                "Could not verify the namespace outbound identity's read access: %s "
+                "Continuing without changing role assignments; ADR may reject removal. "
+                "Use --no-rbac-check to skip this advisory check.",
+                error,
+            )
+
+    def hub_remove(
+        self, endpoint_name: str, namespace_name: str, resource_group_name: str,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+    ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "messaging", IOT_HUB_ENDPOINT_TYPE, "IoT Hub",
-            no_wait=no_wait,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
-    def dps_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+    def dps_remove(
+        self, endpoint_name: str, namespace_name: str, resource_group_name: str,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+    ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "provisioning", DPS_ENDPOINT_TYPE, "DPS",
-            no_wait=no_wait,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
-    def su_remove(self, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+    def su_remove(
+        self, endpoint_name: str, namespace_name: str, resource_group_name: str,
+        no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+    ):
         return self._remove_endpoint(
             endpoint_name, namespace_name, resource_group_name, "updating", SU_ENDPOINT_TYPE, "Software Updates",
-            no_wait=no_wait,
+            no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
         )
 
     def _patch_link(
@@ -313,16 +403,27 @@ class LinkProvider(ADRProvider):
                 strategy=strategy, lookup=lambda parsed, _: deadline.call(self._get_target, parsed, strategy),
                 rbac_manager=self._rbac_manager, rbac_requests=requests,
             )
+            add_dps_hub_role_requirements(
+                requests[0], current,
+                lambda resource_id: deadline.call(
+                    self._get_target, _parse_dps_resource_id(resource_id), _DPS_TARGET,
+                ),
+            )
             deadline.remaining()
             if requests != original_requests:
                 raise AzureResponseError("Link preflight principal or scope changed; no recovery PATCH submitted.")
             self._rbac_manager().verify_many(requests, guard=deadline.remaining)
 
-        required = {assignment for request in original_requests or [] for _, assignment in required_assignments(request)}
+        required = [entry for request in original_requests or [] for entry in required_assignments(request)]
+        created = set(self._rbac.created) if self._rbac else set()
         return LinkRecovery(
             self, namespace, section, name, expected, budget, verify,
             authorization_request=original_requests[0] if original_requests and len(original_requests) == 1 else None,
-            recent_grants=bool(self._rbac) and not required.isdisjoint(self._rbac.created),
+            recent_grants=any(rule.principal != "dps" and assignment in created for rule, assignment in required),
+            recent_inbound_grant=any(
+                rule.principal == "linked" and rule.scope == "namespace" and assignment in created
+                for rule, assignment in required
+            ),
         ).run(
             submit=lambda body: self._patch_endpoints(
                 namespace_name, resource_group_name, section, {name: body}, status_message, no_wait=True,
@@ -875,9 +976,15 @@ class LinkProvider(ADRProvider):
             strategy=_DPS_TARGET,
             rbac_requests=rbac_requests,
         )
+        hub_plan = deepcopy(existing)
+        properties = hub_plan.get("properties") or {}
+        provisioning = properties.get("provisioning") or {}
+        provisioning["endpoints"] = {**(provisioning.get("endpoints") or {}), dps_endpoint_name: dps_body}
+        properties["provisioning"] = provisioning
+        hub_plan["properties"] = properties
         hub = self._preflight_link(
             link_type="hub",
-            namespace=existing,
+            namespace=hub_plan,
             target_resource_id=hub_resource_id,
             inbound_identity=hub_body.get("inboundCallerIdentity"),
             parsed=parsed_hub,

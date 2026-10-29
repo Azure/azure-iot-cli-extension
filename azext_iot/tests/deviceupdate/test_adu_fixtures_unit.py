@@ -321,7 +321,7 @@ def test_permission_never_propagates_fails_bounded_setup_and_keeps_cleanup(adu_h
 
 
 def test_probe_elapsed_time_budget_is_bounded(adu_hubs, mocker):
-    mocker.patch.object(readiness.time, "monotonic", side_effect=[0, 120])
+    mocker.patch.object(readiness.time, "monotonic", side_effect=[0, 0, 120])
     adu_hubs.errors[("iot", "hub", "query")] = UnauthorizedError(PROPAGATION_ERROR)
     with pytest.raises(AssertionError, match="Timed out.*1 attempt"):
         fixtures._iothub_wait_for_data_role(HUB_ID)

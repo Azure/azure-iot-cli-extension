@@ -143,16 +143,9 @@ def _validate_adr_certificate_reference(
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
-    credential_policy_name=None,
 ):
     """Validate and return the 2026-11-02 ADR certificate reference fields."""
-    if (
-        adr_certificate_policy_name is not None and credential_policy_name is not None
-        and adr_certificate_policy_name != credential_policy_name
-    ):
-        raise MutuallyExclusiveArgumentError("Conflicting canonical and legacy certificate policy names.")
-    policy_name = adr_certificate_policy_name if adr_certificate_policy_name is not None else credential_policy_name
-    supplied = [adr_namespace, adr_ca_name, policy_name]
+    supplied = [adr_namespace, adr_ca_name, adr_certificate_policy_name]
     if all(value is None for value in supplied):
         return {}
     if all(value == "" for value in supplied):
@@ -170,7 +163,7 @@ def _validate_adr_certificate_reference(
     return {
         "namespaceName": adr_namespace,
         "certificateAuthorityName": adr_ca_name,
-        "certificatePolicyName": policy_name,
+        "certificatePolicyName": adr_certificate_policy_name,
     }
 
 
@@ -270,7 +263,6 @@ def iot_dps_device_enrollment_create(
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
-    credential_policy_name=None,
     api_version=None,
     login=None,
     auth_type_dataplane=None,
@@ -339,7 +331,6 @@ def iot_dps_device_enrollment_create(
                 adr_namespace,
                 adr_ca_name,
                 adr_certificate_policy_name,
-                credential_policy_name,
             ),
         }
         enrollment = _drop_none(enrollment)
@@ -377,7 +368,6 @@ def iot_dps_device_enrollment_update(
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
-    credential_policy_name=None,
     api_version=None,
     login=None,
     auth_type_dataplane=None,
@@ -478,7 +468,6 @@ def iot_dps_device_enrollment_update(
                 adr_namespace,
                 adr_ca_name,
                 adr_certificate_policy_name,
-                credential_policy_name,
             )
         )
         if reference_supplied:
@@ -498,13 +487,8 @@ def iot_dps_device_enrollment_update(
                     (
                         adr_certificate_policy_name
                         if adr_certificate_policy_name is not None
-                        else (
-                            credential_policy_name
-                            if credential_policy_name is not None
-                            else enrollment_record.get("certificatePolicyName")
-                        )
+                        else enrollment_record.get("certificatePolicyName")
                     ),
-                    credential_policy_name,
                 )
             )
 
@@ -630,7 +614,6 @@ def iot_dps_device_enrollment_group_create(
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
-    credential_policy_name=None,
     api_version=None,
     login=None,
     auth_type_dataplane=None,
@@ -701,7 +684,6 @@ def iot_dps_device_enrollment_group_create(
                 adr_namespace,
                 adr_ca_name,
                 adr_certificate_policy_name,
-                credential_policy_name,
             ),
         }
         return enrollment_group_output(
@@ -739,7 +721,6 @@ def iot_dps_device_enrollment_group_update(
     adr_namespace=None,
     adr_ca_name=None,
     adr_certificate_policy_name=None,
-    credential_policy_name=None,
     api_version=None,
     login=None,
     auth_type_dataplane=None,
@@ -862,7 +843,6 @@ def iot_dps_device_enrollment_group_update(
                 adr_namespace,
                 adr_ca_name,
                 adr_certificate_policy_name,
-                credential_policy_name,
             )
         ):
             enrollment_record.pop("credentialPolicyName", None)
@@ -881,13 +861,8 @@ def iot_dps_device_enrollment_group_update(
                     (
                         adr_certificate_policy_name
                         if adr_certificate_policy_name is not None
-                        else (
-                            credential_policy_name
-                            if credential_policy_name is not None
-                            else enrollment_record.get("certificatePolicyName")
-                        )
+                        else enrollment_record.get("certificatePolicyName")
                     ),
-                    credential_policy_name,
                 )
             )
         return enrollment_group_output(
@@ -971,7 +946,7 @@ def iot_dps_compute_device_key(
 
     return compute_device_key(
         primary_key=symmetric_key, registration_id=registration_id
-    )
+    ).decode("ascii")
 
 
 # DPS Connection strings

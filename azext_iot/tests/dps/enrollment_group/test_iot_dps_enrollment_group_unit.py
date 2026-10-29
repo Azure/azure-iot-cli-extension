@@ -8,7 +8,10 @@
 import pytest
 import json
 import responses
+import yaml
+from types import SimpleNamespace
 from azext_iot.operations import dps as subject
+from knack.output import format_json, format_tsv, format_yaml
 from knack.util import CLIError
 from azext_iot.tests.conftest import mock_dps_target, mock_symmetric_key_attestation
 from azext_iot.tests.dps import GENERATED_KEY, TEST_ENDORSEMENT_KEY, TEST_KEY_REGISTRATION_ID
@@ -933,6 +936,23 @@ class TestComputeDeviceKey():
             cmd=fixture_cmd,
             registration_id=TEST_KEY_REGISTRATION_ID,
             symmetric_key=TEST_ENDORSEMENT_KEY
-        ).decode()
-        offline_device_key = offline_device_key.strip("\"'\n")
+        )
+        assert isinstance(offline_device_key, str)
         assert offline_device_key == GENERATED_KEY
+
+    @pytest.mark.parametrize("formatter, parser", [
+        (format_tsv, str.strip),
+        (format_json, json.loads),
+        (format_yaml, yaml.safe_load),
+    ])
+    def test_compute_device_key_output(self, fixture_cmd, formatter, parser):
+        device_key = subject.iot_dps_compute_device_key(
+            cmd=fixture_cmd,
+            registration_id=TEST_KEY_REGISTRATION_ID,
+            symmetric_key=TEST_ENDORSEMENT_KEY
+        )
+        output = formatter(SimpleNamespace(result=device_key))
+        parsed_key = parser(output)
+        assert isinstance(parsed_key, str)
+        assert len(parsed_key) == 44
+        assert parsed_key == GENERATED_KEY

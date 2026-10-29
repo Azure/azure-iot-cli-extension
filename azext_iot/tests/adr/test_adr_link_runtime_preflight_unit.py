@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from copy import deepcopy
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,7 +22,7 @@ from azext_iot.adr.providers.link_preflight import (
     get_target,
     validate_target_state,
 )
-from azext_iot.adr.rbac import LinkRbacManager
+from azext_iot.adr.rbac import HUB_DATA_ROLE, LinkRbacManager
 
 HUB_ID = (
     "/subscriptions/target-sub/resourceGroups/target-rg/providers/"
@@ -232,11 +233,162 @@ def test_rbac_manager_is_created_lazily():
     manager_type.assert_called_once_with(provider.cmd.cli_ctx)
 
 
+@pytest.mark.parametrize("operation", ["dps_add", "hub_add", "link_add", "dps_update", "hub_update"])
+@pytest.mark.parametrize("user_assigned", [False, True])
+@pytest.mark.parametrize("existing_grant,authorized", [(False, True), (False, False), (True, False)])
+def test_link_commands_ensure_dps_hub_grants_before_mutation(
+    mocker, operation, user_assigned, existing_grant, authorized,
+):
+    provider = _provider()
+    namespace = _namespace()
+    dps_id = HUB_ID.replace("IotHubs/hub", "provisioningServices/dps")
+    old_hub = HUB_ID + "-existing"
+    selected = {"type": "UserAssigned", "userAssignedIdentity": UAMI} if user_assigned else {"type": "SystemAssigned"}
+    dps_endpoint = {
+        "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": dps_id,
+        "inboundCallerIdentity": selected,
+    }
+    namespace["properties"]["messaging"] = {"endpoints": {"existing": {
+        "endpointType": "Microsoft.Devices/IotHubs", "resourceId": old_hub,
+    }}}
+    if operation not in ("dps_add", "link_add"):
+        namespace["properties"]["provisioning"] = {"endpoints": {"dps": deepcopy(dps_endpoint)}}
+    if operation == "dps_update":
+        namespace["properties"]["provisioning"]["endpoints"]["dps"]["inboundCallerIdentity"] = (
+            {"type": "SystemAssigned"} if user_assigned else {"type": "UserAssigned", "userAssignedIdentity": UAMI}
+        )
+    if operation == "hub_update":
+        namespace["properties"]["messaging"]["endpoints"]["hub"] = {
+            "endpointType": "Microsoft.Devices/IotHubs", "resourceId": HUB_ID,
+            "inboundCallerIdentity": {"type": "SystemAssigned"},
+        }
+    provider.client.namespaces.get.return_value = namespace
+    dps = _hub()
+    dps["identity"]["principalId"] = "dps-system"
+    dps["identity"]["userAssignedIdentities"][UAMI]["principalId"] = "dps-user"
+    provider._get_target = MagicMock(side_effect=lambda _, strategy: dps if strategy.display_name == "DPS" else _hub())
+    provider._warn_if_hub_classically_linked = MagicMock()
+    manager = provider._rbac = LinkRbacManager(provider.cmd.cli_ctx, cli=MagicMock())
+    mocker.patch.object(manager, "_assignment_exists", side_effect=lambda principal, role, _scope:
+                        existing_grant or not (principal.startswith("dps-") and role == HUB_DATA_ROLE))
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    permission = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    mocker.patch.object(manager, "_wait_for_assignments")
+    create = mocker.patch.object(manager, "_invoke_json")
+    scopes = [HUB_ID] if operation.startswith("hub") else [old_hub]
+    if operation == "link_add":
+        scopes.append(HUB_ID)
+    expected = {
+        ("dps-user" if user_assigned else "dps-system", HUB_DATA_ROLE, scope.lower())
+        for scope in scopes
+    }
+    linked = deepcopy(namespace)
+    linked["properties"]["provisioning"] = {"endpoints": {"dps": dps_endpoint}}
+
+    def submit(*_, **__):
+        assert set(manager.created) == (set() if existing_grant else expected)
+        return linked
+
+    mutation = mocker.patch.object(provider, "_patch_link", side_effect=submit)
+    kwargs = {"namespace_name": "ns", "resource_group_name": "ns-rg"}
+    if operation == "link_add":
+        kwargs.update(hub_endpoint_name="hub", hub_resource_id=HUB_ID, dps_endpoint_name="dps", dps_resource_id=dps_id)
+        kwargs.update({"dps_mi_user_assigned": UAMI} if user_assigned else {"dps_mi_system_assigned": True})
+    else:
+        kind, action = operation.split("_")
+        kwargs["endpoint_name"] = kind
+        if kind == "dps":
+            kwargs.update({"mi_user_assigned": UAMI} if user_assigned else {"mi_system_assigned": True})
+        elif action == "update":
+            kwargs["mi_system_assigned"] = True
+        if action == "add":
+            kwargs[f"{kind}_resource_id"] = HUB_ID if kind == "hub" else dps_id
+    if existing_grant or authorized:
+        getattr(provider, operation)(**kwargs)
+        assert mutation.call_count == (2 if operation == "link_add" else 1)
+        assert set(manager.created) == (set() if existing_grant else expected)
+        if existing_grant:
+            permission.assert_not_called()
+            create.assert_not_called()
+        else:
+            assert {call.args[1] for call in permission.call_args_list} == {scope.lower() for scope in scopes}
+            assert all(call.kwargs["subscription"] == "target-sub" for call in create.call_args_list)
+    else:
+        with pytest.raises(AzureResponseError, match="No link mutation"):
+            getattr(provider, operation)(**kwargs)
+        mutation.assert_not_called()
+        create.assert_not_called()
+
+
+def test_namespace_outbound_rotation_does_not_retarget_dps_hub_grants(mocker):
+    from azext_iot.adr.providers.namespace import NamespaceProvider
+    from azext_iot.adr.rbac import required_assignments
+
+    provider = _provider()
+    namespace = _namespace()
+    namespace["identity"]["userAssignedIdentities"] = {UAMI: {"principalId": "new-namespace"}}
+    namespace["identity"]["type"] = "SystemAssigned,UserAssigned"
+    dps_id = HUB_ID.replace("IotHubs/hub", "provisioningServices/dps")
+    namespace["properties"] = {
+        "provisioning": {"endpoints": {"dps": {
+            "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": dps_id,
+            "inboundCallerIdentity": {"type": "SystemAssigned"},
+        }}},
+        "messaging": {"endpoints": {"hub": {
+            "endpointType": "Microsoft.Devices/IotHubs", "resourceId": HUB_ID,
+        }}},
+    }
+    dps = _hub()
+    dps["identity"]["principalId"] = "selected-dps"
+    provider._get_target = MagicMock(side_effect=lambda _, strategy: dps if strategy.display_name == "DPS" else _hub())
+    provider._rbac = MagicMock()
+    mocker.patch("azext_iot.adr.providers.link.LinkProvider", return_value=provider)
+    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=provider.client)
+    NamespaceProvider(provider.cmd)._preflight_outbound_identity_change(
+        namespace, {"type": "UserAssigned", "userAssignedIdentity": UAMI},
+    )
+    requests = provider._rbac.ensure_many.call_args.args[0]
+    grants = {assignment for request in requests for _, assignment in required_assignments(request)}
+    assert ("selected-dps", HUB_DATA_ROLE, HUB_ID.lower()) in grants
+    assert ("new-namespace", HUB_DATA_ROLE, HUB_ID) in grants
+    assert not any(principal == "namespace-principal" for principal, _, _ in grants)
+
+
+@pytest.mark.parametrize("properties", [None, {}, {"provisioning": None}, {"provisioning": {"endpoints": None}}])
+def test_combined_add_accepts_null_provisioning_without_mutating_snapshot(fixture_link_provider, mocker, properties):
+    namespace = {**_namespace(), "properties": properties}
+    original = deepcopy(namespace)
+    fixture_link_provider.client.namespaces.get.return_value = namespace
+    mocker.patch.object(fixture_link_provider, "_patch_link", return_value=_namespace())
+    dps_id = HUB_ID.replace("IotHubs/hub", "provisioningServices/dps")
+    fixture_link_provider.link_add("ns", "ns-rg", "hub", HUB_ID, "dps", dps_id, dps_mi_system_assigned=True)
+    plan = fixture_link_provider._preflight_link.call_args_list[1].kwargs["namespace"]
+    assert plan["properties"]["provisioning"]["endpoints"]["dps"]["resourceId"] == dps_id
+    assert namespace == original
+
+
+def test_hub_preflight_rejects_unattached_dps_identity_before_any_grant():
+    provider = _provider()
+    namespace = _namespace()
+    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
+        "endpointType": "Microsoft.Devices/provisioningServices",
+        "resourceId": HUB_ID.replace("IotHubs/hub", "provisioningServices/dps"),
+        "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI + "-unattached"},
+    }}}
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = MagicMock(return_value=_hub())
+    provider._rbac = MagicMock()
+    with pytest.raises(InvalidArgumentValueError, match="not attached to DPS"):
+        provider.hub_add("hub", "ns", "ns-rg", HUB_ID, no_wait=True)
+    provider._rbac.ensure.assert_not_called()
+    provider.client.namespaces.begin_update.assert_not_called()
+
+
 @pytest.mark.parametrize("operation", ["add", "update"])
 @pytest.mark.parametrize("outbound_uami", [False, True])
 @pytest.mark.parametrize("inbound_uami", [False, True])
 @pytest.mark.parametrize("authorized", [False, True])
-def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
+def test_dps_runtime_grants_self_access_to_selected_outbound_identity(
     mocker, operation, outbound_uami, inbound_uami, authorized,
 ):
     provider = _provider()
@@ -276,19 +428,23 @@ def test_dps_runtime_grants_self_access_to_sami_not_outbound_identity(
     invoke("dps", "ns", "ns-rg", no_wait=True, **kwargs)
     outbound = "namespace-user" if outbound_uami else "namespace-principal"
     inbound = "hub-user" if inbound_uami else "hub-system"
-    assert [call.args[0] for call in grants.call_args_list] == [
-        f"role assignment create --assignee-object-id '{outbound}' "
-        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{dps_id}'",
-        f"role assignment create --assignee-object-id '{inbound}' "
-        f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{NS_ID}'",
-        "role assignment create --assignee-object-id 'namespace-principal' "
-        f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Administrator' --scope '{NS_ID}'",
+    expected = [
+        (outbound, "Contributor", dps_id),
+        (inbound, "Azure Device Registry Contributor", NS_ID),
+        (inbound, "Reader", NS_ID),
+        (outbound, "Azure Device Registry Administrator", NS_ID),
+        (outbound, "Reader", "/subscriptions/ns-sub/resourceGroups/ns-rg"),
+        (outbound, "Reader", "/subscriptions/target-sub/resourceGroups/target-rg"),
     ]
-    assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "ns-sub", "ns-sub"]
-    visible.assert_called_once_with([
-        (outbound, "Contributor", dps_id), (inbound, "Contributor", NS_ID),
-        ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
-    ])
+    assert [call.args[0] for call in grants.call_args_list] == [
+        f"role assignment create --assignee-object-id '{principal}' "
+        f"--assignee-principal-type ServicePrincipal --role '{role}' --scope '{scope}'"
+        for principal, role, scope in expected
+    ]
+    assert [call.kwargs["subscription"] for call in grants.call_args_list] == [
+        "target-sub", "ns-sub", "ns-sub", "ns-sub", "ns-sub", "target-sub",
+    ]
+    visible.assert_called_once_with(expected, strict=False)
     provider.client.namespaces.begin_update.assert_called_once()
 
 
@@ -318,7 +474,7 @@ def test_dps_outbound_uami_cannot_hide_missing_namespace_system_identity(missing
 @pytest.mark.parametrize("outbound_uami", [False, True])
 @pytest.mark.parametrize("inbound_uami", [False, True])
 @pytest.mark.parametrize("authorized", [False, True])
-def test_su_runtime_uses_exact_three_roles_for_selected_identities(
+def test_su_runtime_uses_exact_roles_for_selected_identities(
     mocker, operation, outbound_uami, inbound_uami, authorized,
 ):
     provider = _provider()
@@ -365,20 +521,24 @@ def test_su_runtime_uses_exact_three_roles_for_selected_identities(
         invoke("su", "ns", "ns-rg", no_wait=True, **kwargs)
         ns_principal = "namespace-user" if outbound_uami else "namespace-principal"
         su_principal = "hub-user" if inbound_uami else "hub-system"
-        assert [call.args[0] for call in grants.call_args_list] == [
-            f"role assignment create --assignee-object-id '{ns_principal}' "
-            f"--assignee-principal-type ServicePrincipal --role 'Contributor' --scope '{su_id}'",
-            f"role assignment create --assignee-object-id '{ns_principal}' "
-            f"--assignee-principal-type ServicePrincipal --role 'Device Update Administrator' --scope '{su_id}'",
-            f"role assignment create --assignee-object-id '{su_principal}' "
-            f"--assignee-principal-type ServicePrincipal --role 'Azure Device Registry Contributor' --scope '{NS_ID}'",
-        ]
-        assert [call.kwargs["subscription"] for call in grants.call_args_list] == ["target-sub", "target-sub", "ns-sub"]
-        visible.assert_called_once_with([
+        expected = [
             (ns_principal, "Contributor", su_id),
             (ns_principal, "Device Update Administrator", su_id),
             (su_principal, "Azure Device Registry Contributor", NS_ID),
-        ])
+            (su_principal, "Reader", NS_ID),
+            (ns_principal, "Azure Device Registry Administrator", NS_ID),
+            (ns_principal, "Reader", "/subscriptions/ns-sub/resourceGroups/ns-rg"),
+            (ns_principal, "Reader", "/subscriptions/target-sub/resourceGroups/target-rg"),
+        ]
+        assert [call.args[0] for call in grants.call_args_list] == [
+            f"role assignment create --assignee-object-id '{principal}' "
+            f"--assignee-principal-type ServicePrincipal --role '{role}' --scope '{scope}'"
+            for principal, role, scope in expected
+        ]
+        assert [call.kwargs["subscription"] for call in grants.call_args_list] == [
+            "target-sub", "target-sub", "ns-sub", "ns-sub", "ns-sub", "ns-sub", "target-sub",
+        ]
+        visible.assert_called_once_with(expected, strict=False)
         provider.client.namespaces.begin_update.assert_called_once()
         written = provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]
         assert set(written) == {"updating"}

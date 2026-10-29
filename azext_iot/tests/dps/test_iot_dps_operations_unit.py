@@ -170,9 +170,6 @@ def test_adr_certificate_reference_requires_complete_authority():
         "certificateAuthorityName": "authority",
         "certificatePolicyName": "policy",
     }
-    assert subject._validate_adr_certificate_reference(
-        "namespace", "authority", credential_policy_name="legacy-alias"
-    )["certificatePolicyName"] == "legacy-alias"
     with pytest.raises(RequiredArgumentMissingError, match="together"):
         subject._validate_adr_certificate_reference(
             adr_namespace="namespace", adr_certificate_policy_name="policy"

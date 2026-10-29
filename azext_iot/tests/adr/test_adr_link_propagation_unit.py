@@ -175,17 +175,52 @@ def test_fresh_roles_recover_exact_persisted_endpoint_update(mocker, kind, actio
     assert result["properties"][section]["endpoints"][kind]["linkingState"] == "Succeeded"
     assert h.patches == [{section: {"endpoints": {kind: h.body}}}] * 2
     assert h.clock.delays == [30]
-    assert len(h.created) == len(LINK_ROLE_MATRIX[kind])
+    assert len(h.created) == len(LINK_ROLE_MATRIX[kind]) - 1 - (kind == "dps")
     assert len(h.assignments) == len(h.created)  # recovery verifies, never grants again
     inbound_principal = "target-user" if identity == "user" else "target-principal"
     outbound_principal = "namespace-user" if identity == "user" else "namespace-principal"
     principals = {
         "namespace": outbound_principal, "namespace_system": "namespace-principal", "linked": inbound_principal,
     }
-    assert h.created == [
-        (principals[rule.principal], rule.role, KINDS[kind][2] if rule.scope == "target" else NS_ID)
-        for rule in LINK_ROLE_MATRIX[kind]
-    ]
+    scopes = {
+        "target": KINDS[kind][2], "namespace": NS_ID,
+        "namespace_group": "/subscriptions/sub/resourceGroups/rg", "target_group": "/subscriptions/sub/resourceGroups/rg",
+    }
+    expected = list(dict.fromkeys(
+        (principals[rule.principal], rule.role, scopes[rule.scope])
+        for rule in LINK_ROLE_MATRIX[kind] if rule.principal != "dps"
+    ))
+    if kind == "hub":
+        expected.append((inbound_principal, "IoT Hub Data Contributor", HUB_ID.lower()))
+    assert h.created == expected
+
+
+@pytest.mark.parametrize("change", ["grant", "principal", "hub-scope"])
+def test_dps_hub_recovery_stops_when_cross_service_grant_plan_changes(mocker, change):
+    h = Harness(mocker, "dps", action="update")
+    h.namespace["properties"]["messaging"] = {"endpoints": {"hub": {
+        "endpointType": KINDS["hub"][1], "resourceId": HUB_ID,
+    }}}
+
+    def drift():
+        if not h.patches:
+            return
+        if change == "grant":
+            h.assignments[:] = [
+                assignment for assignment in h.assignments
+                if not (assignment["principalId"] == "target-principal"
+                        and assignment["scope"] == HUB_ID.lower())
+            ]
+        elif change == "principal":
+            h.target["identity"]["principalId"] = "replacement-dps"
+        else:
+            h.namespace["properties"]["messaging"]["endpoints"]["hub"]["resourceId"] = HUB_ID + "-other"
+
+    h.get_hook = drift
+    with pytest.raises(AzureResponseError, match="Recovery stopped|principal or scope changed"):
+        h.run()
+    assert len(h.patches) == 1
+    assert len(h.created) == 6
 
 
 @pytest.mark.parametrize("action", ["add", "update"])
@@ -198,6 +233,9 @@ def test_su_admin_grant_uses_outbound_identity_before_mutation(mocker, action, i
     inherited = [
         (principal, "Contributor", SU_ID),
         ("target-user" if identity == "user" else "target-principal", "Azure Device Registry Contributor", NS_ID),
+        ("target-user" if identity == "user" else "target-principal", "Reader", NS_ID),
+        (principal, "Azure Device Registry Administrator", NS_ID),
+        (principal, "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
     for assignee, role, scope in inherited + ([admin] if outcome == "existing" else []):
         h.assignments.append({
@@ -248,7 +286,114 @@ def test_su_recovery_requires_admin_role_without_regranting(mocker):
     with pytest.raises(AzureResponseError, match="Cannot confirm unconditional Device Update Administrator"):
         h.run()
     assert len(h.patches) == 1
-    assert len(h.created) == 3
+    assert len(h.created) == 6
+
+
+@pytest.mark.parametrize("action", ["add", "update"])
+@pytest.mark.parametrize("identity", ["system", "user"])
+@pytest.mark.parametrize("settings", [None, {}, {"availability": "Disabled"}, {"allocationWeight": 31}])
+def test_hub_recovery_accepts_late_population_of_only_omitted_settings(mocker, action, identity, settings):
+    h = Harness(mocker, "hub", identity, action)
+    h.body.pop("provisioning")
+    h.args.pop("availability", None)
+    h.args.pop("allocation_weight", None)
+    if settings is not None:
+        h.body["provisioning"] = deepcopy(settings)
+    if action == "add":
+        for field, option in (("availability", "availability"), ("allocationWeight", "allocation_weight")):
+            if field in (settings or {}):
+                h.args[option] = settings[field]
+    else:
+        h.namespace["properties"]["messaging"]["endpoints"]["hub"] = {
+            **deepcopy(h.body), "linkingState": "Failed",
+        }
+    wait = h.wait
+    populated = {"availability": "Available", "allocationWeight": 1, **(settings or {})}
+
+    def succeed_with_settings(poller, **kwargs):
+        namespace = wait(poller, **kwargs)
+        namespace["properties"]["messaging"]["endpoints"]["hub"]["provisioning"] = deepcopy(populated)
+        h.namespace = deepcopy(namespace)
+        return namespace
+
+    h.provider._await_terminal.side_effect = succeed_with_settings
+    result = h.run()
+    endpoint = result["properties"]["messaging"]["endpoints"]["hub"]
+    assert endpoint["linkingState"] == "Succeeded"
+    assert endpoint["provisioning"] == populated
+    expected_body = deepcopy(h.body)
+    if settings == {} and action == "add":
+        expected_body.pop("provisioning")
+    assert h.patches == [{"messaging": {"endpoints": {"hub": expected_body}}}] * 2
+    assert h.clock.delays == [30]
+
+
+@pytest.mark.parametrize("drift", [
+    "availability", "allocationWeight", "remove-availability", "remove-allocationWeight",
+    "remove-provisioning", "unknown-setting", "resourceId", "inboundCallerIdentity",
+])
+def test_late_hub_settings_are_frozen_individually_and_never_relax_other_fields(mocker, drift):
+    h = Harness(mocker, "hub")
+    h.body.pop("provisioning")
+    recovery = LinkRecovery(h.provider, h.namespace, "messaging", "hub", h.body, None, None)
+    current = deepcopy(h.namespace)
+    endpoint = {**deepcopy(h.body), "linkingState": "Failed", "linkingError": {"code": "AdrMiNotAuthorized"}}
+    current["properties"].update(provisioningState="Failed", messaging={"endpoints": {"hub": endpoint}})
+    recovery.inspect(current)
+    endpoint["provisioning"] = {}
+    recovery.inspect(current)
+    endpoint["provisioning"]["availability"] = "Available"
+    recovery.inspect(current)
+    endpoint["provisioning"]["allocationWeight"] = 1
+    endpoint.update(linkingState="Succeeded")
+    endpoint.pop("linkingError")
+    current["properties"]["provisioningState"] = "Succeeded"
+    recovery.inspect(current)
+    frozen = deepcopy(recovery.snapshot)
+    if drift.startswith("remove-"):
+        field = drift.removeprefix("remove-")
+        (endpoint if field == "provisioning" else endpoint["provisioning"]).pop(field)
+    elif drift in {"availability", "allocationWeight", "unknown-setting"}:
+        endpoint["provisioning"][drift] = "Disabled" if drift == "availability" else 2
+    elif drift == "resourceId":
+        endpoint["resourceId"] += "-other"
+    else:
+        endpoint["inboundCallerIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
+    with pytest.raises(AzureResponseError, match="changed"):
+        recovery.inspect(current)
+    assert recovery.snapshot == frozen
+
+
+@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize("settings", [[], "invalid", {"unknownSetting": 1}])
+def test_recovery_rejects_malformed_or_unknown_service_populated_settings(mocker, kind, settings):
+    h = Harness(mocker, kind)
+    h.body.pop("provisioning", None)
+    section = KINDS[kind][0]
+    recovery = LinkRecovery(h.provider, h.namespace, section, kind, h.body, None, None)
+    current = deepcopy(h.namespace)
+    endpoint = {**deepcopy(h.body), "linkingState": "InProgress"}
+    current["properties"].update(provisioningState="Updating")
+    current["properties"][section] = {"endpoints": {kind: endpoint}}
+    recovery.inspect(current)
+    endpoint["provisioning"] = settings
+    with pytest.raises(AzureResponseError, match="changed"):
+        recovery.inspect(current)
+
+
+@pytest.mark.parametrize("kind", ["dps", "su"])
+def test_hub_default_population_is_not_allowed_on_non_hub_endpoints(mocker, kind):
+    h = Harness(mocker, kind)
+    section = KINDS[kind][0]
+    recovery = LinkRecovery(h.provider, h.namespace, section, kind, h.body, None, None)
+    current = deepcopy(h.namespace)
+    endpoint = {**deepcopy(h.body), "linkingState": "InProgress"}
+    current["properties"].update(provisioningState="Updating")
+    current["properties"][section] = {"endpoints": {kind: endpoint}}
+    recovery.inspect(current)
+    endpoint["provisioning"] = {"availability": "Available", "allocationWeight": 1}
+    with pytest.raises(AzureResponseError, match="changed"):
+        recovery.inspect(current)
 
 
 def test_repeated_auth_failure_uses_shared_deadline_and_clamped_backoff(mocker):
@@ -397,7 +542,7 @@ def test_recovery_rbac_is_read_only_and_fail_closed(mocker, failure):
     with pytest.raises(AzureResponseError):
         h.run()
     assert len(h.patches) == 1
-    assert len(h.created) == 3
+    assert len(h.created) == 6
     assert not h.clock.delays
 
 
@@ -746,8 +891,23 @@ def test_su_recovery_supports_mixed_inbound_and_outbound_identity_types(mocker, 
         ("namespace-user" if outbound_user else "namespace-principal", "Contributor", SU_ID),
         ("namespace-user" if outbound_user else "namespace-principal", "Device Update Administrator", SU_ID),
         ("target-principal" if outbound_user else "target-user", "Azure Device Registry Contributor", NS_ID),
+        ("target-principal" if outbound_user else "target-user", "Reader", NS_ID),
+        ("namespace-user" if outbound_user else "namespace-principal", "Azure Device Registry Administrator", NS_ID),
+        ("namespace-user" if outbound_user else "namespace-principal", "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
     assert len(h.patches) == 2
+
+
+def test_hub_default_population_is_not_allowed_on_dps_endpoints(mocker):
+    h = Harness(mocker, "dps")
+    recovery = LinkRecovery(h.provider, h.namespace, "provisioning", "dps", h.body, None, None)
+    current = deepcopy(h.namespace)
+    endpoint = {**deepcopy(h.body), "linkingState": "InProgress"}
+    current["properties"].update(provisioningState="Updating", provisioning={"endpoints": {"dps": endpoint}})
+    recovery.inspect(current)
+    endpoint["provisioning"] = {"availability": "Available", "allocationWeight": 1}
+    with pytest.raises(AzureResponseError, match="changed"):
+        recovery.inspect(current)
 
 
 @pytest.mark.parametrize("change", ["delete", "target", "identity", "state"])
@@ -855,6 +1015,6 @@ def test_generated_sdk_recovery_distinguishes_fresh_patch_rejection_from_stale_g
                 assert h.clock.now == 120
     assert patch_times == expected_patches
     assert bodies == [{"properties": {"updating": {"endpoints": {"su": h.body}}}}] * len(patch_times)
-    assert len(h.created) == 3
+    assert len(h.created) == 6
     assert all(at < 120 for _, at in requests)
     assert len(mocked_response.calls) == len(requests)  # No Graph or extra requests.

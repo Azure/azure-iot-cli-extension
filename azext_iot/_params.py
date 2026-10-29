@@ -31,7 +31,6 @@ from azext_iot.common.shared import (
     JobType,
     JobCreateType,
     JobStatusType,
-    AuthenticationType,
     AuthenticationTypeDataplane,
     RenewKeyType,
 )
@@ -198,13 +197,6 @@ def load_arguments(self, _):
             arg_type=get_three_state_flag(),
             help="Skip user prompts. Indicates acceptance of action. "
             "Used primarily for automation scenarios. Default: false",
-        )
-        context.argument(
-            "repair",
-            options_list=["--repair", "-r"],
-            arg_type=get_three_state_flag(),
-            deprecate_info=context.deprecate(hide=True),
-            help="[Deprecated] Reinstall uamqp dependency compatible with extension version. Default: false",
         )
         context.argument(
             "consumer_group",
@@ -391,12 +383,12 @@ def load_arguments(self, _):
             default=HostnameType.AUTO.value,
             is_preview=True,
             help="Type of hostname to use as the SAS token audience. "
-            "'auto' uses the device hostname for device/module-scoped tokens "
+            "'auto' (default) uses the device hostname for device/module-scoped tokens "
             "and the service hostname for hub-scoped tokens. "
             "'classic' always uses the default hostname. "
             "'device' uses the device hostname (errors on non-GWv2 hubs). "
             "'service' uses the service hostname (errors on non-GWv2 hubs). "
-            "This option cannot be combined with --connection-string; when "
+            "Only 'auto' can be used with --connection-string; when "
             "--connection-string is supplied, the SAS audience is derived "
             "from its HostName.",
         )
@@ -595,13 +587,6 @@ def load_arguments(self, _):
             "set to null in export output.",
         )
         context.argument(
-            "storage_authentication_type",
-            options_list=["--sat", "--storage-authentication-type"],
-            arg_type=get_enum_type(AuthenticationType),
-            deprecate_info=context.deprecate(hide=True),
-            help="Authentication type for communicating with the storage container.",
-        )
-        context.argument(
             "identity",
             options_list=["--identity"],
             help="Managed identity type to determine if system assigned managed identity or "
@@ -654,13 +639,6 @@ def load_arguments(self, _):
             options_list=["--output-storage-account", "--osa"],
             help="Name of Azure Storage account containing the output blob container."
             "Parameter is ignored when output_blob_container_uri is provided. Write access is required.",
-        )
-        context.argument(
-            "storage_authentication_type",
-            options_list=["--sat", "--storage-authentication-type"],
-            arg_type=get_enum_type(AuthenticationType),
-            deprecate_info=context.deprecate(hide=True),
-            help="Authentication type for communicating with the storage container.",
         )
         context.argument(
             "identity",
@@ -1146,26 +1124,10 @@ def load_arguments(self, _):
         context.argument("top", validator=process_dps_top)
 
     # Apply arg_group only to dataplane commands
-    for dps_dataplane_command in ["compute-device-key", "connection-string", "enrollment", "enrollment-group"]:
+    for dps_dataplane_command in ["connection-string", "enrollment", "enrollment-group"]:
         with self.argument_context(f"iot dps {dps_dataplane_command}") as context:
             context.argument("dps_name", arg_group="Device Provisioning Service Identifier")
             context.argument("login", arg_group="Device Provisioning Service Identifier")
-
-    with self.argument_context("iot dps compute-device-key") as context:
-        context.argument(
-            "enrollment_id",
-            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
-            help="Enrollment group ID."
-        )
-        context.argument(
-            "symmetric_key",
-            options_list=["--symmetric-key", "--key"],
-            help="The symmetric shared access key for the enrollment group. This bypasses the "
-            "Device Provisioning Service registry and generates the SAS token directly "
-            "from the supplied symmetric key without further validation. All other command "
-            "parameters aside from registration ID will be ignored.",
-        )
-        context.argument("registration_id", help="ID of device registration. ")
 
     with self.argument_context("iot dps connection-string") as context:
         context.argument(
@@ -1215,23 +1177,8 @@ def load_arguments(self, _):
             options_list=[
                 "--adr-cert-policy-name",
                 "--certificate-policy-name",
-                context.deprecate(
-                    target="--adr-certificate-policy-name",
-                    redirect="--adr-cert-policy-name",
-                    hide=True,
-                ),
             ],
             help="Certificate Policy name under the Device Registry Certificate Authority.",
-            arg_group="ADR Certificate Policy",
-        )
-        context.argument(
-            "credential_policy_name",
-            options_list=["--credential-policy-name", "--cpn"],
-            deprecate_info=context.deprecate(
-                redirect="--adr-cert-policy-name", hide=True
-            ),
-            help="Deprecated alias for --adr-cert-policy-name. "
-            "--adr-namespace and --adr-ca-name are also required.",
             arg_group="ADR Certificate Policy",
         )
 
@@ -1357,23 +1304,8 @@ def load_arguments(self, _):
             options_list=[
                 "--adr-cert-policy-name",
                 "--certificate-policy-name",
-                context.deprecate(
-                    target="--adr-certificate-policy-name",
-                    redirect="--adr-cert-policy-name",
-                    hide=True,
-                ),
             ],
             help="Certificate Policy name under the Device Registry Certificate Authority.",
-            arg_group="ADR Certificate Policy",
-        )
-        context.argument(
-            "credential_policy_name",
-            options_list=["--credential-policy-name", "--cpn"],
-            deprecate_info=context.deprecate(
-                redirect="--adr-cert-policy-name", hide=True
-            ),
-            help="Deprecated alias for --adr-cert-policy-name. "
-            "--adr-namespace and --adr-ca-name are also required.",
             arg_group="ADR Certificate Policy",
         )
 
@@ -1419,14 +1351,4 @@ def load_arguments(self, _):
             "Device Provisioning Service registry and generates the SAS token directly "
             "from the supplied symmetric key without further validation. All other command "
             "parameters aside from registration ID will be ignored.",
-        )
-
-    with self.argument_context("iot dps registration") as context:
-        context.argument("registration_id", help="ID of device registration.")
-
-    with self.argument_context("iot dps registration list") as context:
-        context.argument(
-            "enrollment_id",
-            options_list=["--enrollment-id", "--eid", "--group-id", "--gid"],
-            help="Enrollment group ID."
         )

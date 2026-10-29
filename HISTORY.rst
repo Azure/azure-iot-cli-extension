@@ -6,6 +6,30 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**Hub bug fixes**
+
+* Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
+* Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
+
+**ADR unlink permission checks**
+
+* Namespace ``link hub|dps|su remove`` now defaults to a state-aware, read-only advisory permission check instead of creating Reader assignments or blocking on preflight failures. ``LinkedResourceDeleted`` and ``Failed`` endpoints skip the check. ``Succeeded`` endpoints check the outbound identity's read-grant evidence at the linked resource's resource group, or subscription when that group is confirmed deleted.
+* By default, missing access, unavailable checks, malformed linked resource IDs and other endpoint states warn and continue, leaving ADR authoritative. Added ``--no-rbac-check``; ``--yes`` still skips only confirmation. Custom roles, conditions, group membership and deny assignments are not fully evaluated.
+* Malformed outbound identity metadata and resource-group response deserialization failures warn and continue during advisory preflight; namespace write and polling errors still propagate.
+* Malformed namespace identity containers stop unlink before advisory preflight with an explicit error when attached identities cannot be safely preserved, including with ``--no-rbac-check``. Valid identity assignments are preserved.
+* Unlink guidance limits target deletion to ``Succeeded`` links and explains that Hub endpoints, including failed links, require clearing Registry Device IoT Hub capability references first.
+* Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed by default.
+* Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check``. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
+
+**Shared command fixes**
+
+* Hub/DPS namespace linking now automatically grants the selected DPS identity IoT Hub Data Contributor on the associated Hubs, including link updates and DPS identity rotation. Existing assignments are reused and historical grants are retained.
+* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
+* DPS linked-Hub updates accept legacy key-based entries without an explicit authentication type, preserving unchanged fields and rejecting updates without mutation parameters.
+* ``az iot du update calculate-hash`` and the shared ``az iot adr ns su software-update calculate-hash`` helper return the supplied absolute file URI without resolving symlinks. File hashes and byte counts are unchanged.
+* Namespace-not-empty guidance includes registry-device deletion while retaining the other supported child-resource cleanup commands.
+* SAS token help clarifies that only automatic hostname selection can be used with a connection string.
+
 **DPS certificate and enrollment fixes**
 
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
@@ -15,7 +39,7 @@ Release History
 
 * Namespace ``link hub|dps|su remove`` now waits for the ARM asynchronous namespace update and reports operation-status errors instead of returning only the initial response. Waits use the shared 600-second ADR budget, and terminal failed responses are rejected.
 * Operation-status and final namespace GETs retain SDK retries for transient failures; retry suppression applies only to the initial namespace read and PUT.
-* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint, retains the unlink Reader grant, and does not retry the namespace PUT.
+* Added ``--no-wait`` to submit endpoint removal without waiting. The command still removes only the endpoint and does not retry the namespace PUT.
 
 **Wait command bug fixes**
 
@@ -23,7 +47,8 @@ Release History
 
 **ADR bug fixes**
 
-* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before RBAC changes or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection, rerun, and retained Reader-grant guidance.
+* DPS namespace link add/update can recover the observed ``ResourceMiNotAuthorized`` / ``400315`` response when the current command created the required role assignments. Recovery retains the existing grant verification, identity checks, and two-retry propagation limit.
+* Namespace link removal uses a validated strong namespace response ETag to prevent overwriting concurrent changes. Missing, weak, or malformed ETags stop removal before permission checks or writes. Conflicting writes preserve the original HTTP 412 without an automatic retry and report inspection and rerun guidance.
 
 1.0.0b2 (Preview)
 +++++++++++++++++
@@ -78,11 +103,11 @@ Release History
 
 * ``az iot adr ns link hub|dps|su add|update|show|list|wait|remove`` is the only way to link Hubs, DPS, and Software Updates to a namespace. Hub/DPS create/update and namespace create/update no longer accept link inputs.
 * Link add/update validate the target's existence, region, state, SKU, identity, endpoint name, cardinality, and DPS-before-Hub ordering before changing the namespace.
-* Link add/update create missing role assignments for callers who can create role assignments (for example Owner, User Access Administrator, or Role Based Access Control Administrator); other callers receive the exact commands to run. Hub, DPS, and SU links grant the namespace outbound identity Contributor on the target (plus IoT Hub Data Contributor on a Hub, or Device Update Administrator on an Update Instance). The linked resource's inbound identity receives Contributor (Hub, DPS) or Azure Device Registry Contributor (SU) on the namespace.
-* DPS links also grant the namespace system-assigned identity Azure Device Registry Administrator on the namespace for registry-device provisioning.
+* Link add/update create missing role assignments for callers who can create role assignments (for example Owner, User Access Administrator, or Role Based Access Control Administrator); other callers receive the exact commands to run. Hub, DPS, and SU links grant the selected namespace outbound identity Contributor on the target (plus IoT Hub Data Contributor on a Hub, or Device Update Administrator on an Update Instance). Each linked resource's inbound identity receives Azure Device Registry Contributor and Reader on the namespace.
+* All links grant the selected namespace outbound identity Azure Device Registry Administrator on the namespace and Reader on the namespace and target resource groups, deduplicating shared grants. DPS links still require the namespace system-assigned identity to be enabled, independently of outbound identity selection.
 * Managed-identity options are ``--system-assigned-mi`` / ``--user-assigned-mi``.
 * ``link hub|dps|su update`` retries a Failed link with its saved identity and settings.
-* ``link hub|dps|su remove`` removes only the namespace endpoint. Delete the linked resource first. The command grants the namespace outbound identity Reader on the linked resource's resource group if missing; the grant is kept after unlinking.
+* ``link hub|dps|su remove`` removes only the namespace endpoint. Delete the linked resource first. Permission checks are advisory; ``--grant-reader`` explicitly requests any missing Reader grant on the linked resource's resource group. Existing grants are reused and grants are retained after unlinking.
 * ``link dps show`` reports ``brownfieldHubsAvailable: false`` when the linked Hubs cannot be read.
 * A failed link add/update reports the error of the endpoint being linked, not an older failure on another endpoint.
 * When a link add/update PATCH loses its connection, the command never resubmits it: it re-reads the namespace, follows the change if the read shows it landed, and otherwise reports that the outcome is unknown with the commands to inspect it.

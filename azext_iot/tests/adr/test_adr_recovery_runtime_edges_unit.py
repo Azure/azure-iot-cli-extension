@@ -31,8 +31,11 @@ def _assert_initial_su_roles_only(harness):
         ("namespace-principal", "Contributor", KINDS["su"][2]),
         ("namespace-principal", "Device Update Administrator", KINDS["su"][2]),
         ("target-principal", "Azure Device Registry Contributor", NS_ID),
+        ("target-principal", "Reader", NS_ID),
+        ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
+        ("namespace-principal", "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
-    assert len(harness.assignments) == 3
+    assert len(harness.assignments) == 6
 
 
 @pytest.mark.parametrize("invalid", ["outbound", "collection", "namespace-state", "success-with-error"])
@@ -163,10 +166,12 @@ def test_malformed_unrelated_endpoint_collections_prevent_retry_patch(mocker, co
     assert len(harness.patches) == 1 and not harness.clock.delays
     assert harness.created == [
         ("namespace-principal", "Contributor", KINDS["dps"][2]),
-        ("target-principal", "Contributor", NS_ID),
+        ("target-principal", "Azure Device Registry Contributor", NS_ID),
+        ("target-principal", "Reader", NS_ID),
         ("namespace-principal", "Azure Device Registry Administrator", NS_ID),
+        ("namespace-principal", "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
-    assert len(harness.assignments) == 3
+    assert len(harness.assignments) == 5
 
 
 def test_json_object_allowlist_accepts_supported_properties_without_mutation():
@@ -219,7 +224,7 @@ def test_strict_assignment_verification_rejects_malformed_list_before_any_write(
     assert "--include-inherited" in args and "--fill-principal-name" in args
 
 
-def test_hub_recovery_without_inbound_identity_only_verifies_two_outbound_roles():
+def test_hub_recovery_without_inbound_identity_verifies_only_outbound_roles():
     cli = Mock()
     requests = []
 
@@ -246,8 +251,10 @@ def test_hub_recovery_without_inbound_identity_only_verifies_two_outbound_roles(
     assert requests == [
         ("namespace-principal", "Contributor", TARGET_SCOPE),
         ("namespace-principal", "IoT Hub Data Contributor", TARGET_SCOPE),
+        ("namespace-principal", "Azure Device Registry Administrator", NS_SCOPE),
+        ("namespace-principal", "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
-    assert guard.call_count == 4
+    assert guard.call_count == 8
 
 
 def test_subscriptionless_assignment_summary_does_not_invent_subscription():
@@ -284,8 +291,7 @@ def test_assignment_visibility_has_only_early_success_or_bounded_timeout_exits(o
     assert all(call.args[0].startswith("role assignment list ") for call in cli.invoke.call_args_list)
 
 
-def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_wait(mocker, caplog):
-    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_wait(mocker):
     cli = Mock()
     clock = Clock()
     manager = LinkRbacManager(Mock(), cli=cli, clock=clock.time, sleeper=clock.sleep)
@@ -315,12 +321,14 @@ def test_all_assignment_creations_racing_with_another_actor_need_no_visibility_w
 
     assert raced == [
         ("namespace-principal", "Contributor", TARGET_SCOPE),
-        ("dps-principal", "Contributor", NS_SCOPE),
-        ("namespace-system", "Azure Device Registry Administrator", NS_SCOPE),
+        ("dps-principal", "Azure Device Registry Contributor", NS_SCOPE),
+        ("dps-principal", "Reader", NS_SCOPE),
+        ("namespace-principal", "Azure Device Registry Administrator", NS_SCOPE),
+        ("namespace-principal", "Reader", "/subscriptions/sub/resourceGroups/rg"),
     ]
     assert reads == raced * 2  # Initial preflight then one race verification per role.
     assert not clock.delays
-    assert "Completed these role-assignment creation requests" not in caplog.text
+    assert not manager.created
     token.assert_not_called()
 
 

@@ -610,6 +610,7 @@ def test_namespace_delete_not_empty_does_not_recommend_deleting_linked_targets(
         fixture_namespace_provider.delete("namespace", "rg")
 
     message = str(raised.value)
+    assert "ns device delete" in message
     assert "job run delete" in message
     assert "ca policy delete" in message
     assert "link hub remove" not in message

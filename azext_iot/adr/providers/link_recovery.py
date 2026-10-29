@@ -17,7 +17,7 @@ from knack.util import CLIError
 
 from azext_iot.adr.providers.base import ADRResourceStateError, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
-from azext_iot.adr.topology import endpoint_update_body
+from azext_iot.adr.topology import endpoint_settings_match, endpoint_update_body
 
 logger = get_logger(__name__)
 AUTHORIZATION_DELAYS = (30, 60, 120)
@@ -44,6 +44,14 @@ _LINK_INITIATE_REJECTED = re.compile(
 _LINK_INITIATE_ACTIONS = {
     "hub": ("Hub", "Microsoft.Devices/IotHubs/linkInitiate/action"),
     "dps": ("DPS", "Microsoft.Devices/provisioningServices/linkInitiate/action"),
+}
+_DPS_INBOUND_AUTHORIZATION_ERROR = {
+    "code": "ResourceMiNotAuthorized",
+    "message": (
+        "DPS could not read the ADR namespace using its inbound identity used for this request. "
+        "Grant that identity namespace read access, allow time for a recent role assignment to propagate, "
+        "then resubmit the request. (DPS resource reported: [400315])"
+    ),
 }
 
 
@@ -123,7 +131,7 @@ class LinkRecovery:
 
     def __init__(
         self, provider, namespace, section, name, expected, budget, verify, *,
-        authorization_request=None, recent_grants=False,
+        authorization_request=None, recent_grants=False, recent_inbound_grant=False,
     ):
         self.provider, self.section, self.name = provider, section, name
         self.kind = {"provisioning": "dps", "messaging": "hub", "updating": "su"}[section]
@@ -131,6 +139,7 @@ class LinkRecovery:
         self.namespace_identity = _namespace_identity(namespace)
         self.authorization_request = deepcopy(authorization_request)
         self.recent_grants, self.retries = recent_grants, 0
+        self.recent_inbound_grant = recent_inbound_grant
         self.snapshot = None
         previous = ((namespace.get("properties") or {}).get(section) or {}).get("endpoints", {}).get(name)
         self.previous = _normalized(endpoint_update_body(previous)) if isinstance(previous, dict) else None
@@ -174,17 +183,11 @@ class LinkRecovery:
         if state == "Succeeded" and endpoint.get("linkingError"):
             raise AzureResponseError("Endpoint reports Succeeded with a linkingError; recovery stopped.")
         actual = _normalized(endpoint_update_body(endpoint))
-        # The RP can fill omitted Hub provisioning defaults on the first read.
-        # Requested values must match; then freeze every writable setting.
-        expected = deepcopy(self.expected)
-        actual_settings = actual.get("provisioning", {})
-        expected_settings = expected.pop("provisioning", {})
-        comparison = {key: value for key, value in actual.items() if key != "provisioning"}
+        # The RP may populate omitted defaults after a failed first observation.
+        # Freeze each setting as it appears, while always honoring requested values.
         if (
-            comparison != expected
-            or not isinstance(actual_settings, dict)
-            or any(actual_settings.get(key) != value for key, value in expected_settings.items())
-            or (self.snapshot is not None and actual != self.snapshot)
+            not endpoint_settings_match(actual, self.expected)
+            or (self.snapshot is not None and not endpoint_settings_match(actual, self.snapshot))
         ):
             changed = sorted(
                 key for key in set(actual) | set(self.expected)
@@ -224,16 +227,19 @@ class LinkRecovery:
         return self._bound_link_initiate_authorization(error) or self._fresh_grant_rejection(error)
 
     def _fresh_grant_rejection(self, error):
-        """Retry the generic Hub/DPS rejection briefly, only after this command created link grants.
+        """Retry observed grant-propagation failures only after this command created link grants.
 
-        ADR hides the service code, so this also matches real configuration
-        errors; PROPAGATION_RETRIES bounds the extra wait for those.
+        The generic envelope can also hide configuration errors;
+        PROPAGATION_RETRIES bounds the extra wait for those.
         """
+        if not self.recent_grants or self.retries >= PROPAGATION_RETRIES:
+            return False
+        if self.kind == "dps" and error == _DPS_INBOUND_AUTHORIZATION_ERROR:
+            return self.recent_inbound_grant
         message = error.get("message")
         match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
         return bool(
-            self.recent_grants and self.retries < PROPAGATION_RETRIES
-            and match and self.kind in _LINK_INITIATE_ACTIONS
+            match and self.kind in _LINK_INITIATE_ACTIONS
             and match["service"] == _LINK_INITIATE_ACTIONS[self.kind][0]
             and error.get("code") == "LinkInitiateFailed"
             and not set(error) - {"code", "message"}
