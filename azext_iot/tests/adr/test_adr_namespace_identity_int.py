@@ -6,6 +6,8 @@
 
 """Namespace identity integration coverage."""
 
+from time import sleep
+
 import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
@@ -18,6 +20,10 @@ from azext_iot.tests.adr.conftest import (
     generate_identity_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+
+
+# Back-to-back identity updates can be throttled, so wait the requested 20 seconds.
+_IDENTITY_OPERATION_INTERVAL = 20
 
 
 def _create_namespace(test, namespace_name: str) -> None:
@@ -104,6 +110,7 @@ class TestADRNamespaceUAMI(ADRFullInfraHelper, ADRLiveScenarioTest):
                 f"iot adr ns create -n {namespace_name} -g {TEST_RG} --location {TEST_LOCATION}",
                 kind="namespace", name=namespace_name, resource_group=TEST_RG,
             )
+            sleep(_IDENTITY_OPERATION_INTERVAL)
             combined = self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --system true --user {uami_id}"
@@ -123,16 +130,19 @@ class TestADRNamespaceUAMI(ADRFullInfraHelper, ADRLiveScenarioTest):
                 expect_failure=True,
             )
 
+            sleep(_IDENTITY_OPERATION_INTERVAL)
             system_only = self.cmd(
                 f"iot adr ns identity remove -n {namespace_name} "
                 f"-g {TEST_RG} --user {uami_id}"
             ).get_output_in_json()
             assert system_only["type"] == "SystemAssigned"
 
+            sleep(_IDENTITY_OPERATION_INTERVAL)
             self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --user {uami_id}"
             )
+            sleep(_IDENTITY_OPERATION_INTERVAL)
             all_users_removed = self.cmd(
                 f"iot adr ns identity remove -n {namespace_name} "
                 f"-g {TEST_RG} --user"

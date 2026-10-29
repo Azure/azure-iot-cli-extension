@@ -7,6 +7,7 @@
 """Offline state-machine proofs for ADR integration cleanup and Hub/DPS readiness."""
 
 from copy import deepcopy
+from http import HTTPStatus
 import shlex
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -14,6 +15,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, ResourceNotFoundError
+from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import (
     ClientAuthenticationError, HttpResponseError, ResourceNotFoundError as SDKResourceNotFoundError, ServiceRequestError,
@@ -581,6 +583,26 @@ def test_accepted_recovery_requires_progress_before_another_retry(link_kind):
     assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
 
 
+def test_transient_namespace_get_retries_wrapped_503():
+    scenario = Mock()
+    clock = Clock()
+    scenario.cmd.side_effect = [
+        CliExecutionError(
+            _http(HTTPStatus.SERVICE_UNAVAILABLE, "ServiceUnavailable", resource_id=NS_ID)
+        ),
+        _output({"id": NS_ID}),
+    ]
+    budget = readiness._Deadline(30, clock, clock.sleep, "namespace read")
+
+    result = readiness._read_namespace(
+        scenario, "iot adr ns show -n ns -g rg", budget
+    )
+
+    assert result == {"id": NS_ID}
+    assert _commands(scenario) == ["iot adr ns show -n ns -g rg"] * 2
+    assert clock.sleeps == [readiness.RESOURCE_POLL_INTERVAL]
+
+
 def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind):
     scenario = Mock()
     clock = Clock()
@@ -625,7 +647,10 @@ def test_recovery_never_retargets_or_changes_endpoint_settings(field, value, lin
 
 def test_recovery_read_and_update_errors_are_not_hidden(link_kind):
     for responses in (
-        [_output(None), _http(502, "BadGateway")],
+        [_output(None)] + [
+            _http(HTTPStatus.BAD_GATEWAY, "BadGateway")
+            for _ in range(readiness._TRANSIENT_NAMESPACE_READ_RETRIES + 1)
+        ],
         [_output(None), _output(_namespace(kind=link_kind)), _output(_namespace(kind=link_kind)),
          AzureResponseError("preflight denied")],
     ):

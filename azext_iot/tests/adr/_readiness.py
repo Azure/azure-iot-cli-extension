@@ -18,11 +18,13 @@ import shlex
 import sys
 import time
 from copy import deepcopy
+from http import HTTPStatus
 from urllib.parse import unquote, urlsplit
 
 from azure.cli.core.azclierror import AzureResponseError
 from azure.cli.core.commands.arm import show_exception_handler
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
@@ -33,7 +35,11 @@ from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
-from azext_iot.tests.adr._helpers import is_resource_not_found_error
+from azext_iot.tests.adr._helpers import (
+    RESOURCE_POLL_INTERVAL,
+    RESOURCE_RETRYABLE_STATUS_CODES,
+    is_resource_not_found_error,
+)
 from azext_iot.tests.adr._log import LogKind, _log
 
 
@@ -47,6 +53,11 @@ _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 _AUTHORIZATION_BACKOFFS = (30, 60, 120)
 _FRESH_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_TRANSIENT_NAMESPACE_READ_RETRIES = 3
+_TRANSIENT_NAMESPACE_READ_STATUS_CODES = RESOURCE_RETRYABLE_STATUS_CODES - {
+    HTTPStatus.NOT_FOUND,
+    HTTPStatus.CONFLICT,
+}
 _LINK_INITIATE_REJECTED = re.compile(
     r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
     r"Verify the endpoint configuration, then resubmit the request\."
@@ -90,8 +101,28 @@ def _http_error(error):
             status = getattr(getattr(error, "response", None), "status_code", None)
         if status is not None:
             return error, status
-        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+        wrapped = getattr(error, "exception", None) if isinstance(error, CliExecutionError) else None
+        error = (
+            error.__cause__
+            or (wrapped if wrapped is not error and id(wrapped) not in seen else None)
+            or (None if error.__suppress_context__ else error.__context__)
+        )
     return None, None
+
+
+def _read_namespace(scenario, command, budget):
+    for retry in range(_TRANSIENT_NAMESPACE_READ_RETRIES + 1):
+        try:
+            return budget.call(scenario.cmd, command).get_output_in_json()
+        except (HttpResponseError, CloudError, CLIError, CliExecutionError) as error:
+            _, status = _http_error(error)
+            if status not in _TRANSIENT_NAMESPACE_READ_STATUS_CODES or retry == _TRANSIENT_NAMESPACE_READ_RETRIES:
+                raise
+            budget.observation = (
+                f"namespace GET returned transient HTTP {status}; "
+                f"retry {retry + 1}/{_TRANSIENT_NAMESPACE_READ_RETRIES}"
+            )
+            budget.pause(RESOURCE_POLL_INTERVAL)
 
 
 def _get_resource(scenario, command, getter=None):
@@ -302,7 +333,7 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
 
 
 def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    """Match observed Hub authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "hub"
         or submitted_at is None
@@ -311,16 +342,32 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
     ):
         return False
     error = endpoint.get("linkingError") or {}
+    if (
+        endpoint.get("linkingState") == "Failed"
+        and error.get("code") == "AdrMiNotAuthorized"
+        and _read_authorization_failure(endpoint)
+    ):
+        return True
     expected_message = (
         "The namespace's managed identity is not authorized to link the Hub resource. "
         "Grant it access on the resource, then resubmit the request. "
         "(Hub resource reported: [AuthorizationFailed])"
     )
+    message = error.get("message")
+    match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
     return (
         endpoint.get("linkingState") == "Failed"
-        and error in (
-            {"code": "LinkInitiateFailed", "message": expected_message},
-            {"code": "LinkCommitFailed", "message": expected_message},
+        and (
+            error in (
+                {"code": "LinkInitiateFailed", "message": expected_message},
+                {"code": "LinkCommitFailed", "message": expected_message},
+            )
+            or (
+                error.get("code") == "LinkInitiateFailed"
+                and not set(error) - {"code", "message"}
+                and match
+                and match["service"] == "Hub"
+            )
         )
     )
 
@@ -409,7 +456,7 @@ def link_with_readiness(
     show = "iot adr ns show " + shlex.join(["-n", namespace_name, "-g", resource_group])
     expected = deepcopy(expected_endpoint)
     expected["endpointType"] = endpoint_type
-    original = budget.call(scenario.cmd, show).get_output_in_json()
+    original = _read_namespace(scenario, show, budget)
     namespace_id = original.get("id")
     expected_path = f"/resourceGroups/{resource_group}/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}"
     assert isinstance(namespace_id, str) and namespace_id.casefold().endswith(expected_path.casefold()), (
@@ -434,7 +481,7 @@ def link_with_readiness(
     retry_at = None
     recovered_fresh_grant_error = None
     while True:
-        namespace = budget.call(scenario.cmd, show).get_output_in_json()
+        namespace = _read_namespace(scenario, show, budget)
         assert _namespace_identity(namespace) == binding.namespace_identity, (
             "Namespace resource or configured outbound identity changed; recovery stopped"
         )

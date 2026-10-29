@@ -23,6 +23,7 @@ GROUP = "cli-int-test-rg"
 REGION = "centraluseuap"
 TARGETS = runpy.run_path(str(Path(__file__).with_name("_integration_target.py")))
 ARM_HOSTS = {"management.azure.com", "centraluseuap.management.azure.com"}
+_ARM_LRO_SEGMENTS = {"operations", "operationstatuses", "operationresults", "asyncoperations"}
 
 
 def configure_target(region="centraluseuap", endpoint=None):
@@ -137,6 +138,20 @@ def mutation_uncertain(record, mutation):
             or pending_mutation(mutation) or status in (408, 429) or (isinstance(status, int) and status >= 500))
 
 
+def _arm_path_for_validation(path):
+    parent_path, separator, operation_id = path.rpartition("/")
+    if not separator:
+        return path
+    unpadded_id = operation_id.rstrip("=")
+    padding = operation_id[len(unpadded_id):]
+    if not padding:
+        return path
+    parent_segment = parent_path.rsplit("/", 1)[-1].casefold()
+    if padding not in ("=", "==") or not unpadded_id or parent_segment not in _ARM_LRO_SEGMENTS:
+        raise OwnershipError("Unplanned ARM polling URL")
+    return f"{parent_path}/{unpadded_id}"
+
+
 def _arm_read_location(url):
     """Validate read origin/subscription without mistaking resource GETs for LRO URLs."""
     if not isinstance(url, str) or not url or re.search(r"[\s\\]", url):
@@ -149,9 +164,10 @@ def _arm_read_location(url):
         parsed = urlsplit(url)
     except ValueError as error:
         raise OwnershipError("Unplanned ARM polling URL") from error
+    validated_path = _arm_path_for_validation(parsed.path)
     if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
             or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
-            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
+            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", validated_path)
             or any(part in (".", "..") for part in parsed.path.split("/")[1:])):
         raise OwnershipError("Unplanned ARM polling URL")
     return parsed
@@ -201,9 +217,7 @@ def response_polling(mutation, headers, resource, run_id):
             path = arm_location(value).path.casefold()
             if path == target:
                 continue
-            if not any(segment in path.split("/") for segment in (
-                "operations", "operationstatuses", "operationresults", "asyncoperations",
-            )):
+            if not any(segment in path.split("/") for segment in _ARM_LRO_SEGMENTS):
                 raise OwnershipError("Unexpected identity response Location")
         polling[key] = polling_key(value)
     return polling

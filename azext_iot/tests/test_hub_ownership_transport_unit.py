@@ -428,6 +428,17 @@ def test_relative_arm_operation_headers_remain_lros(transport, header, status):
     assert ownership.polling_key(operation) == ownership.polling_key(ownership.ARM + operation)
 
 
+@pytest.mark.parametrize("padding", ["=", "=="])
+def test_arm_polling_urls_allow_padding_only_for_lro_operations(padding):
+    operation = (
+        f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/"
+        f"locations/{ownership.REGION}/operationResults/offline{padding}"
+    )
+    assert ownership.polling_key(operation)
+    with pytest.raises(ownership.OwnershipError, match="polling URL"):
+        ownership.polling_key(HUB + padding)
+
+
 @pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
 def test_real_aaz_identity_actual_operation_header_is_not_synchronous_metadata(transport, monkeypatch, header):
     observer, arm, wire = transport

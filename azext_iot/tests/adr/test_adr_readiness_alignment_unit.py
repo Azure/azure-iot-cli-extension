@@ -146,6 +146,16 @@ def _hub_commit_rejection(message=None):
     }
 
 
+def _hub_read_rejection(target):
+    return {
+        "code": "AdrMiNotAuthorized",
+        "message": (
+            f"The namespace's managed identity is not authorized to read the linked resource '{target}'. "
+            "Grant it read access on the resource, then resubmit the request."
+        ),
+    }
+
+
 def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_preserving_update():
     scenario = Scenario("dps")
     scenario.error = _generic_rejection("DPS")
@@ -161,6 +171,7 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
 
 
 @pytest.mark.parametrize(("kind", "error"), [
+    pytest.param("hub", _generic_rejection("Hub"), id="hub-generic-link-initiate"),
     pytest.param("dps", _resource_mi_rejection(), id="dps-resource-mi"),
     pytest.param(
         "dps",
@@ -168,10 +179,11 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
         id="dps-message-change",
     ),
     pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
+    pytest.param("hub", _hub_read_rejection, id="hub-adr-mi-read"),
 ])
 def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = error(scenario.expected["resourceId"]) if callable(error) else error
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()
@@ -219,8 +231,15 @@ def test_retried_resource_mi_rejection_can_outlive_freshness_window():
         False,
         id="hub-altered-message",
     ),
+    pytest.param(
+        "hub",
+        {**_generic_rejection("Hub"), "details": [{"code": "IH400315"}]},
+        False,
+        id="hub-generic-extra-detail",
+    ),
     pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
     pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+    pytest.param("hub", _generic_rejection("Hub"), True, id="hub-generic-stale"),
 ])
 def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
     scenario = Scenario(kind)
