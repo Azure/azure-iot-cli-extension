@@ -2,11 +2,11 @@
 
 trigger: none
 pr: none
-name: integration-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-integration-$(Date:yyyyMMdd).$(Rev:r)
 
 parameters:
   - name: mode
-    displayName: Run mode
+    displayName: Mode
     type: string
     default: Integration tests
     values: [Dry run, Integration tests]
@@ -21,16 +21,16 @@ parameters:
     default: ['3.13']
     values: ['3.10', '3.11', '3.12', '3.13']
   - name: regions
-    displayName: Azure regions (comma-separated, without spaces)
+    displayName: Regions (CSV)
     type: string
     default: australiaeast
   - name: armEndpoint
-    displayName: ARM routing (canary requires centraluseuap)
+    displayName: ARM endpoint
     type: string
     default: public
     values: [public, canary]
   - name: releaseBuildId
-    displayName: Release candidate build ID (0 builds from source)
+    displayName: Release build ID
     type: number
     default: 0
 
@@ -52,11 +52,12 @@ pool:
 
 stages:
   - stage: Plan
-    displayName: Validate execution plan
+    displayName: Plan
     jobs:
       - job: Plan
         steps:
           - task: UsePythonVersion@0
+            displayName: Select Python
             inputs:
               versionSpec: '3.13'
           - bash: |
@@ -65,18 +66,19 @@ stages:
                 --services $SERVICES --versions $VERSIONS --regions $REGIONS \
                 --endpoint "$ENDPOINT" > plan.json
               cat plan.json
-            displayName: Validate exact matrix before Azure access
+            displayName: Check matrix
             env:
               SERVICES: ${{ replace(variables.servicesCsv, ',', ' ') }}
               VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
               REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
               ENDPOINT: $(endpoint)
           - publish: plan.json
+            displayName: Publish plan
             artifact: integration-plan-$(System.JobAttempt)
 
   - ${{ if eq(parameters.mode, 'Integration tests') }}:
       - stage: Build
-        displayName: Build candidate wheel
+        displayName: Build
         dependsOn: Plan
         jobs:
           - job: Build
@@ -87,21 +89,24 @@ stages:
                     parameters:
                       pythonVersion: '3.13'
                   - bash: python -m build --wheel
-                    displayName: Build the immutable test candidate
+                    displayName: Build wheel
                   - publish: dist
+                    displayName: Publish wheel
                     artifact: integration-wheel-$(System.JobAttempt)
               - ${{ if ne(parameters.releaseBuildId, 0) }}:
                   - task: UsePythonVersion@0
+                    displayName: Select Python
                     inputs:
                       versionSpec: '3.13'
                   - bash: python azext_iot/tests/_release_candidate.py parent --metadata "$PARENT_METADATA"
-                    displayName: Validate trusted release producer before download
+                    displayName: Check release source
                     env:
                       RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
                       RELEASE_PIPELINE_ID: $(ReleasePipelineId)
                       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                       PARENT_METADATA: $(Agent.TempDirectory)/release-parent-$(System.JobAttempt).json
                   - task: DownloadPipelineArtifact@2
+                    displayName: Download artifacts
                     inputs:
                       buildType: specific
                       project: $(System.TeamProjectId)
@@ -113,13 +118,14 @@ stages:
                   - bash: |
                       python azext_iot/tests/_release_candidate.py verify \
                         --metadata "$PARENT_METADATA" --candidate "$CANDIDATE"
-                    displayName: Verify candidate provenance, wheel bytes and distribution
+                    displayName: Check candidate
                     env:
                       RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
                       RELEASE_PIPELINE_ID: $(ReleasePipelineId)
                       PARENT_METADATA: $(Agent.TempDirectory)/release-parent-$(System.JobAttempt).json
                       CANDIDATE: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
                   - publish: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
+                    displayName: Publish wheel
                     artifact: integration-wheel-$(System.JobAttempt)
 
       - stage: Lint
@@ -130,19 +136,21 @@ stages:
             timeoutInMinutes: 25
             steps:
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: '3.13'
               - bash: |
                   set -euo pipefail
                   python -m pip install tox
                   python -m tox r -e lint -vv
-                displayName: Flake8 and pylint
+                displayName: Run lint
 
       - stage: Unit
-        displayName: Unit tests
+        displayName: Unit
         dependsOn: Plan
         jobs:
           - job: Unit
+            displayName: Shard $(shard)
             timeoutInMinutes: 25
             strategy:
               maxParallel: 4
@@ -157,6 +165,7 @@ stages:
                   shard: 4
             steps:
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: '3.13'
               - bash: |
@@ -165,7 +174,7 @@ stages:
                   python -m tox r -e python-azcur-unit -vv -- \
                     -p azext_iot.tests._unit_shard_plugin --unit-shard "$SHARD" \
                     --unit-shard-output "$RESULTS" --junitxml "$RESULTS/junit.xml"
-                displayName: Run balanced serial unit shard (tox reports setup and test timings)
+                displayName: Run unit tests
                 env:
                   SHARD: $(shard)
                   UNIT_RUN_ID: $(Build.BuildId)
@@ -174,6 +183,7 @@ stages:
                   RESULTS: $(Build.SourcesDirectory)/unit-result
                   COVERAGE_FILE: $(Build.SourcesDirectory)/unit-result/coverage.dat
               - task: PublishTestResults@2
+                displayName: Publish results
                 condition: succeededOrFailed()
                 inputs:
                   testResultsFormat: JUnit
@@ -182,16 +192,19 @@ stages:
                   failTaskOnFailedTests: true
                   failTaskOnMissingResultsFile: true
               - publish: unit-result
+                displayName: Publish results
                 condition: succeededOrFailed()
                 artifact: unit-shard-$(shard)-$(System.JobAttempt)
           - job: UnitGate
-            displayName: Verify complete unit collection and merge coverage
+            displayName: Unit results
             dependsOn: Unit
             steps:
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: '3.13'
               - task: DownloadPipelineArtifact@2
+                displayName: Download artifacts
                 inputs:
                   buildType: current
                   itemPattern: unit-shard-*/**
@@ -201,11 +214,12 @@ stages:
                   python -m pip install coverage
                   python azext_iot/tests/_unit_shards.py \
                     --history "$(Pipeline.Workspace)/unit-history" --output unit-coverage
-                displayName: Require all four shards and combine verified coverage
+                displayName: Merge unit results
                 env:
                   UNIT_RUN_ID: $(Build.BuildId)
                   UNIT_COMMIT: $(Build.SourceVersion)
               - publish: unit-coverage
+                displayName: Publish coverage
                 artifact: integration-unit-coverage-$(System.JobAttempt)
 
       - ${{ if ne(variables.servicesCsv, '') }}:
@@ -216,7 +230,7 @@ stages:
                   pythonVersions: ${{ parameters.pythonVersions }}
                   regions: ${{ split(parameters.regions, ',') }}
       - stage: Qualify
-        displayName: Verify all expected cases and publish coverage
+        displayName: Results
         dependsOn:
           - Plan
           - Build
@@ -227,11 +241,14 @@ stages:
                   - ${{ service }}
         jobs:
           - job: Gate
+            displayName: Results
             steps:
               - task: UsePythonVersion@0
+                displayName: Select Python
                 inputs:
                   versionSpec: '3.13'
               - task: DownloadPipelineArtifact@2
+                displayName: Download artifacts
                 inputs:
                   buildType: current
                   targetPath: $(Pipeline.Workspace)/qualification
@@ -240,11 +257,14 @@ stages:
                   python azext_iot/tests/_ado_pipeline.py gate --history "$HISTORY"
                   python -m pip install coverage
                   python azext_iot/tests/_ado_pipeline.py coverage --history "$HISTORY"
+                displayName: Check results
                 env:
                   HISTORY: $(Pipeline.Workspace)/qualification
               - task: PublishCodeCoverageResults@2
+                displayName: Publish coverage
                 inputs:
                   summaryFileLocation: coverage.xml
                   failIfCoverageEmpty: true
               - publish: htmlcov
+                displayName: Publish coverage
                 artifact: integration-coverage-$(System.JobAttempt)

@@ -105,15 +105,17 @@ def test_external_mode_is_default_off_and_normal_build_is_unchanged():
     assert len(steps) == 2
     assert steps[0]["${{ if eq(parameters.releaseBuildId, 0) }}"] == [
         {"template": "templates/setup-python.yml", "parameters": {"pythonVersion": "3.13"}},
-        {"bash": "python -m build --wheel", "displayName": "Build the immutable test candidate"},
-        {"publish": "dist", "artifact": "integration-wheel-$(System.JobAttempt)"},
+        {"bash": "python -m build --wheel", "displayName": "Build wheel"},
+        {"publish": "dist", "displayName": "Publish wheel", "artifact": "integration-wheel-$(System.JobAttempt)"},
     ]
     assert not any(item.get("name") == "ReleasePipelineId" for item in entry["variables"])
     assert entry["variables"][0] == {"group": "aziotcli_test_primary"}
     external = steps[1]["${{ if ne(parameters.releaseBuildId, 0) }}"]
     assert len(external) == 5
     setup, lookup, download, verify, publish = external
-    assert setup == {"task": "UsePythonVersion@0", "inputs": {"versionSpec": "3.13"}}
+    assert setup == {
+        "task": "UsePythonVersion@0", "displayName": "Select Python", "inputs": {"versionSpec": "3.13"},
+    }
     assert "_release_candidate.py parent --metadata" in lookup["bash"]
     assert lookup["env"]["SYSTEM_ACCESSTOKEN"] == "$(System.AccessToken)"
     assert "_release_candidate.py verify" in verify["bash"]
@@ -125,6 +127,7 @@ def test_external_mode_is_default_off_and_normal_build_is_unchanged():
     assert lookup["env"]["PARENT_METADATA"] == verify["env"]["PARENT_METADATA"]
     assert download == {
         "task": "DownloadPipelineArtifact@2",
+        "displayName": "Download artifacts",
         "inputs": {
             "buildType": "specific", "project": "$(System.TeamProjectId)", "definition": "$(ReleasePipelineId)",
             "buildVersionToDownload": "specific", "pipelineId": "${{ parameters.releaseBuildId }}",
@@ -133,7 +136,8 @@ def test_external_mode_is_default_off_and_normal_build_is_unchanged():
         },
     }
     assert publish == {
-        "publish": download["inputs"]["targetPath"], "artifact": "integration-wheel-$(System.JobAttempt)",
+        "publish": download["inputs"]["targetPath"], "displayName": "Publish wheel",
+        "artifact": "integration-wheel-$(System.JobAttempt)",
     }
     assert verify["env"]["CANDIDATE"] == publish["publish"]
 

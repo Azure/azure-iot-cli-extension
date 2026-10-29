@@ -10,7 +10,7 @@ parameters:
 
 stages:
   - stage: ${{ parameters.service }}
-    displayName: ${{ parameters.service }} integration tests (manual recovery)
+    displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
     dependsOn:
       - Build
       - Lint
@@ -20,6 +20,7 @@ stages:
           eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
     jobs:
       - job: Tests
+        displayName: ${{ parameters.service }} $(python) $(region)
         timeoutInMinutes: 360
         cancelTimeoutInMinutes: 15
         strategy:
@@ -32,11 +33,14 @@ stages:
                   region: ${{ region }}
         steps:
           - checkout: self
+            displayName: Checkout source
             clean: true
           - task: UsePythonVersion@0
+            displayName: Select Python
             inputs:
               versionSpec: $(python)
           - task: DownloadPipelineArtifact@2
+            displayName: Download artifacts
             inputs:
               buildType: current
               targetPath: $(Pipeline.Workspace)/history
@@ -56,14 +60,14 @@ stages:
               fi
               export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
               python -c "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
-            displayName: Install candidate and prepare test environment
+            displayName: Prepare tests
             env:
               HISTORY: $(Pipeline.Workspace)/history
               PYTHONPATH: $(Build.SourcesDirectory)
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
           - task: AzureCLI@2
-            displayName: Retry failed cases or rerun the full service with fresh fixtures
+            displayName: Run tests
             inputs:
               azureSubscription: $(AzureServiceConnection)
               addSpnToEnvironment: true
@@ -103,20 +107,21 @@ stages:
               azext_iot_adr_arm_resource: https://management.azure.com
           - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
             condition: succeededOrFailed()
-            displayName: Report incomplete execution before publishing
+            displayName: Record results
             env:
               SERVICE: ${{ parameters.service }}
               TEST_PYTHON: $(python)
               TEST_REGION: $(region)
           - publish: attempt
+            displayName: Publish results
             condition: succeededOrFailed()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
           - task: PublishTestResults@2
             condition: succeededOrFailed()
-            displayName: Publish effective results (original attempts remain in artifacts)
+            displayName: Publish results
             inputs:
               testResultsFormat: JUnit
               testResultsFiles: attempt/final.xml
-              testRunTitle: ${{ parameters.service }} Python $(python) $(region) attempt $(System.JobAttempt)
+              testRunTitle: ${{ parameters.service }} $(python) $(region) attempt $(System.JobAttempt)
               failTaskOnFailedTests: true
               failTaskOnMissingResultsFile: true
