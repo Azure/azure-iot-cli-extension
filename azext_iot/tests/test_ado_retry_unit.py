@@ -286,28 +286,23 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 360
 
 
-@pytest.mark.parametrize("status,count,error,message", [
-    (200, 0, None, ""),
-    (200, 1, ValueError, "A GitHub integration run is active"),
-    (403, 0, RuntimeError, "GitHub live-run admission could not be checked"),
-    (302, 0, RuntimeError, "GitHub live-run admission could not be checked"),
-])
-def test_admission_only_checks_github_without_ado_build_credentials(status, count, error, message, mocker, monkeypatch):
-    monkeypatch.delenv("SYSTEM_ACCESSTOKEN", raising=False)
-    monkeypatch.delenv("BUILD_BUILDID", raising=False)
-    response = mocker.MagicMock(status_code=status)
-    response.__enter__.return_value = response
-    response.json.return_value = {"total_count": count}
-    get = mocker.patch("requests.get", return_value=response)
-    if error:
-        with pytest.raises(error, match=message):
-            pipeline.admission()
-    else:
-        pipeline.admission()
-    get.assert_called_once_with(
-        "https://api.github.com/repos/Azure/azure-iot-cli-extension/actions/workflows/int_test.yml/runs",
-        params={"status": "in_progress", "per_page": 1}, timeout=(10, 30), allow_redirects=False,
+def test_live_run_starts_auth_without_admission_requests(tmp_path, mocker, monkeypatch):
+    mocker.patch.object(pipeline, "context", return_value=CONTEXT.copy())
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "1")
+    args = SimpleNamespace(
+        service="ADR", python="3.13", region="australiaeast", endpoint=CONTEXT["endpoint"],
+        wheel=tmp_path, diagnostic=False, history=tmp_path / "history",
     )
+    (tmp_path / "candidate.whl").write_bytes(b"offline")
+    get = mocker.patch("requests.get", side_effect=AssertionError("Unexpected admission lookup"))
+    execute = mocker.patch.object(
+        pipeline.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "auth"),
+    )
+    with pytest.raises(subprocess.CalledProcessError):
+        pipeline.run_attempt(args, tmp_path / "attempt")
+    execute.assert_called_once()
+    assert execute.call_args.args[0][1].endswith("_refresh_ci_auth.py")
+    get.assert_not_called()
 
 
 def test_attempt_selection_is_separate_from_nonqualifying_debug():

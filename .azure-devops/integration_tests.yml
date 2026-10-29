@@ -3,7 +3,6 @@
 trigger: none
 pr: none
 name: integration-$(Date:yyyyMMdd).$(Rev:r)
-lockBehavior: sequential
 
 parameters:
   - name: mode
