@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, ResourceNotFoundError
+from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import (
     ClientAuthenticationError, HttpResponseError, ResourceNotFoundError as SDKResourceNotFoundError, ServiceRequestError,
@@ -53,6 +54,12 @@ NAMESPACE_IDENTITY = {"type": "SystemAssigned", "principalId": "11111111-1111-41
 @pytest.fixture(autouse=True)
 def scoped_subscription(mocker):
     mocker.patch.object(readiness, "get_subscription_id", return_value="sub")
+
+
+@pytest.fixture(autouse=True)
+def short_read_authorization_settle(mocker):
+    # Keep state-machine transcripts short; the production window has a dedicated timing test below.
+    mocker.patch.object(readiness, "_INITIAL_READ_AUTHORIZATION_SETTLE_SECONDS", 10)
 
 
 @pytest.fixture(params=["hub", "dps"])
@@ -581,6 +588,66 @@ def test_accepted_recovery_requires_progress_before_another_retry(link_kind):
     assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
 
 
+def test_initial_read_authorization_retry_waits_for_full_production_backoff(monkeypatch, link_kind):
+    monkeypatch.setattr(
+        readiness, "_INITIAL_READ_AUTHORIZATION_SETTLE_SECONDS", sum(readiness._AUTHORIZATION_BACKOFFS),
+    )
+    scenario = Mock()
+    clock = Clock()
+    writes = []
+    failed = _namespace(kind=link_kind)
+    succeeded = _namespace("Succeeded", "Succeeded", kind=link_kind)
+
+    def command(text, **_):
+        if " add " in text or " update " in text:
+            writes.append((clock.now, text))
+            return _output(None)
+        return _output(failed if len(writes) == 1 else succeeded)
+
+    scenario.cmd.side_effect = command
+    result = _link(scenario, clock, kind=link_kind, timeout=300)
+
+    assert result["linkingState"] == "Succeeded"
+    assert [when for when, _ in writes] == [0, sum(readiness._AUTHORIZATION_BACKOFFS)]
+    assert " add " in writes[0][1] and " update " in writes[1][1]
+
+
+def test_transient_initial_namespace_get_is_retried_without_replaying_link_add(link_kind):
+    scenario = Mock()
+    clock = Clock()
+    original = {
+        "id": NS_ID,
+        "identity": deepcopy(NAMESPACE_IDENTITY),
+        "properties": {"provisioningState": "Succeeded"},
+    }
+    transient = CliExecutionError(
+        _http(503, "ServiceUnavailable", resource_id=NS_ID)
+    )
+    scenario.cmd.side_effect = [
+        transient,
+        _output(original),
+        _output(None),
+        _output(_namespace("Succeeded", "Succeeded", kind=link_kind)),
+    ]
+
+    helper = readiness.link_hub_with_readiness if link_kind == "hub" else readiness.link_dps_with_readiness
+    result = helper(
+        scenario,
+        _add(link_kind),
+        "ns",
+        "rg",
+        LINKS[link_kind][2],
+        _expected(link_kind),
+        clock=clock,
+        sleeper=clock.sleep,
+    )
+
+    assert result["linkingState"] == "Succeeded"
+    assert _commands(scenario)[:2] == ["iot adr ns show -n ns -g rg"] * 2
+    assert sum(" add " in command for command in _commands(scenario)) == 1
+    assert clock.sleeps == [10]
+
+
 def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind):
     scenario = Mock()
     clock = Clock()
@@ -625,7 +692,7 @@ def test_recovery_never_retargets_or_changes_endpoint_settings(field, value, lin
 
 def test_recovery_read_and_update_errors_are_not_hidden(link_kind):
     for responses in (
-        [_output(None), _http(502, "BadGateway")],
+        [_output(None)] + [_http(502, "BadGateway") for _ in range(4)],
         [_output(None), _output(_namespace(kind=link_kind)), _output(_namespace(kind=link_kind)),
          AzureResponseError("preflight denied")],
     ):

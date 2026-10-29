@@ -429,6 +429,37 @@ def test_relative_arm_operation_headers_remain_lros(transport, header, status):
 
 
 @pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
+@pytest.mark.parametrize("padding", ["=", "=="])
+def test_arm_operation_headers_accept_trailing_base64_padding(transport, header, padding):
+    observer, _, wire = transport
+    create_hub(wire)
+    operation = (
+        f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/"
+        f"locations/{ownership.REGION}/operationResults/offline{padding}"
+    )
+    observer.prepare("PUT", HUB, "test", {})
+    observer.complete(HUB, 201, {header: operation}, wire.resources[HUB])
+    record = observer.data["resources"][HUB]
+    assert record["uncertain"] and ownership.pending_mutation(record["mutations"][-1])
+    ownership.observe_poll(observer.data, ownership.ARM + operation, 200, {"status": "Succeeded"})
+    ownership.observe_get(observer.data, HUB, 200, wire.resources[HUB])
+    assert not record["uncertain"]
+
+
+@pytest.mark.parametrize("path", [
+    f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/operationResults/off=line",
+    f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/operationResults/offline===",
+    f"/subscriptions/{ownership.SUBSCRIPTION}/providers/Microsoft.Devices/operationResults/offline=/result",
+    f"/subscriptions/{ownership.SUBSCRIPTION}/resourceGroups/operations/providers/"
+    "Microsoft.Devices/IotHubs/offline=",
+    HUB + "=",
+])
+def test_arm_polling_urls_reject_unsafe_equals(path):
+    with pytest.raises(ownership.OwnershipError, match="polling URL"):
+        ownership.polling_key(path)
+
+
+@pytest.mark.parametrize("header", ["Azure-AsyncOperation", "Location"])
 def test_real_aaz_identity_actual_operation_header_is_not_synchronous_metadata(transport, monkeypatch, header):
     observer, arm, wire = transport
     operation = (

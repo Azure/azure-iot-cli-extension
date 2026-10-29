@@ -330,7 +330,7 @@ def test_cleanup_callbacks_are_independent_and_preserve_failure(cli_scenario, or
     provider.cancel.assert_not_called()
 
 
-def test_missing_adu_smoke_never_cancels_owned_failed_runs(cli_scenario, resources, monkeypatch):
+def test_missing_su_smoke_never_cancels_owned_failed_runs(cli_scenario, resources, monkeypatch):
     scenario, provider = cli_scenario
     monkeypatch.setattr(runs, "_generate_job_name", lambda: "job")
     monkeypatch.setattr(runs, "_generate_group_name", lambda: "group")
@@ -340,7 +340,7 @@ def test_missing_adu_smoke_never_cancels_owned_failed_runs(cli_scenario, resourc
 
     def create(**kwargs):
         name = kwargs["run_name"] or "run-generated"
-        value = _run("Failed", error={"code": "AduEndpointNotLinked"})
+        value = _run("Failed", error={"code": "SuEndpointNotLinked"})
         value["name"] = name
         owned[name] = value
         return value

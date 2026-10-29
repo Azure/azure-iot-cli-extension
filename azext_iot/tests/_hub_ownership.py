@@ -23,6 +23,7 @@ GROUP = "cli-int-test-rg"
 REGION = "centraluseuap"
 TARGETS = runpy.run_path(str(Path(__file__).with_name("_integration_target.py")))
 ARM_HOSTS = {"management.azure.com", "centraluseuap.management.azure.com"}
+_ARM_LRO_SEGMENTS = {"operations", "operationstatuses", "operationresults", "asyncoperations"}
 
 
 def configure_target(region="centraluseuap", endpoint=None):
@@ -149,9 +150,19 @@ def _arm_read_location(url):
         parsed = urlsplit(url)
     except ValueError as error:
         raise OwnershipError("Unplanned ARM polling URL") from error
+    unpadded_path = parsed.path.rstrip("=")
+    padding = parsed.path[len(unpadded_path):]
+    path_segments = unpadded_path.rsplit("/", 2)
+    parent_segment = path_segments[-2].casefold() if len(path_segments) > 1 else ""
+    padded_operation = (
+        padding in ("=", "==")
+        and bool(unpadded_path.rsplit("/", 1)[-1])
+        and parent_segment in _ARM_LRO_SEGMENTS
+    )
     if (parsed.scheme != "https" or parsed.netloc not in ("management.azure.com", urlsplit(ARM).netloc)
             or not parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")
-            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", parsed.path)
+            or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9_.()/-]+", unpadded_path)
+            or (padding and not padded_operation)
             or any(part in (".", "..") for part in parsed.path.split("/")[1:])):
         raise OwnershipError("Unplanned ARM polling URL")
     return parsed
@@ -201,9 +212,7 @@ def response_polling(mutation, headers, resource, run_id):
             path = arm_location(value).path.casefold()
             if path == target:
                 continue
-            if not any(segment in path.split("/") for segment in (
-                "operations", "operationstatuses", "operationresults", "asyncoperations",
-            )):
+            if not any(segment in path.split("/") for segment in _ARM_LRO_SEGMENTS):
                 raise OwnershipError("Unexpected identity response Location")
         polling[key] = polling_key(value)
     return polling

@@ -23,6 +23,7 @@ from urllib.parse import unquote, urlsplit
 from azure.cli.core.azclierror import AzureResponseError
 from azure.cli.core.commands.arm import show_exception_handler
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
@@ -46,7 +47,10 @@ _OWNED_LINK_TYPES = {
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 _AUTHORIZATION_BACKOFFS = (30, 60, 120)
+_INITIAL_READ_AUTHORIZATION_SETTLE_SECONDS = sum(_AUTHORIZATION_BACKOFFS)
 _FRESH_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_TRANSIENT_NAMESPACE_READ_RETRIES = 3
+_TRANSIENT_NAMESPACE_READ_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 _LINK_INITIATE_REJECTED = re.compile(
     r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
     r"Verify the endpoint configuration, then resubmit the request\."
@@ -90,8 +94,29 @@ def _http_error(error):
             status = getattr(getattr(error, "response", None), "status_code", None)
         if status is not None:
             return error, status
-        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+        wrapped = error.exception if isinstance(error, CliExecutionError) else None
+        error = (
+            error.__cause__
+            or (wrapped if wrapped is not error and id(wrapped) not in seen else None)
+            or (None if error.__suppress_context__ else error.__context__)
+        )
     return None, None
+
+
+def _read_namespace(scenario, command, budget):
+    """Retry only a bounded transient failure from the known namespace GET."""
+    for retry in range(_TRANSIENT_NAMESPACE_READ_RETRIES + 1):
+        try:
+            return budget.call(scenario.cmd, command).get_output_in_json()
+        except (HttpResponseError, CloudError, CLIError, CliExecutionError) as error:
+            _, status = _http_error(error)
+            if status not in _TRANSIENT_NAMESPACE_READ_STATUS_CODES or retry == _TRANSIENT_NAMESPACE_READ_RETRIES:
+                raise
+            budget.observation = (
+                f"namespace GET returned transient HTTP {status}; "
+                f"retry {retry + 1}/{_TRANSIENT_NAMESPACE_READ_RETRIES}"
+            )
+            budget.pause(10)
 
 
 def _get_resource(scenario, command, getter=None):
@@ -302,7 +327,7 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
 
 
 def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    """Match observed Hub authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "hub"
         or submitted_at is None
@@ -316,11 +341,21 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
         "Grant it access on the resource, then resubmit the request. "
         "(Hub resource reported: [AuthorizationFailed])"
     )
+    message = error.get("message")
+    match = _LINK_INITIATE_REJECTED.fullmatch(message) if isinstance(message, str) else None
     return (
         endpoint.get("linkingState") == "Failed"
-        and error in (
-            {"code": "LinkInitiateFailed", "message": expected_message},
-            {"code": "LinkCommitFailed", "message": expected_message},
+        and (
+            error in (
+                {"code": "LinkInitiateFailed", "message": expected_message},
+                {"code": "LinkCommitFailed", "message": expected_message},
+            )
+            or (
+                error.get("code") == "LinkInitiateFailed"
+                and not set(error) - {"code", "message"}
+                and match
+                and match["service"] == "Hub"
+            )
         )
     )
 
@@ -396,7 +431,8 @@ def link_with_readiness(
     Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
     Recovery uses the existing identity-preserving update/preflight. After an
     accepted update, stale Failed reads cannot trigger another write: observe
-    progress first, or Succeeded. All CLI/read errors propagate unchanged.
+    progress first, or Succeeded. Transient namespace GET failures are retried
+    within the deadline; all other or exhausted CLI/read errors propagate.
     """
     assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
     section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
@@ -409,7 +445,7 @@ def link_with_readiness(
     show = "iot adr ns show " + shlex.join(["-n", namespace_name, "-g", resource_group])
     expected = deepcopy(expected_endpoint)
     expected["endpointType"] = endpoint_type
-    original = budget.call(scenario.cmd, show).get_output_in_json()
+    original = _read_namespace(scenario, show, budget)
     namespace_id = original.get("id")
     expected_path = f"/resourceGroups/{resource_group}/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}"
     assert isinstance(namespace_id, str) and namespace_id.casefold().endswith(expected_path.casefold()), (
@@ -434,7 +470,7 @@ def link_with_readiness(
     retry_at = None
     recovered_fresh_grant_error = None
     while True:
-        namespace = budget.call(scenario.cmd, show).get_output_in_json()
+        namespace = _read_namespace(scenario, show, budget)
         assert _namespace_identity(namespace) == binding.namespace_identity, (
             "Namespace resource or configured outbound identity changed; recovery stopped"
         )
@@ -472,11 +508,20 @@ def link_with_readiness(
             )
             if recovery_reason and progressed:
                 if retry_at is None:
-                    if recovery_reason == "fresh-grant":
+                    if recovery_reason == "read" and retries == 0:
+                        # A no-wait update has no authoritative operation result,
+                        # so only one retry is safe without observed progress.
+                        # Spend the full production propagation window before it.
+                        retry_at = max(
+                            submitted_at + _INITIAL_READ_AUTHORIZATION_SETTLE_SECONDS,
+                            budget.clock() + 10,
+                        )
+                    elif recovery_reason == "fresh-grant":
                         delay = _AUTHORIZATION_BACKOFFS[min(retries, len(_AUTHORIZATION_BACKOFFS) - 1)]
+                        retry_at = budget.clock() + delay
                     else:
                         delay = min(10 * (retries + 1), 30)
-                    retry_at = budget.clock() + delay
+                        retry_at = budget.clock() + delay
                 if budget.clock() >= retry_at:
                     recovery = failed_link_recovery_commands({
                         "id": namespace["id"],

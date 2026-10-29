@@ -161,6 +161,7 @@ def test_dps_generic_link_initiate_rejection_after_fresh_grant_uses_identity_pre
 
 
 @pytest.mark.parametrize(("kind", "error"), [
+    pytest.param("hub", _generic_rejection("Hub"), id="hub-generic-link-initiate"),
     pytest.param("dps", _resource_mi_rejection(), id="dps-resource-mi"),
     pytest.param(
         "dps",
@@ -219,8 +220,15 @@ def test_retried_resource_mi_rejection_can_outlive_freshness_window():
         False,
         id="hub-altered-message",
     ),
+    pytest.param(
+        "hub",
+        {**_generic_rejection("Hub"), "details": [{"code": "IH400315"}]},
+        False,
+        id="hub-generic-extra-detail",
+    ),
     pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
     pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+    pytest.param("hub", _generic_rejection("Hub"), True, id="hub-generic-stale"),
 ])
 def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
     scenario = Scenario(kind)
@@ -244,7 +252,7 @@ def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, s
 
 
 @pytest.mark.parametrize("mutation", ["hub-service", "extra-detail", "stale-grant", "hub-link"])
-def test_generic_link_initiate_rejection_is_dps_fresh_grant_only(mutation):
+def test_generic_link_initiate_rejection_is_kind_bound_exact_and_fresh(mutation):
     scenario = Scenario("hub" if mutation == "hub-link" else "dps")
     scenario.error = _generic_rejection("Hub" if mutation == "hub-service" else "DPS")
     if mutation == "extra-detail":
