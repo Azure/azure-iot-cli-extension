@@ -11,6 +11,7 @@ from unittest.mock import Mock
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, InvalidArgumentValueError
 from azure.core.exceptions import ServiceRequestError, ServiceResponseError
+from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.util import CLIError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
@@ -72,7 +73,11 @@ def test_brownfield_add_submits_required_hubs_and_dps_once(batch, extra_hub):
         }}
     provider.link_add(**args, no_wait=True)
     provider.client.namespaces.begin_update.assert_called_once()
-    body = provider.client.namespaces.begin_update.call_args.kwargs["properties"]["properties"]
+    arguments = provider.client.namespaces.begin_update.call_args.kwargs
+    assert arguments["retry_total"] == 0
+    assert isinstance(arguments["polling"], ARMPolling)
+    assert arguments["polling"]._operation_config == {}
+    body = arguments["properties"]["properties"]
     assert set(body) == {"provisioning", "messaging"}
     assert set(body["messaging"]["endpoints"]) == ({"hub", "hub2"} if extra_hub else {"hub"})
     requests = provider._rbac.ensure_many.call_args.args[0]
