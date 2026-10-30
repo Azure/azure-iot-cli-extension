@@ -10,6 +10,10 @@ Unreleased
 
 * **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
 
+**IoT Hub updates**
+
+* Fixed ``az iot hub monitor-events --login`` failing with an unhandled ``ValueError`` for Event Hub-compatible connection strings from Azure US Government (``.servicebus.usgovcloudapi.net``) and Azure China (``.servicebus.chinacloudapi.cn``) hubs.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 
