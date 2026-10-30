@@ -1458,6 +1458,25 @@ def test_real_cosmos_lro_without_provisioning_state_then_container_and_cleanup(t
     assert not wire.resources
 
 
+def test_failed_cosmos_create_retry_does_not_block_other_roots(transport):
+    observer, _, wire = transport
+    body = {"location": ownership.REGION}
+    wire.submit("PUT", COSMOS, body)
+    record = observer.data["resources"][COSMOS]
+    wire.resources[COSMOS]["properties"]["provisioningState"] = "Failed"
+    record["mutations"][0].update(awaitingProvisioning=True, pollingFailed=True)
+    record["uncertain"] = True
+
+    wire.accepted[NAMESPACE] = "azure-asyncoperation", 202
+    wire.submit("PUT", NAMESPACE, body)
+    assert wire.submit("PUT", NAMESPACE + "/eventhubs/owned", {"properties": {}}).status_code == 200
+
+    observer.allow_cosmos_create_retry(COSMOS.rsplit("/", 1)[1])
+    assert wire.submit("PUT", COSMOS, body).status_code == 200
+    assert wire.submit("PUT", DATABASE, {"properties": {"resource": {"id": "routedb"}}}).status_code == 200
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
+
+
 @pytest.mark.parametrize("damage", ["uncorrelated", "nonterminal", "failed", "wrong-id", "transport", "foreign-root"])
 def test_polling_never_resolves_unknown_or_unrelated_mutations(transport, damage):
     observer, arm, wire = transport

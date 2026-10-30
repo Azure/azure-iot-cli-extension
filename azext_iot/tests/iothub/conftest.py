@@ -513,6 +513,12 @@ def fixture_isolated_hub(request):
         _isolated_hub_pending = None
 
 
+def _fixture_deadline(request):
+    timeout = request._pyfuncitem.get_closest_marker("timeout")  # pylint: disable=protected-access
+    budget = (timeout.args[0] if timeout.args else timeout.kwargs.get("timeout", 900)) if timeout else 900
+    return monotonic() + budget
+
+
 def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None, require_new=False):
     global _isolated_hub_pending
     if _isolated_hub_pending:
@@ -540,11 +546,7 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
     if require_new and desired_count != 1:
         raise CLIInternalError("A private scenario requires exactly one fresh Hub.")
     observer = _regular_phase_observer(request) if desired_count > 1 else None
-    deadline = None
-    if observer is not None:
-        timeout = request._pyfuncitem.get_closest_marker("timeout")  # pylint: disable=protected-access
-        budget = (timeout.args[0] if timeout.args else timeout.kwargs.get("timeout", 900)) if timeout else 900
-        deadline = monotonic() + budget
+    deadline = _fixture_deadline(request) if observer is not None else None
     hub_results = []
     for _ in range(desired_count):
         name = generate_hub_id()
@@ -563,15 +565,23 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        if observer is not None:
-            _invoke_fixture(base_create_command + " --no-wait")
-            hub_obj = None
-        elif require_new:
-            _require_absent_hub(name)
-            _isolated_hub_pending = name
-            hub_obj = _invoke_fixture(base_create_command).as_json()
-        else:
-            hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
+        try:
+            if observer is not None:
+                _invoke_fixture(base_create_command + " --no-wait")
+                hub_obj = None
+            elif require_new:
+                _require_absent_hub(name)
+                _isolated_hub_pending = name
+                hub_obj = _invoke_fixture(base_create_command).as_json()
+            else:
+                hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
+        except HttpResponseError as error:
+            recovery_observer = observer or _regular_phase_observer(request)
+            if recovery_observer is None or error.status_code != 504:
+                raise
+            if deadline is None:
+                deadline = _fixture_deadline(request)
+            hub_obj = recovery_observer.recover_hub_create(name, deadline)
         if observer is None:
             assert_hub_policy(hub_obj)
         hub_results.append({
@@ -1002,8 +1012,8 @@ def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, 
 
 
 @pytest.fixture(scope="module")
-def provisioned_cosmos_db_module() -> Optional[list]:
-    result = _cosmos_db_provisioner()
+def provisioned_cosmos_db_module(request) -> Optional[list]:
+    result = _cosmos_db_provisioner(_regular_phase_observer(request))
     yield result
     if result:
         _cosmos_db_removal(result["cosmosdb"]["name"])
@@ -1019,7 +1029,7 @@ def _cosmos_db_get_cstring(account_name):
             return cs_object["connectionString"]
 
 
-def _cosmos_db_provisioner():
+def _cosmos_db_provisioner(observer=None):
     """
     Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
     """
@@ -1028,11 +1038,19 @@ def _cosmos_db_provisioner():
     collection_name = generate_hub_depenency_id()
     partition_key_path = "/test"
     location = HUB_TEST_LOCATION
-    cosmos_obj = cli.invoke(
+    create_command = (
         "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
             account_name, RG, location
         )
-    ).as_json()
+    )
+    try:
+        cosmos_obj = cli.invoke(create_command).as_json()
+    except HttpResponseError as error:
+        if (observer is None
+                or getattr(error.error, "code", None) != "RequestTimeout"):
+            raise
+        observer.allow_cosmos_create_retry(account_name)
+        cosmos_obj = cli.invoke(create_command).as_json()
 
     database_obj = cli.invoke(
         "cosmosdb sql database create --account-name {} --resource-group {} --name {}".format(

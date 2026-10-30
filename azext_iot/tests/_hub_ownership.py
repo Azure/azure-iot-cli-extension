@@ -25,6 +25,7 @@ GROUP = "cli-int-test-rg"
 REGION = "centraluseuap"
 TARGETS = runpy.run_path(str(Path(__file__).with_name("_integration_target.py")))
 ARM_HOSTS = {"management.azure.com", "centraluseuap.management.azure.com"}
+RESOURCE_GROUP_PREFIX = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/{GROUP}/providers/".casefold()
 
 
 def configure_target(region="centraluseuap", endpoint=None):
@@ -183,7 +184,7 @@ def pending_mutation(mutation):
 def uncertain_delete(record, mutation):
     """Only a final root DELETE after proven creation can be resolved by absence.
 
-    Preserve the original failure/transport status. A GET cannot establish the
+    Preserve the original failure/transport status. A 404 GET cannot establish the
     outcome of a PUT, child mutation, failed LRO, or invalid response metadata.
     """
     status = mutation.get("status")
@@ -197,6 +198,8 @@ def uncertain_delete(record, mutation):
 
 def mutation_uncertain(record, mutation):
     if uncertain_delete(record, mutation) and mutation.get("absenceConfirmed"):
+        return False
+    if mutation.get("hubCreateRecovered") is True:
         return False
     status = mutation.get("status")
     return (status is None or mutation.get("responseError") or mutation.get("pollingFailed")
@@ -531,7 +534,8 @@ def ownership_errors(data, run_id, phase):
         if not mutations or mutations[0].get("method") != "PUT":
             errors.append("missing initial mutation")
         if any(m.get("status") not in (200, 201, 202, 204, 404)
-               and not expected_rejection(m) and not uncertain_delete(record, m) for m in mutations):
+               and not expected_rejection(m) and not m.get("hubCreateRecovered")
+               and not uncertain_delete(record, m) for m in mutations):
             errors.append("missing/failed mutation response")
         if any(pending_mutation(m) for m in mutations):
             errors.append("unreconciled asynchronous acceptance")
@@ -709,6 +713,60 @@ class Observer:
         self.save()
         return status, resource
 
+    def recover_hub_create(self, hub_name, deadline):
+        target = RESOURCE_GROUP_PREFIX + f"microsoft.devices/iothubs/{hub_name}".casefold()
+        with self.lock:
+            record = self.data["resources"].get(target, {})
+            mutations = record.get("mutations", [])
+            mutation = mutations[0] if len(mutations) == 1 else {}
+            if (record.get("resolved") or not record.get("uncertain")
+                    or record.get("before") != 404 or mutation.get("method") != "PUT"
+                    or mutation.get("id") != target or mutation.get("responseError")
+                    or mutation.get("pollingFailed") or mutation.get("status") != 504):
+                self.reject("Hub create recovery requires one initial PUT with status 504")
+            previous = self.arm.deadline
+            effective_deadline = min(previous or float("inf"), deadline)
+            self.arm.deadline = effective_deadline
+            try:
+                while time.monotonic() < effective_deadline:
+                    read_status, resource = self._read(target, record["apiVersion"])
+                    properties = resource.get("properties", {}) if read_status == 200 else {}
+                    provisioning = properties.get("provisioningState", "").casefold()
+                    if (read_status == 200 and provisioning == "succeeded"
+                            and properties.get("state", "").casefold() == "active"):
+                        mutation["hubCreateRecovered"] = True
+                        mutation["reconciled"] = True
+                        record["resolved"] = True
+                        record["uncertain"] = False
+                        self.save()
+                        return resource
+                    if provisioning in ("failed", "canceled", "cancelled"):
+                        self.reject("Hub create entered a terminal state")
+                    time.sleep(min(15, max(0, effective_deadline - time.monotonic())))
+            finally:
+                self.arm.deadline = previous
+            self.reject("Hub create was not confirmed before the deadline")
+
+    def allow_cosmos_create_retry(self, account_name):
+        target = RESOURCE_GROUP_PREFIX + f"microsoft.documentdb/databaseaccounts/{account_name}".casefold()
+        with self.lock:
+            record = self.data["resources"].get(target, {})
+            mutations = record.get("mutations", [])
+            mutation = mutations[0] if len(mutations) == 1 else {}
+            if (not record.get("uncertain") or record.get("before") != 404
+                    or mutation.get("method") != "PUT" or mutation.get("id") != target
+                    or mutation.get("status") not in (200, 201, 202)
+                    or not mutation.get("pollingFailed") or mutation.get("responseError")):
+                self.reject("Cosmos create retry requires one failed initial PUT")
+            status, resource = self._read(target, record["apiVersion"])
+            if (status != 200
+                    or resource.get("properties", {}).get("provisioningState", "").casefold() != "failed"):
+                self.reject("Cosmos create retry requires a failed owned account")
+            mutation["terminalFailure"] = mutation.pop("pollingFailed")
+            mutation["reconciled"] = True
+            record["uncertain"] = False
+            self.save()
+
     @contextmanager
     def storage_endpoint_attempt(self, hub_id, storage_id, endpoint, container, identity, deadline):
         from azext_iot.tests.helpers import get_role_assignments
@@ -832,8 +890,14 @@ class Observer:
             }
         else:
             if roots[root]["uncertain"]:
+                resources = {root: roots[root]}
+                for mutation in roots[root]["mutations"]:
+                    if mutation.get("deployment"):
+                        deployment = mutation["deployment"]
+                        resources[deployment] = roots[deployment]
+                evidence = dict(self.data, resources=resources)
                 deadline = min(self.arm.deadline or float("inf"), time.monotonic() + 60)
-                self._verify(reconcile, self.arm, self.data, deadline, self.save)
+                self._verify(reconcile, self.arm, evidence, deadline, self.save)
             if roots[root]["uncertain"]:
                 self.reject("Uncertain mutation cannot be replayed")
             if uncertain_delete(roots[root], roots[root]["mutations"][-1]):

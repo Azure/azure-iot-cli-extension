@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import CLIInternalError
+from azure.core.exceptions import HttpResponseError
 
 from azext_iot.tests import _hub_ownership as ownership
 from azext_iot.tests.iothub import conftest as fixtures
@@ -237,6 +238,25 @@ def test_partial_pool_setup_keeps_owned_records_without_replaying_any_create(pha
     assert phase.events == [("create", name) for name in names]
     assert len(phase.observer.data["resources"]) == 2
     assert all(record["uncertain"] for record in phase.observer.data["resources"].values())
+
+
+def test_single_hub_recovers_owned_create_after_504(phase, mocker):
+    name = "aziotclitest-hub-" + "a" * 18
+    mocker.patch.object(fixtures, "generate_hub_id", return_value=name)
+
+    def create(*_args, **_kwargs):
+        resource_id = phase.add(name, pending=True)
+        record = phase.observer.data["resources"][resource_id]
+        record["mutations"][0]["status"] = 504
+        phase.states[resource_id] = ["404", "Succeeded"]
+        error = HttpResponseError("Gateway timeout")
+        error.status_code = 504
+        raise error
+
+    invoke = mocker.patch.object(fixtures.cli, "invoke", side_effect=create)
+    fixtures._iot_hubs_provisioner(pool_request(count=1))
+    assert invoke.call_count == 1
+    assert not ownership.ownership_errors(phase.observer.data, "run", "regular-state-workflow")
 
 
 @pytest.mark.parametrize("pending", [["404", "Updating"], ["Updating"]])
