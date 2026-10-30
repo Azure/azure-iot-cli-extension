@@ -9,7 +9,7 @@ parameters:
 
 jobs:
   - job: Unit${{ parameters.platform }}
-    displayName: ${{ parameters.platform }} $(python)
+    displayName: ${{ parameters.platform }}
     timeoutInMinutes: 90
     strategy:
       matrix:

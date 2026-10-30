@@ -937,6 +937,7 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
 def test_yaml_preserves_all_twelve_unit_style_combinations():
     _, stages = all_stages()
     template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
+    assert "$(" not in template["jobs"][0]["displayName"]
     matrix = template["jobs"][0]["strategy"]["matrix"]
     assert {(job["parameters"]["platform"], leg["python"])
             for job in stages["Unit"]["jobs"] for leg in matrix.values()} == {
@@ -1021,6 +1022,7 @@ def test_yaml_runs_every_frozen_target_cohort_serially():
     pipeline, stages = all_stages()
     assert pipeline["variables"]["RELEASE_DPS_TARGET"] == "${{ parameters.dpsTarget }}"
     job = stages["Integration"]["jobs"][0]
+    assert "$(" not in job["displayName"]
     assert job["strategy"] == {
         "matrix": "$[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]", "maxParallel": 1,
     }

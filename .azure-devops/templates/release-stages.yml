@@ -415,7 +415,7 @@ stages:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: Integration
-            displayName: $(cohort)
+            displayName: Integration
             timeoutInMinutes: 1080
             cancelTimeoutInMinutes: 5
             strategy:
