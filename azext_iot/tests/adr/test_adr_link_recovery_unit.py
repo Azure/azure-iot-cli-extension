@@ -111,12 +111,15 @@ def test_recovery_quotes_arguments_and_accepts_legacy_failed_state():
     assert split(failed_link_recovery_commands(namespace)[0])[8] == "quoted'name"
 
 
-def test_recovery_commands_follow_dps_first_topology():
+def test_failed_pair_guidance_does_not_recommend_separate_mutations(fixture_adr_provider):
     identity = {"type": "SystemAssigned"}
     namespace = _namespace("provisioning", DPS_ENDPOINT_TYPE, identity)
     for _, section, endpoint_type in LINK_TYPES:
         namespace["properties"][section] = _namespace(section, endpoint_type, identity)["properties"][section]
-    assert [split(command)[5] for command in failed_link_recovery_commands(namespace)] == ["dps", "hub", "su"]
+    assert [split(command)[5] for command in failed_link_recovery_commands(namespace)] == ["su"]
+    message = fixture_adr_provider._format_failure("Failed", namespace, None)
+    assert "link update --dps-endpoint-name" in message
+    assert "brownfieldHubs" in message
 
 
 @pytest.mark.parametrize("kind,section,endpoint_type", LINK_TYPES)
@@ -134,6 +137,7 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
         namespace["properties"]["provisioning"] = {
             "endpoints": {"dps": {
                 "endpointType": DPS_ENDPOINT_TYPE,
+                "linkingState": "Succeeded",
                 "resourceId": (
                     "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps"
                 ),
@@ -209,6 +213,7 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     endpoint["provisioning"] = {"availability": "Unavailable", "allocationWeight": 0}
     namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
         "endpointType": DPS_ENDPOINT_TYPE,
+        "linkingState": "Succeeded",
         "resourceId": "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps",
         "inboundCallerIdentity": {"type": "SystemAssigned"},
     }}}

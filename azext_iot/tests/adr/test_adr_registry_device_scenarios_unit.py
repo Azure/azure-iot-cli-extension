@@ -29,7 +29,7 @@ def test_live_scenario_keeps_shared_wrapper_and_readiness_budget(expect_failure,
     methods = [method for name, method in vars(scenario_class).items() if name.startswith("test_")]
     assert len(methods) == 1
     timeout = [mark for mark in methods[0].pytestmark if mark.name == "timeout"]
-    assert len(timeout) == 1 and timeout[0].args == (2100,) and timeout[0].kwargs == {"func_only": False}
+    assert len(timeout) == 1 and timeout[0].args == (600,) and timeout[0].kwargs == {"func_only": False}
     delegate = mocker.patch.object(ADRLiveScenarioTest, "cmd")
     scenario = scenario_class(methods[0].__name__)
     checks = [Mock()]

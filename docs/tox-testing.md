@@ -94,8 +94,8 @@ to run, with `fail-fast: false`, no parallelism cap and no workflow/job concurre
 lock. Job names and result/coverage artifacts identify the service, Python and region.
 The result gate checks the complete selected matrix independently of coverage reporting.
 
-Owned Hub/DPS controllers still sequence their internal phases; ADR still uses
-serial pytest. Controllers do not reserve slots or enforce subscription quota
+Owned Hub/DPS controllers run independent phases concurrently; ADR uses
+`loadgroup` workers. Controllers do not reserve slots or enforce subscription quota
 admission. Inventory and exact-ID reads still establish ownership, detect
 collisions, reconcile known resources and verify cleanup; they are not quota
 count gates. Azure provisioning errors, including quota rejections, fail the run.
@@ -103,20 +103,21 @@ The existing canary scope, identities/RBAC, quarantine and ownership checks stil
 Overlapping runs and additional Python/region combinations can consume resources
 concurrently; the former bounded-cohort reservation does not apply.
 
-DPS phases continue with fresh resources after a prior phase's cleanup fails,
-with a warning and the failed cleanup retained in the report. Cleanup and
+DPS phases use independent resources, with failed cleanup retained in the report. Cleanup and
 ownership checks still apply to each phase, and full qualification still requires
 every test and cleanup to pass. Cancellation and insufficient remaining runtime
 still stop scheduling. Leftover resources can consume quota; subsequent Azure
 provisioning failures are reported normally.
 
 HubControl runs its four shards concurrently, each capped at 90 minutes plus
-15 minutes for controller cleanup and 5 minutes for admission. GitHub and Azure
-DevOps jobs allow 140 minutes (HubData: 120), including 15 minutes for external
-setup/reporting. Individual test timeouts are unchanged except for two 30-minute
-markers that also budget module-scoped setup/teardown:
-`test_iot_cosmos_endpoint_lifecycle` and
-`test_export_import_migrate_missing_hubs_error`. Per-test timeouts are failure
+15 minutes for controller cleanup. Its controller reserves another 5 minutes.
+GitHub and Azure DevOps jobs allow 130 minutes (HubData: 115), including 15
+minutes for setup and 5 minutes of outer headroom. HubData retains its 75-minute
+Entra / 45-minute SAS phases and 15-minute cleanup windows. DPS allows 90 minutes:
+10 setup + 75 controller + 5 outer headroom. Its controller includes the slowest
+35-minute phase, 10-minute cleanup grace, 25 minutes of serial verification, and
+5 minutes of reserve; the overlapping phase windows are not summed.
+Scenario markers include setup and teardown. Per-test timeouts are failure
 guards, not expected durations, so a shard's ceilings may sum past its runtime cap.
 
 HubData isolates the device and module identity round trips in `entra-identities`,
@@ -152,17 +153,18 @@ identity), storage account and SU-linked namespace, then covers stage, import,
 report types. The healthy job-run cancellation case was removed: an Active run
 needs devices in a controllable rollout, which the suite does not provision.
 
-The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
+The GitHub ADR service job allows **180 minutes**, including setup and reporting.
 The root integration matrix applies this budget directly to each ADR service job.
 The job ceiling does not extend per-operation provisioning waits.
 
-ADR runs serially. Its SU-link case already allows 175 minutes for provisioning,
-native link recovery and cleanup, followed later by a separate 75-minute SU-instance
-lifecycle. Other ordinary cases retain their 15-minute cap. Two completed-job logs showed
-the latter lifecycle starting about 109 minutes into a former 120-minute job:
-SU-link alone consumed 56–63 minutes. Preserving its full existing envelope plus
-the observed other work and reporting margin required about 342 minutes before
-the owned Hub/DPS fixture alignment below.
+The ceiling is calibrated against an observed 115-minute full preview-suite run.
+The SU-link lifecycle allows 115 minutes, SU-link deletion 90, and the linked
+software-update/report scenario 60. Each shares one elapsed-time budget across
+its explicit waits and reserves time for cleanup; no wait starts a fresh
+scenario budget. The separate SU-instance lifecycle retains 75 minutes and
+its existing asynchronous deletion. Individual scenario ceilings are not added
+together as expected runtimes, nor does grouping guarantee serialization of
+every software-update test.
 
 Owned no-wait Hub/DPS link fixtures use the native CLI's **600-second** readiness
 default. A local run exhausted the former 240-second bound while an accepted
@@ -170,11 +172,9 @@ recovery was still in progress, not after a terminal service rejection. The same
 monotonic deadline covers the initial snapshot, calls, backoff and polling;
 accepted work is not replayed and invalid-request failures remain non-retryable.
 The three-add lifecycle reserves **45 minutes** (15 minutes plus three 10-minute
-windows), without increasing native CLI or SU provisioning defaults. This adds
-18 minutes to its former allowance and puts that observed-prefix extrapolation
-at about 360 minutes.
+windows), without increasing native CLI or SU provisioning defaults.
 
-360 minutes is practical headroom, **not a guarantee of full coverage or success**.
+180 minutes is a stall ceiling, **not a guarantee of full coverage or success**.
 All case maxima combined exceed one hosted job. A cancellation must be reported
 as incomplete, with failures/skips and unstarted cases preserved; backend failures
 must not be skipped, suppressed, or converted to successful coverage.

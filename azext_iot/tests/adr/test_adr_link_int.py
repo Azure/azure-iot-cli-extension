@@ -38,6 +38,7 @@ fresh service roles, explicit 1200-second mutation budgets, and no fixture repai
 """
 
 from copy import deepcopy
+import json
 import os
 import re
 import shlex
@@ -46,17 +47,19 @@ from typing import Optional
 from urllib.parse import urlsplit
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError, AzureResponseError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import (
+    ArgumentUsageError, AzureResponseError, InvalidArgumentValueError, RequiredArgumentMissingError,
+)
 from azure.core.exceptions import HttpResponseError, ServiceRequestError, ServiceResponseError
 from msrestazure.tools import parse_resource_id
 
-from azext_iot._factory import _ADR_DPS_API_VERSION
+from azext_iot._factory import _ADR_DPS_API_VERSION, adr_service_factory
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
-    SU_LIFECYCLE_TIMEOUT,
     SU_PROVISIONING_MAX_POLLS,
     SU_PROVISIONING_POLL_INTERVAL,
+    ROLE_PROPAGATION_DELAY,
     wait_for_condition,
     wait_for_resource_absent,
 )
@@ -77,6 +80,7 @@ from azext_iot.tests.adr.conftest import (
     generate_identity_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import ScenarioBudget
 from azext_iot.tests.settings import HUB_TEST_LOCATION
 from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG
 from azext_iot.adr.topology import (
@@ -90,6 +94,7 @@ from azext_iot.adr.rbac import (
     CONTRIBUTOR_ROLE,
     HUB_DATA_ROLE,
     LinkRbacManager,
+    required_assignments,
     resolve_namespace_outbound_principal,
 )
 
@@ -103,12 +108,7 @@ _LINKING_POLL_ATTEMPTS = int(
 _LINKING_POLL_INTERVAL_SECONDS = 10
 _NATIVE_LINK_TIMEOUT = 1200
 _NATIVE_LINK_INTERVAL = 10
-_NATIVE_LINK_OPTIONS = f"--timeout {_NATIVE_LINK_TIMEOUT} --interval {_NATIVE_LINK_INTERVAL}"
-_SU_LINK_LIFECYCLE_TIMEOUT = (
-    SU_LIFECYCLE_TIMEOUT
-    + SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL
-    + 2 * _NATIVE_LINK_TIMEOUT
-)
+_SU_LINK_LIFECYCLE_TIMEOUT = 115 * 60
 _REPORT_AUTH_POLL_ATTEMPTS = 21
 _REPORT_AUTH_POLL_INTERVAL_SECONDS = 15
 _HUB_IDENTITY_ROTATION_BACKOFFS = (30, 60, 120)
@@ -434,7 +434,7 @@ def _is_adu_report_authorization_403(error) -> bool:
     )
 
 
-def _assert_namespace_update_report(test_case, namespace_name):
+def _assert_namespace_update_report(test_case, namespace_name, *, timeout=None):
     selector = f"--ns {namespace_name} -g {TEST_RG} --report-type NamespaceUpdateComplianceReport"
     attempts = 0
 
@@ -450,7 +450,7 @@ def _assert_namespace_update_report(test_case, namespace_name):
         generate,
         lambda _: True,
         description="ADU authorization for namespace update report generation",
-        timeout=None,
+        timeout=timeout,
         interval=_REPORT_AUTH_POLL_INTERVAL_SECONDS,
         max_attempts=_REPORT_AUTH_POLL_ATTEMPTS,
         is_retryable_error=_is_adu_report_authorization_403,
@@ -1009,6 +1009,223 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
+class TestADRLinkBrownfieldRecovery(ADRFullInfraHelper, ADRLiveScenarioTest):
+    @pytest.mark.timeout(3600, func_only=False)
+    def test_adr_link_brownfield_recovery(self):
+        self._scenario_budget = ScenarioBudget(3600, cleanup=900)
+        budget = self._scenario_budget
+        rg, namespace_name = TEST_RG, generate_adr_namespace_name()
+        hub_names = [generate_hub_name(), generate_hub_name()]
+        dps_name, identity_name = generate_dps_name(), generate_identity_name()
+        client = adr_service_factory(self.cli_ctx)
+        self.addCleanup(client.close)
+
+        def show():
+            return self.cmd(f"iot adr ns show -n {namespace_name} -g {rg}").get_output_in_json()
+
+        def etag():
+            return budget.call(
+                client.namespaces.get, rg, namespace_name,
+                cls=lambda response, _body, _headers: response.http_response.headers["ETag"],
+            )
+
+        def prepare_roles(namespace, dps, hubs, identity_principal, *, with_namespace_data=True):
+            common = {
+                "namespace_scope": namespace["id"],
+                "namespace_principal_id": resolve_namespace_outbound_principal(namespace),
+                "dps_principal_id": dps["identity"]["principalId"],
+                "hub_scopes": [hub["id"] for hub in hubs],
+            }
+            requests = [{
+                **common, "link_type": "dps", "target_scope": dps["id"],
+                "linked_principal_id": dps["identity"]["principalId"],
+                "namespace_system_principal_id": namespace["identity"]["principalId"],
+            }, *[{
+                **common, "link_type": "hub", "target_scope": hub["id"],
+                "linked_principal_id": identity_principal,
+            } for hub in hubs]]
+            assignments = {assignment for request in requests for _rule, assignment in required_assignments(request)}
+            for principal, role, scope in sorted(assignments):
+                if not with_namespace_data and principal == common["namespace_principal_id"] and role == HUB_DATA_ROLE:
+                    continue
+                assert self.assign_role(principal, role, scope, assignee_type="ServicePrincipal")
+            budget.call(sleep, ROLE_PROPAGATION_DELAY)
+
+        def seed_classic_hubs(hubs):
+            linked = self.cmd(f"iot dps linked-hub list --dps-name {dps_name} -g {rg}").get_output_in_json()
+            existing = {hub["name"].casefold() for hub in linked}
+            for name, hub in zip(hub_names, hubs):
+                if hub["properties"]["hostName"].casefold() not in existing:
+                    self.cmd(
+                        f"iot dps linked-hub create --dps-name {dps_name} -g {rg} "
+                        f"--hub-name {name} --hub-resource-group {rg} "
+                        "--hostname-type classic --authentication-type SystemAssigned"
+                    )
+
+        def submit_failed_patch(properties, expected_errors):
+            with pytest.raises(HttpResponseError) as raised:
+                poller = budget.call(
+                    client.namespaces.begin_update, rg, namespace_name,
+                    {"properties": properties}, retry_total=0,
+                )
+                budget.call(poller.result, timeout=budget.remaining(600))
+            assert raised.value.status_code == 200, "The deliberate write must fail through its LRO, not at admission."
+
+            def failed_as_requested(resource):
+                if resource["properties"]["provisioningState"] != "Failed":
+                    return False
+                for section, endpoints in expected_errors.items():
+                    observed = (resource["properties"].get(section) or {}).get("endpoints") or {}
+                    for name, code in endpoints.items():
+                        endpoint = observed.get(name) or {}
+                        if endpoint.get("linkingState") != "Failed" or (endpoint.get("linkingError") or {}).get("code") != code:
+                            return False
+                return True
+
+            return wait_for_condition(
+                show, failed_as_requested,
+                description="deliberate namespace link failure", timeout=budget.remaining(120), interval=5,
+            )
+
+        try:
+            infra = self.setup_full_infra(
+                rg, namespace_name, hub_names[0], identity_name, assign_setup_roles=False,
+            )
+            identity_id = infra["identity_resource_id"]
+            hubs = [self.cmd(f"iot hub show -n {hub_names[0]} -g {rg}").get_output_in_json()]
+            hubs.append(self.create_owned_resource(
+                f"iot hub create -n {hub_names[1]} -g {rg} --location {HUB_TEST_LOCATION} --sku S1 "
+                f"--user-assigned-mi {identity_id} --disable-local-auth true",
+                kind="hub", name=hub_names[1], resource_group=rg,
+            ).get_output_in_json())
+            dps = self.create_owned_resource(
+                f"iot dps create -n {dps_name} -g {rg} --location {TEST_LOCATION} "
+                "--system-assigned-mi --disable-local-auth true",
+                kind="dps", name=dps_name, resource_group=rg,
+            ).get_output_in_json()
+            bad_identity_name = generate_identity_name()
+            bad_identity = self.create_owned_resource(
+                f"identity create -n {bad_identity_name} -g {rg} --location {TEST_LOCATION}",
+                kind="identity", name=bad_identity_name, resource_group=rg,
+            ).get_output_in_json()
+            self.cmd(f"iot hub identity assign -n {hub_names[0]} -g {rg} --user {bad_identity['id']}")
+            prepare_roles(show(), dps, hubs, infra["identity_principal_id"], with_namespace_data=False)
+            seed_classic_hubs(hubs)
+            dps_body = {
+                "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": dps["id"],
+                "inboundCallerIdentity": {"type": "SystemAssigned"},
+            }
+            hub_bodies = {
+                f"hub-{index}": {
+                    "endpointType": "Microsoft.Devices/IotHubs", "resourceId": hub["id"],
+                    "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": identity_id},
+                    "provisioning": {"availability": "Available", "allocationWeight": index + 1},
+                } for index, hub in enumerate(hubs)
+            }
+            with pytest.raises(InvalidArgumentValueError, match="classic Hubs"):
+                self.cmd(
+                    f"iot adr ns link dps add --ns {namespace_name} -g {rg} -n dps "
+                    f"--dps-id {dps['id']} --system-assigned-mi"
+                )
+            assert not show()["properties"].get("provisioning", {}).get("endpoints")
+
+            # Raw invalid writes reproduce persisted failures that the fixed CLI prevents.
+            dps_failure = {"provisioning": {"dps": "DpsHubsNotInNamespace"}}
+            submit_failed_patch({"provisioning": {"endpoints": {"dps": dps_body}}}, dps_failure)
+            failed = submit_failed_patch(
+                {"provisioning": {"endpoints": {"dps": dps_body}}, "messaging": {"endpoints": hub_bodies}},
+                {"messaging": {name: "AdrMiNotAuthorized" for name in hub_bodies}},
+            )
+            for name in hub_bodies:
+                assert failed["properties"]["messaging"]["endpoints"][name]["linkingState"] == "Failed"
+            prepare_roles(failed, dps, hubs, infra["identity_principal_id"])
+            with pytest.raises(AzureResponseError, match="DPS link 'dps'.*Failed"):
+                self.cmd(
+                    f"iot adr ns link wait --ns {namespace_name} -g {rg} "
+                    "--dps-endpoint-name dps --hub-endpoint-name absent --timeout 30 --interval 1"
+                )
+            self.cmd(
+                f"iot adr ns link dps remove --ns {namespace_name} -g {rg} -n dps --yes"
+            )
+            after = show()
+            assert not after["properties"].get("provisioning", {}).get("endpoints")
+            assert after["properties"]["messaging"] == failed["properties"]["messaging"]
+            submit_failed_patch({"provisioning": {"endpoints": {"dps": dps_body}}}, dps_failure)
+            self.cmd(
+                f"iot adr ns link update --ns {namespace_name} -g {rg} "
+                f"--dps-endpoint-name dps --hub-endpoint-name hub-0 hub-1 --timeout {budget.remaining(600)} --interval 5"
+            )
+            linked = show()
+            for name, body in hub_bodies.items():
+                _assert_native_link_result(linked, "messaging", name, body["resourceId"], body["inboundCallerIdentity"])
+                assert linked["properties"]["messaging"]["endpoints"][name]["provisioning"] == body["provisioning"]
+            _assert_native_link_result(linked, "provisioning", "dps", dps["id"], {"type": "SystemAssigned"})
+
+            self.cmd(
+                f"iot adr ns link hub update --ns {namespace_name} -g {rg} -n hub-0 "
+                "--availability Disabled --allocation-weight 3"
+            )
+            updated = show()
+            assert updated["properties"]["messaging"]["endpoints"]["hub-0"]["provisioning"] == {
+                "availability": "Disabled", "allocationWeight": 3,
+            }
+            assert (
+                updated["properties"]["messaging"]["endpoints"]["hub-0"]["inboundCallerIdentity"]
+                == linked["properties"]["messaging"]["endpoints"]["hub-0"]["inboundCallerIdentity"]
+            )
+            assert (
+                updated["properties"]["messaging"]["endpoints"]["hub-1"]
+                == linked["properties"]["messaging"]["endpoints"]["hub-1"]
+            )
+            before_etag = etag()
+            recreated = self.cmd(f"iot adr ns create -n {namespace_name} -g {rg}").get_output_in_json()
+            assert recreated["properties"] == updated["properties"]
+            assert etag() == before_etag
+
+            rotation = deepcopy(hub_bodies["hub-0"])
+            rotation["inboundCallerIdentity"]["userAssignedIdentity"] = bad_identity["id"]
+            failed = submit_failed_patch({"messaging": {"endpoints": {"hub-0": rotation}}}, {})
+            assert failed["properties"]["messaging"]["endpoints"]["hub-0"]["linkingState"] == "Succeeded"
+            for command in ("link wait", "link hub wait -n hub-0"):
+                with pytest.raises(AzureResponseError, match="terminal provisioningState 'Failed'"):
+                    self.cmd(f"iot adr ns {command} --ns {namespace_name} -g {rg} --timeout 30 --interval 1")
+            before_etag = etag()
+            with pytest.raises(AzureResponseError, match="No changes were submitted"):
+                self.cmd(f"iot adr ns create -n {namespace_name} -g {rg}")
+            assert etag() == before_etag
+
+            self.cleanup_namespace(namespace_name, rg)
+            wait_for_resource_absent(
+                self, f"iot adr ns show -n {namespace_name} -g {rg}", timeout=budget.remaining(120),
+            )
+            namespace_name = generate_adr_namespace_name()
+            namespace = self.create_owned_resource(
+                f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION} "
+                f"--outbound-user-assigned-mi {identity_id}",
+                kind="namespace", name=namespace_name, resource_group=rg,
+            ).get_output_in_json()
+            prepare_roles(namespace, dps, hubs, infra["identity_principal_id"])
+            seed_classic_hubs(hubs)
+            additional = deepcopy(hub_bodies["hub-1"])
+            additional.pop("endpointType")
+            self.kwargs["brownfield_hubs"] = shlex.quote(json.dumps({"hub-1": additional}))
+            self.cmd(
+                f"iot adr ns link add --ns {namespace_name} -g {rg} --dps-endpoint-name dps "
+                f"--dps-resource-id {dps['id']} --dps-system-assigned-mi "
+                f"--hub-endpoint-name hub-0 --hub-resource-id {hubs[0]['id']} --hub-user-assigned-mi {identity_id} "
+                "--hub-endpoints {brownfield_hubs} "
+                f"--timeout {budget.remaining(600)} --interval 5"
+            )
+            linked = show()
+            for name, body in hub_bodies.items():
+                _assert_native_link_result(linked, "messaging", name, body["resourceId"], body["inboundCallerIdentity"])
+            _assert_native_link_result(linked, "provisioning", "dps", dps["id"], {"type": "SystemAssigned"})
+        finally:
+            budget.begin_cleanup()
+            self.cleanup_full_infra()
+
+
+@pytest.mark.usefixtures("set_cwd")
 class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
     """The combined command links DPS successfully before submitting the Hub link.
 
@@ -1017,8 +1234,10 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
     DPS-first sequencing. No fixture repair or preauthorization delay is allowed.
     """
 
-    @pytest.mark.timeout(900 + _NATIVE_LINK_TIMEOUT, func_only=False)
+    @pytest.mark.timeout(1500, func_only=False)
     def test_adr_link_sequential_add(self):
+        self._scenario_budget = ScenarioBudget(1500, cleanup=300)
+        budget = self._scenario_budget
         _log(LogKind.TEST, "test_adr_link_sequential_add")
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
@@ -1052,7 +1271,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                     lambda: self.cmd(f"iot hub show -n {hub_name} -g {rg}").get_output_in_json(),
                     lambda resource: bool(resource.get("id")),
                     description="owned Hub materialization",
-                    timeout=120,
+                    timeout=budget.remaining(120),
                 )
                 hub_id = hub["id"]
 
@@ -1074,7 +1293,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                         for field in ("state", "provisioningState")
                     ),
                     description="owned Hub Active",
-                    timeout=600,
+                    timeout=budget.remaining(600),
                     interval=30,
                     describe=lambda resource: f"Hub state={resource['properties'].get('state')}",
                 )
@@ -1105,7 +1324,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--dps-user-assigned-mi {identity_resource_id} "
                     f"--hub-endpoint-name primary --hub-id {hub_id} "
                     f"--hub-user-assigned-mi {identity_resource_id} --hub-availability Available --hub-weight 1 "
-                    f"{_NATIVE_LINK_OPTIONS}"
+                    f"--timeout {budget.remaining(_NATIVE_LINK_TIMEOUT)} --interval {_NATIVE_LINK_INTERVAL}"
                 ).get_output_in_json()
                 for section, name, resource_id in (
                     ("provisioning", "dps-primary", dps_id), ("messaging", "primary", hub_id),
@@ -1139,6 +1358,7 @@ class TestADRLinkSequentialAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Sequential DPS-first adds produced both exact endpoints in Succeeded")
 
         finally:
+            budget.begin_cleanup()
             self.cleanup_full_infra()
 
 
@@ -1179,12 +1399,14 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             wait_for_resource_absent(
                 self,
                 f"iot adr ns su instance show -n {shlex.quote(name)} -g {shlex.quote(resource_group)}",
-                timeout=SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL,
+                timeout=self._scenario_budget.remaining(SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL),
                 interval=SU_PROVISIONING_POLL_INTERVAL,
             )
 
     @pytest.mark.timeout(_SU_LINK_LIFECYCLE_TIMEOUT, func_only=False)
     def test_adr_link_su_lifecycle(self):
+        self._scenario_budget = ScenarioBudget(_SU_LINK_LIFECYCLE_TIMEOUT)
+        budget = self._scenario_budget
         _log(LogKind.TEST, "test_adr_link_su_lifecycle")
         from azext_iot.tests.adr.conftest import TEST_LOCATION
 
@@ -1209,7 +1431,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 is_terminal_failure=lambda resource: resource["properties"].get("provisioningState")
                 in {"Failed", "Canceled", "Cancelled"},
                 description="owned SU provisioning Succeeded",
-                timeout=None,
+                timeout=budget.remaining(SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL),
                 max_attempts=SU_PROVISIONING_MAX_POLLS,
                 interval=SU_PROVISIONING_POLL_INTERVAL,
                 describe=lambda resource: f"provisioningState={resource['properties'].get('provisioningState')}",
@@ -1260,7 +1482,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     ).get_output_in_json(),
                     lambda resource: bool(resource.get("id")),
                     description="owned SU materialization",
-                    timeout=120,
+                    timeout=budget.remaining(120),
                 )
                 su_id = materialized["id"]
                 # Caller discovery access is independent of link service roles.
@@ -1365,7 +1587,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 add_cmd = (
                     f"iot adr ns link su add --ns {namespace_name} -g {rg} "
                     f"-n {su_endpoint} --su-id {su_id} "
-                    f"--user-assigned-mi {identity_resource_id} {_NATIVE_LINK_OPTIONS}"
+                    f"--user-assigned-mi {identity_resource_id} "
+                    f"--timeout {budget.remaining(_NATIVE_LINK_TIMEOUT)} --interval {_NATIVE_LINK_INTERVAL}"
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
                 result = self.cmd(add_cmd).get_output_in_json()
@@ -1376,7 +1599,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _assert_service_roles(self, roles, present=True)
                 self.cmd(
                     f"iot adr ns link su wait -n {su_endpoint} "
-                    f"--ns {namespace_name} -g {rg}"
+                    f"--ns {namespace_name} -g {rg} --timeout {budget.remaining(3600)}"
                 )
                 self.cmd(add_cmd, expect_failure=True)
                 cap_command = (
@@ -1487,7 +1710,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
 
             with timed_step("Verify namespace report after link su add"):
-                _assert_namespace_update_report(self, namespace_name)
+                _assert_namespace_update_report(
+                    self, namespace_name,
+                    timeout=budget.remaining(_REPORT_AUTH_POLL_ATTEMPTS * _REPORT_AUTH_POLL_INTERVAL_SECONDS),
+                )
 
             with timed_step("Step 4 > link su update (rotate identity UAMI to SAMI)"):
                 if is_owned_su:
@@ -1497,7 +1723,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     )
                 update_cmd = (
                     f"iot adr ns link su update --ns {namespace_name} -g {rg} "
-                    f"-n {su_endpoint} --system-assigned-mi {_NATIVE_LINK_OPTIONS}"
+                    f"-n {su_endpoint} --system-assigned-mi "
+                    f"--timeout {budget.remaining(_NATIVE_LINK_TIMEOUT)} --interval {_NATIVE_LINK_INTERVAL}"
                 )
                 _log(LogKind.CMD, "az %s", update_cmd)
                 result = self.cmd(update_cmd).get_output_in_json()
@@ -1532,11 +1759,15 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Rotated UAMI to SAMI")
 
             with timed_step("Verify namespace report after link su update"):
-                _assert_namespace_update_report(self, namespace_name)
+                _assert_namespace_update_report(
+                    self, namespace_name,
+                    timeout=budget.remaining(_REPORT_AUTH_POLL_ATTEMPTS * _REPORT_AUTH_POLL_INTERVAL_SECONDS),
+                )
 
             _log(LogKind.OK, "Software Updates link lifecycle passed")
 
         finally:
+            budget.begin_cleanup()
             self.cleanup_full_infra()
 
 
@@ -1554,6 +1785,7 @@ class TestADRLinkValidationNegatives(ADRLiveScenarioTest):
     provider unit level.
     """
 
+    @pytest.mark.timeout(300, func_only=False)
     def test_adr_link_validation_negatives(self):
         _log(LogKind.TEST, "test_adr_link_validation_negatives")
         rg = TEST_RG

@@ -37,6 +37,21 @@ def _patch_provider(mocker, module, attr):
     return provider
 
 
+def test_combined_retry_delegates_selected_endpoints_and_wait_options(mocker, cmd):
+    client = Mock()
+    provider = Mock()
+    provider_type = mocker.patch.object(commands_link, "LinkProvider", return_value=provider)
+    result = commands_link.adr_link_update(
+        cmd, client, NS, RG, dps_endpoint_name="dps", hub_endpoint_names=["hub-1", "hub-2"],
+        no_wait=True, timeout=41, interval=2,
+    )
+    provider_type.assert_called_once_with(cmd, client=client)
+    provider.link_update.assert_called_once_with(
+        NS, RG, "dps", ["hub-1", "hub-2"], no_wait=True, timeout_sec=41, wait_sec=2,
+    )
+    assert result is provider.link_update.return_value
+
+
 class TestNamespaceCommands:
     def test_create_and_update_surfaces_exclude_raw_endpoint_parameters(self):
         removed = {
@@ -456,7 +471,7 @@ class TestReportCommands:
         )
 
 
-def test_hub_update_surface_is_identity_only(mocker, cmd):
+def test_hub_update_forwards_identity_and_allocation_settings(mocker, cmd):
     provider = _patch_provider(mocker, commands_link, "LinkProvider")
     namespace_client = Mock()
     commands_link.adr_link_hub_update(
@@ -466,6 +481,8 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
         namespace_name=NS,
         resource_group_name=RG,
         mi_system_assigned=True,
+        availability="Disabled",
+        allocation_weight=3,
         no_wait=True,
     )
     provider.hub_update.assert_called_once_with(
@@ -474,6 +491,8 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
         resource_group_name=RG,
         mi_system_assigned=True,
         mi_user_assigned=None,
+        availability="Disabled",
+        allocation_weight=3,
         no_wait=True,
         timeout_sec=600,
         wait_sec=30,
@@ -1090,4 +1109,5 @@ def test_link_update_resolves_omitted_recovery_options(
         no_wait=no_wait,
         timeout_sec=expected_timeout,
         wait_sec=expected_interval,
+        **({"availability": None, "allocation_weight": None} if kind == "hub" else {}),
     )

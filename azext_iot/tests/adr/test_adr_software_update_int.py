@@ -19,7 +19,6 @@ from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     CleanupLedger,
     ROLE_PROPAGATION_DELAY,
-    SU_LIFECYCLE_TIMEOUT,
     SU_PROVISIONING_MAX_POLLS,
     SU_PROVISIONING_POLL_INTERVAL,
     wait_for_condition,
@@ -32,14 +31,17 @@ from azext_iot.tests.adr.conftest import (
     generate_adr_namespace_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import ScenarioBudget
 
 _REPORT_POLL_ATTEMPTS = 12
 _REPORT_POLL_INTERVAL_SECONDS = 10
 _ACCESS_POLL_ATTEMPTS = 30
+_SOFTWARE_UPDATE_TIMEOUT = 60 * 60
 
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRSoftwareUpdateLocalCommands(ADRLiveScenarioTest):
+    @pytest.mark.timeout(300, func_only=False)
     def test_software_update_local_commands(self):
         with TemporaryDirectory() as directory:
             payload_path = Path(directory) / "install.sh"
@@ -116,8 +118,10 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
     def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
         super()._delete_owned_resource(kind, name, resource_group, no_wait=kind == "su" or no_wait)
 
-    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT * 2)
+    @pytest.mark.timeout(_SOFTWARE_UPDATE_TIMEOUT, func_only=False)
     def test_linked_namespace_software_update_and_reports(self):
+        self._scenario_budget = ScenarioBudget(_SOFTWARE_UPDATE_TIMEOUT)
+        budget = self._scenario_budget
         namespace_name = generate_adr_namespace_name()
         su_name = f"testsu{generate_generic_id()[:8]}"
         storage_account = f"adrsu{generate_generic_id()[:16]}"
@@ -143,7 +147,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                     lambda: self.cmd(f"iot adr ns su instance show -n {su_name} -g {TEST_RG}").get_output_in_json(),
                     lambda resource: bool(resource.get("id")),
                     description="owned SU materialization",
-                    timeout=120,
+                    timeout=budget.remaining(120),
                 )["id"]
                 caller_id = LinkRbacManager(self.cli_ctx)._current_assignee_object_id(  # pylint: disable=protected-access
                     TEST_SUBSCRIPTION
@@ -163,7 +167,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                     is_terminal_failure=lambda resource: resource["properties"].get("provisioningState")
                     in {"Failed", "Canceled", "Cancelled"},
                     description="owned SU provisioning Succeeded",
-                    timeout=None,
+                    timeout=budget.remaining(SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL),
                     max_attempts=SU_PROVISIONING_MAX_POLLS,
                     interval=SU_PROVISIONING_POLL_INTERVAL,
                     describe=lambda resource: f"provisioningState={resource['properties'].get('provisioningState')}",
@@ -172,7 +176,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Setup 3/3 ❯ link su add (system-assigned identity)"):
                 self.cmd(
                     f"iot adr ns link su add --ns {namespace_name} -g {TEST_RG} -n su "
-                    f"--su-id {su_id} --system-assigned-mi --timeout 1200"
+                    f"--su-id {su_id} --system-assigned-mi --timeout {budget.remaining(1200)}"
                 )
                 wait_for_condition(
                     lambda: self.cmd(
@@ -180,7 +184,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                     ).get_output_in_json(),
                     lambda providers: isinstance(providers, list),
                     description="caller SU data-plane access",
-                    timeout=None,
+                    timeout=budget.remaining(_ACCESS_POLL_ATTEMPTS * ROLE_PROPAGATION_DELAY),
                     max_attempts=_ACCESS_POLL_ATTEMPTS,
                     interval=ROLE_PROPAGATION_DELAY,
                     is_retryable_error=_access_pending,
@@ -210,7 +214,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                     )
                     self.cmd(
                         f"iot adr ns su software-update wait --ns {namespace_name} -g {TEST_RG} "
-                        f"{version_args} --created --timeout 1200"
+                        f"{version_args} --created --timeout {budget.remaining(1200)}"
                     )
                     shown = self.cmd(
                         f"iot adr ns su software-update show --ns {namespace_name} -g {TEST_RG} {version_args}"
@@ -244,6 +248,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Reports ❯ Namespace and group reports"):
                 self._assert_reports(namespace_name)
         finally:
+            budget.begin_cleanup()
             with CleanupLedger() as cleanup:
                 if storage_created:
                     cleanup.register(
@@ -275,7 +280,7 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                     lambda: self.cmd(report.format("latest", report_type) + group_arg).get_output_in_json(),
                     lambda _: True,
                     description=f"{report_type} publication",
-                    timeout=None,
+                    timeout=self._scenario_budget.remaining(_REPORT_POLL_ATTEMPTS * _REPORT_POLL_INTERVAL_SECONDS),
                     interval=_REPORT_POLL_INTERVAL_SECONDS,
                     max_attempts=_REPORT_POLL_ATTEMPTS,
                     describe=lambda value: f"reportType={(value or {}).get('reportType')!r}",

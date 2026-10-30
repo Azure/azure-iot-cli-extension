@@ -638,9 +638,10 @@ def test_namespace_create_preserves_existing_observability(
         },
     }
     fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "eastus",
         "properties": {"observability": observability}
     }
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
@@ -651,10 +652,31 @@ def test_namespace_create_preserves_existing_observability(
         tags={"phase": "replaced"},
     )
 
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    assert resource["properties"]["observability"] == observability
+    assert fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs["properties"] == {
+        "tags": {"phase": "replaced"},
+    }
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
+
+
+@pytest.mark.parametrize("state", ["Failed", "Canceled", "Updating", None])
+def test_namespace_create_noop_rejects_unsuccessful_existing_state(fixture_namespace_provider, state):
+    existing = {"location": "centraluseuap", "properties": {"provisioningState": state}}
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    with pytest.raises(AzureResponseError, match="No changes were submitted"):
+        fixture_namespace_provider.create("namespace", "rg")
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
+    assert existing["properties"]["provisioningState"] == state
+
+
+def test_namespace_create_cannot_move_an_existing_namespace(fixture_namespace_provider):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "eastus", "properties": {"provisioningState": "Succeeded"},
+    }
+    with pytest.raises(InvalidArgumentValueError, match="cannot be moved"):
+        fixture_namespace_provider.create("namespace", "rg", location="westus")
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_namespace_create_upsert_preserves_unspecified_namespace_state(
@@ -703,30 +725,14 @@ def test_namespace_create_upsert_preserves_unspecified_namespace_state(
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
-    fixture_namespace_provider.create("namespace", "rg")
-
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    assert resource["location"] == "centraluseuap"
-    assert resource["tags"] == {"existing": "tag"}
-    assert resource["identity"] == {
-        "type": "SystemAssigned,UserAssigned",
-        "userAssignedIdentities": {UAMI_ID: {}},
-    }
-    assert resource["properties"] == {
-        key: value
-        for key, value in existing["properties"].items()
-        if key not in {"uuid", "provisioningState"}
-    }
+    assert fixture_namespace_provider.create("namespace", "rg") == {**existing, "resourceGroup": "rg"}
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
-def test_namespace_create_upsert_projects_endpoints_to_writable_fields(
+def test_namespace_create_upsert_does_not_resubmit_failed_endpoints(
     fixture_namespace_provider, mock_poller
 ):
-    """F2: the CreateOrReplace PUT drops server-computed endpoint status while
-    retaining every writable field, section, and endpoint name, and does not
-    mutate the caller's input."""
     existing = {
         "location": "centraluseuap",
         "properties": {
@@ -742,7 +748,7 @@ def test_namespace_create_upsert_projects_endpoints_to_writable_fields(
                             "availability": "Available",
                             "allocationWeight": 5,
                         },
-                        "linkingState": "Linked",
+                        "linkingState": "Failed",
                         "linkingError": {"code": "None"},
                         "serviceAddress": "sb://hub",
                         "address": "hub-address",
@@ -754,7 +760,7 @@ def test_namespace_create_upsert_projects_endpoints_to_writable_fields(
                     "dps": {
                         "endpointType": DPS_ENDPOINT_TYPE,
                         "resourceId": "/dps",
-                        "linkingState": "Linked",
+                        "linkingState": "Failed",
                         "deviceAddress": "dps-address",
                     }
                 }
@@ -777,50 +783,15 @@ def test_namespace_create_upsert_projects_endpoints_to_writable_fields(
     }
     snapshot = deepcopy(existing)
     fixture_namespace_provider.client.namespaces.get.return_value = existing
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
-    fixture_namespace_provider.create("namespace", "rg")
-
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    endpoints = resource["properties"]
-    # Every section and endpoint name is retained.
-    assert set(endpoints) == {"messaging", "provisioning", "updating"}
-    assert endpoints["messaging"]["endpoints"]["hub"] == {
-        "endpointType": IOT_HUB_ENDPOINT_TYPE,
-        "resourceId": "/hub",
-        "inboundCallerIdentity": {"type": "SystemAssigned"},
-        "provisioning": {"availability": "Available", "allocationWeight": 5},
+    fixture_namespace_provider.create("namespace", "rg", tags={"changed": "only"})
+    assert fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs["properties"] == {
+        "tags": {"changed": "only"},
     }
-    assert endpoints["provisioning"]["endpoints"]["dps"] == {
-        "endpointType": DPS_ENDPOINT_TYPE,
-        "resourceId": "/dps",
-    }
-    assert endpoints["updating"]["endpoints"]["su"] == {
-        "endpointType": SU_ENDPOINT_TYPE,
-        "resourceId": "/su",
-        "inboundCallerIdentity": {
-            "type": "UserAssigned",
-            "userAssignedIdentity": UAMI_ID,
-        },
-    }
-    # No server-computed status/output field survives the projection.
-    for section in endpoints.values():
-        for endpoint in section["endpoints"].values():
-            assert not (
-                {
-                    "linkingState",
-                    "linkingError",
-                    "serviceAddress",
-                    "address",
-                    "deviceAddress",
-                }
-                & set(endpoint)
-            )
-    # The caller's input namespace was not mutated.
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
     assert existing == snapshot
 
 
@@ -845,7 +816,7 @@ def test_namespace_create_upsert_preserves_identity_exactly_when_unspecified(
 ):
     existing = {
         "location": "centraluseuap",
-        "properties": {"observability": {"enabled": True}},
+        "properties": {"provisioningState": "Succeeded", "observability": {"enabled": True}},
     }
     if existing_identity is not None:
         existing["identity"] = existing_identity
@@ -854,20 +825,10 @@ def test_namespace_create_upsert_preserves_identity_exactly_when_unspecified(
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
-    fixture_namespace_provider.create("namespace", "rg")
-
-    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    if existing_identity is None:
-        assert "identity" not in body
-    elif existing_identity["type"] == "None":
-        assert body["identity"] == {"type": "None"}
-    else:
-        assert body["identity"] == {
-            "type": "UserAssigned",
-            "userAssignedIdentities": {UAMI_ID: {}},
-        }
+    result = fixture_namespace_provider.create("namespace", "rg")
+    assert result == {**existing, "resourceGroup": "rg"}
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_namespace_create_upsert_outbound_uami_does_not_add_sami(
@@ -882,7 +843,7 @@ def test_namespace_create_upsert_outbound_uami_does_not_add_sami(
         },
         "properties": {},
     }
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
@@ -892,8 +853,8 @@ def test_namespace_create_upsert_outbound_uami_does_not_add_sami(
         outbound_mi_user_assigned=UAMI_ID,
     )
 
-    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
     ]
     assert body["identity"] == {
         "type": "UserAssigned",
@@ -918,7 +879,7 @@ def test_namespace_create_upsert_can_clear_outbound_identity(
             "outboundIdentity": {"type": "SystemAssigned"},
         },
     }
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
@@ -928,8 +889,8 @@ def test_namespace_create_upsert_can_clear_outbound_identity(
         outbound_mi_system_assigned=False,
     )
 
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
+    resource = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
     ]
     assert resource["properties"]["outboundIdentity"] is None
 
@@ -946,6 +907,7 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
                       "Microsoft.EventGrid/namespaces/eg",
     }
     fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "eastus",
         "properties": {
             "observability": {
                 "enabled": not enabled,
@@ -953,7 +915,7 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
             }
         }
     }
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
         mock_poller({"name": "namespace", "resourceGroup": "rg"})
     )
 
@@ -964,13 +926,13 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
         observability_enabled=enabled,
     )
 
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
+    resource = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
     ]
-    assert resource["properties"]["observability"] == {
-        "enabled": enabled,
-        "endpoints": {"event-grid": endpoint},
-    }
+    assert resource == {"properties": {"observability": {
+        "enabled": enabled, "endpoints": {"event-grid": endpoint},
+    }}}
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
 
 
 @pytest.mark.parametrize("enabled", [True, False])

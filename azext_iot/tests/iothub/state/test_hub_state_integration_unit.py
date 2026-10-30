@@ -133,7 +133,7 @@ def test_state_command_error_precedes_comparison(
     mocker.patch.object(subject.time, "sleep")
     mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", ["login"])
     readiness = mocker.patch.object(
-        subject, "_wait_for_dataplane_query", side_effect=lambda *args: events.append("ready")
+        subject, "_wait_for_dataplane_query", side_effect=lambda *args, **kwargs: events.append("ready")
     )
     compare_hubs = mocker.patch.object(subject, "compare_hubs_dataplane", side_effect=lambda *args: events.append("compare"))
     compare_file = mocker.patch.object(
@@ -160,6 +160,7 @@ def test_state_command_error_precedes_comparison(
     for call in readiness.call_args_list:
         assert call.args[0] == subject._hub_auth(hubs[1] if scenario == "test_migrate_dataplane" else hubs[0])
         assert call.args[1] is owned
+        assert 0 < call.kwargs["timeout"] <= subject.QUERY_VISIBILITY_TIMEOUT
     for call in compare_hubs.call_args_list + compare_file.call_args_list:
         assert call.args[-1] is owned
 

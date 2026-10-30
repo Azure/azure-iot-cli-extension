@@ -143,6 +143,9 @@ _LINK_PARSER_CASES = {
         _DPS_ID,
     ],
     "iot adr ns link wait": _NAMESPACE_ARGUMENTS,
+    "iot adr ns link update": [
+        *_NAMESPACE_ARGUMENTS, "--dps-endpoint-name", "dps", "--hub-endpoint-name", "hub-a", "hub-b",
+    ],
 }
 _PNP_PARSER_CASES = {
     "iot hub digital-twin show": [],
@@ -767,7 +770,7 @@ def test_dps_table_output_preserves_explicit_queries(command_table, kind, action
 
 
 def test_namespace_device_command_names(command_table):
-    assert sum(name.startswith("iot adr ") for name in command_table) == 128
+    assert sum(name.startswith("iot adr ") for name in command_table) == 129
     assert {
         name for name in command_table if name.startswith("iot adr ns device ")
     } == set(_DEVICE_PARSER_CASES)
@@ -1008,6 +1011,43 @@ def test_combined_link_parser_exposes_dependency_wait_options(management_command
     parsed = management_command_parser.parse_args(arguments)
     assert parsed.timeout == 60 and parsed.interval == 1
     assert bool(parsed.no_wait) is no_wait
+
+
+def test_combined_link_parser_preserves_additional_hub_json(management_command_parser):
+    command = "iot adr ns link add"
+    endpoints = json.dumps({"second-hub": {"resourceId": _HUB_ID + "-second"}})
+    parsed = management_command_parser.parse_args([
+        *command.split(), *_LINK_PARSER_CASES[command], "--hub-endpoints", endpoints,
+    ])
+    assert parsed.hub_endpoints == endpoints
+
+
+@pytest.mark.parametrize("weight_option", ["--allocation-weight", "--weight"])
+def test_hub_update_parser_accepts_settings_without_identity(management_command_parser, weight_option):
+    command = "iot adr ns link hub update"
+    parsed = management_command_parser.parse_args([
+        *command.split(), *_LINK_PARSER_CASES[command],
+        "--availability", "Disabled", weight_option, "0",
+    ])
+    assert parsed.availability == "Disabled"
+    assert parsed.allocation_weight == 0
+    assert not parsed.mi_system_assigned and parsed.mi_user_assigned is None
+
+
+def test_batch_link_update_parser_preserves_explicit_selections(management_command_parser):
+    command = "iot adr ns link update"
+    parsed = management_command_parser.parse_args([*command.split(), *_LINK_PARSER_CASES[command]])
+    assert parsed.dps_endpoint_name == "dps"
+    assert parsed.hub_endpoint_names == ["hub-a", "hub-b"]
+
+
+@pytest.mark.parametrize("action", ["show", "list", "wait", "remove"])
+def test_other_hub_commands_reject_allocation_options(management_command_parser, action):
+    command = f"iot adr ns link hub {action}"
+    with pytest.raises(SystemExit):
+        management_command_parser.parse_args([
+            *command.split(), *_LINK_PARSER_CASES[command], "--availability", "Disabled",
+        ])
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
