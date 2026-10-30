@@ -1347,6 +1347,19 @@ def test_export_reconciliation_is_bounded_to_the_requested_owned_tree(transport)
     assert all(call[0] in ("GET", "POST") for call in wire.calls[checkpoint:])
 
 
+def test_root_scoped_reconciliation_persists_ownership_violation(transport):
+    observer, _, wire = transport
+    wire.accepted[HUB] = "azure-asyncoperation", 202
+    create_hub(wire)
+    wire.resources[HUB]["tags"][ownership.OWNER_TAG] = "foreign"
+
+    with pytest.raises(ownership.OwnershipError, match="no longer belongs"):
+        wire.submit("PUT", CERTIFICATE, {"properties": {}})
+
+    detail = json.loads(observer.path.read_text(encoding="utf-8"))["violationDetails"][-1]
+    assert detail["reason"] == "Observed root ownership changed" and detail["resourcePath"] == HUB
+
+
 @pytest.mark.parametrize("damage", ["owner", "group", "id"])
 def test_no_location_deployment_get_still_requires_current_exact_ownership(transport, damage):
     from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
@@ -1456,6 +1469,25 @@ def test_real_cosmos_lro_without_provisioning_state_then_container_and_cleanup(t
     result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 2, observer.path)
     assert result["complete"] and result["absentDescendantIds"] == [DATABASE, CONTAINER]
     assert not wire.resources
+
+
+def test_failed_cosmos_create_retry_does_not_block_other_roots(transport):
+    observer, _, wire = transport
+    body = {"location": ownership.REGION}
+    wire.submit("PUT", COSMOS, body)
+    record = observer.data["resources"][COSMOS]
+    wire.resources[COSMOS]["properties"]["provisioningState"] = "Failed"
+    record["mutations"][0].update(awaitingProvisioning=True, pollingFailed=True)
+    record["uncertain"] = True
+
+    wire.accepted[NAMESPACE] = "azure-asyncoperation", 202
+    wire.submit("PUT", NAMESPACE, body)
+    assert wire.submit("PUT", NAMESPACE + "/eventhubs/owned", {"properties": {}}).status_code == 200
+
+    observer.allow_cosmos_create_retry(COSMOS.rsplit("/", 1)[1])
+    assert wire.submit("PUT", COSMOS, body).status_code == 200
+    assert wire.submit("PUT", DATABASE, {"properties": {"resource": {"id": "routedb"}}}).status_code == 200
+    assert not ownership.ownership_errors(observer.data, "uid", "regular")
 
 
 @pytest.mark.parametrize("damage", ["uncorrelated", "nonterminal", "failed", "wrong-id", "transport", "foreign-root"])

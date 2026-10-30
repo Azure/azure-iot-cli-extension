@@ -29,6 +29,7 @@ from azext_iot.tests.adr.test_adr_link_initiate_recovery_unit import _harness
 DENIED = "968b143a-9db1-4647-8d0e-d4e20aa511cc"
 CLIENT = "3794e83c-342b-4713-ace2-0c42bd4c2c7e"
 OTHER = "11111111-1111-4111-8111-111111111111"
+HUB_NOTIFY_ACTION = "Microsoft.Devices/IotHubs/linkNotify/action"
 
 
 class Scenario:
@@ -66,10 +67,10 @@ class Scenario:
         self.initial_read_cost = 0
         self.cmd = Mock(side_effect=self.command)
 
-    def denial(self, *, principal=DENIED, action=None, target=None):
+    def denial(self, *, code="LinkInitiateFailed", principal=DENIED, action=None, target=None):
         service = {"hub": "Hub", "dps": "DPS"}[self.kind]
         return {
-            "code": "LinkInitiateFailed",
+            "code": code,
             "message": (
                 f"The namespace's managed identity is not authorized to link the {service} resource. "
                 "Grant it access on the resource, then resubmit the request. "
@@ -252,10 +253,14 @@ def test_fresh_grant_recovery_retains_progress_guard_and_backoff(kind, error):
     ),
     pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
     pytest.param("hub", {**_hub_commit_rejection(), "code": "LinkInitiateFailed"}, id="hub-link-initiate"),
+    pytest.param("hub", "bound-hub-commit", id="hub-bound-link-commit"),
 ])
 def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = (
+        scenario.denial(code="LinkCommitFailed", action=HUB_NOTIFY_ACTION)
+        if error == "bound-hub-commit" else error
+    )
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()
@@ -306,13 +311,17 @@ def test_retried_resource_mi_rejection_can_outlive_freshness_window():
     ),
     pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
     pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+    pytest.param("hub", "unbound-hub-commit", False, id="hub-bound-action-mismatch"),
     pytest.param(
         "dps", {**_resource_mi_rejection(), "details": [{"code": "OtherFailure"}]}, False, id="dps-extra-error",
     ),
 ])
 def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = (
+        scenario.denial(code="LinkCommitFailed", action=HUB_NOTIFY_ACTION + "-other")
+        if error == "unbound-hub-commit" else error
+    )
     if stale:
         original = scenario.command
         advanced = [False]
