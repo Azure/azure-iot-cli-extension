@@ -479,7 +479,9 @@ class LinkRecovery:
             logger.warning(
                 "Link '%s' did not complete. Inspect its current state/error with 'iot adr ns link %s show'. "
                 "For a persisted Failed endpoint, verify access and use 'iot adr ns link %s update' with its existing "
-                "identity and settings, not link add. No rollback was attempted.", self.name, self.kind, self.kind,
+                "identity and settings, not link add. If a DPS and required Hubs are Failed, inspect "
+                "'link dps show' brownfieldHubs and use 'az iot adr ns link update' with their endpoint names "
+                "to retry together. No rollback was attempted.", self.name, self.kind, self.kind,
             )
             # Any later stop (changed/malformed state, other endpoint, timeout) keeps the service failure as its cause.
             if (

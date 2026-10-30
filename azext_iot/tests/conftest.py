@@ -92,6 +92,19 @@ mock_symmetric_key_attestation = {
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
 
 
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_protocol(item):
+    marker = item.get_closest_marker("timeout")
+    timeout = (marker.args[0] if marker.args else marker.kwargs.get("timeout", 0)) if marker else 0
+    if item.path.name.endswith("_int.py") and timeout > 0 and not marker.kwargs.get("func_only", False):
+        from azext_iot.tests.helpers import ScenarioBudget
+
+        with ScenarioBudget.track(timeout):
+            yield
+    else:
+        yield
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_pycollect_makeitem(collector, name, obj):
     from azure.cli.testsdk import LiveScenarioTest

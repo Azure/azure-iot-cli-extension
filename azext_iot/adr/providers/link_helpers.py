@@ -139,8 +139,9 @@ def resolve_update_identity(endpoint: dict, mi_system_assigned: bool, mi_user_as
     if identity is not None:
         return identity
     if not is_failed_link_endpoint(endpoint):
+        settings = "--availability, --allocation-weight, " if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) else ""
         raise RequiredArgumentMissingError(
-            "Nothing to update. Pass --system-assigned-mi or --user-assigned-mi <uami-resource-id>. "
+            f"Nothing to update. Pass {settings}--system-assigned-mi or --user-assigned-mi <uami-resource-id>. "
             "Omit identity options only to retry a Failed endpoint with its saved settings."
         )
     identity = endpoint.get("inboundCallerIdentity")
@@ -172,6 +173,7 @@ def failed_link_recovery_commands(namespace: dict) -> list:
         return []
 
     commands = []
+    failed_kinds = set()
     for kind, section, endpoint_type in (
         ("dps", "provisioning", DPS_ENDPOINT_TYPE),
         ("hub", "messaging", IOT_HUB_ENDPOINT_TYPE),
@@ -184,6 +186,7 @@ def failed_link_recovery_commands(namespace: dict) -> list:
                 continue
             if not is_failed_link_endpoint(endpoint):
                 continue
+            failed_kinds.add(kind)
             identity = endpoint.get("inboundCallerIdentity") or {}
             if not isinstance(identity, dict):
                 continue
@@ -209,7 +212,7 @@ def failed_link_recovery_commands(namespace: dict) -> list:
                 "--subscription", parsed["subscription"],
                 *identity_args,
             ]))
-    return commands
+    return [] if {"dps", "hub"} <= failed_kinds else commands
 
 
 def build_hub_endpoint_body(

@@ -1382,7 +1382,9 @@ def test_sequential_scenario_exercises_combined_command_without_helper_recovery(
             assert f"--dps-id {DPS_ID} --dps-user-assigned-mi {UAMI_ID}" in text
             assert f"--hub-id {HUB_ID} --hub-user-assigned-mi {UAMI_ID}" in text
             assert "--hub-availability Available --hub-weight 1" in text
-            assert link_scenarios._NATIVE_LINK_OPTIONS in text
+            arguments = text.split()
+            assert 0 < int(arguments[arguments.index("--timeout") + 1]) <= link_scenarios._NATIVE_LINK_TIMEOUT
+            assert arguments[arguments.index("--interval") + 1] == str(link_scenarios._NATIVE_LINK_INTERVAL)
             assert "--no-wait" not in text
             if failure == "combined":
                 raise RuntimeError("synthetic combined command failure")

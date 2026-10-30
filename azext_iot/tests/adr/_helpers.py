@@ -417,6 +417,12 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         "identity": "identity",
     }
 
+    def cmd(self, *args, **kwargs):
+        budget = getattr(self, "_scenario_budget", None)
+        if budget is not None:
+            return budget.call(super().cmd, *args, **kwargs)
+        return super().cmd(*args, **kwargs)
+
     def create_owned_resource(self, command, *, kind, name, resource_group):
         """Require absence and record the attempt before creating a resource."""
         if kind not in self._RESOURCE_COMMANDS:

@@ -12,6 +12,7 @@ import pytest
 from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
 from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
+from azext_iot.tests.helpers import ScenarioBudget
 
 
 def _log_job_device_statistics(job, expected_count):
@@ -32,8 +33,9 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubJobs, self).__init__(test_case)
 
-    @pytest.mark.timeout(900 + 2 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
+    @pytest.mark.timeout(2700, func_only=False)
     def test_jobs(self):
+        budget = ScenarioBudget(45 * 60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 2
             device_ids_twin_tags = self.generate_device_names(device_count)
@@ -65,6 +67,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 ).get_output_in_json(),
                 device_ids_twin_tags,
                 id_key="deviceId",
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             tag_job = self.cmd(
@@ -113,6 +116,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 ).get_output_in_json(),
                 device_ids_twin_props,
                 id_key="deviceId",
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             property_job = self.cmd(

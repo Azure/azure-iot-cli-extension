@@ -51,7 +51,7 @@ def _assert_unlink_service_rejection(error, namespace_id):
     method = getattr(request, "method", None)
     path = urlsplit(getattr(request, "url", "")).path
     if error.status_code == 400:
-        assert method == "PUT", "Failure did not reject the namespace mutation."
+        assert method == "PATCH", "Failure did not reject the namespace mutation."
         assert path.casefold() == namespace_id.casefold(), "Failure belongs to another resource."
     else:
         assert error.status_code == 200 and method == "GET", f"Unexpected unlink HTTP failure: {error.status_code}"
@@ -202,7 +202,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             assert after["properties"].get(endpoint_section, {}).get("endpoints", {}) == retained
         self.cmd(f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes", expect_failure=True)
 
-    @pytest.mark.timeout(3600)
+    @pytest.mark.timeout(2700, func_only=False)
     def test_adr_link_hub_dps_delete(self):
         namespace_name, first_hub = generate_adr_namespace_name(), generate_hub_name()
         second_hub, dps_name = generate_hub_name(), generate_dps_name()
@@ -276,7 +276,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         finally:
             self.cleanup_full_infra()
 
-    @pytest.mark.timeout(900)
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_unlink_missing_rg_advisory(self):
         namespace_name = generate_adr_namespace_name()
         missing_group = f"unlink-absent-{generate_generic_id()}"

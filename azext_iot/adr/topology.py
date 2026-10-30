@@ -16,14 +16,19 @@ from azext_iot.adr.common import (
 
 
 DPS_REQUIRED_MSG = (
-    "A DPS link is required before adding a new Hub or retrying a failed Hub. "
+    "A Succeeded DPS link is required before adding a new Hub or retrying a failed Hub individually. "
     "Run 'az iot adr ns link dps add ...' or "
-    "'az iot adr ns link add ...' to add both at once."
+    "'az iot adr ns link add ...' to add both. For an existing Failed DPS and its required Failed Hubs, "
+    "use 'az iot adr ns link update --dps-endpoint-name <dps> --hub-endpoint-name <hubs>'."
 )
 
 DPS_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked DPS; only one is allowed. "
     "Use 'az iot adr ns link dps update' to change its identity or retry a Failed link. "
+    "Retry an existing Failed DPS and its required Failed Hubs together with 'az iot adr ns link update'. "
+    "If the DPS is Failed and required Hub entries are missing, save their settings, remove the Failed DPS "
+    "and only its required Failed Hub entries, then use 'az iot adr ns link add' with the missing/removed Hubs. "
+    "Reapply saved allocation settings through --hub-endpoints provisioning; preserve Succeeded Hubs. "
     "To change the target, remove the existing link with 'az iot adr ns link dps remove'. "
     "Delete the target first for Succeeded links, not Failed links."
 )
@@ -60,6 +65,13 @@ def has_dps_endpoint(namespace: dict) -> bool:
     """Return whether the namespace contains a DPS-typed provisioning endpoint."""
     return any(
         endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE)
+        for endpoint in get_endpoints(namespace, "provisioning").values()
+    )
+
+
+def has_succeeded_dps_endpoint(namespace: dict) -> bool:
+    return any(
+        endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and endpoint.get("linkingState") == "Succeeded"
         for endpoint in get_endpoints(namespace, "provisioning").values()
     )
 

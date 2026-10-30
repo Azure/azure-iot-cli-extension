@@ -19,6 +19,7 @@ from azext_iot.tests.iothub import (
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
+from azext_iot.tests.helpers import ScenarioBudget
 
 
 class TestIoTHubModules(IoTLiveScenarioTest):
@@ -42,10 +43,9 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             assert result["status"] == 200
             assert result["payload"] == {"method": "echo", "received": payload}
 
-    @pytest.mark.timeout(
-        900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
-    )
+    @pytest.mark.timeout(2700, func_only=False)
     def test_iothub_module_identity(self):
+        budget = ScenarioBudget(45 * 60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             for device_type in DEVICE_TYPES:
                 device_count = 1
@@ -227,6 +227,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     ).get_output_in_json(),
                     expected_modules,
                     id_key="moduleId",
+                    timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
                 )
 
                 # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.

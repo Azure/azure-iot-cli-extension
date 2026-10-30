@@ -111,12 +111,14 @@ still stop scheduling. Leftover resources can consume quota; subsequent Azure
 provisioning failures are reported normally.
 
 HubControl runs its four shards concurrently, each capped at 90 minutes plus
-15 minutes for controller cleanup and 5 minutes for admission. GitHub and Azure
-DevOps jobs allow 140 minutes (HubData: 120), including 15 minutes for external
-setup/reporting. Individual test timeouts are unchanged except for two 30-minute
-markers that also budget module-scoped setup/teardown:
-`test_iot_cosmos_endpoint_lifecycle` and
-`test_export_import_migrate_missing_hubs_error`. Per-test timeouts are failure
+15 minutes for controller cleanup. Its controller reserves another 5 minutes.
+GitHub and Azure DevOps jobs allow 130 minutes (HubData: 115), including 15
+minutes for setup and 5 minutes of outer headroom. HubData retains its 75-minute
+Entra / 45-minute SAS phases and 15-minute cleanup windows. DPS allows 90 minutes:
+10 setup + 75 controller + 5 outer headroom. Its controller includes the slowest
+35-minute phase, 10-minute cleanup grace, 25 minutes of serial verification, and
+5 minutes of reserve; the overlapping phase windows are not summed.
+Scenario markers include setup and teardown. Per-test timeouts are failure
 guards, not expected durations, so a shard's ceilings may sum past its runtime cap.
 
 HubData isolates the device and module identity round trips in `entra-identities`,
@@ -146,12 +148,13 @@ the selected GA API and are not included in its worker groups or expected covera
 The workers preserve the release branch's grouping mechanism, adapted to the
 16 supported scenarios.
 
-The GitHub ADR service job reserves **360 minutes**, including setup and reporting.
+The GitHub ADR service job allows **180 minutes**, including setup and reporting.
 The root integration matrix applies this budget directly to each ADR service job.
 The job ceiling does not extend per-operation provisioning waits.
 
-The release branch's conservative job ceiling is retained; it is not a measured
-GA runtime. Live qualification remains deferred until the GA APIs are deployed.
+This ceiling is calibrated against an observed 115-minute full preview-suite run,
+not a measured worst-case GA runtime.
+Live qualification remains deferred until the GA APIs are deployed.
 `azext_iot_adr_workers` controls the worker count; each group remains serial.
 
 Owned no-wait Hub/DPS link fixtures use the native CLI's **600-second** readiness
@@ -164,7 +167,7 @@ invalid-request failures remain non-retryable.
 The three-add lifecycle reserves **45 minutes** (15 minutes plus three 10-minute
 windows), without increasing native CLI defaults.
 
-360 minutes is practical headroom, **not a guarantee of full coverage or success**.
+180 minutes is a stall ceiling, **not a guarantee of full coverage or success**.
 All case maxima combined exceed one hosted job. A cancellation must be reported
 as incomplete, with failures/skips and unstarted cases preserved; backend failures
 must not be skipped, suppressed, or converted to successful coverage.

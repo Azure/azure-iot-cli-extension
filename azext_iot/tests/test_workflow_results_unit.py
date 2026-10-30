@@ -345,7 +345,7 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     assert ado_budgets == {suite: budgets[suite]["job_timeout_minutes"] for suite in BUDGETS}
     for suite, phases in BUDGETS.items():
         assert budgets[suite].get("concurrent_phases") is True
-        # Concurrent phases are bounded by the slowest phase; job timeouts keep their serial-era headroom.
+        # Concurrent phases are bounded by the slowest phase, plus controller reserve.
         assert runner_seconds(suite, phases) == 60 * (max(
             phase["runtime_minutes"] + phase["cleanup_minutes"] for phase in budgets[suite]["phases"]
         ) + budgets[suite]["reserve_minutes"])
@@ -362,7 +362,7 @@ def test_adr_budget_applies_directly_to_service_job():
     matrix = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
     assert "ci_budgets.json" in matrix["run"]
     budget = _ci_budgets()["ADR"]["job_timeout_minutes"]
-    assert budget == 360
+    assert budget == 180
     lifecycle_timeout = next(
         mark.args[0] for mark in getattr(TestADRLinkLifecycle.test_adr_link_lifecycle, "pytestmark")
         if mark.name == "timeout"
@@ -378,7 +378,7 @@ def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     assert "ci_budgets.json" in matrix["run"]
     budget = _ci_budgets()["DPS"]
-    assert budget["job_timeout_minutes"] == 100
+    assert budget["job_timeout_minutes"] == 90
     assert [phase["name"] for phase in budget["phases"]] == ["regular", "service-sas", "local-auth-toggle"]
     steps = _integration_service_job()["steps"]
     setup = next(step for step in steps if step["name"] == "Setup tox test environment")
@@ -635,12 +635,13 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
     if filtered:
         assert nodes == expected
     else:
-        assert len(nodes) == 18
+        assert len(nodes) == 19
         assert {
             "test_adr_schema_int.py::TestADRSchemaLifecycle::test_schema_registry_and_versions_lifecycle",
             "test_adr_registry_device_int.py::TestADRRegistryDeviceLifecycle::test_registry_device_lifecycle",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_link_hub_dps_delete",
             "test_adr_link_int.py::TestADRLinkSequentialAdd::test_adr_link_sequential_add",
+            "test_adr_link_int.py::TestADRLinkBrownfieldRecovery::test_adr_link_brownfield_recovery",
             "test_adr_link_delete_int.py::TestADRLinkDelete::test_adr_unlink_missing_rg_advisory",
         } <= nodes
         assert expected <= nodes

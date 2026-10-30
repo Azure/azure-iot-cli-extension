@@ -58,6 +58,7 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
         assert parser_error.value.code == 2
         assert message in [record.getMessage() for record in logs.records]
 
+    @pytest.mark.timeout(300, func_only=False)
     def test_adr_validation_negatives(self):
         _log(LogKind.TEST, "test_adr_validation_negatives")
         rg = TEST_RG

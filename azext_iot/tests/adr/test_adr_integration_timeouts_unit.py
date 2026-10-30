@@ -29,7 +29,7 @@ def test_owned_hub_dps_link_lifecycle_includes_bounded_recovery_and_cleanup():
 
 
 @pytest.mark.parametrize("scenario,expected", [
-    (links.TestADRLinkSequentialAdd.test_adr_link_sequential_add, 900 + 1200),
+    (links.TestADRLinkSequentialAdd.test_adr_link_sequential_add, 1500),
 ])
 def test_fresh_link_scenarios_reserve_native_recovery_without_consuming_cleanup_budget(scenario, expected):
     assert links._NATIVE_LINK_TIMEOUT == 1200

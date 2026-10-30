@@ -274,6 +274,9 @@ class ADRProvider(object):
                 "If the failed endpoint is still present, use link update, not link add, "
                 "preserving its existing identity and endpoint settings. "
                 "Update reruns RBAC preflight; it does not require deleting the linked resource."
+                " If a DPS and its Hubs are Failed, inspect 'link dps show' brownfieldHubs and use "
+                "'az iot adr ns link update --dps-endpoint-name <dps> --hub-endpoint-name <required-hubs>' "
+                "to retry the dependent endpoints together."
             )
             commands = failed_link_recovery_commands(body)
             if commands:

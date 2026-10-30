@@ -27,7 +27,7 @@ from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.iothub import (
+from azext_iot.tests.iothub import (  # noqa: F401 - DATAPLANE_AUTH_TYPES is re-exported to scenarios.
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
     DATAPLANE_AUTH_TYPES,
@@ -44,8 +44,8 @@ CONTROLPLANE = "arm"
 MAX_RETRIES = 5
 # An isolated consumer owns both cold setup and shared cleanup, not just the command under test.
 CONTROLPLANE_LIFECYCLE_TIMEOUT = 45 * 60
-# One source-fixture window and one destination window per migration/import auth phase.
-DATAPLANE_LIFECYCLE_TIMEOUT = 900 + QUERY_VISIBILITY_TIMEOUT * (1 + len(DATAPLANE_AUTH_TYPES))
+# Keep one shared query window plus setup and cleanup allowance.
+DATAPLANE_LIFECYCLE_TIMEOUT = 900 + QUERY_VISIBILITY_TIMEOUT
 
 
 def _invoke_state(command: str) -> EmbeddedCLI:
@@ -105,9 +105,10 @@ def _hub_auth(hub):
     return f"--hub-name {hub['name']} --resource-group {hub['rg']} --auth-type login"
 
 
-def _wait_for_dataplane_query(hub_auth, owned):
+def _wait_for_dataplane_query(hub_auth, owned, *, timeout=None):
     assert owned.device_ids, "IoT Hub state readiness requires owned device IDs."
-    owned.query_deadline = time.monotonic() + QUERY_VISIBILITY_TIMEOUT
+    timeout = QUERY_VISIBILITY_TIMEOUT if timeout is None else timeout
+    owned.query_deadline = time.monotonic() + timeout
     return wait_for_query_ids(
         lambda: _invoke_setup(f'iot hub query {hub_auth} -q "select deviceId from devices"').as_json(),
         owned.device_ids,

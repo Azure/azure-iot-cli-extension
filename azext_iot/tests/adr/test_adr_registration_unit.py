@@ -149,7 +149,7 @@ def test_2026_command_surface_is_registered():
     }
     assert expected_commands <= set(commands)
     assert "iot adr ns job run create" not in commands
-    assert len(commands) == 61
+    assert len(commands) == 62
     assert commands["iot adr schema registry create"] == (
         "command", "adr_schema_registry_create", {"supports_no_wait": True},
     )
@@ -362,7 +362,8 @@ def test_load_adr_arguments():
         "--dps-endpoint-name",
         "--den",
     ]
-    assert "Wait for DPS linking to succeed" in bundled["no_wait"]["help"]
+    assert "For a batch plan, return after submission" in bundled["no_wait"]["help"]
+    assert "Otherwise wait for DPS" in bundled["no_wait"]["help"]
     for scope, registered in arguments.items():
         if not scope.startswith("iot adr ns link"):
             continue

@@ -190,14 +190,6 @@ def namespace_links_succeeded(
                 if endpoint_is_type(endpoint, endpoint_type)
             )
 
-    if missing:
-        return WaitEvaluation(
-            False,
-            observation="not materialized: " + ", ".join(missing),
-        )
-    if not selected:
-        return WaitEvaluation(False, observation="no namespace links found")
-
     pending = []
     for label, endpoint in selected:
         state = _link_state(endpoint)
@@ -210,6 +202,15 @@ def namespace_links_succeeded(
             )
         if not evaluation.complete:
             pending.append(f"{label}={state or 'unknown'}")
+    namespace_evaluation = provisioning_succeeded(namespace)
+    if namespace_evaluation.failure:
+        return namespace_evaluation
+    if missing:
+        return WaitEvaluation(False, observation="not materialized: " + ", ".join(missing))
+    if not selected:
+        return WaitEvaluation(False, observation="no namespace links found")
+    if not namespace_evaluation.complete:
+        return namespace_evaluation
     return WaitEvaluation(
         not pending,
         observation=", ".join(pending) if pending else "all selected links succeeded",

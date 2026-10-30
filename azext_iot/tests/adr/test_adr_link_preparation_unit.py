@@ -21,4 +21,4 @@ def test_fresh_link_scenarios_do_not_import_fixture_service_role_recovery(scenar
     assert ".ensure(" not in source and ".ensure_many(" not in source
     assert "_ROLE_SETTLE_SECONDS" not in source
     assert "link_dps_with_readiness(" not in source and "link_hub_with_readiness(" not in source
-    assert "_NATIVE_LINK_OPTIONS" in source
+    assert "budget.remaining(_NATIVE_LINK_TIMEOUT)" in source

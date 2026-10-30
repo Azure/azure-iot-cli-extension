@@ -22,7 +22,6 @@ from azext_iot.adr import commands_link
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.rbac import LinkRbacManager
-from azext_iot.adr.topology import writable_namespace_properties
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
 
@@ -139,13 +138,13 @@ def test_delete_preserves_namespace_and_waits_without_target_reads(
     ))
     client.namespaces.get.return_value = (source, ETAG)
     completed = {"properties": {"provisioningState": "Succeeded"}}
-    client.namespaces.begin_create_or_replace.return_value.result.return_value = completed
+    client.namespaces.begin_update.return_value.result.return_value = completed
     provider = LinkProvider(fixture_cmd, client=client)
     for name in ("_get_target", "_preflight_link"):
         mocker.patch.object(provider, name, side_effect=AssertionError(f"Unexpected {name}"))
     wait = mocker.spy(provider, "_wait")
     unlink_rbac.check_unlink_read_access.side_effect = (
-        lambda *_, **__: client.namespaces.begin_create_or_replace.assert_not_called()
+        lambda *_, **__: client.namespaces.begin_update.assert_not_called()
     )
 
     assert getattr(provider, kind + "_remove")("primary", "ns", "rg", grant_reader=grant_reader) is completed
@@ -155,8 +154,8 @@ def test_delete_preserves_namespace_and_waits_without_target_reads(
     )
 
     client.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="ns", retry_total=0, cls=ANY)
-    arguments = client.namespaces.begin_create_or_replace.call_args.kwargs
-    assert set(arguments) == {"resource_group_name", "namespace_name", "resource", "headers", "retry_total", "polling"}
+    arguments = client.namespaces.begin_update.call_args.kwargs
+    assert set(arguments) == {"resource_group_name", "namespace_name", "properties", "headers", "retry_total", "polling"}
     assert arguments["headers"] == {"If-Match": ETAG}
     assert arguments["namespace_name"] == "ns" and arguments["resource_group_name"] == "rg"
     assert arguments["retry_total"] == 0
@@ -165,22 +164,10 @@ def test_delete_preserves_namespace_and_waits_without_target_reads(
     assert polling._timeout == 7
     assert polling._path_format_arguments == {"endpoint": client._config.base_url}
     assert polling._operation_config == {}
-    body = arguments["resource"]
-    expected = writable_namespace_properties(original["properties"])
-    del expected[section]["endpoints"]["primary"]
-    assert body["properties"] == expected
-    assert body["location"] == original["location"]
-    if identity == "system":
-        assert set(body) == {"location", "properties", "identity"}
-    else:
-        assert body["tags"] == original["tags"]
-    assert body["identity"] == {
-        "type": original["identity"]["type"],
-        **({"userAssignedIdentities": {UAMI: {}}} if identity in ("mixed", "user") else {}),
-    }
+    assert arguments["properties"] == {"properties": {section: {"endpoints": {"primary": None}}}}
     assert source == original
     assert [call[0] for call in client.mock_calls] == [
-        "namespaces.get", "namespaces.begin_create_or_replace", "namespaces.begin_create_or_replace().result",
+        "namespaces.get", "namespaces.begin_update", "namespaces.begin_update().result",
     ]
 
 
@@ -200,7 +187,7 @@ def test_delete_requires_the_named_endpoint_of_the_correct_kind(fixture_cmd, unl
     client.namespaces.get.return_value = (source, ETAG)
     with pytest.raises(ResourceNotFoundError, match="primary"):
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
     unlink_rbac.check_unlink_read_access.assert_not_called()
 
 
@@ -226,11 +213,11 @@ def test_delete_preflight_failure_warns_and_continues(fixture_cmd, unlink_rbac, 
     original = deepcopy(source)
     getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert source == original
-    client.namespaces.begin_create_or_replace.assert_called_once()
+    client.namespaces.begin_update.assert_called_once()
     assert "Could not verify" in caplog.text
     assert "Continuing without changing role assignments; ADR may reject removal." in caplog.text
     if defect == "identity":
-        assert "identity" not in client.namespaces.begin_create_or_replace.call_args.kwargs["resource"]
+        assert "identity" not in client.namespaces.begin_update.call_args.kwargs["properties"]
     if defect != "rbac":
         unlink_rbac.check_unlink_read_access.assert_not_called()
 
@@ -251,16 +238,16 @@ def test_delete_real_sdk_non_string_resource_id_does_not_block_unlink(
     completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
     with responses.RequestsMock() as network:
         network.get(URL, json=source, headers={"ETag": ETAG})
-        network.put(URL, json=completed)
+        network.patch(URL, json=completed)
 
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
             "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
 
         assert result == completed
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
-        assert "primary" not in json.loads(network.calls[1].request.body)["properties"][section]["endpoints"]
+        assert json.loads(network.calls[1].request.body) == {"properties": {section: {"endpoints": {"primary": None}}}}
         assert ("did not include a string resourceId" in caplog.text) is (not no_rbac_check)
         assert ("Continuing without changing role assignments" in caplog.text) is (not no_rbac_check)
         unlink_rbac.check_unlink_read_access.assert_not_called()
@@ -277,124 +264,18 @@ def test_delete_real_sdk_unscoped_resource_id_is_advisory(
     completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
     with responses.RequestsMock() as network:
         network.get(URL, json=source, headers={"ETag": ETAG})
-        network.put(URL, json=completed)
+        network.patch(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
             "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
         assert result == completed
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
         body = json.loads(network.calls[1].request.body)
-        assert "primary" not in body["properties"][section]["endpoints"]
-        assert body["identity"]["userAssignedIdentities"] == {UAMI: {}}
+        assert body == {"properties": {section: {"endpoints": {"primary": None}}}}
     assert ("resource-group-scoped ARM resource ID" in caplog.text) is (not no_rbac_check)
     assert ("Continuing without changing role assignments" in caplog.text) is (not no_rbac_check)
     unlink_rbac.check_unlink_read_access.assert_not_called()
-
-
-@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("field", ["identity", "userAssignedIdentities"])
-@pytest.mark.parametrize("value", [
-    pytest.param(123, id="integer"),
-    pytest.param(0, id="zero"),
-    pytest.param(True, id="true"),
-    pytest.param(False, id="false"),
-    pytest.param(UAMI, id="string"),
-    pytest.param("", id="empty-string"),
-    pytest.param([UAMI], id="list"),
-    pytest.param([], id="empty-list"),
-    pytest.param([{"id": UAMI}], id="list-of-objects"),
-])
-@pytest.mark.parametrize("outbound_type,state,no_rbac_check", [
-    pytest.param("UserAssigned", "Succeeded", False, id="user-advisory"),
-    pytest.param("UserAssigned", "Succeeded", True, id="user-no-rbac-check"),
-    pytest.param("SystemAssigned", "Succeeded", False, id="system-advisory"),
-    pytest.param("SystemAssigned", "Succeeded", True, id="system-no-rbac-check"),
-    pytest.param("UserAssigned", "Failed", False, id="failed-link"),
-    pytest.param("SystemAssigned", "LinkedResourceDeleted", False, id="deleted-resource"),
-])
-def test_delete_real_sdk_rejects_malformed_identity_containers_before_preflight(
-    fixture_cmd, unlink_client, unlink_rbac, mocker, caplog,
-    kind, section, _endpoint_type, field, value, outbound_type, state, no_rbac_check,
-):
-    source = namespace()
-    source["properties"]["outboundIdentity"]["type"] = outbound_type
-    source["properties"][section]["endpoints"]["primary"]["linkingState"] = state
-    if field == "identity":
-        source["identity"] = value
-    else:
-        source["identity"]["userAssignedIdentities"] = value
-    original = deepcopy(source)
-    provider = LinkProvider(fixture_cmd, client=unlink_client)
-    preflight = mocker.patch.object(provider, "_check_unlink_permissions")
-    with responses.RequestsMock() as network:
-        network.get(URL, json=source, headers={"ETag": ETAG})
-        with pytest.raises(AzureResponseError, match="attached identities cannot be safely preserved") as error:
-            getattr(provider, kind + "_remove")("primary", "ns", "rg", no_rbac_check=no_rbac_check)
-        assert field in str(error.value)
-        assert [call.request.method for call in network.calls] == ["GET"]
-    assert source == original
-    preflight.assert_not_called()
-    unlink_rbac.check_unlink_read_access.assert_not_called()
-    assert "Continuing" not in caplog.text
-
-
-@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("no_rbac_check", [False, True])
-def test_delete_rejects_non_string_attached_identity_keys(fixture_cmd, unlink_rbac, kind, section, _endpoint_type, no_rbac_check):
-    source = namespace()
-    source["identity"]["userAssignedIdentities"] = {123: {}}
-    client = Mock()
-    client.namespaces.get.return_value = (source, ETAG)
-    with pytest.raises(AzureResponseError, match="identity.userAssignedIdentities"):
-        getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", no_rbac_check=no_rbac_check)
-    client.namespaces.begin_create_or_replace.assert_not_called()
-    unlink_rbac.check_unlink_read_access.assert_not_called()
-
-
-@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("identity,expected", [
-    pytest.param(None, None, id="null"),
-    pytest.param({}, {}, id="empty-object"),
-    pytest.param({"type": "None"}, {"type": "None"}, id="no-identity"),
-    pytest.param(
-        {"type": "SystemAssigned", "principalId": "ns-system", "userAssignedIdentities": None},
-        {"type": "SystemAssigned"}, id="null-attachments",
-    ),
-    pytest.param(
-        {"type": "SystemAssigned", "principalId": "ns-system", "userAssignedIdentities": {}},
-        {"type": "SystemAssigned"}, id="empty-attachments",
-    ),
-    pytest.param(
-        {"type": "SystemAssigned, UserAssigned", "principalId": "ns-system", "userAssignedIdentities": {
-            UAMI: {"principalId": "ns-user"}, UAMI + "-other": None,
-        }},
-        {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {UAMI: {}, UAMI + "-other": {}}},
-        id="multiple-attachments",
-    ),
-])
-@pytest.mark.parametrize("no_rbac_check", [False, True])
-def test_delete_real_sdk_preserves_supported_identity_shapes(
-    fixture_cmd, unlink_client, kind, section, _endpoint_type, identity, expected, no_rbac_check,
-):
-    source = namespace()
-    source["identity"] = identity
-    source["properties"]["outboundIdentity"] = {"type": "SystemAssigned"}
-    original = deepcopy(source)
-    completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
-    with responses.RequestsMock() as network:
-        network.get(URL, json=source, headers={"ETag": ETAG})
-        network.put(URL, json=completed)
-        result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
-            "primary", "ns", "rg", no_rbac_check=no_rbac_check,
-        )
-        assert result == completed
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
-        assert network.calls[1].request.headers["If-Match"] == ETAG
-        body = json.loads(network.calls[1].request.body)
-        assert body["identity"] == expected
-        assert "primary" not in body["properties"][section]["endpoints"]
-    assert source == original
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -428,18 +309,16 @@ def test_delete_real_sdk_malformed_identity_is_advisory(
     completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
     with responses.RequestsMock() as network:
         network.get(URL, json=source, headers={"ETag": ETAG})
-        network.put(URL, json=completed)
+        network.patch(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")(
             "primary", "ns", "rg", no_rbac_check=no_rbac_check,
         )
         assert result == completed
         assert source == original
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
         body = json.loads(network.calls[1].request.body)
-        assert "primary" not in body["properties"][section]["endpoints"]
-        assert body["properties"]["outboundIdentity"] == source["properties"]["outboundIdentity"]
-        assert body["identity"] == {"type": source["identity"]["type"], "userAssignedIdentities": {UAMI: {}}}
+        assert body == {"properties": {section: {"endpoints": {"primary": None}}}}
         assert ("Could not verify" in caplog.text) is (state == "Succeeded" and not no_rbac_check)
         assert ("Continuing without changing role assignments" in caplog.text) is (state == "Succeeded" and not no_rbac_check)
         unlink_rbac.check_unlink_read_access.assert_not_called()
@@ -463,11 +342,11 @@ def test_delete_real_sdk_group_deserialization_failure_is_advisory(
         mocker.patch("azure.cli.core.commands.client_factory.get_mgmt_service_client", return_value=resources)
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
         network.get(group_url, json=["malformed-group"])
-        network.put(URL, json=completed)
+        network.patch(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
 
         assert result == completed
-        assert [call.request.method for call in network.calls] == ["GET", "GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "GET", "PATCH"]
         assert network.calls[1].request.url.split("?")[0] == group_url
         assert network.calls[2].request.headers["If-Match"] == ETAG
         assert isinstance(check.spy_exception, DeserializationError)
@@ -489,11 +368,11 @@ def test_delete_does_not_swallow_unexpected_advisory_errors(
     with pytest.raises(error_type) as raised:
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert raised.value is error
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("stage", ["get", "put", "result"])
+@pytest.mark.parametrize("stage", ["get", "patch", "result"])
 @pytest.mark.parametrize("error_type", [HttpResponseError, ServiceRequestError, DeserializationError])
 def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, section, _endpoint_type, stage, error_type):
     client = Mock()
@@ -501,19 +380,19 @@ def test_delete_does_not_translate_or_swallow_backend_errors(fixture_cmd, kind, 
     error = error_type("original backend error")
     operation = {
         "get": client.namespaces.get,
-        "put": client.namespaces.begin_create_or_replace,
-        "result": client.namespaces.begin_create_or_replace.return_value.result,
+        "patch": client.namespaces.begin_update,
+        "result": client.namespaces.begin_update.return_value.result,
     }[stage]
     operation.side_effect = error
     with pytest.raises(error_type) as raised:
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     assert raised.value is error
     if stage == "get":
-        client.namespaces.begin_create_or_replace.assert_not_called()
+        client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("stage", ["put", "result"])
+@pytest.mark.parametrize("stage", ["patch", "result"])
 def test_delete_conflict_warns_and_preserves_original_exception(
     fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, stage,
 ):
@@ -521,7 +400,7 @@ def test_delete_conflict_warns_and_preserves_original_exception(
     client.namespaces.get.return_value = (namespace(), ETAG)
     error = HttpResponseError("original conflict detail")
     error.status_code = 412
-    operation = client.namespaces.begin_create_or_replace
+    operation = client.namespaces.begin_update
     if stage == "result":
         operation = operation.return_value.result
     operation.side_effect = error
@@ -534,7 +413,7 @@ def test_delete_conflict_warns_and_preserves_original_exception(
     assert raised.value.status_code == 412
     assert "Namespace 'ns' changed before endpoint removal (HTTP 412)." in caplog.text
     assert "Inspect the namespace with 'az iot adr ns show' and rerun the remove command." in caplog.text
-    assert client.namespaces.get.call_count == client.namespaces.begin_create_or_replace.call_count == 1
+    assert client.namespaces.get.call_count == client.namespaces.begin_update.call_count == 1
     unlink_rbac.check_unlink_read_access.assert_called_once_with("ns-user", TARGET_RG, grant_reader=False)
 
 
@@ -561,7 +440,7 @@ def test_delete_command_handler_forwards_selectors_and_flags(
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("status", [200, 201])
+@pytest.mark.parametrize("status", [200, 202])
 @pytest.mark.parametrize("etag,expected_etag", [
     pytest.param(ETAG, ETAG, id="strong-etag"),
     pytest.param(f" \t{ETAG}\t ", ETAG, id="trim-http-ows"),
@@ -576,7 +455,7 @@ def test_delete_real_sdk_polls_async_status_and_returns_completed_namespace(
     completed["properties"] = {"provisioningState": "Succeeded", section: {"endpoints": {}}}
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"eTag": etag})
-        network.put(URL, json=initial, status=status, headers={
+        network.patch(URL, json=initial, status=status, headers={
             "Azure-AsyncOperation": STATUS_URL, "Location": URL + "/must-not-follow", "Retry-After": "0",
         })
         network.get(STATUS_URL, json={"status": "Running"})
@@ -584,12 +463,11 @@ def test_delete_real_sdk_polls_async_status_and_returns_completed_namespace(
         network.get(URL, json=completed)
         result = getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
         assert result == completed
-        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET", "GET", "GET"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH", "GET", "GET", "GET"]
         assert [call.request.url for call in network.calls[2:4]] == [STATUS_URL, STATUS_URL]
         assert network.calls[1].request.headers["If-Match"] == expected_etag
         body = json.loads(network.calls[1].request.body)
-        assert "primary" not in body["properties"][section]["endpoints"]
-        assert body["identity"] == {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {UAMI: {}}}
+        assert body == {"properties": {section: {"endpoints": {"primary": None}}}}
         unlink_rbac.check_unlink_read_access.assert_called_once_with("ns-user", TARGET_RG, grant_reader=False)
 
 
@@ -600,15 +478,15 @@ def test_delete_real_sdk_raises_async_service_failure(fixture_cmd, unlink_client
 
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
-                    headers={"Azure-AsyncOperation": STATUS_URL})
+        network.patch(URL, json={"properties": {"provisioningState": "Accepted"}}, status=202,
+                      headers={"Azure-AsyncOperation": STATUS_URL})
         network.get(STATUS_URL, json={
             "status": state, "error": {"code": "BackendUnlinkRejected", "message": "Original backend unlink detail."},
         })
         with pytest.raises(HttpResponseError, match="Original backend unlink detail") as raised:
             getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
         assert raised.value.error.code == "BackendUnlinkRejected"
-        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH", "GET"]
         assert network.calls[-1].request.url == STATUS_URL
         namespace_id = URL.removeprefix("https://management.azure.com")
         if state == "Failed":
@@ -626,8 +504,8 @@ def test_delete_real_sdk_preserves_polling_http_error_after_retries(
 ):
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
-                    headers={"Azure-AsyncOperation": STATUS_URL})
+        network.patch(URL, json={"properties": {"provisioningState": "Accepted"}}, status=202,
+                      headers={"Azure-AsyncOperation": STATUS_URL})
         if stage == "final-resource":
             network.get(STATUS_URL, json={"status": "Succeeded"})
         failure_url = STATUS_URL if stage == "async-status" else URL
@@ -641,7 +519,7 @@ def test_delete_real_sdk_preserves_polling_http_error_after_retries(
         policy = unlink_client._config.retry_policy
         attempts = 1 if status == 403 else 1 + min(policy.total_retries, policy.status_retries)
         assert [call.request.method for call in network.calls] == (
-            ["GET", "PUT"] + (["GET"] if stage == "final-resource" else []) + ["GET"] * attempts
+            ["GET", "PATCH"] + (["GET"] if stage == "final-resource" else []) + ["GET"] * attempts
         )
         expected_url = STATUS_URL if stage == "async-status" else network.calls[0].request.url
         assert all(call.request.url == expected_url for call in network.calls[-attempts:])
@@ -662,8 +540,8 @@ def test_delete_real_sdk_recovers_from_transient_polling_error(
     completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.put(URL, json={"properties": {"provisioningState": "Accepted"}}, status=201,
-                    headers={"Azure-AsyncOperation": STATUS_URL})
+        network.patch(URL, json={"properties": {"provisioningState": "Accepted"}}, status=202,
+                      headers={"Azure-AsyncOperation": STATUS_URL})
         if stage == "final-resource":
             network.get(STATUS_URL, json={"status": "Succeeded"})
         failure_url = STATUS_URL if stage == "async-status" else URL
@@ -679,7 +557,7 @@ def test_delete_real_sdk_recovers_from_transient_polling_error(
 
         assert result == completed
         assert network.calls[1].request.headers["If-Match"] == ETAG
-        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET", "GET", "GET"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH", "GET", "GET", "GET"]
         resource_url = network.calls[0].request.url
         assert [call.request.url for call in network.calls] == (
             [resource_url, resource_url, STATUS_URL, STATUS_URL, resource_url] if stage == "async-status"
@@ -692,13 +570,13 @@ def test_delete_real_sdk_recovers_from_transient_polling_error(
 def test_delete_rejects_inline_terminal_failure(fixture_cmd, unlink_client, kind, section, _endpoint_type, state):
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.put(URL, json={
+        network.patch(URL, json={
             "properties": {"provisioningState": state},
             "error": {"code": "BackendUnlinkRejected", "message": "Original inline unlink detail."},
         })
         with pytest.raises(AzureResponseError, match="BackendUnlinkRejected: Original inline unlink detail"):
             getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -708,41 +586,41 @@ def test_delete_no_wait_returns_poller_without_waiting(mocker, fixture_cmd, kind
     provider = LinkProvider(fixture_cmd, client=client)
     wait = mocker.patch.object(provider, "_await_terminal", side_effect=AssertionError("Unexpected wait"))
     assert getattr(provider, kind + "_remove")("primary", "ns", "rg", no_wait=True) is (
-        client.namespaces.begin_create_or_replace.return_value
+        client.namespaces.begin_update.return_value
     )
     wait.assert_not_called()
-    client.namespaces.begin_create_or_replace.return_value.result.assert_not_called()
+    client.namespaces.begin_update.return_value.result.assert_not_called()
 
 
-@pytest.mark.parametrize("stage", ["get", "put"])
+@pytest.mark.parametrize("stage", ["get", "patch"])
 @pytest.mark.parametrize("status", [400, 403, 404, 409, 412, 429, 500, 503])
 def test_delete_real_sdk_preserves_backend_error_without_retries(fixture_cmd, unlink_client, caplog, stage, status):
     failure = {"error": {"code": "BackendUnlinkRejected", "message": "Original backend deletion detail."}}
     with responses.RequestsMock() as network:
-        if stage == "put":
+        if stage == "patch":
             network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.add("GET" if stage == "get" else "PUT", URL, json=failure, status=status)
+        network.add("GET" if stage == "get" else "PATCH", URL, json=failure, status=status)
         with pytest.raises(HttpResponseError, match="Original backend deletion detail") as raised:
             LinkProvider(fixture_cmd, client=unlink_client).hub_remove("primary", "ns", "rg")
         assert raised.value.status_code == status
         assert raised.value.error.code == "BackendUnlinkRejected"
         assert len(network.calls) == (1 if stage == "get" else 2)
-        assert ("rerun the remove command" in caplog.text) is (stage == "put" and status == 412)
+        assert ("rerun the remove command" in caplog.text) is (stage == "patch" and status == 412)
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 @pytest.mark.parametrize("error_type", [ServiceRequestError, ServiceResponseError])
-def test_delete_real_sdk_does_not_retry_put_transport_error(
+def test_delete_real_sdk_does_not_retry_patch_transport_error(
     fixture_cmd, unlink_client, kind, section, _endpoint_type, error_type,
 ):
-    error = error_type("Original PUT transport error.")
+    error = error_type("Original PATCH transport error.")
     with responses.RequestsMock() as network:
         network.get(URL, json=namespace(), headers={"ETag": ETAG})
-        network.put(URL, body=error)
+        network.patch(URL, body=error)
         with pytest.raises(error_type) as raised:
             getattr(LinkProvider(fixture_cmd, client=unlink_client), kind + "_remove")("primary", "ns", "rg")
         assert raised.value is error
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
 
 
@@ -751,15 +629,15 @@ def test_delete_real_cli_returns_completed_response(offline_cli, mocker, kind, s
     get = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get",
                        return_value=(namespace(), ETAG))
     completed = {"properties": {"provisioningState": "Succeeded", section: {"endpoints": {}}}}
-    put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
-                       return_value=SimpleNamespace(result=lambda: completed))
+    patch = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update",
+                         return_value=SimpleNamespace(result=lambda: completed))
     output = StringIO()
     assert offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
                                "-g", "rg", "--yes", "-o", "json"], out_file=output) == 0
     assert json.loads(output.getvalue()) == completed
-    assert get.call_count == put.call_count == 1
-    assert isinstance(put.call_args.kwargs["polling"], ARMPolling)
-    assert put.call_args.kwargs["headers"] == {"If-Match": ETAG}
+    assert get.call_count == patch.call_count == 1
+    assert isinstance(patch.call_args.kwargs["polling"], ARMPolling)
+    assert patch.call_args.kwargs["headers"] == {"If-Match": ETAG}
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -768,8 +646,8 @@ def test_delete_real_cli_reports_conflict(offline_cli, mocker, caplog, kind, sec
                        return_value=(namespace(), ETAG))
     error = HttpResponseError("Original backend conflict detail.")
     error.status_code = 412
-    put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
-                       side_effect=error)
+    patch = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update",
+                         side_effect=error)
     output = StringIO()
 
     assert offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
@@ -778,8 +656,8 @@ def test_delete_real_cli_reports_conflict(offline_cli, mocker, caplog, kind, sec
     assert output.getvalue() == ""
     assert "Original backend conflict detail." in caplog.text
     assert "Inspect the namespace with 'az iot adr ns show' and rerun the remove command." in caplog.text
-    assert get.call_count == put.call_count == 1
-    assert put.call_args.kwargs["headers"] == {"If-Match": ETAG}
+    assert get.call_count == patch.call_count == 1
+    assert patch.call_args.kwargs["headers"] == {"If-Match": ETAG}
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -816,7 +694,7 @@ def test_delete_unusable_etag_stops_before_rbac_and_put(fixture_cmd, unlink_rbac
     with pytest.raises(AzureResponseError, match="usable ETag header"):
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg")
     unlink_rbac.check_unlink_read_access.assert_not_called()
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -856,29 +734,31 @@ def test_delete_real_sdk_preserves_concurrent_changes_and_can_be_rerun(
         current_etag = '"namespace-version-2"'
         concurrent = deepcopy(stored)
 
-    def replace(request):
-        nonlocal stored, current_etag
+    def update(request):
+        nonlocal current_etag
         if request.headers.get("If-Match") != current_etag:
             return 412, {}, json.dumps({"error": {"code": "PreconditionFailed", "message": "Namespace changed."}})
-        stored = json.loads(request.body)
+        assert json.loads(request.body) == {"properties": {section: {"endpoints": {"primary": None}}}}
+        del stored["properties"][section]["endpoints"]["primary"]
+        stored["properties"]["provisioningState"] = "Succeeded"
         current_etag = '"namespace-version-3"'
         return 200, {"ETag": current_etag}, json.dumps(stored)
 
     unlink_rbac.check_unlink_read_access.side_effect = concurrent_write
     with responses.RequestsMock() as network, DeviceRegistryMgmtClient(credential, "sub") as client:
         network.add_callback("GET", URL, callback=read, content_type="application/json")
-        network.add_callback("PUT", URL, callback=replace, content_type="application/json")
+        network.add_callback("PATCH", URL, callback=update, content_type="application/json")
         provider = LinkProvider(fixture_cmd, client=client)
         with pytest.raises(HttpResponseError) as raised:
             getattr(provider, kind + "_remove")("primary", "ns", "rg")
         assert raised.value.status_code == 412
         assert stored == concurrent
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
 
         unlink_rbac.check_unlink_read_access.side_effect = None
         result = getattr(provider, kind + "_remove")("primary", "ns", "rg")
-        assert [call.request.method for call in network.calls] == ["GET", "PUT", "GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH", "GET", "PATCH"]
         assert network.calls[3].request.headers["If-Match"] == '"namespace-version-2"'
         assert result == stored
         assert stored["tags"]["concurrent"] == "keep"
@@ -892,8 +772,8 @@ def test_delete_real_sdk_preserves_concurrent_changes_and_can_be_rerun(
 def test_delete_real_cli_returns_nonzero_for_operation_failure(offline_cli, mocker, kind, section, _endpoint_type):
     mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=(namespace(), ETAG))
     error = HttpResponseError("(BackendUnlinkRejected) Original asynchronous unlink error.")
-    put = mocker.patch(
-        "azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
+    patch = mocker.patch(
+        "azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update",
         return_value=SimpleNamespace(result=Mock(side_effect=error)),
     )
     output = StringIO()
@@ -901,14 +781,14 @@ def test_delete_real_cli_returns_nonzero_for_operation_failure(offline_cli, mock
                                "-g", "rg", "--yes", "-o", "json"], out_file=output) != 0
     assert not output.getvalue().strip()
     assert "Original asynchronous unlink error" in str(offline_cli.result.error)
-    put.assert_called_once()
+    patch.assert_called_once()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
 def test_delete_real_cli_accepts_no_wait(offline_cli, mocker, kind, section, _endpoint_type):
     mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=(namespace(), ETAG))
     poller = Mock(spec=LROPoller)
-    mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace", return_value=poller)
+    mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update", return_value=poller)
     output = StringIO()
     assert offline_cli.invoke(["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns",
                                "-g", "rg", "--yes", "--no-wait", "-o", "json"], out_file=output) == 0
@@ -945,7 +825,7 @@ def test_delete_warning_explains_state_and_hub_prerequisites(
         assert "any Hub endpoint, including Failed links" in caplog.text
         assert "Deleting the IoT Hub does not clear these references." in caplog.text
     assert unlink_rbac.check_unlink_read_access.call_count == (state == "Succeeded" and not no_rbac_check)
-    client.namespaces.begin_create_or_replace.assert_called_once()
+    client.namespaces.begin_update.assert_called_once()
 
 
 @pytest.mark.parametrize("state", ["Succeeded", "Failed"])
@@ -955,14 +835,14 @@ def test_delete_real_sdk_preserves_hub_device_reference_rejection(fixture_cmd, u
     source["properties"]["messaging"]["endpoints"]["primary"]["linkingState"] = state
     with responses.RequestsMock() as network:
         network.get(URL, json=source, headers={"ETag": ETAG})
-        network.put(URL, status=400, json={"error": {
+        network.patch(URL, status=400, json={"error": {
             "code": "EndpointUsedByNestedDevices", "message": "Registry Devices still reference this Hub endpoint.",
         }})
         with pytest.raises(HttpResponseError) as raised:
             LinkProvider(fixture_cmd, client=unlink_client).hub_remove("primary", "ns", "rg", no_rbac_check=no_rbac_check)
         assert raised.value.status_code == 400
         assert raised.value.error.code == "EndpointUsedByNestedDevices"
-        assert [call.request.method for call in network.calls] == ["GET", "PUT"]
+        assert [call.request.method for call in network.calls] == ["GET", "PATCH"]
         assert network.calls[1].request.headers["If-Match"] == ETAG
     assert "Clear Registry Device IoT Hub capability references" in caplog.text
 
@@ -990,7 +870,7 @@ def test_delete_state_gate_skips_identity_target_and_permission_work(
     )
     resolver.assert_not_called()
     unlink_rbac.check_unlink_read_access.assert_not_called()
-    client.namespaces.begin_create_or_replace.assert_called_once()
+    client.namespaces.begin_update.assert_called_once()
     assert ("permission preflight is unavailable" in caplog.text) is (state not in ("LinkedResourceDeleted", "Failed"))
 
 
@@ -998,7 +878,7 @@ def test_delete_state_gate_skips_identity_target_and_permission_work(
 @pytest.mark.parametrize("error_type", [
     AzureResponseError, HttpResponseError, ServiceRequestError, ServiceResponseError, DeserializationError,
 ])
-@pytest.mark.parametrize("stage", ["put", "result"])
+@pytest.mark.parametrize("stage", ["patch", "result"])
 def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
     fixture_cmd, unlink_rbac, caplog, kind, section, _endpoint_type, error_type, stage,
 ):
@@ -1006,7 +886,7 @@ def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
     client.namespaces.get.return_value = (namespace(), ETAG)
     unlink_rbac.check_unlink_read_access.side_effect = error_type("permission lookup unavailable")
     rejection = HttpResponseError("ADR unlink rejected")
-    operation = client.namespaces.begin_create_or_replace
+    operation = client.namespaces.begin_update
     if stage == "result":
         operation = operation.return_value.result
     operation.side_effect = rejection
@@ -1018,7 +898,7 @@ def test_delete_permission_errors_warn_but_do_not_swallow_backend_rejection(
 
 
 @pytest.mark.parametrize("status", [400, 409, 401, 403, 404, 412, 429, 500, 503])
-@pytest.mark.parametrize("method,resource", [("PUT", "ns"), ("GET", "ns"), ("PUT", "other")])
+@pytest.mark.parametrize("method,resource", [("PATCH", "ns"), ("GET", "ns"), ("PATCH", "other")])
 def test_live_unlink_negative_requires_a_structured_namespace_mutation_rejection(status, method, resource):
     from azext_iot.tests.adr.test_adr_link_delete_int import _assert_unlink_service_rejection
 
@@ -1029,7 +909,7 @@ def test_live_unlink_negative_requires_a_structured_namespace_mutation_rejection
     error.response = SimpleNamespace(request=SimpleNamespace(
         method=method, url="https://management.azure.com" + namespace_id.removesuffix("ns") + resource,
     ))
-    if status == 400 and method == "PUT" and resource == "ns":
+    if status == 400 and method == "PATCH" and resource == "ns":
         _assert_unlink_service_rejection(error, namespace_id)
     else:
         with pytest.raises(AssertionError):
@@ -1062,8 +942,8 @@ def test_delete_real_cli_no_rbac_check_is_independent_of_yes_and_no_wait(
     mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get", return_value=(namespace(), ETAG))
     poller = Mock(spec=LROPoller)
     poller.result.return_value = {"properties": {"provisioningState": "Succeeded"}}
-    put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace",
-                       return_value=poller)
+    patch = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update",
+                         return_value=poller)
     output = StringIO()
     args = ["iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns", "-g", "rg", "--yes"]
     if option:
@@ -1078,7 +958,7 @@ def test_delete_real_cli_no_rbac_check_is_independent_of_yes_and_no_wait(
             "ns-user", TARGET_RG, grant_reader=option == "--grant-reader",
         )
     assert poller.result.call_count == (0 if no_wait else 1)
-    assert put.call_args.kwargs["headers"] == {"If-Match": ETAG}
+    assert patch.call_args.kwargs["headers"] == {"If-Match": ETAG}
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -1094,7 +974,7 @@ def test_delete_no_rbac_check_does_not_bypass_etag_or_endpoint_validation(
     with pytest.raises(ResourceNotFoundError):
         getattr(provider, kind + "_remove")("missing", "ns", "rg", no_rbac_check=True)
     unlink_rbac.check_unlink_read_access.assert_not_called()
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps"])
@@ -1115,14 +995,14 @@ def test_delete_permission_flags_do_not_bypass_confirmation(offline_cli, mocker,
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 def test_delete_real_cli_rejects_conflicting_permission_flags(offline_cli, mocker, unlink_rbac, caplog, kind):
     get = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.get")
-    put = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_create_or_replace")
+    patch = mocker.patch("azext_iot.sdk.deviceregistry.operations.NamespacesOperations.begin_update")
     assert offline_cli.invoke([
         "iot", "adr", "ns", "link", kind, "remove", "-n", "primary", "--ns", "ns", "-g", "rg",
         "--yes", "--no-rbac-check", "--grant-reader",
     ]) != 0
     assert "--grant-reader cannot be combined with --no-rbac-check." in caplog.text
     get.assert_not_called()
-    put.assert_not_called()
+    patch.assert_not_called()
     unlink_rbac.check_unlink_read_access.assert_not_called()
 
 
@@ -1146,7 +1026,7 @@ def test_delete_grant_setup_errors_stop_before_namespace_put(
     assert "endpoint removal was not submitted" in str(raised.value)
     assert "already created are retained" in str(raised.value)
     assert "Continuing without changing role assignments" not in caplog.text
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
@@ -1169,11 +1049,11 @@ def test_delete_grant_validates_before_any_rbac_write(fixture_cmd, unlink_rbac, 
     with pytest.raises((AzureResponseError, ResourceNotFoundError)):
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", grant_reader=True)
     unlink_rbac.check_unlink_read_access.assert_not_called()
-    client.namespaces.begin_create_or_replace.assert_not_called()
+    client.namespaces.begin_update.assert_not_called()
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
-@pytest.mark.parametrize("stage", ["put", "result"])
+@pytest.mark.parametrize("stage", ["patch", "result"])
 @pytest.mark.parametrize("status", [400, 403, 412, 500])
 def test_delete_grant_is_retained_on_namespace_failure_without_retry(
     fixture_cmd, unlink_rbac, kind, section, _endpoint_type, stage, status,
@@ -1183,13 +1063,13 @@ def test_delete_grant_is_retained_on_namespace_failure_without_retry(
     unlink_rbac.created = [("ns-user", "Reader", TARGET_RG)]
     failure = HttpResponseError("original namespace failure")
     failure.status_code = status
-    operation = client.namespaces.begin_create_or_replace
+    operation = client.namespaces.begin_update
     if stage == "result":
         operation = operation.return_value.result
     operation.side_effect = failure
     with pytest.raises(HttpResponseError) as raised:
         getattr(LinkProvider(fixture_cmd, client=client), kind + "_remove")("primary", "ns", "rg", grant_reader=True)
     assert raised.value is failure
-    assert client.namespaces.get.call_count == client.namespaces.begin_create_or_replace.call_count == 1
+    assert client.namespaces.get.call_count == client.namespaces.begin_update.call_count == 1
     assert unlink_rbac.created == [("ns-user", "Reader", TARGET_RG)]
     assert unlink_rbac.method_calls == [call.check_unlink_read_access("ns-user", TARGET_RG, grant_reader=True)]

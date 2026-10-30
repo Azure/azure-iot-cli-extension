@@ -90,6 +90,7 @@ def test_endpoint_default_accepts_nested_status_and_surfaces_failure():
 def _namespace_links(hub="Succeeded", dps="Succeeded"):
     return {
         "properties": {
+            "provisioningState": "Succeeded",
             "messaging": {
                 "endpoints": {
                     "hub": {
@@ -159,6 +160,23 @@ def test_general_link_default_does_not_complete_empty_scope():
     result = namespace_links_succeeded({"properties": {}})
     assert not result.complete
     assert result.observation == "no namespace links found"
+
+
+@pytest.mark.parametrize("state", ["Accepted", "Updating", "Failed", "Canceled"])
+@pytest.mark.parametrize("scope", [{}, {"hub_endpoint_name": "hub"}, {"dps_endpoint_name": "dps"}])
+def test_link_wait_does_not_mistake_old_succeeded_links_for_rotation_success(state, scope):
+    namespace = _namespace_links()
+    namespace["properties"]["provisioningState"] = state
+    result = namespace_links_succeeded(namespace, **scope)
+    assert not result.complete
+    assert bool(result.failure) is (state in ("Failed", "Canceled"))
+
+
+def test_missing_selected_endpoint_does_not_mask_selected_failure():
+    namespace = _namespace_links(dps="Failed")
+    result = namespace_links_succeeded(namespace, hub_endpoint_name="missing", dps_endpoint_name="dps")
+    assert "DPS link 'dps'" in result.failure
+    assert not result.complete
 
 
 def test_wait_uses_default_condition_when_no_standard_predicate(mock_progress):
