@@ -503,6 +503,7 @@ def test_pipeline_adapts_shared_four_shards_and_unit_gate_without_cross_job_cach
     stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     unit = next(stage for stage in stages if stage.get("stage") == "Unit")
     job, gate = unit["jobs"]
+    assert "$(" not in job["displayName"]
     assert job["strategy"]["maxParallel"] == 4
     assert {value["shard"] for value in job["strategy"]["matrix"].values()} == {1, 2, 3, 4}
     assert gate["dependsOn"] == "Unit" and "condition" not in gate
@@ -532,6 +533,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )
     assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
+    assert "$(" not in stage["jobs"][0]["displayName"]
     steps = stage["jobs"][0]["steps"]
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))
     publish = next(step for step in steps if step.get("publish") == "attempt")
