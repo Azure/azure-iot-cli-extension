@@ -9,14 +9,14 @@ parameters:
 
 jobs:
   - job: Unit${{ parameters.platform }}
-    displayName: ${{ parameters.platform }}
+    displayName: ${{ replace(parameters.platform, 'MacOS', 'macOS') }}
     timeoutInMinutes: 90
     strategy:
       matrix:
-        Python310: {python: "3.10"}
-        Python311: {python: "3.11"}
-        Python312: {python: "3.12"}
-        Python313: {python: "3.13"}
+        py310: {python: "3.10"}
+        py311: {python: "3.11"}
+        py312: {python: "3.12"}
+        py313: {python: "3.13"}
     ${{ if eq(parameters.platform, 'Linux') }}:
       pool:
         name: iotupx-1espt-release-probe

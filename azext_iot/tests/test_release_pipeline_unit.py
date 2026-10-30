@@ -939,6 +939,7 @@ def test_yaml_preserves_all_twelve_unit_style_combinations():
     template = yaml.safe_load((ROOT / ".azure-devops/templates/release-unit.yml").read_text(encoding="utf-8"))
     assert "$(" not in template["jobs"][0]["displayName"]
     matrix = template["jobs"][0]["strategy"]["matrix"]
+    assert all(name == "py" + leg["python"].replace(".", "") for name, leg in matrix.items())
     assert {(job["parameters"]["platform"], leg["python"])
             for job in stages["Unit"]["jobs"] for leg in matrix.values()} == {
         (image, version) for image in ("Linux", "Windows", "MacOS")
