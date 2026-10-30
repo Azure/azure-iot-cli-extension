@@ -125,7 +125,6 @@ def iot_c2d_message_send(
     ack: Optional[str] = None,
     wait_on_feedback: bool = False,
     yes: bool = False,
-    repair: bool = False,
     hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,

@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azure.cli.testsdk.reverse_dependency import get_dummy_cli
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.tests.settings import Setting
@@ -20,6 +22,8 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     resource = discovery.find_resource(resource_name=dps_name)
     assert resource["name"] == dps_name
 
+    # Policy/key metadata is read through ARM with the logged-in identity. It is
+    # still useful to test with disableLocalAuth=true; no service SAS request is made.
     auto_policy = discovery.find_policy(resource_name=dps_name, rg=dps_rg)
     assert auto_policy
 
@@ -53,7 +57,8 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     assert len(rg_dpss) <= len(sub_dps)
 
 
-def test_dps_targets(provisioned_iot_dps_no_hub_module):
+@pytest.mark.parametrize("auth_type", ["key", "login"])
+def test_dps_targets(provisioned_iot_dps_no_hub_module, auth_type):
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
     dps_host_name = provisioned_iot_dps_no_hub_module['dps']['properties']['serviceOperationsHostName']
@@ -61,7 +66,7 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     setattr(cmd_shell, "cli_ctx", get_dummy_cli())
     discovery = DPSDiscovery(cmd_shell)
 
-    auto_target = discovery.get_target(resource_name=dps_name)
+    auto_target = discovery.get_target(resource_name=dps_name, auth_type=auth_type)
     assert_target(auto_target, rg=dps_rg)
     connection_string = auto_target["cs"]
 
@@ -71,16 +76,20 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     cs_target2 = discovery.get_target(resource_name=None, login=connection_string)
     assert_target(cs_target2, True)
 
-    cs_target2 = discovery.get_target(resource_name=dps_host_name)
+    cs_target2 = discovery.get_target(resource_name=dps_host_name, auth_type=auth_type)
     assert_target(cs_target2, True)
 
-    auto_target = discovery.get_target(resource_name=dps_name, resource_group_name=dps_rg)
+    auto_target = discovery.get_target(resource_name=dps_name, resource_group_name=dps_rg, auth_type=auth_type)
     assert_target(auto_target, rg=dps_rg)
+    if auth_type == "login":
+        assert auto_target["policy"] == "login"
+        assert auto_target["cmd"] is cmd_shell
+        assert auto_target["entity"] == dps_host_name
 
-    sub_targets = discovery.get_targets()
+    sub_targets = discovery.get_targets(auth_type=auth_type)
     [assert_target(tar) for tar in sub_targets]
 
-    rg_targets = discovery.get_targets(resource_group_name=dps_rg)
+    rg_targets = discovery.get_targets(resource_group_name=dps_rg, auth_type=auth_type)
     [assert_target(tar, rg=dps_rg) for tar in rg_targets]
 
     assert len(rg_targets) <= len(sub_targets)

@@ -21,7 +21,6 @@ from azure.cli.core.util import CLIError
 
 from azext_iot.core.command_map import (
     load_core_commands,
-    PolicyUpdateResultTransform,
     EndpointUpdateResultTransform,
     RouteUpdateResultTransform,
     HubDeleteResultTransform,
@@ -36,25 +35,47 @@ def test_load_core_commands():
     load_core_commands(MagicMock(), None)
 
 
+def test_load_root_hub_and_dps_data_commands():
+    from azext_iot.commands import load_command_table
+
+    load_command_table(MagicMock(), None)
+
+
 def test_load_core_arguments():
     load_core_arguments(MagicMock(), None)
 
 
-def test_patch_core_help_with_existing_keys():
-    from knack.help_files import helps
-
+def test_patch_core_help_with_existing_keys(monkeypatch):
     # Pre-populate the help keys so the conditional append branches execute.
-    helps["iot hub create"] = "type: command"
-    helps["iot dps create"] = "type: command"
+    helps = {name: "type: command\nexamples:\n" for name in ("iot hub create", "iot dps create")}
+    monkeypatch.setattr("azext_iot.core.help.helps", helps)
     patch_core_help()
     assert "iot dps identity" in helps
+    from yaml import safe_load
+    assert safe_load(helps["iot hub create"])["examples"]
+    assert safe_load(helps["iot dps create"])["examples"]
 
 
-def test_policy_update_result_transform(mocker):
-    transform = PolicyUpdateResultTransform(MagicMock())
-    result = {"properties": {"authorizationPolicies": ["p"]}}
-    mocker.patch(f"{cm_path}.LongRunningOperation.__call__", return_value=result)
-    assert transform("poller") == ["p"]
+def test_patch_dps_update_help_retains_authentication_and_capacity_examples(monkeypatch):
+    from yaml import safe_load
+
+    helps = {"iot dps update": "type: command\nexamples:\n"}
+    monkeypatch.setattr("azext_iot.core.help.helps", helps)
+    patch_core_help()
+    examples = safe_load(helps["iot dps update"])["examples"]
+    commands = [example["text"] for example in examples]
+    assert any("--disable-local-auth" in command for command in commands)
+    assert any("--set sku.capacity=1" in command for command in commands)
+
+
+@pytest.mark.parametrize("action", ["create", "delete"])
+def test_policy_mutations_preserve_handler_output_without_hub_result_transform(action):
+    loader = MagicMock()
+    load_core_commands(loader, None)
+    calls = loader.command_group.return_value.__enter__.return_value.command.call_args_list
+    mutations = [call for call in calls if call.args == (action, f"iot_hub_policy_{action}")]
+    assert len(mutations) == 1
+    assert mutations[0].kwargs == {}
 
 
 def test_endpoint_update_result_transform(mocker):

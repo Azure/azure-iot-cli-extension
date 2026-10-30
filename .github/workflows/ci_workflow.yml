@@ -8,6 +8,13 @@ concurrency:
 on:
   pull_request:
   push:
+    branches:
+      - dev
+      - preview
+      - 1.1.0-preview
+      - "release/**"
+    tags:
+      - "**"
   workflow_dispatch:
 jobs:
   build:
@@ -17,3 +24,6 @@ jobs:
   linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
+  index-compatibility:
+    needs: [build]
+    uses: ./.github/workflows/index_compatibility.yml

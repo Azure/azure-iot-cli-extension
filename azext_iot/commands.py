@@ -13,6 +13,27 @@ from azext_iot import (
     iotdps_ops,
 )
 
+_DPS_ENROLLMENT_LIST_TABLE = (
+    "[].{RegistrationId:registrationId,DeviceId:deviceId,"
+    "Namespace:namespaceName,CertificateAuthority:certificateAuthorityName,"
+    "CertificatePolicy:certificatePolicyName,Status:provisioningStatus}"
+)
+_DPS_ENROLLMENT_SHOW_TABLE = (
+    "{RegistrationId:registrationId,DeviceId:deviceId,"
+    "Namespace:namespaceName,CertificateAuthority:certificateAuthorityName,"
+    "CertificatePolicy:certificatePolicyName,Status:provisioningStatus}"
+)
+_DPS_ENROLLMENT_GROUP_LIST_TABLE = (
+    "[].{EnrollmentGroupId:enrollmentGroupId,Namespace:namespaceName,"
+    "CertificateAuthority:certificateAuthorityName,"
+    "CertificatePolicy:certificatePolicyName,Status:provisioningStatus}"
+)
+_DPS_ENROLLMENT_GROUP_SHOW_TABLE = (
+    "{EnrollmentGroupId:enrollmentGroupId,Namespace:namespaceName,"
+    "CertificateAuthority:certificateAuthorityName,"
+    "CertificatePolicy:certificatePolicyName,Status:provisioningStatus}"
+)
+
 
 def load_command_table(self, _):
     """
@@ -42,7 +63,7 @@ def load_command_table(self, _):
             getter_name="iot_device_show",
             custom_func_type=iothub_ops,
             setter_name="iot_device_update",
-            custom_func_name="update_iot_device_custom"
+            custom_func_name="update_iot_device_custom",
         )
         cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")
@@ -170,19 +191,18 @@ def load_command_table(self, _):
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
 
-    with self.command_group("iot dps", command_type=iotdps_ops) as cmd_group:
-        cmd_group.command(
-            "compute-device-key",
-            "iot_dps_compute_device_key",
-            deprecate_info=self.deprecate(
-                redirect='iot dps enrollment-group compute-device-key', hide=True
-            )
-        )
-
     with self.command_group("iot dps enrollment", command_type=iotdps_ops) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_create")
-        cmd_group.command("list", "iot_dps_device_enrollment_list")
-        cmd_group.show_command("show", "iot_dps_device_enrollment_get")
+        cmd_group.command(
+            "list",
+            "iot_dps_device_enrollment_list",
+            table_transformer=_DPS_ENROLLMENT_LIST_TABLE,
+        )
+        cmd_group.show_command(
+            "show",
+            "iot_dps_device_enrollment_get",
+            table_transformer=_DPS_ENROLLMENT_SHOW_TABLE,
+        )
         cmd_group.command("update", "iot_dps_device_enrollment_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_delete")
 
@@ -196,8 +216,16 @@ def load_command_table(self, _):
         "iot dps enrollment-group", command_type=iotdps_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_group_create")
-        cmd_group.command("list", "iot_dps_device_enrollment_group_list")
-        cmd_group.show_command("show", "iot_dps_device_enrollment_group_get")
+        cmd_group.command(
+            "list",
+            "iot_dps_device_enrollment_group_list",
+            table_transformer=_DPS_ENROLLMENT_GROUP_LIST_TABLE,
+        )
+        cmd_group.show_command(
+            "show",
+            "iot_dps_device_enrollment_group_get",
+            table_transformer=_DPS_ENROLLMENT_GROUP_SHOW_TABLE,
+        )
         cmd_group.command("update", "iot_dps_device_enrollment_group_update")
         cmd_group.command("delete", "iot_dps_device_enrollment_group_delete")
         cmd_group.command(
@@ -206,15 +234,6 @@ def load_command_table(self, _):
 
     with self.command_group(
         "iot dps enrollment-group registration", command_type=iotdps_ops
-    ) as cmd_group:
-        cmd_group.command("list", "iot_dps_registration_list")
-        cmd_group.show_command("show", "iot_dps_registration_get")
-        cmd_group.command("delete", "iot_dps_registration_delete")
-
-    with self.command_group(
-        "iot dps registration",
-        command_type=iotdps_ops,
-        deprecate_info=self.deprecate(redirect='iot dps enrollment-group registration', hide=True)
     ) as cmd_group:
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.show_command("show", "iot_dps_registration_get")

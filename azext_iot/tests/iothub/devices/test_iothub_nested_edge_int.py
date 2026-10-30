@@ -4,9 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from azext_iot.tests.helpers import wait_for_assertion
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
+from azext_iot.tests.helpers import ScenarioBudget
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
@@ -16,7 +19,9 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubNestedEdge, self).__init__(test_case)
 
+    @pytest.mark.timeout(2700, func_only=False)
     def test_iothub_nested_edge(self):
+        budget = ScenarioBudget(45 * 60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 3
             device_ids = self.generate_device_names(device_count)
@@ -167,11 +172,26 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            self._wait_for_children(
-                edge_device_ids[0],
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[0]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
                 [device_ids[1]],
-                auth_phase,
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
+
+            # List child devices of edge device
+            output = self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity children list -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
+                    auth_type=auth_phase,
+                )
+            )
+            assert output.get_output_in_json() == [device_ids[1]]
 
             # Error - Remove all child devices of non-edge device
             self.cmd(
@@ -181,6 +201,19 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
+            )
+
+            # The query-backed remove-all must see every intended target before it runs.
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [edge_device_ids[0], device_ids[0], device_ids[2]],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             # Remove all child devices from edge device
@@ -193,7 +226,17 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            self._wait_for_children(edge_device_ids[1], [], auth_phase)
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
+            )
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
@@ -254,19 +297,18 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-            self._wait_for_children(edge_device_ids[1], [], auth_phase)
-
-    def _wait_for_children(self, parent_id, expected_children, auth_phase):
-        def check():
-            output = self.cmd(
-                self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {parent_id} -n {self.host_name} -g {self.entity_rg}",
-                    auth_type=auth_phase,
-                )
-            ).get_output_in_json()
-            assert output == expected_children
-
-        wait_for_assertion(check)
+            # List child devices of edge device which doesn't have any children
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
+            )
 
     def test_iothub_device_scope_on_create(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:

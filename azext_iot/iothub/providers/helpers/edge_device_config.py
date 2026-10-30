@@ -29,7 +29,7 @@ from azure.cli.core.azclierror import (
 )
 
 from azext_iot.operations.hub import _process_config_content
-from azext_iot.sdk.iothub.service.models import ConfigurationContent
+from azext_iot.iothub._payload import make_payload
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -488,7 +488,7 @@ def try_parse_valid_deployment_config(deployment_path: str):
         processed_content = _process_config_content(
             deployment_content, config_type=ConfigType.edge
         )
-        return ConfigurationContent(**processed_content)
+        return make_payload("ConfigurationContent", **processed_content)
     except CLIInternalError:
         raise FileOperationError(
             f"Please ensure a deployment file exists at path: '{deployment_path}'"

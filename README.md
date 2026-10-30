@@ -7,6 +7,12 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
+- This branch prepares **azure-iot 1.0.0** using `2026-11-01` for all seven ADR/CMS, IoT Hub control/data-plane, and DPS control/data-plane SDK packages. See [HISTORY.rst](HISTORY.rst) for the supported scope. Deployment and live qualification remain deferred; this is not a publication or deployment announcement.
+
+- To unlink, run `az iot adr ns link hub|dps remove`; delete the linked resource first only for a `Succeeded` link, not a `Failed` link. Hub endpoints in any state also require clearing Registry Device IoT Hub capability references first, for example by deleting the referencing Registry Devices with `az iot adr ns device delete`; deleting the Hub does not clear these references. Remove deletes only the namespace endpoint and waits for completion by default. Use `--no-wait` to return after submission.
+
+- **ADR unlink permission checks:** Checks are advisory by default. Use `--no-rbac-check` to omit the check or `--grant-reader` to request missing resource-group Reader access. See [ADR link troubleshooting](#adr-link-troubleshooting) for prerequisites, side effects, and recovery guidance.
+
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
@@ -36,20 +42,67 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 Please refer to the official `az iot` reference on [Microsoft Docs](https://learn.microsoft.com/en-us/cli/azure/ext/azure-iot/iot) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
 
+## ADR link troubleshooting
+
+**Removal prerequisites.** `az iot adr ns link <kind> remove` removes only the
+namespace endpoint. Delete the linked resource first for a `Succeeded` link;
+`Failed` links do not require target deletion. Before removing any Hub endpoint,
+clear Registry Device IoT Hub capability references (`EndpointUsedByNestedDevices`).
+Deleting the Hub does not clear them. Delete referencing Registry Devices with
+`az iot adr ns device delete` only if you intend to delete those devices.
+
+**Permission checks.** For `Succeeded` links, ADR verifies target deletion using
+the namespace outbound identity. It needs read access at a surviving scope: the
+target resource group, or the subscription if the group was deleted.
+Target-scoped roles granted by `link add` do not provide that parent-scope access.
+The CLI recognizes unconditional Reader, Contributor and Owner assignments,
+including inherited grants. Custom roles, conditions, group membership and deny
+assignments are not fully evaluated; recognized grants do not guarantee effective
+access. `LinkedResourceDeleted` and `Failed` endpoints skip the check; other
+states warn and continue. Missing or unavailable permission evidence is advisory:
+no roles change by default, and ADR remains authoritative. `--no-rbac-check`
+skips only this advisory check; `--yes` skips only confirmation.
+
+**Reader grants.** When no recognized read grant is found, the warning includes
+an exact manual Reader assignment command. Reader covers every resource at that
+scope; subscription grants are broader than resource-group grants. Alternatively,
+`--grant-reader` requests missing Reader access at the target resource group for
+`Succeeded` links. It requires role-assignment permission, never grants at
+subscription scope, and cannot be combined with `--no-rbac-check`. If the group
+was deleted and no recognized subscription grant exists, removal stops with
+manual remediation. Setup failures stop removal. Requested assignments are
+retained after success or failure, including HTTP 412. New grants can take
+several minutes to take effect; if ADR rejects removal, wait for propagation
+before retrying.
+
+**Completion and concurrent updates.** Removal waits up to 600 seconds and
+reports asynchronous service errors. `--no-wait` returns after submission but
+still waits for requested Reader setup and assignment visibility. After a timeout
+or `--no-wait`, inspect `az iot adr ns show` before retrying. Missing, weak or
+malformed ETags stop removal before permission checks or writes. Concurrent
+namespace changes cause HTTP 412 rather than being overwritten; inspect the
+latest namespace state before rerunning removal.
+
 ## Installation
 
 1. Install the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-    - You must have at least `v2.59.0` for the latest versions of `azure-iot`, which you can verify with `az --version`
+    - You must have at least `v2.73.0` for this version of `azure-iot`, which you can verify with `az --version`
 1. Add, Update or Remove the IoT extension with the following commands:
     - Add: `az extension add --name azure-iot`
     - Update: `az extension update --name azure-iot`
     - Remove: `az extension remove --name azure-iot`
 
+The extension installer resolves native dependencies for the Python runtime used by
+that `az` executable. If multiple Azure CLI installations are present, install and run
+the extension with the same executable, or give each installation a separate
+`AZURE_EXTENSION_DIR`. Do not share one extension directory between Azure CLI
+installations that use different Python versions.
+
 Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) if you run into any issues or the [Alternative Installation Methods](docs/alt-install-methods.md) if you'd like to install from a GitHub release or local source.
 
 ## Usage
 
-After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge` and `device` commands.
+After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge`, `device`, `adr` and `du` commands.
 
 For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for the following IoT services.
 

@@ -151,12 +151,12 @@ $commands += "az iot hub device-identity delete -g $resource_group_name -n $ioth
 $commands += "az iot edge deployment delete -g $resource_group_name -d $edge_deployment_name -n $iothub_name"
 
 # IoT DPS
-$commands += "az iot dps compute-device-key -g $resource_group_name --key $dps_endorsement_key --registration-id $dps_registration_id"
+$commands += "az iot dps enrollment-group compute-device-key -g $resource_group_name --key $dps_endorsement_key --registration-id $dps_registration_id"
 $commands += "az iot dps enrollment-group create -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps enrollment-group show -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps enrollment create -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id --attestation-type tpm --endorsement-key $dps_endorsement_key"
 $commands += "az iot dps enrollment show -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_id"
-$commands += "az iot dps registration list -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
+$commands += "az iot dps enrollment-group registration list -g $resource_group_name --dps-name $dps_name --enrollment-id $dps_enrollment_group_id"
 $commands += "az iot dps connection-string show -g $resource_group_name --dps-name $dps_name --all"
 
 # DPS Resource Cleanup
@@ -193,7 +193,8 @@ $commands += "az dt twin delete -g $resource_group_name -n $dt_instance_name --t
 $commands += "az dt route delete -g $resource_group_name -n $dt_instance_name --route-name $dt_route_name"
 $commands += "az dt endpoint delete -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint -y"
 $commands += "az eventgrid topic delete -g $resource_group_name --name $dt_eventgrid_topic --resource-group $resource_group_name"
-$commands += "az dt reset -g $resource_group_name -n $dt_instance_name -y"
+$commands += "az dt model delete-all -g $resource_group_name -n $dt_instance_name -y"
+$commands += "az dt twin delete-all -g $resource_group_name -n $dt_instance_name -y"
 $commands += "az dt delete -g $resource_group_name -n $dt_instance_name -y"
 
 # IoT Central
