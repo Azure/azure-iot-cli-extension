@@ -768,6 +768,10 @@ class LinkProvider(ADRProvider):
                 self.client.namespaces.begin_update,
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
                 properties={"properties": sections}, retry_total=0,
+                polling=ARMPolling(
+                    timeout=self.client._config.polling_interval,
+                    path_format_arguments={"endpoint": self.client._config.base_url},
+                ),
             )
             if no_wait:
                 return self._wait(poller, message, no_wait=True)
