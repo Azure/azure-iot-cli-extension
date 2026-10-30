@@ -299,13 +299,13 @@ stages:
                   BUILD_SOURCEBRANCH: refs/heads/${{ parameters.sourceBranch }}
 
       - stage: CommandLint
-        displayName: CLI lint
+        displayName: Lint
         dependsOn: [Resolve, Build]
         variables:
           sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
         jobs:
           - job: CommandLint
-            displayName: CLI lint
+            displayName: Lint
             timeoutInMinutes: 45
             steps:
               - template: release-source.yml
@@ -334,7 +334,7 @@ stages:
                   cp linter_exclusions.yml "$AZURE_EXTENSION_DIR/azure-iot/"
                   cp .pylintrc pylintrc
                   azdev linter --include-whl-extensions azure-iot --min-severity medium
-                displayName: Run CLI lint
+                displayName: Run Lint
                 env:
                   SOURCE: $(Agent.TempDirectory)/release-source
                   CANDIDATE: $(Pipeline.Workspace)/release-candidate
