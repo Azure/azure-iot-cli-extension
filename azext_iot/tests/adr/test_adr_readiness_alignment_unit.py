@@ -29,6 +29,7 @@ from azext_iot.tests.adr.test_adr_link_initiate_recovery_unit import _harness
 DENIED = "968b143a-9db1-4647-8d0e-d4e20aa511cc"
 CLIENT = "3794e83c-342b-4713-ace2-0c42bd4c2c7e"
 OTHER = "11111111-1111-4111-8111-111111111111"
+HUB_NOTIFY_ACTION = "Microsoft.Devices/IotHubs/linkNotify/action"
 
 
 class Scenario:
@@ -66,10 +67,10 @@ class Scenario:
         self.initial_read_cost = 0
         self.cmd = Mock(side_effect=self.command)
 
-    def denial(self, *, principal=DENIED, action=None, target=None):
+    def denial(self, *, code="LinkInitiateFailed", principal=DENIED, action=None, target=None):
         service = {"hub": "Hub", "dps": "DPS"}[self.kind]
         return {
-            "code": "LinkInitiateFailed",
+            "code": code,
             "message": (
                 f"The namespace's managed identity is not authorized to link the {service} resource. "
                 "Grant it access on the resource, then resubmit the request. "
@@ -252,10 +253,14 @@ def test_fresh_grant_recovery_retains_progress_guard_and_backoff(kind, error):
     ),
     pytest.param("hub", _hub_commit_rejection(), id="hub-link-commit"),
     pytest.param("hub", {**_hub_commit_rejection(), "code": "LinkInitiateFailed"}, id="hub-link-initiate"),
+    pytest.param("hub", "bound-hub-commit", id="hub-bound-link-commit"),
 ])
 def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, error):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = (
+        scenario.denial(code="LinkCommitFailed", action=HUB_NOTIFY_ACTION)
+        if error == "bound-hub-commit" else error
+    )
     scenario.states = ["Failed", "Failed", "Failed", "Failed", "Succeeded"]
 
     result = scenario.run()
@@ -265,6 +270,26 @@ def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, er
     assert " add " in scenario.writes[0] and " update " in scenario.writes[1]
     assert scenario.write_times == [0, 30]
     assert all(command.endswith(" --no-wait") for command in scenario.writes)
+
+
+@pytest.mark.parametrize("mutation", ["principal", "action", "scope", "extra-error"])
+def test_bound_hub_commit_rejection_requires_exact_request(mutation):
+    scenario = Scenario()
+    denial = {"code": "LinkCommitFailed", "action": HUB_NOTIFY_ACTION}
+    if mutation == "principal":
+        denial["principal"] = OTHER
+    elif mutation == "action":
+        denial["action"] += "-other"
+    elif mutation == "scope":
+        denial["target"] = scenario.expected["resourceId"] + "-other"
+    scenario.error = scenario.denial(**denial)
+    if mutation == "extra-error":
+        scenario.error["details"] = [{"code": "OtherFailure"}]
+
+    with pytest.raises(AssertionError, match="Non-recoverable"):
+        scenario.run()
+
+    assert len(scenario.writes) == 1
 
 
 def test_retried_resource_mi_rejection_can_outlive_freshness_window():
