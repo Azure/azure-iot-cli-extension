@@ -1132,12 +1132,34 @@ class TestADRLinkBrownfieldRecovery(ADRFullInfraHelper, ADRLiveScenarioTest):
             wait_for_resource_absent(
                 self, f"iot adr ns show -n {namespace_name} -g {rg}", timeout=budget.remaining(120),
             )
+            # Deleting a namespace orphans its linked Hubs; a new link plan needs fresh targets.
+            self._cleanup_owned_resources([
+                ("dps", dps_name, rg), *[("hub", name, rg) for name in hub_names],
+            ])
+            for command, name in [("iot dps", dps_name), *[("iot hub", name) for name in hub_names]]:
+                wait_for_resource_absent(
+                    self, f"{command} show -n {name} -g {rg}", timeout=budget.remaining(120),
+                )
             namespace_name = generate_adr_namespace_name()
             namespace = self.create_owned_resource(
                 f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION} "
                 f"--outbound-user-assigned-mi {identity_id}",
                 kind="namespace", name=namespace_name, resource_group=rg,
             ).get_output_in_json()
+            hub_names = [generate_hub_name(), generate_hub_name()]
+            hubs = [self.create_owned_resource(
+                f"iot hub create -n {name} -g {rg} --location {HUB_TEST_LOCATION} --sku S1 "
+                f"--user-assigned-mi {identity_id} --disable-local-auth true",
+                kind="hub", name=name, resource_group=rg,
+            ).get_output_in_json() for name in hub_names]
+            dps_name = generate_dps_name()
+            dps = self.create_owned_resource(
+                f"iot dps create -n {dps_name} -g {rg} --location {TEST_LOCATION} "
+                "--system-assigned-mi --disable-local-auth true",
+                kind="dps", name=dps_name, resource_group=rg,
+            ).get_output_in_json()
+            for index, hub in enumerate(hubs):
+                hub_bodies[f"hub-{index}"]["resourceId"] = hub["id"]
             prepare_roles(namespace, dps, hubs, infra["identity_principal_id"])
             seed_classic_hubs(hubs)
             additional = deepcopy(hub_bodies["hub-1"])
