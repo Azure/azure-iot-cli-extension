@@ -83,6 +83,7 @@ def _delete_test_run(scenario, scope):
 @pytest.mark.usefixtures("set_cwd")
 class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_job_run_surface_smoke(self):
         _log(LogKind.TEST, "test_adr_job_run_surface_smoke")
         rg = TEST_RG

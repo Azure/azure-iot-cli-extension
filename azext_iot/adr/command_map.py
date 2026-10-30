@@ -227,6 +227,7 @@ def load_adr_commands(self, _):
         "iot adr ns link", command_type=adr_link_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command("add", "adr_link_add", supports_no_wait=True)
+        cmd_group.command("update", "adr_link_update", supports_no_wait=True)
         cmd_group.command(
             "wait", "adr_link_wait", command_type=adr_link_wait_ops
         )

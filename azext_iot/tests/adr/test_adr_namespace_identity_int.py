@@ -38,6 +38,7 @@ def _cleanup_namespace(test, namespace_name: str) -> None:
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRNamespaceIdentity(ADRLiveScenarioTest):
+    @pytest.mark.timeout(600, func_only=False)
     def test_namespace_identity_assign_remove_show(self):
         namespace_name = generate_adr_namespace_name()
         missing_namespace = f"missing{generate_generic_id()[:8]}"
@@ -91,6 +92,7 @@ class TestADRNamespaceIdentity(ADRLiveScenarioTest):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRNamespaceUAMI(ADRFullInfraHelper, ADRLiveScenarioTest):
+    @pytest.mark.timeout(600, func_only=False)
     def test_namespace_uami_idempotent_assign_and_partial_remove(self):
         namespace_name = generate_adr_namespace_name()
         identity_name = generate_identity_name()

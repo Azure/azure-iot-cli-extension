@@ -225,7 +225,7 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 128
+    assert len(commands) == 129
     assert commands["iot adr schema registry create"] == (
         "command",
         "adr_schema_registry_create",
@@ -481,7 +481,8 @@ def test_load_adr_arguments():
         "--den",
     ]
     assert "has no effect" in arguments["iot adr ns group delete"]["no_wait"]["help"]
-    assert "Wait for DPS linking to succeed" in bundled["no_wait"]["help"]
+    assert "For a batch plan, return after submission" in bundled["no_wait"]["help"]
+    assert "Otherwise wait for DPS" in bundled["no_wait"]["help"]
     for scope, registered in arguments.items():
         if not scope.startswith("iot adr ns link"):
             continue

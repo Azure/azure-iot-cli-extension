@@ -162,7 +162,8 @@ def test_hub_manifest_collection_preserves_isolated_state_groups(
                 assert heavy_dependencies.isdisjoint(fixtures)
                 assert fixtures["provisioned_only_iot_hubs_module"][-1].scope == "module"
                 timeout = item.get_closest_marker("timeout")
-                assert timeout.args == (_state_helpers.DATAPLANE_LIFECYCLE_TIMEOUT,)
+                expected_timeout = 3300 if item.name == "test_migrate_dataplane" else _state_helpers.DATAPLANE_LIFECYCLE_TIMEOUT
+                assert timeout.args == (expected_timeout,)
                 assert timeout.kwargs == {"func_only": False}
             elif "setup_hub_states_controlplane" in fixtures:
                 assert item.module is controlplane

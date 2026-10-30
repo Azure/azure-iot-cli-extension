@@ -20,7 +20,6 @@ from azure.mgmt.core.polling.arm_polling import ARMPolling
 from knack.log import get_logger
 from knack.util import CLIError
 from msrestazure.tools import parse_resource_id
-from azext_iot.common.arm import sanitize_arm_identity
 
 from azext_iot._factory import (
     _get_canary_credential_scopes,
@@ -32,8 +31,9 @@ from azext_iot.adr.common import (
     DPS_ENDPOINT_TYPE,
     IOT_HUB_ENDPOINT_TYPE,
     SU_ENDPOINT_TYPE,
+    MessagingEndpointAvailability,
 )
-from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
+from azext_iot.adr.providers.base import ADRProvider, ADRResourceStateError, _ADR_LRO_TIMEOUT_SECONDS, parse_json_object
 from azext_iot.adr.providers.link_helpers import (
     MI_MUTEX_MSG as _MI_MUTEX_MSG,
     build_dps_endpoint_body as _build_dps_endpoint_body,
@@ -57,9 +57,10 @@ from azext_iot.adr.providers.link_preflight import (
     add_dps_hub_role_requirements,
     get_target,
     preflight_target,
+    validate_dps_hubs,
 )
-from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, validate_options
-from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
+from azext_iot.adr.providers.link_recovery import LinkDeadline, LinkRecovery, _normalized, validate_options
+from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL, link_succeeded, provisioning_succeeded
 from azext_iot.adr.rbac import (
     HUB_UNLINK_WARNING, LinkRbacManager, UNLINK_WARNING, required_assignments, resolve_namespace_outbound_principal,
 )
@@ -69,11 +70,13 @@ from azext_iot.adr.topology import (
     HUB_CAP_EXCEEDED_MSG,
     SU_CAP_EXCEEDED_MSG,
     endpoint_is_type,
+    endpoint_settings_match,
     has_dps_endpoint,
     has_su_endpoint,
+    has_succeeded_dps_endpoint,
     hub_endpoint_count,
     is_failed_hub_endpoint,
-    writable_namespace_properties,
+    is_failed_link_endpoint,
 )
 
 logger = get_logger(__name__)
@@ -141,6 +144,7 @@ class LinkProvider(ADRProvider):
         strategy: TargetLookup,
         *,
         rbac_requests: Optional[list] = None,
+        planned_hubs: Optional[dict] = None,
     ) -> dict:
         requests = []
         target = preflight_target(
@@ -154,6 +158,8 @@ class LinkProvider(ADRProvider):
             rbac_manager=self._rbac_manager,
             rbac_requests=requests,
         )
+        if link_type == "dps":
+            validate_dps_hubs(namespace, target, planned_hubs)
         add_dps_hub_role_requirements(
             requests[0], namespace,
             lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
@@ -227,33 +233,14 @@ class LinkProvider(ADRProvider):
                 "Endpoint removal was not submitted because concurrent changes cannot be protected."
             )
         endpoint = self._get_typed_endpoint(namespace, section, endpoint_name, endpoint_type, namespace_name, display_name)
-        resource = {key: deepcopy(namespace[key]) for key in ("location", "tags") if key in namespace}
-        if "identity" in namespace:
-            identity = namespace["identity"]
-            if identity is not None and not isinstance(identity, dict):
-                raise AzureResponseError(
-                    "The namespace response identity must be an object or null. "
-                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
-                )
-            attached = identity.get("userAssignedIdentities") if identity else None
-            if attached is not None and (
-                not isinstance(attached, dict) or any(not isinstance(identity_id, str) for identity_id in attached)
-            ):
-                raise AzureResponseError(
-                    "The namespace response identity.userAssignedIdentities must be an object with string keys or null. "
-                    "Endpoint removal was not submitted because attached identities cannot be safely preserved."
-                )
-            resource["identity"] = sanitize_arm_identity(identity)
-        properties = writable_namespace_properties(namespace["properties"])
-        del properties[section]["endpoints"][endpoint_name]
-        resource["properties"] = properties
         if not no_rbac_check:
             self._check_unlink_permissions(namespace, endpoint, section, grant_reader=grant_reader)
         try:
-            poller = self.client.namespaces.begin_create_or_replace(
+            poller = self.client.namespaces.begin_update(
                 resource_group_name=resource_group_name, namespace_name=namespace_name,
-                resource=resource, headers={"If-Match": etag}, retry_total=0,
-                # Keep retry suppression on the PUT, not on the poller's idempotent GETs.
+                properties={"properties": {section: {"endpoints": {endpoint_name: None}}}},
+                headers={"If-Match": etag}, retry_total=0,
+                # Suppress mutation retries without suppressing the poller's idempotent GET retries.
                 polling=ARMPolling(
                     timeout=self.client._config.polling_interval,
                     path_format_arguments={"endpoint": self.client._config.base_url},
@@ -452,7 +439,7 @@ class LinkProvider(ADRProvider):
         existing = self._get_namespace(namespace_name, resource_group_name)
 
         # DPS-first: namespace must already have at least one DPS endpoint
-        if not has_dps_endpoint(existing):
+        if not has_succeeded_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_REQUIRED_MSG)
         if hub_endpoint_count(existing) >= 10:
             raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
@@ -461,8 +448,8 @@ class LinkProvider(ADRProvider):
                 f"Messaging endpoint '{endpoint_name}' already exists on namespace "
                 f"'{namespace_name}' and cannot be repointed by link hub add. "
                 "Use 'az iot adr ns link hub update' for an existing Hub link, "
-                "or choose an unused endpoint name. To remove the existing link, delete the linked IoT Hub first, "
-                "then run 'az iot adr ns link hub remove'."
+                "or choose an unused endpoint name. Use 'az iot adr ns link hub remove' to remove it; "
+                "delete the target first only for a Succeeded link."
             )
 
         endpoint_body = _build_hub_endpoint_body(
@@ -501,6 +488,8 @@ class LinkProvider(ADRProvider):
         resource_group_name: str,
         mi_system_assigned: bool = False,
         mi_user_assigned: Optional[str] = None,
+        availability: Optional[str] = None,
+        allocation_weight: Optional[int] = None,
         **kwargs,
     ):
         """Partial-update an existing IoT Hub messaging endpoint on a namespace."""
@@ -517,18 +506,28 @@ class LinkProvider(ADRProvider):
             namespace_name,
             "Hub",
         )
-        if is_failed_hub_endpoint(endpoint) and not has_dps_endpoint(existing):
+        if is_failed_hub_endpoint(endpoint) and not has_succeeded_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_REQUIRED_MSG)
 
+        settings = {}
+        if availability is not None:
+            settings["availability"] = availability
+        if allocation_weight is not None:
+            settings["allocationWeight"] = allocation_weight
+        if settings and not mi_system_assigned and not mi_user_assigned and endpoint.get("linkingState") == "Succeeded":
+            return self._patch_endpoints(
+                namespace_name, resource_group_name, "messaging", {endpoint_name: {"provisioning": settings}},
+                f"Updating provisioning settings for Hub '{endpoint_name}'...", **kwargs,
+            )
         inbound_identity = resolve_update_identity(endpoint, mi_system_assigned, mi_user_assigned)
 
-        # The backend requires the full endpoint identity (endpointType + resourceId) on update,
-        # so re-send the existing endpoint with the requested changes overlaid rather than a
-        # sparse patch (which fails InvalidRequestContent).
+        # Identity changes and Failed retries retain the endpoint's saved writable settings.
         endpoint_patch = _endpoint_update_body(
             endpoint,
             inbound_identity=inbound_identity,
         )
+        if settings:
+            endpoint_patch["provisioning"] = {**(endpoint_patch.get("provisioning") or {}), **settings}
         hub_resource_id = endpoint.get("resourceId")
         parsed_hub = _parse_hub_resource_id(hub_resource_id)
         hub = self._preflight_link(
@@ -638,8 +637,9 @@ class LinkProvider(ADRProvider):
                     logger.warning(
                         "IoT Hub '%s' is also configured in the linked DPS "
                         "properties.iotHubs list. The namespace Hub link is the "
-                        "authoritative ADR relationship; keep classic DPS allocation "
-                        "settings reconciled.",
+                        "authoritative ADR relationship. The classic list is read-only while linked; "
+                        "use 'az iot adr ns link hub update --availability ... --weight ...' "
+                        "to change namespace allocation settings.",
                         parsed_hub["name"],
                     )
                     return
@@ -669,7 +669,7 @@ class LinkProvider(ADRProvider):
             raise ArgumentUsageError(
                 f"Provisioning endpoint '{endpoint_name}' already exists on "
                 f"namespace '{namespace_name}'. Choose an unused endpoint name. "
-                "To remove the existing link, delete the linked DPS first, then run 'az iot adr ns link dps remove'."
+                "Use 'az iot adr ns link dps remove' to remove it; delete the target first only for a Succeeded link."
             )
 
         endpoint_body = _build_dps_endpoint_body(
@@ -910,6 +910,57 @@ class LinkProvider(ADRProvider):
 
     # Combined DPS-first link add
 
+    def _patch_link_batch(self, namespace_name, resource_group_name, sections, *, no_wait=False,
+                          timeout_sec=_ADR_LRO_TIMEOUT_SECONDS, wait_sec=DEFAULT_WAIT_INTERVAL):
+        budget = LinkDeadline(timeout_sec, wait_sec, clock=monotonic, sleeper=sleep)
+        message = f"Updating selected links on namespace {namespace_name}..."
+        try:
+            poller = budget.call(
+                self.client.namespaces.begin_update,
+                resource_group_name=resource_group_name, namespace_name=namespace_name,
+                properties={"properties": sections}, retry_total=0,
+                polling=ARMPolling(
+                    timeout=self.client._config.polling_interval,
+                    path_format_arguments={"endpoint": self.client._config.base_url},
+                ),
+            )
+            if no_wait:
+                return self._wait(poller, message, no_wait=True)
+            budget.call(
+                self._wait, poller, message, timeout_sec=budget.remaining(), wait_sec=wait_sec,
+                deadline_guard=budget.remaining,
+            )
+            while True:
+                current = budget.call(self._get_namespace, namespace_name, resource_group_name)
+                ready = provisioning_succeeded(current)
+                if ready.failure:
+                    raise ADRResourceStateError(self._format_failure("Failed", current, None), current)
+                complete = ready.complete
+                for section, group in sections.items():
+                    endpoints = (current["properties"].get(section) or {}).get("endpoints") or {}
+                    for name, expected in group["endpoints"].items():
+                        endpoint = endpoints.get(name)
+                        evaluation = link_succeeded(endpoint or {}, label=f"Link '{name}'")
+                        if evaluation.failure:
+                            raise ADRResourceStateError(evaluation.failure, current)
+                        complete = complete and evaluation.complete
+                        if evaluation.complete and not endpoint_settings_match(
+                            _normalized(endpoint), _normalized(expected),
+                        ):
+                            raise AzureResponseError(f"Link '{name}' settings changed while waiting; stopped.")
+                if complete:
+                    return current
+                budget.pause(wait_sec)
+        except (CLIError, HttpResponseError, ServiceRequestError, ServiceResponseError):
+            logger.warning(
+                "The selected links did not complete; the submitted operation may still be running. "
+                "Inspect 'az iot adr ns show'; use 'az iot adr ns link wait' for pending links. "
+                "Only after observing Failed endpoints, use 'az iot adr ns link update' with the Failed DPS "
+                "and required Failed Hub endpoint names to retry together. "
+                "Do not rerun add for existing endpoints. No rollback was attempted."
+            )
+            raise
+
     def link_add(
         self,
         namespace_name: str,
@@ -924,21 +975,17 @@ class LinkProvider(ADRProvider):
         dps_mi_user_assigned: Optional[str] = None,
         hub_availability: Optional[str] = None,
         hub_allocation_weight: Optional[int] = None,
+        hub_endpoints=None,
         **kwargs,
     ):
-        """Preflight both targets, link DPS successfully, then submit the Hub link.
-
-        Even with no_wait, the DPS dependency must reach linkingState Succeeded.
-        Only the final Hub operation may be returned without waiting. Partial
-        completion is preserved on failure; never replay adds or roll back DPS.
-        """
+        """Batch brownfield/multi-Hub plans; retain DPS-first sequencing for a new single Hub."""
         timeout = kwargs.setdefault("timeout_sec", _ADR_LRO_TIMEOUT_SECONDS)
         interval = kwargs.setdefault("wait_sec", DEFAULT_WAIT_INTERVAL)
         validate_options(timeout, interval)
         # Validate both ARM IDs up front; reject overflow/collisions before
         # composing the body or touching RBAC.
         parsed_dps = _parse_dps_resource_id(dps_resource_id)
-        parsed_hub = _parse_hub_resource_id(hub_resource_id)
+        _parse_hub_resource_id(hub_resource_id)
         existing = self._get_namespace(namespace_name, resource_group_name)
         if has_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_CAP_EXCEEDED_MSG)
@@ -966,8 +1013,53 @@ class LinkProvider(ADRProvider):
             availability=hub_availability,
             allocation_weight=hub_allocation_weight,
         )
+        hubs = {hub_endpoint_name: hub_body}
+        if hub_endpoints is not None:
+            for name, value in parse_json_object(hub_endpoints, "--hub-endpoints").items():
+                if not name or name in hubs or name in _get_messaging_endpoints(existing):
+                    raise ArgumentUsageError(f"Hub endpoint name '{name}' is empty or already in use.")
+                if not isinstance(value, dict):
+                    raise ArgumentUsageError("Each --hub-endpoints value must be a JSON object.")
+                value = parse_json_object(
+                    value, "--hub-endpoints", allowed_keys={"resourceId", "inboundCallerIdentity", "provisioning"},
+                    required_keys={"resourceId"},
+                )
+                for field in ("inboundCallerIdentity", "provisioning"):
+                    if field in value and not isinstance(value[field], dict):
+                        raise ArgumentUsageError(f"Hub {field} must be a JSON object.")
+                if not isinstance(value["resourceId"], str):
+                    raise ArgumentUsageError("Each --hub-endpoints resourceId must be a string ARM resource ID.")
+                _parse_hub_resource_id(value["resourceId"])
+                identity = parse_json_object(
+                    value.get("inboundCallerIdentity", {}), "inboundCallerIdentity",
+                    allowed_keys={"type", "userAssignedIdentity"},
+                )
+                if identity and identity.get("type") not in ("SystemAssigned", "UserAssigned"):
+                    raise ArgumentUsageError("Hub inboundCallerIdentity.type must be SystemAssigned or UserAssigned.")
+                if "userAssignedIdentity" in identity and not isinstance(identity["userAssignedIdentity"], str):
+                    raise ArgumentUsageError("Hub userAssignedIdentity must be a string ARM resource ID.")
+                if (identity.get("type") == "UserAssigned") != bool(identity.get("userAssignedIdentity")):
+                    raise ArgumentUsageError("Only UserAssigned inbound identities require userAssignedIdentity.")
+                provisioning = parse_json_object(
+                    value.get("provisioning", {}), "provisioning", allowed_keys={"availability", "allocationWeight"},
+                )
+                if "availability" in provisioning and provisioning["availability"] not in [
+                    choice.value for choice in MessagingEndpointAvailability
+                ]:
+                    raise ArgumentUsageError("Hub provisioning.availability must be Available or Disabled.")
+                if "allocationWeight" in provisioning and type(provisioning["allocationWeight"]) is not int:
+                    raise ArgumentUsageError("Hub provisioning.allocationWeight must be an integer.")
+                hubs[name] = _build_hub_endpoint_body(
+                    value["resourceId"], identity.get("type") == "SystemAssigned",
+                    identity.get("userAssignedIdentity"), provisioning.get("availability"),
+                    provisioning.get("allocationWeight"),
+                )
+        if hub_endpoint_count(existing) + len(hubs) > 10:
+            raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
+        if len({body["resourceId"].casefold() for body in hubs.values()}) != len(hubs):
+            raise ArgumentUsageError("Each Hub resource may appear only once in the link plan.")
         rbac_requests = []
-        self._preflight_link(
+        dps = self._preflight_link(
             link_type="dps",
             namespace=existing,
             target_resource_id=dps_resource_id,
@@ -975,6 +1067,7 @@ class LinkProvider(ADRProvider):
             parsed=parsed_dps,
             strategy=_DPS_TARGET,
             rbac_requests=rbac_requests,
+            planned_hubs=hubs,
         )
         hub_plan = deepcopy(existing)
         properties = hub_plan.get("properties") or {}
@@ -982,17 +1075,23 @@ class LinkProvider(ADRProvider):
         provisioning["endpoints"] = {**(provisioning.get("endpoints") or {}), dps_endpoint_name: dps_body}
         properties["provisioning"] = provisioning
         hub_plan["properties"] = properties
-        hub = self._preflight_link(
-            link_type="hub",
-            namespace=hub_plan,
-            target_resource_id=hub_resource_id,
-            inbound_identity=hub_body.get("inboundCallerIdentity"),
-            parsed=parsed_hub,
-            strategy=_HUB_TARGET,
-            rbac_requests=rbac_requests,
-        )
+        batch = len(hubs) > 1 or bool((dps.get("properties") or {}).get("iotHubs"))
+        if batch:
+            properties["messaging"] = {"endpoints": {**_get_messaging_endpoints(existing), **hubs}}
+            add_dps_hub_role_requirements(rbac_requests[0], hub_plan, None)
+        for body in hubs.values():
+            self._preflight_link(
+                link_type="hub", namespace=hub_plan, target_resource_id=body["resourceId"],
+                inbound_identity=body.get("inboundCallerIdentity"), parsed=_parse_hub_resource_id(body["resourceId"]),
+                strategy=_HUB_TARGET, rbac_requests=rbac_requests,
+            )
         self._rbac_manager().ensure_many(rbac_requests)
-        self._warn_if_hub_classically_linked(existing, parsed_hub, hub)
+        if batch:
+            return self._patch_link_batch(
+                namespace_name, resource_group_name,
+                {"provisioning": {"endpoints": {dps_endpoint_name: dps_body}}, "messaging": {"endpoints": hubs}},
+                **kwargs,
+            )
 
         no_wait = kwargs.pop("no_wait", False)
         budget = LinkDeadline(timeout, interval, clock=monotonic, sleeper=sleep)
@@ -1036,3 +1135,37 @@ class LinkProvider(ADRProvider):
                 "For a pending endpoint, use 'iot adr ns link hub wait'. Do not rerun combined link add."
             )
             raise
+
+    def link_update(
+        self, namespace_name, resource_group_name, dps_endpoint_name=None, hub_endpoint_names=None, **kwargs,
+    ):
+        validate_options(kwargs.get("timeout_sec", _ADR_LRO_TIMEOUT_SECONDS), kwargs.get("wait_sec", DEFAULT_WAIT_INTERVAL))
+        if not dps_endpoint_name and not hub_endpoint_names:
+            raise ArgumentUsageError("Select --dps-endpoint-name and/or --hub-endpoint-name to retry.")
+        existing = self._get_namespace(namespace_name, resource_group_name)
+        sections = {}
+        for kind, section, names, endpoint_type in (
+            ("dps", "provisioning", [dps_endpoint_name] if dps_endpoint_name else [], DPS_ENDPOINT_TYPE),
+            ("hub", "messaging", hub_endpoint_names or [], IOT_HUB_ENDPOINT_TYPE),
+        ):
+            for name in names:
+                endpoint = self._get_typed_endpoint(existing, section, name, endpoint_type, namespace_name, kind)
+                if not is_failed_link_endpoint(endpoint):
+                    raise ArgumentUsageError(f"Link '{name}' is not Failed; select only endpoints to retry.")
+                sections.setdefault(section, {"endpoints": {}})["endpoints"][name] = _endpoint_update_body(endpoint)
+        hubs = sections.get("messaging", {}).get("endpoints", {})
+        dps = sections.get("provisioning", {}).get("endpoints", {})
+        if hubs and not dps and not has_succeeded_dps_endpoint(existing):
+            raise ArgumentUsageError("Select the Failed DPS with --dps-endpoint-name to retry it with its Hubs.")
+        requests = []
+        for kind, group, parser, strategy in (
+            ("dps", dps, _parse_dps_resource_id, _DPS_TARGET),
+            ("hub", hubs, _parse_hub_resource_id, _HUB_TARGET),
+        ):
+            for body in group.values():
+                self._preflight_link(
+                    kind, existing, body["resourceId"], body.get("inboundCallerIdentity"),
+                    parser(body["resourceId"]), strategy, rbac_requests=requests, planned_hubs=hubs,
+                )
+        self._rbac_manager().ensure_many(requests)
+        return self._patch_link_batch(namespace_name, resource_group_name, sections, **kwargs)

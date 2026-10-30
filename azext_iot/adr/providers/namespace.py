@@ -28,7 +28,6 @@ from azext_iot.adr.providers.base import ADRProvider, console
 from azext_iot.adr.topology import (
     endpoint_is_type,
     get_endpoints,
-    writable_namespace_properties,
 )
 
 logger = get_logger(__name__)
@@ -323,8 +322,30 @@ class NamespaceProvider(ADRProvider):
                 raise
             existing_namespace = None
 
-        if not location:
-            location = (existing_namespace or {}).get("location")
+        outbound_identity = _resolve_outbound_identity(outbound_mi_system_assigned, outbound_mi_user_assigned)
+        if existing_namespace is not None:
+            if location and location.casefold() != str(existing_namespace.get("location") or "").casefold():
+                raise InvalidArgumentValueError("An existing namespace cannot be moved to another location.")
+            if (
+                tags is None and outbound_identity is None and outbound_mi_system_assigned is not False
+                and observability_enabled is None
+            ):
+                state = (existing_namespace.get("properties") or {}).get("provisioningState")
+                if str(state or "").casefold() != "succeeded":
+                    raise AzureResponseError(
+                        f"Namespace '{namespace_name}' already exists with provisioningState '{state or 'unknown'}'. "
+                        "No changes were submitted. Inspect 'az iot adr ns show'; use 'az iot adr ns wait' "
+                        "while an operation is pending. For a Failed operation, explicitly retry the affected "
+                        "link or namespace update instead of rerunning create."
+                    )
+                return {**existing_namespace, "resourceGroup": resource_group_name}
+            return self.update(
+                namespace_name, resource_group_name, tags=tags,
+                outbound_mi_system_assigned=outbound_mi_system_assigned,
+                outbound_mi_user_assigned=outbound_mi_user_assigned,
+                observability_enabled=observability_enabled, **kwargs,
+            )
+
         if not location:
             location = self._ensure_location(
                 self.cmd.cli_ctx, resource_group_name, location
@@ -333,66 +354,24 @@ class NamespaceProvider(ADRProvider):
         namespace_resource = {"location": location}
         if tags is not None:
             namespace_resource["tags"] = tags
-        elif existing_namespace is not None and "tags" in existing_namespace:
-            namespace_resource["tags"] = deepcopy(existing_namespace["tags"])
-
-        outbound_identity = _resolve_outbound_identity(
-            outbound_mi_system_assigned, outbound_mi_user_assigned
-        )
-
-        existing_properties = (existing_namespace or {}).get("properties") or {}
-        properties = writable_namespace_properties(existing_properties)
+        properties = {}
         if outbound_identity is not None:
             properties["outboundIdentity"] = outbound_identity
         elif outbound_mi_system_assigned is False:
             properties["outboundIdentity"] = None
 
-        if existing_namespace is None:
-            # Keep the established new-resource default while avoiding an
-            # implicit SAMI change on CreateOrReplace of an existing resource.
-            namespace_resource["identity"] = _build_namespace_identity(
-                user_assigned_identity=(
-                    outbound_identity.get("userAssignedIdentity")
-                    if outbound_identity
-                    else None
-                ),
-                ensure_system_assigned=True,
-            )
-        elif outbound_identity is not None:
-            namespace_resource["identity"] = _build_namespace_identity(
-                existing_identity=existing_namespace.get("identity"),
-                user_assigned_identity=outbound_identity.get(
-                    "userAssignedIdentity"
-                ),
-                ensure_system_assigned=bool(
-                    outbound_mi_system_assigned
-                ),
-            )
-        elif "identity" in existing_namespace:
-            existing_identity = existing_namespace.get("identity")
-            namespace_resource["identity"] = (
-                _build_namespace_identity(existing_identity)
-                if existing_identity
-                else existing_identity
-            )
+        namespace_resource["identity"] = _build_namespace_identity(
+            user_assigned_identity=outbound_identity.get("userAssignedIdentity") if outbound_identity else None,
+            ensure_system_assigned=True,
+        )
 
-        existing_observability = existing_properties.get("observability")
         if observability_enabled is not None:
             properties["observability"] = _build_observability(
-                existing_observability, observability_enabled
+                None, observability_enabled
             )
 
         if properties:
             namespace_resource["properties"] = properties
-
-        if existing_namespace is not None and (
-            outbound_identity is not None
-            or outbound_mi_system_assigned is False
-        ):
-            self._preflight_outbound_identity_change(
-                existing_namespace,
-                outbound_identity,
-            )
 
         poller = self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name,
