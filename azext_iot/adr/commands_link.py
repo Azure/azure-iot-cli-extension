@@ -252,9 +252,11 @@ def adr_link_add(
 def adr_link_update(
     cmd, client, namespace_name: str, resource_group_name: str,
     dps_endpoint_name: Optional[str] = None, hub_endpoint_names: Optional[list] = None,
-    no_wait: bool = False, timeout: int = _ADR_LRO_TIMEOUT_SECONDS, interval: int = DEFAULT_WAIT_INTERVAL,
+    no_wait: bool = False, timeout: Optional[int] = None, interval: Optional[int] = None,
 ):
     return LinkProvider(cmd, client=client).link_update(
         namespace_name, resource_group_name, dps_endpoint_name, hub_endpoint_names,
-        no_wait=no_wait, timeout_sec=timeout, wait_sec=interval,
+        no_wait=no_wait,
+        timeout_sec=_ADR_LRO_TIMEOUT_SECONDS if timeout is None else timeout,
+        wait_sec=DEFAULT_WAIT_INTERVAL if interval is None else interval,
     )
