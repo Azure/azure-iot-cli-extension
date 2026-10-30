@@ -150,7 +150,7 @@ stages:
         dependsOn: Plan
         jobs:
           - job: Unit
-            displayName: Shard $(shard)
+            displayName: Unit
             timeoutInMinutes: 25
             strategy:
               maxParallel: 4

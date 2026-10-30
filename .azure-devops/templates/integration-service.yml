@@ -20,7 +20,7 @@ stages:
           eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
     jobs:
       - job: Tests
-        displayName: ${{ parameters.service }} $(python) $(region)
+        displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
         timeoutInMinutes: 360
         cancelTimeoutInMinutes: 15
         strategy:
