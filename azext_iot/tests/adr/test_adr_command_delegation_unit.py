@@ -37,17 +37,25 @@ def _patch_provider(mocker, module, attr):
     return provider
 
 
-def test_combined_retry_delegates_selected_endpoints_and_wait_options(mocker, cmd):
+@pytest.mark.parametrize("options,expected_timeout,expected_interval", [
+    ({}, 600, 30),
+    ({"timeout": None, "interval": None}, 600, 30),
+    ({"timeout": 41, "interval": 2}, 41, 2),
+    ({"timeout": 0, "interval": 0}, 0, 0),
+])
+def test_combined_retry_delegates_selected_endpoints_and_wait_options(
+    mocker, cmd, options, expected_timeout, expected_interval,
+):
     client = Mock()
     provider = Mock()
     provider_type = mocker.patch.object(commands_link, "LinkProvider", return_value=provider)
     result = commands_link.adr_link_update(
         cmd, client, NS, RG, dps_endpoint_name="dps", hub_endpoint_names=["hub-1", "hub-2"],
-        no_wait=True, timeout=41, interval=2,
+        no_wait=True, **options,
     )
     provider_type.assert_called_once_with(cmd, client=client)
     provider.link_update.assert_called_once_with(
-        NS, RG, "dps", ["hub-1", "hub-2"], no_wait=True, timeout_sec=41, wait_sec=2,
+        NS, RG, "dps", ["hub-1", "hub-2"], no_wait=True, timeout_sec=expected_timeout, wait_sec=expected_interval,
     )
     assert result is provider.link_update.return_value
 
