@@ -157,6 +157,10 @@ The GitHub ADR service job allows **180 minutes**, including setup and reporting
 The root integration matrix applies this budget directly to each ADR service job.
 The job ceiling does not extend per-operation provisioning waits.
 
+The namespace CRUD and two namespace-list scenarios retain **15-minute** limits:
+their unchanged DELETE wait alone allows 10 minutes, so a 10-minute scenario cap
+can interrupt cleanup before the CLI reports its timeout or backend failure.
+
 The ceiling is calibrated against an observed 115-minute full preview-suite run.
 The SU-link lifecycle allows 115 minutes, SU-link deletion 90, and the linked
 software-update/report scenario 60. Each shares one elapsed-time budget across

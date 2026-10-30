@@ -23,7 +23,7 @@ from azext_iot.tests.adr.conftest import (
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRNamespaceCrud(ADRLiveScenarioTest):
-    @pytest.mark.timeout(600, func_only=False)
+    @pytest.mark.timeout(900, func_only=False)
     def test_namespace_crud_lifecycle(self):
         _log(L.TEST, "test_namespace_crud_lifecycle")
         namespace_name = generate_adr_namespace_name()
@@ -122,11 +122,11 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                 )
                 _log(L.OK, "Namespace deleted")
 
-    @pytest.mark.timeout(600, func_only=False)
+    @pytest.mark.timeout(900, func_only=False)
     def test_namespace_list_by_resource_group(self):
         self._assert_namespace_list(by_resource_group=True)
 
-    @pytest.mark.timeout(600, func_only=False)
+    @pytest.mark.timeout(900, func_only=False)
     def test_namespace_list_by_subscription(self):
         self._assert_namespace_list(by_resource_group=False)
 
