@@ -143,7 +143,7 @@ stages:
                   set -euo pipefail
                   python -m pip install tox
                   python -m tox r -e lint -vv
-                displayName: Run lint
+                displayName: Run Lint
 
       - stage: Unit
         displayName: Unit
