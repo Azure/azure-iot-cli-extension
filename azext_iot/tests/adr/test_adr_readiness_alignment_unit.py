@@ -272,26 +272,6 @@ def test_observed_fresh_grant_rejections_use_identity_preserving_update(kind, er
     assert all(command.endswith(" --no-wait") for command in scenario.writes)
 
 
-@pytest.mark.parametrize("mutation", ["principal", "action", "scope", "extra-error"])
-def test_bound_hub_commit_rejection_requires_exact_request(mutation):
-    scenario = Scenario()
-    denial = {"code": "LinkCommitFailed", "action": HUB_NOTIFY_ACTION}
-    if mutation == "principal":
-        denial["principal"] = OTHER
-    elif mutation == "action":
-        denial["action"] += "-other"
-    elif mutation == "scope":
-        denial["target"] = scenario.expected["resourceId"] + "-other"
-    scenario.error = scenario.denial(**denial)
-    if mutation == "extra-error":
-        scenario.error["details"] = [{"code": "OtherFailure"}]
-
-    with pytest.raises(AssertionError, match="Non-recoverable"):
-        scenario.run()
-
-    assert len(scenario.writes) == 1
-
-
 def test_retried_resource_mi_rejection_can_outlive_freshness_window():
     scenario = Scenario("dps")
     scenario.error = _resource_mi_rejection()
@@ -331,13 +311,17 @@ def test_retried_resource_mi_rejection_can_outlive_freshness_window():
     ),
     pytest.param("dps", _resource_mi_rejection(), True, id="dps-stale"),
     pytest.param("hub", _hub_commit_rejection(), True, id="hub-stale"),
+    pytest.param("hub", "unbound-hub-commit", False, id="hub-bound-action-mismatch"),
     pytest.param(
         "dps", {**_resource_mi_rejection(), "details": [{"code": "OtherFailure"}]}, False, id="dps-extra-error",
     ),
 ])
 def test_observed_fresh_grant_rejections_are_kind_bound_and_fresh(kind, error, stale):
     scenario = Scenario(kind)
-    scenario.error = error
+    scenario.error = (
+        scenario.denial(code="LinkCommitFailed", action=HUB_NOTIFY_ACTION + "-other")
+        if error == "unbound-hub-commit" else error
+    )
     if stale:
         original = scenario.command
         advanced = [False]

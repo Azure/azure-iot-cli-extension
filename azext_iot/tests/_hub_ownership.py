@@ -184,7 +184,7 @@ def pending_mutation(mutation):
 def uncertain_delete(record, mutation):
     """Only a final root DELETE after proven creation can be resolved by absence.
 
-    Preserve the original failure/transport status. A 404 GET cannot establish the
+    Preserve the original failure/transport status. A GET cannot establish the
     outcome of a PUT, child mutation, failed LRO, or invalid response metadata.
     """
     status = mutation.get("status")
@@ -895,7 +895,10 @@ class Observer:
                     if mutation.get("deployment"):
                         deployment = mutation["deployment"]
                         resources[deployment] = roots[deployment]
-                evidence = dict(self.data, resources=resources)
+                evidence = dict(
+                    self.data, resources=resources,
+                    violationDetails=self.data.setdefault("violationDetails", []),
+                )
                 deadline = min(self.arm.deadline or float("inf"), time.monotonic() + 60)
                 self._verify(reconcile, self.arm, evidence, deadline, self.save)
             if roots[root]["uncertain"]:

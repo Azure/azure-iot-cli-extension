@@ -259,6 +259,77 @@ def test_single_hub_recovers_owned_create_after_504(phase, mocker):
     assert not ownership.ownership_errors(phase.observer.data, "run", "regular-state-workflow")
 
 
+@pytest.mark.parametrize("failure", ["foreign-owner", "terminal", "deadline", "history"])
+def test_hub_create_recovery_refuses_unproven_outcomes_without_replay(phase, failure):
+    name = "aziotclitest-hub-" + "a" * 18
+    resource_id = phase.add(name, pending=True)
+    record = phase.observer.data["resources"][resource_id]
+    mutation = record["mutations"][0]
+    mutation["status"] = 504
+    deadline = 30
+    if failure == "foreign-owner":
+        phase.resources[resource_id]["tags"][ownership.OWNER_TAG] = "foreign"
+    elif failure == "terminal":
+        phase.states[resource_id] = ["Failed"]
+    elif failure == "deadline":
+        deadline = phase.clock[0]
+    else:
+        record["mutations"].append(dict(mutation))
+
+    with pytest.raises(ownership.OwnershipError):
+        phase.observer.recover_hub_create(name, deadline)
+
+    assert record["uncertain"] and not record["resolved"]
+    assert not mutation.get("hubCreateRecovered") and not mutation.get("reconciled")
+    phase.invoke.assert_not_called()
+    assert all(event[0] in ("read", "sleep") for event in phase.events)
+
+
+@pytest.mark.parametrize(("case", "attempts"), [
+    ("success", 2),
+    ("other-error", 1),
+    ("missing-observer", 1),
+    ("rejected", 1),
+    ("second-error", 2),
+])
+def test_cosmos_timeout_retry_is_authorized_identical_and_single(mocker, case, attempts):
+    def result(payload):
+        return Mock(as_json=Mock(return_value=payload))
+
+    timeout = HttpResponseError("Request timed out")
+    timeout.error = SimpleNamespace(code="RequestTimeout")
+    other = HttpResponseError("Other failure")
+    other.error = SimpleNamespace(code="OtherFailure")
+    keys = {"connectionStrings": [{
+        "description": "Primary SQL Connection String", "connectionString": "connection-string",
+    }]}
+    outcomes = {
+        "success": [timeout, result({"name": "account"}), result({}), result({}), result(keys)],
+        "other-error": [other],
+        "missing-observer": [timeout],
+        "rejected": [timeout],
+        "second-error": [timeout, timeout],
+    }
+    observer = None if case == "missing-observer" else Mock()
+    if case == "rejected":
+        observer.allow_cosmos_create_retry.side_effect = ownership.OwnershipError("Retry rejected")
+    mocker.patch.object(fixtures, "generate_hub_depenency_id", side_effect=["account", "database", "container"])
+    invoke = mocker.patch.object(fixtures.cli, "invoke", side_effect=outcomes[case])
+    if case == "success":
+        fixtures._cosmos_db_provisioner(observer)
+    else:
+        with pytest.raises(ownership.OwnershipError if case == "rejected" else HttpResponseError):
+            fixtures._cosmos_db_provisioner(observer)
+
+    creates = [call.args[0] for call in invoke.call_args_list if call.args[0].startswith("cosmosdb create ")]
+    assert creates == [creates[0]] * attempts
+    if observer is not None:
+        if case in ("success", "rejected", "second-error"):
+            observer.allow_cosmos_create_retry.assert_called_once_with("account")
+        else:
+            observer.allow_cosmos_create_retry.assert_not_called()
+
+
 @pytest.mark.parametrize("pending", [["404", "Updating"], ["Updating"]])
 def test_pool_wait_is_get_only_and_keeps_the_poll_interval(phase, pending):
     name = "aziotclitest-hub-" + "a" * 18

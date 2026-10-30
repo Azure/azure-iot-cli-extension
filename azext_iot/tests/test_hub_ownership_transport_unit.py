@@ -1347,6 +1347,19 @@ def test_export_reconciliation_is_bounded_to_the_requested_owned_tree(transport)
     assert all(call[0] in ("GET", "POST") for call in wire.calls[checkpoint:])
 
 
+def test_root_scoped_reconciliation_persists_ownership_violation(transport):
+    observer, _, wire = transport
+    wire.accepted[HUB] = "azure-asyncoperation", 202
+    create_hub(wire)
+    wire.resources[HUB]["tags"][ownership.OWNER_TAG] = "foreign"
+
+    with pytest.raises(ownership.OwnershipError, match="no longer belongs"):
+        wire.submit("PUT", CERTIFICATE, {"properties": {}})
+
+    detail = json.loads(observer.path.read_text(encoding="utf-8"))["violationDetails"][-1]
+    assert detail["reason"] == "Observed root ownership changed" and detail["resourcePath"] == HUB
+
+
 @pytest.mark.parametrize("damage", ["owner", "group", "id"])
 def test_no_location_deployment_get_still_requires_current_exact_ownership(transport, damage):
     from azext_iot.tests.test_hub_phase_runner_unit import fixture_template
