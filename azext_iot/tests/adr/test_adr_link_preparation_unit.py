@@ -24,6 +24,13 @@ SU_ID = (
 )
 
 
+def _assert_bounded_native_options(command):
+    arguments = shlex.split(command)
+    assert 0 < int(arguments[arguments.index("--timeout") + 1]) <= subject._NATIVE_LINK_TIMEOUT
+    assert arguments[arguments.index("--interval") + 1] == str(subject._NATIVE_LINK_INTERVAL)
+    assert "--no-wait" not in arguments
+
+
 @pytest.fixture()
 def preparation(monkeypatch):
     test = ADRFullInfraHelper()
@@ -205,7 +212,7 @@ def test_owned_su_waits_only_for_resource_and_leaves_fresh_roles_to_native_link(
             raise RequiredArgumentMissingError(subject.MI_REQUIRED_MSG)
         elif command.startswith("iot adr ns link su add --ns ns "):
             assert now[0] == 0
-            assert subject._NATIVE_LINK_OPTIONS in command
+            _assert_bounded_native_options(command)
             manager.ensure.assert_not_called()
             raise RuntimeError("stop at actual UAMI link")
         elif command.startswith("role assignment list "):
@@ -514,7 +521,7 @@ def test_owned_su_lifecycle_native_commands_own_fresh_roles_recovery_and_termina
             raise AssertionError(f"Unexpected command: {command}")
         native_commands.append(command)
         native_stages.append(action)
-        assert subject._NATIVE_LINK_OPTIONS in command and "--no-wait" not in command
+        _assert_bounded_native_options(command)
         if failure == action:
             raise HttpResponseError(f"{action} failed")
         endpoint = {
@@ -596,9 +603,7 @@ def test_fresh_link_scenarios_do_not_import_fixture_service_role_recovery(scenar
     import inspect
 
     source = inspect.getsource(scenario)
-    if "_NATIVE_LINK_OPTIONS" not in source and scenario.__qualname__.startswith("TestADRLinkSU."):
-        source = inspect.getsource(subject.TestADRLinkSU)
     assert ".ensure(" not in source and ".ensure_many(" not in source
     assert "_ROLE_SETTLE_SECONDS" not in source
     assert "link_dps_with_readiness(" not in source and "link_hub_with_readiness(" not in source
-    assert "_NATIVE_LINK_OPTIONS" in source
+    assert "budget.remaining(_NATIVE_LINK_TIMEOUT)" in source

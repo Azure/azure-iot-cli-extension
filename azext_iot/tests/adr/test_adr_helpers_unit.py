@@ -96,6 +96,8 @@ def test_su_lifecycle_cleanup_waits_for_exact_absence_after_one_async_delete(mon
     from azext_iot.tests.adr import test_adr_link_int as link_scenarios
 
     scenario = object.__new__(link_scenarios.TestADRLinkSU)
+    scenario._scenario_budget = link_scenarios.ScenarioBudget(link_scenarios._SU_LINK_LIFECYCLE_TIMEOUT)
+    scenario._scenario_budget.begin_cleanup()
     scenario.cmd = Mock()
     wait = Mock(side_effect=AssertionError("SU deletion not complete") if wait_failed else None)
     monkeypatch.setattr(link_scenarios, "wait_for_resource_absent", wait)

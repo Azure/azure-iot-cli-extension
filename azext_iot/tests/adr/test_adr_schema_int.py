@@ -120,7 +120,7 @@ class _SchemaScenario(ADRLiveScenarioTest):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRSemanticModelLifecycle(_SchemaScenario):
-    @pytest.mark.timeout(2400, func_only=False)
+    @pytest.mark.timeout(1500, func_only=False)
     def test_schema_registry_models_and_device_reference_lifecycle(self):
         suffix = generate_generic_id().lower()[:10]
         storage_name = f"adrschema{suffix}"

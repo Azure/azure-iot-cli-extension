@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import inspect
 from copy import deepcopy
 from unittest.mock import Mock, patch
 
@@ -92,6 +91,7 @@ def _endpoint(endpoint_type, resource_id, **extra):
     return {
         "endpointType": endpoint_type,
         "resourceId": resource_id,
+        "linkingState": "Succeeded",
         **extra,
     }
 
@@ -277,10 +277,35 @@ def test_hub_add_rejects_eleventh_hub_before_preflight(fixture_link_provider, li
     assert "Clear Registry Device IoT Hub capability references" in str(raised.value)
 
 
-def test_hub_update_surface_is_identity_only():
-    parameters = inspect.signature(LinkProvider.hub_update).parameters
-    assert "availability" not in parameters
-    assert "allocation_weight" not in parameters
+@pytest.mark.parametrize("changes,expected", [
+    ({"availability": "Disabled"}, {"availability": "Disabled"}),
+    ({"allocation_weight": 3}, {"allocationWeight": 3}),
+    ({"availability": "Available", "allocation_weight": 2}, {"availability": "Available", "allocationWeight": 2}),
+])
+def test_hub_allocation_update_does_not_rotate_identity_or_replay_settings(fixture_link_provider, changes, expected):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(hubs={
+        "hub": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID, inboundCallerIdentity={"type": "SystemAssigned"},
+                         provisioning={"availability": "Available", "allocationWeight": 7}),
+    })
+    fixture_link_provider.hub_update("hub", "namespace", "rg", no_wait=True, **changes)
+    assert fixture_link_provider.client.namespaces.begin_update.call_args.kwargs["properties"] == {
+        "properties": {"messaging": {"endpoints": {"hub": {"provisioning": expected}}}},
+    }
+    fixture_link_provider._preflight_link.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["add", "update"])
+def test_failed_dps_blocks_individual_hub_write_before_grants(fixture_link_provider, operation):
+    fixture_link_provider.client.namespaces.get.return_value = _namespace(
+        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID, linkingState="Failed")},
+        hubs={"hub": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID, linkingState="Failed")} if operation == "update" else {},
+    )
+    with pytest.raises(ArgumentUsageError, match="Succeeded DPS"):
+        getattr(fixture_link_provider, "hub_" + operation)(
+            "hub", "namespace", "rg", **({"hub_resource_id": HUB_ID} if operation == "add" else {}),
+        )
+    fixture_link_provider._preflight_link.assert_not_called()
+    fixture_link_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_hub_update_rotates_identity_and_preserves_provisioning(

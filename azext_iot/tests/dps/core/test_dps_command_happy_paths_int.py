@@ -19,6 +19,7 @@ from azext_iot.tests.helpers import invoke_checked, policy_snapshot
 from azext_iot.tests.test_utils import certificate_fingerprints, create_certificate
 
 
+@pytest.mark.timeout(600, func_only=False)
 def test_dps_management_happy_paths(request, tmp_path):
     if not _phase_receipts.settings() or _phase.get_phase() != _phase.REGULAR:
         raise pytest.UsageError("DPS management qualification requires the admitted, receipt-enabled regular DPS runner.")

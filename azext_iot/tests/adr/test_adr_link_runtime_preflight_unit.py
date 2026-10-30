@@ -247,6 +247,7 @@ def test_link_commands_ensure_dps_hub_grants_before_mutation(
     dps_endpoint = {
         "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": dps_id,
         "inboundCallerIdentity": selected,
+        "linkingState": "Succeeded",
     }
     namespace["properties"]["messaging"] = {"endpoints": {"existing": {
         "endpointType": "Microsoft.Devices/IotHubs", "resourceId": old_hub,
@@ -372,6 +373,7 @@ def test_hub_preflight_rejects_unattached_dps_identity_before_any_grant():
     namespace = _namespace()
     namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
         "endpointType": "Microsoft.Devices/provisioningServices",
+        "linkingState": "Succeeded",
         "resourceId": HUB_ID.replace("IotHubs/hub", "provisioningServices/dps"),
         "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI + "-unattached"},
     }}}
@@ -585,6 +587,7 @@ def test_rbac_failure_prevents_namespace_mutation(fixture_link_provider):
         "endpoints": {
             "dps": {
                 "endpointType": "Microsoft.Devices/provisioningServices",
+                "linkingState": "Succeeded",
                 "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps",
             }
         }
@@ -611,7 +614,8 @@ def test_hub_add_rejects_existing_logical_endpoint_before_preflight(
             "provisioning": {
                 "endpoints": {
                     "dps": {
-                        "endpointType": "Microsoft.Devices/provisioningServices"
+                        "endpointType": "Microsoft.Devices/provisioningServices",
+                        "linkingState": "Succeeded",
                     }
                 }
             },

@@ -100,7 +100,7 @@ class TestHubCommandHappyPaths(IoTLiveScenarioTest):
         assert stats["totalDeviceCount"] == stats["enabledDeviceCount"] + stats["disabledDeviceCount"]
         assert stats["enabledDeviceCount"] >= 0 and stats["disabledDeviceCount"] >= 0
 
-    @pytest.mark.timeout(3600, func_only=False)
+    @pytest.mark.timeout(1800, func_only=False)
     @pytest.mark.usefixtures("fixture_isolated_hub")
     def test_manual_failover(self):
         before = self._command("show")

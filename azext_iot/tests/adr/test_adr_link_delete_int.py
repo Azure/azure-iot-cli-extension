@@ -22,7 +22,9 @@ from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     ROLE_PROPAGATION_DELAY,
-    SU_LIFECYCLE_TIMEOUT,
+    SU_PROVISIONING_MAX_POLLS,
+    SU_PROVISIONING_POLL_INTERVAL,
+    wait_for_condition,
     wait_for_resource_absent,
 )
 from azext_iot.tests.adr._readiness import link_dps_with_readiness, link_hub_with_readiness
@@ -35,6 +37,7 @@ from azext_iot.tests.adr.conftest import (
     generate_identity_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import ScenarioBudget
 from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 logger = get_logger(__name__)
@@ -52,7 +55,7 @@ def _assert_unlink_service_rejection(error, namespace_id):
     method = getattr(request, "method", None)
     path = urlsplit(getattr(request, "url", "")).path
     if error.status_code == 400:
-        assert method == "PUT", "Failure did not reject the namespace mutation."
+        assert method == "PATCH", "Failure did not reject the namespace mutation."
         assert path.casefold() == namespace_id.casefold(), "Failure belongs to another resource."
     else:
         assert error.status_code == 200 and method == "GET", f"Unexpected unlink HTTP failure: {error.status_code}"
@@ -96,9 +99,11 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
 
     def _delete_owned_resource(self, kind, name, resource_group, *, no_wait=False):
         super()._delete_owned_resource(kind, name, resource_group, no_wait=kind == "su" or no_wait)
+        timeout = 3600 if kind == "su" else 600
+        budget = getattr(self, "_scenario_budget", None)
         wait_for_resource_absent(
             self, f"{self._RESOURCE_COMMANDS[kind]} show -n {name} -g {resource_group}",
-            timeout=3600 if kind == "su" else 600,
+            timeout=budget.remaining(timeout) if budget is not None else timeout,
         )
 
     def _assert_live_target_removal_rejected(self, namespace_name, kind, section, endpoint_name):
@@ -203,7 +208,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             assert after["properties"].get(endpoint_section, {}).get("endpoints", {}) == retained
         self.cmd(f"iot adr ns link {kind} remove {selector} -n {endpoint_name} --yes", expect_failure=True)
 
-    @pytest.mark.timeout(3600)
+    @pytest.mark.timeout(2700, func_only=False)
     def test_adr_link_hub_dps_delete(self):
         namespace_name, first_hub = generate_adr_namespace_name(), generate_hub_name()
         second_hub, dps_name = generate_hub_name(), generate_dps_name()
@@ -276,8 +281,10 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         finally:
             self.cleanup_full_infra()
 
-    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT * 2)
+    @pytest.mark.timeout(90 * 60, func_only=False)
     def test_adr_link_su_delete(self):
+        self._scenario_budget = ScenarioBudget(90 * 60)
+        budget = self._scenario_budget
         namespace_name = generate_adr_namespace_name()
         su_name = f"unlinksu{generate_generic_id()[:8]}"
         try:
@@ -289,11 +296,20 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             assert namespace["identity"]["type"] == "SystemAssigned"
             assert namespace["identity"]["principalId"]
             assert not namespace["identity"].get("userAssignedIdentities")
-            su = self.create_owned_resource(
+            self.create_owned_resource(
                 f"iot adr ns su instance create -n {su_name} -g {TEST_RG} "
-                f"--location {TEST_LOCATION} --system-assigned-mi",
+                f"--location {TEST_LOCATION} --system-assigned-mi --no-wait",
                 kind="su", name=su_name, resource_group=TEST_RG,
-            ).get_output_in_json()
+            )
+            su = wait_for_condition(
+                lambda: self.cmd(f"iot adr ns su instance show -n {su_name} -g {TEST_RG}").get_output_in_json(),
+                lambda resource: resource["properties"]["provisioningState"] == "Succeeded",
+                is_terminal_failure=lambda resource: resource["properties"].get("provisioningState")
+                in {"Failed", "Canceled", "Cancelled"},
+                description="owned SU provisioning Succeeded",
+                timeout=budget.remaining(SU_PROVISIONING_MAX_POLLS * SU_PROVISIONING_POLL_INTERVAL),
+                interval=SU_PROVISIONING_POLL_INTERVAL,
+            )
             assert su["properties"]["provisioningState"] == "Succeeded", su
             for role in ("Contributor", "Device Update Administrator"):
                 assert self.assign_role(
@@ -302,14 +318,15 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
             sleep(ROLE_PROPAGATION_DELAY)
             self.cmd(
                 f"iot adr ns link su add --ns {namespace_name} -g {TEST_RG} -n su "
-                f"--su-id {su['id']} --system-assigned-mi --timeout 1200",
+                f"--su-id {su['id']} --system-assigned-mi --timeout {budget.remaining(1200)}",
             )
             self._assert_requested_reader_retained(namespace_name, "su", "updating", "su")
             self._remove_endpoint(namespace_name, "su", "updating", "su", su_name, grant_reader=True)
         finally:
+            budget.begin_cleanup()
             self.cleanup_full_infra()
 
-    @pytest.mark.timeout(900)
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_unlink_missing_rg_advisory(self):
         namespace_name = generate_adr_namespace_name()
         missing_group = f"unlink-absent-{generate_generic_id()}"
