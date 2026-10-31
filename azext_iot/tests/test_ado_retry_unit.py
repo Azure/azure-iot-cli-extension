@@ -523,16 +523,20 @@ def test_pipeline_adapts_shared_four_shards_and_unit_gate_without_cross_job_cach
     assert "condition" not in run
 
 
-def test_service_stages_require_all_prechecks_but_remain_independent_retry_targets():
+def test_service_stages_run_independently_of_unit_with_available_agent_capacity():
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]
     assert stage["stage"] == "${{ parameters.service }}"
-    assert stage["dependsOn"] == ["Build", "Lint", "Unit", {"${{ if parameters.health }}": ["Plan"]}]
+    assert stage["dependsOn"] == ["Build", "Lint", {"${{ if parameters.health }}": ["Plan"]}]
     assert " ".join(stage["${{ if not(parameters.health) }}"]["condition"].split()) == (
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
-        "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
+        "eq(dependencies.Lint.result, 'Succeeded'))"
     )
-    assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
+    health_condition = stage["${{ if parameters.health }}"]["condition"]
+    assert "dependencies.Unit" not in health_condition
+    assert "dependencies.Lint.result" in health_condition
+    assert "dependencies.Plan.outputs['Plan.health.${{ parameters.service }}']" in health_condition
+    assert stage["jobs"][0]["strategy"]["maxParallel"] == 0
     assert "$(" not in stage["jobs"][0]["displayName"]
     steps = stage["jobs"][0]["steps"]
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))

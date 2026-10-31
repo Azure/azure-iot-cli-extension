@@ -17,17 +17,16 @@ stages:
     dependsOn:
       - Build
       - Lint
-      - Unit
       - ${{ if parameters.health }}:
           - Plan
     ${{ if not(parameters.health) }}:
       condition: |
         and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
-            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+            eq(dependencies.Lint.result, 'Succeeded'))
     ${{ if parameters.health }}:
       condition: |
         and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
-            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'),
+            eq(dependencies.Lint.result, 'Succeeded'),
             eq(dependencies.Plan.outputs['Plan.health.${{ parameters.service }}'], 'true'))
     jobs:
       - job: Tests
@@ -35,7 +34,7 @@ stages:
         timeoutInMinutes: 360
         cancelTimeoutInMinutes: 15
         strategy:
-          maxParallel: 1
+          maxParallel: 0
           ${{ if parameters.health }}:
             matrix: $[ stageDependencies.Plan.Plan.outputs['health.matrix'] ]
           ${{ if not(parameters.health) }}:
