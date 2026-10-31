@@ -1,0 +1,82 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: sourceBranch
+    type: string
+  - name: platform
+    type: string
+    values: [Linux, Windows, MacOS]
+
+jobs:
+  - job: Unit${{ parameters.platform }}
+    displayName: ${{ replace(parameters.platform, 'MacOS', 'macOS') }}
+    timeoutInMinutes: 90
+    strategy:
+      matrix:
+        py310: {python: "3.10"}
+        py311: {python: "3.11"}
+        py312: {python: "3.12"}
+        py313: {python: "3.13"}
+    ${{ if eq(parameters.platform, 'Linux') }}:
+      pool:
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-ubuntu2404
+        os: linux
+    ${{ if eq(parameters.platform, 'Windows') }}:
+      pool:
+        name: iotupx-1espt-release-probe
+        image: iotupx-1espt-windows2025
+        os: windows
+    ${{ if eq(parameters.platform, 'MacOS') }}:
+      pool:
+        name: Azure Pipelines
+        image: macOS-15
+        os: macOS
+    steps:
+      - template: release-source.yml
+        parameters:
+          sourceBranch: ${{ parameters.sourceBranch }}
+      - template: release-feed.yml
+      - task: UsePythonVersion@0
+        displayName: Select Python
+        inputs:
+          versionSpec: $(python)
+      - ${{ if eq(parameters.platform, 'MacOS') }}:
+          - bash: |
+              source scripts/select-openssl.sh
+              echo "##vso[task.prependpath]$openssl_bin"
+            displayName: Select OpenSSL
+            workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: python -m pip install tox
+        displayName: Install tox
+      - script: >-
+          tox run --notest
+          -x "testenv:python-azcur-unit.pass_env+=PIP_*"
+          -x "testenv:lint.pass_env+=PIP_*"
+        displayName: Prepare tests
+        workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: >-
+          python scripts/release_pipeline.py unit-constraints
+          --source "$(Agent.TempDirectory)/release-source"
+          --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
+        displayName: Resolve dependencies
+      - script: >-
+          tox run --skip-pkg-install
+          -x "testenv:python-azcur-unit.pass_env+=PIP_*"
+          -x "testenv:lint.pass_env+=PIP_*"
+        displayName: Run unit and lint
+        workingDirectory: $(Agent.TempDirectory)/release-source
+      - script: >-
+          python scripts/release_pipeline.py unit-inventory
+          --source "$(Agent.TempDirectory)/release-source"
+          --directory "$(Build.SourcesDirectory)/release-dependency-inventory"
+        displayName: Record dependencies
+      - task: PublishTestResults@2
+        displayName: Publish results
+        condition: always()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: $(Agent.TempDirectory)/release-source/junit/test-iotext-unit.xml
+          testRunTitle: ${{ parameters.platform }} $(python)
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true

@@ -1,0 +1,545 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: mode
+    displayName: Mode
+    type: string
+    default: Plan
+    values: [Plan, Validate, Release]
+  - name: sourceBranch
+    displayName: Source branch
+    type: string
+    default: release/1.1.0-preview
+  - name: createIndexPr
+    type: boolean
+    default: false
+
+stages:
+  - stage: Resolve
+    displayName: Plan
+    jobs:
+      - job: Resolve
+        displayName: Plan
+        steps:
+          - checkout: self
+            displayName: Checkout source
+            clean: true
+            persistCredentials: false
+          - task: UsePythonVersion@0
+            displayName: Select Python
+            inputs:
+              versionSpec: "3.13"
+              disableDownloadFromRegistry: true
+          - script: python scripts/release_pipeline.py options
+            displayName: Check options
+            env:
+              RELEASE_MODE: ${{ parameters.mode }}
+              RELEASE_CREATE_INDEX_PR: ${{ parameters.createIndexPr }}
+          - ${{ if eq(parameters.mode, 'Plan') }}:
+              - script: python scripts/release_pipeline.py plan
+                displayName: Show plan
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+          - ${{ if ne(parameters.mode, 'Plan') }}:
+              - script: python scripts/release_pipeline.py resolve --source "$(Agent.TempDirectory)/release-source"
+                name: source
+                displayName: Resolve source
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_MODE: ${{ parameters.mode }}
+
+  - ${{ if ne(parameters.mode, 'Plan') }}:
+      - stage: Build
+        dependsOn: Resolve
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: Build
+            displayName: Package
+            dependsOn: [BuildLinux, BuildWindows]
+            timeoutInMinutes: 45
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Build.ArtifactStagingDirectory)/release-candidate
+                  artifact: release-candidate
+                - output: pipelineArtifact
+                  path: $(Build.ArtifactStagingDirectory)/release-tooling
+                  artifact: release-tooling
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - download: current
+                displayName: Download artifacts
+                artifact: release-runtime-linux
+              - download: current
+                displayName: Download artifacts
+                artifact: release-runtime-windows
+              - script: >-
+                  python scripts/release_pipeline.py assemble-runtime
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Pipeline.Workspace)"
+                displayName: Combine SBOMs
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+              - script: >-
+                  python scripts/release_pipeline.py candidate
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Build.ArtifactStagingDirectory)/release-candidate"
+                name: candidate
+                displayName: Record candidate
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+              - bash: |
+                  set -euo pipefail
+                  python -m venv "$AGENT_TEMPDIRECTORY/publication-venv"
+                  source "$AGENT_TEMPDIRECTORY/publication-venv/bin/activate"
+                  python -m pip install azdev==0.2.13 packaging "editorconfig>=0.12.2"
+                  python -m pip check
+                  python scripts/release_pipeline.py prepare-publication \
+                    --directory "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-candidate" \
+                    --prepared "$BUILD_ARTIFACTSTAGINGDIRECTORY/release-tooling" \
+                    --work-dir "$AGENT_TEMPDIRECTORY/publication-preparation"
+                displayName: Prepare publication
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+                  AZURE_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azure-config
+                  AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/publication-preparation/azdev-config
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/publication-preparation/extensions
+
+          - job: BuildLinux
+            displayName: Linux build
+            timeoutInMinutes: 45
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/release-source/dist
+                  artifact: release-runtime-linux
+                  isProduction: true
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - script: >-
+                  python scripts/release_pipeline.py build
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --work-dir "$(Agent.TempDirectory)"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
+                displayName: Build wheel and SBOM
+              - script: >-
+                  python scripts/release_pipeline.py runtime-receipt
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Agent.TempDirectory)/release-source/dist"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
+                displayName: Check SBOM
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+
+          - job: BuildWindows
+            displayName: Windows SBOM
+            dependsOn: BuildLinux
+            timeoutInMinutes: 45
+            pool:
+              name: iotupx-1espt-release-probe
+              image: iotupx-1espt-windows2025
+              os: windows
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/windows-runtime
+                  artifact: release-runtime-windows
+                  isProduction: true
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - download: current
+                displayName: Download artifacts
+                artifact: release-runtime-linux
+              - script: python -m pip install packaging
+                displayName: Install dependencies
+              - script: >-
+                  python scripts/release_pipeline.py windows-runtime
+                  --source "$(Agent.TempDirectory)/release-source"
+                  --directory "$(Pipeline.Workspace)/release-runtime-linux"
+                  --work-dir "$(Agent.TempDirectory)"
+                  --inventory "$(Build.SourcesDirectory)/release-runtime-inventory"
+                displayName: Build Windows SBOM
+                env:
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+
+      - stage: Unit
+        displayName: Unit
+        dependsOn: Resolve
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - template: release-unit.yml
+            parameters:
+              sourceBranch: ${{ parameters.sourceBranch }}
+              platform: Linux
+          - template: release-unit.yml
+            parameters:
+              sourceBranch: ${{ parameters.sourceBranch }}
+              platform: Windows
+          - template: release-unit.yml
+            parameters:
+              sourceBranch: ${{ parameters.sourceBranch }}
+              platform: MacOS
+
+      - stage: Security
+        dependsOn: Resolve
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: Security
+            pool:
+              name: iotupx-1espt-release-probe
+              image: iotupx-1espt-windows2025
+              os: windows
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - pwsh: |
+                  git fetch --no-tags "$env:SOURCE" "$env:SOURCE_COMMIT"
+                  if ($LASTEXITCODE -ne 0) { throw "Cannot fetch the qualified security checkout." }
+                  git checkout --detach "$env:SOURCE_COMMIT"
+                  if ($LASTEXITCODE -ne 0) { throw "Cannot select the qualified security checkout." }
+                  if ((git rev-parse HEAD) -ne $env:SOURCE_COMMIT) { throw "Security source mismatch." }
+                displayName: Prepare scan
+                env:
+                  SOURCE: $(Agent.TempDirectory)/release-source
+                  SOURCE_COMMIT: $(sourceCommit)
+              - task: UseDotNet@2
+                inputs:
+                  packageType: sdk
+                  version: 5.0.x
+              - task: UseDotNet@2
+                inputs:
+                  packageType: sdk
+                  version: 6.0.x
+              - task: UseDotNet@2
+                displayName: Install .NET
+                inputs:
+                  packageType: runtime
+                  version: 8.0.x
+              - pwsh: |
+                  $ErrorActionPreference = 'Stop'
+                  $update = Join-Path $env:AGENT_TEMPDIRECTORY "defender-signatures-$env:SYSTEM_JOBATTEMPT.exe"
+                  if (Test-Path $update) { throw "Defender update staging path already exists." }
+                  Invoke-WebRequest 'https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' -OutFile $update
+                  $signature = Get-AuthenticodeSignature $update
+                  if ($signature.Status -ne 'Valid' -or
+                      $signature.SignerCertificate.Subject -notmatch '(^|,\s*)O=Microsoft Corporation(,|$)') {
+                    throw "The Defender update does not have a trusted Microsoft signature."
+                  }
+                  $process = Start-Process -FilePath $update -Wait -PassThru
+                  if ($process.ExitCode -ne 0) { throw "Defender update failed with exit code $($process.ExitCode)." }
+                  Get-MpComputerStatus | Select-Object AntivirusSignatureVersion, AntivirusSignatureLastUpdated
+                name: updateDefender
+                displayName: Update Defender
+                timeoutInMinutes: 5
+              - pwsh: |
+                  $ErrorActionPreference = 'Stop'
+                  $id = 'microsoft.security.devops.cli.win-x64'
+                  $version = '0.215.0'
+                  # SHA-512 published in the NuGet catalog for this exact package version.
+                  $expectedHash = 'B314D6DDA33FA08B3BD9629787B900E8BBF4B08B923D23B32E2FF1DFE64D2E9C7DB8862BB1B9016E7E918A6CDE4CB9CF0C52A83E5CC335AE485BB8B3E7AB7431'
+                  if ([string]::IsNullOrWhiteSpace($env:SYSTEM_ACCESSTOKEN) -or $env:SYSTEM_ACCESSTOKEN.Contains('$(')) {
+                      throw 'The pipeline job token is required to stage MSDO.'
+                  }
+                  $destination = Join-Path $env:AGENT_TEMPDIRECTORY "msdo-$version-$env:SYSTEM_JOBATTEMPT"
+                  if (Test-Path -LiteralPath $destination) { throw 'MSDO staging must use a fresh directory.' }
+                  New-Item -ItemType Directory -Path $destination | Out-Null
+                  $archive = Join-Path $destination "$id.$version.zip"
+                  $feed = 'https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/nuget/v3/flat2'
+                  Invoke-WebRequest "$feed/$id/$version/$id.$version.nupkg" -OutFile $archive `
+                      -Headers @{Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN"} -TimeoutSec 120
+                  $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA512).Hash
+                  if ($actualHash -cne $expectedHash) { throw 'MSDO package digest differs from the pinned publisher digest.' }
+                  Expand-Archive -LiteralPath $archive -DestinationPath $destination
+                  $manifests = @(Get-ChildItem -LiteralPath $destination -Filter '*.nuspec' -File)
+                  if ($manifests.Count -ne 1) { throw 'Expected exactly one MSDO package manifest.' }
+                  [xml]$manifest = Get-Content -LiteralPath $manifests[0].FullName -Raw
+                  if ($manifest.package.metadata.id -ine $id -or $manifest.package.metadata.version -cne $version) {
+                      throw 'MSDO package identity or version differs from the pinned package.'
+                  }
+                  $tools = Join-Path $destination 'tools'
+                  if (-not (Test-Path -LiteralPath (Join-Path $tools 'guardian.cmd') -PathType Leaf)) {
+                      throw 'The verified MSDO package does not contain its Windows launcher.'
+                  }
+                  Write-Host "Staged MSDO $version from the approved feed; SHA512=$actualHash"
+                  Write-Host "##vso[task.setvariable variable=directory;isOutput=true]$tools"
+                  Write-Host "##vso[task.setvariable variable=version;isOutput=true]$version"
+                name: stageMsdo
+                displayName: Install scanners
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              - task: MicrosoftSecurityDevOps@1
+                displayName: Run security scans
+                inputs:
+                  break: true
+                  publish: true
+                  artifactName: release-security-$(System.JobAttempt)
+                env:
+                  MSDO_DIRECTORY: $(stageMsdo.directory)
+                  MSDO_FILEPATH: $(stageMsdo.directory)/guardian.cmd
+                  MSDO_VERSION: $(stageMsdo.version)
+                  CKV_SKIP_PACKAGE_UPDATE_CHECK: "true"
+                  GDN_BANDIT_TARGET: $(Build.SourcesDirectory)/azext_iot
+                  GDN_BANDIT_RECURSIVE: "true"
+                  BUILD_SOURCEVERSION: $(sourceCommit)
+                  BUILD_SOURCEBRANCH: refs/heads/${{ parameters.sourceBranch }}
+
+      - stage: CommandLint
+        displayName: Lint
+        dependsOn: [Resolve, Build]
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: CommandLint
+            displayName: Lint
+            timeoutInMinutes: 45
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - download: current
+                displayName: Download artifacts
+                artifact: release-candidate
+              - script: python scripts/release_pipeline.py verify --directory "$(Pipeline.Workspace)/release-candidate"
+                displayName: Check candidate
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+              - bash: |
+                  set -euo pipefail
+                  python -m venv "$AGENT_TEMPDIRECTORY/lint-venv"
+                  source "$AGENT_TEMPDIRECTORY/lint-venv/bin/activate"
+                  cd "$SOURCE"
+                  python -m pip install azdev==0.2.13 "editorconfig>=0.12.2"
+                  python -m pip check
+                  git clone --quiet --depth=1 --branch dev https://github.com/Azure/azure-cli.git \
+                    "$AGENT_TEMPDIRECTORY/azure-cli"
+                  azdev setup -c "$AGENT_TEMPDIRECTORY/azure-cli" -r "$SOURCE"
+                  az extension add --source "$CANDIDATE/"*.whl --yes
+                  cp linter_exclusions.yml "$AZURE_EXTENSION_DIR/azure-iot/"
+                  cp .pylintrc pylintrc
+                  azdev linter --include-whl-extensions azure-iot --min-severity medium
+                displayName: Run Lint
+                env:
+                  SOURCE: $(Agent.TempDirectory)/release-source
+                  CANDIDATE: $(Pipeline.Workspace)/release-candidate
+                  AZURE_CONFIG_DIR: $(Agent.TempDirectory)/lint-config
+                  AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/lint-azdev-config
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/lint-extensions
+
+      - stage: IndexCompatibility
+        displayName: Index check
+        dependsOn: [Resolve, Build]
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: IndexCompatibility
+            displayName: Index check
+            timeoutInMinutes: 45
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/index-compatibility/reports
+                  artifact: release-index-compatibility-$(System.JobAttempt)
+                  isProduction: false
+                  condition: always()
+            steps:
+              - template: release-source.yml
+                parameters:
+                  sourceBranch: ${{ parameters.sourceBranch }}
+              - template: release-feed.yml
+              - task: UsePythonVersion@0
+                displayName: Select Python
+                inputs:
+                  versionSpec: "3.14"
+              - download: current
+                displayName: Download artifacts
+                artifact: release-candidate
+              - bash: |
+                  set -euo pipefail
+                  mkdir -p "$COMPAT_ROOT/run" "$COMPAT_ROOT/wheels" "$COMPAT_ROOT/reports"
+                  cp "$CANDIDATE/"*.whl "$COMPAT_ROOT/wheels/"
+                  unset PYTHONHOME
+                  python -m venv "$COMPAT_ROOT/venv"
+                  source "$COMPAT_ROOT/venv/bin/activate"
+                  cd "$COMPAT_ROOT/run"
+                  git clone --quiet --depth=1 --branch dev https://github.com/Azure/azure-cli.git \
+                    "$COMPAT_ROOT/azure-cli"
+                  git clone --quiet --depth=1 --branch main https://github.com/Azure/azure-cli-extensions.git \
+                    "$COMPAT_ROOT/azure-cli-extensions"
+                  python -m pip install --upgrade pip
+                  python -m pip install azdev==0.2.13 build wheel "editorconfig>=0.12.2"
+                  python -m pip check
+                  azdev setup -c "$COMPAT_ROOT/azure-cli" -r "$COMPAT_ROOT/azure-cli-extensions"
+                  python "$BUILD_SOURCESDIRECTORY/scripts/release_pipeline.py" index-check \
+                    --source "$SOURCE" --directory "$CANDIDATE" --work-dir "$COMPAT_ROOT"
+                displayName: Run index check
+                env:
+                  SOURCE: $(Agent.TempDirectory)/release-source
+                  CANDIDATE: $(Pipeline.Workspace)/release-candidate
+                  COMPAT_ROOT: $(Agent.TempDirectory)/index-compatibility
+                  AZURE_CONFIG_DIR: $(Agent.TempDirectory)/index-compatibility/azure-config
+                  AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/index-compatibility/azdev-config
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/index-compatibility/extensions
+                  AZURE_EXTENSION_DEV_SOURCES: $(Agent.TempDirectory)/index-compatibility/azure-cli-extensions
+                  AZURE_CORE_COLLECT_TELEMETRY: "no"
+                  PYTHONNOUSERSITE: "1"
+                  PYTHONPATH: ""
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+
+      - stage: Integration
+        displayName: Integration
+        dependsOn: [Resolve, Build, Security, CommandLint, IndexCompatibility]
+        condition: >-
+          and(not(canceled()), eq(dependencies.Resolve.result, 'Succeeded'),
+          eq(dependencies.Build.result, 'Succeeded'),
+          eq(dependencies.Security.result, 'Succeeded'), eq(dependencies.CommandLint.result, 'Succeeded'),
+          eq(dependencies.IndexCompatibility.result, 'Succeeded'))
+        variables:
+          sourceCommit: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: Integration
+            displayName: Integration
+            timeoutInMinutes: 1080
+            cancelTimeoutInMinutes: 5
+            strategy:
+              matrix: $[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]
+              maxParallel: 0
+            templateContext:
+              outputs:
+                - output: pipelineArtifact
+                  path: $(Agent.TempDirectory)/integration-run.json
+                  artifact: release-integration-$(cohort)-$(System.JobAttempt)
+                  isProduction: false
+                  condition: and(always(), ne(variables['integrationBuildId'], ''))
+            steps:
+              - checkout: self
+                displayName: Checkout source
+                clean: true
+                persistCredentials: false
+              - task: UsePythonVersion@0
+                displayName: Select Python
+                inputs:
+                  versionSpec: "3.13"
+                  disableDownloadFromRegistry: true
+              - download: current
+                displayName: Download artifacts
+                artifact: release-candidate
+              - script: >-
+                  python scripts/release_pipeline.py integrate
+                  --directory "$(Pipeline.Workspace)/release-candidate"
+                  --record "$(Agent.TempDirectory)/integration-run.json"
+                displayName: Run integration
+                env:
+                  RELEASE_COHORT: $(cohort)
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+              - task: DownloadPipelineArtifact@2
+                displayName: Download artifacts
+                inputs:
+                  buildType: specific
+                  project: $(System.TeamProjectId)
+                  definition: "147"
+                  buildVersionToDownload: specific
+                  pipelineId: $(integrationBuildId)
+                  patterns: "integration-wheel-*/**"
+                  targetPath: $(Agent.TempDirectory)/integration-artifacts
+              - script: >-
+                  python scripts/release_pipeline.py verify-integration
+                  --directory "$(Pipeline.Workspace)/release-candidate"
+                  --work-dir "$(Agent.TempDirectory)/integration-artifacts"
+                displayName: Check integration
+                env:
+                  RELEASE_COHORT: $(cohort)
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+              - script: >-
+                  python scripts/release_pipeline.py cancel
+                  --directory "$(Pipeline.Workspace)/release-candidate"
+                  --record "$(Agent.TempDirectory)/integration-run.json"
+                displayName: Cancel integration
+                condition: or(failed(), canceled())
+                env:
+                  RELEASE_COHORT: $(cohort)
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+
+  - ${{ if eq(parameters.mode, 'Release') }}:
+      - stage: Publish
+        displayName: Publish
+        dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility, Integration]
+        condition: >-
+          and(not(canceled()), eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
+          eq(dependencies.Resolve.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'),
+          eq(dependencies.Unit.result, 'Succeeded'), eq(dependencies.Security.result, 'Succeeded'),
+          eq(dependencies.CommandLint.result, 'Succeeded'), eq(dependencies.IndexCompatibility.result, 'Succeeded'),
+          eq(dependencies.Integration.result, 'Succeeded'))
+        variables:
+          - group: aziotcli_release_publish
+          - name: sourceCommit
+            value: $[ stageDependencies.Resolve.Resolve.outputs['source.commit'] ]
+        jobs:
+          - job: Publish
+            templateContext:
+              type: releaseJob
+              isProduction: true
+              inputs:
+                - input: pipelineArtifact
+                  artifactName: release-candidate
+                  targetPath: $(Pipeline.Workspace)/release-candidate
+                - input: pipelineArtifact
+                  artifactName: release-tooling
+                  targetPath: $(Pipeline.Workspace)/release-tooling
+            steps:
+              - checkout: none
+              - task: UsePythonVersion@0
+                displayName: Select Python
+                inputs:
+                  versionSpec: "3.13"
+                  disableDownloadFromRegistry: true
+              - script: >-
+                  python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" publish
+                  --directory "$(Pipeline.Workspace)/release-candidate"
+                  --record "$(Agent.TempDirectory)/publication/release.json"
+                  --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
+                displayName: Publish release
+                env:
+                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
+                  RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
+                  RELEASE_MODE: ${{ parameters.mode }}
+              - ${{ if parameters.createIndexPr }}:
+                  - script: >-
+                      python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" index
+                      --directory "$(Pipeline.Workspace)/release-candidate"
+                      --record "$(Agent.TempDirectory)/publication/release.json"
+                      --work-dir "$(Agent.TempDirectory)/index-submission"
+                      --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
+                    displayName: Create index PR
+                    env:
+                      RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+                      RELEASE_SOURCE_COMMIT: $(sourceCommit)
+                      RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
+                      INDEX_FORK_REPOSITORY: $(IndexForkRepository)
+                      RELEASE_MODE: ${{ parameters.mode }}
+                      RELEASE_CREATE_INDEX_PR: ${{ parameters.createIndexPr }}
+                      PYTHONNOUSERSITE: "1"
+                      PYTHONPATH: ""
