@@ -581,11 +581,19 @@ def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
 
 
+EVENTHUB_HOSTNAME_SUFFIXES = (
+    ".servicebus.windows.net",
+    ".servicebus.usgovcloudapi.net",
+    ".servicebus.chinacloudapi.cn",
+)
+
+
 def is_eventhub_connection_string(cs: str) -> bool:
     """Check if a connection string is an Event Hub connection string.
 
-    Validates that the string contains 'EntityPath=' and that the
-    Endpoint hostname ends with '.servicebus.windows.net'.
+    Validates that the string contains 'EntityPath=' and that the Endpoint
+    hostname ends with a Service Bus suffix of the public, US Government or
+    China cloud.
     """
     try:
         from azext_iot.common._azure import parse_event_hub_connection_string
@@ -595,7 +603,7 @@ def is_eventhub_connection_string(cs: str) -> bool:
         from urllib.parse import urlparse
         parsed = urlparse(endpoint)
         hostname = (parsed.hostname or "").lower()
-        return hostname.endswith(".servicebus.windows.net")
+        return hostname.endswith(EVENTHUB_HOSTNAME_SUFFIXES)
     except (IndexError, ValueError):
         return False
 
