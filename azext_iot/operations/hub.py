@@ -2847,6 +2847,15 @@ def _iot_hub_monitor_events(  # pragma: no cover
         cmd, timeout, properties, enqueued_time, repair, yes, message_count
     )
 
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name_or_hostname,
+        resource_group_name=resource_group_name,
+        include_events=True,
+        monitor_events=True,
+        login=login,
+    )
+
     device_ids = {}
     if device_query:
         devices_result = iot_query(
@@ -2855,14 +2864,6 @@ def _iot_hub_monitor_events(  # pragma: no cover
         if devices_result:
             for device_result in devices_result:
                 device_ids[device_result["deviceId"]] = True
-
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name_or_hostname,
-        resource_group_name=resource_group_name,
-        include_events=True,
-        login=login,
-    )
 
     from azext_iot.monitor.builders import hub_target_builder
     from azext_iot.monitor.handlers import CommonHandler

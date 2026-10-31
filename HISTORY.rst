@@ -6,6 +6,10 @@ Release History
 Unreleased
 ++++++++++
 
+**IoT Hub updates**
+
+* Fixed ``az iot hub monitor-events`` to fail immediately with an actionable error when hub discovery detects that local authentication is disabled, instead of attempting SAS authentication to the built-in Event Hub-compatible endpoint.
+
 **IoT Hub Device Provisioning Service (DPS) updates**
 
 * **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
