@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from azext_iot.tests import _integration_health as health
+from azext_iot.tests import _ado_pipeline as pipeline
 
 
 @pytest.fixture
@@ -99,6 +100,9 @@ def test_rerun_uses_original_profile_not_library_changes(setup_health, tmp_path,
     monkeypatch.setattr(health, "ado_get", lookup)
     value = health.resolve(tmp_path)
     assert value["profile"]["region"] == "eastus"
+    health.plan(tmp_path / "replay", tmp_path)
+    jobs = json.loads((tmp_path / "replay/plan.json").read_text())
+    assert pipeline.run_title(jobs, "health", "Integration tests", "123") == "iot-health-123 (eastus) (DPS)"
     lookup.assert_not_called()
     value["producer"]["build"] = "999"
     (directory / "health-profile.json").write_text(json.dumps(value))
@@ -113,7 +117,19 @@ def test_health_entrypoint_always_executes_shared_live_pipeline():
     assert entry["extends"] == {
         "template": "templates/integration-pipeline.yml", "parameters": {"health": True, "mode": "Integration tests"},
     }
+    assert entry["appendCommitMessageToRunName"] is False
+    assert yaml.safe_load((root / ".azure-devops/integration_tests.yml").read_text())[
+        "appendCommitMessageToRunName"
+    ] is False
     template = yaml.safe_load((root / ".azure-devops/templates/integration-pipeline.yml").read_text())
+    title_step = template["stages"][0]["jobs"][0]["steps"][-1]
+    assert title_step["displayName"] == "Set run title" and "_ado_pipeline.py title" in title_step["bash"]
+    assert title_step["env"]["${{ if parameters.health }}"] == {
+        "PLAN": "health-plan/plan.json", "RUN_KIND": "health",
+    }
+    assert title_step["env"]["${{ else }}"] == {"PLAN": "plan.json", "RUN_KIND": "integration"}
+    assert title_step["env"]["RUN_MODE"] == "${{ parameters.mode }}"
+    assert title_step["env"]["RELEASE_BUILD_ID"] == "${{ parameters.releaseBuildId }}"
     assert {"${{ if parameters.health }}": [{"group": "iot-cli-integration-health"}]} in template["variables"]
     stage = yaml.safe_load((root / ".azure-devops/templates/integration-service.yml").read_text())["stages"][0]
     assert "Plan.health.${{ parameters.service }}" in stage["${{ if parameters.health }}"]["condition"]

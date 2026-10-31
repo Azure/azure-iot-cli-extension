@@ -314,6 +314,68 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 360
 
 
+@pytest.mark.parametrize("services,scope", [
+    (["ADR", "HubData", "DPS", "ADU", "HubControl"], "DPS,Hub,ADU,ADR"),
+    (["HubControl", "ADR"], "HubControl,ADR"),
+    (["HubData"], "HubData"),
+])
+def test_run_title_uses_distinct_planned_services_not_matrix_combinations(services, scope):
+    jobs = pipeline.plan(services, ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
+    assert pipeline.run_title(jobs, "health", "Integration tests", "123") == (
+        f"iot-health-123 (australiaeast) ({scope})"
+    )
+
+
+def test_run_title_labels_fixture_region_dry_run_and_release_child():
+    jobs = pipeline.plan(["ADU"], ["3.13"], ["centraluseuap"], pipeline.TARGET["CANARY_ARM"])
+    assert pipeline.run_title(jobs, "integration", "Dry run", "123") == (
+        "iot-integration-123 (hub centraluseuap) (ADU) (dry-run,canary)"
+    )
+    assert pipeline.run_title(jobs, "integration", "Integration tests", "123", "456") == (
+        "iot-integration-123 (hub centraluseuap) (ADU) (release-child 456,canary)"
+    )
+
+
+def test_run_title_compacts_whole_regions_and_retains_unique_build():
+    regions = [f"region{index:02d}" + "x" * 56 for index in range(40)]
+    jobs = pipeline.plan(["DPS"], ["3.13"], regions, pipeline.TARGET["PUBLIC_ARM"])
+    title = pipeline.run_title(jobs, "integration", "Integration tests", "123")
+    assert title == f"iot-integration-123 ({regions[0]} +39) (DPS)"
+    assert len(title) <= 255
+
+
+@pytest.mark.parametrize("damage", ["region", "service", "build", "empty"])
+def test_run_title_rejects_invalid_plan_values(damage):
+    jobs = pipeline.plan(["DPS"], ["3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
+    build = "123"
+    if damage in ("region", "service"):
+        jobs[0][damage] = "bad\n##vso[task.complete result=Succeeded]"
+    elif damage == "build":
+        build = "123\ninjected"
+    else:
+        jobs = []
+    with pytest.raises(ValueError):
+        pipeline.run_title(jobs, "health", "Integration tests", build)
+
+
+def test_title_command_preserves_plan_json_and_does_not_append_on_retry(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "plan.json"
+    jobs = pipeline.plan(["DPS", "ADR"], ["3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
+    path.write_text(json.dumps(jobs))
+    original = path.read_bytes()
+    monkeypatch.setenv("BUILD_BUILDID", "123")
+    monkeypatch.setattr(sys, "argv", [
+        "planner", "title", "--plan", str(path), "--kind", "integration", "--mode", "Dry run",
+    ])
+    for number in ("iot-integration-20261031.1", "iot-integration-123 (australiaeast) (DPS,ADR) (dry-run)"):
+        monkeypatch.setenv("BUILD_BUILDNUMBER", number)
+        assert pipeline.main() == 0
+        assert capsys.readouterr().out.strip() == (
+            "##vso[build.updatebuildnumber]iot-integration-123 (australiaeast) (DPS,ADR) (dry-run)"
+        )
+        assert path.read_bytes() == original
+
+
 @pytest.mark.parametrize("definition", ["147", "166"])
 def test_live_run_starts_auth_without_admission_requests(tmp_path, mocker, monkeypatch, definition):
     mocker.patch.object(pipeline, "context", return_value=dict(CONTEXT, definition=definition))

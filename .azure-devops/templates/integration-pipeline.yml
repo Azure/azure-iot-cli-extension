@@ -92,6 +92,19 @@ stages:
               - publish: health-plan
                 displayName: Publish plan
                 artifact: integration-plan-$(System.JobAttempt)
+          - bash: >-
+              python azext_iot/tests/_ado_pipeline.py title --plan "$PLAN" --kind "$RUN_KIND"
+              --mode "$RUN_MODE" --release-build-id "$RELEASE_BUILD_ID"
+            displayName: Set run title
+            env:
+              ${{ if parameters.health }}:
+                PLAN: health-plan/plan.json
+                RUN_KIND: health
+              ${{ else }}:
+                PLAN: plan.json
+                RUN_KIND: integration
+              RUN_MODE: ${{ parameters.mode }}
+              RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
 
   - ${{ if eq(parameters.mode, 'Integration tests') }}:
       - stage: Build

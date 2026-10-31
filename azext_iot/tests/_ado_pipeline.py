@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import shutil
 import signal
@@ -52,6 +53,40 @@ def plan(services, versions, regions, endpoint, diagnostic=False):
     if len(jobs) > 40:
         raise ValueError("Select at most 40 combinations per run.")
     return jobs
+
+
+def run_title(jobs, kind, mode, build_id, parent="0"):
+    if (kind not in {"health", "integration"} or mode not in {"Dry run", "Integration tests"}
+            or not re.fullmatch(r"[1-9][0-9]*", build_id) or not re.fullmatch(r"0|[1-9][0-9]*", parent)
+            or kind == "health" and (mode != "Integration tests" or parent != "0")):
+        raise ValueError("Invalid run title identity or mode.")
+    services = {job["service"] for job in jobs}
+    if not services or not services <= set(RETRY["SERVICES"]):
+        raise ValueError("Run titles require a supported, nonempty service plan.")
+    regions = sorted({TARGET["target"](job["region"], job["endpoint"])["region"] for job in jobs})
+    for count in range(len(regions), 0, -1):
+        region_label = ",".join(regions[:count]) + (f" +{len(regions) - count}" if count < len(regions) else "")
+        if len(region_label) <= 80:
+            break
+    if services == {"ADU"}:
+        region_label = "hub " + region_label
+    if {"HubControl", "HubData"} <= services:
+        services = services - {"HubControl", "HubData"} | {"Hub"}
+    scope = ",".join(service for service in ("DPS", "Hub", "HubControl", "HubData", "ADU", "ADR")
+                     if service in services)
+    modes = []
+    if mode == "Dry run":
+        modes.append("dry-run")
+    if parent != "0":
+        modes.append(f"release-child {parent}")
+    if any(job["endpoint"] == TARGET["CANARY_ARM"] for job in jobs):
+        modes.append("canary")
+    title = f"iot-{kind}-{build_id} ({region_label}) ({scope})"
+    if modes:
+        title += f" ({','.join(modes)})"
+    if len(title) > 255 or not re.fullmatch(r"[A-Za-z0-9 (),+-]+", title):
+        raise ValueError("Run title exceeds Azure Pipelines length or character limits.")
+    return title
 
 
 def context(service, python, region, endpoint, wheel, diagnostic):
@@ -490,6 +525,11 @@ def main():
     planner.add_argument("--regions", nargs="+", required=True)
     planner.add_argument("--endpoint", required=True)
     planner.add_argument("--diagnostic", action="store_true")
+    namer = commands.add_parser("title")
+    namer.add_argument("--plan", type=Path, required=True)
+    namer.add_argument("--kind", choices=["health", "integration"], required=True)
+    namer.add_argument("--mode", choices=["Dry run", "Integration tests"], required=True)
+    namer.add_argument("--release-build-id", default="0")
     runner = commands.add_parser("run")
     for name in ("service", "python", "region", "endpoint", "wheel", "history", "output"):
         runner.add_argument("--" + name, required=True)
@@ -505,6 +545,13 @@ def main():
         if name == "candidate":
             subparser.add_argument("--output", required=True)
     args = parser.parse_args()
+    if args.command == "title":
+        jobs = json.loads(args.plan.read_text(encoding="utf-8"))
+        title = run_title(jobs, args.kind, args.mode, os.environ["BUILD_BUILDID"], args.release_build_id)
+        print(f"##vso[build.updatebuildnumber]{title}", flush=True)
+        if any(job["service"] == "ADU" for job in jobs):
+            print("Device Update uses title regions for dependency Hubs only; account locations are fixture-defined.")
+        return 0
     if args.command == "report-incomplete":
         if not (Path(args.output) / "final.xml").is_file():
             reject(args.output, "No terminal report was produced; installation, login or execution did not complete.",
