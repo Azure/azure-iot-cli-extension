@@ -8,6 +8,8 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
+from urllib.parse import urlsplit
+
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
@@ -15,13 +17,25 @@ from azext_iot.common.auth import IoTOAuth, get_cli_credential
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.common.utility import ensure_azure_namespace_path
-from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGENT
+from azext_iot.constants import (
+    IOTDPS_RESOURCE_ID,
+    IOTDPS_RESOURCE_ID_CHINA,
+    IOTDPS_RESOURCE_ID_US_GOV,
+    IOTHUB_RESOURCE_ID,
+    USER_AGENT,
+)
 
 ensure_azure_namespace_path()
 
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
 
 logger = get_logger(__name__)
+
+_IOTDPS_RESOURCE_ID_BY_HOST_SUFFIX = {
+    ".azure-devices-provisioning.net": IOTDPS_RESOURCE_ID,
+    ".azure-devices-provisioning.us": IOTDPS_RESOURCE_ID_US_GOV,
+    ".azure-devices-provisioning.cn": IOTDPS_RESOURCE_ID_CHINA,
+}
 
 __all__ = [
     "SdkResolver",
@@ -148,6 +162,14 @@ def resource_service_factory(cli_ctx, **_):
     return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_RESOURCE_RESOURCES)
 
 
+def _get_dps_resource_id(endpoint):
+    hostname = (urlsplit(endpoint).hostname or "").rstrip(".").casefold()
+    for suffix, resource_id in _IOTDPS_RESOURCE_ID_BY_HOST_SUFFIX.items():
+        if hostname.endswith(suffix):
+            return resource_id
+    return IOTDPS_RESOURCE_ID
+
+
 class SdkResolver(object):
     def __init__(self, target, device_id=None, auth_override=None):
         self.target = target
@@ -218,7 +240,10 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTDPS_RESOURCE_ID)
+            credentials = IoTOAuth(
+                cli_ctx=self.target["cmd"].cli_ctx,
+                resource_id=_get_dps_resource_id(self.endpoint),
+            )
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
