@@ -19,6 +19,7 @@ from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.constants import (
     IOTDPS_RESOURCE_ID,
+    IOTDPS_RESOURCE_ID_CHINA,
     IOTDPS_RESOURCE_ID_US_GOV,
     IOTHUB_RESOURCE_ID,
     USER_AGENT,
@@ -33,6 +34,7 @@ logger = get_logger(__name__)
 _IOTDPS_RESOURCE_ID_BY_HOST_SUFFIX = {
     ".azure-devices-provisioning.net": IOTDPS_RESOURCE_ID,
     ".azure-devices-provisioning.us": IOTDPS_RESOURCE_ID_US_GOV,
+    ".azure-devices-provisioning.cn": IOTDPS_RESOURCE_ID_CHINA,
 }
 
 __all__ = [

@@ -309,6 +309,7 @@ class TestSdkResolverHostnames:
         [
             ("mydps.azure-devices-provisioning.net", "https://azure-devices-provisioning.net"),
             ("mydps.azure-devices-provisioning.us", "https://azure-devices-provisioning.us"),
+            ("mydps.azure-devices-provisioning.cn", "https://azure-devices-provisioning.cn"),
         ],
     )
     def test_dps_service_sdk_uses_cloud_resource(self, mocker, hostname, resource_id):
