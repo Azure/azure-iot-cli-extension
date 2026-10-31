@@ -405,10 +405,10 @@ stages:
 
       - stage: Integration
         displayName: Integration
-        dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility]
+        dependsOn: [Resolve, Build, Security, CommandLint, IndexCompatibility]
         condition: >-
           and(not(canceled()), eq(dependencies.Resolve.result, 'Succeeded'),
-          eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'),
+          eq(dependencies.Build.result, 'Succeeded'),
           eq(dependencies.Security.result, 'Succeeded'), eq(dependencies.CommandLint.result, 'Succeeded'),
           eq(dependencies.IndexCompatibility.result, 'Succeeded'))
         variables:
@@ -420,7 +420,7 @@ stages:
             cancelTimeoutInMinutes: 5
             strategy:
               matrix: $[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]
-              maxParallel: 1
+              maxParallel: 0
             templateContext:
               outputs:
                 - output: pipelineArtifact

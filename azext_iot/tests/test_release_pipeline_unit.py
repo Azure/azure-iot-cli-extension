@@ -1019,14 +1019,21 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
     assert stages["Publish"]["variables"][0] == {"group": "aziotcli_release_publish"}
 
 
-def test_yaml_runs_every_frozen_target_cohort_serially():
+def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity():
     pipeline, stages = all_stages()
     assert pipeline["variables"]["RELEASE_DPS_TARGET"] == "${{ parameters.dpsTarget }}"
     job = stages["Integration"]["jobs"][0]
     assert "$(" not in job["displayName"]
     assert job["strategy"] == {
-        "matrix": "$[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]", "maxParallel": 1,
+        "matrix": "$[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]", "maxParallel": 0,
     }
+    assert stages["Unit"]["dependsOn"] == "Resolve"
+    assert stages["Integration"]["dependsOn"] == ["Resolve", "Build", "Security", "CommandLint", "IndexCompatibility"]
+    assert "dependencies.Unit" not in stages["Integration"]["condition"]
+    assert stages["Publish"]["dependsOn"] == [
+        "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration",
+    ]
+    assert "eq(dependencies.Unit.result, 'Succeeded')" in stages["Publish"]["condition"]
     assert job["timeoutInMinutes"] >= 9 * 60 + 7 * 60
     assert "$(cohort)" in job["templateContext"]["outputs"][0]["artifact"]
     scripts = [step for step in job["steps"] if "script" in step]
