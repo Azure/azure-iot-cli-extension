@@ -4,6 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from copy import deepcopy
+from unittest.mock import patch
+
+from azext_iot.common.base_discovery import ResourceDiscoveryError
 from azext_iot.iothub.providers.discovery import (
     IotHubDiscovery,
     PRIVILEDGED_ACCESS_RIGHTS_SET,
@@ -95,6 +99,30 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
 
         assert any(target["name"] == self.entity_name for target in sub_targets)
         assert any(target["name"] == self.entity_name for target in rg_targets)
+        self._assert_missing_hostname_handling(discovery)
+
+    def _assert_missing_hostname_handling(self, discovery):
+        resource = discovery.find_resource(self.entity_name, rg=self.entity_rg)
+        incomplete = deepcopy(resource)
+        for field in ("hostName", "serviceHostName", "deviceHostName"):
+            incomplete["properties"].pop(field, None)
+
+        # Inject incomplete ARM metadata without racing actual Hub provisioning.
+        with patch.object(IotHubDiscovery, "find_resource", return_value=incomplete):
+            with self.assertRaises(ResourceDiscoveryError):
+                self.cmd(
+                    f"iot hub generate-sas-token --hub-name {self.entity_name} --resource-group {self.entity_rg}"
+                )
+            with self.assertRaises(ResourceDiscoveryError):
+                discovery.get_target(self.entity_name, self.entity_rg, auth_type="login")
+            with patch.object(discovery, "get_resources", return_value=[resource]):
+                with self.assertLogs("cli.azext_iot.common.base_discovery", level="WARNING") as logs:
+                    assert discovery.get_targets(resource_group_name=self.entity_rg, auth_type="login") == []
+                assert any("No usable hostname" in message and self.entity_name in message for message in logs.output)
+
+        assert_target(
+            discovery.get_target(self.entity_name, self.entity_rg, auth_type="login"), rg=self.entity_rg
+        )
 
 
 def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs):

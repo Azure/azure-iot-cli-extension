@@ -1429,6 +1429,7 @@ def test_hub_collection_scenarios_require_owned_hub_not_cross_request_counts(moc
             run = discovery_tests.TestIoTHubDiscovery.test_iothub_discovery_lists
         else:
             discovery.get_targets.side_effect = [sub_hubs, rg_hubs]
+            scenario._assert_missing_hostname_handling = Mock()
             run = discovery_tests.TestIoTHubDiscovery.test_iothub_target_lists
 
     if missing_scope:

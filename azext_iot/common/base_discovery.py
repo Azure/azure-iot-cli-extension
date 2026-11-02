@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import ABC, abstractmethod
-from azure.cli.core.azclierror import ForbiddenError, ResourceNotFoundError, UnauthorizedError
+from azure.cli.core.azclierror import AzureResponseError, ForbiddenError, ResourceNotFoundError, UnauthorizedError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -20,6 +20,10 @@ POLICY_ERROR_TEMPLATE = (
     "When interfacing with an {0}, the IoT extension requires any single policy with "
     "{3} rights."
 )
+
+
+class ResourceDiscoveryError(AzureResponseError):
+    """Resource metadata cannot provide a usable connection target."""
 
 
 def _format_policy_set(inputs: set) -> str:
@@ -385,7 +389,9 @@ class BaseDiscovery(ABC):
                             **kwargs
                         )
                     )
-                except (HttpResponseError, ResourceNotFoundError, ForbiddenError, UnauthorizedError) as e:
+                except (
+                    HttpResponseError, ResourceNotFoundError, ForbiddenError, UnauthorizedError, ResourceDiscoveryError
+                ) as e:
                     logger.warning("Could not access %s. %s", resource["name"], e)
 
         return targets

@@ -7,7 +7,7 @@
 from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
-from azext_iot.common.base_discovery import BaseDiscovery
+from azext_iot.common.base_discovery import BaseDiscovery, ResourceDiscoveryError
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane, GatewayVersion
 from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string, valid_hostname
 from azext_iot.iothub.models.iothub_target import IotHubTarget, derive_iot_hub_hostnames
@@ -114,12 +114,18 @@ class IotHubDiscovery(BaseDiscovery):
         )
         subscription_id = self.resolve_subscription_id(resource)
 
-        props = resource.get("properties", {})
+        props = resource.get("properties") or {}
         tls_device = props.get("deviceHostName")
         tls_service = props.get("serviceHostName")
-        gw_version = props.get("iotHubDetails", {}).get("gatewayVersion")
+        gw_version = (props.get("iotHubDetails") or {}).get("gatewayVersion")
         service_hostname = tls_service if gw_version == GatewayVersion.V2.value else None
         hostname = service_hostname or props.get("hostName")
+        if not isinstance(hostname, str) or not hostname.strip():
+            raise ResourceDiscoveryError(
+                f"No usable hostname could be resolved for IoT Hub '{resource['name']}'. "
+                f"Check 'az iot hub show --name {resource['name']} --resource-group {rg}' "
+                "and retry when a hostname is available."
+            )
 
         target = {}
         target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
