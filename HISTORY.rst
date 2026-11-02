@@ -63,6 +63,10 @@ Release History
 * Reused the updated preview release's concurrent owned Hub/DPS phase controllers, ADR worker grouping, fixture readiness fixes, and strict workflow result gates. GA-specific API and command-scope adaptations remain; live qualification is still deferred.
 * Reused deterministic serial unit sharding and advisory extension-index compatibility checks. The full twelve OS/Python combinations and existing Azure Pipelines unit coverage remain enabled.
 
+**IoT Hub updates**
+
+* Fixed ``az iot hub monitor-events --login`` failing with an unhandled ``ValueError`` for Event Hub-compatible connection strings from Azure US Government (``.servicebus.usgovcloudapi.net``) and Azure China (``.servicebus.chinacloudapi.cn``) hubs.
+
 0.33.0b1 (Preview)
 ++++++++++++++++++
 
