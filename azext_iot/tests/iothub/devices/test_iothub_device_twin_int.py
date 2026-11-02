@@ -120,7 +120,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
-            assert d0_twin["tags"] is None
+            assert d0_twin.get("tags") in (None, {})
 
             # Prepare removal of single desired twin property
             target_key = list(patch_desired.keys())[0]

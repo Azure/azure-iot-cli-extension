@@ -8,7 +8,7 @@ import json
 import os
 
 import pytest
-from azure.cli.core.azclierror import FileOperationError
+from azure.cli.core.azclierror import BadRequestError, FileOperationError
 
 import azext_iot.iothub.providers.helpers.state_strings as messages
 import azext_iot.iothub.providers.state as subject
@@ -21,7 +21,21 @@ def provider(mocker):
     result.target = {"name": "myhub"}
     result.login = None
     mocker.patch.object(
-        result, "process_hub_to_dict", return_value={"devices": {"device1": {"identity": {}}}}
+        result, "process_hub_to_dict", return_value={
+            "devices": {
+                "device1": {
+                    "identity": {
+                        "authentication": {
+                            "type": "sas",
+                            "symmetricKey": {"primaryKey": "primary", "secondaryKey": "secondary"},
+                        },
+                        "capabilities": {"iotEdge": False},
+                        "status": "enabled",
+                    },
+                    "twin": {"properties": {"desired": {}}},
+                },
+            },
+        },
     )
     return result
 
@@ -270,6 +284,18 @@ def test_collection_failure_does_not_claim_recovery(provider, tmp_path, mocker):
     fallback = mocker.patch.object(subject, "_write_fallback_state_file")
 
     with pytest.raises(IndexError, match="missing ARM resource"):
+        provider.save_state(str(tmp_path / "state.json"), hub_aspects=["devices"])
+
+    write.assert_not_called()
+    fallback.assert_not_called()
+
+
+def test_invalid_collected_state_does_not_claim_recovery(provider, tmp_path, mocker):
+    provider.process_hub_to_dict.return_value["devices"]["device1"]["identity"] = {}
+    write = mocker.patch.object(subject, "_write_state_file")
+    fallback = mocker.patch.object(subject, "_write_fallback_state_file")
+
+    with pytest.raises(BadRequestError, match="authentication.*required field is missing"):
         provider.save_state(str(tmp_path / "state.json"), hub_aspects=["devices"])
 
     write.assert_not_called()

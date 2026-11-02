@@ -7,6 +7,7 @@
 from typing import Optional
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.commands import LongRunningOperation
 from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.iothub.providers.base import IoTHubProvider
@@ -33,7 +34,7 @@ class MessageRoute(IoTHubProvider):
         enabled: bool = True,
         condition: str = "true",
     ):
-        self.hub_resource.properties.routing.routes.append(
+        self.hub_resource["properties"]["routing"]["routes"].append(
             {
                 "source": source_type,
                 "name": route_name,
@@ -44,12 +45,7 @@ class MessageRoute(IoTHubProvider):
         )
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-                resource_name=self.hub_resource.name,
-                iot_hub_description=self.hub_resource,
-                if_match=self.hub_resource.etag
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -62,50 +58,40 @@ class MessageRoute(IoTHubProvider):
         condition: Optional[str] = None,
     ):
         route = self.show(route_name=route_name)
-        route.source = route.source if source_type is None else source_type
-        route.endpoint_names = route.endpoint_names if endpoint_name is None else endpoint_name.split()
-        route.condition = route.condition if condition is None else condition
-        route.is_enabled = route.is_enabled if enabled is None else enabled
+        route["source"] = route["source"] if source_type is None else source_type
+        route["endpointNames"] = route["endpointNames"] if endpoint_name is None else endpoint_name.split()
+        route["condition"] = route["condition"] if condition is None else condition
+        route["isEnabled"] = route["isEnabled"] if enabled is None else enabled
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-                resource_name=self.hub_resource.name,
-                iot_hub_description=self.hub_resource,
-                if_match=self.hub_resource.etag
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
     def show(self, route_name: str):
-        routes = self.hub_resource.properties.routing.routes
+        routes = self.hub_resource["properties"]["routing"]["routes"]
         for route in routes:
-            if route.name.lower() == route_name.lower():
+            if route["name"].lower() == route_name.lower():
                 return route
         raise ResourceNotFoundError("No route found.")
 
     def list(self, source_type: Optional[str] = None):
-        routes = self.hub_resource.properties.routing.routes
+        routes = self.hub_resource["properties"]["routing"]["routes"]
         if source_type:
-            return [route for route in routes if route.source.lower() == source_type.lower()]
+            return [route for route in routes if route["source"].lower() == source_type.lower()]
         return routes
 
     def delete(self, route_name: Optional[str] = None, source_type: Optional[str] = None):
-        routing = self.hub_resource.properties.routing
+        routing = self.hub_resource["properties"]["routing"]
         if not route_name and not source_type:
-            routing.routes = []
+            routing["routes"] = []
         elif route_name:
-            routing.routes = [route for route in routing.routes if route.name.lower() != route_name.lower()]
+            routing["routes"] = [route for route in routing["routes"] if route["name"].lower() != route_name.lower()]
         else:
-            routing.routes = [route for route in routing.routes if route.source.lower() != source_type.lower()]
+            routing["routes"] = [route for route in routing["routes"] if route["source"].lower() != source_type.lower()]
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-                resource_name=self.hub_resource.name,
-                iot_hub_description=self.hub_resource,
-                if_match=self.hub_resource.etag
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -136,8 +122,8 @@ class MessageRoute(IoTHubProvider):
                 "route": route
             }
             return self.discovery.client.test_route(
-                iot_hub_name=self.hub_resource.name,
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                iot_hub_name=self.hub_resource["name"],
+                resource_group_name=self.rg,
                 input=test_route_input
             )
 
@@ -148,28 +134,31 @@ class MessageRoute(IoTHubProvider):
                 "twin": None
             }
             return self.discovery.client.test_all_routes(
-                iot_hub_name=self.hub_resource.name,
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                iot_hub_name=self.hub_resource["name"],
+                resource_group_name=self.rg,
                 input=test_all_routes_input
             )
 
-        # for all types, need to test all types one by one
+        # Probe GA sources plus any legacy sources actually used by saved routes.
         routes = []
         fallback = None
-        for type in RouteSourceType.list_valid_types():
+        source_types = dict.fromkeys(RouteSourceType.list_valid_types())
+        for route in self.hub_resource["properties"]["routing"]["routes"]:
+            source_types[route["source"].lower()] = None
+        for type in source_types:
             test_all_routes_input = {
                 "routingSource": type,
                 "message": route_message,
                 "twin": None
             }
             result = self.discovery.client.test_all_routes(
-                iot_hub_name=self.hub_resource.name,
-                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                iot_hub_name=self.hub_resource["name"],
+                resource_group_name=self.rg,
                 input=test_all_routes_input
-            ).routes
+            )["routes"]
 
             # Fallback for if no routes pass
-            if len(result) == 1 and result[0].properties.name == "$fallback":
+            if len(result) == 1 and result[0]["properties"]["name"] == "$fallback":
                 fallback = result
             else:
                 routes.extend(result)
@@ -179,16 +168,11 @@ class MessageRoute(IoTHubProvider):
         return {"routes": routes}
 
     def show_fallback(self):
-        return self.hub_resource.properties.routing.fallback_route
+        return self.hub_resource["properties"]["routing"]["fallbackRoute"]
 
     def set_fallback(self, enabled: bool):
-        fallback_route = self.hub_resource.properties.routing.fallback_route
-        fallback_route.is_enabled = enabled
+        fallback_route = self.hub_resource["properties"]["routing"]["fallbackRoute"]
+        fallback_route["isEnabled"] = enabled
 
-        self.discovery.client.begin_create_or_update(
-            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-            resource_name=self.hub_resource.name,
-            iot_hub_description=self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
-        return self.show_fallback()
+        hub_resource = LongRunningOperation(self.cmd.cli_ctx)(self._begin_hub_update())
+        return hub_resource["properties"]["routing"]["fallbackRoute"]

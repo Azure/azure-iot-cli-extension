@@ -339,6 +339,60 @@ def message_endpoint_show(
     return message_endpoint_provider.show(endpoint_name=endpoint_name)
 
 
+def message_endpoint_create_fabric_eventstream(
+    cmd,
+    hub_name: str,
+    endpoint_name: str,
+    endpoint_uri: str,
+    entity_path: str,
+    identity: str,
+    workspace_id: str,
+    eventstream_id: str,
+    source_id: str,
+    resource_group_name: Optional[str] = None,
+):
+    message_endpoint_provider = MessageEndpoint(
+        cmd=cmd, hub_name=hub_name, rg=resource_group_name
+    )
+    return message_endpoint_provider.create(
+        endpoint_name=endpoint_name,
+        endpoint_type=EndpointType.FabricEventStream.value,
+        endpoint_uri=endpoint_uri,
+        entity_path=entity_path,
+        identity=identity,
+        workspace_id=workspace_id,
+        eventstream_id=eventstream_id,
+        source_id=source_id,
+    )
+
+
+def message_endpoint_update_fabric_eventstream(
+    cmd,
+    hub_name: str,
+    endpoint_name: str,
+    endpoint_uri: Optional[str] = None,
+    entity_path: Optional[str] = None,
+    identity: Optional[str] = None,
+    workspace_id: Optional[str] = None,
+    eventstream_id: Optional[str] = None,
+    source_id: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+):
+    message_endpoint_provider = MessageEndpoint(
+        cmd=cmd, hub_name=hub_name, rg=resource_group_name
+    )
+    return message_endpoint_provider.update(
+        endpoint_name=endpoint_name,
+        endpoint_type=EndpointType.FabricEventStream.value,
+        endpoint_uri=endpoint_uri,
+        entity_path=entity_path,
+        identity=identity,
+        workspace_id=workspace_id,
+        eventstream_id=eventstream_id,
+        source_id=source_id,
+    )
+
+
 def message_endpoint_list(
     cmd,
     hub_name: str,

@@ -1,4 +1,4 @@
-# checkov:skip=CKV_GHA_7:workflow_dispatch inputs are typed booleans controlling release flow, not injected into build output
+# checkov:skip=CKV_GHA_7:typed inputs control release flow, not build output
 name: Build and Publish Release
 run-name: Build and publish release${{ github.event.inputs.github_release == 'true' &&  ' - Stage Release' || ''}}
 permissions: {}
@@ -50,6 +50,11 @@ jobs:
     uses: ./.github/workflows/azdev_linter.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  index-compatibility:
+    permissions:
+      contents: read
+    needs: [build]
+    uses: ./.github/workflows/index_compatibility.yml
   int_test:
     permissions:
       contents: read
@@ -60,7 +65,10 @@ jobs:
     with:
       test-services: "auto"
       python-versions: "3.10,3.13"
-      regions: "westus"
+      regions: "australiaeast"
+      arm-endpoint: "public"
+      resource-group: "cli-int-test-rg"
+      subscription-id: "a386d5ea-ea90-441a-8263-d816368c84a1"
     secrets: inherit
   approval:
     needs: [security, build, unit-test, azdev_linter, int_test]

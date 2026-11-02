@@ -14,6 +14,7 @@ from azext_iot.tests.generators import generate_generic_id
     [
         ('{"test_case1": "test_value1"}', False),
         ('{test_case: test_value1}', True),
+        ('[1, 2, 3]', True),
     ],
 )
 def test_parse_manifest_json(json_input: str, expect_error: bool, mocker):
