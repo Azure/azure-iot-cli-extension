@@ -283,7 +283,7 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     jobs = pipeline.plan(list(retry.SERVICES), ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
     assert len(jobs) == 10
     assert {job["service"] for job in jobs} == set(retry.SERVICES)
-    assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 360
+    assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 180
 
 
 @pytest.mark.parametrize("status,count,error,message", [
