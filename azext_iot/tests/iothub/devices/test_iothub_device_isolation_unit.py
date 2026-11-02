@@ -112,6 +112,7 @@ def isolated_backend(mocker):
     marker = SimpleNamespace(kwargs={"count": 1})
     backend.request = SimpleNamespace(
         instance=scenario, _pyfuncitem=SimpleNamespace(get_closest_marker=lambda _name: marker),
+        config=SimpleNamespace(pluginmanager=SimpleNamespace(get_plugin=lambda _name: None)),
     )
     backend.marker = marker
     backend.providers = []
@@ -143,6 +144,25 @@ def isolated_backend(mocker):
 
 def _fixture(backend):
     return infrastructure.fixture_isolated_hub.__wrapped__(backend.request)
+
+
+@pytest.mark.parametrize("auth,grant", [
+    (None, True), ((), True), (("arm:entra",), False),
+    (("arm:entra", "service:entra"), True), (["arm:entra"], True),
+])
+def test_private_role_is_omitted_only_for_explicit_arm_only_selection(isolated_backend, auth, grant):
+    backend = isolated_backend
+    selection = SimpleNamespace(kwargs={"auth": auth}) if auth is not None else None
+    backend.request._pyfuncitem.get_closest_marker = (  # pylint: disable=protected-access
+        lambda name: selection if name == "hub_selection" else backend.marker
+    )
+    fixture = _fixture(backend)
+    next(fixture)
+    assert backend.roles.call_count == int(grant)
+    with pytest.raises(StopIteration):
+        next(fixture)
+    assert backend.active == {"shared"}
+    assert vars(backend.scenario) == backend.original
 
 
 @pytest.mark.parametrize("status", [200, 401, 403, 404, 429, 500])

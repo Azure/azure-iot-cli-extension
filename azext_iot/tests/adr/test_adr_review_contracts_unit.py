@@ -8,6 +8,7 @@
 
 import base64
 import hashlib
+import os
 from pathlib import Path
 from shlex import quote
 
@@ -46,10 +47,20 @@ def test_composite_label_options_parse_through_native_cli(
     assert "deprecated" not in warnings.lower()
 
 
-def test_hash_remains_local_through_native_cli(offline_cli, tmp_path):
+@pytest.mark.parametrize("symlink", [
+    False,
+    pytest.param(True, marks=pytest.mark.skipif(
+        os.name == "nt", reason="Creating Windows symlinks requires additional privileges.",
+    )),
+])
+def test_hash_remains_local_through_native_cli(offline_cli, tmp_path, symlink):
     payload = b"local ADR payload"
     path = tmp_path / "payload with spaces.bin"
     path.write_bytes(payload)
+    if symlink:
+        link = tmp_path / "input link.bin"
+        link.symlink_to(path)
+        path = link
     output = EmbeddedCLI(cli_ctx=offline_cli).invoke(
         f"iot adr ns su software-update calculate-hash --file-path {quote(str(path))}"
     )

@@ -163,12 +163,12 @@ PERMISSIONS = ["registryread", "registrywrite", "serviceconnect", "deviceconnect
     list(items) for size in range(1, 5) for items in combinations(PERMISSIONS, size)
 ])
 def test_policy_create_deduplicates_permissions(preview_mgmt, permissions):
-    cmd, client, hub, _, _ = preview_mgmt
+    cmd, client, hub, _, wait = preview_mgmt
     existing = {"keyName": "existing", "rights": "DeviceConnect"}
-    client.iot_hub_resource.list_keys.return_value = [existing]
-    assert custom.iot_hub_policy_create(cmd, client, "hub", "new", permissions + permissions, "rg") is (
-        client.iot_hub_resource.begin_create_or_update.return_value
-    )
+    readback = [existing, {"keyName": "new", "primaryKey": "generated-primary", "secondaryKey": "generated-secondary"}]
+    client.iot_hub_resource.list_keys.side_effect = [[existing], readback]
+    assert custom.iot_hub_policy_create(cmd, client, "hub", "new", permissions + permissions, "rg") is readback
+    wait.assert_called_once_with(client.iot_hub_resource.begin_create_or_update.return_value)
     policies = hub["properties"]["authorizationPolicies"]
     assert policies[0] == existing
     assert policies[1]["keyName"] == "new"
@@ -194,13 +194,68 @@ def test_policy_conflicts_do_not_write(preview_mgmt, action):
 
 
 def test_policy_delete_is_case_insensitive(preview_mgmt):
-    cmd, client, hub, _, _ = preview_mgmt
+    cmd, client, hub, _, wait = preview_mgmt
     keep = {"keyName": "keep"}
-    client.iot_hub_resource.list_keys.return_value = [keep, {"keyName": "OWNER"}]
-    assert custom.iot_hub_policy_delete(cmd, client, "hub", "owner", "rg") is (
-        client.iot_hub_resource.begin_create_or_update.return_value
-    )
+    readback = [keep]
+    client.iot_hub_resource.list_keys.side_effect = [[keep, {"keyName": "OWNER"}], readback]
+    assert custom.iot_hub_policy_delete(cmd, client, "hub", "owner", "rg") is readback
+    wait.assert_called_once_with(client.iot_hub_resource.begin_create_or_update.return_value)
     assert hub["properties"]["authorizationPolicies"] == [keep]
+
+
+@pytest.mark.parametrize("action", ["create", "delete"])
+@pytest.mark.parametrize("resource_group", [None, "rg"])
+@pytest.mark.parametrize("failure", [None, "write", "wait", "readback"])
+def test_policy_write_reads_authoritative_keys_only_after_success(preview_mgmt, action, resource_group, failure):
+    cmd, client, hub, _, wait = preview_mgmt
+    existing = [{"keyName": "keep", "primaryKey": "kept-primary", "secondaryKey": "kept-secondary"}]
+    policy = {"keyName": "owner", "primaryKey": "generated-primary", "secondaryKey": "generated-secondary"}
+    before = existing if action == "create" else existing + [policy]
+    after = existing + [policy] if action == "create" else existing
+    result_without_keys = {"id": hub["id"], "properties": {"provisioningState": "Succeeded"}}
+    events = []
+    error = CLIError("Explicit policy operation failure")
+    poller = client.iot_hub_resource.begin_create_or_update.return_value
+
+    def list_keys(**kwargs):
+        assert kwargs == {"resource_group_name": "rg", "resource_name": "hub"}
+        stage = "readback" if events else "initial"
+        events.append(stage)
+        if failure == stage:
+            raise error
+        return iter(after if stage == "readback" else before)
+
+    def write(**kwargs):
+        assert kwargs == {
+            "resource_group_name": "rg", "resource_name": "hub",
+            "iot_hub_description": custom._hub_description_for_write(hub),
+            **custom.hub_etag_arguments(hub),
+        }
+        events.append("write")
+        if failure == "write":
+            raise error
+        return poller
+
+    def complete(value):
+        assert value is poller
+        events.append("wait")
+        if failure == "wait":
+            raise error
+        return result_without_keys
+
+    client.iot_hub_resource.list_keys.side_effect = list_keys
+    client.iot_hub_resource.begin_create_or_update.side_effect = write
+    wait.side_effect = complete
+    handler = getattr(custom, f"iot_hub_policy_{action}")
+    args = (["registryread"],) if action == "create" else ()
+    if failure:
+        with pytest.raises(CLIError) as raised:
+            handler(cmd, client, "hub", "owner", *args, resource_group_name=resource_group)
+        assert raised.value is error
+    else:
+        assert list(handler(cmd, client, "hub", "owner", *args, resource_group_name=resource_group)) == after
+    expected = ["initial", "write", "wait", "readback"]
+    assert events == (expected[:expected.index(failure) + 1] if failure else expected)
 
 
 @pytest.mark.parametrize("renew,keys", [("primary", (None, "s")), ("secondary", ("p", None)), ("swap", ("s", "p"))])

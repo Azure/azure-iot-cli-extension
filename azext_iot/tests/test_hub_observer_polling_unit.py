@@ -394,7 +394,7 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
         "state": SimpleNamespace(cli=cli, DATAPLANE=_state_helpers.DATAPLANE),
     }
     exec(compile(ast.fix_missing_locations(ast.Module(body=[definition], type_ignores=[])), str(source), "exec"), namespace)
-    arguments = [[{"name": HUB.rsplit("/", 1)[1], "rg": ownership.GROUP}]] if definition.args.args else []
+    arguments = [{"name": HUB.rsplit("/", 1)[1], "rg": ownership.GROUP}] if definition.args.args else []
     namespace[definition.name](*arguments)
     assert isinstance(cli.get_error(), ResourceNotFoundError)
     assert sum(

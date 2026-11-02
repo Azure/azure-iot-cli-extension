@@ -16,6 +16,7 @@ from azext_iot.tests.iothub import (
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
+from azext_iot.tests.helpers import ScenarioBudget
 
 
 class TestIoTHubDevices(IoTLiveScenarioTest):
@@ -24,10 +25,9 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
 
     @pytest.mark.usefixtures("fixture_isolated_hub")
     @pytest.mark.hub_infrastructure(count=1)
-    @pytest.mark.timeout(
-        900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES), func_only=False
-    )
+    @pytest.mark.timeout(2700, func_only=False)
     def test_iothub_device_identity(self):
+        budget = ScenarioBudget(45 * 60)
         to_remove_device_ids = []
         for auth_phase in DATAPLANE_AUTH_TYPES:
             for device_type in DEVICE_TYPES:
@@ -259,6 +259,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                     ).get_output_in_json(),
                     to_remove_device_ids,
                     id_key="deviceId",
+                    timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
                 )
                 self.cmd(
                     self.set_cmd_auth_type(

@@ -14,6 +14,7 @@ import json
 from shlex import quote
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
+from uuid import UUID
 
 from knack.log import get_logger
 from azure.cli.core._profile import Profile
@@ -39,7 +40,18 @@ PERMISSIONS_API_VERSION = "2022-04-01"
 ROLE_ASSIGNMENTS_WRITE_ACTION = "Microsoft.Authorization/roleAssignments/write"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
-UNLINK_READER_PROPAGATION_DELAY_SECONDS = 30
+UNLINK_CONFIRMATION = (
+    "This removes only the namespace endpoint, not the linked resource. "
+    "Reader assignments requested with --grant-reader are retained even if removal fails."
+)
+UNLINK_WARNING = (
+    "For a Succeeded link, delete the linked resource first. "
+    "Failed links do not require the linked resource to be deleted."
+)
+HUB_UNLINK_WARNING = UNLINK_WARNING + (
+    " Clear Registry Device IoT Hub capability references before removing any Hub endpoint, including Failed links "
+    "(EndpointUsedByNestedDevices). Deleting the IoT Hub does not clear these references."
+)
 NAMESPACE_SYSTEM_IDENTITY_REQUIRED_MESSAGE = (
     "DPS links additionally require the namespace system-assigned identity, "
     "even when outbound uses a user-assigned identity. Enable it with "
@@ -54,6 +66,11 @@ LINK_ROLE_IDS = {
     ADU_ADMINISTRATOR_ROLE: "02ca0879-e8e4-47a5-a61e-5c618b76e64a",
     ADR_ADMINISTRATOR_ROLE: "12675fd7-7f59-493f-9201-f7944860a2f1",
 }
+UNLINK_READ_ROLE_IDS = frozenset({
+    LINK_ROLE_IDS[READER_ROLE],
+    LINK_ROLE_IDS[CONTRIBUTOR_ROLE],
+    "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",  # Owner
+})
 
 
 @dataclass(frozen=True)
@@ -70,23 +87,53 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     "hub": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
         RoleRule("namespace", HUB_DATA_ROLE, "target"),
-        RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
+        RoleRule("dps", HUB_DATA_ROLE, "hubs"),
     ),
     "dps": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
-        RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
-        RoleRule("namespace_system", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
+        RoleRule("dps", HUB_DATA_ROLE, "hubs"),
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
         RoleRule("namespace", ADU_ADMINISTRATOR_ROLE, "target"),
         RoleRule("linked", ADR_CONTRIBUTOR_ROLE, "namespace"),
+        RoleRule("linked", READER_ROLE, "namespace"),
+        RoleRule("namespace", ADR_ADMINISTRATOR_ROLE, "namespace"),
+        RoleRule("namespace", READER_ROLE, "namespace_group"),
+        RoleRule("namespace", READER_ROLE, "target_group"),
     ),
 }
 
 
 def _normalized_id(resource_id: str) -> str:
     return (resource_id or "").rstrip("/").casefold()
+
+
+def _resource_group_scope(resource_id: str) -> str:
+    parts = resource_id.rstrip("/").split("/") if isinstance(resource_id, str) else []
+    if (
+        len(parts) < 5 or parts[0] or parts[1].casefold() != "subscriptions"
+        or not parts[2] or parts[3].casefold() != "resourcegroups" or not parts[4]
+    ):
+        raise InvalidArgumentValueError(
+            f"A resource-group-scoped ARM resource ID is required for link RBAC: '{resource_id}'."
+        )
+    return "/".join(parts[:5])
+
+
+def _assignment_key(assignment: Tuple[str, str, str]) -> Tuple[str, str, str]:
+    principal, role, scope = assignment
+    return _normalized_id(principal), role, _normalized_id(scope)
 
 
 def _assignment_scope_applies(assignment_scope: str, scope: str, *, inherited_at_scope: bool = False) -> bool:
@@ -255,10 +302,15 @@ def resolve_linked_resource_principal(
 def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
-        "namespace_system": "namespace system-assigned MI",
         "linked": f"{link_type.upper()} selected inbound MI",
+        "dps": "DPS selected MI",
     }
-    scopes = {"namespace": "namespace", "target": link_type.upper()}
+    scopes = {
+        "namespace": "namespace", "target": link_type.upper(),
+        "namespace_group": "namespace resource group",
+        "target_group": f"{link_type.upper()} resource group",
+        "hubs": "linked IoT Hubs",
+    }
     return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
 
 
@@ -279,11 +331,13 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
         "namespace": request["namespace_principal_id"],
         "linked": request.get("linked_principal_id"),
         "namespace_system": request.get("namespace_system_principal_id"),
+        "dps": request.get("dps_principal_id"),
     }
     if request["link_type"] == "dps" and not principals["namespace_system"]:
         raise AzureResponseError(
             "DPS link RBAC requires the namespace system-assigned principalId "
-            "for registry-device provisioning. Verify the namespace identity and retry."
+            "to remain enabled. Self-access is granted to the selected outbound identity. "
+            "Verify the namespace identity and retry."
         )
     return principals
 
@@ -291,13 +345,24 @@ def _request_principals(request: dict) -> Dict[str, Optional[str]]:
 def required_assignments(request: dict):
     """Yield (rule, (principal_id, role, scope)) for every assignment a link request needs."""
     principals = _request_principals(request)
-    scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
+    scopes = {
+        "namespace": (request["namespace_scope"],), "target": (request["target_scope"],),
+        "namespace_group": (_resource_group_scope(request["namespace_scope"]),),
+        "target_group": (_resource_group_scope(request["target_scope"]),),
+        "hubs": request.get("hub_scopes", ()),
+    }
+    seen = set()
     for rule in LINK_ROLE_MATRIX[request["link_type"]]:
         principal_id = principals.get(rule.principal)
         # Hub inbound identity is optional. There is no principal to grant
         # in that direction when the endpoint omits it.
         if principal_id:
-            yield rule, (principal_id, rule.role, scopes[rule.scope])
+            for scope in scopes[rule.scope]:
+                assignment = (principal_id, rule.role, scope)
+                key = _assignment_key(assignment)
+                if key not in seen:
+                    seen.add(key)
+                    yield rule, assignment
 
 
 class LinkRbacManager:
@@ -397,15 +462,16 @@ class LinkRbacManager:
         Conditions are not proof of unconditional service access. Missing or
         conditional grants stop recovery; this method never creates assignments.
         """
+        seen = set()
         for request in requests:
-            principals = _request_principals(request)
-            scopes = {"namespace": request["namespace_scope"], "target": request["target_scope"]}
-            for rule in LINK_ROLE_MATRIX[request["link_type"]]:
-                principal = principals[rule.principal]
-                if not principal:
+            for _, assignment in required_assignments(request):
+                key = _assignment_key(assignment)
+                if key in seen:
                     continue
+                seen.add(key)
+                principal, role, scope = assignment
                 guard()
-                exists = self._assignment_exists(principal, rule.role, scopes[rule.scope], strict=True)
+                exists = self._assignment_exists(principal, role, scope, strict=True)
                 guard()
                 if not exists:
                     guidance = (
@@ -416,8 +482,8 @@ class LinkRbacManager:
                         else ""
                     )
                     raise AzureResponseError(
-                        f"Cannot confirm unconditional {rule.role} for principalId={principal} "
-                        f"at scope={scopes[rule.scope]}. Recovery stopped without another namespace mutation. "
+                        f"Cannot confirm unconditional {role} for principalId={principal} "
+                        f"at scope={scope}. Recovery stopped without another namespace mutation. "
                         "Verify the required service-role assignment; no broader roles or caller data access were granted."
                         f"{guidance}"
                     )
@@ -494,7 +560,7 @@ class LinkRbacManager:
         return False
 
     def _wait_for_assignments(
-        self, assignments: Iterable[Tuple[str, str, str]]
+        self, assignments: Iterable[Tuple[str, str, str]], *, strict=False,
     ) -> None:
         """Wait until newly-created assignments are visible to ARM reads."""
         pending = list(dict.fromkeys(assignments))
@@ -507,7 +573,7 @@ class LinkRbacManager:
             still_pending = []
             for principal_id, role, scope in pending:
                 try:
-                    if self._assignment_exists(principal_id, role, scope):
+                    if self._assignment_exists(principal_id, role, scope, strict=strict):
                         continue
                 except AzureResponseError:
                     # Role-assignment reads can be transiently throttled while
@@ -581,6 +647,8 @@ class LinkRbacManager:
         linked_principal_id: Optional[str],
         *,
         namespace_system_principal_id: Optional[str] = None,
+        dps_principal_id: Optional[str] = None,
+        hub_scopes: Tuple[str, ...] = (),
     ) -> None:
         self.ensure_many(
             [
@@ -591,6 +659,8 @@ class LinkRbacManager:
                     "namespace_principal_id": namespace_principal_id,
                     "linked_principal_id": linked_principal_id,
                     "namespace_system_principal_id": namespace_system_principal_id,
+                    "dps_principal_id": dps_principal_id,
+                    "hub_scopes": hub_scopes,
                 }
             ]
         )
@@ -599,6 +669,7 @@ class LinkRbacManager:
         """Authorize a complete atomic link plan before creating any assignment."""
         missing = []
         descriptions = {}
+        seen = set()
         for request in requests:
             link_type = request["link_type"]
             if link_type not in LINK_ROLE_MATRIX:
@@ -606,44 +677,115 @@ class LinkRbacManager:
                     f"Unsupported link type '{link_type}' for RBAC preflight."
                 )
             for rule, assignment in required_assignments(request):
-                if assignment not in missing and not self._assignment_exists(*assignment):
+                key = _assignment_key(assignment)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not self._assignment_exists(*assignment):
                     missing.append(assignment)
                     descriptions[assignment] = _format_role_requirement(link_type, rule)
 
         self._ensure_assignments(missing, descriptions)
 
-    def ensure_unlink_reader(self, namespace_principal_id: str, resource_group_scope: str) -> None:
-        """Allow the outbound MI to confirm deletion at the surviving parent scope."""
+    def check_unlink_read_access(
+        self, namespace_principal_id: str, resource_group_scope: str, *, grant_reader: bool = False,
+    ) -> None:
+        """Look for read-grant evidence; optionally establish Reader at the surviving resource group."""
+        from azure.cli.core.commands.client_factory import get_mgmt_service_client
+        from azure.core.exceptions import HttpResponseError
+        from azure.mgmt.resource import ResourceManagementClient
+        from azext_iot._factory import _get_canary_credential_scopes
+        from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
+        if not isinstance(namespace_principal_id, str) or not namespace_principal_id.strip():
+            raise AzureResponseError("The namespace outbound identity did not include a usable principalId.")
+        if grant_reader:
+            try:
+                UUID(namespace_principal_id)
+            except ValueError as error:
+                raise AzureResponseError(
+                    "The namespace outbound identity principalId must be a GUID before Reader can be granted."
+                ) from error
+        subscription = _scope_subscription(resource_group_scope)
+        scope = resource_group_scope
         try:
-            if self._assignment_exists(namespace_principal_id, READER_ROLE, resource_group_scope, strict=True):
+            with get_mgmt_service_client(
+                self._cli_ctx, ResourceManagementClient, subscription_id=subscription,
+                base_url=get_adr_arm_endpoint(), credential_scopes=_get_canary_credential_scopes(self._cli_ctx),
+            ) as client:
+                group = client.resource_groups.get(resource_group_scope.rsplit("/", 1)[-1], retry_total=0)
+            group_id = getattr(group, "id", None)
+            if not isinstance(group_id, str) or _normalized_id(group_id) != _normalized_id(resource_group_scope):
+                raise AzureResponseError("The resource-group lookup did not return the expected resource group.")
+        except HttpResponseError as error:
+            if error.status_code != 404 or getattr(error.error, "code", None) != "ResourceGroupNotFound":
+                raise
+            scope = f"/subscriptions/{subscription}"
+            logger.info("Linked resource group is deleted; checking read-grant evidence at %s.", scope)
+
+        assignments = self._invoke_json(
+            "role assignment list "
+            f"--assignee-object-id {quote(namespace_principal_id)} --scope {quote(scope)} "
+            "--include-inherited --fill-principal-name false",
+            subscription=subscription,
+        )
+        if not isinstance(assignments, list) or any(not isinstance(item, dict) for item in assignments):
+            raise AzureResponseError("Malformed role-assignment response during unlink permission check.")
+        for assignment in assignments:
+            if (
+                isinstance(assignment.get("principalId"), str)
+                and _normalized_id(assignment["principalId"]) == _normalized_id(namespace_principal_id)
+                and isinstance(assignment.get("roleDefinitionId"), str)
+                and _normalized_id(assignment["roleDefinitionId"]).rsplit("/", 1)[-1] in UNLINK_READ_ROLE_IDS
+                and isinstance(assignment.get("scope"), str)
+                and _assignment_scope_applies(assignment["scope"], scope, inherited_at_scope=True)
+                and not assignment.get("condition")
+                and not assignment.get("conditionVersion")
+            ):
+                logger.info(
+                    "Observed a read-capable role assignment for namespace outbound principalId=%s at scope=%s. "
+                    "This is not an effective-access guarantee; ADR decides whether removal is allowed.",
+                    namespace_principal_id, scope,
+                )
                 return
-            assignment = (namespace_principal_id, READER_ROLE, resource_group_scope)
+        assignment = (namespace_principal_id, READER_ROLE, scope)
+        if grant_reader:
+            if scope != resource_group_scope:
+                raise AzureResponseError(
+                    "The linked resource group is deleted and no recognized subscription read grant was found. "
+                    "--grant-reader never creates subscription-scoped assignments, which cover all resources "
+                    "in the subscription. Endpoint removal was not submitted. "
+                    "An authorized principal can review and run this command manually, allow propagation, and retry:\n"
+                    f"{self._manual_commands([assignment])}"
+                )
+            logger.warning(
+                "--grant-reader will request Reader for namespace outbound principalId=%s at scope=%s. "
+                "This grants read access to all resources in that resource group. "
+                "If created, the assignment is retained after removal, including if removal fails.",
+                namespace_principal_id, scope,
+            )
             self._ensure_assignments(
                 [assignment],
                 {assignment: "namespace outbound MI -> Reader on the linked resource's resource group"},
+                strict=True,
             )
             logger.warning(
-                "Waiting %s seconds for the new Reader grant to propagate before submitting unlink.",
-                UNLINK_READER_PROPAGATION_DELAY_SECONDS,
+                "Reader setup completed. New assignments can take several minutes to take effect; "
+                "if ADR rejects removal, wait for propagation and retry."
             )
-            self._sleep(UNLINK_READER_PROPAGATION_DELAY_SECONDS)
-        except AzureResponseError as error:
-            if "ResourceGroupNotFound" in str(error):
-                message = (
-                    f"{error}\nUnlink Reader setup requires resource group "
-                    f"'{resource_group_scope}' to exist. If that group was "
-                    "deleted, recreate it before retrying. No namespace PUT "
-                    "or broader subscription-level grant was submitted."
-                )
-            else:
-                message = (
-                    f"{error}\nUnlink Reader setup did not complete. No "
-                    "namespace PUT or broader subscription-level grant was "
-                    "submitted."
-                )
-            raise AzureResponseError(message) from error
+            return
+        logger.warning(
+            "Cannot confirm read access for namespace outbound principalId=%s at scope=%s. "
+            "Continuing without changing role assignments; ADR may reject removal. "
+            "If read access is missing, an authorized principal can grant Reader with:\n%s\n"
+            "Reader grants read access to all resources within this scope. "
+            "New assignments can take several minutes to take effect. "
+            "Use --no-rbac-check to skip only this advisory check, not ADR authorization.",
+            namespace_principal_id, scope,
+            self._manual_commands([assignment]),
+        )
 
-    def _ensure_assignments(self, missing, descriptions) -> None:
+    def _ensure_assignments(self, missing, descriptions, *, strict=False) -> None:
         if not missing:
             return
 
@@ -659,12 +801,9 @@ class LinkRbacManager:
         if unauthorized_scopes:
             scopes_text = ", ".join(unauthorized_scopes)
             raise AzureResponseError(
-                "Missing link role assignments, and the signed-in principal is "
-                "not assigned a role that can create role assignments (for "
-                "example Owner, User Access Administrator, or Role Based Access "
-                "Control Administrator) at every required scope "
-                f"({scopes_text}). No link mutation was submitted. "
-                "Run these exact remediation commands as an authorized principal:\n"
+                "Missing link role assignments. The signed-in identity cannot create role assignments "
+                f"at these scopes: {scopes_text}. No link mutation was submitted. "
+                "Ask an authorized identity to run:\n"
                 f"{commands}"
             )
 
@@ -690,7 +829,7 @@ class LinkRbacManager:
                 # a duplicate or blocking an otherwise idempotent link retry.
                 try:
                     assignment_now_exists = self._assignment_exists(
-                        principal_id, role, scope
+                        principal_id, role, scope, strict=strict,
                     )
                 except AzureResponseError:
                     assignment_now_exists = False
@@ -711,9 +850,12 @@ class LinkRbacManager:
                 ) from error
         self.created.extend(created)
         if created:
-            logger.warning(
-                "Completed these role-assignment creation requests "
-                "(service authorization may still need time to propagate):\n%s",
+            logger.info(
+                "Created %d role assignment(s); service authorization may still need time to propagate.",
+                len(created),
+            )
+            logger.debug(
+                "Created role assignments:\n%s",
                 self._assignment_summary(created, descriptions),
             )
-        self._wait_for_assignments(created)
+        self._wait_for_assignments(created, strict=strict)

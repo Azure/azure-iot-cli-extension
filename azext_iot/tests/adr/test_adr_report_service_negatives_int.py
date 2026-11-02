@@ -20,6 +20,7 @@ from azext_iot.tests.adr.conftest import (
 class TestADRReportServiceNegatives(
     ADRFullInfraHelper, ADRLiveScenarioTest
 ):
+    @pytest.mark.timeout(600, func_only=False)
     def test_report_service_negatives(self):
         namespace_name = generate_adr_namespace_name()
         rg = TEST_RG

@@ -10,6 +10,7 @@ import responses
 import pytest
 import json
 import os
+import inspect
 from functools import partial
 from pathlib import Path
 from urllib3.util.retry import Retry
@@ -89,6 +90,42 @@ mock_symmetric_key_attestation = {
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_protocol(item):
+    marker = item.get_closest_marker("timeout")
+    timeout = (marker.args[0] if marker.args else marker.kwargs.get("timeout", 0)) if marker else 0
+    if item.path.name.endswith("_int.py") and timeout > 0 and not marker.kwargs.get("func_only", False):
+        from azext_iot.tests.helpers import ScenarioBudget
+
+        with ScenarioBudget.track(timeout):
+            yield
+    else:
+        yield
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pycollect_makeitem(collector, name, obj):
+    from azure.cli.testsdk import LiveScenarioTest
+
+    # Pytest instantiates unittest classes during collection, before skip handling.
+    # Live scenario constructors can provision resources even in a unit-only run.
+    patterns = collector.config.getini("python_files")
+    unit_only = (
+        collector.config.getoption("keyword").strip() == "_unit.py"
+        or (patterns and all(pattern.endswith("_unit.py") for pattern in patterns))
+        or (collector.config.args and all(
+            str(arg).split("::", maxsplit=1)[0].endswith("_unit.py") for arg in collector.config.args
+        ))
+    )
+    if (
+        unit_only
+        and inspect.isclass(obj)
+        and issubclass(obj, LiveScenarioTest)
+    ):
+        return []
+    return None
 
 
 @pytest.fixture(autouse=True)

@@ -20,6 +20,7 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest, MAX_RBAC_ASSIGNMENT_TRIE
 from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON
 from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.tests.iothub.conftest import _delete_fixture_resource
+from azext_iot.tests.helpers import role_assignment_create_command, role_assignment_create_scope
 from azext_iot.tests.settings import UserTypes, HUB_TEST_LOCATION
 from azext_iot.common.utility import generate_storage_account_sas_token
 
@@ -112,7 +113,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
     def _storage_role_assignments(self):
         assignments = self.cmd(
             f'role assignment list --scope "{self.live_storage_id}" --role "{STORAGE_ROLE}" '
-            "--fill-role-definition-name false"
+            "--fill-role-definition-name false --fill-principal-name false"
         ).get_output_in_json()
         if not isinstance(assignments, list) or any(
             not isinstance(assignment, dict) or not isinstance(assignment.get("principalId"), str)
@@ -132,11 +133,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         if assigned():
             self._storage_event("role.reused", principal_id=assignee)
             return
-        if self.user["type"] == UserTypes.user.value:
-            assignee_args = f'--assignee "{assignee}"'
-        elif self.user["type"] == UserTypes.servicePrincipal.value:
-            assignee_args = f'--assignee-object-id "{assignee}" --assignee-principal-type ServicePrincipal'
-        else:
+        if self.user["type"] not in {UserTypes.user.value, UserTypes.servicePrincipal.value}:
             raise CLIError(f"User type {self.user['type']} not supported. Can't run test(s).")
 
         assignment_name = str(uuid4())
@@ -146,10 +143,12 @@ class TestIoTStorage(IoTLiveScenarioTest):
             _delete_fixture_resource, f'role assignment delete --ids "{assignment_id}"', assignment_id,
         )
         self._storage_event("role.create.start", principal_id=assignee, assignment_id=assignment_id)
-        self.cmd(
-            f'role assignment create {assignee_args} --role "{STORAGE_ROLE}" --scope "{self.live_storage_id}" '
-            f"--name {assignment_name}"
+        command = role_assignment_create_command(
+            STORAGE_ROLE, self.live_storage_id,
+            assignee_object_id=assignee, assignee_principal_type="ServicePrincipal",
         )
+        with role_assignment_create_scope(assignee):
+            self.cmd(f"{command} --name {assignment_name}")
         self._storage_event("role.create.complete", principal_id=assignee, assignment_id=assignment_id)
         for attempt in range(1, MAX_RBAC_ASSIGNMENT_TRIES + 1):
             visible = assigned()

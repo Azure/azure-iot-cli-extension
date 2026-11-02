@@ -5,8 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Optional
-from azext_iot.digitaltwins.commands_twins import delete_all_twin
-from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.digitaltwins.common import (
     ADX_DEFAULT_TABLE,
@@ -75,11 +73,6 @@ def delete_instance(cmd, name: str, resource_group_name: Optional[str] = None):
 def wait_instance(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.find_instance(name=name, resource_group_name=resource_group_name, wait=True)
-
-
-def reset_instance(cmd, name: str, resource_group_name: Optional[str] = None):
-    delete_all_models(cmd, name, resource_group_name)
-    delete_all_twin(cmd, name, resource_group_name)
 
 
 def list_endpoints(cmd, name: str, resource_group_name: Optional[str] = None):

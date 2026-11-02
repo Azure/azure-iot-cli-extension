@@ -16,7 +16,7 @@ Covers the ``iot adr ns job run`` surface:
 
 Scheduling creates a run resource independently of successful execution.
 This fixture deliberately has no linked Software Update endpoint, so the
-immediate run must fail with ``AduEndpointNotLinked``. The smoke test covers:
+immediate run must fail with ``SuEndpointNotLinked``. The smoke test covers:
 
 * Run resource creation, explicit/custom waits, and failed-execution reporting.
 * Run show, list, summary, results, and deletion without a deployment fixture.
@@ -83,6 +83,7 @@ def _delete_test_run(scenario, scope):
 @pytest.mark.usefixtures("set_cwd")
 class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_job_run_surface_smoke(self):
         _log(LogKind.TEST, "test_adr_job_run_surface_smoke")
         rg = TEST_RG
@@ -157,7 +158,7 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert failed_run["properties"]["provisioningState"] == "Succeeded"
                 assert failed_run["properties"]["status"] == "Failed"
-                assert failed_run["properties"]["error"]["code"] == "AduEndpointNotLinked"
+                assert failed_run["properties"]["error"]["code"] == "SuEndpointNotLinked"
                 with pytest.raises(AzureResponseError, match="terminal status 'Failed'"):
                     self.cmd(wait_command)
 
@@ -181,7 +182,7 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"-n {explicit_run} --job-name {job_name} --ns {namespace_name} -g {rg}",
                     ("Failed",),
                 )
-                assert failed_explicit["properties"]["error"]["code"] == "AduEndpointNotLinked"
+                assert failed_explicit["properties"]["error"]["code"] == "SuEndpointNotLinked"
 
                 summary = self.cmd(
                     f"iot adr ns job run summary -n {explicit_run} --job-name {job_name} "

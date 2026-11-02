@@ -39,7 +39,7 @@ def test_profile_uses_queued_utc_day_and_pins_source(setup_health, tmp_path):
     health.plan(tmp_path / "output", tmp_path / "history")
     value = json.loads((tmp_path / "output/plan.json").read_text())
     assert value == [{"service": "DPS", "python": "3.13", "region": "eastus",
-                      "endpoint": "https://management.azure.com", "minutes": 100}]
+                      "endpoint": "https://management.azure.com", "minutes": 90}]
 
 
 def test_canary_profile_pins_endpoint_in_plan_and_job_matrix(setup_health, tmp_path, monkeypatch, capsys):

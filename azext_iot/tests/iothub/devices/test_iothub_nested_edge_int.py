@@ -9,6 +9,7 @@ import pytest
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
+from azext_iot.tests.helpers import ScenarioBudget
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
@@ -18,8 +19,9 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubNestedEdge, self).__init__(test_case)
 
-    @pytest.mark.timeout(900 + 4 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
+    @pytest.mark.timeout(2700, func_only=False)
     def test_iothub_nested_edge(self):
+        budget = ScenarioBudget(45 * 60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 3
             device_ids = self.generate_device_names(device_count)
@@ -179,6 +181,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                     )
                 ).get_output_in_json(),
                 [device_ids[1]],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             # List child devices of edge device
@@ -210,6 +213,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                     )
                 ).get_output_in_json(),
                 [edge_device_ids[0], device_ids[0], device_ids[2]],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             # Remove all child devices from edge device
@@ -231,6 +235,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                     )
                 ).get_output_in_json(),
                 [],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
             # Error - remove all child devices of edge device which does not have any child devices
@@ -302,6 +307,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                     )
                 ).get_output_in_json(),
                 [],
+                timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
             )
 
     def test_iothub_device_scope_on_create(self):

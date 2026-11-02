@@ -37,8 +37,13 @@ def wire(tmp_path, monkeypatch, mocker):
         ("azext_iot_dps_test_phase", "regular"),
     ):
         monkeypatch.setenv(key, value)
-    monkeypatch.setattr(registry, "RESOLVE_TIMEOUT", 0)
-    monkeypatch.setattr(registry, "DELETE_TIMEOUT", 0)
+    original_wait = registry.wait_for_condition
+
+    def wait(*args, **kwargs):
+        kwargs.update(timeout=None, max_attempts=1)
+        return original_wait(*args, **kwargs)
+
+    monkeypatch.setattr(registry, "wait_for_condition", wait)
     mocker.patch.object(csr.fixtures, "ENTITY_RG", "rg")
     resources = {}
     for name, kind in (("ns", "csrns"), ("dps", "csrdps"), ("hub", "csrhub")):

@@ -78,6 +78,7 @@ def storage_scenario(mocker):
         if args[:3] == ["role", "assignment", "list"]:
             state.role_reads += 1
             assert args[args.index("--scope") + 1] == scenario.live_storage_id
+            assert args[args.index("--fill-principal-name") + 1] == "false"
             assert args[args.index("--role") + 1] == subject.STORAGE_ROLE
             assert args[args.index("--fill-role-definition-name") + 1] == "false"
             result = [] if state.role_reads <= state.invisible_reads else deepcopy(state.roles)
@@ -226,13 +227,14 @@ def test_role_cleanup_failure_still_removes_owned_attachment(storage_scenario, k
     assert state.borrowed_id in state.identity["userAssignedIdentities"]
 
 
-@pytest.mark.parametrize("user_type,assignee_flag", [("user", "--assignee"), ("servicePrincipal", "--assignee-object-id")])
+@pytest.mark.parametrize("user_type", ["user", "servicePrincipal"])
 @pytest.mark.parametrize("visible", [False, True])
 def test_role_visibility_is_bounded_without_a_blind_settle(
-    mocker, storage_scenario, user_type, assignee_flag, visible
+    mocker, storage_scenario, user_type, visible
 ):
     scenario, state = storage_scenario
     scenario.user["type"] = user_type
+    create_scope = mocker.patch.object(subject, "role_assignment_create_scope")
     state.invisible_reads = 3 if visible else 100
     mocker.patch.object(subject, "MAX_RBAC_ASSIGNMENT_TRIES", 3)
     if visible:
@@ -249,8 +251,14 @@ def test_role_visibility_is_bounded_without_a_blind_settle(
     assert state.events == ["role.create", "role.delete"]
     assert not state.roles
     create = next(call.args[0] for call in scenario.cmd.call_args_list if call.args[0].startswith("role assignment create"))
-    assert assignee_flag in split(create)
+    args = split(create)
+    assert "--assignee" not in args
+    assert args[args.index("--assignee-object-id") + 1] == "principal"
+    assert args[args.index("--assignee-principal-type") + 1] == "ServicePrincipal"
     assert "--name 11111111-2222-3333-4444-555555555555" in create
+    create_scope.assert_called_once_with("principal")
+    create_scope.return_value.__enter__.assert_called_once_with()
+    create_scope.return_value.__exit__.assert_called_once_with(None, None, None)
 
 
 @pytest.mark.parametrize("response", [None, {}, (), [None], [{}], [{"principalId": 1}], [{"principalId": ""}]])

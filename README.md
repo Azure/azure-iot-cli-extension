@@ -11,7 +11,9 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 - 🆕 **`1.0.0b2` Preview** fixes ADR certificate policy validity (1 through 90 days) and preserves the original service failure when namespace-link recovery stops. See [HISTORY.rst](HISTORY.rst) for details.
 
-- 🆕 **`1.0.0b1` Preview** provides 112 `az iot adr` commands and adds the Hub/DPS SDK and command upgrades: modeless management, Fabric routing, certificate-reference enrollment, and REST device registration with certificate issuance and operation-status lookup. Hub management uses `2026-10-01-preview`, DPS management uses `2026-06-01-preview`, DPS service/device REST uses `2026-11-02-preview`, and Hub service/device REST uses `2026-11-01-preview`. **Preview APIs support the Azure public cloud only; Hub, DPS, and ADR management requests use public ARM by default. Set `AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` to use the Central US EUAP (canary) ARM endpoint.** ADR provides Registry Device CRUD/auth/attributes/capabilities, certificate authorities and policies, groups, jobs, reports, Software Updates, and canonical namespace links (`az iot adr ns link hub|dps|su`). Link add/update validate the target and create missing service role assignments when you can create role assignments. To unlink, delete the linked resource first, then run `link hub|dps|su remove`; it removes only the namespace endpoint and waits for completion by default. Use `--no-wait` to return after submission. AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
+- 🆕 **`1.0.0b1` Preview** provides 112 `az iot adr` commands and adds the Hub/DPS SDK and command upgrades: modeless management, Fabric routing, certificate-reference enrollment, and REST device registration with certificate issuance and operation-status lookup. Hub management uses `2026-10-01-preview`, DPS management uses `2026-06-01-preview`, DPS service/device REST uses `2026-11-02-preview`, and Hub service/device REST uses `2026-11-01-preview`. **Preview APIs support the Azure public cloud only; Hub, DPS, and ADR management requests use public ARM by default. Set `AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` to use the Central US EUAP (canary) ARM endpoint.** ADR provides Registry Device CRUD/auth/attributes/capabilities, certificate authorities and policies, groups, jobs, reports, Software Updates, and canonical namespace links (`az iot adr ns link hub|dps|su`). Link add/update validate the target and create missing service role assignments when you can create role assignments. To unlink, run `link hub|dps|su remove`; delete the linked resource first only for a `Succeeded` link, not a `Failed` link. Hub endpoints in any state also require clearing Registry Device IoT Hub capability references first, for example by deleting the referencing Registry Devices with `az iot adr ns device delete`; deleting the Hub does not clear these references. Remove deletes only the namespace endpoint and waits for completion by default. Use `--no-wait` to return after submission. AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
+
+- **ADR unlink permission checks:** Checks are advisory by default. Use `--no-rbac-check` to omit the check or `--grant-reader` to request missing resource-group Reader access. See [ADR link troubleshooting](#adr-link-troubleshooting) for prerequisites, side effects, and recovery guidance.
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
 
@@ -39,6 +41,47 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 ## Commands
 
 Please refer to the official `az iot` reference on [Microsoft Docs](https://learn.microsoft.com/en-us/cli/azure/ext/azure-iot/iot) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
+
+## ADR link troubleshooting
+
+**Removal prerequisites.** `az iot adr ns link <kind> remove` removes only the
+namespace endpoint. Delete the linked resource first for a `Succeeded` link;
+`Failed` links do not require target deletion. Before removing any Hub endpoint,
+clear Registry Device IoT Hub capability references (`EndpointUsedByNestedDevices`).
+Deleting the Hub does not clear them. Delete referencing Registry Devices with
+`az iot adr ns device delete` only if you intend to delete those devices.
+
+**Permission checks.** For `Succeeded` links, ADR verifies target deletion using
+the namespace outbound identity. It needs read access at a surviving scope: the
+target resource group, or the subscription if the group was deleted.
+Target-scoped roles granted by `link add` do not provide that parent-scope access.
+The CLI recognizes unconditional Reader, Contributor and Owner assignments,
+including inherited grants. Custom roles, conditions, group membership and deny
+assignments are not fully evaluated; recognized grants do not guarantee effective
+access. `LinkedResourceDeleted` and `Failed` endpoints skip the check; other
+states warn and continue. Missing or unavailable permission evidence is advisory:
+no roles change by default, and ADR remains authoritative. `--no-rbac-check`
+skips only this advisory check; `--yes` skips only confirmation.
+
+**Reader grants.** When no recognized read grant is found, the warning includes
+an exact manual Reader assignment command. Reader covers every resource at that
+scope; subscription grants are broader than resource-group grants. Alternatively,
+`--grant-reader` requests missing Reader access at the target resource group for
+`Succeeded` links. It requires role-assignment permission, never grants at
+subscription scope, and cannot be combined with `--no-rbac-check`. If the group
+was deleted and no recognized subscription grant exists, removal stops with
+manual remediation. Setup failures stop removal. Requested assignments are
+retained after success or failure, including HTTP 412. New grants can take
+several minutes to take effect; if ADR rejects removal, wait for propagation
+before retrying.
+
+**Completion and concurrent updates.** Removal waits up to 600 seconds and
+reports asynchronous service errors. `--no-wait` returns after submission but
+still waits for requested Reader setup and assignment visibility. After a timeout
+or `--no-wait`, inspect `az iot adr ns show` before retrying. Missing, weak or
+malformed ETags stop removal before permission checks or writes. Concurrent
+namespace changes cause HTTP 412 rather than being overwritten; inspect the
+latest namespace state before rerunning removal.
 
 ## Installation
 
