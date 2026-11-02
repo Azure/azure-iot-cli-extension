@@ -51,7 +51,7 @@ def load_deviceprovisioningservice_help():
 
     JSON output preserves issuedCertificateChain and connectionProfile when DPS
     returns them, plus registryDeviceExternalId for Registry Device correlation.
-    The 2026-11-02-preview RegisterDeviceAndIssueCertificate contract describes issuedCertificateChain
+    The 2026-11-01 RegisterDeviceAndIssueCertificate contract describes issuedCertificateChain
     only as an array of bytes and does not define its wire encoding or certificate
     order. Consequently, this command preserves that field in JSON output but does
     not offer a certificate-file output option; writing a guessed chain could

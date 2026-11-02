@@ -675,6 +675,32 @@ def test_link_delete_is_registered(command_table, kind):
     assert "--grant-reader are retained even if removal fails" in confirmation
 
 
+@pytest.mark.parametrize("prefix", [
+    "iot hub message-endpoint",
+    "iot hub message-route",
+    "iot hub distributed-tracing",
+])
+def test_ga_hub_command_groups_are_not_preview(command_table, prefix):
+    commands = {name: command for name, command in command_table.items() if name.startswith(prefix + " ")}
+    assert commands
+    assert not {name for name, command in commands.items() if command.command_kwargs.get("is_preview")}
+
+
+@pytest.mark.parametrize("command_name,argument_name", [
+    ("iot hub connection-string show", "hostname_type"),
+    ("iot hub device-identity connection-string show", "hostname_type"),
+    ("iot hub module-identity connection-string show", "hostname_type"),
+    ("iot hub generate-sas-token", "hostname_type"),
+    ("iot device send-d2c-message", "data_file_path"),
+    ("iot device c2d-message send", "data_file_path"),
+])
+def test_ga_hub_arguments_are_not_preview(loader, command_table, command_name, argument_name):
+    loader.skip_applicability = True
+    loader.load_arguments(command_name)
+    AzCommandsLoader.load_arguments(loader, command_name)
+    assert not command_table[command_name].arguments[argument_name].type.settings.get("is_preview")
+
+
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 @pytest.mark.parametrize("option", [None, "--no-rbac-check", "--grant-reader"])
 def test_link_remove_permission_flags_parser(management_command_parser, kind, option):

@@ -349,7 +349,6 @@ def load_arguments(self, _):
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
             default=HostnameType.AUTO.value,
-            is_preview=True,
             help="Type of hostname to use in the connection string. "
             "'auto' (default) uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
             "'classic' always uses the default hostname. "
@@ -367,7 +366,6 @@ def load_arguments(self, _):
                 options_list=["--hostname-type", "--ht"],
                 arg_type=get_enum_type(HostnameType),
                 default=HostnameType.AUTO.value,
-                is_preview=True,
                 help="Type of hostname to use in the connection string. "
                 "'auto' (default) uses the TLS 1.3 device hostname on GWv2 hubs, classic otherwise. "
                 "'classic' always uses the default hostname. "
@@ -381,7 +379,6 @@ def load_arguments(self, _):
             options_list=["--hostname-type", "--ht"],
             arg_type=get_enum_type(HostnameType),
             default=HostnameType.AUTO.value,
-            is_preview=True,
             help="Type of hostname to use as the SAS token audience. "
             "'auto' (default) uses the device hostname for device/module-scoped tokens "
             "and the service hostname for hub-scoped tokens. "
@@ -748,7 +745,6 @@ def load_arguments(self, _):
         context.argument(
             "data_file_path",
             options_list=["--data-file-path", "--dfp"],
-            is_preview=True,
             help="""Provide path to file for message body payload. Please note when the payload needs
             to be sent in binary format, set the content type to application/octet-stream."""
         )

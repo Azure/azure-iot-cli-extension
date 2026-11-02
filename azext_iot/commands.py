@@ -148,7 +148,7 @@ def load_command_table(self, _):
         )
 
     with self.command_group(
-        "iot hub distributed-tracing", command_type=iothub_ops, is_preview=True
+        "iot hub distributed-tracing", command_type=iothub_ops
     ) as cmd_group:
         cmd_group.show_command("show", "iot_hub_distributed_tracing_show")
         cmd_group.command("update", "iot_hub_distributed_tracing_update")

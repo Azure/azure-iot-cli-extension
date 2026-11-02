@@ -133,8 +133,6 @@ Commands:
     delete          : Delete an existing Digital Twins instance.
     list            : List the collection of Digital Twins instances by subscription or resource
                       group.
-    reset [Preview] : Reset an existing Digital Twins instance by deleting associated
-                      assets. Currently only supports deleting models and twins.
     show            : Show an existing Digital Twins instance.
     wait            : Wait until an operation on an Digital Twins instance is complete.
 ```
@@ -249,7 +247,7 @@ Subgroups:
     devicestream                        : Manage device streams of an IoT hub.
     digital-twin                        : Manipulate and interact with the digital twin of an IoT
                                           Hub device.
-    distributed-tracing       [Preview] : Manage distributed settings per-device.
+    distributed-tracing                 : Manage distributed settings per-device.
     identity                            : Manage identities of an Azure IoT hub.
     job                                 : Manage IoT Hub jobs (v2).
     message-enrichment                  : Manage message enrichments for endpoints of an IoT Hub.
