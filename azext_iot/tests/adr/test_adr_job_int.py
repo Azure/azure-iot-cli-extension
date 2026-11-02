@@ -59,6 +59,7 @@ def _future_scheduled_time():
 class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     """End-to-end Job CRUD + schedule + delete."""
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_job_lifecycle(self):
         _log(LogKind.TEST, "test_adr_job_lifecycle")
         rg = TEST_RG
@@ -225,6 +226,7 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "job deleted")
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_onboarding_update_job_lifecycle(self):
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
@@ -296,6 +298,7 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
     provider-side ArgumentUsageError messages too.
     """
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_job_validation_negatives(self):
         _log(LogKind.TEST, "test_adr_job_validation_negatives")
         rg = TEST_RG

@@ -563,7 +563,7 @@ def load_adr_arguments(self, _):
                 help="Resource ID of a user-assigned identity attached to the linked IoT Hub.",
             )
 
-    with self.argument_context("iot adr ns link hub add") as context:
+    with self.argument_context("iot adr ns link hub") as context:
         context.argument(
             "availability",
             arg_group="Provisioning",
@@ -578,6 +578,7 @@ def load_adr_arguments(self, _):
             type=int,
             help="Relative allocation weight used when distributing devices across endpoints.",
         )
+    with self.argument_context("iot adr ns link hub add") as context:
         context.argument(
             "hub_resource_id",
             options_list=["--hub-resource-id", "--hub-id"],
@@ -962,6 +963,20 @@ def load_adr_arguments(self, _):
         )
 
     for kind in ("hub", "dps", "su"):
+        with self.argument_context(f"iot adr ns link {kind} remove") as context:
+            context.argument(
+                "no_rbac_check", options_list=["--no-rbac-check"], action="store_true",
+                help="Skip the advisory outbound-identity read-permission check. "
+                     "Does not bypass confirmation, ETag validation or ADR service validation. "
+                     "Cannot be combined with --grant-reader.",
+            )
+            context.argument(
+                "grant_reader", options_list=["--grant-reader"], action="store_true",
+                help="For Succeeded links, assign missing Reader access to the namespace outbound identity on the "
+                     "linked resource's resource group. Requires permission to assign roles; never grants at subscription "
+                     "scope. Setup failures stop removal. Assignments are retained even if removal fails and can take "
+                     "several minutes to take effect. Cannot be combined with --no-rbac-check.",
+            )
         for action in ("add", "update"):
             with self.argument_context(f"iot adr ns link {kind} {action}") as context:
                 context.argument(
@@ -977,8 +992,26 @@ def load_adr_arguments(self, _):
                     help="Return after submission without observing endpoint readiness or recovering later failures.",
                 )
 
+    with self.argument_context("iot adr ns link update") as context:
+        context.argument("namespace_name", options_list=["--namespace", "--ns"], help="Namespace containing the links.")
+        context.argument(
+            "dps_endpoint_name", options_list=["--dps-endpoint-name", "--den"],
+            help="Failed DPS endpoint to retry with its required Failed Hubs.",
+        )
+        context.argument(
+            "hub_endpoint_names", options_list=["--hub-endpoint-name", "--hen"], nargs="+",
+            help="Names of Failed Hub endpoints to include. Unselected endpoints are not resubmitted.",
+        )
+        context.argument("timeout", options_list=["--timeout"], type=int, help="Positive wait budget in seconds.")
+        context.argument("interval", options_list=["--interval"], type=int, help="Positive polling interval in seconds.")
+
     # Combined DPS-first link add
     with self.argument_context("iot adr ns link add") as context:
+        context.argument(
+            "hub_endpoints", options_list=["--hub-endpoints"], arg_group="Hub",
+            help="JSON object or file of additional Hub endpoints, keyed by endpoint name. Each value contains "
+                 "resourceId and optional inboundCallerIdentity and provisioning settings.",
+        )
         context.argument(
             "timeout", options_list=["--timeout"], type=int, arg_group="Wait Condition",
             help="Positive shared mutation/recovery budget in seconds for DPS and Hub "
@@ -990,7 +1023,7 @@ def load_adr_arguments(self, _):
         )
         context.argument(
             "no_wait",
-            help="Wait for DPS linking to succeed, then return without waiting for the final Hub operation.",
+            help="For a batch plan, return after submission. Otherwise wait for DPS, then submit the Hub without waiting.",
         )
         context.argument(
             "namespace_name",

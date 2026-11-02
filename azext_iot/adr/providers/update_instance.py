@@ -67,21 +67,12 @@ class UpdateInstanceProvider(ADRProvider):
         mi_user_assigned: Optional[List[str]] = None,
         **kwargs,
     ):
-        availability = self.client.update_instances.check_name_availability(
-            {"name": update_instance_name, "type": SU_ENDPOINT_TYPE}
-        )
         current = None
-        if (
-            isinstance(availability, dict)
-            and availability.get("nameAvailable") is False
-        ):
-            try:
-                current = self.show(
-                    update_instance_name, resource_group_name
-                )
-            except HttpResponseError as error:
-                if error.status_code != 404:
-                    raise
+        try:
+            current = self.show(update_instance_name, resource_group_name)
+        except HttpResponseError as error:
+            if error.status_code != 404:
+                raise
 
         if location is None:
             location = (current or {}).get("location")

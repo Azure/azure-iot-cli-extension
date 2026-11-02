@@ -26,32 +26,48 @@ def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path)
     monkeypatch.chdir(tmp_path)
     cases = manifest.contract()
     preview = any(case.capability == "preview" for case in cases)
-    assert len(cases) == (84 if preview else 78)
+    assert len(cases) == (90 if preview else 84)
     control = manifest.nodes("HubControl", "regular")
     entra = manifest.nodes("HubData", "entra")
     sas = manifest.nodes("HubData", "sas")
     assert (len(control), len(entra), len(sas)) == (
-        31 if preview else 28,
+        36 if preview else 33,
         44 if preview else 42,
-        8 if preview else 6,
+        9 if preview else 7,
     )
     control_shards = [manifest.nodes("HubControl", phase) for phase in manifest.phases("HubControl")]
     entra_shards = [manifest.nodes("HubData", phase) for phase in manifest.HUB_DATA_ENTRA_PHASES]
     assert set(node for shard in control_shards for node in shard) == set(control)
     assert set(node for shard in entra_shards for node in shard) == set(entra)
-    assert [len(shard) for shard in control_shards] == [6, 15 if preview else 14, 6 if preview else 5, 4 if preview else 3]
-    assert [len(shard) for shard in entra_shards] == [7, 37 if preview else 35]
+    assert [len(shard) for shard in control_shards] == [6, 20 if preview else 19, 6 if preview else 5, 4 if preview else 3]
+    assert [len(shard) for shard in entra_shards] == [7, 35 if preview else 33, 2]
     assert len(set(entra) & set(sas)) == (2 if preview else 0)
     assert not set(control) & (set(entra) | set(sas))
     exceptions = {case.node for case in cases if case.exclusion}
     assert set(control) | set(entra) | set(sas) | exceptions == set(manifest.inventory())
     assert len(exceptions) == (3 if preview else 2)
     assert all(case.group and case.protocol and case.auth and case.dependencies for case in cases)
-    assert manifest.phases("HubData") == ("entra-state-config", "entra-devices-protocol", "sas")
+    assert manifest.phases("HubData") == ("entra-state-config", "entra-devices-protocol", "entra-identities", "sas")
     assert manifest.phases("HubControl") == (
         "regular-state-workflow", "regular-state-schemes-cert", "regular-endpoints-a", "regular-endpoints-b",
     )
     assert json.loads(json.dumps(manifest.manifest("HubData", "entra")))["expected"] == list(entra)
+
+
+def test_query_heavy_identities_have_an_independent_budget_without_changing_coverage():
+    identities = manifest.nodes("HubData", "entra-identities")
+    assert identities == manifest.SHARDS["HubData"]["entra-identities"]
+    assert len(identities) == 2
+    assert not set(identities) & set(manifest.nodes("HubData", "entra-devices-protocol"))
+    assert all(node in manifest.nodes("HubData", "entra") for node in identities)
+
+
+def test_hub_data_explicit_shards_cannot_overlap(monkeypatch):
+    monkeypatch.setitem(
+        manifest.SHARDS["HubData"], "entra-identities", manifest.SHARDS["HubData"]["entra-state-config"][:1],
+    )
+    with pytest.raises(ValueError, match="HubData shard partition mismatch"):
+        manifest.contract()
 
 
 def test_sas_exact_order_and_existing_normal_skip_contract():
@@ -75,7 +91,7 @@ def test_sas_exact_order_and_existing_normal_skip_contract():
                 values[name] = literal(node.value)
     assert manifest.nodes("HubData", "sas") == values["NODES"]
     skipped = [case for case in manifest.contract() if case.normal_skip]
-    assert len(skipped) == 6
+    assert len(skipped) == 7
     assert all(case.phases == ("sas",) for case in skipped)
     for case in skipped:
         filename, _, method = case.node.split("::")
@@ -109,9 +125,9 @@ def _checkout(tmp_path, capability="base"):
 
 def test_child_capability_is_not_optional_file_existence(tmp_path):
     root = _checkout(tmp_path, "preview")
-    assert len(manifest.contract(root)) == 84
+    assert len(manifest.contract(root)) == 90
     assert len(manifest.nodes("HubData", "entra", root)) == 44
-    assert len(manifest.nodes("HubData", "sas", root)) == 8
+    assert len(manifest.nodes("HubData", "sas", root)) == 9
     with pytest.raises(ValueError, match="not enabled"):
         manifest.nodes("HubData", "linked-metadata", root)
     assert len(manifest.nodes("HubData", "linked-metadata", root, linked_metadata=True)) == 1

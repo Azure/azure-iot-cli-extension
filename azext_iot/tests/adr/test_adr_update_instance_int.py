@@ -232,6 +232,7 @@ class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRUpdateInstanceValidation(ADRLiveScenarioTest):
+    @pytest.mark.timeout(300, func_only=False)
     def test_update_instance_validation_negatives(self):
         with pytest.raises(
             RequiredArgumentMissingError,

@@ -36,6 +36,7 @@ def provisioned_mqtt5_hub():
             )
 
 
+@pytest.mark.timeout(1200, func_only=False)
 def test_mqtt5_profile_and_topic_group_lifecycle(provisioned_mqtt5_hub):
     hub_name = provisioned_mqtt5_hub["name"]
     hub = cli.invoke(

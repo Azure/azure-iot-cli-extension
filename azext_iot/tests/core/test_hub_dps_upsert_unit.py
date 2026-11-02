@@ -177,3 +177,12 @@ def test_legacy_discovery_metadata_and_known_namespace_projections():
     assert arm.hub_description_for_write(original) == {"properties": {"future": {"keep": True}}}
     assert custom._dps_description_for_write(original) == {"properties": {"future": {"keep": True}}}
     assert len(original["properties"]) == 4
+
+
+@pytest.mark.parametrize("property_name", ["deviceStreams", "encryption", "ipVersion"])
+def test_legacy_hub_configuration_is_not_silently_dropped(property_name):
+    original = {"properties": {property_name: {"legacyConfiguration": True}}}
+    body = arm.hub_description_for_write(original)
+    assert body == original and body is not original
+    body["properties"][property_name]["legacyConfiguration"] = False
+    assert original["properties"][property_name]["legacyConfiguration"] is True

@@ -56,6 +56,7 @@ def local_auth_dps(provisioned_iot_dps_local_auth_module):
         assert _invoke(disable_local_auth).success()
 
 
+@pytest.mark.timeout(600, func_only=False)
 def test_dps_create_disable_local_auth(provisioned_iot_dps_local_auth_module):
     dps_name = provisioned_iot_dps_local_auth_module["name"]
     dps_rg = provisioned_iot_dps_local_auth_module["resourceGroup"]
@@ -65,6 +66,7 @@ def test_dps_create_disable_local_auth(provisioned_iot_dps_local_auth_module):
     assert dps["properties"]["disableLocalAuth"] is True
 
 
+@pytest.mark.timeout(600, func_only=False)
 def test_dps_update_disable_local_auth(local_auth_dps):
     dps_name = local_auth_dps["name"]
     dps_rg = local_auth_dps["resourceGroup"]
@@ -94,6 +96,7 @@ def test_dps_update_disable_local_auth(local_auth_dps):
     assert dps["properties"]["disableLocalAuth"] is False
 
 
+@pytest.mark.timeout(600, func_only=False)
 def test_dps_disable_local_auth_dataplane(local_auth_dps):
     dps_name = local_auth_dps["name"]
     dps_rg = local_auth_dps["resourceGroup"]

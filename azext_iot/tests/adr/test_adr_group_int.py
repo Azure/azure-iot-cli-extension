@@ -66,6 +66,7 @@ def _observe_group_refresh(scenario, command):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_group_delete_allows_immediate_name_reuse(self):
         namespace_name = generate_adr_namespace_name()
         group_name = _generate_group_name()
@@ -108,6 +109,7 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 cleanup.dismiss("group")
                 self.cmd(f"iot adr ns group wait {group_args} --deleted")
 
+    @pytest.mark.timeout(600, func_only=False)
     def test_adr_group_lifecycle(self):
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()

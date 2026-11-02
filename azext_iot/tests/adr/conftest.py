@@ -76,6 +76,7 @@ _ADR_XDIST_GROUPS = {
         "test_external_activation_no_wait",
     },
     "adr-g3-link-lifecycle": {
+        "test_adr_unlink_missing_rg_advisory",
         "test_adr_link_lifecycle",
         "test_adr_link_sequential_add",
         "test_adr_certificate_authority_lifecycle",
@@ -97,6 +98,9 @@ _ADR_XDIST_GROUPS = {
         "test_adr_group_lifecycle",
         "test_adr_validation_negatives",
         "test_adr_link_su_lifecycle",
+    },
+    "adr-g5-brownfield-recovery": {
+        "test_adr_link_brownfield_recovery",
     },
 }
 _ADR_GROUP_ORDER = {group: index for index, group in enumerate(_ADR_XDIST_GROUPS)}

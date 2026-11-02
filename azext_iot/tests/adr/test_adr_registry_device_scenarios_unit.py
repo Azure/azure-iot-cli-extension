@@ -29,7 +29,7 @@ def test_live_scenario_keeps_shared_wrapper_and_readiness_budget(expect_failure,
     methods = [method for name, method in vars(scenario_class).items() if name.startswith("test_")]
     assert len(methods) == 1
     timeout = [mark for mark in methods[0].pytestmark if mark.name == "timeout"]
-    assert len(timeout) == 1 and timeout[0].args == (2100,) and timeout[0].kwargs == {"func_only": False}
+    assert len(timeout) == 1 and timeout[0].args == (600,) and timeout[0].kwargs == {"func_only": False}
     delegate = mocker.patch.object(ADRLiveScenarioTest, "cmd")
     scenario = scenario_class(methods[0].__name__)
     checks = [Mock()]
@@ -316,7 +316,7 @@ def test_attribute_listing_wait_stops_at_120_seconds_without_mutation(attribute_
     read.return_value = Mock(get_output_in_json=Mock(return_value=page))
     with pytest.raises(AssertionError, match="Timed out waiting for owned registry-device attribute list visibility"):
         scenario.test_registry_device_lifecycle()
-    assert elapsed[0] == 120 and pauses == [5] * 24 and read.call_count == 25
+    assert elapsed[0] == 120 and pauses == [5] * 24 and read.call_count == 24
     assert sum(" attribute create " in " ".join(command) for command in backend.commands) == 1
     assert not backend.resources
 

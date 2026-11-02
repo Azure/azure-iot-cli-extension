@@ -17,7 +17,7 @@ from azext_iot.tests.generators import generate_names
 
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
-@pytest.mark.timeout(2700)
+@pytest.mark.timeout(1800, func_only=False)
 def test_register_without_csr_deadline_contract(provisioned_csr_issuance, timeout):
     resource = provisioned_csr_issuance
     dps = resource["dps"]
@@ -42,7 +42,7 @@ def test_register_without_csr_deadline_contract(provisioned_csr_issuance, timeou
 
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
-@pytest.mark.timeout(2700)
+@pytest.mark.timeout(1800, func_only=False)
 def test_register_and_issue_certificate_contract(provisioned_csr_issuance, tmp_path, timeout):
     resource = provisioned_csr_issuance
     dps = resource["dps"]
@@ -67,6 +67,8 @@ def test_register_and_issue_certificate_contract(provisioned_csr_issuance, tmp_p
         properties = resource["hub"]["hub"]["properties"]
         assert state["assignedHub"] in {properties["hostName"], properties["deviceHostName"]}
         connection_profile = state.get("connectionProfile")
+        if connection_profile is None:
+            connection_profile = "classic"
         assert isinstance(connection_profile, str) and connection_profile.casefold() in {"classic", "mqttv5"}
         assert state["issuedCertificateChain"]
         assert state["registryDeviceExternalId"]

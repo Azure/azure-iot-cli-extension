@@ -8,7 +8,6 @@ import inspect
 
 import pytest
 
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, DEVICE_TYPES
 from azext_iot.tests.iothub.devices import test_iothub_devices_int as devices
 from azext_iot.tests.iothub.devices import test_iothub_nested_edge_int as nested
 from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as jobs
@@ -57,16 +56,16 @@ def test_ordinary_scenarios_keep_the_default_timeout(scenario):
     assert not any(mark.name == "timeout" for mark in getattr(scenario, "pytestmark", []))
 
 
-@pytest.mark.parametrize("scenario,windows", [
-    (devices.TestIoTHubDevices.test_iothub_device_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
-    (modules.TestIoTHubModules.test_iothub_module_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
-    (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, 4 * len(DATAPLANE_AUTH_TYPES)),
-    (jobs.TestIoTHubJobs.test_jobs, 2 * len(DATAPLANE_AUTH_TYPES)),
-    (state_dataplane.test_migrate_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
-    (state_dataplane.test_export_import_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
+@pytest.mark.parametrize("scenario,seconds", [
+    (devices.TestIoTHubDevices.test_iothub_device_identity, 2700),
+    (modules.TestIoTHubModules.test_iothub_module_identity, 2700),
+    (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, 2700),
+    (jobs.TestIoTHubJobs.test_jobs, 2700),
+    (state_dataplane.test_migrate_dataplane, 3300),
+    (state_dataplane.test_export_import_dataplane, 2700),
 ])
-def test_query_scenarios_budget_each_sequential_window_and_the_existing_lifecycle(scenario, windows):
-    _assert_lifecycle_budget(scenario, 900 + 1800 * windows)
+def test_query_scenarios_share_one_setup_work_and_cleanup_budget(scenario, seconds):
+    _assert_lifecycle_budget(scenario, seconds)
 
 
 @pytest.mark.parametrize("scenario_class,heavy", [

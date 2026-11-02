@@ -86,7 +86,7 @@ class _RegistryDeviceScenario(ADRLiveScenarioTest):
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRRegistryDeviceLifecycle(_RegistryDeviceScenario):
-    @pytest.mark.timeout(2100, func_only=False)
+    @pytest.mark.timeout(600, func_only=False)
     def test_registry_device_lifecycle(self):
         namespace = generate_adr_namespace_name()
         name = f"registry{generate_generic_id()}"
