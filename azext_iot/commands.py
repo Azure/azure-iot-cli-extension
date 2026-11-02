@@ -191,15 +191,6 @@ def load_command_table(self, _):
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
 
-    with self.command_group("iot dps", command_type=iotdps_ops) as cmd_group:
-        cmd_group.command(
-            "compute-device-key",
-            "iot_dps_compute_device_key",
-            deprecate_info=self.deprecate(
-                redirect='iot dps enrollment-group compute-device-key', hide=True
-            )
-        )
-
     with self.command_group("iot dps enrollment", command_type=iotdps_ops) as cmd_group:
         cmd_group.command("create", "iot_dps_device_enrollment_create")
         cmd_group.command(
@@ -243,15 +234,6 @@ def load_command_table(self, _):
 
     with self.command_group(
         "iot dps enrollment-group registration", command_type=iotdps_ops
-    ) as cmd_group:
-        cmd_group.command("list", "iot_dps_registration_list")
-        cmd_group.show_command("show", "iot_dps_registration_get")
-        cmd_group.command("delete", "iot_dps_registration_delete")
-
-    with self.command_group(
-        "iot dps registration",
-        command_type=iotdps_ops,
-        deprecate_info=self.deprecate(redirect='iot dps enrollment-group registration', hide=True)
     ) as cmd_group:
         cmd_group.command("list", "iot_dps_registration_list")
         cmd_group.show_command("show", "iot_dps_registration_get")

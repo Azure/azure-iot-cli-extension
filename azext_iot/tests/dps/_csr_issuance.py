@@ -8,20 +8,25 @@
 
 from contextlib import contextmanager, ExitStack
 import json
+from math import isfinite
 from shlex import quote
 from time import monotonic, sleep, time
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 import pytest
 from azure.cli.command_modules.role._client_factory import _auth_client_factory
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
+from azure.core.pipeline import PipelineContext, PipelineResponse
+from azure.core.pipeline.policies import RetryPolicy
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import adr_service_factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.adr._helpers import is_resource_not_found_error, wait_for_condition
+from azext_iot.tests.adr._readiness import _Deadline
 from azext_iot.tests.dps import conftest as fixtures, _phase, _phase_receipts as receipts, _phase_runtime as runtime
 from azext_iot.tests.helpers import invoke_checked, role_assignment_create_command, role_assignment_create_scope
 
@@ -32,6 +37,7 @@ LINK_OPTIONS = "--timeout 1200 --interval 10"
 WAIT_OPTIONS = "--timeout 600 --interval 10"
 NAMESPACE_ROLE_RECEIPT = "csr-namespace-self-role.json"
 NAMESPACE_ROLE_PROPAGATION_SECONDS = 60
+NAMESPACE_DELETE_BACKOFFS = (10, 30, 60)
 # Built-in Azure Device Registry Administrator: Microsoft.DeviceRegistry/*
 # includes Microsoft.DeviceRegistry/namespaces/registryDevices/write (39640174).
 NAMESPACE_ROLE_DEFINITION_ID = "12675fd7-7f59-493f-9201-f7944860a2f1"
@@ -101,6 +107,65 @@ def _wait_arm_absent(fetch, description):
         fetch, lambda resource: resource is None, description=description,
         timeout=600, interval=10, is_retryable_error=lambda _error: False,
     )
+
+
+def _namespace_delete_retry_delay(error, record, fallback):
+    response = getattr(error, "response", None)
+    request = getattr(response, "request", None)
+    url = getattr(request, "url", None)
+    if not isinstance(url, str):
+        return None
+    target, actual = urlsplit(receipts.target()["endpoint"]), urlsplit(url)
+    if (
+        error.status_code != 429 or getattr(response, "status_code", None) != 429
+        or getattr(request, "method", None) != "DELETE"
+        or actual.scheme != target.scheme or actual.netloc != target.netloc
+        or actual.path.casefold() != record["id"].casefold()
+    ):
+        return None
+    try:
+        retry_after = RetryPolicy().get_retry_after(PipelineResponse(request, response, PipelineContext(None)))
+    except (ValueError, TypeError, OverflowError):
+        raise error
+    if retry_after is not None and (not isfinite(retry_after) or retry_after < 0):
+        raise error
+    return max(fallback, retry_after or 0)
+
+
+def _delete_owned_namespace(name, record):
+    budget = _Deadline(600, monotonic, sleep, "owned CSR namespace deletion")
+    current = budget.call(find_namespace, name)
+    accepted = not receipts.before_delete(name, current)
+    retries = 0
+    while current is not None:
+        _require_owned(name, current)
+        assert receipts.location_matches(current), "CSR namespace location no longer matches its receipt."
+        state = current.get("properties", {}).get("provisioningState")
+        if not accepted and state not in {"Deleting", "Creating", "Updating", "Accepted", "InProgress"}:
+            assert state in {"Succeeded", "Failed", "Canceled", "Cancelled"}, "Unknown CSR namespace deletion state."
+            try:
+                # Each deliberate attempt is fenced independently; accepted or uncertain writes are never replayed.
+                with runtime.owned_write(name, "DELETE"):
+                    # GET 404 can precede LRO completion and its target unlink notifications.
+                    budget.call(invoke, f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
+            except HttpResponseError as error:
+                if retries >= len(NAMESPACE_DELETE_BACKOFFS):
+                    raise
+                delay = _namespace_delete_retry_delay(error, record, NAMESPACE_DELETE_BACKOFFS[retries])
+                if delay is None:
+                    raise
+                retries += 1
+                budget.observation = f"DELETE rejected with HTTP 429; retry {retries} after at least {delay:g}s"
+                budget.pause(delay)
+                current = budget.call(find_namespace, name)
+                continue
+            accepted = True
+        if state == "Deleting":
+            accepted = True
+        budget.observation = "waiting for namespace GET HTTP 404; no accepted DELETE replay"
+        budget.pause(10)
+        current = budget.call(find_namespace, name)
+    budget.call(receipts.after_delete, name)
 
 
 def _children(namespace):
@@ -250,12 +315,59 @@ def _remove_namespace_self_role(name):
     receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "deleted": True})
 
 
+def _remove_namespace_group_reader_roles(name, namespace):
+    record = receipts._owned(name)  # pylint: disable=protected-access
+    directory = receipts.settings()[0]
+    for path in directory.glob("mutation-*.json"):
+        journal = json.loads(path.read_text(encoding="utf-8"))
+        binding = journal.get("readerGrant")
+        if not binding or journal.get("method") != "PUT" or binding.get("namespaceId") != record["id"]:
+            continue
+        assert all(journal.get(key) == record[key] for key in ("run_uid", "subscription", "phase"))
+        if runtime.reader_creation_rejected(journal):
+            continue
+        assert namespace is not None or journal.get("readerDeleted"), (
+            "Namespace disappeared before its owned RG Reader cleanup."
+        )
+        scope = f"/subscriptions/{record['subscription']}/resourceGroups/{record['resource_group']}"
+        principal = _namespace_sami(namespace) if namespace is not None else str(UUID(binding["principalId"]))
+        assert binding == {"namespaceId": record["id"], "principalId": principal, "scope": scope}
+        assignment_name = str(UUID(journal["id"].rsplit("/", 1)[-1]))
+        expected = {
+            "id": scope + "/providers/Microsoft.Authorization/roleAssignments/" + assignment_name,
+            "name": assignment_name, "scope": scope, "principalId": binding["principalId"],
+            "principalType": "ServicePrincipal",
+            "roleDefinitionId": (
+                f"/subscriptions/{record['subscription']}/providers/Microsoft.Authorization/"
+                f"roleDefinitions/{runtime.GROUP_READER_ROLE_ID}"
+            ),
+        }
+        assert journal["id"].casefold() == expected["id"].casefold()
+        with _auth_client_factory(fixtures.cli.az_cli, scope=scope) as client:
+            if not journal.get("readerDeleteAttempted"):
+                wait_for_condition(
+                    lambda: _get_namespace_role(client, expected), lambda value: value is not None,
+                    description="uncertain native RG Reader creation reconciliation", timeout=300, interval=5,
+                    is_retryable_error=lambda _error: False,
+                )
+            if _get_namespace_role(client, expected) is not None:
+                assert not journal.get("readerDeleted"), "Completed namespace RG Reader assignment reappeared."
+                if not journal.get("readerDeleteAttempted"):
+                    journal["readerDeleteAttempted"] = True
+                    receipts.write(path.name, journal)
+                    with runtime.owned_namespace_group_reader(namespace):
+                        invoke(f"role assignment delete --ids {quote(expected['id'])} --subscription {record['subscription']}")
+                _wait_arm_absent(lambda: _get_namespace_role(client, expected), "owned namespace RG Reader absence")
+        receipts.write(path.name, {**journal, "readerDeleted": True})
+
+
 def delete_namespace(name):
     from azext_iot.tests.dps._csr_registry import cleanup_registry_devices
 
     current = find_namespace(name)
     if current is None:
         _remove_namespace_self_role(name)
+        _remove_namespace_group_reader_roles(name, None)
         return
     record = _require_owned(name, current)
     cleanup_registry_devices(record)
@@ -290,11 +402,8 @@ def delete_namespace(name):
             invoke(f"{command} delete {arguments} -y")
         _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
     _remove_namespace_self_role(name)
-    if receipts.before_delete(name, find_namespace(name)):
-        with runtime.owned_write(name, "DELETE"):
-            invoke(f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y")
-        _wait_arm_absent(lambda: find_namespace(name), "owned CSR namespace absence")
-        receipts.after_delete(name)
+    _remove_namespace_group_reader_roles(name, current)
+    _delete_owned_namespace(name, record)
 
 
 def _create_namespace(run_uid, kind, dps, hub):
@@ -319,15 +428,15 @@ def _create_namespace(run_uid, kind, dps, hub):
             ).as_json()
             assert (identity["identity"] if kind_name == "dps" else identity)["principalId"]
 
-        # Journal the fixture-owned grant first so automatic link RBAC reuses it.
-        role_ready_at = _grant_namespace_self_role(name)
-        linked = invoke(
-            f"iot adr ns link add --ns {name} -g {fixtures.ENTITY_RG} "
-            f"--dps-endpoint-name dps --dps-id {dps['dps']['id']} --dps-system-assigned-mi "
-            f"--hub-endpoint-name hub --hub-id {hub['hub']['id']} --hub-system-assigned-mi "
-            f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
-        ).as_json()
+        with runtime.owned_namespace_group_reader(namespace):
+            linked = invoke(
+                f"iot adr ns link add --ns {name} -g {fixtures.ENTITY_RG} "
+                f"--dps-endpoint-name dps --dps-id {dps['dps']['id']} --dps-system-assigned-mi "
+                f"--hub-endpoint-name hub --hub-id {hub['hub']['id']} --hub-system-assigned-mi "
+                f"--hub-availability Available --hub-weight 1 {LINK_OPTIONS}"
+            ).as_json()
         _assert_linked(linked, dps, hub)
+        role_ready_at = monotonic() + NAMESPACE_ROLE_PROPAGATION_SECONDS
 
         record = receipts._owned(name)  # pylint: disable=protected-access
         for label, command, arguments, child_path, options in _children(name):

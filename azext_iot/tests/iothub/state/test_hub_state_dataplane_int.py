@@ -10,6 +10,7 @@ from shlex import quote
 
 import pytest
 
+from azext_iot.tests.helpers import ScenarioBudget
 from azext_iot.tests.iothub import set_cmd_auth_type
 from azext_iot.tests.iothub.state import _state_helpers as state
 
@@ -18,8 +19,9 @@ setup_hub_states_dataplane = state.setup_hub_states_dataplane
 
 
 @pytest.mark.hub_infrastructure(count=2)
-@pytest.mark.timeout(state.DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
+@pytest.mark.timeout(3300, func_only=False)
 def test_migrate_dataplane(setup_hub_states_dataplane):
+    budget = ScenarioBudget(55 * 60)
     origin_name = setup_hub_states_dataplane[0]["name"]
     origin_rg = setup_hub_states_dataplane[0]["rg"]
     origin_auth = state._hub_auth(setup_hub_states_dataplane[0])
@@ -34,7 +36,10 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
                 cstring=None
             ),
         )
-        state._wait_for_dataplane_query(dest_auth, setup_hub_states_dataplane[0]["state_data"])
+        state._wait_for_dataplane_query(
+            dest_auth, setup_hub_states_dataplane[0]["state_data"],
+            timeout=budget.remaining(state.QUERY_VISIBILITY_TIMEOUT),
+        )
         state.compare_hubs_dataplane(origin_auth, dest_auth, setup_hub_states_dataplane[0]["state_data"])
         # Keep the final owned dataset for the fixture's checked teardown.
         if phase_index + 1 < len(state.DATAPLANE_AUTH_TYPES):
@@ -44,6 +49,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
 @pytest.mark.hub_infrastructure(count=1)
 @pytest.mark.timeout(state.DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_dataplane(setup_hub_states_dataplane):
+    budget = ScenarioBudget(45 * 60)
     filename = setup_hub_states_dataplane[0]["filename"]
     hub_name = setup_hub_states_dataplane[0]["name"]
     hub_rg = setup_hub_states_dataplane[0]["rg"]
@@ -67,5 +73,8 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
                 cstring=None
             ),
         )
-        state._wait_for_dataplane_query(hub_auth, setup_hub_states_dataplane[0]["state_data"])
+        state._wait_for_dataplane_query(
+            hub_auth, setup_hub_states_dataplane[0]["state_data"],
+            timeout=budget.remaining(state.QUERY_VISIBILITY_TIMEOUT),
+        )
         state.compare_hub_dataplane_to_file(filename, hub_auth, setup_hub_states_dataplane[0]["state_data"])

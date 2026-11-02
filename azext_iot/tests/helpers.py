@@ -8,7 +8,9 @@ import json
 import os
 
 from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import wraps
+from hashlib import sha256
 from inspect import getsourcefile
 from time import monotonic, sleep
 from types import SimpleNamespace
@@ -56,6 +58,57 @@ TEST_PIPELINE_ID = "{} {} {}".format(
     settings.env.job_id
 ).strip()
 USE_TAGS = str(settings.env.use_tags).lower() == "true"
+
+
+class ScenarioBudget:
+    """Share elapsed time across test operations, reserving the tail for cleanup."""
+
+    _active_deadline = ContextVar("scenario_deadline", default=None)
+
+    def __init__(self, timeout, cleanup=900):
+        if not 0 <= cleanup < timeout:
+            raise ValueError("Scenario timeout must exceed its nonnegative cleanup reserve.")
+        self.end = monotonic() + timeout
+        outer = self._active_deadline.get()
+        if outer is not None:
+            self.end = min(self.end, outer)
+        self.cleanup_reserve = cleanup
+
+    @classmethod
+    @contextmanager
+    def track(cls, timeout):
+        token = cls._active_deadline.set(monotonic() + timeout)
+        try:
+            yield
+        finally:
+            cls._active_deadline.reset(token)
+
+    def remaining(self, maximum=None):
+        remaining = int(self.end - self.cleanup_reserve - monotonic())
+        if remaining < 1:
+            raise AssertionError("Scenario time budget exhausted.")
+        return min(remaining, maximum) if maximum is not None else remaining
+
+    def call(self, callback, *args, **kwargs):
+        self.remaining()
+        result = callback(*args, **kwargs)
+        self.remaining()
+        return result
+
+    def begin_cleanup(self):
+        self.cleanup_reserve = 0
+
+
+def policy_snapshot(policies):
+    """Compare policy preservation without putting service keys in assertion output."""
+    return {
+        policy["keyName"]: (
+            frozenset(policy["rights"].replace(" ", "").split(",")),
+            sha256(policy["primaryKey"].encode()).hexdigest(),
+            sha256(policy["secondaryKey"].encode()).hexdigest(),
+        )
+        for policy in policies
+    }
 
 
 def invoke_checked(cli: EmbeddedCLI, command: str, *, description: str) -> EmbeddedCLI:

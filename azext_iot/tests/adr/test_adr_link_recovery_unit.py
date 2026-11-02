@@ -111,12 +111,15 @@ def test_recovery_quotes_arguments_and_accepts_legacy_failed_state():
     assert split(failed_link_recovery_commands(namespace)[0])[8] == "quoted'name"
 
 
-def test_recovery_commands_follow_dps_first_topology():
+def test_failed_pair_guidance_does_not_recommend_separate_mutations(fixture_adr_provider):
     identity = {"type": "SystemAssigned"}
     namespace = _namespace("provisioning", DPS_ENDPOINT_TYPE, identity)
     for _, section, endpoint_type in LINK_TYPES:
         namespace["properties"][section] = _namespace(section, endpoint_type, identity)["properties"][section]
-    assert [split(command)[5] for command in failed_link_recovery_commands(namespace)] == ["dps", "hub", "su"]
+    assert [split(command)[5] for command in failed_link_recovery_commands(namespace)] == ["su"]
+    message = fixture_adr_provider._format_failure("Failed", namespace, None)
+    assert "link update --dps-endpoint-name" in message
+    assert "brownfieldHubs" in message
 
 
 @pytest.mark.parametrize("kind,section,endpoint_type", LINK_TYPES)
@@ -132,7 +135,14 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     namespace = _namespace(section, endpoint_type, identity)
     if kind == "hub":
         namespace["properties"]["provisioning"] = {
-            "endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}},
+            "endpoints": {"dps": {
+                "endpointType": DPS_ENDPOINT_TYPE,
+                "linkingState": "Succeeded",
+                "resourceId": (
+                    "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps"
+                ),
+                "inboundCallerIdentity": {"type": "SystemAssigned"},
+            }},
         }
         namespace["properties"][section]["endpoints"]["primary"]["provisioning"] = {
             "availability": "Available", "allocationWeight": 2,
@@ -165,6 +175,8 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
     update_args = identity_args if repeat_identity else {}
     getattr(provider, f"{kind}_update")("primary", "ns", "ns-rg", no_wait=True, **update_args)
     extra = {"namespace_system_principal_id": "namespace-principal"} if kind == "dps" else {}
+    if kind == "hub":
+        extra.update(dps_principal_id="target-system", hub_scopes=(target_id.lower(),))
     provider._rbac.ensure.assert_called_once_with(
         link_type=kind, namespace_scope=NS_ID, target_scope=target_id,
         namespace_principal_id="namespace-principal",
@@ -199,7 +211,12 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     endpoint.pop("linkingState")
     endpoint[state_field] = "fAiLeD" if state_field == "linkingState" else {"status": "Failed"}
     endpoint["provisioning"] = {"availability": "Unavailable", "allocationWeight": 0}
-    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}}}
+    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {
+        "endpointType": DPS_ENDPOINT_TYPE,
+        "linkingState": "Succeeded",
+        "resourceId": "/subscriptions/target-sub/resourceGroups/target-rg/providers/Microsoft.Devices/provisioningServices/dps",
+        "inboundCallerIdentity": {"type": "SystemAssigned"},
+    }}}
     original = deepcopy(namespace)
     command = split(failed_link_recovery_commands(namespace)[0])
     assert command[-2:] == ["--subscription", "ns-sub"]
@@ -207,6 +224,7 @@ def test_failed_hub_without_inbound_identity_retries_without_inventing_one(state
     provider.client.namespaces.get.return_value = namespace
     provider._get_target = Mock(return_value={
         "location": "centraluseuap", "sku": {"name": "S1"}, "properties": {"provisioningState": "Succeeded"},
+        "identity": {"type": "SystemAssigned", "principalId": "dps-principal"},
     })
     provider._rbac = Mock(created=[])
     provider._warn_if_hub_classically_linked = Mock()

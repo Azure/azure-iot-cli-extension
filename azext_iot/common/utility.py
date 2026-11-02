@@ -461,7 +461,6 @@ def init_monitoring(
     timeout,
     properties,
     enqueued_time,
-    repair,
     yes,
     message_count: Optional[int] = None,
 ):

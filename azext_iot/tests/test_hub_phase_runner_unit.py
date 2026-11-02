@@ -331,6 +331,61 @@ def test_controller_fail_closed(tmp_path, damage):
         assert set(calls) == phases
 
 
+@pytest.mark.parametrize("phase", ["entra-state-config", "sas"])
+@pytest.mark.parametrize("failure", ["ownership-missing", "ownership-invalid", "cleanup", "receipt-missing"])
+def test_controller_cleanup_exception_reports_the_failed_stage(tmp_path, monkeypatch, phase, failure):
+    secret = "sig=cleanup-test-secret"
+    original_read = runner.read_json
+
+    def read_json(path):
+        path = Path(path)
+        if path.parent.name == phase:
+            if path.name == "ownership.json" and failure.startswith("ownership-"):
+                if failure == "ownership-invalid":
+                    raise json.JSONDecodeError(secret, secret, 0)
+                raise FileNotFoundError(secret)
+            if path.name == "pytest.json" and failure == "receipt-missing":
+                raise FileNotFoundError(secret)
+        return original_read(path)
+
+    monkeypatch.setattr(runner, "read_json", read_json)
+    if failure == "cleanup":
+        cleanup_name = "sas_cleanup_errors" if phase == "sas" else "cleanup_regular"
+        original_cleanup = getattr(runner, cleanup_name)
+
+        def fail_cleanup(*args, **kwargs):
+            if phase == "sas" or args[1]["phase"] == phase:
+                raise dps_runner.PhaseError(secret)
+            return original_cleanup(*args, **kwargs)
+
+        monkeypatch.setattr(runner, cleanup_name, fail_cleanup)
+
+    result, calls = run(tmp_path)
+    assert result == 1 and set(calls) == {name for name, _ in runner.BUDGETS["HubData"]}
+    output = tmp_path / "phases"
+    cleanup = original_read(output / phase / "cleanup.json")
+    summary = original_read(output / "hub-phases.json")
+    failed = next(item for item in summary["phases"] if item["name"] == phase)
+    error_type = {
+        "ownership-missing": "FileNotFoundError", "ownership-invalid": "JSONDecodeError",
+        "cleanup": "PhaseError", "receipt-missing": "FileNotFoundError",
+    }[failure]
+    assert failed["status"] == "failed" and failed["errorType"] == error_type
+    assert all(item["status"] == "passed" for item in summary["phases"] if item["name"] != phase)
+    if failure == "receipt-missing":
+        assert cleanup["complete"] and cleanup["errors"] == []
+        assert cleanup["ownedIds"] == cleanup["absentIds"]
+        assert "errorType" not in cleanup
+    else:
+        assert not cleanup["complete"]
+        assert cleanup["errors"] == [
+            "cleanup execution failed" if failure == "cleanup" else "ownership evidence could not be read"
+        ]
+        assert cleanup["errorType"] == error_type
+    assert secret not in json.dumps(cleanup) + json.dumps(summary)
+    assert not runner.evaluate_hub_phases(output)["passed"]
+
+
 @pytest.mark.parametrize("damage", ["sas-failure", "sas-missing-pass"])
 def test_sas_case_failure_does_not_erase_verified_cleanup(tmp_path, damage):
     result, calls = run(tmp_path, damage=damage)
@@ -766,7 +821,10 @@ def test_budgets_leave_external_setup_below_github_cap():
             ("regular-endpoints-a", 90 * 60),
             ("regular-endpoints-b", 90 * 60),
         ),
-        "HubData": (("entra-state-config", 75 * 60), ("entra-devices-protocol", 75 * 60), ("sas", 45 * 60)),
+        "HubData": (
+            ("entra-state-config", 75 * 60), ("entra-devices-protocol", 75 * 60),
+            ("entra-identities", 75 * 60), ("sas", 45 * 60),
+        ),
     }
     assert runner.CLEANUP == 15 * 60
     assert runner.RESERVE == 5 * 60

@@ -482,9 +482,11 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                 return
             with summary_lock:
                 result.update({k: v for k, v in execution.items() if k != "cleanup_deadline"})
-            cleanup = {"runId": result["runId"], "complete": False, "errors": ["missing ownership evidence"]}
+            cleanup = None
+            cleanup_error = "ownership evidence could not be read"
             try:
                 evidence = read_json(folder / "ownership.json")
+                cleanup_error = "cleanup execution failed"
                 if phase == "sas":
                     with summary_lock:
                         result["sasRunUid"] = evidence["runUid"]
@@ -509,6 +511,11 @@ def run(suite, subscription, group, region, output, arm=None, execute=None, base
                         and not execution["timed_out"] and not execution["interrupted"] and not cancel.is_set()
                     ) else "failed"
             except Exception as error:  # Never serialize credential-bearing exception messages.
+                if cleanup is None:
+                    cleanup = {
+                        "runId": result["runId"], "complete": False,
+                        "errors": [cleanup_error], "errorType": type(error).__name__,
+                    }
                 with summary_lock:
                     result["status"] = "failed"
                     result["errorType"] = type(error).__name__

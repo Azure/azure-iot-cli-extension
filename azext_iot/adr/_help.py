@@ -720,15 +720,38 @@ def load_adr_help():
   type: group
   short-summary: Manage links between a Device Registry namespace and downstream resources.
   long-summary: |
-    Link a DPS first, then link your IoT Hubs. Use update to change a link's inbound
+    Link an empty DPS first, then link your IoT Hubs. If the DPS already lists Hubs,
+    use link add with every required Hub in the same request. Use update to change a link's inbound
     identity or retry a Failed endpoint with its saved identity and settings.
     Use show, list and wait to inspect linkingState. Links belong to the namespace.
-    To unlink, delete the linked resource first, then run link hub/dps/su remove to remove
-    its endpoint from the namespace. Remove does not delete or check the linked resource
+    For a Succeeded link, delete the linked resource before running link hub/dps/su remove.
+    Failed links do not require deleting the linked resource. Hub endpoints in any state
+    also require clearing Registry Device IoT Hub capability references; see link hub remove --help.
+    Remove does not delete or check the linked resource; it removes only the namespace endpoint
     and waits for the namespace update to complete unless --no-wait is specified.
+    Remove performs a state-aware advisory permission check without changing role assignments by default.
+    Use --grant-reader to explicitly request missing Reader access at the linked resource's resource group.
     Add/update wait for the link to succeed (--timeout default 600 seconds, --interval 30).
     After add/update --no-wait, use link hub/dps/su wait to track completion.
     After remove --no-wait, inspect the namespace with 'az iot adr ns show'.
+  """
+
+    helps["iot adr ns link update"] = """
+  type: command
+  short-summary: Retry selected Failed DPS and Hub links together.
+  long-summary: |
+    Select a Failed DPS and every required Failed Hub from its brownfieldHubs list,
+    shown by link dps show. Saved identities and provisioning settings are preserved.
+    Only selected endpoints are resubmitted; other endpoints are not retried.
+    All selected targets and required roles are checked before a single namespace PATCH.
+    The command waits for the namespace and every selected endpoint to succeed.
+    --no-wait returns after submission; use link wait to observe completion.
+    To change a healthy link's identity or allocation settings, use link hub/dps update instead.
+  examples:
+    - name: Retry a Failed DPS and its two Failed Hubs in one request
+      text: |
+        az iot adr ns link update --ns myNamespace -g myResourceGroup \\
+          --dps-endpoint-name primary-dps --hub-endpoint-name hub-a hub-b
   """
 
     helps[
@@ -743,26 +766,41 @@ def load_adr_help():
   """
 
     for kind, resource in (("hub", "IoT Hub"), ("dps", "DPS"), ("su", "Software Updates instance")):
+        hub_prerequisite = (
+            "\n    Clear Registry Device IoT Hub capability references before removing any Hub endpoint,"
+            "\n    including Failed links (EndpointUsedByNestedDevices)."
+            "\n    Deleting the IoT Hub does not clear these references."
+            if kind == "hub" else ""
+        )
         helps[f"iot adr ns link {kind} remove"] = f"""
   type: command
   short-summary: Remove a {resource} endpoint from a Device Registry namespace.
   long-summary: |
-    Delete the linked {resource} first; this command removes only the namespace endpoint.
-    The namespace outbound identity needs Reader on the linked resource's resource group.
-    A missing grant is created when you can create role assignments; it is kept after unlinking.
-    Keep that resource group until the unlink completes.
-    By default, the command waits up to 600 seconds for the namespace update and reports
-    asynchronous service errors. Use --no-wait to return after submission instead.
-    After --no-wait or a timeout, inspect completion with 'az iot adr ns show'.
-    Missing, weak, or malformed namespace ETags stop removal before RBAC changes or writes.
-    Concurrent namespace changes cause a precondition failure (HTTP 412) instead of being overwritten.
-    A conflict reports guidance to inspect the namespace and rerun the command against its latest state.
-    Any Reader grant created during preflight is retained after a conflict.
+    This command removes only the namespace endpoint, not the linked {resource}.
+    For a Succeeded link, delete the linked {resource} first.
+    Failed links do not require the linked resource to be deleted.{hub_prerequisite}
+    For Succeeded links, the namespace outbound identity needs read access to the linked resource's
+    resource group, or subscription if that group was deleted. Checks are advisory by default:
+    uncertain access warns and continues without changing role assignments; ADR validates removal.
+    --no-rbac-check skips only the advisory check, not ADR authorization. --yes skips only confirmation.
+    For Succeeded links, --grant-reader requests missing Reader access at the linked resource's
+    resource group, never its subscription. Reader covers all resources in that group.
+    It requires role-assignment permission and cannot be combined with --no-rbac-check.
+    Reader setup failures stop removal. Requested assignments are retained even if removal fails
+    and can take several minutes to take effect; retry after propagation if ADR rejects removal.
+    The command waits up to 600 seconds. --no-wait returns after submission but does not skip Reader setup.
+    After --no-wait or a timeout, inspect completion with 'az iot adr ns show' before retrying.
+    For permission-check limitations, deleted resource groups and concurrent updates, see:
+    https://github.com/Azure/azure-iot-cli-extension/blob/release/1.1.0-preview/README.md#adr-link-troubleshooting
   examples:
     - name: Remove an endpoint after its linked {resource} has been deleted
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes
     - name: Submit endpoint removal without waiting for completion
       text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
+    - name: Remove an endpoint without the advisory permission check
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --no-rbac-check
+    - name: Grant missing resource-group Reader access before removing a Succeeded endpoint
+      text: az iot adr ns link {kind} remove -n primary --ns myNamespace -g myResourceGroup --yes --grant-reader
   """
 
     helps[
@@ -772,7 +810,8 @@ def load_adr_help():
   short-summary: Link an IoT Hub to a Device Registry namespace.
   long-summary: |
     Link a Standard S-tier Hub, such as S1, as a namespace messaging endpoint.
-    Requires the namespace to already have at least one linked DPS (DPS-first ordering).
+    Requires the namespace DPS endpoint to be Succeeded.
+    Use link update to retry a Failed DPS and its required Failed Hubs together.
     --system-assigned-mi and --user-assigned-mi are optional. When supplied, exactly one may be
     used to set the inbound caller identity that the Hub will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("hub")}.
@@ -807,8 +846,9 @@ def load_adr_help():
     Retry a Failed Hub endpoint without identity options to preserve its saved identity
     (including no inbound identity) and provisioning settings. A linked DPS is required.
     To change the inbound identity, pass --system-assigned-mi or --user-assigned-mi.
-    Healthy endpoints require an explicit identity change; target and provisioning settings
-    cannot be changed in place. A Succeeded endpoint remains updateable after DPS deletion.
+    Use --availability and --weight to change provisioning settings in place, without
+    changing the inbound identity. Omitted settings are preserved; the target cannot change.
+    A Succeeded endpoint remains updateable after DPS deletion.
     Update checks target existence, region,
     provisioning-state, Standard SKU, selected identity attachment, namespace outbound
     principal, and automatic RBAC preflight. Newly created assignments must become visible
@@ -860,7 +900,8 @@ def load_adr_help():
   short-summary: Wait for an IoT Hub endpoint to link successfully.
   long-summary: |
     The endpoint name is required. Without an explicit wait predicate, this command
-    polls that endpoint's linkingState and fails immediately if it reaches Failed.
+    waits for both namespace provisioningState and endpoint linkingState to succeed.
+    A Failed or Canceled namespace, or a Failed endpoint, is reported immediately.
   examples:
     - name: Wait until a Hub endpoint reaches linkingState Succeeded
       text: az iot adr ns link hub wait -n primary --ns myNamespace -g myResourceGroup
@@ -873,8 +914,8 @@ def load_adr_help():
   short-summary: Manage DPS links (provisioning endpoints) on a Device Registry namespace.
   long-summary: |
     Only one DPS may be linked per namespace today. Links live on the namespace, not on the
-    DPS resource. After deleting the DPS resource, run link dps remove to remove its
-    namespace endpoint.
+    DPS resource. Run link dps remove to remove its namespace endpoint. For a Succeeded
+    link, delete the DPS resource first; Failed links do not require deleting it.
   """
 
     helps[
@@ -887,9 +928,10 @@ def load_adr_help():
     Rejected if the namespace already has a linked DPS (one DPS per namespace).
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided.
     Required service-to-service roles: {format_role_requirements("dps")}.
-    The namespace must also have a system-assigned identity. It receives Azure Device Registry
-    Administrator on its own namespace for registry-device provisioning, even when the
-    namespace outbound identity is user-assigned. No role is granted to the signed-in caller;
+    The namespace must also have a system-assigned identity enabled. Azure Device Registry
+    Administrator on the namespace is granted to the selected outbound identity: SAMI when
+    system-assigned outbound is selected, or the selected UAMI otherwise.
+    No role is granted to the signed-in caller;
     DPS enrollment management with --auth-type login requires separate DPS data-plane access.
     The command reuses inherited assignments and creates only missing assignments when run by
     a caller who can create role assignments (for example Owner, User Access Administrator,
@@ -920,8 +962,8 @@ def load_adr_help():
     Update checks target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
-    DPS preflight also ensures the namespace system-assigned identity has Azure Device Registry
-    Administrator on its own namespace, independently of the namespace outbound identity.
+    DPS preflight retains the namespace system-assigned identity prerequisite, but grants
+    Azure Device Registry Administrator on the namespace to its selected outbound identity.
     ARM assignment visibility does not guarantee that the linked service already honors access.
     Waited add/update commands recover only confirmed AdrMiNotAuthorized on the unchanged endpoint,
     rechecking required assignments and preserving identity and settings. --timeout (600 seconds) bounds
@@ -940,7 +982,7 @@ def load_adr_help():
   type: command
   short-summary: Show a single DPS provisioning endpoint on a Device Registry namespace.
   long-summary: |
-    Inspect the named endpoint and decide which existing DPS Hubs to link to the namespace.
+    Inspect classic DPS Hub registrations to plan combined linking or dependent Failed-link recovery.
     When the DPS read succeeds, brownfieldHubs contains its properties.iotHubs[] list and
     brownfieldHubsAvailable is true. An empty list then means no Hubs are registered.
     If access or a service failure prevents that read, brownfieldHubs is null,
@@ -974,7 +1016,8 @@ def load_adr_help():
   short-summary: Wait for a DPS endpoint to link successfully.
   long-summary: |
     The endpoint name is required. Without an explicit wait predicate, this command
-    polls that endpoint's linkingState and fails immediately if it reaches Failed.
+    waits for both namespace provisioningState and endpoint linkingState to succeed.
+    A Failed or Canceled namespace, or a Failed endpoint, is reported immediately.
   examples:
     - name: Wait until a DPS endpoint reaches linkingState Succeeded
       text: az iot adr ns link dps wait -n primary --ns myNamespace -g myResourceGroup
@@ -1005,7 +1048,7 @@ def load_adr_help():
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
-    These are exactly three service-to-service grants. Device Update Administrator enables
+    Identical resource-group Reader grants are deduplicated. Device Update Administrator enables
     namespace-initiated ADU data-plane operations, including report generation; ARM Contributor
     alone does not grant data-plane access. The configured namespace outbound identity
     and the selected Update Instance inbound identity each support SAMI or an attached UAMI.
@@ -1454,13 +1497,18 @@ def load_adr_help():
         "iot adr ns link add"
     ] = f"""
   type: command
-  short-summary: Link DPS first, then a Hub, to a Device Registry namespace.
+  short-summary: Link a DPS and its Hubs to a Device Registry namespace.
   long-summary: |
     Validates both targets, endpoint names, identity selections, and required RBAC before
-    changing namespace endpoints. Submits a DPS-only namespace update and waits for the exact
+    changing namespace endpoints. If the DPS already lists Hubs, all unlinked Hubs must
+    be included. Use --hub-endpoints JSON/file for additional Hubs with per-Hub identities/settings.
+    Brownfield and multi-Hub plans submit one PATCH; --no-wait returns after that submission.
+    Batch requests do not retry automatically. If role propagation causes a failure, inspect the
+    endpoint states and retry the Failed selections together with link update after propagation.
+    Otherwise submits a DPS-only namespace update and waits for the exact
     DPS endpoint to reach linkingState Succeeded before submitting a separate Hub update.
     --no-wait still waits for this DPS dependency; it skips waiting only for the final Hub operation.
-    Both waited stages recover only confirmed AdrMiNotAuthorized on the unchanged endpoint after
+    For greenfield single-Hub plans, both waited stages recover only confirmed AdrMiNotAuthorized after
     verifying required service-role assignments. Recovery uses endpoint update, never another add.
     --timeout (600 seconds) is one shared mutation/recovery budget for both stages after initial RBAC
     preflight, including RPCs, polling and bounded 30/60/120-second backoff. --interval defaults to 30
@@ -1474,6 +1522,12 @@ def load_adr_help():
     Required service-to-service roles:
     {format_role_requirements("dps")}; {format_role_requirements("hub")}.
   examples:
+    - name: Include an additional Hub in a brownfield DPS link plan
+      text: |
+        az iot adr ns link add --ns myNamespace -g myResourceGroup \\
+          --dps-endpoint-name primary-dps --dps-id <dps-id> --dps-system-assigned-mi \\
+          --hub-endpoint-name hub-a --hub-id <hub-a-id> --hub-system-assigned-mi \\
+          --hub-endpoints '{{"hub-b":{{"resourceId":"<hub-b-id>","inboundCallerIdentity":{{"type":"SystemAssigned"}}}}}}'
     - name: Link both a Hub and a DPS using system-assigned identity for both inbound callers
       text: |
         az iot adr ns link add --ns myNamespace -g myResourceGroup \\

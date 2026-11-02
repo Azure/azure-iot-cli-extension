@@ -326,7 +326,7 @@ def test_ci_budget_source_covers_matrix_and_controller_arithmetic():
         assert controller + config["setup_minutes"] <= config["job_timeout_minutes"]
     assert {
         service: budgets[service]["job_timeout_minutes"] for service in ("DPS", "HubControl", "HubData", "ADU", "ADR")
-    } == {"DPS": 100, "HubControl": 140, "HubData": 120, "ADU": 150, "ADR": 360}
+    } == {"DPS": 90, "HubControl": 130, "HubData": 115, "ADU": 150, "ADR": 180}
 
 
 @POSIX_WORKFLOW

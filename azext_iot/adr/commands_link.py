@@ -11,24 +11,33 @@ from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.wait import DEFAULT_WAIT_INTERVAL
 
 
-def adr_link_hub_remove(cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+def adr_link_hub_remove(
+    cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+):
     return LinkProvider(cmd, client=client).hub_remove(
         endpoint_name=endpoint_name, namespace_name=namespace_name, resource_group_name=resource_group_name,
-        no_wait=no_wait,
+        no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
     )
 
 
-def adr_link_dps_remove(cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+def adr_link_dps_remove(
+    cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+):
     return LinkProvider(cmd, client=client).dps_remove(
         endpoint_name=endpoint_name, namespace_name=namespace_name, resource_group_name=resource_group_name,
-        no_wait=no_wait,
+        no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
     )
 
 
-def adr_link_su_remove(cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str, no_wait: bool = False):
+def adr_link_su_remove(
+    cmd, client, endpoint_name: str, namespace_name: str, resource_group_name: str,
+    no_wait: bool = False, no_rbac_check: bool = False, grant_reader: bool = False,
+):
     return LinkProvider(cmd, client=client).su_remove(
         endpoint_name=endpoint_name, namespace_name=namespace_name, resource_group_name=resource_group_name,
-        no_wait=no_wait,
+        no_wait=no_wait, no_rbac_check=no_rbac_check, grant_reader=grant_reader,
     )
 
 
@@ -74,6 +83,8 @@ def adr_link_hub_update(
     no_wait: bool = False,
     timeout: Optional[int] = None,
     interval: Optional[int] = None,
+    availability: Optional[str] = None,
+    allocation_weight: Optional[int] = None,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.hub_update(
@@ -82,6 +93,8 @@ def adr_link_hub_update(
         resource_group_name=resource_group_name,
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
+        availability=availability,
+        allocation_weight=allocation_weight,
         no_wait=no_wait,
         timeout_sec=_ADR_LRO_TIMEOUT_SECONDS if timeout is None else timeout,
         wait_sec=DEFAULT_WAIT_INTERVAL if interval is None else interval,
@@ -303,6 +316,7 @@ def adr_link_add(
     no_wait: bool = False,
     timeout: int = _ADR_LRO_TIMEOUT_SECONDS,
     interval: int = DEFAULT_WAIT_INTERVAL,
+    hub_endpoints: Optional[str] = None,
 ):
     provider = LinkProvider(cmd, client=client)
     return provider.link_add(
@@ -318,7 +332,21 @@ def adr_link_add(
         dps_mi_user_assigned=dps_mi_user_assigned,
         hub_availability=hub_availability,
         hub_allocation_weight=hub_allocation_weight,
+        hub_endpoints=hub_endpoints,
         no_wait=no_wait,
         timeout_sec=timeout,
         wait_sec=interval,
+    )
+
+
+def adr_link_update(
+    cmd, client, namespace_name: str, resource_group_name: str,
+    dps_endpoint_name: Optional[str] = None, hub_endpoint_names: Optional[list] = None,
+    no_wait: bool = False, timeout: Optional[int] = None, interval: Optional[int] = None,
+):
+    return LinkProvider(cmd, client=client).link_update(
+        namespace_name, resource_group_name, dps_endpoint_name, hub_endpoint_names,
+        no_wait=no_wait,
+        timeout_sec=_ADR_LRO_TIMEOUT_SECONDS if timeout is None else timeout,
+        wait_sec=DEFAULT_WAIT_INTERVAL if interval is None else interval,
     )

@@ -73,6 +73,7 @@ def test_state_module_pools_own_distinct_resources_and_propagate_cleanup_failure
 
     mocker.patch.object(infrastructure.cli, "invoke", side_effect=invoke)
     mocker.patch.object(infrastructure, "get_closest_marker", side_effect=lambda request: request.marker)
+    mocker.patch.object(infrastructure, "_regular_phase_observer", return_value=None)
     cp_count = 2 if controlplane_pool == "routing" else 1
     cp_request = SimpleNamespace(marker=SimpleNamespace(kwargs=(
         {"count": 2, "sys_identity": True, "user_identity": True, "storage": True}
@@ -116,7 +117,7 @@ def test_state_module_pools_own_distinct_resources_and_propagate_cleanup_failure
 
 
 @pytest.mark.parametrize("suite,phase,count", [
-    ("HubControl", "regular", 31),
+    ("HubControl", "regular", 36),
     ("HubData", "entra", 44),
 ])
 def test_hub_manifest_collection_preserves_isolated_state_groups(
@@ -161,7 +162,8 @@ def test_hub_manifest_collection_preserves_isolated_state_groups(
                 assert heavy_dependencies.isdisjoint(fixtures)
                 assert fixtures["provisioned_only_iot_hubs_module"][-1].scope == "module"
                 timeout = item.get_closest_marker("timeout")
-                assert timeout.args == (_state_helpers.DATAPLANE_LIFECYCLE_TIMEOUT,)
+                expected_timeout = 3300 if item.name == "test_migrate_dataplane" else _state_helpers.DATAPLANE_LIFECYCLE_TIMEOUT
+                assert timeout.args == (expected_timeout,)
                 assert timeout.kwargs == {"func_only": False}
             elif "setup_hub_states_controlplane" in fixtures:
                 assert item.module is controlplane

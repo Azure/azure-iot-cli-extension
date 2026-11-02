@@ -69,10 +69,10 @@ def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
 
 
 @pytest.mark.hub_infrastructure(count=1)
-def test_mirgate_hub_dataplane_error(provisioned_only_iot_hubs_module):
+def test_mirgate_hub_dataplane_error(provisioned_shared_iot_hub):
     """A dataplane-only migration cannot create a missing destination."""
-    hub_name = provisioned_only_iot_hubs_module[0]["name"]
-    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    hub_name = provisioned_shared_iot_hub["name"]
+    hub_rg = provisioned_shared_iot_hub["rg"]
     fake_hub_name = "fakehub"
     fake_hub_rg = "fakerg"
     result = state.cli.invoke(
