@@ -32,6 +32,10 @@ Release History
 * Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed by default.
 * Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check``. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
 
+**ADR link identity changes**
+
+* Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub, DPS or Software Updates instance was deleted.
+
 **Shared command fixes**
 
 * Hub/DPS namespace linking now automatically grants the selected DPS identity IoT Hub Data Contributor on the associated Hubs, including link updates and DPS identity rotation. Existing assignments are reused and historical grants are retained.

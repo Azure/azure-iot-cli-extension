@@ -12,6 +12,7 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
+    ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
@@ -28,6 +29,7 @@ from azext_iot.adr.providers.base import ADRProvider, console
 from azext_iot.adr.topology import (
     endpoint_is_type,
     get_endpoints,
+    is_linked_resource_deleted,
 )
 
 logger = get_logger(__name__)
@@ -205,11 +207,11 @@ class NamespaceProvider(ADRProvider):
             "updating": "su",
         }
         links = [
-            (kind, endpoint)
+            (section, kind, name, endpoint)
             for section, kind in sections.items()
-            for endpoint in (
+            for name, endpoint in (
                 (properties.get(section) or {}).get("endpoints") or {}
-            ).values()
+            ).items()
             if endpoint
         ]
         if not links:
@@ -280,7 +282,11 @@ class NamespaceProvider(ADRProvider):
             "dps": "Microsoft.Devices/provisioningServices",
             "su": "Microsoft.DeviceUpdate/updateInstances",
         }
-        for kind, endpoint in links:
+        # ADR neither reads linked resources nor checks a DPS's iotHubs for an outbound identity change,
+        # so a deleted Hub or DPS that is still linked must not block it. Resolve each target once.
+        resolved = []
+        deleted = []
+        for section, kind, name, endpoint in links:
             if (
                 str(endpoint.get("endpointType") or "").casefold()
                 != endpoint_types[kind].casefold()
@@ -288,6 +294,26 @@ class NamespaceProvider(ADRProvider):
                 continue
             resource_id = endpoint.get("resourceId")
             parser, strategy = strategies[kind]
+            if is_linked_resource_deleted(endpoint):
+                deleted.append((section, name))
+                continue
+            try:
+                target = provider._get_target(  # pylint: disable=protected-access
+                    parser(resource_id), strategy
+                )
+            except ResourceNotFoundError:
+                deleted.append((section, name))
+                continue
+            resolved.append((kind, endpoint, resource_id, parser, strategy, target))
+        for section, name in deleted:
+            candidate["properties"][section]["endpoints"].pop(name, None)
+        if deleted:
+            logger.warning(
+                "Skipping role assignments for linked endpoints whose resource no longer exists: %s. "
+                "Remove these links with 'az iot adr ns link hub|dps|su remove'.",
+                ", ".join(f"{section}/{name}" for section, name in deleted),
+            )
+        for kind, endpoint, resource_id, parser, strategy, target in resolved:
             provider._preflight_link(  # pylint: disable=protected-access
                 link_type=kind,
                 namespace=candidate,
@@ -296,6 +322,9 @@ class NamespaceProvider(ADRProvider):
                 parsed=parser(resource_id),
                 strategy=strategy,
                 rbac_requests=requests,
+                target=target,
+                validate_iot_hubs=False,
+                hub_exists=lambda _resource_id: True,
             )
         provider._rbac_manager().ensure_many(  # pylint: disable=protected-access
             requests

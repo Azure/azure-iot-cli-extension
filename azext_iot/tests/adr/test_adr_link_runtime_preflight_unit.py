@@ -813,3 +813,289 @@ def test_combined_add_rejects_topology_and_name_collisions(
     fixture_link_provider._preflight_link.assert_not_called()
     fixture_link_provider._rbac.ensure_many.assert_not_called()
     fixture_link_provider.client.namespaces.begin_update.assert_not_called()
+
+
+# Stale DPS iotHubs / deleted linked resources (ADO 40494597).
+_STALE_UAMI = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi"
+_STALE_HUB_A = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub-a"
+_STALE_HUB_B = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub-b"
+_STALE_DPS = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps"
+
+
+def _stale_target(resource_id, name, **properties):
+    return {
+        "id": resource_id,
+        "location": "centraluseuap",
+        "sku": {"name": "S1"},
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "principalId": f"{name}-system",
+            "userAssignedIdentities": {_STALE_UAMI: {"principalId": f"{name}-user"}},
+        },
+        "properties": {"provisioningState": "Succeeded", "hostName": f"{name}.azure-devices.net", **properties},
+    }
+
+
+def _stale_namespace(hub_b_state="LinkedResourceDeleted", dps_state="Succeeded"):
+    hubs = {"hub-a": {
+        "endpointType": "Microsoft.Devices/IotHubs", "resourceId": _STALE_HUB_A,
+        "inboundCallerIdentity": {"type": "SystemAssigned"}, "linkingState": "Succeeded",
+    }}
+    if hub_b_state:
+        hubs["hub-b"] = {
+            "endpointType": "Microsoft.Devices/IotHubs", "resourceId": _STALE_HUB_B,
+            "inboundCallerIdentity": {"type": "SystemAssigned"}, "linkingState": hub_b_state,
+        }
+    return {
+        "id": NS_ID,
+        "location": "centraluseuap",
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "principalId": "namespace-system",
+            "userAssignedIdentities": {_STALE_UAMI: {"principalId": "namespace-user"}},
+        },
+        "properties": {
+            "provisioningState": "Succeeded",
+            "messaging": {"endpoints": hubs},
+            "provisioning": {"endpoints": {"dps": {
+                "endpointType": "Microsoft.Devices/provisioningServices", "resourceId": _STALE_DPS,
+                "inboundCallerIdentity": {"type": "SystemAssigned"}, "linkingState": dps_state,
+            }}},
+        },
+    }
+
+
+def _stale_lookup(missing=("hub-b",)):
+    def lookup(parsed, _strategy):
+        name = parsed["name"]
+        if name in missing:
+            raise ResourceNotFoundError(f"'{name}' was not found")
+        if name == "dps":
+            return _stale_target(_STALE_DPS, "dps", iotHubs=[
+                {"name": "hub-a.azure-devices.net"}, {"name": "hub-b.azure-devices.net"},
+            ])
+        return _stale_target(_STALE_HUB_A, name)
+    return MagicMock(side_effect=lookup)
+
+
+def _looked_up(provider):
+    return [call.args[0]["name"] for call in provider._get_target.call_args_list]
+
+
+def _granted_scopes(requests):
+    from azext_iot.adr.rbac import required_assignments
+
+    return {scope.lower() for request in requests for _, (_, _, scope) in required_assignments(request)}
+
+
+@pytest.mark.parametrize(
+    "endpoint, expected",
+    [
+        ({"linkingState": "LinkedResourceDeleted"}, True),
+        ({"linkingState": "linkedresourcedeleted"}, True),
+        ({"provisioningStatus": {"status": "LinkedResourceDeleted"}}, True),
+        ({"status": {"status": "LinkedResourceDeleted"}}, True),
+        ({"linkingState": "Succeeded", "status": {"status": "LinkedResourceDeleted"}}, False),
+        ({"linkingState": "Failed"}, False),
+        ({}, False),
+        (None, False),
+    ],
+)
+def test_is_linked_resource_deleted(endpoint, expected):
+    from azext_iot.adr.topology import is_linked_resource_deleted
+
+    assert is_linked_resource_deleted(endpoint) is expected
+
+
+# "Succeeded": ADR has not yet reported the deleted Hub, so only its 404 identifies it.
+@pytest.mark.parametrize("hub_b_state", ["LinkedResourceDeleted", None, "Succeeded"])
+@pytest.mark.parametrize("identity", [{"mi_user_assigned": _STALE_UAMI}, {"mi_system_assigned": True}])
+def test_dps_update_ignores_stale_classic_hubs_and_deleted_hub_links(hub_b_state, identity):
+    provider = _provider()
+    provider.client.namespaces.get.return_value = _stale_namespace(hub_b_state)
+    provider._get_target = _stale_lookup()
+    provider._rbac = MagicMock()
+    provider._patch_link = MagicMock(return_value="SUBMITTED")
+
+    assert provider.dps_update("dps", "ns", "rg", no_wait=True, **identity) == "SUBMITTED"
+
+    provider._patch_link.assert_called_once()
+    assert _looked_up(provider).count("hub-b") == (1 if hub_b_state == "Succeeded" else 0)
+    request = provider._rbac.ensure.call_args.kwargs
+    assert request["hub_scopes"] == (_STALE_HUB_A.lower(),)
+    assert _STALE_HUB_B.lower() not in _granted_scopes([request])
+
+
+@pytest.mark.parametrize("hub_b_state", ["LinkedResourceDeleted", None])
+def test_failed_dps_update_still_requires_classic_hubs_to_be_linked(hub_b_state):
+    provider = _provider()
+    provider.client.namespaces.get.return_value = _stale_namespace(hub_b_state, dps_state="Failed")
+    provider._get_target = _stale_lookup()
+    provider._rbac = MagicMock()
+    provider._patch_link = MagicMock()
+
+    with pytest.raises(InvalidArgumentValueError, match="hub-b"):
+        provider.dps_update("dps", "ns", "rg", mi_system_assigned=True, no_wait=True)
+
+    provider._patch_link.assert_not_called()
+    provider._rbac.ensure.assert_not_called()
+
+
+def test_dps_add_still_requires_classic_hubs_to_be_linked():
+    provider = _provider()
+    namespace = _stale_namespace(None)
+    namespace["properties"]["provisioning"] = {"endpoints": {}}
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = _stale_lookup()
+    provider._rbac = MagicMock()
+    provider._patch_link = MagicMock()
+
+    with pytest.raises(InvalidArgumentValueError, match="hub-b"):
+        provider.dps_add("dps", "ns", "rg", _STALE_DPS, mi_system_assigned=True, no_wait=True)
+
+    provider._patch_link.assert_not_called()
+
+
+def _run_outbound_preflight(mocker, namespace, lookup, outbound=None):
+    from azext_iot.adr.providers.namespace import NamespaceProvider
+
+    provider = _provider()
+    provider._get_target = lookup
+    provider._rbac = MagicMock()
+    mocker.patch("azext_iot.adr.providers.link.LinkProvider", return_value=provider)
+    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=provider.client)
+    warning = mocker.patch("azext_iot.adr.providers.namespace.logger.warning")
+    original = deepcopy(namespace)
+    NamespaceProvider(provider.cmd)._preflight_outbound_identity_change(
+        namespace, outbound or {"type": "UserAssigned", "userAssignedIdentity": _STALE_UAMI},
+    )
+    assert namespace == original
+    return provider, provider._rbac.ensure_many.call_args.args[0], warning
+
+
+@pytest.mark.parametrize(
+    "hub_b_state, missing, expect_get, expect_warning",
+    [
+        ("LinkedResourceDeleted", ("hub-b",), False, True),
+        ("Succeeded", ("hub-b",), True, True),
+        (None, ("hub-b",), False, False),
+    ],
+)
+@pytest.mark.parametrize("outbound", [
+    {"type": "UserAssigned", "userAssignedIdentity": _STALE_UAMI}, {"type": "SystemAssigned"},
+])
+def test_outbound_identity_preflight_skips_deleted_hubs_and_stale_classic_hubs(
+    mocker, hub_b_state, missing, expect_get, expect_warning, outbound,
+):
+    provider, requests, warning = _run_outbound_preflight(
+        mocker, _stale_namespace(hub_b_state), _stale_lookup(missing), outbound,
+    )
+
+    assert _looked_up(provider).count("hub-b") == (1 if expect_get else 0)
+    assert {(request["link_type"], request["target_scope"]) for request in requests} == {
+        ("dps", _STALE_DPS), ("hub", _STALE_HUB_A),
+    }
+    principal = "namespace-user" if outbound["type"] == "UserAssigned" else "namespace-system"
+    assert all(request["namespace_principal_id"] == principal for request in requests)
+    assert all(request["hub_scopes"] == (_STALE_HUB_A.lower(),) for request in requests)
+    assert _STALE_HUB_B.lower() not in _granted_scopes(requests)
+    assert warning.called is expect_warning
+    if expect_warning:
+        assert "messaging/hub-b" in warning.call_args.args[1]
+
+
+def test_outbound_identity_preflight_skips_deleted_dps_without_dps_hub_grants(mocker):
+    namespace = _stale_namespace(None, dps_state="LinkedResourceDeleted")
+    provider, requests, warning = _run_outbound_preflight(mocker, namespace, _stale_lookup(("dps",)))
+
+    assert "dps" not in _looked_up(provider)
+    assert [(request["link_type"], request["target_scope"]) for request in requests] == [("hub", _STALE_HUB_A)]
+    assert "dps_principal_id" not in requests[0]
+    assert "provisioning/dps" in warning.call_args.args[1]
+
+
+def test_outbound_identity_preflight_propagates_non_404_target_errors(mocker):
+    from azext_iot.adr.providers.namespace import NamespaceProvider
+
+    provider = _provider()
+    provider._get_target = MagicMock(side_effect=_http_error(403))
+    provider._rbac = MagicMock()
+    mocker.patch("azext_iot.adr.providers.link.LinkProvider", return_value=provider)
+    mocker.patch("azext_iot.adr.providers.base.adr_service_factory", return_value=provider.client)
+    with pytest.raises(HttpResponseError):
+        NamespaceProvider(provider.cmd)._preflight_outbound_identity_change(
+            _stale_namespace("Succeeded"), {"type": "SystemAssigned"},
+        )
+    provider._rbac.ensure_many.assert_not_called()
+
+
+def test_dps_update_recovery_recomputes_the_same_grants_without_the_missing_hub(mocker):
+    provider = _provider()
+    namespace = _stale_namespace("Succeeded")
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = _stale_lookup()
+    provider._rbac = MagicMock()
+    recovery = mocker.patch("azext_iot.adr.providers.link.LinkRecovery")
+
+    provider.dps_update("dps", "ns", "rg", mi_system_assigned=True)
+
+    stored = provider._link_requests[("dps", _STALE_DPS.casefold())]
+    assert stored[0]["hub_scopes"] == (_STALE_HUB_A.lower(),)
+    verify = recovery.call_args.args[6]
+    deadline = MagicMock(call=lambda fn, *args: fn(*args), remaining=MagicMock(return_value=60))
+    verify(namespace, deadline)
+    provider._rbac.verify_many.assert_called_once()
+    assert provider._rbac.verify_many.call_args.args[0] == stored
+
+
+def test_dps_update_propagates_non_404_hub_errors():
+    provider = _provider()
+    provider.client.namespaces.get.return_value = _stale_namespace("Succeeded")
+    lookup = _stale_lookup(())
+
+    def failing(parsed, strategy):
+        if parsed["name"] == "hub-b":
+            raise _http_error(403)
+        return lookup(parsed, strategy)
+
+    provider._get_target = MagicMock(side_effect=failing)
+    provider._rbac = MagicMock()
+    provider._patch_link = MagicMock()
+    with pytest.raises(HttpResponseError):
+        provider.dps_update("dps", "ns", "rg", mi_system_assigned=True, no_wait=True)
+    provider._patch_link.assert_not_called()
+
+
+def test_combined_batch_add_keeps_missing_existing_hub_out_of_dps_grants(mocker):
+    provider = _provider()
+    namespace = _stale_namespace("Succeeded")
+    namespace["properties"]["provisioning"] = {"endpoints": {}}
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = _stale_lookup()
+    provider._rbac = MagicMock()
+    batch = mocker.patch.object(provider, "_patch_link_batch", return_value="SUBMITTED")
+    hub_c = _STALE_HUB_A.replace("hub-a", "hub-c")
+
+    provider.link_add("ns", "rg", "hub-c", hub_c, "dps", _STALE_DPS, dps_mi_system_assigned=True)
+
+    batch.assert_called_once()
+    assert _looked_up(provider).count("hub-b") == 1
+    requests = provider._rbac.ensure_many.call_args.args[0]
+    dps_request = next(request for request in requests if request["link_type"] == "dps")
+    assert dps_request["hub_scopes"] == tuple(sorted({_STALE_HUB_A.lower(), hub_c.lower()}))
+    assert _STALE_HUB_B.lower() not in _granted_scopes(requests)
+
+
+@pytest.mark.parametrize("su_state", ["LinkedResourceDeleted", "Succeeded"])
+def test_outbound_identity_preflight_skips_deleted_software_updates_instance(mocker, su_state):
+    su_id = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceUpdate/updateInstances/su"
+    namespace = _stale_namespace(None)
+    namespace["properties"]["updating"] = {"endpoints": {"su": {
+        "endpointType": "Microsoft.DeviceUpdate/updateInstances", "resourceId": su_id,
+        "inboundCallerIdentity": {"type": "SystemAssigned"}, "linkingState": su_state,
+    }}}
+    provider, requests, warning = _run_outbound_preflight(mocker, namespace, _stale_lookup(("hub-b", "su")))
+
+    assert _looked_up(provider).count("su") == (1 if su_state == "Succeeded" else 0)
+    assert {request["link_type"] for request in requests} == {"dps", "hub"}
+    assert "updating/su" in warning.call_args.args[1]
