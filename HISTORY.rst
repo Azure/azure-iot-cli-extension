@@ -8,6 +8,8 @@ Unreleased
 
 **IoT Hub Device Provisioning Service (DPS) updates**
 
+* Fixed DPS data-plane commands using ``--auth-type login`` failing against Azure US Government (``.azure-devices-provisioning.us``) and Azure China (``.azure-devices-provisioning.cn``) endpoints because they requested the public-cloud Microsoft Entra audience.
+
 * **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
 
 **IoT Hub updates**
