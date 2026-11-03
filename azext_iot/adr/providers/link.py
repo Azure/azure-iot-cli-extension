@@ -121,6 +121,15 @@ class LinkProvider(ADRProvider):
             strategy,
         )
 
+    def _hub_exists(self, resource_id: str, call=None) -> bool:
+        """Whether a linked Hub still exists; ADR may not yet report a deleted Hub as LinkedResourceDeleted."""
+        try:
+            (call or (lambda fn, *args: fn(*args)))(self._get_target, _parse_hub_resource_id(resource_id), _HUB_TARGET)
+        except ResourceNotFoundError:
+            logger.warning("Skipping DPS role assignment for linked IoT Hub '%s' because it no longer exists.", resource_id)
+            return False
+        return True
+
     def _preflight_link(
         self,
         link_type: str,
@@ -132,6 +141,9 @@ class LinkProvider(ADRProvider):
         *,
         rbac_requests: Optional[list] = None,
         planned_hubs: Optional[dict] = None,
+        target: Optional[dict] = None,
+        validate_iot_hubs: bool = True,
+        hub_exists=None,
     ) -> dict:
         requests = []
         target = preflight_target(
@@ -141,15 +153,20 @@ class LinkProvider(ADRProvider):
             inbound_identity=inbound_identity,
             parsed=parsed,
             strategy=strategy,
-            lookup=lambda parsed_id, _: self._get_target(parsed_id, strategy),
+            lookup=(
+                (lambda parsed_id, _: self._get_target(parsed_id, strategy)) if target is None
+                else (lambda _parsed_id, _strategy: target)
+            ),
             rbac_manager=self._rbac_manager,
             rbac_requests=requests,
         )
-        if link_type == "dps":
+        # ADR checks a DPS's iotHubs only when the DPS is added or a Failed DPS is retried.
+        if link_type == "dps" and validate_iot_hubs:
             validate_dps_hubs(namespace, target, planned_hubs)
         add_dps_hub_role_requirements(
             requests[0], namespace,
             lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
+            hub_exists or self._hub_exists,
         )
         self._link_requests[(link_type, target_resource_id.casefold())] = deepcopy(requests)
         if rbac_requests is not None:
@@ -371,6 +388,7 @@ class LinkProvider(ADRProvider):
                 lambda resource_id: deadline.call(
                     self._get_target, _parse_dps_resource_id(resource_id), _DPS_TARGET,
                 ),
+                lambda resource_id: self._hub_exists(resource_id, deadline.call),
             )
             deadline.remaining()
             if requests != original_requests:
@@ -711,6 +729,7 @@ class LinkProvider(ADRProvider):
             inbound_identity=inbound_identity,
             parsed=_parse_dps_resource_id(dps_resource_id),
             strategy=_DPS_TARGET,
+            validate_iot_hubs=is_failed_link_endpoint(endpoint),
         )
 
         return self._patch_link(
@@ -927,7 +946,13 @@ class LinkProvider(ADRProvider):
         batch = len(hubs) > 1 or bool((dps.get("properties") or {}).get("iotHubs"))
         if batch:
             properties["messaging"] = {"endpoints": {**_get_messaging_endpoints(existing), **hubs}}
-            add_dps_hub_role_requirements(rbac_requests[0], hub_plan, None)
+            # Keep existing Hubs the DPS preflight found missing out of the batch grants.
+            known_hubs = set(rbac_requests[0].get("hub_scopes") or ()) | {
+                body["resourceId"].rstrip("/").lower() for body in hubs.values()
+            }
+            add_dps_hub_role_requirements(
+                rbac_requests[0], hub_plan, None, lambda resource_id: resource_id.rstrip("/").lower() in known_hubs,
+            )
         for body in hubs.values():
             self._preflight_link(
                 link_type="hub", namespace=hub_plan, target_resource_id=body["resourceId"],

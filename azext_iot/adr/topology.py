@@ -88,10 +88,19 @@ def is_failed_hub_endpoint(endpoint) -> bool:
     return endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and is_failed_link_endpoint(endpoint)
 
 
-def is_failed_link_endpoint(endpoint: dict) -> bool:
+def _link_state(endpoint: dict) -> str:
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     state = endpoint.get("linkingState") or (status.get("status") if isinstance(status, dict) else None)
-    return str(state or "").casefold() == "failed"
+    return str(state or "").casefold()
+
+
+def is_failed_link_endpoint(endpoint: dict) -> bool:
+    return _link_state(endpoint) == "failed"
+
+
+def is_linked_resource_deleted(endpoint) -> bool:
+    """Return whether ADR reports that the endpoint's linked resource was deleted."""
+    return isinstance(endpoint, dict) and _link_state(endpoint) == "linkedresourcedeleted"
 
 
 def endpoint_update_body(

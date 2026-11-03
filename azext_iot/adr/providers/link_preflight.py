@@ -22,7 +22,13 @@ from azext_iot.adr.rbac import (
     resolve_linked_resource_principal,
     resolve_namespace_outbound_principal,
 )
-from azext_iot.adr.topology import DPS_CAP_EXCEEDED_MSG, endpoint_is_type, get_endpoints, is_failed_link_endpoint
+from azext_iot.adr.topology import (
+    DPS_CAP_EXCEEDED_MSG,
+    endpoint_is_type,
+    get_endpoints,
+    is_failed_link_endpoint,
+    is_linked_resource_deleted,
+)
 
 
 @dataclass(frozen=True)
@@ -196,16 +202,20 @@ def preflight_target(
     return target
 
 
-def add_dps_hub_role_requirements(request: dict, namespace: dict, lookup_dps: Callable) -> None:
+def add_dps_hub_role_requirements(
+    request: dict, namespace: dict, lookup_dps: Callable, hub_exists: Optional[Callable[[str], bool]] = None,
+) -> None:
     """Bind the selected DPS principal to the Hub scopes in this link plan."""
     kind = request["link_type"]
     if kind not in ("hub", "dps"):
         return
+    # A deleted Hub has no scope to grant; ADR keeps its endpoint until the link is removed.
     hub_scopes = (
         [request["target_scope"]] if kind == "hub" else [
             endpoint.get("resourceId")
             for endpoint in get_endpoints(namespace, "messaging").values()
-            if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE)
+            if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and not is_linked_resource_deleted(endpoint)
+            and (hub_exists is None or hub_exists(endpoint.get("resourceId")))
         ]
     )
     if not hub_scopes:
