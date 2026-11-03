@@ -62,7 +62,7 @@ def test_handoff_records_acceptance_without_claiming_deletion(receipt_directory,
     name = "iot_hub_service_factory" if kind == "hub" else "iot_service_provisioning_factory"
     factory = mocker.patch.object(fixtures, name)
     client = factory.return_value.__enter__.return_value
-    getattr(fixtures, f"_delete_{kind}")("owned")
+    getattr(fixtures, "_delete_fixture_dps" if kind == "dps" else "_delete_hub")("owned")
     operation = client.iot_hub_resource if kind == "hub" else client.iot_dps_resource
     assert operation.begin_delete.call_args.kwargs["polling"] is False
     operation.begin_delete.return_value.result.assert_not_called()
