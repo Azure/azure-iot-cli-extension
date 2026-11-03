@@ -17,7 +17,6 @@ from azure.cli.core.azclierror import InvalidArgumentValueError
 from azure.core.pipeline.transport import RequestsTransport
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests.adr._helpers import wait_for_condition
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
 from azext_iot.tests.dps import conftest as fixtures
@@ -103,5 +102,3 @@ def test_dps_unit_capacity_owned_lifecycle(request):
             description="owned DPS capacity allocation absence", timeout=600, interval=10,
             is_retryable_error=lambda _error: False,
         )
-        if handoff.enabled():
-            _phase_receipts.after_delete(name)
