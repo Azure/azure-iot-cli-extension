@@ -314,15 +314,16 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 180
 
 
+@pytest.mark.parametrize("kind", ["integration", "health"])
 @pytest.mark.parametrize("services,scope", [
     (["ADR", "HubData", "DPS", "ADU", "HubControl"], "DPS,Hub,ADU,ADR"),
     (["HubControl", "ADR"], "HubControl,ADR"),
     (["HubData"], "HubData"),
 ])
-def test_run_title_uses_distinct_planned_services_not_matrix_combinations(services, scope):
+def test_run_title_uses_distinct_planned_services_not_matrix_combinations(kind, services, scope):
     jobs = pipeline.plan(services, ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
-    assert pipeline.run_title(jobs, "health", "Integration tests", "123") == (
-        f"iot-health-123 (australiaeast) ({scope})"
+    assert pipeline.run_title(jobs, kind, "Integration tests", "123") == (
+        f"iot-{kind}-123 (australiaeast) ({scope})"
     )
 
 
@@ -437,11 +438,20 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     entry["stages"] = implementation["stages"]
     parameters = {value["name"]: value for value in entry["parameters"]}
     assert entry["trigger"] == entry["pr"] == "none"
+    assert entry["appendCommitMessageToRunName"] is False
     assert parameters["mode"]["default"] == "Integration tests"
     assert parameters["mode"]["values"] == ["Dry run", "Integration tests"]
     assert len(entry["stages"]) == 2
     assert entry["stages"][0]["stage"] == "Plan"
     assert [job["job"] for job in entry["stages"][0]["jobs"]] == ["Plan"]
+    title_step = entry["stages"][0]["jobs"][0]["steps"][-1]
+    assert title_step["displayName"] == "Set run title" and "_ado_pipeline.py title" in title_step["bash"]
+    assert title_step["env"] == {
+        "${{ if parameters.health }}": {"PLAN": "health-plan/plan.json", "RUN_KIND": "health"},
+        "${{ else }}": {"PLAN": "plan.json", "RUN_KIND": "integration"},
+        "RUN_MODE": "${{ parameters.mode }}",
+        "RELEASE_BUILD_ID": "${{ parameters.releaseBuildId }}",
+    }
     assert "${{ if eq(parameters.mode, 'Integration tests') }}" in entry["stages"][1]
     assert parameters["services"]["default"] == ["DPS/Hub/ADR/ADU"]
     assert parameters["services"]["values"] == ["DPS/Hub/ADR/ADU", *retry.SERVICES]
