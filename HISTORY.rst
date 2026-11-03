@@ -6,8 +6,19 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**MQTT 5 preview**
+
+* Added ``--connection-profile MqttV5`` to Hub creation and ``az iot hub topic-group`` commands for MQTT 5 topic-group management.
+* MQTT 5 Hubs use ADR namespace links.
+
+**Semantic Model preview**
+
+* Added ADR schema registry, schema, and schema-version commands for Thing Models, Thing Descriptions, and message schemas.
+* Added device type references for Registry Devices, DPS enrollments, and enrollment groups, plus Hub route data-schema references and ``DOObservationV1`` endpoint formatting for contextualized telemetry.
+
 **Hub bug fixes**
 
+* Fixed ``az iot hub monitor-events --login`` failing with an unhandled ``ValueError`` for Event Hub-compatible connection strings from Azure US Government (``.servicebus.usgovcloudapi.net``) and Azure China (``.servicebus.chinacloudapi.cn``) hubs.
 * Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
 * Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
 
@@ -32,6 +43,7 @@ Release History
 
 **DPS certificate and enrollment fixes**
 
+* Fixed DPS data-plane commands using ``--auth-type login`` failing against Azure US Government (``.azure-devices-provisioning.us``) and Azure China (``.azure-devices-provisioning.cn``) endpoints because they requested the public-cloud Microsoft Entra audience.
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
 * Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
 
