@@ -239,17 +239,22 @@ def test_subscription_resolution_is_shared_by_setup_and_direct_service_login(tmp
 
 
 @POSIX_WORKFLOW
-def test_release_inputs_build_complete_australiaeast_public_matrix(tmp_path):
+@pytest.mark.parametrize("region", [None, "centraluseuap", "australiaeast", "centralus"])
+def test_release_inputs_build_complete_selected_region_public_matrix(tmp_path, region):
     release = yaml.safe_load((ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    declared = _triggers(release)["workflow_dispatch"]["inputs"]["integration_region"]
+    selected_region = declared["default"] if region is None else region
+    assert selected_region in declared["options"]
     inputs = release["jobs"]["int_test"]["with"]
+    assert inputs["regions"] == "${{ inputs.integration_region }}"
     result, outputs = _matrix(
         tmp_path, INPUT_SERVICES=inputs["test-services"], INPUT_PYTHON_VERSIONS=inputs["python-versions"],
-        INPUT_REGIONS=inputs["regions"], INPUT_ARM_ENDPOINT=inputs["arm-endpoint"],
+        INPUT_REGIONS=selected_region, INPUT_ARM_ENDPOINT=inputs["arm-endpoint"],
         RESOURCE_GROUP=inputs["resource-group"], TEST_SUBSCRIPTION_ID=inputs["subscription-id"],
     )
     assert result.returncode == 0, result.stdout + result.stderr
     rows = json.loads(outputs["matrix"])
-    expected = Counter(itertools.product(SERVICES, ("3.10", "3.13"), ("australiaeast",)))
+    expected = Counter(itertools.product(SERVICES, ("3.10", "3.13"), (selected_region,)))
     assert Counter((row["service"], row["python"], row["region"]) for row in rows) == expected
     assert all(row["arm_endpoint"] == "https://management.azure.com" for row in rows)
 

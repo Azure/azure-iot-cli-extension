@@ -21,6 +21,15 @@ on:
         type: boolean
         required: false
         default: true
+      integration_region:
+        description: Integration test region
+        type: choice
+        required: false
+        default: australiaeast
+        options:
+          - centraluseuap
+          - australiaeast
+          - centralus
 jobs:
   security:
     permissions:
@@ -65,7 +74,7 @@ jobs:
     with:
       test-services: "auto"
       python-versions: "3.10,3.13"
-      regions: "australiaeast"
+      regions: ${{ inputs.integration_region }}
       arm-endpoint: "public"
       resource-group: "cli-int-test-rg"
       subscription-id: "a386d5ea-ea90-441a-8263-d816368c84a1"

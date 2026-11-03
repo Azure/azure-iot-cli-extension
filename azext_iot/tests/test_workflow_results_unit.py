@@ -775,13 +775,18 @@ def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_p
     assert not output.exists()
 
 
-def test_release_caller_uses_owned_australiaeast_public_scope():
+def test_release_caller_uses_selected_region_in_owned_public_scope():
     release = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
+    triggers = release.get("on", release.get(True))
+    region = triggers["workflow_dispatch"]["inputs"]["integration_region"]
+    assert region["type"] == "choice"
+    assert region["default"] == "australiaeast"
+    assert region["options"] == ["centraluseuap", "australiaeast", "centralus"]
     assert release["jobs"]["int_test"]["uses"] == "./.github/workflows/int_test.yml"
     inputs = release["jobs"]["int_test"]["with"]
     assert inputs["test-services"] == "auto"
     assert inputs["python-versions"] == "3.10,3.13"
-    assert inputs["regions"] == "australiaeast"
+    assert inputs["regions"] == "${{ inputs.integration_region }}"
     assert inputs["arm-endpoint"] == "public"
     assert inputs["resource-group"] == "cli-int-test-rg"
     assert inputs["subscription-id"] == "a386d5ea-ea90-441a-8263-d816368c84a1"
