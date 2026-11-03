@@ -416,6 +416,39 @@ class TestSdkResolverHostnames:
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net"
         assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"
 
+    @pytest.mark.parametrize("hostname_field", ["entity", "serviceHostName"])
+    @pytest.mark.parametrize(
+        "hostname,resource_id",
+        [
+            ("mydps.azure-devices-provisioning.net", "https://azure-devices-provisioning.net"),
+            ("mydps.azure-devices-provisioning.us", "https://azure-devices-provisioning.us"),
+            ("mydps.azure-devices-provisioning.cn", "https://azure-devices-provisioning.cn"),
+        ],
+    )
+    def test_dps_service_sdk_uses_cloud_resource(self, mocker, mocked_response, hostname_field, hostname, resource_id):
+        from urllib.parse import parse_qs, urlsplit
+        from azext_iot._factory import SdkResolver
+
+        cmd = mocker.Mock()
+        target = {"entity": "legacy.azure-devices-provisioning.net", "policy": "login", "cmd": cmd}
+        target[hostname_field] = hostname
+        token = mocker.patch(
+            "azext_iot.common.auth.get_aad_token",
+            return_value={"tokenType": "Bearer", "accessToken": "test-token"},
+        )
+        mocked_response.add(
+            method="GET", url=f"https://{hostname}/enrollments/test", json={"registrationId": "test"}
+        )
+
+        with SdkResolver(target)._get_dps_service_sdk() as client:
+            assert client.individual_enrollment.get(id="test") == {"registrationId": "test"}
+
+        token.assert_called_once_with(cli_ctx=cmd.cli_ctx, resource=resource_id)
+        assert len(mocked_response.calls) == 1
+        request = mocked_response.calls[0].request
+        assert request.url.split("?")[0] == f"https://{hostname}/enrollments/test"
+        assert parse_qs(urlsplit(request.url).query)["api-version"] == ["2026-11-01"]
+
 
 ORDINARY_MANAGEMENT_OPERATIONS = [
     ("iot_hub_service_factory", "iot_hub_resource", "IotHubs",

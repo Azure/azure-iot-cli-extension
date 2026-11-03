@@ -27,6 +27,7 @@ Release History
 * **[Breaking Change]** ``az iot dps enrollment-group compute-device-key`` returns a string: TSV no longer includes the Python ``b'...'`` wrapper, and YAML no longer represents it as binary.
 * **[Breaking Change]** Removed deprecated DPS command aliases, ``az dt reset``, obsolete ``--repair`` and ``--storage-authentication-type`` options, and deprecated ADR enrollment option spellings.
 * Fixed ``az iot hub monitor-events --login`` for Event Hub-compatible connection strings from Azure US Government and Azure China.
+* Fixed DPS data-plane commands using ``--auth-type login`` failing against Azure US Government (``.azure-devices-provisioning.us``) and Azure China (``.azure-devices-provisioning.cn``) endpoints because they requested the public-cloud Microsoft Entra audience.
 
 0.33.0b1 (Preview)
 ++++++++++++++++++
