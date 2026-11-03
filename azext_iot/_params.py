@@ -1319,6 +1319,7 @@ def load_arguments(self, _):
             context.argument(
                 "device_type_ref",
                 options_list=["--device-type-ref"],
+                is_preview=True,
                 help="Device type reference stored by DPS. "
                 "The CLI passes the value as provided without resolving it or validating its format.",
                 arg_group="Semantic Model",
@@ -1329,6 +1330,7 @@ def load_arguments(self, _):
             context.argument(
                 "remove_device_type_ref",
                 options_list=["--remove-device-type-ref"],
+                is_preview=True,
                 arg_type=get_three_state_flag(),
                 help="Remove the device type reference stored by DPS.",
                 arg_group="Semantic Model",
