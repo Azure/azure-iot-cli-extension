@@ -169,3 +169,46 @@ def test_adr_infrastructure_cleanup_handoff_is_cleanup_only(records, mocker, kin
         operation.begin_delete.return_value.result.assert_not_called()
     else:
         assert ("--no-wait" in helper.cmd.call_args.args[0]) == (kind != "identity")
+
+
+@pytest.mark.parametrize("kind", ["dps", "hub", "namespace"])
+def test_adr_mid_test_cleanup_waits_even_with_handoff_enabled(records, mocker, kind):
+    from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+
+    helper = ADRFullInfraHelper()
+    resource = (kind, "owned", "rg")
+    helper._owned_resources = {resource: None}
+    delete = mocker.patch.object(helper, "_delete_owned_resource")
+    deferred = mocker.patch.object(helper, "_handoff_owned_resource")
+    helper._cleanup_owned_resources([resource])
+    delete.assert_called_once_with(*resource)
+    deferred.assert_not_called()
+    assert not helper._owned_resources
+    assert handoff.summary(records) == []
+
+
+@pytest.mark.parametrize("teardown", [False, True])
+def test_dps_deletion_waits_unless_fixture_teardown_explicitly_defers(records, mocker, teardown):
+    from azext_iot.tests.dps import conftest as fixtures
+
+    mocker.patch.object(fixtures._phase_receipts, "settings", return_value=(records, "run", "subscription"))
+    mocker.patch.object(fixtures._phase_receipts, "before_delete", return_value=True)
+    after = mocker.patch.object(fixtures._phase_receipts, "after_delete")
+    mocker.patch.object(fixtures, "_find_dps_by_name", return_value={"name": "owned"})
+    mocker.patch.object(fixtures._phase_runtime, "owned_write")
+    invoke = mocker.patch.object(fixtures.cli, "invoke")
+    factory = mocker.patch.object(fixtures, "iot_service_provisioning_factory")
+    if teardown:
+        fixtures._resource_handlers("dps")[1]("owned")
+        factory.return_value.__enter__.return_value.iot_dps_resource.begin_delete.assert_called_once_with(
+            resource_group_name=fixtures.ENTITY_RG, provisioning_service_name="owned", polling=False, retry_total=0,
+        )
+        invoke.assert_not_called()
+        after.assert_called_once_with("owned", completed=False)
+    else:
+        fixtures._delete_dps("owned")
+        invoke.assert_called_once_with(
+            f"iot dps delete --name owned --resource-group {fixtures.ENTITY_RG}", capture_stderr=True,
+        )
+        factory.assert_not_called()
+        after.assert_called_once_with("owned")

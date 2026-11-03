@@ -475,7 +475,9 @@ def _resource_handlers(kind):
         from azext_iot.tests.dps._csr_issuance import find_namespace, delete_namespace
 
         return find_namespace, delete_namespace
-    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (_find_dps_by_name, _delete_dps)
+    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (
+        _find_dps_by_name, _delete_fixture_dps,
+    )
 
 
 # --- Age-based garbage collection of orphans (from crashed runs) -------------------------------
@@ -573,11 +575,18 @@ def _find_dps_by_name(dps_name: str) -> Optional[dict]:
         raise
 
 
-def _delete_dps(dps_name: str) -> None:
+def _delete_fixture_dps(dps_name: str) -> None:
+    if handoff.enabled():
+        _delete_dps(dps_name, allow_handoff=True)
+    else:
+        _delete_dps(dps_name)
+
+
+def _delete_dps(dps_name: str, *, allow_handoff=False) -> None:
     if _phase_receipts.settings() and not _phase_receipts.before_delete(dps_name, _find_dps_by_name(dps_name)):
         return
     with _phase_runtime.owned_write(dps_name, "DELETE"):
-        if handoff.enabled():
+        if allow_handoff and handoff.enabled():
             with iot_service_provisioning_factory(cli.az_cli, subscription_id=_phase_receipts.settings()[2]) as client:
                 client.iot_dps_resource.begin_delete(
                     resource_group_name=ENTITY_RG, provisioning_service_name=dps_name, polling=False, retry_total=0,
@@ -690,7 +699,10 @@ def _create_managed_dps(
         if _phase_receipts.settings() and _find_dps_by_name(name) is not None:
             raise CLIInternalError("Isolated DPS name already exists; refusing to overwrite it.")
         _phase_receipts.before_create(name, ENTITY_RG, run_uid, kind)
-        cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_dps_by_name, _delete_dps)
+        cleanup.callback(
+            _cleanup_created_resource, name, run_uid, kind, _find_dps_by_name,
+            _delete_fixture_dps,
+        )
         with _phase_runtime.owned_write(name, "PUT"):
             target_dps = cli.invoke(
                 f"iot dps create --name {name} --resource-group {ENTITY_RG} "
@@ -737,7 +749,9 @@ def _iot_dps_provisioner(
             )
             cleanup.callback(
                 _shared_release, run_uid, kind,
-                lambda name: _cleanup_created_resource(name, run_uid, kind, _find_dps_by_name, _delete_dps),
+                lambda name: _cleanup_created_resource(
+                    name, run_uid, kind, _find_dps_by_name, _delete_fixture_dps,
+                ),
             )
             dps_name = target_dps["name"]
             hub_host_name = _hub_link_host_name(iot_hub) if iot_hub else None
@@ -787,7 +801,7 @@ def _iot_dps_removal(dps):
     run_uid = dps.get("_runUid")
     kind = dps.get("_kind")
     if run_uid and kind:
-        _shared_release(run_uid, kind, delete_fn=_delete_dps)
+        _shared_release(run_uid, kind, delete_fn=_delete_fixture_dps)
 
 
 # IoT Hub fixtures for DPS

@@ -679,10 +679,10 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         targets from endpoints or delete a supplied external fixture.
         """
         resources = getattr(self, "_owned_resources", {})
-        self._cleanup_owned_resources(resources)
+        self._cleanup_owned_resources(resources, allow_handoff=True)
 
-    def _cleanup_owned_resource(self, resource):
-        if handoff.enabled():
+    def _cleanup_owned_resource(self, resource, *, allow_handoff=False):
+        if allow_handoff and handoff.enabled():
             kind, name, group = resource
             resource_type = {
                 "namespace": "Microsoft.DeviceRegistry/namespaces",
@@ -719,7 +719,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                     self.cmd(f"{self._RESOURCE_COMMANDS[kind]} delete {arguments}{options}")
         self._owned_resources.pop(resource, None)
 
-    def _cleanup_owned_resources(self, resources):
+    def _cleanup_owned_resources(self, resources, *, allow_handoff=False):
         if not hasattr(self, "_owned_resources"):
             self._owned_resources = {}
         order = {kind: index for index, kind in enumerate(self._RESOURCE_COMMANDS)}
@@ -729,7 +729,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             self._owned_resources.setdefault(resource, None)
             ledger.register(
                 f"{kind} {name}",
-                lambda resource=resource: self._cleanup_owned_resource(resource),
+                lambda resource=resource: self._cleanup_owned_resource(resource, allow_handoff=allow_handoff),
             )
         failures = ledger.cleanup()
         if failures and sys.exc_info()[0] is None:
