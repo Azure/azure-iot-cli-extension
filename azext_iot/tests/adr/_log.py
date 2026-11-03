@@ -141,10 +141,12 @@ def _pretty_log_enabled() -> bool:
 
 
 def _print_pretty(text: str) -> None:
-    encoding = getattr(sys.stdout, "encoding", None)
+    """Escape unsupported characters before writing; never retry a failed write."""
+    stream = sys.stdout
+    encoding = getattr(stream, "encoding", None)
     if encoding:
         text = text.encode(encoding, errors="backslashreplace").decode(encoding)
-    print(text, flush=True)
+    print(text, file=stream, flush=True)
 
 
 def _ts() -> str:

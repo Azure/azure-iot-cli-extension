@@ -8,9 +8,10 @@
       "identity": {
         "type": "SystemAssigned"
       },
-      "location": "eastus",
+      "location": "centraluseuap",
       "name": "test-hub",
       "properties": {
+        "disableLocalAuth": true,
         "allowedFqdnList": [],
         "cloudToDevice": {
           "defaultTtlAsIso8601": "PT1H",

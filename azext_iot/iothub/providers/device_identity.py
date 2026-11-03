@@ -18,14 +18,12 @@ from azext_iot.common.fileops import tar_directory, write_content_to_file
 from azext_iot.iothub.providers.helpers.edge_device_config import (
     DEVICE_README,
     EDGE_ROOT_CERTIFICATE_FILENAME,
-    MAX_DEVICE_SCOPE_RETRIES,
     create_edge_device_config,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
     create_edge_device_config_script,
 )
 from tqdm import tqdm
-from time import sleep
 from typing import Dict, List
 from knack.log import get_logger
 from typing import Optional
@@ -49,7 +47,7 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError,
 )
 from azext_iot.operations.hub import _assemble_device
-from azext_iot.sdk.iothub.service.models import Device
+from msrestazure.azure_exceptions import CloudError
 
 logger = get_logger(__name__)
 
@@ -220,7 +218,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 if visualize
                 else existing_device_ids
             )
-            self.delete_device_identities(delete_iterator)
+            self.delete_device_identities(delete_iterator, ignore_missing=True)
             if self.service_sdk.devices.get_devices():
                 raise AzureResponseError(
                     "An error has occurred - Not all devices were deleted."
@@ -287,7 +285,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 edge_enabled=True,
             )
             # create device identity
-            device_result: Device = self.service_sdk.devices.create_or_update_identity(
+            device_result = self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=assembled_device
             )
 
@@ -309,8 +307,8 @@ class DeviceIdentityProvider(IoTHubProvider):
                         overwrite=True
                     )
                 else:
-                    device_keys = device_result.authentication.symmetric_key
-                    device_pk = device_keys.primary_key if device_keys else None
+                    device_keys = device_result["authentication"].get("symmetricKey")
+                    device_pk = device_keys.get("primaryKey") if device_keys else None
 
                 # edge device config
                 create_edge_device_config(
@@ -368,47 +366,15 @@ class DeviceIdentityProvider(IoTHubProvider):
                 # delete uncompressed files
                 rmtree(device_cert_output_directory)
 
-        # Get all device ids and scopes (inconsistent timing, hence sleep)
-        scope_retries = 0
-        query_args = ["SELECT deviceId, deviceScope FROM devices"]
-        query_method = self.service_sdk.query.get_twins
-        required_scope_ids = set(device_to_parent_dict.values())
-
-        def get_required_scopes(devices):
-            return {
-                device["deviceId"]: device["deviceScope"]
-                for device in devices
-                if (
-                    device["deviceId"] in required_scope_ids
-                    and device.get("deviceScope")
-                )
-            }
-
-        all_hub_devices = _execute_query(query_args, query_method)
-        scope_dict = get_required_scopes(all_hub_devices)
-
-        # Ensure we retrieve all device scopes
-        while len(scope_dict) < len(required_scope_ids) and scope_retries < MAX_DEVICE_SCOPE_RETRIES:
-            sleep(3)
-            scope_retries += 1
-            logger.info("Retrying device scope query - attempt {} of {}"
-                        .format(scope_retries, MAX_DEVICE_SCOPE_RETRIES))
-            all_hub_devices = _execute_query(query_args, query_method)
-            scope_dict = get_required_scopes(all_hub_devices)
-
-        # Set scopes required for parent / child relationships
-        if len(scope_dict) < len(required_scope_ids):
-            missing_device_ids = sorted(required_scope_ids.difference(scope_dict))
-            for device_id in missing_device_ids:
-                device = self.service_sdk.devices.get_identity(id=device_id)
-                if device.device_scope:
-                    scope_dict[device_id] = device.device_scope
-
-            if len(scope_dict) < len(required_scope_ids):
-                raise AzureResponseError(
-                    "An error occurred - Failed to fetch device scopes for all devices after {} retries"
-                    .format(scope_retries)
-                )
+        # Parent identities were just created and their IDs are known. Read the
+        # registry directly instead of depending on eventual query-index visibility.
+        # Flat configurations do not require any parent-scope reads.
+        scope_dict: Dict[str, str] = {}
+        for parent_id in dict.fromkeys(device_to_parent_dict.values()):
+            parent = self.service_sdk.devices.get_identity(id=parent_id)
+            if not parent.get("deviceScope"):
+                raise AzureResponseError(f"Parent device '{parent_id}' did not return a device scope.")
+            scope_dict[parent_id] = parent["deviceScope"]
 
         # Set parent / child relationships
         device_to_parent_iterator = (
@@ -422,7 +388,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             parent_id = device_to_parent_dict[device_id]
             parent_scope = scope_dict[parent_id]
             # set new parent scope
-            device.parent_scopes = [parent_scope]
+            device["parentScopes"] = [parent_scope]
             # update device
             self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=device, if_match="*"
@@ -448,9 +414,12 @@ class DeviceIdentityProvider(IoTHubProvider):
             bundle_plural = '' if num_bundles == 1 else 's'
             print(f"{num_bundles} device bundle{bundle_plural} created in folder: {abspath(bundle_output_directory)}")
 
-    def delete_device_identities(self, device_ids: List[str]):
+    def delete_device_identities(self, device_ids: List[str], ignore_missing: bool = False):
         for id in device_ids:
             try:
                 self.service_sdk.devices.delete_identity(id=id, if_match="*")
             except Exception as err:
+                response = getattr(err, "response", None)
+                if ignore_missing and isinstance(err, CloudError) and getattr(response, "status_code", None) == 404:
+                    continue
                 raise AzureResponseError(err)

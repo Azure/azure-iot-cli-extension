@@ -3,18 +3,31 @@
 Release History
 ===============
 
-Unreleased
-++++++++++
+1.0.0
++++++
 
-**IoT Hub Device Provisioning Service (DPS) updates**
+**API compatibility**
 
+* Updated Device Registry/CMS, IoT Hub management/service/device, and DPS management/service/device SDKs to ``2026-11-01``. Azure CLI 2.73.0 or later is required.
+* Hub and DPS management use the active cloud's ARM endpoint. ADR/CMS is public-cloud-only; API availability remains dependent on service rollout.
+* Removed preview labels from GA Hub routing/Fabric endpoints, hostname selection, distributed tracing, and message payload-file options.
+
+**Device Registry and certificate management**
+
+* Added GA namespace, identity, certificate authority/policy, registry-device, schema registry/schema/version, and Hub/DPS linking commands.
+* Fixed linking an existing DPS with Hubs, retrying failed DPS/Hub pairs, isolated endpoint removal, allocation updates, identity-rotation waits, and preservation of existing namespace configuration.
+* Link operations provide role preflight and actionable recovery guidance. Removal protects concurrent updates with ETags and retains unrelated endpoints; optional Reader grants require ``--grant-reader``.
+* Added DPS certificate issuance during device registration and operation-status recovery after timeouts.
+* Preview-only ADR Software Updates, groups/jobs, reports, device child commands, and namespace observability are not included in the GA API.
+
+**Important behavior changes**
+
+* **[Breaking Change]** New IoT Hubs disable Hub-policy SAS by default; specify ``--disable-local-auth false`` to enable it. Hub connection-string/SAS and DPS linked-Hub creation commands default to automatic hostname selection.
+* DPS enrollment-group create/update redact keys by default; use ``--show-keys`` to include them. Enrollment table output includes ADR namespace/certificate fields; JSON/YAML output remains unchanged.
+* **[Breaking Change]** ``az iot dps enrollment-group compute-device-key`` returns a string: TSV no longer includes the Python ``b'...'`` wrapper, and YAML no longer represents it as binary.
+* **[Breaking Change]** Removed deprecated DPS command aliases, ``az dt reset``, obsolete ``--repair`` and ``--storage-authentication-type`` options, and deprecated ADR enrollment option spellings.
+* Fixed ``az iot hub monitor-events --login`` for Event Hub-compatible connection strings from Azure US Government and Azure China.
 * Fixed DPS data-plane commands using ``--auth-type login`` failing against Azure US Government (``.azure-devices-provisioning.us``) and Azure China (``.azure-devices-provisioning.cn``) endpoints because they requested the public-cloud Microsoft Entra audience.
-
-* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
-
-**IoT Hub updates**
-
-* Fixed ``az iot hub monitor-events --login`` failing with an unhandled ``ValueError`` for Event Hub-compatible connection strings from Azure US Government (``.servicebus.usgovcloudapi.net``) and Azure China (``.servicebus.chinacloudapi.cn``) hubs.
 
 0.33.0b1 (Preview)
 ++++++++++++++++++

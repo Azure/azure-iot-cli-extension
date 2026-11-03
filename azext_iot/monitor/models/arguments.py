@@ -17,7 +17,6 @@ class TelemetryArguments:
         timeout: int,
         properties: list,
         enqueued_time: int,
-        repair: bool,
         yes: bool,
     ):
         (enqueued_time, unique_properties, timeout_ms, output, _) = init_monitoring(
@@ -25,7 +24,6 @@ class TelemetryArguments:
             timeout=timeout,
             properties=properties,
             enqueued_time=enqueued_time,
-            repair=repair,
             yes=yes,
         )
         self.output = output

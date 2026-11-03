@@ -516,10 +516,11 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         assert twin_query_result["cost"]
 
         self.cmd(
-            "dt reset -n {} --yes".format(
+            "dt model delete-all -n {} --yes".format(
                 instance_name,
             )
         )
+        self.cmd("dt twin delete-all -n {} --yes".format(instance_name))
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)
@@ -704,10 +705,11 @@ class TestDTTwinLifecycle(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt reset -n {} --yes".format(
+            "dt model delete-all -n {} --yes".format(
                 instance_name,
             )
         )
+        self.cmd("dt twin delete-all -n {} --yes".format(instance_name))
 
         # Wait for API to catch up
         sleep(10)

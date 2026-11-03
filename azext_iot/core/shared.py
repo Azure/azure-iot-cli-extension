@@ -101,7 +101,6 @@ class IotHubSku(Enum):
     B1 = "B1"
     B2 = "B2"
     B3 = "B3"
-    GEN2 = "GEN2"
 
 
 class IotDpsSku(Enum):
@@ -147,22 +146,3 @@ class AccessRights(str, Enum):
     REGISTRY_READ_SERVICE_CONNECT_DEVICE_CONNECT = "RegistryRead, ServiceConnect, DeviceConnect"
     REGISTRY_WRITE_SERVICE_CONNECT_DEVICE_CONNECT = "RegistryWrite, ServiceConnect, DeviceConnect"
     REGISTRY_READ_REGISTRY_WRITE_SERVICE_CONNECT_DEVICE_CONNECT = "RegistryRead, RegistryWrite, ServiceConnect, DeviceConnect"
-
-
-class DeviceRegistryNamespaceAuthenticationType(str, Enum):
-    """Device Registry Namespace MI authentication type."""
-
-    SYSTEM_ASSIGNED = "SystemAssigned"
-    USER_ASSIGNED = "UserAssigned"
-
-
-# Roles that ADR needs assigned against Hub on create
-ADR_NS_IDENTITY_ROLES_FOR_HUB = ["Contributor", "IoT Hub Registry Contributor"]
-
-# ADR role assignment error message
-ADR_ROLE_ASSIGN_ERROR_MSG = (
-    "You may need to manually assign the following roles from the ADR namespace's system identity to this hub "
-    f"for credential sync to work properly: {','.join(ADR_NS_IDENTITY_ROLES_FOR_HUB)}"
-)
-
-ADR_CONFIGURE_ROLES_ERROR_MSG = "Unable to configure role assignments for credential sync."

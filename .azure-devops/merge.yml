@@ -123,8 +123,8 @@ jobs:
       vmImage: ${{ parameters.linuxImage }}
 
     steps:
-      - template: templates/install-azure-cli-released.yml
       - template: templates/setup-python.yml
+      - template: templates/install-azure-cli-released.yml
       - template: templates/download-install-local-azure-iot-cli-extension-with-pip.yml
 
       - script: "pylint azext_iot/ --rcfile=.pylintrc"

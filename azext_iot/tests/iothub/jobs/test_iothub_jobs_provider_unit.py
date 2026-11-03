@@ -132,16 +132,12 @@ class TestCreateErrors:
 class TestConvertV1ToV2:
     def test_convert_includes_failure_reason(self, mocker):
         p, _ = _provider(mocker)
-        job_v1 = mocker.MagicMock()
-        job_v1.failure_reason = "something failed"
-        job_v1.additional_properties = {}
+        job_v1 = {"failureReason": "something failed"}
         result = p._convert_v1_to_v2(job_v1)
         assert result["failureReason"] == "something failed"
 
     def test_convert_without_failure_reason(self, mocker):
         p, _ = _provider(mocker)
-        job_v1 = mocker.MagicMock()
-        job_v1.failure_reason = None
-        job_v1.additional_properties = {}
+        job_v1 = {"failureReason": None}
         result = p._convert_v1_to_v2(job_v1)
         assert "failureReason" not in result

@@ -23,12 +23,12 @@ resource_not_found_error = "Resource not found."
 
 
 class TestHubStateExport:
-    def test_present_file_no_replace(self, fixture_cmd, fixture_ghcs, mocker):
+    def test_present_file_no_replace(self, fixture_cmd, fixture_ghcs, mocker, tmp_path):
         patched_prompt_y_n = mocker.patch("azext_iot.iothub.providers.state.prompt_y_n")
         patched_prompt_y_n.return_value = False
 
         # make a temporary file
-        fake_file = "fake_file.json"
+        fake_file = str(tmp_path / "fake_file.json")
         with open(fake_file, "w", encoding='utf-8') as f:
             f.write("Hello World")
 
@@ -76,10 +76,10 @@ class TestHubStateImport:
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
 
-    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs_resource_not_found_error):
+    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs_resource_not_found_error, tmp_path):
         hub_name = "someHub"
         # make a temporary file
-        fake_file = "fake_file.json"
+        fake_file = str(tmp_path / "fake_file.json")
         with open(fake_file, "w", encoding='utf-8') as f:
             f.write("{}")
 
@@ -90,7 +90,8 @@ class TestHubStateImport:
                 hub_name_or_hostname=hub_name,
                 resource_group_name="somerg"
             )
-        assert constants.HUB_NOT_CREATED_MSG.format(hub_name) == str(error.value)
+        assert "Invalid Hub state" in str(error.value)
+        assert "required field is missing" in str(error.value)
 
         if os.path.isfile(fake_file):
             os.remove(fake_file)

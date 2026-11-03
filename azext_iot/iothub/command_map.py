@@ -58,7 +58,7 @@ def load_iothub_commands(self, _):
         cmd_group.command("update", "patch_digital_twin")
 
     with self.command_group(
-        "iot hub message-endpoint", command_type=iothub_message_endpoint_ops, is_preview=True
+        "iot hub message-endpoint", command_type=iothub_message_endpoint_ops
     ) as cmd_group:
         cmd_group.show_command("show", "message_endpoint_show")
         cmd_group.command("list", "message_endpoint_list")
@@ -102,8 +102,7 @@ def load_iothub_commands(self, _):
         cmd_group.command(
             "fabric-eventstream",
             "message_endpoint_create_fabric_eventstream",
-            transform=EndpointUpdateResultTransform(self.cli_ctx),
-            is_preview=True
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
 
     with self.command_group(
@@ -139,12 +138,11 @@ def load_iothub_commands(self, _):
         cmd_group.command(
             "fabric-eventstream",
             "message_endpoint_update_fabric_eventstream",
-            transform=EndpointUpdateResultTransform(self.cli_ctx),
-            is_preview=True
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
 
     with self.command_group(
-        'iot hub message-route', command_type=iothub_message_route_ops, is_preview=True
+        'iot hub message-route', command_type=iothub_message_route_ops
     ) as cmd_group:
         cmd_group.command(
             'create', 'message_route_create', transform=RouteUpdateResultTransform(self.cli_ctx)
