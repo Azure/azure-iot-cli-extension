@@ -77,8 +77,6 @@ def run_title(jobs, kind, mode, build_id, parent="0"):
     modes = []
     if mode == "Dry run":
         modes.append("dry-run")
-    if parent != "0":
-        modes.append(f"release-child {parent}")
     if any(job["endpoint"] == TARGET["CANARY_ARM"] for job in jobs):
         modes.append("canary")
     title = f"iot-{kind}-{build_id} ({region_label}) ({scope})"
