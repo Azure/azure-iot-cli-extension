@@ -121,10 +121,7 @@ class JobProvider(IoTHubProvider):
         poll_interval=10,
         poll_duration=600,
     ):
-        from azext_iot.sdk.iothub.service.models import (
-            CloudToDeviceMethod,
-            JobRequest
-        )
+        from azext_iot.iothub._payload import make_payload
 
         if (
             job_type
@@ -171,7 +168,8 @@ class JobProvider(IoTHubProvider):
                 method_payload, argument_name="method-payload"
             )
 
-        job_request = JobRequest(
+        job_request = make_payload(
+            "JobRequest",
             job_id=job_id,
             type=job_type,
             start_time=start_time,
@@ -182,9 +180,10 @@ class JobProvider(IoTHubProvider):
         if job_type == JobType.scheduleUpdateTwin.value:
             # scheduleUpdateTwin job type is a force update, which only accepts '*' as the Etag.
             twin_patch["etag"] = "*"
-            job_request.update_twin = twin_patch
+            job_request["updateTwin"] = twin_patch
         elif job_type == JobType.scheduleDeviceMethod.value:
-            job_request.cloud_to_device_method = CloudToDeviceMethod(
+            job_request["cloudToDeviceMethod"] = make_payload(
+                "CloudToDeviceMethod",
                 method_name=method_name,
                 connect_timeout_in_seconds=method_connect_timeout,
                 response_timeout_in_seconds=method_response_timeout,
@@ -231,19 +230,25 @@ class JobProvider(IoTHubProvider):
         v2_result = {}
 
         # For v1 jobs, startTime is the same as createdTime
-        v2_result["createdTime"] = job_v1.start_time_utc
-        v2_result["startTime"] = job_v1.start_time_utc
-        v2_result["endTime"] = job_v1.end_time_utc
-        v2_result["jobId"] = job_v1.job_id
-        v2_result["status"] = job_v1.status
-        v2_result["type"] = job_v1.type
-        v2_result["progress"] = job_v1.progress
-        v2_result["excludeKeysInExport"] = job_v1.exclude_keys_in_export
+        v2_result["createdTime"] = job_v1.get("startTimeUtc")
+        v2_result["startTime"] = job_v1.get("startTimeUtc")
+        v2_result["endTime"] = job_v1.get("endTimeUtc")
+        v2_result["jobId"] = job_v1.get("jobId")
+        v2_result["status"] = job_v1.get("status")
+        v2_result["type"] = job_v1.get("type")
+        v2_result["progress"] = job_v1.get("progress")
+        v2_result["excludeKeysInExport"] = job_v1.get("excludeKeysInExport")
 
-        if job_v1.failure_reason:
-            v2_result["failureReason"] = job_v1.failure_reason
+        if job_v1.get("failureReason"):
+            v2_result["failureReason"] = job_v1["failureReason"]
 
-        v2_result.update(job_v1.additional_properties)
+        known = {
+            "jobId", "startTimeUtc", "endTimeUtc", "type", "status", "progress",
+            "inputBlobContainerUri", "inputBlobName", "outputBlobContainerUri", "outputBlobName",
+            "excludeKeysInExport", "storageAuthenticationType", "identity", "failureReason",
+            "includeConfigurations", "configurationsBlobName",
+        }
+        v2_result.update({key: value for key, value in job_v1.items() if key not in known})
         return v2_result
 
     def _filter_jobs(self, jobs, job_type=None, job_status=None):

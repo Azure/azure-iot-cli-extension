@@ -68,7 +68,6 @@ def load_iothub_arguments(self, _):
         )
         context.argument(
             "data_file_path",
-            is_preview=True,
             options_list=["--data-file-path", "--dfp"],
             help="Provide path to file for message body payload. Please "
             "note when the payload needs to be sent in binary format, "
@@ -597,6 +596,46 @@ def load_iothub_arguments(self, _):
             "{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are "
             "arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}. To "
             "clear this property, set this to \"\""
+        )
+
+    with self.argument_context("iot hub message-endpoint create fabric-eventstream") as context:
+        context.argument(
+            "workspace_id",
+            options_list=["--workspace-id", "--ws-id"],
+            help="The Fabric workspace Id. Required so the Azure Portal and Fabric Portal "
+            "can render this connection as a deep link to the specific Fabric workspace.",
+        )
+        context.argument(
+            "eventstream_id",
+            options_list=["--eventstream-id", "--es-id"],
+            help="The Fabric Eventstream Id. Required so the Azure Portal and Fabric Portal "
+            "can render this connection as a deep link to the specific Eventstream.",
+        )
+        context.argument(
+            "source_id",
+            options_list=["--source-id"],
+            help="The Fabric Custom Endpoint source Id. Required so the Azure Portal and Fabric "
+            "Portal can render this connection as a deep link to the specific source inside the Eventstream.",
+        )
+
+    with self.argument_context("iot hub message-endpoint update fabric-eventstream") as context:
+        context.argument(
+            "workspace_id",
+            options_list=["--workspace-id", "--ws-id"],
+            help="The Fabric workspace Id. Optional on update — only set if you want to overwrite "
+            "the existing value.",
+        )
+        context.argument(
+            "eventstream_id",
+            options_list=["--eventstream-id", "--es-id"],
+            help="The Fabric Eventstream Id. Optional on update — only set if you want to overwrite "
+            "the existing value.",
+        )
+        context.argument(
+            "source_id",
+            options_list=["--source-id"],
+            help="The Fabric Custom Endpoint source Id. Optional on update — only set if you want "
+            "to overwrite the existing value.",
         )
 
     with self.argument_context("iot hub message-endpoint delete") as context:

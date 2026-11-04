@@ -155,7 +155,7 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
             else:
                 return DeviceUpdateMgmtModels.ManagedServiceIdentity(
                     type=DeviceUpdateMgmtModels.ManagedServiceIdentityType.USER_ASSIGNED,
-                    user_assigned_identities={assign_identity[0], {}},  # pylint: disable=unhashable-member
+                    user_assigned_identities={assign_identity[0]: {}},
                 )
         else:
             target_identity_type = DeviceUpdateMgmtModels.ManagedServiceIdentityType.USER_ASSIGNED

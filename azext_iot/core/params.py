@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 """
-Parameter definitions for new DPS management commands.
+Parameter definitions for new IoT Hub and DPS management commands.
 These will be added to CLI Core
 """
 
@@ -16,8 +16,40 @@ from azext_iot.core._params import load_arguments
 
 def load_core_arguments(self, _):
 
-    # load default CLI Core args
+    # Load default CLI core args
     load_arguments(self, _)
+
+    # DPS create / update identity params. Namespace links are managed only by
+    # ``iot adr ns link`` and are intentionally absent here.
+    for command in ("iot dps create", "iot dps update"):
+        with self.argument_context(command) as c:
+            c.argument(
+                "mi_system_assigned",
+                arg_type=get_three_state_flag(),
+                options_list=[
+                    "--system-assigned-mi",
+                    c.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
+                help="Enable system-assigned managed identity for this provisioning service.",
+            )
+            c.argument(
+                "mi_user_assigned",
+                nargs="*",
+                options_list=[
+                    "--user-assigned-mi",
+                    c.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
+                help="Enable user-assigned managed identities for this provisioning service. "
+                "Accepts space-separated list of identity resource IDs.",
+            )
 
     # DPS local authentication params
     for scope in ["iot dps create", "iot dps update"]:
@@ -30,3 +62,35 @@ def load_core_arguments(self, _):
                 "authentication for this provisioning service. When disabled, only Azure RBAC is "
                 "used to authorize data plane requests.",
             )
+
+    # DPS identity assignment params
+    with self.argument_context("iot dps identity assign") as c:
+        c.argument(
+            "system_assigned",
+            arg_type=get_three_state_flag(),
+            options_list=["--system", "--system-assigned"],
+            help="Assign a system-assigned managed identity to this provisioning service.",
+        )
+        c.argument(
+            "user_assigned",
+            nargs="*",
+            options_list=["--user", "--user-assigned"],
+            help="Assign user-assigned managed identities to this provisioning service. "
+            "Accepts space-separated list of identity resource IDs.",
+        )
+
+    # DPS identity removal params
+    with self.argument_context("iot dps identity remove") as c:
+        c.argument(
+            "system_assigned",
+            arg_type=get_three_state_flag(),
+            options_list=["--system", "--system-assigned"],
+            help="Remove a system-assigned managed identity from this provisioning service.",
+        )
+        c.argument(
+            "user_assigned",
+            nargs="*",
+            options_list=["--user", "--user-assigned"],
+            help="Remove user-assigned managed identities from this provisioning service. "
+            "Accepts space-separated list of identity resource IDs.",
+        )

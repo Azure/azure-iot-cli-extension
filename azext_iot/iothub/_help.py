@@ -417,6 +417,10 @@ def load_iothub_help():
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
+                       Selected Hub-state reads must succeed before the output file is written. Device state capture is
+                       not supported for Basic-tier hubs because a complete device snapshot cannot be guaranteed.
+                       Use --aspects arm to export only the ARM template of a Basic-tier hub.
+
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
         - name: Export the supported state of the specified hub to the specified file.
@@ -446,6 +450,11 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the import process.
+
+                       All selected aspects and their required restore fields are validated before --replace deletes
+                       destination state. Unselected aspects need not be present. Empty device maps and empty ADM/edge
+                       configuration groups are valid; a selected ARM template must contain the Hub resource.
+                       Device state restore is not supported for Basic-tier hubs.
 
                        For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
@@ -483,6 +492,9 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the migration process.
+
+                       Selected source Hub-state reads and snapshot validation must succeed before destination state
+                       is deleted or recreated. Device state migration is not supported for Basic-tier hubs.
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
 
@@ -781,6 +793,59 @@ def load_iothub_help():
           - name: Get all the endpoints of type "EventHub" from an IoT Hub.
             text: >
               az iot hub message-endpoint list -n {iothub_name} --endpoint-type eventhub
+          - name: Get all the endpoints of type "Fabric Eventstream" from an IoT Hub.
+            text: >
+              az iot hub message-endpoint list -n {iothub_name} --endpoint-type fabric-eventstream
+    """
+
+    helps[
+        "iot hub message-endpoint create fabric-eventstream"
+    ] = """
+        type: command
+        short-summary: Add a Microsoft Fabric Eventstream endpoint for an IoT Hub.
+        long-summary: |
+          The Fabric Custom Endpoint source (workspace, Eventstream item, and source) must be
+          created separately in Microsoft Fabric — via the Fabric portal or the `fab` CLI — before
+          running this command. Then take the source's connection details (sb:// endpoint URI,
+          entity path, and the workspace / eventstream / source GUIDs) and register them here.
+
+          This endpoint type supports identity-based authentication only. The hub must have a
+          managed identity assigned (system-assigned or user-assigned).
+
+        examples:
+          - name: Create a Fabric Eventstream endpoint using the hub's system-assigned identity.
+            text: >
+              az iot hub message-endpoint create fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+              --identity [system] --workspace-id {workspace_id} --eventstream-id {eventstream_id}
+              --source-id {source_id}
+          - name: Create a Fabric Eventstream endpoint using a user-assigned identity.
+            text: >
+              az iot hub message-endpoint create fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
+              --identity {user_identity_resource_id} --workspace-id {workspace_id}
+              --eventstream-id {eventstream_id} --source-id {source_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update fabric-eventstream"
+    ] = """
+        type: command
+        short-summary: Update a Microsoft Fabric Eventstream endpoint for an IoT Hub.
+        long-summary: |
+          This endpoint type supports identity-based authentication only. To change the
+          underlying Fabric Custom Endpoint source, update --endpoint-uri and --entity-path
+          together with values from the new source.
+        examples:
+          - name: Update a Fabric Eventstream endpoint to a different user-assigned identity.
+            text: >
+              az iot hub message-endpoint update fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --identity {user_identity_resource_id}
+          - name: Update a Fabric Eventstream endpoint's Fabric metadata (display values).
+            text: >
+              az iot hub message-endpoint update fabric-eventstream -n {iothub_name}
+              --en {endpoint_name} --workspace-id {workspace_id} --eventstream-id {eventstream_id}
+              --source-id {source_id}
     """
 
     helps[

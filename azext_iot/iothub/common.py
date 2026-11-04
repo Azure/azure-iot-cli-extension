@@ -9,7 +9,6 @@ common: Define shared data types(enums) and constant strings.
 
 from enum import Enum
 from typing import NamedTuple, Optional, List, Dict
-from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
 class EdgeContainerAuth(NamedTuple):
@@ -26,7 +25,7 @@ class EdgeDeviceConfig(NamedTuple):
     Individual Edge device configuration data format.
     """
     device_id: str
-    deployment: Optional[ConfigurationContent] = None
+    deployment: Optional[dict] = None
     parent_id: Optional[str] = None
     hostname: Optional[str] = None
     parent_hostname: Optional[str] = None
@@ -95,6 +94,20 @@ CA_TRANSITION_API_VERSION = "2022-04-30-preview"
 HUB_PROVIDER = "Microsoft.Devices/IotHubs"
 DEFAULT_ROOT_AUTHORITY = {"enableRootCertificateV2": False}
 
+
+def transform_iot_hub_hostname(hostname, hostname_type):
+    """Transform an IoT Hub hostname to its classic, device, or service form."""
+    parts = hostname.split(".")
+    hub_name = parts[0]
+    domain = ".".join(parts[2:] if parts[1].lower() in ("device", "service") else parts[1:])
+    hostname_map = {
+        "classic": f"{hub_name}.{domain}",
+        "device": f"{hub_name}.device.{domain}",
+        "service": f"{hub_name}.service.{domain}",
+    }
+    return hostname_map.get(hostname_type, hostname)
+
+
 # Certificate Migration Messages
 CA_TRANSITION_WARNING = "Please ensure the following: \n\
     You must update all devices to trust the DigiCert Global G2 root. \n\
@@ -121,6 +134,7 @@ class EndpointType(Enum):
     ServiceBusTopic = "servicebus-topic"
     AzureStorageContainer = "storage-container"
     CosmosDBContainer = "cosmosdb-container"
+    FabricEventStream = "fabric-eventstream"
 
     @classmethod
     def list(cls):
@@ -184,7 +198,10 @@ class RouteSourceType(Enum):
 
     @classmethod
     def list_valid_types(cls):
-        return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
+        return [
+            source.value for source in cls
+            if source not in (cls.Invalid, cls.DigitalTwinChangeEvents)
+        ]
 
 
 class IoTHubSDKVersion(Enum):

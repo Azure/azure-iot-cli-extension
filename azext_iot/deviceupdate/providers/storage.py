@@ -4,22 +4,25 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.identity import AzureCliCredential
 from azure.mgmt.storage import StorageManagementClient
 from azure.storage.blob import BlobServiceClient
 from msrestazure.tools import parse_resource_id
 from azure.cli.core.azclierror import ResourceNotFoundError
 from typing import TypeVar
 
+from azext_iot.common.auth import get_cli_credential
+
 
 StorageAccount = TypeVar("StorageAccount")
 
 
 class StorageAccountManager(object):
-    def __init__(self, subscription_id: str):
+    def __init__(self, cli_ctx, subscription_id: str):
         self.subscription_id = subscription_id
         self.client = StorageManagementClient(
-            credential=AzureCliCredential(), subscription_id=self.subscription_id)
+            credential=get_cli_credential(cli_ctx, subscription_id=self.subscription_id),
+            subscription_id=self.subscription_id,
+        )
 
     def find_storage_account(self, account_name: str) -> StorageAccount:
         list_iterator = self.client.storage_accounts.list()

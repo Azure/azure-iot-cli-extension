@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.31.0"
+VERSION = "1.0.0"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -39,6 +39,7 @@ TRACING_ALLOWED_FOR_SKU = "standard"
 USER_AGENT = "IoTPlatformCliExtension/{}".format(VERSION)
 IOTHUB_RESOURCE_ID = "https://iothubs.azure.net"
 IOTDPS_RESOURCE_ID = "https://azure-devices-provisioning.net"
+IOTDPS_RESOURCE_ID_US_GOV = "https://azure-devices-provisioning.us"
 DIGITALTWINS_RESOURCE_ID = "https://digitaltwins.azure.net"
 IOTDPS_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 DEVICETWIN_POLLING_INTERVAL_SEC = 10
@@ -48,3 +49,8 @@ IOTHUB_THROTTLE_SLEEP_SEC = 20
 THROTTLE_HTTP_STATUS_CODE = 429
 IOTHUB_RENEW_KEY_BATCH_SIZE = 100
 PNP_DTDLV2_COMPONENT_MARKER = "__t"
+LRO_POLL_WAIT_SEC = 30
+LRO_POLL_RETRIES = 10
+
+IOTHUB_PREVIEW_API_VERSION = "2026-11-01"
+IOT_HUB_DEFAULT_POLICY = "iothubowner"

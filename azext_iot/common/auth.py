@@ -9,6 +9,16 @@ from azure.cli.core._profile import Profile
 from msrest.authentication import Authentication
 
 
+def get_cli_credential(cli_ctx, subscription_id: Optional[str] = None):
+    """Reuse the hosting CLI's login instead of spawning another az process."""
+    from azure.cli.core.commands.client_factory import get_subscription_id
+
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+    profile = Profile(cli_ctx=cli_ctx)
+    credential, _, _ = profile.get_login_credentials(subscription_id=subscription_id)
+    return credential
+
+
 def get_aad_token(cli_ctx, resource: Optional[str] = None):
     """
     get AAD token to access to a specified resource
