@@ -184,6 +184,16 @@ def _find_linked_hub_entry(linked_hubs, hub_name=None, linked_hub=None):
     return matches[0]
 
 
+def _resolve_linked_hub_name(cmd, linked_hubs, linked_hub):
+    """Resolve a dotless --linked-hub to its hostname; fall back to DPS entries if the Hub is gone from ARM."""
+    if '.' in linked_hub:
+        return linked_hub
+    try:
+        return _get_iot_hub_hostname(iot_hub_service_factory(cmd.cli_ctx), linked_hub)
+    except CLIInternalError:
+        return _find_linked_hub_entry(linked_hubs, hub_name=linked_hub)["name"]
+
+
 # CUSTOM METHODS FOR DPS
 def iot_dps_list(client, resource_group_name=None):
     if resource_group_name is None:
@@ -432,12 +442,9 @@ def iot_dps_linked_hub_list(client, dps_name, resource_group_name=None):
 
 
 def iot_dps_linked_hub_get(cmd, client, dps_name, linked_hub, resource_group_name=None):
-    if '.' not in linked_hub:
-        hub_client = iot_hub_service_factory(cmd.cli_ctx)
-        linked_hub = _get_iot_hub_hostname(hub_client, linked_hub)
-
     dps = iot_dps_get(client, dps_name, resource_group_name)
     _warn_namespace_linked_dps(dps)
+    linked_hub = _resolve_linked_hub_name(cmd, dps["properties"]["iotHubs"], linked_hub)
     for hub in dps["properties"]["iotHubs"]:
         if hub["name"] == linked_hub:
             return hub
@@ -720,13 +727,10 @@ def iot_dps_linked_hub_update(
 
 
 def iot_dps_linked_hub_delete(cmd, client, dps_name, linked_hub, resource_group_name=None, no_wait=False):
-    if '.' not in linked_hub:
-        hub_client = iot_hub_service_factory(cmd.cli_ctx)
-        linked_hub = _get_iot_hub_hostname(hub_client, linked_hub)
-
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     dps_linked_hubs = []
     dps_linked_hubs.extend(iot_dps_linked_hub_list(client, dps_name, resource_group_name))
+    linked_hub = _resolve_linked_hub_name(cmd, dps_linked_hubs, linked_hub)
     if not _is_linked_hub_existed(dps_linked_hubs, linked_hub):
         raise ResourceNotFoundError("Linked hub {0} doesn't exist.".format(linked_hub))
     updated_hubs = [p for p in dps_linked_hubs if p["name"].lower() != linked_hub.lower()]
@@ -1699,7 +1703,7 @@ def _protect_hub_link_identity(
     linking_state = str(
         (device_registry.get("linkingProperties") or {}).get("state") or ""
     ).casefold()
-    if not device_registry.get("namespaceResourceId") or linking_state == "failed":
+    if not device_registry.get("namespaceResourceId") or linking_state in ("failed", "orphaned"):
         return
 
     selected = device_registry.get("identity") or {}
@@ -2595,9 +2599,11 @@ def _protect_dps_link_identity(
 ) -> None:
     """Block removal of identities selected by canonical namespace links."""
     dps = _adr_identity_target(cmd, dps, "dps")
-    namespace_links = ((dps or {}).get("properties") or {}).get(
-        "deviceRegistryNamespaces"
-    ) or []
+    namespace_links = [
+        link for link in ((dps or {}).get("properties") or {}).get("deviceRegistryNamespaces") or []
+        # An Orphaned link's namespace was deleted, so no link uses the identity.
+        if str((link or {}).get("linkingState") or "").casefold() != "orphaned"
+    ]
     if not namespace_links:
         return
 

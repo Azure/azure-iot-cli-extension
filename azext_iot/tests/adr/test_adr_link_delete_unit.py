@@ -7,6 +7,7 @@
 from copy import deepcopy
 from io import StringIO
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import ANY, Mock, call
 
@@ -116,6 +117,119 @@ def test_live_unlink_scenarios_preserve_the_native_reader(mocker, grant_reader, 
     assert reader.call_count == (3 if grant_reader else 2)
     cleanup.assert_not_called()
     assert not any("role assignment create" in item.args[0] for item in scenario.cmd.call_args_list)
+
+
+class _UnlinkSubmitted(Exception):
+    pass
+
+
+def _deleted_target_scenario(mocker, kind, section, observed, *, show_error=None, region="centraluseuap"):
+    """Drive the live unlink helper offline with a fake clock; stop at the positive unlink."""
+    from azext_iot.tests.adr import _helpers, test_adr_link_delete_int as scenarios
+
+    mocker.patch.object(scenarios, "TEST_LOCATION", region)
+
+    clock = SimpleNamespace(now=0.0, slept=[])
+
+    def sleep(seconds):
+        clock.slept.append(seconds)
+        clock.now += seconds
+
+    mocker.patch.object(_helpers, "time", SimpleNamespace(monotonic=lambda: clock.now, sleep=sleep))
+    scenario = scenarios.TestADRLinkDelete("test_adr_link_hub_dps_delete")
+    mocker.patch.object(scenario, "_reader_assignments", return_value=[{"id": "native-reader"}])
+    events = []
+    mocker.patch.object(scenario, "_delete_owned_resource", side_effect=lambda *_: events.append("delete"))
+    snapshots = iter(observed)
+
+    def command(text):
+        if " remove " in text:
+            events.append(text)
+            raise _UnlinkSubmitted()
+        assert text.startswith("iot adr ns show ")
+        if "delete" not in events:
+            return Mock(get_output_in_json=namespace)
+        events.append("show")
+        if show_error:
+            raise show_error
+        current = namespace()
+        update = next(snapshots)
+        endpoint = current["properties"][section]["endpoints"]
+        if update is None:
+            endpoint.pop("primary")
+        else:
+            endpoint["primary"].update(update)
+        return Mock(get_output_in_json=lambda: current)
+
+    scenario.cmd = Mock(side_effect=command)
+    return scenario, events, clock
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("option", [{}, {"grant_reader": True}, {"no_rbac_check": True}])
+@pytest.mark.parametrize("states", [
+    ["Succeeded", "Succeeded", "LinkedResourceDeleted"],
+    ["LinkedResourceDeleted"],
+])
+def test_live_unlink_waits_for_deleted_target_link_before_one_unlink(
+    mocker, kind, section, _endpoint_type, option, states,
+):
+    scenario, events, clock = _deleted_target_scenario(
+        mocker, kind, section, [{"linkingState": state} for state in states],
+    )
+    # The fixture namespace is globally Failed; only the selected endpoint state gates unlink.
+    with pytest.raises(_UnlinkSubmitted):
+        scenario._remove_endpoint("ns", kind, section, "primary", "target", **option)
+    removes = [event for event in events if " remove " in event]
+    assert events == ["delete", *["show"] * len(states), *removes]
+    assert len(removes) == 1 and f"link {kind} remove " in removes[0] and "-n primary " in removes[0]
+    assert clock.slept == [10] * (len(states) - 1)
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+@pytest.mark.parametrize("observed,message", [
+    ([{"linkingState": "Succeeded"}] * 31, "linkingState='Succeeded'"),
+    ([{"linkingState": "Failed"}] * 31, "linkingState='Failed'"),
+    ([{"linkingState": None}] * 31, "linkingState=None"),
+    ([None], "terminal failure after 1 attempt(s) (endpoint missing or retargeted)"),
+    ([{"resourceId": "/other", "linkingState": "LinkedResourceDeleted"}], "endpoint missing or retargeted"),
+])
+def test_live_unlink_never_submits_without_selected_deleted_target_link(
+    mocker, kind, section, _endpoint_type, observed, message,
+):
+    scenario, events, _ = _deleted_target_scenario(mocker, kind, section, observed)
+    if kind == "hub":
+        # Another endpoint reaching LinkedResourceDeleted must not satisfy the selected wait.
+        original = scenario.cmd.side_effect
+
+        def command(text):
+            result = original(text)
+            current = result.get_output_in_json()
+            current["properties"]["messaging"]["endpoints"]["secondary"]["linkingState"] = "LinkedResourceDeleted"
+            return Mock(get_output_in_json=lambda: current)
+
+        scenario.cmd.side_effect = command
+    with pytest.raises(AssertionError, match=f"endpoint 'primary' LinkedResourceDeleted.*{re.escape(message)}"):
+        scenario._remove_endpoint("ns", kind, section, "primary", "target")
+    assert not any(" remove " in event for event in events)
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+def test_live_unlink_skips_deleted_target_wait_outside_centraluseuap(mocker, kind, section, _endpoint_type):
+    scenario, events, clock = _deleted_target_scenario(mocker, kind, section, [], region="australiaeast")
+    with pytest.raises(_UnlinkSubmitted):
+        scenario._remove_endpoint("ns", kind, section, "primary", "target")
+    assert events[0] == "delete" and len(events) == 2 and f"link {kind} remove " in events[1]
+    assert clock.slept == []
+
+
+def test_live_unlink_read_error_propagates_without_unlink(mocker):
+    error = AzureResponseError("(AuthorizationFailed) denied")
+    scenario, events, clock = _deleted_target_scenario(mocker, "hub", "messaging", [], show_error=error)
+    with pytest.raises(AzureResponseError, match="AuthorizationFailed"):
+        scenario._remove_endpoint("ns", "hub", "messaging", "primary", "target")
+    assert events == ["delete", "show"]
+    assert clock.slept == []
 
 
 @pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)

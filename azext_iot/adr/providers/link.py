@@ -66,13 +66,26 @@ from azext_iot.adr.topology import (
     endpoint_is_type,
     endpoint_settings_match,
     has_dps_endpoint,
-    has_succeeded_dps_endpoint,
+    has_linked_dps_endpoint,
     hub_endpoint_count,
     is_failed_hub_endpoint,
     is_failed_link_endpoint,
+    is_linked_dps_dependency,
+    is_linked_resource_deleted,
 )
 
 logger = get_logger(__name__)
+
+
+def _warn_if_linked_dps_deleted(namespace: dict) -> None:
+    for name, endpoint in _get_provisioning_endpoints(namespace).items():
+        if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and is_linked_resource_deleted(endpoint):
+            logger.warning(
+                "The DPS linked by provisioning endpoint '%s' was deleted. ADR still accepts Hub links, but devices "
+                "can't be provisioned to them until you remove it with 'az iot adr ns link dps remove' and link a DPS.",
+                name,
+            )
+
 
 _HUB_TARGET = TargetLookup(
     factory=adr_iot_hub_service_factory,
@@ -121,6 +134,15 @@ class LinkProvider(ADRProvider):
             strategy,
         )
 
+    def _hub_exists(self, resource_id: str, call=None) -> bool:
+        """Whether a linked Hub still exists; ADR may not yet report a deleted Hub as LinkedResourceDeleted."""
+        try:
+            (call or (lambda fn, *args: fn(*args)))(self._get_target, _parse_hub_resource_id(resource_id), _HUB_TARGET)
+        except ResourceNotFoundError:
+            logger.warning("Skipping DPS role assignment for linked IoT Hub '%s' because it no longer exists.", resource_id)
+            return False
+        return True
+
     def _preflight_link(
         self,
         link_type: str,
@@ -132,6 +154,10 @@ class LinkProvider(ADRProvider):
         *,
         rbac_requests: Optional[list] = None,
         planned_hubs: Optional[dict] = None,
+        target: Optional[dict] = None,
+        validate_iot_hubs: bool = True,
+        hub_exists=None,
+        lookup_dps=None,
     ) -> dict:
         requests = []
         target = preflight_target(
@@ -141,15 +167,20 @@ class LinkProvider(ADRProvider):
             inbound_identity=inbound_identity,
             parsed=parsed,
             strategy=strategy,
-            lookup=lambda parsed_id, _: self._get_target(parsed_id, strategy),
+            lookup=(
+                (lambda parsed_id, _: self._get_target(parsed_id, strategy)) if target is None
+                else (lambda _parsed_id, _strategy: target)
+            ),
             rbac_manager=self._rbac_manager,
             rbac_requests=requests,
         )
-        if link_type == "dps":
+        # ADR checks a DPS's iotHubs only when the DPS is added or a Failed DPS is retried.
+        if link_type == "dps" and validate_iot_hubs:
             validate_dps_hubs(namespace, target, planned_hubs)
         add_dps_hub_role_requirements(
             requests[0], namespace,
-            lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
+            lookup_dps or (lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET)),
+            hub_exists or self._hub_exists,
         )
         self._link_requests[(link_type, target_resource_id.casefold())] = deepcopy(requests)
         if rbac_requests is not None:
@@ -344,21 +375,22 @@ class LinkProvider(ADRProvider):
         original_dps = {
             name: _endpoint_update_body(endpoint)
             for name, endpoint in _get_provisioning_endpoints(namespace).items()
-            if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE)
+            if is_linked_dps_dependency(endpoint)
         }
 
         def verify(current, deadline):
             requests = []
             deadline.remaining()
+            # A Hub recovery PATCH retries a Failed Hub, which ADR accepts only with a linked DPS.
             if kind == "hub":
                 current_dps = {
                     name: _endpoint_update_body(endpoint)
                     for name, endpoint in _get_provisioning_endpoints(current).items()
-                    if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and endpoint.get("linkingState") == "Succeeded"
+                    if is_linked_dps_dependency(endpoint)
                 }
                 if not original_dps or current_dps != original_dps:
                     raise AzureResponseError(
-                        "The exact DPS dependency is no longer Succeeded; no Hub recovery PATCH submitted."
+                        "The DPS link is missing, Failed, or changed; no Hub recovery PATCH submitted."
                     )
             preflight_target(
                 link_type=kind, namespace=current, target_resource_id=expected["resourceId"],
@@ -371,6 +403,7 @@ class LinkProvider(ADRProvider):
                 lambda resource_id: deadline.call(
                     self._get_target, _parse_dps_resource_id(resource_id), _DPS_TARGET,
                 ),
+                lambda resource_id: self._hub_exists(resource_id, deadline.call),
             )
             deadline.remaining()
             if requests != original_requests:
@@ -415,8 +448,9 @@ class LinkProvider(ADRProvider):
         existing = self._get_namespace(namespace_name, resource_group_name)
 
         # DPS-first: namespace must already have at least one DPS endpoint
-        if not has_succeeded_dps_endpoint(existing):
+        if not has_linked_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_REQUIRED_MSG)
+        _warn_if_linked_dps_deleted(existing)
         if hub_endpoint_count(existing) >= 10:
             raise ArgumentUsageError(HUB_CAP_EXCEEDED_MSG)
         if endpoint_name in _get_messaging_endpoints(existing):
@@ -482,8 +516,11 @@ class LinkProvider(ADRProvider):
             namespace_name,
             "Hub",
         )
-        if is_failed_hub_endpoint(endpoint) and not has_succeeded_dps_endpoint(existing):
+        retry = is_failed_hub_endpoint(endpoint)
+        if retry and not has_linked_dps_endpoint(existing):
             raise ArgumentUsageError(DPS_REQUIRED_MSG)
+        if retry:
+            _warn_if_linked_dps_deleted(existing)
 
         settings = {}
         if availability is not None:
@@ -594,7 +631,7 @@ class LinkProvider(ADRProvider):
             str(((hub.get("properties") or {}).get("deviceHostName") or "")).casefold(),
         }
         for endpoint in _get_provisioning_endpoints(namespace).values():
-            if not endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE):
+            if not endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) or is_linked_resource_deleted(endpoint):
                 continue
             dps = self._side_get_dps_resource(endpoint.get("resourceId"))
             if dps is None:
@@ -711,6 +748,7 @@ class LinkProvider(ADRProvider):
             inbound_identity=inbound_identity,
             parsed=_parse_dps_resource_id(dps_resource_id),
             strategy=_DPS_TARGET,
+            validate_iot_hubs=is_failed_link_endpoint(endpoint),
         )
 
         return self._patch_link(
@@ -927,7 +965,13 @@ class LinkProvider(ADRProvider):
         batch = len(hubs) > 1 or bool((dps.get("properties") or {}).get("iotHubs"))
         if batch:
             properties["messaging"] = {"endpoints": {**_get_messaging_endpoints(existing), **hubs}}
-            add_dps_hub_role_requirements(rbac_requests[0], hub_plan, None)
+            # Keep existing Hubs the DPS preflight found missing out of the batch grants.
+            known_hubs = set(rbac_requests[0].get("hub_scopes") or ()) | {
+                body["resourceId"].rstrip("/").lower() for body in hubs.values()
+            }
+            add_dps_hub_role_requirements(
+                rbac_requests[0], hub_plan, None, lambda resource_id: resource_id.rstrip("/").lower() in known_hubs,
+            )
         for body in hubs.values():
             self._preflight_link(
                 link_type="hub", namespace=hub_plan, target_resource_id=body["resourceId"],
@@ -1004,8 +1048,10 @@ class LinkProvider(ADRProvider):
                 sections.setdefault(section, {"endpoints": {}})["endpoints"][name] = _endpoint_update_body(endpoint)
         hubs = sections.get("messaging", {}).get("endpoints", {})
         dps = sections.get("provisioning", {}).get("endpoints", {})
-        if hubs and not dps and not has_succeeded_dps_endpoint(existing):
+        if hubs and not dps and not has_linked_dps_endpoint(existing):
             raise ArgumentUsageError("Select the Failed DPS with --dps-endpoint-name to retry it with its Hubs.")
+        if hubs and not dps:
+            _warn_if_linked_dps_deleted(existing)
         requests = []
         for kind, group, parser, strategy in (
             ("dps", dps, _parse_dps_resource_id, _DPS_TARGET),
