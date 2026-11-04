@@ -87,6 +87,9 @@ def validate_dps_hubs(namespace: dict, target: dict, planned_hubs=None) -> None:
         raise InvalidArgumentValueError(
             "DPS has classic Hubs that must be linked in the same request: "
             f"{', '.join(missing)}. {guidance}"
+            "If a listed Hub was deleted, remove its stale entry with 'az iot dps linked-hub delete "
+            f"--dps-name {target.get('name') or '<dps>'} --linked-hub <hostname>' before linking the DPS; "
+            "the list is read-only while the DPS is linked. "
             "No role assignments or namespace changes were submitted."
         )
 

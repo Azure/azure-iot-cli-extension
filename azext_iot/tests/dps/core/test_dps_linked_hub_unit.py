@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from copy import deepcopy
+
 import pytest
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
@@ -640,3 +642,70 @@ class TestLegacyLinkedHubHostNameBackfill:
         entry = legacy_entries[0]
         assert entry["hostName"] == "myhub.azure-devices.net"
         assert "fresh-key" in entry["connectionString"]
+
+
+class TestLinkedHubShortNameForDeletedHub:
+    """A dotless --linked-hub resolves through ARM, falling back to the DPS entries when the Hub is gone."""
+
+    HUBS = [
+        {"name": "myhub.azure-devices.net"},
+        {"name": "myhub.device.azure-devices.net"},
+        {"name": "gone.azure-devices.net"},
+        {"name": "dup.azure-devices.net"},
+        {"name": "dup.device.azure-devices.net"},
+    ]
+
+    @pytest.fixture
+    def hostname(self, mocker):
+        from azure.cli.core.azclierror import CLIInternalError
+
+        def lookup(_client, name):
+            if name == "myhub":
+                return "myhub.azure-devices.net"
+            raise CLIInternalError(f"No IoT Hub found with name {name} in current subscription.")
+
+        mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
+        mocker.patch("azext_iot.core.custom.iot_dps_get", return_value={"properties": {"iotHubs": deepcopy(self.HUBS)}})
+        mocker.patch("azext_iot.core.custom.iot_dps_linked_hub_list", return_value=deepcopy(self.HUBS))
+        mocker.patch("azext_iot.core.custom._ensure_dps_resource_group_name", return_value="rg")
+        return mocker.patch("azext_iot.core.custom._get_iot_hub_hostname", side_effect=lookup)
+
+    @pytest.mark.parametrize("linked_hub, expected", [
+        ("gone", "gone.azure-devices.net"),
+        ("myhub", "myhub.azure-devices.net"),
+        ("dup.device.azure-devices.net", "dup.device.azure-devices.net"),
+    ])
+    def test_show(self, fixture_cmd, hostname, linked_hub, expected):
+        from azext_iot.core.custom import iot_dps_linked_hub_get
+
+        assert iot_dps_linked_hub_get(fixture_cmd, None, "dps", linked_hub)["name"] == expected
+        assert hostname.called is ("." not in linked_hub)
+
+    @pytest.mark.parametrize("linked_hub, removed", [
+        ("gone", "gone.azure-devices.net"),
+        ("myhub", "myhub.azure-devices.net"),
+    ])
+    def test_delete(self, fixture_cmd, hostname, mocker, linked_hub, removed):
+        from azext_iot.core.custom import iot_dps_linked_hub_delete
+
+        put = mocker.patch("azext_iot.core.custom._put_dps")
+        iot_dps_linked_hub_delete(fixture_cmd, None, "dps", linked_hub, no_wait=True)
+
+        remaining = [hub["name"] for hub in put.call_args.args[3]["properties"]["iotHubs"]]
+        assert remaining == [hub["name"] for hub in self.HUBS if hub["name"] != removed]
+
+    @pytest.mark.parametrize("linked_hub, error, match", [
+        ("dup", InvalidArgumentValueError, "--linked-hub <full-hostname>"),
+        ("missing", ResourceNotFoundError, "No linked hub found"),
+    ])
+    @pytest.mark.parametrize("command", ["show", "delete"])
+    def test_deleted_hub_errors(self, fixture_cmd, hostname, mocker, command, linked_hub, error, match):
+        from azext_iot.core import custom
+
+        put = mocker.patch("azext_iot.core.custom._put_dps")
+        with pytest.raises(error, match=match):
+            if command == "show":
+                custom.iot_dps_linked_hub_get(fixture_cmd, None, "dps", linked_hub)
+            else:
+                custom.iot_dps_linked_hub_delete(fixture_cmd, None, "dps", linked_hub, no_wait=True)
+        put.assert_not_called()
