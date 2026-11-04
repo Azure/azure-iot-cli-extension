@@ -1396,6 +1396,9 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
        ``link hub remove`` of hub-b.
     4. Delete the DPS; ADR keeps its endpoint as ``LinkedResourceDeleted`` and still accepts
        a hub-a identity change and a new hub-c link.
+    5. After removing the deleted DPS's link, ``link dps add`` of an unlinked DPS that still lists hub-b
+       explains how to remove the stale entry; ``dps linked-hub show/delete --linked-hub <short name>``
+       remove it and the DPS links.
     """
 
     @pytest.mark.timeout(3600 + _DELETED_LINK_TIMEOUT, func_only=False)
@@ -1408,6 +1411,7 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
         hub_names = [generate_hub_name(), generate_hub_name()]
         hub_c_name = generate_hub_name()
         dps_name, identity_name = generate_dps_name(), generate_identity_name()
+        dps2_name = generate_dps_name()
 
         def show():
             return self.cmd(f"iot adr ns show -n {namespace_name} -g {rg}").get_output_in_json()
@@ -1481,7 +1485,7 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     kind="namespace", name=namespace_name, resource_group=rg,
                 )
 
-            with timed_step("Setup 2/4 > Create three Standard Hubs and a DPS"):
+            with timed_step("Setup 2/4 > Create three Standard Hubs and two DPS"):
                 for name in (*hub_names, hub_c_name):
                     self.create_owned_resource(
                         f"iot hub create -n {name} -g {rg} --location {HUB_TEST_LOCATION} --sku S1 "
@@ -1494,6 +1498,11 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     kind="dps", name=dps_name, resource_group=rg,
                 ).get_output_in_json()
                 dps_id = dps["id"]
+                dps2 = self.create_owned_resource(
+                    f"iot dps create -n {dps2_name} -g {rg} --location {TEST_LOCATION} --disable-local-auth true "
+                    "--system-assigned-mi",
+                    kind="dps", name=dps2_name, resource_group=rg,
+                ).get_output_in_json()
                 hubs = [wait_for_condition(
                     lambda name=name: self.cmd(f"iot hub show -n {name} -g {rg}").get_output_in_json(),
                     lambda resource: resource.get("properties", {}).get("state") == "Active",
@@ -1507,15 +1516,14 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                 ) for name in (*hub_names, hub_c_name)]
                 hub_c = hubs.pop()
 
-            with timed_step("Setup 3/4 > Register both Hubs in the DPS classic iotHubs list"):
-                for hub in hubs:
-                    assert self.assign_role(
-                        dps["identity"]["principalId"], HUB_DATA_ROLE, hub["id"], assignee_type="ServicePrincipal",
-                    )
+            with timed_step("Setup 3/4 > Register both Hubs in the DPS, and hub-b in dps2, classic iotHubs list"):
+                for principal, hub in (*((dps["identity"]["principalId"], hub) for hub in hubs),
+                                       (dps2["identity"]["principalId"], hubs[1])):
+                    assert self.assign_role(principal, HUB_DATA_ROLE, hub["id"], assignee_type="ServicePrincipal")
                 budget.call(sleep, ROLE_PROPAGATION_DELAY)
-                for name in hub_names:
+                for target, name in ((dps_name, hub_names[0]), (dps_name, hub_names[1]), (dps2_name, hub_names[1])):
                     self.cmd(
-                        f"iot dps linked-hub create --dps-name {dps_name} -g {rg} "
+                        f"iot dps linked-hub create --dps-name {target} -g {rg} "
                         f"--hub-name {name} --hub-resource-group {rg} "
                         "--hostname-type classic --authentication-type SystemAssigned"
                     )
@@ -1607,6 +1615,26 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     {"type": "UserAssigned", "userAssignedIdentity": identity_id},
                 )
                 wait_for_namespace_links(deleted=("dps",))
+
+            with timed_step("Step 8 ❯ Link dps2 after removing hub-b's stale entry by short name"):
+                self.cmd(f"iot adr ns link dps remove --ns {namespace_name} -g {rg} -n dps --yes")
+                dps2_add = (
+                    f"iot adr ns link dps add --ns {namespace_name} -g {rg} -n dps2 --dps-id {dps2['id']} "
+                    f"--system-assigned-mi --timeout {budget.remaining(_NATIVE_LINK_TIMEOUT)} "
+                    f"--interval {_NATIVE_LINK_INTERVAL}"
+                )
+                with pytest.raises(InvalidArgumentValueError, match="remove its stale entry with 'az iot dps linked-hub"):
+                    self.cmd(dps2_add)
+                entry = self.cmd(
+                    f"iot dps linked-hub show --dps-name {dps2_name} -g {rg} --linked-hub {hub_names[1]}"
+                ).get_output_in_json()
+                assert entry["name"].casefold() == hubs[1]["properties"]["hostName"].casefold(), entry
+                self.cmd(f"iot dps linked-hub delete --dps-name {dps2_name} -g {rg} --linked-hub {hub_names[1]}")
+                assert not self.cmd(f"iot dps linked-hub list --dps-name {dps2_name} -g {rg}").get_output_in_json()
+                _assert_native_link_result(
+                    self.cmd(dps2_add).get_output_in_json(), "provisioning", "dps2", dps2["id"], {"type": "SystemAssigned"},
+                )
+                wait_for_namespace_links()
         finally:
             budget.begin_cleanup()
             self.cleanup_full_infra()
