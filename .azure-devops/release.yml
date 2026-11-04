@@ -33,7 +33,7 @@ extends:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.14'
-              - template: templates/release-feed.yml
+              - template: /.azure-devops/templates/release-feed.yml@self
               - bash: |
                   set -euo pipefail
                   python -m venv "$AGENT_TEMPDIRECTORY/trust-probe"
@@ -51,7 +51,7 @@ extends:
               - task: UsePythonVersion@0
                 inputs:
                   versionSpec: '3.13'
-              - template: templates/release-feed.yml
+              - template: /.azure-devops/templates/release-feed.yml@self
               - bash: |
                   set -euo pipefail
                   git init --quiet "$AGENT_TEMPDIRECTORY/ops-source"
