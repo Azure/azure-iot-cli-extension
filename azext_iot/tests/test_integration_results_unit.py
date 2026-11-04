@@ -7,7 +7,6 @@
 import json
 import os
 from pathlib import Path
-import runpy
 import subprocess
 import sys
 import textwrap
@@ -15,7 +14,6 @@ from time import monotonic, sleep
 from types import SimpleNamespace
 
 import pytest
-import yaml
 
 from azext_iot.tests._integration_progress import IntegrationProgress
 from azext_iot.tests._integration_results import IntegrationResults
@@ -216,76 +214,6 @@ def test_incremental_option_allows_xdist_controller_writer(mocker):
     assert any(isinstance(plugin, IntegrationProgress) for plugin in registered)
 
 
-def _record_step():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    return next(step for step in workflow["jobs"]["int-test"]["steps"] if step["name"] == "Record test result")
-
-
-@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "windows-crlf"])
-def test_record_step_reads_utf8_workflow_under_windows_default_encoding(tmp_path, monkeypatch, newline):
-    relative = ".github/workflows/int_test.yml"
-    source = (ROOT / relative).read_text(encoding="utf-8")
-    source = "# UTF-8 probe: \u2510\n" + source
-    workflow = tmp_path / relative
-    workflow.parent.mkdir(parents=True)
-    workflow.write_bytes(source.replace("\n", newline).encode("utf-8"))
-
-    def windows_read_text(path, encoding=None, errors=None, **kwargs):
-        # Reproduce Windows' non-UTF-8 default on every test platform.
-        with path.open(encoding=encoding or "cp1252", errors=errors, **kwargs) as stream:
-            return stream.read()
-
-    monkeypatch.setattr(Path, "read_text", windows_read_text)
-    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
-    # Keep the encoding probe independent of the production workflow's presentation.
-    with pytest.raises(UnicodeDecodeError):
-        workflow.read_text()
-    step = _record_step()
-    assert step["name"] == "Record test result"
-    assert step["if"] == "${{ always() }}"
-    assert "ADR incremental test evidence is missing" in step["run"]
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow record step.")
-@pytest.mark.parametrize("receipt", ["failed", "cancelled", "missing", "passed", "not-started", "no-selection"])
-def test_actual_workflow_record_step_preserves_incremental_adr_evidence(tmp_path, receipt):
-    directory = tmp_path / "test-result"
-    if receipt != "missing":
-        writer = IntegrationResults(directory)
-        if receipt != "no-selection":
-            writer.select([NODE])
-        if receipt not in ("not-started", "no-selection"):
-            writer.start(NODE)
-            for phase in ("setup", "call", "teardown"):
-                _report(writer, when=phase, outcome="failed" if receipt == "failed" and phase == "call" else "passed")
-        if receipt != "cancelled":
-            writer.finish(1 if receipt == "failed" else 0)
-    (tmp_path / "test-output.log").write_text("No final pytest summary was emitted.\n")
-    status = {"failed": "failure", "cancelled": "cancelled"}.get(receipt, "success")
-    result = subprocess.run(
-        ["bash", "-c", _record_step()["run"]], cwd=tmp_path,
-        env=dict(os.environ, TEST_SERVICE="ADR", TEST_STATUS=status, TEST_PYTHON="3.13", TEST_REGION="centraluseuap"),
-        capture_output=True, text=True, timeout=10, check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    failures = (directory / "failures.txt").read_text()
-    assert bool(failures) == (receipt != "passed")
-    if receipt == "failed":
-        assert "failed phase(s): call" in failures
-    elif receipt == "cancelled":
-        assert "session incomplete" in failures
-    elif receipt == "missing":
-        assert "missing" in failures
-    assert (directory / "status.txt").read_text().strip() == status
-    evaluate = runpy.run_path(str(ROOT / "azext_iot/tests/_evaluate_test_results.py"))["evaluate_results"]
-    summary, errors = evaluate(
-        directory, [{"service": "ADR", "python": "3.13", "region": "centraluseuap"}],
-        {"setup": "success", "unit-test": "success", "int-test": "success", "gate preparation": "success"},
-    )
-    assert bool(errors) == (receipt != "passed")
-    assert ("### Passed" in summary) == (receipt == "passed")
-
-
 def test_only_adr_tox_enables_incremental_serial_receipts():
     text = (ROOT / "tox.ini").read_text()
     enabled = [line.strip() for line in text.splitlines() if "--integration-results-dir" in line]
@@ -295,7 +223,6 @@ def test_only_adr_tox_enables_incremental_serial_receipts():
         + "\\"
     )
     assert enabled == [expected]
-    assert _record_step()["if"] == "${{ always() }}"
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Verifies abrupt Linux process cancellation without sessionfinish.")

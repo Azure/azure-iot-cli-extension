@@ -83,16 +83,21 @@ In order to list all recognized environments, you can type `tox -av`, which will
 
 ## Integration workflow topology
 
-`int_test.yml` runs lint and four duration-balanced serial unit shards in parallel.
-Its unit gate verifies complete, nonduplicated execution and combines coverage
-before any integration jobs are eligible. See [parallel CI unit tests](../CONTRIBUTING.md#parallel-ci-unit-tests)
+Native Azure Pipelines integration uses
+[`.azure-devops/integration_tests.yml`](../.azure-devops/integration_tests.yml).
+Its shared pipeline template runs build, lint, and four duration-balanced serial
+unit shards. Service stages start after build and lint while units run independently.
+The unit gate verifies complete, nonduplicated execution and combines coverage;
+final qualification requires units and all selected services to pass.
+See [parallel CI unit tests](../CONTRIBUTING.md#parallel-ci-unit-tests)
 for shard artifacts, reruns and timing-profile maintenance.
 
-The direct service × Python × region matrix starts after setup and the unit gate
-succeed. Every selected combination, including ADU, is independently eligible
-to run, with `fail-fast: false`, no parallelism cap and no workflow/job concurrency
-lock. Job names and result/coverage artifacts identify the service, Python and region.
-The result gate checks the complete selected matrix independently of coverage reporting.
+Each selected service has a native ADO stage with Python and region combinations.
+Jobs and evidence identify the service, Python, region, and attempt; the final
+result gate checks the complete selected matrix independently of coverage reporting.
+Use ADO's **Run pipeline** controls for selection and routing. The former GitHub
+live/release entrypoints, integration scheduler, and GitHub-to-ADO bridge are retired;
+GitHub PR checks remain enabled.
 
 Owned Hub/DPS controllers run independent phases concurrently; ADR uses
 `loadgroup` workers. Controllers do not reserve slots or enforce subscription quota
@@ -111,7 +116,7 @@ provisioning failures are reported normally.
 
 HubControl runs its four shards concurrently, each capped at 90 minutes plus
 15 minutes for controller cleanup. Its controller reserves another 5 minutes.
-GitHub and Azure DevOps jobs allow 130 minutes (HubData: 115), including 15
+The shared CI budgets allow 130 minutes (HubData: 115), including 15
 minutes for setup and 5 minutes of outer headroom. HubData retains its 75-minute
 Entra / 45-minute SAS phases and 15-minute cleanup windows. DPS allows 90 minutes:
 10 setup + 75 controller + 5 outer headroom. Its controller includes the slowest
@@ -127,9 +132,9 @@ cases retain their existing 30-minute query-visibility bounds. This prevents the
 serial query waits from consuming the protocol phase's budget. SAS coverage and
 the total selected case inventory are unchanged.
 
-Every selected service runs its full branch-specific suite. GitHub dispatch and
-reusable workflows have no ADR pytest filter, certificate-revocation opt-in or DPS
-capacity-limit input; the release caller does not supply a quota override either.
+Every selected service runs its full branch-specific suite. Native ADO selection
+does not expose an ADR pytest filter, certificate-revocation opt-in, or DPS
+capacity-limit override.
 Both ADR Microsoft CA revocation cases run using newly created, test-owned CAs.
 Pre-existing resources are rejected before creation, and the certificate action
 tracker independently enforces exact ownership before any mutation.
@@ -153,9 +158,9 @@ identity), storage account and SU-linked namespace, then covers stage, import,
 report types. The healthy job-run cancellation case was removed: an Active run
 needs devices in a controllable rollout, which the suite does not provision.
 
-The GitHub ADR service job allows **180 minutes**, including setup and reporting.
-The root integration matrix applies this budget directly to each ADR service job.
-The job ceiling does not extend per-operation provisioning waits.
+The shared ADR CI budget is **180 minutes**, including setup and reporting.
+ADO's outer job envelope also accommodates its attempt lifecycle; it does not
+extend per-operation provisioning waits.
 
 The namespace CRUD and two namespace-list scenarios retain **15-minute** limits:
 their unchanged DELETE wait alone allows 10 minutes, so a 10-minute scenario cap

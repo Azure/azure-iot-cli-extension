@@ -139,10 +139,10 @@ Execute the following command to run the IoT Hub unit tests:
 
 #### Parallel CI unit tests
 
-The GitHub integration precheck uses four balanced unit-test shards on
-Linux/Python 3.13. PR CI uses the same runner on Python 3.13 across Ubuntu,
+The native Azure Pipelines integration precheck uses four balanced unit-test shards on
+Linux/Python 3.13. GitHub PR CI uses the same runner on Python 3.13 across Ubuntu,
 Windows, and macOS, plus Python 3.10 on Ubuntu: four combinations and 16 unit jobs.
-GitHub branch/tag pushes, manual runs, and release workflows retain all three operating
+GitHub CI branch/tag pushes and manual runs retain all three operating
 systems and Python 3.10-3.13: twelve combinations and 48 unit jobs. The reusable
 workflow defaults to the full matrix; only the CI caller's `pull_request` event
 enables `pr-matrix`. Each combination runs all unit tests across four shards,
@@ -163,15 +163,16 @@ the PR unit gate; the former additional ADO unit combinations and tests against
 the unreleased CLI test SDK are no longer part of Merge validation. Full-matrix
 GitHub runs and other integration/unit pipelines are unchanged.
 
-Integration starts only after lint, all shards, and the `unit-test` gate pass.
-The gate checks complete, exactly-once case coverage and combines coverage into
-`coverage-unit`. Native reruns can reuse successful shards from the same run and
+Native ADO service stages start after build and lint; units run independently.
+Final qualification requires the unit gate and every selected service to pass.
+The unit gate checks complete, exactly-once case coverage and combines coverage into
+`integration-unit-coverage-<attempt>`. Native reruns can reuse successful shards from the same run and
 commit, but incomplete newer attempts cannot fall back to older results.
 
 Shard results are published as `unit-shard-<number>-<attempt>`.
 PR CI uses `tox-unit-<os>-py<version>-<number>-<attempt>` to keep each combination
 separate from the others and from integration prechecks.
-Integration summaries use `unit-summary-<attempt>`; PR summaries use
+Integration summaries are included in `integration-unit-coverage-<attempt>`; PR summaries use
 `tox-summary-<os>-py<version>-<attempt>`. Both include the completeness summary
 and `timings.json`; use those timings to maintain `azext_iot/tests/unit_test_durations.json`.
 The shared runner accepts CI-neutral run, commit, and attempt inputs so Azure
@@ -195,26 +196,26 @@ runs are partial coverage. Provisioning failures fail the run, and resource
 ownership and verified cleanup remain mandatory.
 See [integration workflow guidance](docs/tox-testing.md#integration-workflow-topology).
 
-The GitHub integration workflow's `regions` input accepts Azure public-region
+The native Azure Pipelines integration entrypoint,
+`.azure-devops/integration_tests.yml`, exposes service, Python, region, and ARM
+routing controls through **Run pipeline**. Its `regions` parameter accepts Azure public-region
 identifiers, such as `australiaeast` or `westeurope`, without a per-region allowlist;
-it defaults to `australiaeast`. The `arm-endpoint` input is `public` (default,
+it defaults to `australiaeast`. The `armEndpoint` parameter is `public` (default,
 `https://management.azure.com`) or `canary`; canary routing requires `centraluseuap`.
 Resource location and ARM routing are passed together through the full service
 run. Public ARM is not a region-derived hostname. Unsupported API or region
 operations fail rather than falling back to canary or changing the selected tests.
 
-Release-build integration tests explicitly select `australiaeast` with public ARM
-routing for all services on Python 3.10 and 3.13, retaining the existing test
-subscription and `cli-int-test-rg` resource group. The scheduled workflow also uses
-`australiaeast` with public ARM. Preview management commands default to public ARM;
+Native release pipelines own their integration selection and qualification.
+Preview management commands default to public ARM;
 canary ARM is opt-in through
 `AZURE_IOT_ADR_ARM_ENDPOINT=https://centraluseuap.management.azure.com` and is
-exercised only by an explicit `arm-endpoint=canary` / `regions=centraluseuap`
+exercised only by an explicit `armEndpoint=canary` / `regions=centraluseuap`
 dispatch or the Azure DevOps centraluseuap pipeline.
 
-Scheduled integration tests are configured separately in
-`.github/workflows/int_test_schedule.yml` on the default branch (`dev`), not the
-release branch. Release-build settings do not change scheduled regions or cadence.
+GitHub live integration, release, the GitHub-to-ADO bridge, and their integration
+scheduler are retired. Use native Azure Pipelines for those operations;
+GitHub PR build, lint, unit, and index-compatibility checks remain in place.
 
 Integration tests end in "_int.py" so execute the following command to run all integration tests,
 `pytest -k "_int.py"`

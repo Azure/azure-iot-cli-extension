@@ -205,39 +205,6 @@ def test_real_four_process_collection_and_coverage_with_random_parameters(tmp_pa
     assert len(shards.read(tmp_path / "combined/timings.json")["seconds"]) == 4
 
 
-def test_github_prechecks_keep_lint_independent_and_gate_every_shard():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))["jobs"]
-    lint, job, gate = (jobs[name] for name in ("lint", "unit-shards", "unit-test"))
-    assert "needs" not in lint and "needs" not in job
-    assert job["strategy"] == {"fail-fast": False, "max-parallel": 4, "matrix": {"shard": [1, 2, 3, 4]}}
-    assert gate["needs"] == ["lint", "unit-shards"]
-    for precheck in (lint, job, gate):
-        assert "if" not in precheck and "continue-on-error" not in precheck
-        assert precheck["permissions"] == {"contents": "read"}
-        assert not any(step.get("continue-on-error") for step in precheck["steps"])
-    run = next(step for step in job["steps"] if "run" in step)
-    assert "-e python-azcur-unit" in run["run"]
-    assert "--unit-shard" in run["run"] and "--unit-shard-output" in run["run"]
-    assert run["env"]["COVERAGE_FILE"].endswith("/coverage.dat")
-    assert run["env"]["UNIT_ATTEMPT"] == "${{ github.run_attempt }}"
-    assert "if" not in run
-    upload = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@"))
-    assert upload["if"] == "${{ always() }}"
-    assert upload["with"]["name"] == "unit-shard-${{ matrix.shard }}-${{ github.run_attempt }}"
-    assert upload["with"]["if-no-files-found"] == "error" and not upload["with"].get("overwrite")
-    download = next(step for step in gate["steps"] if step.get("uses", "").startswith("actions/download-artifact@"))
-    assert download["with"] == {"pattern": "unit-shard-*", "path": "unit-history"}
-    combine = next(step for step in gate["steps"] if "run" in step)
-    assert "_unit_shards.py --history unit-history --output unit-coverage" in combine["run"]
-    assert combine["env"] == {name: run["env"][name] for name in ("UNIT_RUN_ID", "UNIT_COMMIT")}
-    coverage = next(step for step in gate["steps"] if step.get("with", {}).get("name") == "coverage-unit")
-    assert coverage["with"]["path"] == "unit-coverage/.coverage"
-    assert coverage["with"]["include-hidden-files"] is True
-    assert coverage["with"]["if-no-files-found"] == "error" and "if" not in coverage
-    assert jobs["int-test"]["needs"] == ["setup", "unit-test"]
-    assert "needs.unit-test.result == 'success'" in jobs["int-test"]["if"]
-
-
 @pytest.mark.parametrize("branch,push_enabled", [
     ("dev", True),
     ("preview", True),
@@ -305,7 +272,7 @@ def test_only_ci_pull_requests_request_the_reduced_unit_matrix():
         for name, job in yaml.safe_load(path.read_text(encoding="utf-8")).get("jobs", {}).items()
         if job.get("uses") == "./.github/workflows/tox.yml"
     }
-    assert ("release_workflow.yml", "unit-test") in callers
+    assert ("ci_workflow.yml", "test") in callers
     for key, job in callers.items():
         if key == ("ci_workflow.yml", "test"):
             assert job["with"]["pr-matrix"] == "${{ github.event_name == 'pull_request' }}"
