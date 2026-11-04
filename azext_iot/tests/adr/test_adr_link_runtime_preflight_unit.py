@@ -922,6 +922,13 @@ def test_outbound_identity_preflight_skips_deleted_hubs_and_stale_classic_hubs(
         assert "messaging/hub-b" in warning.call_args.args[1]
 
 
+def test_outbound_identity_preflight_fetches_each_linked_target_once(mocker):
+    provider, requests, _ = _run_outbound_preflight(mocker, _stale_namespace("Succeeded"), _stale_lookup(()))
+
+    assert sorted(_looked_up(provider)) == ["dps", "hub-a", "hub-b"]
+    assert all(request["dps_principal_id"] for request in requests if request["link_type"] == "hub")
+
+
 def test_outbound_identity_preflight_skips_deleted_dps_without_dps_hub_grants(mocker):
     namespace = _stale_namespace(None, dps_state="LinkedResourceDeleted")
     provider, requests, warning = _run_outbound_preflight(mocker, namespace, _stale_lookup(("dps",)))

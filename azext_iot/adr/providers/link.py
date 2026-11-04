@@ -144,6 +144,7 @@ class LinkProvider(ADRProvider):
         target: Optional[dict] = None,
         validate_iot_hubs: bool = True,
         hub_exists=None,
+        lookup_dps=None,
     ) -> dict:
         requests = []
         target = preflight_target(
@@ -165,7 +166,7 @@ class LinkProvider(ADRProvider):
             validate_dps_hubs(namespace, target, planned_hubs)
         add_dps_hub_role_requirements(
             requests[0], namespace,
-            lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET),
+            lookup_dps or (lambda resource_id: self._get_target(_parse_dps_resource_id(resource_id), _DPS_TARGET)),
             hub_exists or self._hub_exists,
         )
         self._link_requests[(link_type, target_resource_id.casefold())] = deepcopy(requests)
