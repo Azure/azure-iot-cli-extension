@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from azext_iot.tests._ado_retry import retryable_failure, case_id
+from azext_iot.tests._ado_retry import retryable_failure, case_id, case_names
 
 
 def pytest_configure(config):
@@ -58,6 +58,8 @@ class Receipt:
             raise pytest.UsageError("Retry selection is not an exact subset of the original collection.")
         self.data["expected"] = nodes
         self.data["excluded"] = [case_id(item.nodeid) for item in excluded]
+        self.data["caseNames"] = {case_id(item.nodeid): item.originalname for item in items}
+        case_names(self.data)
         selected, dropped = [], excluded
         for item in enabled:
             (selected if not self.selected or case_id(item.nodeid) in self.selected else dropped).append(item)
@@ -77,15 +79,15 @@ class Receipt:
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error):
         value = getattr(node, "workeroutput", {}).get("ado_receipt", {})
-        collection = (value.get("expected"), value.get("excluded"))
+        collection = (value.get("expected"), value.get("excluded"), value.get("caseNames"))
         if (error or value.get("finished") is not True or value.get("exitstatus") not in (0, 1)
-                or not collection[0] or not isinstance(collection[1], list)
+                or not collection[0] or not isinstance(collection[1], list) or not isinstance(collection[2], dict)
                 or self.worker_collection is not None and self.worker_collection != collection
                 or value.get("collected") != self.data["collected"]):
             self.data.setdefault("workerErrors", []).append("Worker execution or collection evidence is incomplete.")
         else:
             self.worker_collection = collection
-            self.data["expected"], self.data["excluded"] = collection
+            self.data["expected"], self.data["excluded"], self.data["caseNames"] = collection
         self.save()
 
     @pytest.hookimpl(hookwrapper=True)
@@ -109,7 +111,7 @@ class Receipt:
         outcome = yield
         if self.worker:
             session.config.workeroutput["ado_receipt"] = {
-                key: self.data[key] for key in ("expected", "excluded", "collected")
+                key: self.data[key] for key in ("expected", "excluded", "collected", "caseNames") if key in self.data
             }
             session.config.workeroutput["ado_receipt"].update(
                 finished=outcome.excinfo is None, exitstatus=int(session.exitstatus),
