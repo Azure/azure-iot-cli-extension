@@ -292,6 +292,26 @@ def test_junit_rejects_conflicting_names_for_the_same_full_hash(tmp_path):
     assert not (tmp_path / "final.xml").exists()
 
 
+def test_invalid_collected_name_is_not_saved_in_the_failure_receipt(tmp_path):
+    (tmp_path / "test_cases.py").write_text("def test_case():\n    pass\n", encoding="utf-8")
+    (tmp_path / "conftest.py").write_text(
+        "def pytest_collection_modifyitems(items):\n"
+        "    items[0].originalname = 'test_case[private-parameter]'\n",
+        encoding="utf-8",
+    )
+    path = tmp_path / "receipt.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", str(tmp_path), "-q", "-p", "azext_iot.tests._ado_retry_plugin"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False,
+        env=dict(os.environ, azext_iot_ado_receipt=str(path), PYTEST_ADDOPTS="",
+                 PYTHONPATH=os.pathsep.join(dict.fromkeys([str(ROOT), *map(os.path.abspath, sys.path)]))),
+    )
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "private-parameter" not in path.read_text()
+    with pytest.raises(ValueError):
+        retry.outcomes(retry.read(path))
+
+
 @pytest.mark.parametrize("services,versions,regions,endpoint", [
     (["Central"], ["3.13"], ["westus"], pipeline.TARGET["PUBLIC_ARM"]),
     (["DPS", "DPS"], ["3.13"], ["westus"], pipeline.TARGET["PUBLIC_ARM"]),

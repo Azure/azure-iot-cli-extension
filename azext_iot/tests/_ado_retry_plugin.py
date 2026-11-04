@@ -58,8 +58,9 @@ class Receipt:
             raise pytest.UsageError("Retry selection is not an exact subset of the original collection.")
         self.data["expected"] = nodes
         self.data["excluded"] = [case_id(item.nodeid) for item in excluded]
-        self.data["caseNames"] = {case_id(item.nodeid): item.originalname for item in items}
-        case_names(self.data)
+        self.data["caseNames"] = case_names({
+            **self.data, "caseNames": {case_id(item.nodeid): item.originalname for item in items},
+        })
         selected, dropped = [], excluded
         for item in enabled:
             (selected if not self.selected or case_id(item.nodeid) in self.selected else dropped).append(item)
