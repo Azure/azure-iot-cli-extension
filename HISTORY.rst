@@ -51,7 +51,7 @@ Release History
 
 **DPS certificate and enrollment fixes**
 
-* Fixed DPS data-plane commands using ``--auth-type login`` failing against Azure US Government (``.azure-devices-provisioning.us``) and Azure China (``.azure-devices-provisioning.cn``) endpoints because they requested the public-cloud Microsoft Entra audience.
+* Fixed DPS data-plane commands using ``--auth-type login`` to select the Fairfax Microsoft Entra audience for Azure US Government (``.azure-devices-provisioning.us``) endpoints while retaining the public-cloud audience for Azure China (``.azure-devices-provisioning.cn``) endpoints.
 * DPS data-plane commands report a clear error instead of ``KeyError`` when the DPS has no service hostname yet (still provisioning).
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
 * Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
