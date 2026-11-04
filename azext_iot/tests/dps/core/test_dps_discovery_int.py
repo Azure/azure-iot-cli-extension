@@ -92,7 +92,9 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module, auth_type):
     rg_targets = discovery.get_targets(resource_group_name=dps_rg, auth_type=auth_type)
     [assert_target(tar, rg=dps_rg) for tar in rg_targets]
 
-    assert len(rg_targets) <= len(sub_targets)
+    # Other runs share the subscription and resource group, so compare membership rather than racy counts.
+    assert dps_host_name in {tar["entity"] for tar in sub_targets}
+    assert dps_host_name in {tar["entity"] for tar in rg_targets}
 
 
 def assert_target(target: dict, by_cstring=False, **kwargs):
