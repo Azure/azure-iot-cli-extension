@@ -50,6 +50,19 @@ def case_id(node):
     return hashlib.sha256(node.encode()).hexdigest()
 
 
+def case_names(receipt):
+    if "caseNames" not in receipt:
+        return {}
+    names = receipt["caseNames"]
+    nodes = set(receipt.get("expected", [])) | set(receipt.get("excluded", []))
+    if (not isinstance(names, dict) or set(names) != nodes
+            or any(not isinstance(node, str) or not re.fullmatch("[a-f0-9]{64}", node)
+                   or not isinstance(name, str) or not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", name)
+                   for node, name in names.items())):
+        raise ValueError("Invalid parameter-free test names or collection identity.")
+    return names
+
+
 def retryable_failure(error):
     pending_errors, seen = [error], set()
     while pending_errors:
@@ -72,6 +85,7 @@ def fixture_failure(receipt):
 
 
 def outcomes(receipt, *, allow_fixture_failures=False):
+    case_names(receipt)
     if receipt.get("finished") is not True or receipt.get("exitstatus") not in (0, 1):
         raise ValueError("Missing terminal pytest execution; full-service recovery is required.")
     if receipt.get("workerErrors"):
@@ -265,11 +279,26 @@ def verify_artifacts(path, record):
 
 def junit(history, context, path):
     _, effective, recovered, full_required = _evaluate(history, context)
+    names = {}
+    for attempt in history:
+        if attempt.get("executionErrors"):
+            continue
+        for phase, value in attempt["phases"].items():
+            for node, name in case_names(value["receipt"]).items():
+                key = phase, node
+                if key in names and names[key] != name:
+                    raise ValueError("Test function name changed for an immutable case identity.")
+                names[key] = name
+
+    def title(phase, node):
+        name = names.get((phase, node))
+        return f"{name} [sha256:{node}]" if name else node
+
     suite = ET.Element("testsuite", name=context["service"])
     failures = 0
     for phase, cases in effective.items():
         for node, status in cases.items():
-            case = ET.SubElement(suite, "testcase", classname=phase, name=node)
+            case = ET.SubElement(suite, "testcase", classname=phase, name=title(phase, node))
             if status != "passed":
                 failures += 1
                 ET.SubElement(case, "failure", message="Unresolved test failure; see immutable attempt artifacts.")
@@ -284,7 +313,7 @@ def junit(history, context, path):
     for phase, value in latest.items():
         for node in value.get("excluded", []):
             excluded += 1
-            case = ET.SubElement(suite, "testcase", classname=phase, name=node)
+            case = ET.SubElement(suite, "testcase", classname=phase, name=title(phase, node))
             ET.SubElement(case, "skipped", message="Committed unconditional skip; not counted as passed coverage.")
     suite.set("tests", str(sum(map(len, effective.values())) + excluded + int(full_required)))
     suite.set("skipped", str(excluded))

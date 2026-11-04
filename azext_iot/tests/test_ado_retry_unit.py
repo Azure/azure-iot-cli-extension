@@ -15,6 +15,7 @@ import sys
 from string import Template
 from types import SimpleNamespace
 from unittest.mock import Mock
+import xml.etree.ElementTree as ET
 
 import pytest
 import yaml
@@ -265,6 +266,30 @@ def test_real_incomplete_execution_report_is_failing_and_never_overwrites_result
 def test_parameter_case_hashes_preserve_identity_without_persisting_secrets():
     assert retry.case_id("test[secret-one]") != retry.case_id("test[secret-two]")
     assert "secret" not in retry.case_id("test[secret-one]")
+
+
+@pytest.mark.parametrize("names", [
+    None, {}, {"a" * 64: "test_case[private-secret]"}, {"b" * 64: "test_case"},
+])
+def test_invalid_display_names_cannot_publish_parameter_values(names):
+    value = receipt({"a" * 64: "passed"})
+    value.update(expected=["a" * 64], caseNames=names)
+    with pytest.raises(ValueError, match="parameter-free test names") as error:
+        retry.outcomes(value)
+    assert "private-secret" not in str(error.value)
+
+
+def test_junit_rejects_conflicting_names_for_the_same_full_hash(tmp_path):
+    node = "a" * 64
+    first = attempt({node: "failed"})
+    first["phases"]["tests"]["expected"] = [node]
+    first["phases"]["tests"]["receipt"].update(expected=[node], caseNames={node: "test_original"})
+    second = attempt({node: "passed"}, first)
+    second["phases"]["tests"]["expected"] = [node]
+    second["phases"]["tests"]["receipt"].update(expected=[node], caseNames={node: "test_changed"})
+    with pytest.raises(ValueError, match="name changed"):
+        retry.junit([first, second], CONTEXT, tmp_path / "final.xml")
+    assert not (tmp_path / "final.xml").exists()
 
 
 @pytest.mark.parametrize("services,versions,regions,endpoint", [
@@ -957,12 +982,15 @@ def test_real_completed_call_failures_can_be_retried_without_erasing_failure(tmp
 def test_real_plugin_selects_exact_parameterized_failures_with_xdist(tmp_path, workers, distribution):
     source = tmp_path / "test_cases.py"
     source.write_text(
-        "import os\nimport pytest\n"
+        "import os\nimport pytest\nimport unittest\n"
         "@pytest.mark.xdist_group('shared')\n"
-        "@pytest.mark.parametrize('value', ['secret-one', 'secret-two', "
+        "@pytest.mark.parametrize('value', ['secret-one', 'secret-two::test_private_name', "
         "pytest.param('disabled', marks=pytest.mark.skip(reason='checked-in exclusion'))])\n"
         "def test_case(value):\n"
-        "    assert value != 'secret-two' or os.environ.get('OFFLINE_RECOVER') == 'yes'\n",
+        "    assert not value.startswith('secret-two') or os.environ.get('OFFLINE_RECOVER') == 'yes'\n"
+        "class TestMethods(unittest.TestCase):\n"
+        "    def test_method(self):\n"
+        "        pass\n",
         encoding="utf-8",
     )
     path = tmp_path / "receipt.json"
@@ -978,9 +1006,11 @@ def test_real_plugin_selects_exact_parameterized_failures_with_xdist(tmp_path, w
     first = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=60, check=False)
     assert first.returncode == 1, first.stdout + first.stderr
     value = retry.read(path)
-    assert len(retry.outcomes(value)) == 2
+    assert len(retry.outcomes(value)) == 3
     assert len(value["excluded"]) == 1
     assert "secret-" not in path.read_text()
+    assert set(value["caseNames"]) == set(value["expected"] + value["excluded"])
+    assert set(value["caseNames"].values()) == {"test_case", "test_method"}
     selected = [node for node, outcome in retry.outcomes(value).items() if outcome == "failed"]
     environment.update(
         OFFLINE_RECOVER="yes", azext_iot_ado_selected=json.dumps(selected),
@@ -988,7 +1018,21 @@ def test_real_plugin_selects_exact_parameterized_failures_with_xdist(tmp_path, w
     )
     second = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=60, check=False)
     assert second.returncode == 0, second.stdout + second.stderr
-    assert retry.outcomes(retry.read(tmp_path / "retry.json")) == {selected[0]: "passed"}
+    retried = retry.read(tmp_path / "retry.json")
+    assert retry.outcomes(retried) == {selected[0]: "passed"}
+    assert retried["caseNames"] == value["caseNames"]
+    first_record = attempt({})
+    first_record["phases"]["tests"].update(expected=value["expected"], receipt=value, excluded=value["excluded"])
+    second_record = attempt({}, first_record)
+    second_record["phases"]["tests"].update(expected=value["expected"], receipt=retried, excluded=value["excluded"])
+    assert retry.pending([first_record], CONTEXT) == {"tests": selected}
+    assert retry.junit([first_record, second_record], CONTEXT, tmp_path / "final.xml") == 0
+    cases = list(ET.parse(tmp_path / "final.xml").getroot().iter("testcase"))
+    assert {case.get("name") for case in cases} == {
+        f"{name} [sha256:{node}]" for node, name in value["caseNames"].items()
+    }
+    assert sum(case.find("skipped") is not None for case in cases) == 1
+    assert "secret-" not in (tmp_path / "final.xml").read_text()
 
 
 @pytest.mark.parametrize("defect", ["worker-exit", "worker-finish", "controller-finish", "exclusions"])
