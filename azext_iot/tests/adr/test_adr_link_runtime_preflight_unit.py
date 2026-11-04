@@ -1106,3 +1106,79 @@ def test_outbound_identity_preflight_skips_deleted_software_updates_instance(moc
     assert _looked_up(provider).count("su") == (1 if su_state == "Succeeded" else 0)
     assert {request["link_type"] for request in requests} == {"dps", "hub"}
     assert "updating/su" in warning.call_args.args[1]
+
+
+def _verify_recovery(recovery, namespace):
+    deadline = MagicMock(call=lambda fn, *args: fn(*args), remaining=MagicMock(return_value=60))
+    recovery.call_args.args[6](namespace, deadline)
+
+
+# None: no DPS link. A recovery PATCH retries the then-Failed Hub, which ADR rejects without a linked DPS.
+@pytest.mark.parametrize("dps_state", ["LinkedResourceDeleted", "Succeeded", "Failed", None])
+def test_hub_identity_change_is_not_blocked_by_a_deleted_dps(mocker, dps_state):
+    provider = _provider()
+    namespace = _stale_namespace(None, dps_state=dps_state)
+    if dps_state is None:
+        namespace["properties"]["provisioning"] = {"endpoints": {}}
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = _stale_lookup(("dps",))
+    provider._rbac = MagicMock()
+    provider._side_get_dps_resource = MagicMock(return_value=None)
+    recovery = mocker.patch("azext_iot.adr.providers.link.LinkRecovery")
+
+    provider.hub_update("hub-a", "ns", "rg", mi_user_assigned=_STALE_UAMI)
+
+    looked_up = dps_state in ("Succeeded", "Failed")
+    assert ("dps" in _looked_up(provider)) is looked_up
+    assert provider._side_get_dps_resource.called is looked_up
+    stored = provider._link_requests[("hub", _STALE_HUB_A.casefold())]
+    assert "dps_principal_id" not in stored[0]
+    recovery.return_value.run.assert_called_once()
+    if dps_state in ("Failed", None):
+        with pytest.raises(AzureResponseError, match="no Hub recovery PATCH"):
+            _verify_recovery(recovery, namespace)
+        provider._rbac.verify_many.assert_not_called()
+        return
+    _verify_recovery(recovery, namespace)
+    assert provider._rbac.verify_many.call_args.args[0] == stored
+
+
+def test_hub_add_with_a_deleted_dps_is_allowed_with_guidance(mocker):
+    provider = _provider()
+    namespace = _stale_namespace(None, dps_state="LinkedResourceDeleted")
+    provider.client.namespaces.get.return_value = namespace
+    provider._get_target = _stale_lookup(("dps",))
+    provider._rbac = MagicMock()
+    recovery = mocker.patch("azext_iot.adr.providers.link.LinkRecovery")
+    warning = mocker.patch("azext_iot.adr.providers.link.logger.warning")
+
+    provider.hub_add("hub-b", "ns", "rg", _STALE_HUB_B, mi_user_assigned=_STALE_UAMI)
+
+    assert "dps" not in _looked_up(provider)
+    assert any("link dps remove" in call.args[0] for call in warning.call_args_list)
+    recovery.return_value.run.assert_called_once()
+    _verify_recovery(recovery, namespace)
+
+
+@pytest.mark.parametrize("dps_state, allowed", [("LinkedResourceDeleted", True), ("Failed", False)])
+@pytest.mark.parametrize("command", ["hub update", "link update"])
+def test_failed_hub_retry_follows_the_adr_dps_dependency(mocker, dps_state, allowed, command):
+    provider = _provider()
+    provider.client.namespaces.get.return_value = _stale_namespace("Failed", dps_state=dps_state)
+    provider._get_target = _stale_lookup(("dps",))
+    provider._rbac = MagicMock()
+    recovery = mocker.patch("azext_iot.adr.providers.link.LinkRecovery")
+    batch = mocker.patch.object(provider, "_patch_link_batch")
+    retry = (
+        (lambda: provider.hub_update("hub-b", "ns", "rg")) if command == "hub update"
+        else (lambda: provider.link_update("ns", "rg", hub_endpoint_names=["hub-b"]))
+    )
+
+    if not allowed:
+        with pytest.raises(ArgumentUsageError):
+            retry()
+        provider._rbac.ensure.assert_not_called()
+        return
+    retry()
+    assert "dps" not in _looked_up(provider)
+    assert recovery.return_value.run.called or batch.called

@@ -35,6 +35,7 @@ Release History
 **ADR link identity changes**
 
 * Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub, DPS or Software Updates instance was deleted.
+* ``az iot adr ns link hub add|update`` follow ADR when the linked DPS was deleted but its link remains: Hub identity updates are no longer blocked, and Hub add/retry is allowed with removal guidance.
 
 **Shared command fixes**
 

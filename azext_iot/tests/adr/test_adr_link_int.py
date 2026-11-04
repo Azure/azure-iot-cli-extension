@@ -1885,13 +1885,15 @@ _DELETED_LINK_TIMEOUT = int(os.getenv("azext_iot_adr_deleted_link_timeout", "180
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTest):
-    """Identity changes stay available after a linked Hub that DPS still lists is deleted.
+    """Identity changes stay available after a linked Hub or DPS is deleted.
 
     1. Link a DPS whose classic ``iotHubs`` contains hub-a and hub-b, with both Hubs.
     2. Delete hub-b; ADR reports its endpoint as ``LinkedResourceDeleted`` while the
        DPS keeps the stale classic entry.
     3. ``link dps update`` and ``ns update --outbound-*`` succeed before and after
        ``link hub remove`` of hub-b.
+    4. Delete the DPS; ADR keeps its endpoint as ``LinkedResourceDeleted`` and still accepts
+       a hub-a identity change and a new hub-c link.
     """
 
     @pytest.mark.timeout(3600 + _DELETED_LINK_TIMEOUT, func_only=False)
@@ -1902,6 +1904,7 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
         hub_names = [generate_hub_name(), generate_hub_name()]
+        hub_c_name = generate_hub_name()
         dps_name, identity_name = generate_dps_name(), generate_identity_name()
 
         def show():
@@ -1976,11 +1979,11 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     kind="namespace", name=namespace_name, resource_group=rg,
                 )
 
-            with timed_step("Setup 2/4 > Create two Standard Hubs and a DPS"):
-                for name in hub_names:
+            with timed_step("Setup 2/4 > Create three Standard Hubs and a DPS"):
+                for name in (*hub_names, hub_c_name):
                     self.create_owned_resource(
                         f"iot hub create -n {name} -g {rg} --location {HUB_TEST_LOCATION} --sku S1 "
-                        f"--user-assigned-mi {identity_id} --disable-local-auth true --no-wait",
+                        f"--system-assigned-mi --user-assigned-mi {identity_id} --disable-local-auth true --no-wait",
                         kind="hub", name=name, resource_group=rg,
                     )
                 dps = self.create_owned_resource(
@@ -1999,7 +2002,8 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     description=f"owned Hub '{name}' Active",
                     timeout=budget.remaining(900),
                     interval=30,
-                ) for name in hub_names]
+                ) for name in (*hub_names, hub_c_name)]
+                hub_c = hubs.pop()
 
             with timed_step("Setup 3/4 > Register both Hubs in the DPS classic iotHubs list"):
                 for hub in hubs:
@@ -2068,6 +2072,39 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
             with timed_step("Step 4 ❯ DPS and outbound identity changes after hub-b removal"):
                 namespace = change_identities("--system-assigned-mi", "--outbound-system-assigned-mi", deleted=())
                 assert set(namespace["properties"]["messaging"]["endpoints"]) == {"hub-a"}
+
+            with timed_step("Step 5 ❯ Delete the DPS and wait for ADR to report LinkedResourceDeleted"):
+                self.cmd(f"iot dps delete -n {dps_name} -g {rg}")
+                wait_for_resource_absent(self, f"iot dps show -n {dps_name} -g {rg}", timeout=budget.remaining(600))
+                wait_for_condition(
+                    lambda: _show_link(self, "dps", namespace_name, rg, "dps"),
+                    lambda shown: _link_observation(shown)[0] == "LinkedResourceDeleted",
+                    description="dps LinkedResourceDeleted",
+                    timeout=budget.remaining(_DELETED_LINK_TIMEOUT),
+                    interval=30,
+                    describe=lambda shown: f"linkingState={_link_observation(shown)[0]!r}",
+                )
+
+            with timed_step("Step 6 ❯ hub-a identity change with the DPS LinkedResourceDeleted"):
+                endpoint = _update_hub_to_sami_with_recovery(
+                    self,
+                    f"iot adr ns link hub update --ns {namespace_name} -g {rg} -n hub-a --system-assigned-mi "
+                    f"--interval {_NATIVE_LINK_INTERVAL}",
+                    namespace_name, rg, "hub-a", hubs[0]["id"], identity_id,
+                )
+                assert _link_observation(endpoint) == ("Succeeded", "SystemAssigned"), endpoint
+
+            with timed_step("Step 7 ❯ Link hub-c while ADR still treats the deleted DPS as linked"):
+                result = self.cmd(
+                    f"iot adr ns link hub add --ns {namespace_name} -g {rg} -n hub-c --hub-id {hub_c['id']} "
+                    f"--user-assigned-mi {identity_id} "
+                    f"--timeout {budget.remaining(_NATIVE_LINK_TIMEOUT)} --interval {_NATIVE_LINK_INTERVAL}"
+                ).get_output_in_json()
+                _assert_native_link_result(
+                    result, "messaging", "hub-c", hub_c["id"],
+                    {"type": "UserAssigned", "userAssignedIdentity": identity_id},
+                )
+                wait_for_namespace_links(deleted=("dps",))
         finally:
             budget.begin_cleanup()
             self.cleanup_full_infra()
