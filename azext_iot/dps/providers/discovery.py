@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
+from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
@@ -86,13 +87,19 @@ class DPSDiscovery(BaseDiscovery):
         # same result as _azure.get_iot_dps_connection_string()
         # In future iteration we will return a 'Target' object rather than dict
         # but that will be better served aligning with vNext pattern for DPS
+        hostname = (resource.get("properties") or {}).get("serviceOperationsHostName")
+        if not hostname:
+            raise ResourceNotFoundError(
+                f"No service hostname is available for DPS '{resource['name']}' yet. "
+                "Retry when it finishes provisioning."
+            )
         result = {}
         result["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
-            resource["properties"]["serviceOperationsHostName"],
+            hostname,
             policy["keyName"],
             policy["primaryKey"] if key_type == "primary" else policy["secondaryKey"],
         )
-        result["entity"] = resource["properties"]["serviceOperationsHostName"]
+        result["entity"] = hostname
         result["policy"] = policy["keyName"]
         result["primarykey"] = policy["primaryKey"]
         result["secondarykey"] = policy["secondaryKey"]
