@@ -276,10 +276,14 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
 
 
 @pytest.mark.parametrize("target", ["public", "canary"])
+@pytest.mark.parametrize("already_versioned", [False, True])
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
-        candidate, tmp_path, monkeypatch, capsys, target):
+        candidate, tmp_path, monkeypatch, capsys, target, already_versioned):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_DPS_TARGET", target)
+    title = "iot-release-20261104.1"
+    versioned_title = f"{title} ({value['wheel']['version']})"
+    monkeypatch.setenv("BUILD_BUILDNUMBER", versioned_title if already_versioned else title)
     source = tmp_path / "source"
     dist = source / "dist"
     manifest = dist / "_manifest/spdx_2.2/manifest.spdx.json"
@@ -293,7 +297,9 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert generated["wheel"] == value["wheel"]
     assert generated["producer"] == value["producer"]
     assert generated["cohorts"] == release.integration_cohorts(target)
-    matrix = json.loads(capsys.readouterr().out.splitlines()[-1].split("]", 1)[1])
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == f"##vso[build.updatebuildnumber]{versioned_title}"
+    matrix = json.loads(lines[-1].split("]", 1)[1])
     assert set(matrix) == set(generated["cohorts"])
     with zipfile.ZipFile(output / "SBOM.zip") as archive:
         assert archive.read("_manifest/spdx_2.2/manifest.spdx.json") == manifest.read_bytes()

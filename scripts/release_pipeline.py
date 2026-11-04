@@ -391,6 +391,9 @@ def create_candidate(source, directory):
     }
     write(directory / "candidate.json", value)
     verify_candidate(directory)
+    suffix = f" ({value['wheel']['version']})"
+    title = environment("BUILD_BUILDNUMBER").removesuffix(suffix) + suffix
+    print(f"##vso[build.updatebuildnumber]{title}", flush=True)
     print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
         key: {"cohort": key} for key in value["cohorts"]
     }), flush=True)
