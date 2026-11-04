@@ -825,6 +825,7 @@ _STALE_DPS = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/p
 def _stale_target(resource_id, name, **properties):
     return {
         "id": resource_id,
+        "name": name,
         "location": "centraluseuap",
         "sku": {"name": "S1"},
         "identity": {
@@ -934,8 +935,9 @@ def test_failed_dps_update_still_requires_classic_hubs_to_be_linked(hub_b_state)
     provider._rbac = MagicMock()
     provider._patch_link = MagicMock()
 
-    with pytest.raises(InvalidArgumentValueError, match="hub-b"):
+    with pytest.raises(InvalidArgumentValueError, match="hub-b") as error:
         provider.dps_update("dps", "ns", "rg", mi_system_assigned=True, no_wait=True)
+    assert "remove its stale entry with 'az iot dps linked-hub delete" in str(error.value)
 
     provider._patch_link.assert_not_called()
     provider._rbac.ensure.assert_not_called()
@@ -950,8 +952,9 @@ def test_dps_add_still_requires_classic_hubs_to_be_linked():
     provider._rbac = MagicMock()
     provider._patch_link = MagicMock()
 
-    with pytest.raises(InvalidArgumentValueError, match="hub-b"):
+    with pytest.raises(InvalidArgumentValueError, match="hub-b") as error:
         provider.dps_add("dps", "ns", "rg", _STALE_DPS, mi_system_assigned=True, no_wait=True)
+    assert "'az iot dps linked-hub delete --dps-name dps --linked-hub <hostname>' before linking" in str(error.value)
 
     provider._patch_link.assert_not_called()
 
