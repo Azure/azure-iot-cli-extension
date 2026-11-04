@@ -38,7 +38,7 @@ def candidate(tmp_path, monkeypatch):
         "RELEASE_SOURCE_BRANCH": "release/1.1.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
-        "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "public",
+        "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "Hub",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -70,7 +70,7 @@ def candidate(tmp_path, monkeypatch):
     return directory, value
 
 
-def integration_build(value, result="succeeded", cohort="public"):
+def integration_build(value, result="succeeded", cohort="Hub"):
     return {
         "id": 901, "definition": {"id": 147}, "project": {"id": PROJECT},
         "repository": {"id": release.REPOSITORY, "type": "GitHub"},
@@ -306,17 +306,33 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert release.verify_candidate(output) == generated
 
 
-@pytest.mark.parametrize("change", ["missing", "python", "endpoint", "omitted"])
+@pytest.mark.parametrize("target", ["public", "canary"])
+def test_service_coordinators_preserve_full_suite_and_endpoint_routing(target):
+    cohorts = release.integration_cohorts(target)
+    assert {key: value["services"] for key, value in cohorts.items()} == {
+        "DPS": ["DPS"], "Hub": ["HubControl", "HubData"], "ADU": ["ADU"], "ADR": ["ADR"],
+    }
+    for service, parameters in cohorts.items():
+        assert parameters["mode"] == "Integration tests"
+        assert parameters["pythonVersions"] == ["3.10", "3.13"]
+        canary = service == "DPS" and target == "canary"
+        assert parameters["regions"] == ("centraluseuap" if canary else "australiaeast")
+        assert parameters["armEndpoint"] == ("canary" if canary else "public")
+
+
+@pytest.mark.parametrize("change", ["missing", "python", "endpoint", "services", "omitted"])
 def test_candidate_rejects_missing_or_tampered_target_cohorts(candidate, monkeypatch, change):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
     value["cohorts"] = release.integration_cohorts()
     if change == "missing":
-        del value["cohorts"]["dps_canary"]
+        del value["cohorts"]["ADR"]
     elif change == "python":
-        value["cohorts"]["dps_canary"]["pythonVersions"].remove("3.10")
+        value["cohorts"]["DPS"]["pythonVersions"].remove("3.10")
     elif change == "endpoint":
-        value["cohorts"]["public"]["armEndpoint"] = "canary"
+        value["cohorts"]["Hub"]["armEndpoint"] = "canary"
+    elif change == "services":
+        value["cohorts"]["Hub"]["services"].remove("HubData")
     else:
         del value["cohorts"]
     release.write(directory / "candidate.json", value)
@@ -506,18 +522,20 @@ def test_duplicate_child_ownership_rejected(candidate, monkeypatch):
         release.existing_integration(value)
 
 
-@pytest.mark.parametrize("duplicate", [None, "dps_canary", "public", "unexpected"])
-def test_mixed_target_children_are_matched_by_exact_scope(candidate, monkeypatch, duplicate):
+@pytest.mark.parametrize("target", ["public", "canary"])
+@pytest.mark.parametrize("duplicate", [None, "DPS", "Hub", "ADU", "ADR", "unexpected"])
+def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, target, duplicate):
     _, value = candidate
-    value["cohorts"] = release.integration_cohorts("canary")
-    monkeypatch.setenv("RELEASE_COHORT", "dps_canary")
-    dps = integration_build(value, cohort="dps_canary")
-    public = {**integration_build(value), "id": 902}
-    builds = [public, dps]
+    value["cohorts"] = release.integration_cohorts(target)
+    monkeypatch.setenv("RELEASE_COHORT", "DPS")
+    builds = [
+        {**integration_build(value, cohort=cohort), "id": 901 + index}
+        for index, cohort in enumerate(value["cohorts"])
+    ]
     if duplicate in value["cohorts"]:
-        builds.append(integration_build(value, cohort=duplicate))
+        builds.append({**integration_build(value, cohort=duplicate), "id": 999})
     elif duplicate == "unexpected":
-        public["templateParameters"]["armEndpoint"] = "canary"
+        builds[1]["templateParameters"]["armEndpoint"] = "canary"
     monkeypatch.setattr(release, "ado", Mock(side_effect=[
         {"definition": {"id": 150}, "sourceVersion": AUTOMATION_SHA, "queueTime": "2026-10-08T00:00:00Z"},
         {"value": builds},
@@ -526,10 +544,10 @@ def test_mixed_target_children_are_matched_by_exact_scope(candidate, monkeypatch
         with pytest.raises(ValueError, match="Multiple children|unexpected release cohort"):
             release.existing_integration(value)
     else:
-        assert release.existing_integration(value) == dps
+        assert release.existing_integration(value) == builds[0]
 
 
-@pytest.mark.parametrize("cohort", ["dps_canary", "public"])
+@pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
 def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monkeypatch, cohort):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
@@ -547,15 +565,17 @@ def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monk
 
 
 @pytest.mark.parametrize("hour", [8, 13])
-def test_integration_queues_exact_candidate_once_without_admission(candidate, tmp_path, monkeypatch, hour):
+@pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
+def test_integration_queues_exact_candidate_once_without_admission(candidate, tmp_path, monkeypatch, hour, cohort):
     directory, value = candidate
+    monkeypatch.setenv("RELEASE_COHORT", cohort)
     monkeypatch.setattr(release, "existing_integration", Mock(return_value=None))
     monkeypatch.setattr(
         release, "datetime", Mock(now=Mock(return_value=datetime(2026, 10, 29, hour, tzinfo=timezone.utc))),
         raising=False,
     )
     monkeypatch.setattr(release.time, "sleep", Mock(side_effect=AssertionError("Unexpected admission wait")))
-    mocked = Mock(side_effect=[{"id": 901}, integration_build(value)])
+    mocked = Mock(side_effect=[{"id": 901}, integration_build(value, cohort=cohort)])
     monkeypatch.setattr(release, "ado", mocked)
     record = tmp_path / "child.json"
     assert release.integrate(directory, record) == "901"
@@ -565,7 +585,8 @@ def test_integration_queues_exact_candidate_once_without_admission(candidate, tm
     assert payload["sourceBranch"] == value["sourceBranch"]
     assert payload["sourceVersion"] == SOURCE_SHA
     assert payload["templateParameters"]["releaseBuildId"] == "900"
-    assert json.loads(payload["templateParameters"]["services"]) == release.INTEGRATION_PARAMETERS["services"]
+    assert json.loads(payload["templateParameters"]["services"]) == value["cohorts"][cohort]["services"]
+    assert json.loads(payload["templateParameters"]["pythonVersions"]) == ["3.10", "3.13"]
     assert release.read(record)["producer"] == value["producer"]
     assert mocked.call_count == 2
     assert mocked.call_args_list[1].args == ("build/builds/901",)
@@ -629,7 +650,7 @@ def test_cancellation_rejects_other_parent_receipt(candidate, tmp_path):
 def test_cancellation_rejects_another_cohort_of_the_same_parent(candidate, tmp_path):
     directory, value = candidate
     record = tmp_path / "child.json"
-    release.write(record, {"id": "901", "producer": value["producer"], "cohort": "dps_canary"})
+    release.write(record, {"id": "901", "producer": value["producer"], "cohort": "DPS"})
     with pytest.raises(ValueError, match="another release"):
         release.cancel_integration(record, directory)
     release.ado.assert_not_called()

@@ -434,14 +434,17 @@ def verify_candidate(directory):
 
 def integration_cohorts(target=None):
     target = target or environment("RELEASE_DPS_TARGET")
-    public = deepcopy(INTEGRATION_PARAMETERS)
-    if target == "public":
-        return {"public": public}
-    if target != "canary":
+    if target not in {"public", "canary"}:
         raise ValueError("DPS target must be public or canary.")
-    dps = {**deepcopy(public), "services": ["DPS"], "regions": "centraluseuap", "armEndpoint": "canary"}
-    public["services"] = ["HubControl", "HubData", "ADU", "ADR"]
-    return {"dps_canary": dps, "public": public}
+    cohorts = {
+        service: {**deepcopy(INTEGRATION_PARAMETERS), "services": selections}
+        for service, selections in {
+            "DPS": ["DPS"], "Hub": ["HubControl", "HubData"], "ADU": ["ADU"], "ADR": ["ADR"],
+        }.items()
+    }
+    if target == "canary":
+        cohorts["DPS"].update(regions="centraluseuap", armEndpoint="canary")
+    return cohorts
 
 
 def integration_parameters(candidate, cohort=None):
