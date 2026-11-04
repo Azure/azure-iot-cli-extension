@@ -2,30 +2,8 @@
 
 trigger: none
 pr: none
-name: iot-release-$(Date:yyyyMMdd).$(Rev:r)
-
-parameters:
-  - name: mode
-    displayName: Mode
-    type: string
-    default: Plan
-    values: [Plan, Validate, Release]
-  - name: sourceBranch
-    displayName: Source branch
-    type: string
-    default: release/1.1.0-preview
-  - name: createIndexPr
-    displayName: Create index PR
-    type: boolean
-    default: false
-  - name: dpsTarget
-    displayName: DPS target
-    type: string
-    default: public
-    values: [public, canary]
-
-variables:
-  RELEASE_DPS_TARGET: ${{ parameters.dpsTarget }}
+name: release-environment-probe-$(Date:yyyyMMdd).$(Rev:r)
+appendCommitMessageToRunName: false
 
 resources:
   repositories:
@@ -47,8 +25,50 @@ extends:
         image: iotupx-1espt-windows2025
         os: windows
     stages:
-      - template: templates/release-stages.yml
-        parameters:
-          mode: ${{ parameters.mode }}
-          sourceBranch: ${{ parameters.sourceBranch }}
-          createIndexPr: ${{ parameters.createIndexPr }}
+      - stage: EnvironmentProbe
+        jobs:
+          - job: LinuxTLS
+            timeoutInMinutes: 20
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.14'
+              - template: templates/release-feed.yml
+              - bash: |
+                  set -euo pipefail
+                  python -m venv "$AGENT_TEMPDIRECTORY/trust-probe"
+                  "$AGENT_TEMPDIRECTORY/trust-probe/bin/python" -m pip install \
+                    requests==2.34.2 certifi==2026.10.23
+                  "$AGENT_TEMPDIRECTORY/trust-probe/bin/python" scripts/release_env_probe.py tls
+                displayName: Compare verified certificate stores
+          - job: MacOSDependencies
+            timeoutInMinutes: 60
+            pool:
+              name: Azure Pipelines
+              image: macOS-15
+              os: macOS
+            steps:
+              - task: UsePythonVersion@0
+                inputs:
+                  versionSpec: '3.13'
+              - template: templates/release-feed.yml
+              - bash: |
+                  set -euo pipefail
+                  git init --quiet "$AGENT_TEMPDIRECTORY/ops-source"
+                  cd "$AGENT_TEMPDIRECTORY/ops-source"
+                  git remote add origin https://github.com/Azure/azure-iot-ops-cli-extension.git
+                  git fetch --quiet --depth=1 origin 6b2f3726e4a5cf355044077467caea726388773e
+                  git checkout --quiet --detach FETCH_HEAD
+                  test "$(git rev-parse HEAD)" = 6b2f3726e4a5cf355044077467caea726388773e
+                  python "$BUILD_SOURCESDIRECTORY/scripts/release_env_probe.py" inventory
+                  python -m pip install tox
+                  python -m tox run --notest -e python -x "testenv:python.pass_env+=PIP_*"
+                displayName: Reproduce original dependency environment
+              - bash: |
+                  set -euo pipefail
+                  cd "$AGENT_TEMPDIRECTORY/ops-source"
+                  .tox/python/bin/python "$BUILD_SOURCESDIRECTORY/scripts/release_env_probe.py" inventory
+                  .tox/python/bin/python -I "$BUILD_SOURCESDIRECTORY/scripts/release_env_probe.py" inventory
+                  .tox/python/bin/python -m pip check
+                condition: always()
+                displayName: Identify installed versions and dependency origin
