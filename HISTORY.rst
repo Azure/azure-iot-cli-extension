@@ -18,6 +18,7 @@ Release History
 * Fixed linking an existing DPS with Hubs, retrying failed DPS/Hub pairs, isolated endpoint removal, allocation updates, identity-rotation waits, and preservation of existing namespace configuration.
 * Link operations provide role preflight and actionable recovery guidance. Removal protects concurrent updates with ETags and retains unrelated endpoints; optional Reader grants require ``--grant-reader``.
 * Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub or DPS was deleted.
+* ``az iot adr ns link hub add|update`` follow ADR when the linked DPS was deleted but its link remains: Hub identity updates are no longer blocked, and Hub add/retry is allowed with removal guidance.
 * Added DPS certificate issuance during device registration and operation-status recovery after timeouts.
 * Preview-only ADR Software Updates, groups/jobs, reports, device child commands, and namespace observability are not included in the GA API.
 

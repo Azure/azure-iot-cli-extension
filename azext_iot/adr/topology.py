@@ -16,7 +16,7 @@ from azext_iot.adr.common import (
 
 
 DPS_REQUIRED_MSG = (
-    "A Succeeded DPS link is required before adding a new Hub or retrying a failed Hub individually. "
+    "A DPS link is required before adding a new Hub or retrying a failed Hub individually. "
     "Run 'az iot adr ns link dps add ...' or "
     "'az iot adr ns link add ...' to add both. For an existing Failed DPS and its required Failed Hubs, "
     "use 'az iot adr ns link update --dps-endpoint-name <dps> --hub-endpoint-name <hubs>'."
@@ -69,11 +69,15 @@ def has_dps_endpoint(namespace: dict) -> bool:
     )
 
 
-def has_succeeded_dps_endpoint(namespace: dict) -> bool:
-    return any(
-        endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and endpoint.get("linkingState") == "Succeeded"
-        for endpoint in get_endpoints(namespace, "provisioning").values()
+def is_linked_dps_dependency(endpoint: dict) -> bool:
+    """ADR keeps treating a Succeeded DPS endpoint as linked after its DPS is deleted, until the link is removed."""
+    return endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and (
+        endpoint.get("linkingState") == "Succeeded" or is_linked_resource_deleted(endpoint)
     )
+
+
+def has_linked_dps_endpoint(namespace: dict) -> bool:
+    return any(is_linked_dps_dependency(endpoint) for endpoint in get_endpoints(namespace, "provisioning").values())
 
 
 def hub_endpoint_count(namespace: dict) -> int:
