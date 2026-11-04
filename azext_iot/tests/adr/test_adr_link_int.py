@@ -1385,6 +1385,12 @@ class TestADRLinkValidationNegatives(ADRLiveScenarioTest):
 _DELETED_LINK_TIMEOUT = int(os.getenv("azext_iot_adr_deleted_link_timeout", "1800"))
 
 
+# TODO: ADR reports LinkedResourceDeleted after Hub/DPS deletion only in centraluseuap for now (backend rollout);
+# every step below depends on it. Run in all regions once rolled out.
+@pytest.mark.skipif(
+    TEST_LOCATION.casefold() != "centraluseuap",
+    reason="ADR LinkedResourceDeleted is not rolled out in this region yet",
+)
 @pytest.mark.usefixtures("set_cwd")
 class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTest):
     """Identity changes stay available after a linked Hub or DPS is deleted.
