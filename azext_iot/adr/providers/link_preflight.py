@@ -15,6 +15,7 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link_helpers import parse_hub_resource_id
@@ -29,6 +30,8 @@ from azext_iot.adr.topology import (
     is_failed_link_endpoint,
     is_linked_resource_deleted,
 )
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -234,9 +237,18 @@ def add_dps_hub_role_requirements(
         if len(endpoints) != 1:
             raise InvalidArgumentValueError(DPS_CAP_EXCEEDED_MSG)
         endpoint = endpoints[0]
-        principal = resolve_linked_resource_principal(
-            lookup_dps(endpoint.get("resourceId")), endpoint.get("inboundCallerIdentity"), "DPS",
-        )
+        # ADR doesn't read a deleted DPS for Hub changes; its grants return when a DPS is linked again.
+        if is_linked_resource_deleted(endpoint):
+            return
+        try:
+            dps = lookup_dps(endpoint.get("resourceId"))
+        except ResourceNotFoundError:
+            logger.warning(
+                "Skipping DPS role assignment on this IoT Hub because linked DPS '%s' no longer exists.",
+                endpoint.get("resourceId"),
+            )
+            return
+        principal = resolve_linked_resource_principal(dps, endpoint.get("inboundCallerIdentity"), "DPS")
     if not principal:
         raise AzureResponseError(
             "The linked DPS must select an attached managed identity before granting access to IoT Hubs."
