@@ -22,6 +22,7 @@ from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     ROLE_PROPAGATION_DELAY,
+    wait_for_condition,
     wait_for_resource_absent,
 )
 from azext_iot.tests.adr._readiness import link_dps_with_readiness, link_hub_with_readiness
@@ -144,13 +145,33 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         assert after["identity"] == before["identity"]
         assert after["tags"] == before["tags"]
 
+    def _wait_for_deleted_target_link(self, namespace_name, section, endpoint_name, resource_id):
+        """ADR marks the endpoint after target deletion; unlinking before that races its namespace ETag (412)."""
+        def endpoint(namespace):
+            return ((namespace.get("properties", {}).get(section) or {}).get("endpoints") or {}).get(endpoint_name)
+
+        def unexpected(namespace):
+            current = endpoint(namespace)
+            return not isinstance(current, dict) or str(current.get("resourceId", "")).casefold() != resource_id.casefold()
+
+        wait_for_condition(
+            lambda: self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json(),
+            lambda namespace: not unexpected(namespace)
+            and endpoint(namespace).get("linkingState") == "LinkedResourceDeleted",
+            is_terminal_failure=unexpected,
+            description=f"namespace '{namespace_name}' {section} endpoint '{endpoint_name}' LinkedResourceDeleted",
+            describe=lambda namespace: "endpoint missing or retargeted" if unexpected(namespace)
+            else f"linkingState={endpoint(namespace).get('linkingState')!r}",
+        )
+
     def _remove_endpoint(
         self, namespace_name, kind, section, endpoint_name, target_name, *, no_rbac_check=False, grant_reader=False,
     ):
         selector = f"--ns {namespace_name} -g {TEST_RG}"
         before = self.cmd(f"iot adr ns show -n {namespace_name} -g {TEST_RG}").get_output_in_json()
         principal = resolve_namespace_outbound_principal(before)
-        scope = before["properties"][section]["endpoints"][endpoint_name]["resourceId"].split("/providers/")[0]
+        resource_id = before["properties"][section]["endpoints"][endpoint_name]["resourceId"]
+        scope = resource_id.split("/providers/")[0]
         existing_reader = self._reader_assignments(principal, scope)
         if not existing_reader:
             self.addCleanup(self._cleanup_reader, principal, scope)
@@ -159,6 +180,7 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         prepared_reader = self._reader_assignments(principal, scope)
         assert len(prepared_reader) == 1, "Fixture must prepare the required access before unlink."
         self._delete_owned_resource(kind, target_name, TEST_RG)
+        self._wait_for_deleted_target_link(namespace_name, section, endpoint_name, resource_id)
         permission_option = " --no-rbac-check" if no_rbac_check else " --grant-reader" if grant_reader else ""
         with self.assertLogs("cli.azext_iot.adr", level="INFO") as logs:
             submitted = self.cmd(

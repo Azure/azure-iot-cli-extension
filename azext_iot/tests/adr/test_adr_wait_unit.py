@@ -162,6 +162,35 @@ def test_general_link_default_does_not_complete_empty_scope():
     assert result.observation == "no namespace links found"
 
 
+@pytest.mark.parametrize("scope", [{}, {"hub_endpoint_name": "hub"}])
+def test_link_wait_stops_on_deleted_target(scope):
+    result = namespace_links_succeeded(_namespace_links(hub="LinkedResourceDeleted"), **scope)
+    assert not result.complete
+    assert "HUB link 'hub' target was deleted (linkingState 'LinkedResourceDeleted')" in result.failure
+    assert "'az iot adr ns link hub remove'" in result.failure
+    assert namespace_links_succeeded(
+        _namespace_links(hub="LinkedResourceDeleted"), dps_endpoint_name="dps"
+    ).complete
+    nested = link_succeeded({"name": "dps", "provisioningStatus": {"status": "LinkedResourceDeleted"}})
+    assert "Link 'dps' target was deleted" in nested.failure
+
+
+def test_link_wait_command_fails_fast_on_deleted_target():
+    sleeper = MagicMock()
+    ticks = iter(range(0, 100000, 31))
+    with pytest.raises(AzureResponseError, match="target was deleted"):
+        wait_for_resource(
+            MagicMock(),
+            MagicMock(return_value=_namespace_links(hub="LinkedResourceDeleted")),
+            namespace_links_succeeded,
+            timeout=600,
+            interval=30,
+            sleeper=sleeper,
+            clock=lambda: next(ticks),
+        )
+    sleeper.assert_not_called()
+
+
 @pytest.mark.parametrize("state", ["Accepted", "Updating", "Failed", "Canceled"])
 @pytest.mark.parametrize("scope", [{}, {"hub_endpoint_name": "hub"}, {"dps_endpoint_name": "dps"}])
 def test_link_wait_does_not_mistake_old_succeeded_links_for_rotation_success(state, scope):
@@ -257,17 +286,23 @@ def test_wait_preserves_explicit_exists_custom_and_updated_modes():
     )
 
 
-def test_wait_explicit_predicate_surfaces_failed_provisioning_state():
-    with pytest.raises(AzureResponseError, match="operation failed"):
+@pytest.mark.parametrize("state", ["Failed", "Canceled"])
+@pytest.mark.parametrize("mode", ["created", "updated"])
+def test_wait_explicit_predicate_surfaces_failed_provisioning_state(state, mode):
+    with pytest.raises(AzureResponseError, match=f"operation failed \\(provisioningState '{state}'\\)"):
         wait_for_resource(
             MagicMock(),
-            lambda: {"properties": {"provisioningState": "Failed"}},
+            lambda: {"properties": {"provisioningState": state}},
             resource_exists,
-            created=True,
             timeout=1,
             interval=1,
             sleeper=lambda _: None,
+            **{mode: True},
         )
+    canceled = {"properties": {"provisioningState": "Canceled"}, "ready": True}
+    assert wait_for_resource(
+        MagicMock(), lambda: canceled, resource_exists, custom="ready", timeout=1, interval=1, sleeper=lambda _: None,
+    ) is None
     assert (
         wait_for_resource(
             MagicMock(),
@@ -317,15 +352,16 @@ def test_wait_deleted_tolerates_failed_until_not_found():
     assert getter.call_count == 2
 
 
-def test_wait_deleted_fails_after_deleting_then_failed():
+@pytest.mark.parametrize("state", ["Failed", "Canceled"])
+def test_wait_deleted_fails_after_deleting_then_failed(state):
     getter = MagicMock(
         side_effect=[
             {"properties": {"provisioningState": "Deleting"}},
-            {"properties": {"provisioningState": "Failed"}},
+            {"properties": {"provisioningState": state}},
         ]
     )
 
-    with pytest.raises(AzureResponseError, match="operation failed"):
+    with pytest.raises(AzureResponseError, match=f"provisioningState '{state}'"):
         wait_for_resource(
             MagicMock(),
             getter,

@@ -217,6 +217,7 @@ def test_retry_rejects_empty_selection_and_succeeded_endpoints(batch, selection)
 @pytest.mark.parametrize("failure,message", [
     ("namespace", "Failed"),
     ("endpoint", "Failed"),
+    ("deleted", "target was deleted"),
     ("settings", "settings changed"),
 ])
 def test_batch_wait_stops_on_terminal_failure_or_competing_settings(batch, failure, message):
@@ -233,6 +234,8 @@ def test_batch_wait_stops_on_terminal_failure_or_competing_settings(batch, failu
         namespace["properties"]["provisioningState"] = "Failed"
     elif failure == "endpoint":
         namespace["properties"]["messaging"]["endpoints"]["hub"]["linkingState"] = "Failed"
+    elif failure == "deleted":
+        namespace["properties"]["messaging"]["endpoints"]["hub"]["linkingState"] = "LinkedResourceDeleted"
     else:
         namespace["properties"]["messaging"]["endpoints"]["hub"]["provisioning"]["allocationWeight"] = 8
     with pytest.raises(AzureResponseError, match=message):

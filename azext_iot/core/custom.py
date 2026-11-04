@@ -1703,7 +1703,7 @@ def _protect_hub_link_identity(
     linking_state = str(
         (device_registry.get("linkingProperties") or {}).get("state") or ""
     ).casefold()
-    if not device_registry.get("namespaceResourceId") or linking_state == "failed":
+    if not device_registry.get("namespaceResourceId") or linking_state in ("failed", "orphaned"):
         return
 
     selected = device_registry.get("identity") or {}
@@ -2599,9 +2599,11 @@ def _protect_dps_link_identity(
 ) -> None:
     """Block removal of identities selected by canonical namespace links."""
     dps = _adr_identity_target(cmd, dps, "dps")
-    namespace_links = ((dps or {}).get("properties") or {}).get(
-        "deviceRegistryNamespaces"
-    ) or []
+    namespace_links = [
+        link for link in ((dps or {}).get("properties") or {}).get("deviceRegistryNamespaces") or []
+        # An Orphaned link's namespace was deleted, so no link uses the identity.
+        if str((link or {}).get("linkingState") or "").casefold() != "orphaned"
+    ]
     if not namespace_links:
         return
 
