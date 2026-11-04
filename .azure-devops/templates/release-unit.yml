@@ -49,6 +49,7 @@ jobs:
             workingDirectory: $(Agent.TempDirectory)/release-source
       - script: python -m pip install tox
         displayName: Install tox
+        retryCountOnTaskFailure: 3
       - script: >-
           tox run --notest
           -x "testenv:python-azcur-unit.pass_env+=PIP_*"

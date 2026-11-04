@@ -341,6 +341,9 @@ stages:
                   AZURE_CONFIG_DIR: $(Agent.TempDirectory)/lint-config
                   AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/lint-azdev-config
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/lint-extensions
+                  # Use the 1ES agent's system trust store for proxied HTTPS.
+                  REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+                  SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
 
       - stage: IndexCompatibility
         displayName: Index check
@@ -396,6 +399,8 @@ stages:
                   AZURE_CONFIG_DIR: $(Agent.TempDirectory)/index-compatibility/azure-config
                   AZDEV_CONFIG_DIR: $(Agent.TempDirectory)/index-compatibility/azdev-config
                   AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/index-compatibility/extensions
+                  REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+                  SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
                   AZURE_EXTENSION_DEV_SOURCES: $(Agent.TempDirectory)/index-compatibility/azure-cli-extensions
                   AZURE_CORE_COLLECT_TELEMETRY: "no"
                   PYTHONNOUSERSITE: "1"
