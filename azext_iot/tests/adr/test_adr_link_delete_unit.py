@@ -124,9 +124,11 @@ class _UnlinkSubmitted(Exception):
     pass
 
 
-def _deleted_target_scenario(mocker, kind, section, observed, *, show_error=None):
+def _deleted_target_scenario(mocker, kind, section, observed, *, show_error=None, region="centraluseuap"):
     """Drive the live unlink helper offline with a fake clock; stop at the positive unlink."""
     from azext_iot.tests.adr import _helpers, test_adr_link_delete_int as scenarios
+
+    mocker.patch.object(scenarios, "TEST_LOCATION", region)
 
     clock = SimpleNamespace(now=0.0, slept=[])
 
@@ -211,6 +213,15 @@ def test_live_unlink_never_submits_without_selected_deleted_target_link(
     with pytest.raises(AssertionError, match=f"endpoint 'primary' LinkedResourceDeleted.*{re.escape(message)}"):
         scenario._remove_endpoint("ns", kind, section, "primary", "target")
     assert not any(" remove " in event for event in events)
+
+
+@pytest.mark.parametrize("kind,section,_endpoint_type", KINDS)
+def test_live_unlink_skips_deleted_target_wait_outside_centraluseuap(mocker, kind, section, _endpoint_type):
+    scenario, events, clock = _deleted_target_scenario(mocker, kind, section, [], region="australiaeast")
+    with pytest.raises(_UnlinkSubmitted):
+        scenario._remove_endpoint("ns", kind, section, "primary", "target")
+    assert events[0] == "delete" and len(events) == 2 and f"link {kind} remove " in events[1]
+    assert clock.slept == []
 
 
 def test_live_unlink_read_error_propagates_without_unlink(mocker):

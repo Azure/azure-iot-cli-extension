@@ -185,7 +185,10 @@ class TestADRLinkDelete(ADRFullInfraHelper, ADRLiveScenarioTest):
         prepared_reader = self._reader_assignments(principal, scope)
         assert len(prepared_reader) == 1, "Fixture must prepare the required access before unlink."
         self._delete_owned_resource(kind, target_name, TEST_RG)
-        self._wait_for_deleted_target_link(namespace_name, section, endpoint_name, resource_id)
+        # TODO: ADR reports LinkedResourceDeleted after target deletion only in centraluseuap for now (backend
+        # rollout); elsewhere the endpoint stays Succeeded, so unlink right after deletion. Wait in all regions once rolled out.
+        if TEST_LOCATION.casefold() == "centraluseuap":
+            self._wait_for_deleted_target_link(namespace_name, section, endpoint_name, resource_id)
         permission_option = " --no-rbac-check" if no_rbac_check else " --grant-reader" if grant_reader else ""
         with self.assertLogs("cli.azext_iot.adr", level="INFO") as logs:
             submitted = self.cmd(
