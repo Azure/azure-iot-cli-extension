@@ -37,6 +37,8 @@ Release History
 * Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub, DPS or Software Updates instance was deleted.
 * ``az iot adr ns link hub add|update`` follow ADR when the linked DPS was deleted but its link remains: Hub identity updates are no longer blocked, and Hub add/retry is allowed with removal guidance.
 * Fixed ``az iot dps linked-hub show|delete --linked-hub <hub-name>`` failing for a deleted IoT Hub, so its stale DPS entry can be removed by name. ADR link guidance now covers stale entries.
+* ``az iot adr ns link wait`` and ``link hub|dps wait`` stop with removal guidance when a linked Hub or DPS was deleted, instead of polling until timeout. ``--created|--updated|--deleted`` waits also stop on ``Canceled``.
+* Fixed ``az iot dps identity remove`` and ``az iot adr ns su instance create|update`` identity changes being blocked after the linked ADR namespace was deleted (link reported as ``Orphaned``). ``az iot hub identity remove`` no longer suggests link rotation for an orphaned Hub.
 
 **Shared command fixes**
 

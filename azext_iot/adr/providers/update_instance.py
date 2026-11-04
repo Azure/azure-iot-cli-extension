@@ -176,7 +176,8 @@ class UpdateInstanceProvider(ADRProvider):
     def _protect_link_identity(self, instance: dict, desired_identity: dict):
         linking = ((instance or {}).get("properties") or {}).get("linking") or {}
         namespace_id = linking.get("namespaceResourceId")
-        if not namespace_id:
+        # An Orphaned link's namespace was deleted, so no link uses the identity.
+        if not namespace_id or str(linking.get("linkingState") or "").casefold() == "orphaned":
             return
 
         raw_instance_id = (

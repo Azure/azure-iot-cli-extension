@@ -1897,6 +1897,8 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
     5. After removing the deleted DPS's link, ``link dps add`` of an unlinked DPS that still lists hub-b
        explains how to remove the stale entry; ``dps linked-hub show/delete --linked-hub <short name>``
        remove it and the DPS links.
+    6. Delete the namespace; ADR leaves Orphaned references. ``dps identity remove`` succeeds, and
+       ``hub identity remove`` reaches the service, which rejects writes to an orphaned Hub.
     """
 
     @pytest.mark.timeout(3600 + _DELETED_LINK_TIMEOUT, func_only=False)
@@ -2065,6 +2067,11 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                 )
                 _log(LogKind.OK, f"ADR reported LinkedResourceDeleted after {monotonic() - started:.0f}s")
                 assert hubs[1]["properties"]["hostName"].casefold() in classic_hub_hosts()
+                for wait_command in ("link hub wait -n hub-b", "link wait"):
+                    started = monotonic()
+                    with pytest.raises(AzureResponseError, match="HUB link 'hub-b' target was deleted"):
+                        self.cmd(f"iot adr ns {wait_command} --ns {namespace_name} -g {rg} --timeout 600 --interval 30")
+                    assert monotonic() - started < 120, f"{wait_command} kept polling a deleted target"
 
             with timed_step("Step 2 ❯ DPS and outbound identity changes with hub-b LinkedResourceDeleted"):
                 change_identities(
@@ -2133,6 +2140,37 @@ class TestADRLinkDeletedHubIdentityChanges(ADRFullInfraHelper, ADRLiveScenarioTe
                     self.cmd(dps2_add).get_output_in_json(), "provisioning", "dps2", dps2["id"], {"type": "SystemAssigned"},
                 )
                 wait_for_namespace_links()
+
+            with timed_step("Step 9 ❯ Delete the namespace; dps2 identity removal is not blocked"):
+                self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} --yes")
+                wait_for_resource_absent(self, f"iot adr ns show -n {namespace_name} -g {rg}", timeout=budget.remaining(900))
+
+                def stale_link_states():
+                    dps_links = self.cmd(f"iot dps show -n {dps2_name} -g {rg}").get_output_in_json()[
+                        "properties"].get("deviceRegistryNamespaces") or []
+                    registry = self.cmd(f"iot hub show -n {hub_c_name} -g {rg}").get_output_in_json()[
+                        "properties"].get("deviceRegistry") or {}
+                    return (
+                        [link.get("linkingState") for link in dps_links],
+                        (registry.get("linkingProperties") or {}).get("state") if registry.get("namespaceResourceId") else None,
+                    )
+
+                # ADR leaves Orphaned references on the targets after the namespace is deleted.
+                wait_for_condition(
+                    stale_link_states,
+                    lambda states: all(state == "Orphaned" for state in states[0]) and states[1] in (None, "Orphaned"),
+                    description="dps2 and hub-c links Orphaned",
+                    timeout=budget.remaining(600),
+                    interval=30,
+                    describe=str,
+                )
+                dps2_result = self.cmd(
+                    f"iot dps identity remove -n {dps2_name} -g {rg} --system-assigned"
+                ).get_output_in_json()
+                assert (dps2_result.get("identity") or {}).get("type") in (None, "None"), dps2_result.get("identity")
+                # The CLI no longer suggests an impossible link rotation; the service rejects writes to an orphaned Hub.
+                with pytest.raises(HttpResponseError, match="orphaned; only GET and DELETE"):
+                    self.cmd(f"iot hub identity remove -n {hub_c_name} -g {rg} --user-assigned {identity_id}")
         finally:
             budget.begin_cleanup()
             self.cleanup_full_infra()
