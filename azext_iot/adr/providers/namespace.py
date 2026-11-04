@@ -313,6 +313,7 @@ class NamespaceProvider(ADRProvider):
                 "Remove these links with 'az iot adr ns link hub|dps|su remove'.",
                 ", ".join(f"{section}/{name}" for section, name in deleted),
             )
+        targets = {resource_id.casefold(): target for _, _, resource_id, _, _, target in resolved}
         for kind, endpoint, resource_id, parser, strategy, target in resolved:
             provider._preflight_link(  # pylint: disable=protected-access
                 link_type=kind,
@@ -325,6 +326,7 @@ class NamespaceProvider(ADRProvider):
                 target=target,
                 validate_iot_hubs=False,
                 hub_exists=lambda _resource_id: True,
+                lookup_dps=lambda dps_id: targets[dps_id.casefold()],
             )
         provider._rbac_manager().ensure_many(  # pylint: disable=protected-access
             requests
