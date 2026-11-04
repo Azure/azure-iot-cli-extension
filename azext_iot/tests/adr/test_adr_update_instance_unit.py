@@ -807,6 +807,23 @@ def test_update_identity_guard_ignores_unlinked_instance(
     )
 
 
+def test_update_identity_guard_skips_orphaned_link_of_deleted_namespace(update_instance_provider):
+    linking = {
+        "namespaceResourceId": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns",
+        "linkingState": "Orphaned",
+    }
+    instance = {"id": "/updateInstances/instance", "properties": {"linking": linking}}
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        side_effect=RuntimeError("namespace not found"),
+    ) as factory:
+        update_instance_provider._protect_link_identity(instance, {"type": "None"})
+        factory.assert_not_called()
+        linking["linkingState"] = "Succeeded"
+        with pytest.raises(ArgumentUsageError, match="could not be read"):
+            update_instance_provider._protect_link_identity(instance, {"type": "None"})
+
+
 def test_update_identity_guard_rejects_invalid_or_unreadable_namespace(
     update_instance_provider,
 ):

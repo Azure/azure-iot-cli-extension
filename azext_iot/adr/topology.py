@@ -17,7 +17,7 @@ from azext_iot.adr.common import (
 
 
 DPS_REQUIRED_MSG = (
-    "A Succeeded DPS link is required before adding a new Hub or retrying a failed Hub individually. "
+    "A DPS link is required before adding a new Hub or retrying a failed Hub individually. "
     "Run 'az iot adr ns link dps add ...' or "
     "'az iot adr ns link add ...' to add both. For an existing Failed DPS and its required Failed Hubs, "
     "use 'az iot adr ns link update --dps-endpoint-name <dps> --hub-endpoint-name <hubs>'."
@@ -84,11 +84,15 @@ def has_su_endpoint(namespace: dict) -> bool:
     )
 
 
-def has_succeeded_dps_endpoint(namespace: dict) -> bool:
-    return any(
-        endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and endpoint.get("linkingState") == "Succeeded"
-        for endpoint in get_endpoints(namespace, "provisioning").values()
+def is_linked_dps_dependency(endpoint: dict) -> bool:
+    """ADR keeps treating a Succeeded DPS endpoint as linked after its DPS is deleted, until the link is removed."""
+    return endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE) and (
+        endpoint.get("linkingState") == "Succeeded" or is_linked_resource_deleted(endpoint)
     )
+
+
+def has_linked_dps_endpoint(namespace: dict) -> bool:
+    return any(is_linked_dps_dependency(endpoint) for endpoint in get_endpoints(namespace, "provisioning").values())
 
 
 def hub_endpoint_count(namespace: dict) -> int:
@@ -103,10 +107,19 @@ def is_failed_hub_endpoint(endpoint) -> bool:
     return endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and is_failed_link_endpoint(endpoint)
 
 
-def is_failed_link_endpoint(endpoint: dict) -> bool:
+def _link_state(endpoint: dict) -> str:
     status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
     state = endpoint.get("linkingState") or (status.get("status") if isinstance(status, dict) else None)
-    return str(state or "").casefold() == "failed"
+    return str(state or "").casefold()
+
+
+def is_failed_link_endpoint(endpoint: dict) -> bool:
+    return _link_state(endpoint) == "failed"
+
+
+def is_linked_resource_deleted(endpoint) -> bool:
+    """Return whether ADR reports that the endpoint's linked resource was deleted."""
+    return isinstance(endpoint, dict) and _link_state(endpoint) == "linkedresourcedeleted"
 
 
 def endpoint_update_body(

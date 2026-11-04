@@ -456,6 +456,27 @@ def test_dps_identity_guard_ignores_unrelated_namespace_endpoint():
         )
 
 
+def test_dps_identity_guard_skips_orphaned_link_of_deleted_namespace():
+    dps = _dps()
+    other_ns = NS_ID.replace("/ns", "/active")
+    dps["properties"]["deviceRegistryNamespaces"] = [
+        {"resourceId": NS_ID, "linkingState": "Orphaned"},
+        {"resourceId": other_ns, "linkingState": "Succeeded"},
+    ]
+    registry = MagicMock()
+    registry.namespaces.get.return_value = {"properties": {"provisioning": {"endpoints": {
+        "dps": {"resourceId": DPS_ID, "inboundCallerIdentity": {"type": "SystemAssigned"}},
+    }}}}
+    with patch("azext_iot._factory.adr_service_factory", return_value=registry):
+        with pytest.raises(ArgumentUsageError, match="used by an active ADR link"):
+            _protect_dps_link_identity(MagicMock(), dps, remove_system=True, remove_user_identities=None)
+        registry.namespaces.get.assert_called_once_with(resource_group_name="rg", namespace_name="active")
+        registry.namespaces.get.reset_mock()
+        dps["properties"]["deviceRegistryNamespaces"].pop()
+        _protect_dps_link_identity(MagicMock(), dps, remove_system=True, remove_user_identities=[])
+        registry.namespaces.get.assert_not_called()
+
+
 def test_classic_linked_hub_list_and_show_run_namespace_warning(mocker):
     dps = {
         "properties": {
