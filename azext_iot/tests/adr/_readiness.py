@@ -31,7 +31,11 @@ from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.base import ADRProvider, _ADR_LRO_TIMEOUT_SECONDS
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
-from azext_iot.adr.providers.link_recovery import LinkRecovery, _namespace_identity
+from azext_iot.adr.providers.link_recovery import (
+    LinkRecovery,
+    _LINK_INITIATE_AUTHORIZATION as _LINK_AUTHORIZATION,
+    _namespace_identity,
+)
 from azext_iot.adr.rbac import resolve_namespace_outbound_principal
 from azext_iot.adr.topology import endpoint_settings_match
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
@@ -48,6 +52,7 @@ _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 _AUTHORIZATION_BACKOFFS = (30, 60, 120)
 _FRESH_GRANT_WINDOW = sum(_AUTHORIZATION_BACKOFFS) + 60
+_HUB_LINK_NOTIFY_ACTION = "Microsoft.Devices/IotHubs/linkNotify/action"
 _LINK_INITIATE_REJECTED = re.compile(
     r"The (?P<service>Hub|DPS) resource rejected the link request as invalid\. "
     r"Verify the endpoint configuration, then resubmit the request\."
@@ -318,8 +323,28 @@ def _fresh_dps_grant_rejection(endpoint, binding, submitted_at, now):
     )
 
 
+def _bound_hub_commit_rejection(error, binding):
+    request = binding.authorization_request or {}
+    principal = request.get("namespace_principal_id")
+    target = request.get("target_scope")
+    message = error.get("message")
+    match = _LINK_AUTHORIZATION.fullmatch(message) if isinstance(message, str) else None
+    return bool(
+        error.get("code") == "LinkCommitFailed"
+        and not set(error) - {"code", "message"}
+        and request.get("link_type") == "hub"
+        and isinstance(principal, str)
+        and isinstance(target, str)
+        and match
+        and match["service"] == "Hub"
+        and match["principal"].casefold() == principal.casefold()
+        and match["action"].casefold() == _HUB_LINK_NOTIFY_ACTION.casefold()
+        and match["scope"].casefold() == target.casefold()
+    )
+
+
 def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
-    """Match ADR's redacted Hub authorization envelope only while fresh grants can still propagate."""
+    """Match exact Hub authorization envelopes only while fresh grants can still propagate."""
     if (
         binding.kind != "hub"
         or submitted_at is None
@@ -335,9 +360,12 @@ def _fresh_hub_grant_rejection(endpoint, binding, submitted_at, now):
     )
     return (
         endpoint.get("linkingState") == "Failed"
-        and error in (
-            {"code": "LinkInitiateFailed", "message": expected_message},
-            {"code": "LinkCommitFailed", "message": expected_message},
+        and (
+            error in (
+                {"code": "LinkInitiateFailed", "message": expected_message},
+                {"code": "LinkCommitFailed", "message": expected_message},
+            )
+            or _bound_hub_commit_rejection(error, binding)
         )
     )
 
