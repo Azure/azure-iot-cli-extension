@@ -152,7 +152,7 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 ### Released-version monitors
 
 `.azure-devops/release-monitor.yml` is shared by six independent definitions:
-`Azure IoT CLI - Monitor - <Public|Fairfax|Mooncake> - <GA|Preview>`.
+`IoT CLI - <Public|Fairfax|Mooncake> - <GA|Preview>`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
 The resolver selects the latest published GA or Preview wheel, verifies GitHub's
 SHA256 and wheel metadata, and acquires the exact tagged test-source commit.
@@ -170,8 +170,10 @@ python scripts/release_monitor.py definitions \
   --branch refs/heads/<reviewed-automation-branch> --output definitions.json
 ```
 
-Create each payload through the ADO build-definitions API after the reviewed branch
-exists. Existing definitions are not changed. Payloads use `\official\monitors`,
+Apply each payload through the ADO build-definitions API after the reviewed branch
+exists. Reuse definition **166** for Public GA; update matching definitions rather
+than creating duplicates. Integration **147** and Release **161** stay separate.
+Payloads use `\official\release-health`,
 disabled queueing, no triggers/schedules, and non-overridable variables. The runner
 also checks definition name, repository and every configured target variable.
 Never store personal account passwords or tokens in these files.
@@ -189,6 +191,8 @@ They cannot qualify another monitor or a release candidate. Public monitors reta
 the native DPS/Hub/ADU/ADR scope; sovereign monitors retain only the selected Hub/DPS
 cohorts documented above. A cloud-support source PR does not certify an older
 published wheel. Sovereign identity and DPS capability blockers still apply.
+Run titles include the cloud, track, resolved CLI version and build ID. Historical
+source-health runs retained on definition 166 are not released-version evidence.
 
 ### Unit Tests
 

@@ -22,7 +22,7 @@ def stage(bundle, output):
     bundle, output = Path(bundle).resolve(), Path(output).resolve()
     manifest = verify_bundle(
         bundle, extension="azure-iot", automation_commit=os.environ["BUILD_SOURCEVERSION"],
-        cloud=os.environ["MONITOR_CLOUD"], track=os.environ["MONITOR_TRACK"],
+        cloud=os.environ["MONITOR_CLOUD"], track=os.environ["MONITOR_TRACK"], slot=os.environ["MONITOR_TRACK"],
     )
     if output.exists():
         raise ValueError("Monitor test workspace must be fresh for this attempt.")

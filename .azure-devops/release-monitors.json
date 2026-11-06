@@ -1,7 +1,7 @@
 {
   "extension": "azure-iot",
-  "namePrefix": "Azure IoT CLI - Monitor",
-  "tracks": ["ga", "preview"],
+  "namePrefix": "IoT CLI",
+  "tracks": {"ga": "ga", "preview": "preview"},
   "clouds": {
     "public": {
       "displayName": "Public",

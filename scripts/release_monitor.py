@@ -201,7 +201,6 @@ def resolve(extension, cloud, track, automation_commit, releases=None):
         candidates.append((version, item))
     candidates.sort(key=lambda pair: pair[0], reverse=True)
     selected, runtime = None, None
-    milestones = {}
     for version, release in candidates:
         source_commit = tag_commit(config["repository"], release["tag_name"])
         if extension == "azure-iot":
@@ -214,20 +213,15 @@ def resolve(extension, cloud, track, automation_commit, releases=None):
             continue
         if profile is None:
             raise ValueError("A published AIO release is missing its Public runtime profile.")
-        family = profile["milestone"]
-        if family not in milestones:
-            milestones[family] = (version, release, source_commit)
-        if len(milestones) == 3:
+        if profile["milestone"] == track:
+            selected = (version, release, source_commit)
             break
+    if selected is None:
+        raise ValueError("No matching published release was found.")
     if extension == "azure-iot-ops":
-        if len(milestones) != 3 or track not in milestones:
-            raise ValueError("The requested milestone is not in the latest three published runtime families.")
-        selected = milestones[track]
         runtime = runtime_profile(config["repository"], selected[2], cloud)
         if runtime is not None and runtime["milestone"] != track:
             raise ValueError("The cloud-specific runtime does not belong to the selected milestone.")
-    if selected is None:
-        raise ValueError("No matching published release was found.")
     version, release, source_commit = selected
     blockers = []
     if extension == "azure-iot-ops" and runtime is None:
@@ -244,7 +238,7 @@ def resolve(extension, cloud, track, automation_commit, releases=None):
     }
 
 
-def validate_manifest(manifest, *, extension=None, cloud=None, track=None, automation_commit=None):
+def validate_manifest(manifest, *, extension=None, cloud=None, track=None, slot=None, automation_commit=None):
     config = settings(manifest["extension"])
     if any(manifest.get(key) != value for key, value in config.items()) or manifest.get("schema") != 1:
         raise ValueError("Invalid release manifest repository or schema.")
@@ -253,10 +247,16 @@ def validate_manifest(manifest, *, extension=None, cloud=None, track=None, autom
             or manifest["extension"] == "azure-iot-ops" and cloud_key == "mooncake"):
         raise ValueError("Invalid release manifest cloud.")
     for key, expected in (
-        ("extension", extension), ("cloudKey", cloud), ("track", track), ("automationCommit", automation_commit),
+        ("extension", extension), ("cloudKey", cloud), ("track", track), ("slot", slot),
+        ("automationCommit", automation_commit),
     ):
         if expected is not None and manifest.get(key) != expected:
             raise ValueError(f"Release manifest differs from the requested {key}.")
+    if "slot" in manifest:
+        allowed = {"ga", "preview"} if config["extension"] == "azure-iot" else {"v1", "v2", "v3"}
+        if (manifest["slot"] not in allowed
+                or config["extension"] == "azure-iot" and manifest["slot"] != manifest["track"]):
+            raise ValueError("Invalid release-health support slot.")
     commit(manifest["automationCommit"])
     if commit(manifest["testSourceCommit"]) != commit(manifest["release"]["commit"]):
         raise ValueError("Test source must match the released source commit.")
@@ -387,14 +387,17 @@ def acquire(manifest, output):
     verify_bundle(output)
 
 
-def frozen_manifest(history, extension, cloud, track, automation_commit, attempt):
+def frozen_manifest(history, extension, cloud, track, automation_commit, attempt, *, slot=None):
     paths = sorted(Path(history).glob("release-selection-*/manifest.json")) if history else []
     if not paths:
         if attempt != 1:
             raise ValueError("A retry cannot rediscover releases without its original frozen manifest.")
-        return resolve(extension, cloud, track, automation_commit)
+        value = resolve(extension, cloud, track, automation_commit)
+        if slot is not None:
+            value["slot"] = slot
+        return validate_manifest(value, slot=slot)
     values = [
-        validate_manifest(read_json(path), extension=extension, cloud=cloud, track=track,
+        validate_manifest(read_json(path), extension=extension, cloud=cloud, track=track, slot=slot,
                           automation_commit=automation_commit)
         for path in paths
     ]
@@ -403,17 +406,28 @@ def frozen_manifest(history, extension, cloud, track, automation_commit, attempt
     return values[0]
 
 
-def configurations(config):
+def configured_tracks(config):
     extension = config["extension"]
     settings(extension)
     tracks = config["tracks"]
-    if len(set(tracks)) != len(tracks) or not tracks:
-        raise ValueError("Monitor tracks must be nonempty and distinct.")
-    if extension == "azure-iot" and set(tracks) != {"ga", "preview"}:
+    if not isinstance(tracks, dict):
+        raise ValueError("Configure an explicit release target for every health track or support slot.")
+    if extension == "azure-iot" and tracks != {"ga": "ga", "preview": "preview"}:
         raise ValueError("IoT monitoring requires GA and Preview.")
-    if extension == "azure-iot-ops" and (
-            len(tracks) != 3 or any(not re.fullmatch(r"[1-9][0-9]*\.[0-9]+", track) for track in tracks)):
-        raise ValueError("AIO monitoring requires three explicit, distinct runtime milestones.")
+    if extension == "azure-iot-ops":
+        if set(tracks) != {"v1", "v2", "v3"} or any(
+                not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*\.[0-9]+", value)
+                for value in tracks.values()):
+            raise ValueError("AIO health requires v1, v2 and v3 mapped to explicit runtime milestones.")
+        versions = [Version(tracks[key]) for key in ("v1", "v2", "v3")]
+        if len(set(versions)) != 3 or versions != sorted(versions, reverse=True):
+            raise ValueError("AIO support slots must select distinct milestones, newest first.")
+    return tracks
+
+
+def configurations(config):
+    extension = config["extension"]
+    tracks = configured_tracks(config)
     expected_clouds = {"public", "fairfax", "mooncake"} if extension == "azure-iot" else {"public", "fairfax"}
     if set(config["clouds"]) != expected_clouds:
         raise ValueError("Monitor clouds do not match the product's supported cloud matrix.")
@@ -459,7 +473,7 @@ def definitions(config, baseline, branch):
     source["defaultBranch"] = branch
     source["properties"] = {"connectedServiceId": repository["properties"]["connectedServiceId"]}
     return [{
-        "name": item["name"], "path": "\\official\\monitors", "type": "build",
+        "name": item["name"], "path": "\\official\\release-health", "type": "build",
         "queueStatus": "disabled", "triggers": [], "repository": source,
         "queue": {"id": baseline["queue"]["id"]},
         "process": {"type": 2, "yamlFilename": ".azure-devops/release-monitor.yml"},
@@ -468,6 +482,21 @@ def definitions(config, baseline, branch):
             for name, value in item["variables"].items()
         },
     } for item in configurations(config)]
+
+
+def run_title(manifest, build):
+    validate_manifest(manifest)
+    if not re.fullmatch(r"[1-9][0-9]*", build):
+        raise ValueError("A positive ADO build ID is required for the release-health run title.")
+    prefix = "iot" if manifest["extension"] == "azure-iot" else "aio"
+    title = f"{prefix}-health-{manifest['cloudKey']}-{manifest['slot']}-cli{manifest['release']['version']}"
+    if manifest["extension"] == "azure-iot-ops":
+        runtime = manifest["runtime"]["version"] if manifest["runtime"] else "unavailable"
+        title += f"-runtime{runtime}"
+    title += f"-b{build}"
+    if len(title) > 255:
+        raise ValueError("The resolved release-health run title exceeds the ADO name limit.")
+    return title
 
 
 def main(argv=None):
@@ -492,13 +521,18 @@ def main(argv=None):
     setup.add_argument("--output", required=True)
     args = parser.parse_args(argv)
     if args.command == "resolve":
+        target, slot = args.track, None
         if args.configuration:
-            check_definition(read_json(args.configuration), args.extension, args.cloud, args.track)
+            config = read_json(args.configuration)
+            check_definition(config, args.extension, args.cloud, args.track)
+            target, slot = configured_tracks(config)[args.track], args.track
         value = frozen_manifest(
-            args.history, args.extension, args.cloud, args.track, args.automation_commit, args.attempt,
+            args.history, args.extension, args.cloud, target, args.automation_commit, args.attempt, slot=slot,
         )
         write_json(args.output, value)
         print(json.dumps(value, indent=2))
+        if args.configuration:
+            print(f"##vso[build.updatebuildnumber]{run_title(value, os.environ['BUILD_BUILDID'])}")
     elif args.command == "acquire":
         acquire(read_json(args.manifest), args.output)
     else:

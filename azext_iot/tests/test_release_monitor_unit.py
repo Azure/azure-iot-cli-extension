@@ -81,7 +81,7 @@ def test_distinct_milestones_use_latest_cli_patch_and_cloud_profile(monitor, moc
     assert latest["runtime"]["version"] == "1.5.46"
     assert previous["release"]["version"] == "2.10.0"
     assert oldest["release"]["version"] == "2.7.0"
-    with pytest.raises(ValueError, match="latest three"):
+    with pytest.raises(ValueError, match="matching published release"):
         monitor.resolve("azure-iot-ops", "public", "1.2", AUTOMATION, releases)
 
 
@@ -192,10 +192,10 @@ def test_definition_binding_rejects_scope_overrides(monitor, monkeypatch):
     monkeypatch.setenv("BUILD_REPOSITORY_NAME", monitor.REPOSITORIES[config["extension"]])
     for key, value in item["variables"].items():
         monkeypatch.setenv(key.upper(), value)
-    monitor.check_definition(config, config["extension"], "public", config["tracks"][0])
+    monitor.check_definition(config, config["extension"], "public", item["variables"]["MonitorTrack"])
     monkeypatch.setenv("MONITORRESOURCEGROUP", "another-resource-group")
     with pytest.raises(ValueError, match="reviewed monitor configuration"):
-        monitor.check_definition(config, config["extension"], "public", config["tracks"][0])
+        monitor.check_definition(config, config["extension"], "public", item["variables"]["MonitorTrack"])
 
 
 def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
