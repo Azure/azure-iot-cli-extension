@@ -316,6 +316,9 @@ def environment(base, suite, phase, folder, run_id, subscription, group, *, debu
         azext_iot_hub_auth_phase=selection()["auth_phase"](phase),
         azext_iot_hubsas_subscription=subscription, azext_iot_hubsas_receipt=str(folder / "ownership.json"),
     )
+    # Let released clients resolve sovereign ARM from the active CLI cloud.
+    if TARGETS["cloud"](target["endpoint"])["name"] != "AzureCloud":
+        result.pop("AZURE_IOT_ADR_ARM_ENDPOINT", None)
     if debug:
         result["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
     result["AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE"] = "login"
