@@ -1431,7 +1431,9 @@ def test_export_remains_fail_closed(transport, damage):
 
 @pytest.mark.parametrize("header", ["azure-asyncoperation", "location"])
 @pytest.mark.parametrize("initial_status", [200, 202])
-def test_real_cosmos_lro_without_provisioning_state_then_container_and_cleanup(transport, header, initial_status):
+def test_real_cosmos_lro_without_provisioning_state_then_container_and_cleanup(
+    transport, monkeypatch, header, initial_status,
+):
     from azure.mgmt.cosmosdb import CosmosDBManagementClient
     observer, arm, wire = transport
     wire.submit("PUT", COSMOS, {"location": ownership.REGION})
@@ -1456,7 +1458,10 @@ def test_real_cosmos_lro_without_provisioning_state_then_container_and_cleanup(t
     assert len(mutations) == 3
     assert all(m["reconciled"] and m["pollingSucceeded"] for m in mutations[1:])
     assert [urlsplit(call[1]).path.casefold() for call in wire.calls if call[0] == "PUT"] == [COSMOS, DATABASE, CONTAINER]
-    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", time.monotonic() + 2, observer.path)
+    clock = [0]
+    monkeypatch.setattr(runner.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    result = runner.cleanup_regular(arm, observer.data, "uid", "regular", 2, observer.path)
     assert result["complete"] and result["absentDescendantIds"] == [DATABASE, CONTAINER]
     assert not wire.resources
 
