@@ -397,6 +397,28 @@ class TestSdkResolverHostnames:
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net"
         assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"
 
+    @pytest.mark.parametrize(
+        "hostname,resource_id",
+        [
+            ("mydps.azure-devices-provisioning.net", "https://azure-devices-provisioning.net"),
+            ("mydps.azure-devices-provisioning.us", "https://azure-devices-provisioning.us"),
+            ("mydps.azure-devices-provisioning.cn", "https://azure-devices-provisioning.net"),
+        ],
+    )
+    def test_dps_service_sdk_uses_cloud_resource(self, mocker, hostname, resource_id):
+        from azext_iot._factory import SdkResolver
+
+        cmd = mocker.Mock()
+        target = {"entity": hostname, "policy": "login", "cmd": cmd}
+        oauth = mocker.patch("azext_iot._factory.IoTOAuth")
+        auth_policy = mocker.patch("azext_iot.dps.services._authentication.DpsAuthenticationPolicy")
+
+        client = SdkResolver(target)._get_dps_service_sdk()
+
+        oauth.assert_called_once_with(cli_ctx=cmd.cli_ctx, resource_id=resource_id)
+        auth_policy.assert_called_once_with(oauth.return_value, endpoint=f"https://{hostname}")
+        assert client._client._base_url == f"https://{hostname}"
+
 
 ORDINARY_MANAGEMENT_OPERATIONS = [
     ("iot_hub_service_factory", "iot_hub_resource", "IotHubs",
