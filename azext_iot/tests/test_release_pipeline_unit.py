@@ -35,7 +35,7 @@ def candidate(tmp_path, monkeypatch):
         "SYSTEM_DEFINITIONID": "150", "BUILD_BUILDID": "900", "BUILD_SOURCEVERSION": AUTOMATION_SHA,
         "BUILD_SOURCEBRANCH": "refs/heads/dev", "BUILD_REPOSITORY_NAME": release.REPOSITORY,
         "SYSTEM_TEAMPROJECTID": PROJECT, "SYSTEM_JOBATTEMPT": "1",
-        "RELEASE_SOURCE_BRANCH": "release/1.1.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
+        "RELEASE_SOURCE_BRANCH": "release/1.2.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
         "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "Hub",
@@ -53,7 +53,7 @@ def candidate(tmp_path, monkeypatch):
     with zipfile.ZipFile(directory / "SBOM.zip", "w") as sbom:
         sbom.writestr("_manifest/spdx_2.2/manifest.spdx.json", '{"spdxVersion": "SPDX-2.2"}')
     value = {
-        "schema": 1, "repository": release.REPOSITORY, "sourceBranch": "refs/heads/release/1.1.0-preview",
+        "schema": 1, "repository": release.REPOSITORY, "sourceBranch": "refs/heads/release/1.2.0-preview",
         "sourceCommit": SOURCE_SHA, "producer": {"definition": "150", "build": "900", "commit": AUTOMATION_SHA},
         "cohorts": release.integration_cohorts(),
         "wheel": {"file": filename, "sha256": release.digest(directory / filename), "version": "1.1.0b1"},
@@ -106,7 +106,7 @@ def test_invalid_source_branches(value):
         release.branch(value)
 
 
-@pytest.mark.parametrize("source", ["release/1.1.0-preview", "users/test/release-validation"])
+@pytest.mark.parametrize("source", ["release/1.2.0-preview", "users/test/release-validation"])
 def test_plan_requires_no_cloud_credentials(candidate, monkeypatch, capsys, source):
     monkeypatch.setenv("RELEASE_MODE", "Plan")
     monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
@@ -142,7 +142,7 @@ def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkey
 
 
 @pytest.mark.parametrize("mode,source", [
-    ("Release", "release/1.1.0-preview"), ("Validate", "users/test/release-validation"),
+    ("Release", "release/1.2.0-preview"), ("Validate", "users/test/release-validation"),
 ])
 def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
         candidate, tmp_path, monkeypatch, capsys, mode, source):

@@ -13,7 +13,7 @@ parameters:
   - name: sourceBranch
     displayName: Source branch
     type: string
-    default: release/1.1.0-preview
+    default: release/1.2.0-preview
   - name: createIndexPr
     displayName: Create index PR
     type: boolean

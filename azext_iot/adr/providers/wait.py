@@ -135,6 +135,13 @@ def link_succeeded(resource, label: Optional[str] = None) -> WaitEvaluation:
             _link_failure(label, endpoint, state),
             f"linkingState={state!r}",
         )
+    if normalized == "linkedresourcedeleted":
+        return WaitEvaluation(
+            False,
+            f"{label} target was deleted (linkingState '{state}') and will not reach Succeeded. "
+            "Remove the link with 'az iot adr ns link hub|dps|su remove'.",
+            f"linkingState={state!r}",
+        )
     return WaitEvaluation(
         normalized == "succeeded",
         observation=f"linkingState={state!r}",
@@ -251,10 +258,11 @@ def _explicit_condition(
     if exists:
         return True
     state = _get_provisioning_state(resource)
-    if str(state or "").casefold() == "failed":
-        raise AzureResponseError("The operation failed.")
+    normalized = str(state or "").casefold()
+    if normalized == "failed" or (normalized == "canceled" and (created or updated)):
+        raise AzureResponseError(f"The operation failed (provisioningState '{state}').")
     return bool(
-        ((created or updated) and str(state or "").casefold() == "succeeded")
+        ((created or updated) and normalized == "succeeded")
         or (custom and verify_property(resource, custom))
     )
 
@@ -305,8 +313,8 @@ def wait_for_resource(
                     normalized = str(state or "").casefold()
                     if normalized == "deleting":
                         delete_observed_deleting = True
-                    if normalized == "failed" and delete_observed_deleting:
-                        raise AzureResponseError("The operation failed.")
+                    if normalized in ("failed", "canceled") and delete_observed_deleting:
+                        raise AzureResponseError(f"The operation failed (provisioningState '{state}').")
                     if state:
                         last_observation = f"still exists (provisioningState {state})"
                     else:

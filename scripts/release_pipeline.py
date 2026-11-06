@@ -31,7 +31,7 @@ REPOSITORY = "Azure/azure-iot-cli-extension"
 INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
-BRANCHES = {"dev", "preview", "release/1.1.0-preview"}
+BRANCHES = {"dev", "preview", "release/1.2.0-preview"}
 INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
     "pythonVersions": ["3.10", "3.13"], "regions": "australiaeast", "armEndpoint": "public",

@@ -300,7 +300,7 @@ def test_failed_dps_blocks_individual_hub_write_before_grants(fixture_link_provi
         dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID, linkingState="Failed")},
         hubs={"hub": _endpoint(IOT_HUB_ENDPOINT_TYPE, HUB_ID, linkingState="Failed")} if operation == "update" else {},
     )
-    with pytest.raises(ArgumentUsageError, match="Succeeded DPS"):
+    with pytest.raises(ArgumentUsageError, match="DPS link is required"):
         getattr(fixture_link_provider, "hub_" + operation)(
             "hub", "namespace", "rg", **({"hub_resource_id": HUB_ID} if operation == "add" else {}),
         )

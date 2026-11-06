@@ -66,6 +66,30 @@ class TestDPSDiscovery:
             discovery.get_targets(auth_type="key")
         assert raised.value is error
 
+    @pytest.mark.parametrize("auth_type", ["key", "login"])
+    def test_bulk_targets_skip_dps_without_service_hostname(self, mocker, fixture_cmd, caplog, auth_type):
+        discovery = DPSDiscovery(cmd=fixture_cmd)
+
+        def dps(name, hostname=None):
+            props = {"idScope": "scope"}
+            if hostname:
+                props["serviceOperationsHostName"] = hostname
+            return {"name": name, "properties": props, "id": f"/subscriptions/sub/resourceGroups/test-rg/"
+                    f"providers/Microsoft.Devices/provisioningServices/{name}"}
+
+        provisioning, ready = dps("provisioning"), dps("ready", "ready.azure-devices-provisioning.net")
+        mocker.patch.object(discovery, "get_resources", return_value=[provisioning, ready])
+        mocker.patch.object(discovery, "find_resource", side_effect=[provisioning, ready])
+        mocker.patch.object(
+            discovery, "find_policy", return_value={"keyName": "key", "primaryKey": "p", "secondaryKey": "s"}
+        )
+
+        targets = discovery.get_targets(auth_type=auth_type)
+
+        assert [t["entity"] for t in targets] == ["ready.azure-devices-provisioning.net"]
+        assert "Could not access provisioning" in caplog.text
+        assert "No service hostname is available for DPS 'provisioning'" in caplog.text
+
     def test_bulk_targets_propagate_unexpected_target_errors(self, mocker, fixture_cmd):
         discovery = DPSDiscovery(cmd=fixture_cmd)
         mocker.patch.object(discovery, "get_resources", return_value=[{"name": "dps"}])

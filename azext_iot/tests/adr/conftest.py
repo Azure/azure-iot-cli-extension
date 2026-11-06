@@ -102,6 +102,9 @@ _ADR_XDIST_GROUPS = {
     "adr-g5-brownfield-recovery": {
         "test_adr_link_brownfield_recovery",
     },
+    "adr-g6-deleted-hub": {
+        "test_adr_link_deleted_hub_identity_changes",
+    },
 }
 _ADR_GROUP_ORDER = {group: index for index, group in enumerate(_ADR_XDIST_GROUPS)}
 _ADR_TEST_GROUP = {test: group for group, tests in _ADR_XDIST_GROUPS.items() for test in tests}

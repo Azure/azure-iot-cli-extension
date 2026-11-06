@@ -6,8 +6,19 @@ Release History
 1.1.0b1 (Preview)
 +++++++++++++++++
 
+**MQTT 5 preview**
+
+* Added ``--connection-profile MqttV5`` to Hub creation and ``az iot hub topic-group`` commands for MQTT 5 topic-group management.
+* MQTT 5 Hubs use ADR namespace links.
+
+**Semantic Model preview**
+
+* Added ADR schema registry, schema, and schema-version commands for Thing Models, Thing Descriptions, and message schemas.
+* Added device type references for Registry Devices, DPS enrollments, and enrollment groups, plus Hub route data-schema references and ``DOObservationV1`` endpoint formatting for contextualized telemetry.
+
 **Hub bug fixes**
 
+* Fixed ``az iot hub monitor-events --login`` failing with an unhandled ``ValueError`` for Event Hub-compatible connection strings from Azure US Government (``.servicebus.usgovcloudapi.net``) and Azure China (``.servicebus.chinacloudapi.cn``) hubs.
 * Full Hub updates omit service-returned TLS migration metadata while preserving the configured minimum TLS version.
 * Hub policy create/delete read the authoritative policy list after the update completes instead of requiring policies in the Hub update response.
 
@@ -21,6 +32,14 @@ Release History
 * Unconfirmed read access includes a manual Reader assignment command for the checked resource group or subscription scope, with scope and propagation guidance. No role assignments are changed by default.
 * Added opt-in ``--grant-reader`` for missing outbound-identity Reader access on a Succeeded link's target resource group. It cannot be combined with ``--no-rbac-check``. Setup failures stop removal; deleted resource groups require an existing subscription read grant or manual remediation, never an automatic subscription grant. Created assignments are retained after removal or failure, including HTTP 412, and can take several minutes to take effect.
 
+**ADR link identity changes**
+
+* Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub, DPS or Software Updates instance was deleted.
+* ``az iot adr ns link hub add|update`` follow ADR when the linked DPS was deleted but its link remains: Hub identity updates are no longer blocked, and Hub add/retry is allowed with removal guidance.
+* Fixed ``az iot dps linked-hub show|delete --linked-hub <hub-name>`` failing for a deleted IoT Hub, so its stale DPS entry can be removed by name. ADR link guidance now covers stale entries.
+* ``az iot adr ns link wait`` and ``link hub|dps wait`` stop with removal guidance when a linked Hub or DPS was deleted, instead of polling until timeout. ``--created|--updated|--deleted`` waits also stop on ``Canceled``.
+* Fixed ``az iot dps identity remove`` and ``az iot adr ns su instance create|update`` identity changes being blocked after the linked ADR namespace was deleted (link reported as ``Orphaned``). ``az iot hub identity remove`` no longer suggests link rotation for an orphaned Hub.
+
 **Shared command fixes**
 
 * Hub/DPS namespace linking now automatically grants the selected DPS identity IoT Hub Data Contributor on the associated Hubs, including link updates and DPS identity rotation. Existing assignments are reused and historical grants are retained.
@@ -32,6 +51,8 @@ Release History
 
 **DPS certificate and enrollment fixes**
 
+* Fixed DPS data-plane commands using ``--auth-type login`` to select the Fairfax Microsoft Entra audience for Azure US Government (``.azure-devices-provisioning.us``) endpoints while retaining the public-cloud audience for Azure China (``.azure-devices-provisioning.cn``) endpoints.
+* DPS data-plane commands report a clear error instead of ``KeyError`` when the DPS has no service hostname yet (still provisioning).
 * Certificate ``generate-verification-code`` and ``verify`` now fetch the current ETag when ``--etag`` is omitted. Explicit ETags skip the additional read. Denied certificate reads explain how to supply an ETag or request read permission; concurrent changes still fail without an unconditional retry.
 * Enrollment and enrollment-group creation now allow ``--iot-hubs`` without ``--allocation-policy``, inheriting the DPS instance's allocation policy independently of ADR certificate settings.
 

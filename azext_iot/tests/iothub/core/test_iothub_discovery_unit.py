@@ -98,12 +98,13 @@ class TestIoTHubDiscovery:
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["cmd"] == fixture_cmd
 
-    def test_get_target_by_eh_connection_string(self, fixture_cmd, get_mgmt_client):
+    @pytest.mark.parametrize("domain", ["windows.net", "usgovcloudapi.net", "chinacloudapi.cn"])
+    def test_get_target_by_eh_connection_string(self, fixture_cmd, get_mgmt_client, domain):
         """An Event Hub connection string passed as --login is parsed directly without ARM."""
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
         fake_eh_cs = (
-            "Endpoint=sb://cooliothub.servicebus.windows.net/;"
+            f"Endpoint=sb://cooliothub.servicebus.{domain}/;"
             "SharedAccessKeyName=iothubowner;"
             "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=;"
             "EntityPath=cooliothub"
@@ -123,3 +124,17 @@ class TestIoTHubDiscovery:
         assert target["primarykey"] == ""
         # Endpoint resolution is deferred to EventTargetBuilder — no 'events' key here
         assert "events" not in target
+
+    def test_get_target_by_eh_connection_string_unknown_suffix(self, fixture_cmd, get_mgmt_client):
+        """An Event Hub-shaped string with an unrecognized endpoint host is not treated as Event Hub."""
+        fake_cs = (
+            "Endpoint=sb://cooliothub.servicebus.windows.net.example.com/;"
+            "SharedAccessKeyName=iothubowner;"
+            "SharedAccessKey=fake;"
+            "EntityPath=cooliothub"
+        )
+
+        with pytest.raises(ValueError):
+            IotHubDiscovery(cmd=fixture_cmd).get_target(
+                resource_name=None, resource_group_name=None, login=fake_cs
+            )

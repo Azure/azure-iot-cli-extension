@@ -15,6 +15,7 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link_helpers import parse_hub_resource_id
@@ -22,7 +23,15 @@ from azext_iot.adr.rbac import (
     resolve_linked_resource_principal,
     resolve_namespace_outbound_principal,
 )
-from azext_iot.adr.topology import DPS_CAP_EXCEEDED_MSG, endpoint_is_type, get_endpoints, is_failed_link_endpoint
+from azext_iot.adr.topology import (
+    DPS_CAP_EXCEEDED_MSG,
+    endpoint_is_type,
+    get_endpoints,
+    is_failed_link_endpoint,
+    is_linked_resource_deleted,
+)
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -78,6 +87,9 @@ def validate_dps_hubs(namespace: dict, target: dict, planned_hubs=None) -> None:
         raise InvalidArgumentValueError(
             "DPS has classic Hubs that must be linked in the same request: "
             f"{', '.join(missing)}. {guidance}"
+            "If a listed Hub was deleted, remove its stale entry with 'az iot dps linked-hub delete "
+            f"--dps-name {target.get('name') or '<dps>'} --linked-hub <hostname>' before linking the DPS; "
+            "the list is read-only while the DPS is linked. "
             "No role assignments or namespace changes were submitted."
         )
 
@@ -196,16 +208,20 @@ def preflight_target(
     return target
 
 
-def add_dps_hub_role_requirements(request: dict, namespace: dict, lookup_dps: Callable) -> None:
+def add_dps_hub_role_requirements(
+    request: dict, namespace: dict, lookup_dps: Callable, hub_exists: Optional[Callable[[str], bool]] = None,
+) -> None:
     """Bind the selected DPS principal to the Hub scopes in this link plan."""
     kind = request["link_type"]
     if kind not in ("hub", "dps"):
         return
+    # A deleted Hub has no scope to grant; ADR keeps its endpoint until the link is removed.
     hub_scopes = (
         [request["target_scope"]] if kind == "hub" else [
             endpoint.get("resourceId")
             for endpoint in get_endpoints(namespace, "messaging").values()
-            if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE)
+            if endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and not is_linked_resource_deleted(endpoint)
+            and (hub_exists is None or hub_exists(endpoint.get("resourceId")))
         ]
     )
     if not hub_scopes:
@@ -224,9 +240,18 @@ def add_dps_hub_role_requirements(request: dict, namespace: dict, lookup_dps: Ca
         if len(endpoints) != 1:
             raise InvalidArgumentValueError(DPS_CAP_EXCEEDED_MSG)
         endpoint = endpoints[0]
-        principal = resolve_linked_resource_principal(
-            lookup_dps(endpoint.get("resourceId")), endpoint.get("inboundCallerIdentity"), "DPS",
-        )
+        # ADR doesn't read a deleted DPS for Hub changes; its grants return when a DPS is linked again.
+        if is_linked_resource_deleted(endpoint):
+            return
+        try:
+            dps = lookup_dps(endpoint.get("resourceId"))
+        except ResourceNotFoundError:
+            logger.warning(
+                "Skipping DPS role assignment on this IoT Hub because linked DPS '%s' no longer exists.",
+                endpoint.get("resourceId"),
+            )
+            return
+        principal = resolve_linked_resource_principal(dps, endpoint.get("inboundCallerIdentity"), "DPS")
     if not principal:
         raise AzureResponseError(
             "The linked DPS must select an attached managed identity before granting access to IoT Hubs."
