@@ -1217,7 +1217,7 @@ class Observer:
                 action_root = resource_id.rsplit("/", 1)[0]
                 readonly = False
                 if method == "POST" and action == "exporttemplate":
-                    group_id = f"/subscriptions/{SUBSCRIPTION}/resourcegroups/{GROUP}"
+                    group_id = f"/subscriptions/{SUBSCRIPTION}/resourcegroups/{GROUP}".casefold()
                     resources = body.get("resources", [])
                     if (resource_id != group_id + "/exporttemplate"
                             or set(body) - {"resources", "options", "outputFormat"}

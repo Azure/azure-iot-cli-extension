@@ -1329,7 +1329,10 @@ def test_explicit_export_child_needs_exact_receipt_and_current_root_and_child(tr
     assert not any(call[0] == "POST" for call in wire.calls)
 
 
-def test_export_reconciliation_is_bounded_to_the_requested_owned_tree(transport):
+@pytest.mark.parametrize("uppercase_group", [False, True])
+def test_export_reconciliation_is_bounded_to_the_requested_owned_tree(transport, monkeypatch, uppercase_group):
+    if uppercase_group:
+        monkeypatch.setattr(ownership, "GROUP", ownership.GROUP.upper())
     observer, arm, wire = transport
     wire.submit("PUT", NAMESPACE, {"location": ownership.REGION})
     observer.prepare("PUT", NAMESPACE, "test", {})
