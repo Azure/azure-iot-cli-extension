@@ -693,6 +693,9 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    # Kept private because tox execute logs record the environment.
                                    azext_iot_tox_log_dir=str(private / name / "tox-log"),
                                    azext_iot_tox_tmp_dir=str(private / name / "tox-tmp"))
+                # Let released clients resolve sovereign ARM from the active CLI cloud.
+                if TARGETS["cloud"](target["endpoint"])["name"] != "AzureCloud":
+                    environment.pop("AZURE_IOT_ADR_ARM_ENDPOINT", None)
                 if debug:
                     environment[FOCUSED["ENV"]] = json.dumps(debug)
                     # These args follow tox's base 300s dump option. Only debug

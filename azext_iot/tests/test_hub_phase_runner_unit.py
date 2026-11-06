@@ -671,6 +671,30 @@ def test_hub_environment_refuses_conflicting_endpoint_before_child(tmp_path, key
         )
 
 
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast", "usgovvirginia", "chinaeast2"])
+@pytest.mark.parametrize("inherited", [False, True])
+def test_hub_environment_uses_active_sovereign_cloud_without_adr_override(tmp_path, region, inherited):
+    target = runner.TARGETS["target"](region)
+    base = {"AZURE_IOT_ADR_ARM_ENDPOINT": target["endpoint"]} if inherited else {}
+    environment = runner.environment(
+        base, "HubData", "sas", tmp_path, "uid", ownership.SUBSCRIPTION, ownership.GROUP, region=region,
+    )
+    assert environment["azext_iot_test_arm_endpoint"] == target["endpoint"]
+    if runner.TARGETS["cloud"](target["endpoint"])["name"] == "AzureCloud":
+        assert environment["AZURE_IOT_ADR_ARM_ENDPOINT"] == target["endpoint"]
+    else:
+        assert "AZURE_IOT_ADR_ARM_ENDPOINT" not in environment
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+def test_hub_sovereign_environment_rejects_conflicting_override_before_removing_it(tmp_path, region):
+    with pytest.raises(ValueError, match="Conflicting ambient resource scope"):
+        runner.environment(
+            {"AZURE_IOT_ADR_ARM_ENDPOINT": runner.TARGETS["PUBLIC_ARM"]},
+            "HubData", "sas", tmp_path, "uid", ownership.SUBSCRIPTION, ownership.GROUP, region=region,
+        )
+
+
 @pytest.mark.parametrize("subscription,group", [
     ("foreign", ownership.GROUP), (ownership.SUBSCRIPTION, "foreign"),
 ])
