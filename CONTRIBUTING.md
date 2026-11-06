@@ -152,7 +152,7 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 ### Released-version monitors
 
 `.azure-devops/release-monitor.yml` is shared by six independent definitions:
-`IoT CLI - <Public|Fairfax|Mooncake> - <GA|Preview>`.
+`Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
 The resolver selects the latest published GA or Preview wheel, verifies GitHub's
 SHA256 and wheel metadata, and acquires the exact tagged test-source commit.

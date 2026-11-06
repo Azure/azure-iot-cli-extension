@@ -436,7 +436,7 @@ def configurations(config):
         for track in tracks:
             label = {"ga": "GA", "preview": "Preview"}.get(track, track)
             result.append({
-                "name": f"{config['namePrefix']} - {profile['displayName']} - {label}",
+                "name": f"{config['namePrefix']} ({profile['displayName']} {label})",
                 "variables": {
                     "MonitorCloud": cloud, "MonitorTrack": track, "MonitorAzureCloud": CLOUDS[cloud],
                     **{name: value.format(track=track, cloud=cloud) for name, value in profile["variables"].items()},

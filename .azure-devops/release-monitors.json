@@ -1,6 +1,6 @@
 {
   "extension": "azure-iot",
-  "namePrefix": "IoT CLI",
+  "namePrefix": "Azure IoT CLI - Release Health",
   "tracks": {"ga": "ga", "preview": "preview"},
   "clouds": {
     "public": {
