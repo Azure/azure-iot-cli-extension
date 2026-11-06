@@ -9,7 +9,7 @@
         {
             "file": "azext_iot\\tests\\adr\\test_adr_command_log_unit.py",
             "placeholder": "https://user:redactme@host/path",
-            "_justification": "CSCAN-GENERAL0060: synthetic URL userinfo used only to verify command redaction; not a service credential."
+            "_justification": "checkov:skip=CKV_SECRET_4:CSCAN-GENERAL0060: synthetic URL userinfo used only to verify command redaction; not a service credential."
         },
         {
             "file": "azext_iot\\tests\\dps\\core\\test_dps_phase_runtime_unit.py",

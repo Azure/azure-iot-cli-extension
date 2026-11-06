@@ -27,6 +27,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, invoke_checked
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
+from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -441,9 +442,24 @@ def _shared_release(run_uid: str, kind: str, delete_fn) -> None:
 
 
 def _release_phase_fixture(run_uid: str, kind: str) -> None:
+    if handoff.enabled():
+        path = _phase_receipts.settings()[0] / f"owned-{kind}.json"
+        if path.is_file():
+            resource = json.loads(path.read_text(encoding="utf-8"))
+            return handoff.cleanup(resource["id"], lambda: _release_owned_phase_fixture(run_uid, kind), accepted=False)
+    return _release_owned_phase_fixture(run_uid, kind)
+
+
+def _release_owned_phase_fixture(run_uid, kind):
     if kind in ("csrdps", "csrhub"):
         from azext_iot.tests.dps._csr_registry import require_registry_cleanup_resolved, require_namespace_cleanup_resolved
 
+        if handoff.enabled():
+            directory = _phase_receipts.settings()[0]
+            if (directory / "owned-csrns.json").exists() and not (directory / "deleted-csrns.json").exists():
+                resource = json.loads((directory / f"owned-{kind}.json").read_text(encoding="utf-8"))
+                handoff.record(resource["id"], "pending", "NamespaceDeletionPending")
+                return
         require_registry_cleanup_resolved()
         require_namespace_cleanup_resolved()
     logger.info("Releasing phase controller reference for '%s' fixture.", kind)
@@ -459,7 +475,9 @@ def _resource_handlers(kind):
         from azext_iot.tests.dps._csr_issuance import find_namespace, delete_namespace
 
         return find_namespace, delete_namespace
-    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (_find_dps_by_name, _delete_dps)
+    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (
+        _find_dps_by_name, _delete_fixture_dps,
+    )
 
 
 # --- Age-based garbage collection of orphans (from crashed runs) -------------------------------
@@ -557,10 +575,24 @@ def _find_dps_by_name(dps_name: str) -> Optional[dict]:
         raise
 
 
-def _delete_dps(dps_name: str) -> None:
+def _delete_fixture_dps(dps_name: str) -> None:
+    if handoff.enabled():
+        _delete_dps(dps_name, allow_handoff=True)
+    else:
+        _delete_dps(dps_name)
+
+
+def _delete_dps(dps_name: str, *, allow_handoff=False) -> None:
     if _phase_receipts.settings() and not _phase_receipts.before_delete(dps_name, _find_dps_by_name(dps_name)):
         return
     with _phase_runtime.owned_write(dps_name, "DELETE"):
+        if allow_handoff and handoff.enabled():
+            with iot_service_provisioning_factory(cli.az_cli, subscription_id=_phase_receipts.settings()[2]) as client:
+                client.iot_dps_resource.begin_delete(
+                    resource_group_name=ENTITY_RG, provisioning_service_name=dps_name, polling=False, retry_total=0,
+                )
+            _phase_receipts.after_delete(dps_name, completed=False)
+            return
         result = cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}", capture_stderr=True)
     if not result.success():
         raise CLIInternalError(f"Failed to delete DPS '{dps_name}' in resource group '{ENTITY_RG}'.")
@@ -667,7 +699,10 @@ def _create_managed_dps(
         if _phase_receipts.settings() and _find_dps_by_name(name) is not None:
             raise CLIInternalError("Isolated DPS name already exists; refusing to overwrite it.")
         _phase_receipts.before_create(name, ENTITY_RG, run_uid, kind)
-        cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_dps_by_name, _delete_dps)
+        cleanup.callback(
+            _cleanup_created_resource, name, run_uid, kind, _find_dps_by_name,
+            _delete_fixture_dps,
+        )
         with _phase_runtime.owned_write(name, "PUT"):
             target_dps = cli.invoke(
                 f"iot dps create --name {name} --resource-group {ENTITY_RG} "
@@ -714,7 +749,9 @@ def _iot_dps_provisioner(
             )
             cleanup.callback(
                 _shared_release, run_uid, kind,
-                lambda name: _cleanup_created_resource(name, run_uid, kind, _find_dps_by_name, _delete_dps),
+                lambda name: _cleanup_created_resource(
+                    name, run_uid, kind, _find_dps_by_name, _delete_fixture_dps,
+                ),
             )
             dps_name = target_dps["name"]
             hub_host_name = _hub_link_host_name(iot_hub) if iot_hub else None
@@ -764,7 +801,7 @@ def _iot_dps_removal(dps):
     run_uid = dps.get("_runUid")
     kind = dps.get("_kind")
     if run_uid and kind:
-        _shared_release(run_uid, kind, delete_fn=_delete_dps)
+        _shared_release(run_uid, kind, delete_fn=_delete_fixture_dps)
 
 
 # IoT Hub fixtures for DPS
@@ -829,6 +866,13 @@ def _delete_hub(name: str) -> None:
     if _phase_receipts.settings() and not _phase_receipts.before_delete(name, _find_hub_by_name(name)):
         return
     with _phase_runtime.owned_write(name, "DELETE"):
+        if handoff.enabled():
+            with iot_hub_service_factory(cli.az_cli, subscription_id=_phase_receipts.settings()[2]) as client:
+                client.iot_hub_resource.begin_delete(
+                    resource_group_name=ENTITY_RG, resource_name=name, polling=False, retry_total=0,
+                )
+            _phase_receipts.after_delete(name, completed=False)
+            return
         if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=True).success():
             raise CLIInternalError(f"Failed to delete iot hub resource '{name}' in resource group '{ENTITY_RG}'.")
     _phase_receipts.after_delete(name)

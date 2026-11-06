@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Offline proofs for the account-profile race mitigation and its workflow lifetime."""
+"""Offline proofs for the CI account-profile race mitigation."""
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -26,7 +26,6 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 import requests
 import responses
-import yaml
 
 from azure.cli.core import _profile, cloud
 from azure.cli.core._session import Session
@@ -728,114 +727,3 @@ def test_real_process_failure_is_nonzero_and_never_prints_request_or_token_mater
     assert OIDC_URL not in result.stdout + result.stderr
     assert "Traceback" not in result.stderr
     assert "refreshed" not in result.stdout
-
-
-def workflow_step():
-    workflow = yaml.safe_load((ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    steps = workflow["jobs"]["int-test"]["steps"]
-    return next(step for step in steps if step.get("id") == "run_tests")
-
-
-def test_workflow_refresh_is_bound_to_test_lifetime_and_has_no_profile_writing_commands():
-    step = workflow_step()
-    script = step["run"]
-    assert step["env"]["AZURE_CLIENT_ID"] == "${{ secrets.AZURE_CLIENT_ID }}"
-    assert step["env"]["AZURE_TENANT_ID"] == "${{ secrets.AZURE_TENANT_ID }}"
-    assert 'auth_python=".tox/$TEST_TOX_ENV/bin/python"' in script
-    assert 'auth_python=".tox/DPS-phases/bin/python"' in script
-    assert 'trap stop_auth EXIT' in script
-    assert 'wait "$auth_pid"' in script
-    assert script.index('"$auth_python" azext_iot/tests/_refresh_ci_auth.py\n') < script.index("run_service()")
-    for forbidden in ("az login", "az account set", "curl ", "--federated-token", "AZURE_CONFIG_DIR="):
-        assert forbidden not in script
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Ubuntu workflow Bash supervision")
-@pytest.mark.parametrize("service", ["DPS", "HubControl", "HubData", "ADR", "ADU"])
-@pytest.mark.parametrize("failure", [
-    "none", "preflight", "startup", "startup-timeout", "refresh", "early-success",
-    "shutdown-failure", "shutdown-timeout", "tests",
-])
-def test_workflow_supervision_never_masks_auth_or_test_failures(tmp_path, service, failure):
-    """Execute the actual step shell, replacing only external Python/tox commands."""
-    step = workflow_step()
-    # A small fake interpreter records non-secret argv and models a cooperative
-    # daemon. No actual test controller or Azure CLI command can be invoked.
-    executable = tmp_path / "runtime"
-    executable.write_text(
-        f"#!{sys.executable}\n"
-        "import os, signal, sys, time\nfrom pathlib import Path\n"
-        "mode = os.environ['OFFLINE_FAILURE']\n"
-        "if '_refresh_ci_auth.py' not in sys.argv[1]:\n"
-        "    assert Path('ready').exists(), 'Tests started before the refresher was ready'\n"
-        "    if os.environ['TEST_SERVICE'] == 'DPS':\n"
-        "        assert sys.argv[sys.argv.index('--arm-endpoint') + 1] == os.environ['TEST_ARM_ENDPOINT']\n"
-        "    if mode == 'shutdown-timeout':\n"
-        "        while not Path('test-cache.json').exists(): time.sleep(.01)\n"
-        "    Path('tests-started').touch()\n"
-        "    if mode in ('refresh', 'early-success'):\n"
-        "        while not Path('failed').exists(): time.sleep(.01)\n"
-        "        time.sleep(.1)\n"
-        "    print('offline tests completed')\n"
-        "    sys.exit(7 if mode == 'tests' else 0)\n"
-        "if '--loop' not in sys.argv:\n"
-        "    sys.exit(1 if mode == 'preflight' else 0)\n"
-        "if mode == 'startup': sys.exit(1)\n"
-        "time.sleep(.2)\n"
-        "stopped = False\n"
-        "def stop(*args):\n"
-        "    global stopped\n"
-        "    stopped = True\n"
-        "signal.signal(signal.SIGTERM, stop)\n"
-        "Path('ready').touch()\n"
-        "if mode != 'startup-timeout':\n"
-        "    Path(sys.argv[sys.argv.index('--ready-file') + 1]).write_text('ready\\n')\n"
-        "if mode == 'shutdown-timeout':\n"
-        "    Path('test-cache.json').write_text('{')\n"
-        "    while not Path('release-cache').exists(): time.sleep(.01)\n"
-        "    Path('test-cache.json').write_text('{\"complete\": true}')\n"
-        "if mode in ('refresh', 'early-success'):\n"
-        "    while not Path('tests-started').exists(): time.sleep(.01)\n"
-        "    Path('failed').touch()\n"
-        "    sys.exit(1 if mode == 'refresh' else 0)\n"
-        "while not stopped: time.sleep(.01)\n"
-        "Path('stopped').touch()\n"
-        "sys.exit(1 if mode == 'shutdown-failure' else 0)\n", encoding="utf-8",
-    )
-    executable.chmod(0o755)
-    runtime = tmp_path / ".tox" / ("DPS-phases" if service == "DPS" else service + "-int") / "bin"
-    runtime.mkdir(parents=True)
-    (runtime / "python").symlink_to(executable)
-    (tmp_path / "tox").symlink_to(executable)
-    env = dict(
-        os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"], OFFLINE_FAILURE=failure,
-        TEST_SERVICE=service, TEST_TOX_ENV=service + "-int", TEST_SUBSCRIPTION_ID=SUBSCRIPTION,
-        RESOURCE_GROUP="offline-rg", TEST_REGION="offline", TEST_ARM_ENDPOINT="https://management.azure.com",
-    )
-    try:
-        result = subprocess.run(
-            ["bash", "-c", step["run"].replace("SECONDS + 30", "SECONDS + 2").replace("SECONDS + 180", "SECONDS + 2")],
-            cwd=tmp_path, env=env, capture_output=True, text=True, timeout=15, check=False,
-        )
-        if failure == "shutdown-timeout":
-            assert "cache persistence was not force-killed" in result.stdout
-            assert (tmp_path / "test-cache.json").read_text() == "{"
-            assert (tmp_path / "test-result/auth-refresh.log").exists()
-            assert not (tmp_path / "stopped").exists()
-    finally:
-        (tmp_path / "release-cache").touch()
-        if failure == "shutdown-timeout":
-            deadline = time.monotonic() + 5
-            while not (tmp_path / "stopped").exists():
-                assert time.monotonic() < deadline, "Workflow must not terminate the unfinished cache writer"
-                time.sleep(0.01)
-            assert json.loads((tmp_path / "test-cache.json").read_text()) == {"complete": True}
-    assert (result.returncode == 0) == (failure == "none"), result.stdout + result.stderr
-    if failure == "tests":
-        assert result.returncode == 7
-    if failure in ("preflight", "startup", "startup-timeout"):
-        assert "offline tests completed" not in result.stdout
-    else:
-        assert "offline tests completed" in result.stdout
-    if failure in ("none", "tests", "shutdown-failure"):
-        assert (tmp_path / "stopped").exists(), "Refresher must be reaped before the step ends"

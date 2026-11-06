@@ -295,6 +295,10 @@ def _remove_namespace_self_role(name):
                 "Namespace disappeared before exact role cleanup; orphan reconciliation is required."
             )
             return
+        from azext_iot.tests import _cleanup_handoff as handoff
+        if not claim["verified"] and handoff.enabled():
+            handoff.record(claim["id"], "pending", "RoleCreationUnresolved")
+            return
         if not claim["verified"]:
             # An uncertain create followed by an early 404 cannot release the
             # namespace: a delayed assignment could otherwise become orphaned.
@@ -311,7 +315,12 @@ def _remove_namespace_self_role(name):
                 claim["delete_attempted"] = True
                 receipts.write(NAMESPACE_ROLE_RECEIPT, claim)
                 invoke(f"role assignment delete --ids {quote(claim['id'])} --subscription {record['subscription']}")
-            _wait_arm_absent(lambda: _get_namespace_role(client, claim), "owned namespace SAMI role absence")
+            if handoff.enabled():
+                if _get_namespace_role(client, claim) is not None:
+                    handoff.record(claim["id"], "pending", "RoleDeletionPending")
+                    return
+            else:
+                _wait_arm_absent(lambda: _get_namespace_role(client, claim), "owned namespace SAMI role absence")
     receipts.write(NAMESPACE_ROLE_RECEIPT, {**claim, "deleted": True})
 
 
@@ -362,7 +371,8 @@ def _remove_namespace_group_reader_roles(name, namespace):
 
 
 def delete_namespace(name):
-    from azext_iot.tests.dps._csr_registry import cleanup_registry_devices
+    from azext_iot.tests import _cleanup_handoff as handoff
+    from azext_iot.tests.dps._csr_registry import cleanup_registry_devices, require_registry_cleanup_resolved
 
     current = find_namespace(name)
     if current is None:
@@ -371,7 +381,14 @@ def delete_namespace(name):
         return
     record = _require_owned(name, current)
     cleanup_registry_devices(record)
+    if handoff.enabled():
+        try:
+            require_registry_cleanup_resolved()
+        except AssertionError:
+            handoff.record(record["id"], "pending", "RegistryDeviceCleanupUnresolved")
+            return
     directory = receipts.settings()[0]
+    pending = False
     for label, command, arguments, child_path, _ in reversed(_children(name)):
         path = directory / f"csr-child-{label}.json"
         if not path.is_file():
@@ -399,11 +416,32 @@ def delete_namespace(name):
         if ownership_changed:
             raise AssertionError("Refusing CSR child deletion after an ownership change.")
         if child["properties"].get("provisioningState") != "Deleting":
-            invoke(f"{command} delete {arguments} -y")
-        _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
+            if handoff.enabled():
+                if not child_record.get("delete_attempted"):
+                    receipts.write(path.name, {**child_record, "delete_attempted": True})
+                    handoff.cleanup(expected_id, lambda: invoke(f"{command} delete {arguments} -y --no-wait"))
+            else:
+                invoke(f"{command} delete {arguments} -y")
+        if handoff.enabled():
+            pending = find_child(name, label) is not None or pending
+        else:
+            _wait_arm_absent(lambda: find_child(name, label), f"owned CSR {label} absence")
+    if pending:
+        handoff.record(record["id"], "pending", "ChildDeletionPending")
+        return
     _remove_namespace_self_role(name)
+    role_path = directory / NAMESPACE_ROLE_RECEIPT
+    if handoff.enabled() and role_path.is_file() and not json.loads(role_path.read_text(encoding="utf-8"))["deleted"]:
+        handoff.record(record["id"], "pending", "NamespaceRoleCleanupUnresolved")
+        return
     _remove_namespace_group_reader_roles(name, current)
-    _delete_owned_namespace(name, record)
+    if not handoff.enabled():
+        _delete_owned_namespace(name, record)
+        return
+    if receipts.before_delete(name, find_namespace(name)):
+        with runtime.owned_write(name, "DELETE"):
+            invoke(f"iot adr ns delete -n {name} -g {fixtures.ENTITY_RG} -y --no-wait")
+        receipts.after_delete(name, completed=False)
 
 
 def _create_namespace(run_uid, kind, dps, hub):
@@ -530,7 +568,9 @@ def enrollment(resource, enrollment_id, *, certificate=True):
         if ownership:
             ownership.cleanup()
         # Never read/log generated keys: native registration discovers the enrollment's bootstrap key internally.
-        if _optional(f"iot dps enrollment registration show {arguments}", dataplane=True) is not None:
-            invoke(f"iot dps enrollment registration delete {arguments}")
-        if _optional(f"iot dps enrollment show {arguments} --query registrationId", dataplane=True) is not None:
-            invoke(f"iot dps enrollment delete {arguments}")
+        from azext_iot.tests import _cleanup_handoff as handoff
+        if not handoff.enabled() or not ownership or ownership.cleanup_complete:
+            if _optional(f"iot dps enrollment registration show {arguments}", dataplane=True) is not None:
+                invoke(f"iot dps enrollment registration delete {arguments}")
+            if _optional(f"iot dps enrollment show {arguments} --query registrationId", dataplane=True) is not None:
+                invoke(f"iot dps enrollment delete {arguments}")

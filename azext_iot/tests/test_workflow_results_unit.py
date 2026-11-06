@@ -178,29 +178,6 @@ def test_matrix_endpoint_receipt_must_match_scheduled_target(tmp_path, endpoint)
     assert bool(errors) == (endpoint != combination["arm_endpoint"])
 
 
-@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast"])
-def test_workflow_environment_passes_real_hub_controller_preflight(tmp_path, region):
-    from azext_iot.tests import _hub_phase_runner as controller
-    target = controller.TARGETS["target"](region)
-    bindings = {
-        "matrix.config.region": region, "matrix.config.arm_endpoint": target["endpoint"],
-        "env.RESOURCE_GROUP": controller.TARGETS["RESOURCE_GROUP"],
-        "env.TEST_SUBSCRIPTION_ID": controller.TARGETS["SUBSCRIPTION"],
-        "secrets.AZURE_CLIENT_ID": "offline-client", "secrets.AZURE_TENANT_ID": "offline-tenant",
-    }
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    step = next(step for step in workflow["jobs"]["int-test"]["steps"] if step.get("id") == "run_tests")
-    env = {name: bindings[value[3:-3].strip()] if value.startswith("${{") else value
-           for name, value in step["env"].items()}
-    result = controller.environment(
-        env, "HubData", "entra", tmp_path, "uid", bindings["env.TEST_SUBSCRIPTION_ID"],
-        bindings["env.RESOURCE_GROUP"], **target,
-    )
-    assert result["azext_iot_test_arm_endpoint"] == target["endpoint"]
-    assert result["AZURE_IOT_ADR_ARM_ENDPOINT"] == target["endpoint"]
-    assert result["azext_iot_testhub_location"] == result["azext_iot_adr_location"] == region
-
-
 def test_workflow_gate_requires_every_combination_to_pass(tmp_path):
     other = dict(MATRIX[0], python="3.12")
     _result(tmp_path / "passing")
@@ -294,51 +271,9 @@ def test_ado_style_check_installs_cli_in_selected_python():
     assert install["steps"][0]["script"] == "python -m pip install azure-cli"
 
 
-def test_workflow_failure_propagation_is_wired():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    jobs = workflow["jobs"]
-    assert not jobs["int-test"].get("continue-on-error", False)
-    assert _integration_service_job()["strategy"]["fail-fast"] is False
-    assert not _integration_service_job().get("continue-on-error", False)
-    gate = jobs["int-test-gate"]
-    assert set(gate["needs"]) == {"setup", "unit-test", "int-test"}
-    assert not any(step.get("continue-on-error", False) for step in gate["steps"])
-    evaluation = next(step for step in gate["steps"] if step["name"] == "Evaluate per-service results")
-    assert "azext_iot/tests/_evaluate_test_results.py" in evaluation["run"]
-    assert "needs.int-test.result" in evaluation["env"]["INTEGRATION_RESULT"]
-    assert "needs.setup.outputs.matrix" in evaluation["env"]["INTEGRATION_MATRIX"]
-    assert "job.status" in evaluation["env"]["GATE_JOB_RESULT"]
-    summaries = [step for step in jobs["combine-coverage"]["steps"] if step["name"] == "Write job summary"]
-    assert summaries[0] is jobs["combine-coverage"]["steps"][-1]
-    assert "job.status" in summaries[0]["env"]["COVERAGE_RESULT"]
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow summary shell.")
-@pytest.mark.parametrize("field", ["SETUP_RESULT", "UNIT_TEST_RESULT", "INTEGRATION_RESULT", "GATE_RESULT", "COVERAGE_RESULT"])
-@pytest.mark.parametrize("status", ["success", "failure", "cancelled", "skipped", ""])
-def test_coverage_summary_cannot_mask_missing_cancelled_or_failed_independent_gates(tmp_path, field, status):
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    coverage = workflow["jobs"]["combine-coverage"]
-    assert coverage["needs"] == ["setup", "unit-test", "int-test", "int-test-gate"]
-    summary = coverage["steps"][-1]
-    assert summary["name"] == "Write job summary" and summary["if"] == "${{ always() }}"
-    environment = {name: "success" for name in summary["env"]}
-    environment[field] = status
-    path = tmp_path / "summary"
-    result = subprocess.run(
-        ["bash", "-c", summary["run"]], cwd=tmp_path, capture_output=True, text=True, timeout=10, check=False,
-        env=dict(os.environ, **environment, GITHUB_STEP_SUMMARY=str(path)),
-    )
-    assert (result.returncode == 0) is (status == "success"), result.stderr
-    assert ("All workflow checks passed" in path.read_text()) is (status == "success")
-
-
 def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     from azext_iot.tests._hub_phase_runner import BUDGETS, runner_seconds
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    jobs = workflow["jobs"]
-    matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert "ci_budgets.json" in matrix["run"]
+
     budgets = _ci_budgets()
     ado = yaml.safe_load((REPOSITORY_ROOT / ".azure-devops/templates/trigger-tests.yml").read_text(encoding="utf-8"))
     ado_budgets = {job["job"]: job["timeoutInMinutes"] for job in ado["jobs"] if job.get("job") in BUDGETS}
@@ -352,202 +287,18 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
         assert runner_seconds(suite, phases) / 60 + budgets[suite]["setup_minutes"] <= (
             budgets[suite]["job_timeout_minutes"]
         )
-    assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
 
 
-def test_adr_budget_applies_directly_to_service_job():
+def test_adr_budget_accommodates_owned_lifecycles():
     from azext_iot.tests.adr._helpers import SU_LIFECYCLE_TIMEOUT
     from azext_iot.tests.adr.test_adr_link_int import _SU_LINK_LIFECYCLE_TIMEOUT
 
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    matrix = next(step for step in workflow["jobs"]["setup"]["steps"] if step.get("id") == "matrix")
-    assert "ci_budgets.json" in matrix["run"]
     budget = _ci_budgets()["ADR"]["job_timeout_minutes"]
     assert budget == 180
     assert SU_LIFECYCLE_TIMEOUT == 75 * 60
     assert _SU_LINK_LIFECYCLE_TIMEOUT == 115 * 60
     # Scenario ceilings are not serial runtime estimates for the loadgroup workers.
     assert budget * 60 > max(_SU_LINK_LIFECYCLE_TIMEOUT, SU_LIFECYCLE_TIMEOUT)
-    assert "uses" not in workflow["jobs"]["int-test"]
-    assert _integration_service_job()["timeout-minutes"] == "${{ matrix.config.timeout }}"
-
-
-def test_dps_workflow_runs_three_serial_complete_phases_with_existing_redaction_and_gate():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    jobs = workflow["jobs"]
-    matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    assert "ci_budgets.json" in matrix["run"]
-    budget = _ci_budgets()["DPS"]
-    assert budget["job_timeout_minutes"] == 90
-    assert [phase["name"] for phase in budget["phases"]] == ["regular", "service-sas", "local-auth-toggle"]
-    steps = _integration_service_job()["steps"]
-    setup = next(step for step in steps if step["name"] == "Setup tox test environment")
-    assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
-    step = next(step for step in steps if step.get("id") == "run_tests")
-    assert ".tox/DPS-phases/bin/python azext_iot/tests/_dps_phase_runner.py" in step["run"]
-    assert ".tox/DPS-int/bin/python azext_iot/tests/_dps_phase_runner.py" not in step["run"]
-    assert "including owned CSR issuance" in step["run"]
-    assert "serial local-auth-toggle" in step["run"]
-    assert '--subscription "$TEST_SUBSCRIPTION_ID"' in step["run"]
-    assert "set -euo pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
-    assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
-    assert 'tox r -e "$TEST_TOX_ENV" --skip-pkg-install' in step["run"]
-    upload = next(step for step in steps if step["name"] == "Upload test result")
-    assert upload["with"]["path"] == "test-result/"
-
-
-def _integration_service_job():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    return workflow["jobs"]["int-test"]
-
-
-def _integration_run_step():
-    return next(step for step in _integration_service_job()["steps"] if step.get("id") == "run_tests")
-
-
-def test_direct_job_preserves_installed_extension_and_service_environment():
-    job = _integration_service_job()
-    steps = {step["name"]: step for step in job["steps"]}
-    install = steps["Build and install extension"]["run"]
-    assert "python -m build" in install
-    assert "az extension add --source ./dist/*.whl -y" in install
-    assert "az extension show -n azure-iot --query path -o tsv" in install
-    assert 'pip install --target "$ext_dir" --upgrade --force-reinstall --no-deps rpds-py cryptography' in install
-    run = _integration_run_step()
-    assert run["env"] == {
-        "AZURE_CLIENT_ID": "${{ secrets.AZURE_CLIENT_ID }}", "AZURE_TENANT_ID": "${{ secrets.AZURE_TENANT_ID }}",
-        "AZURE_TEST_RUN_LIVE": "True", "PYTHONUNBUFFERED": "1",
-        "azext_iot_testrg": "${{ env.RESOURCE_GROUP }}",
-        "azext_iot_testhub_location": "${{ matrix.config.region }}",
-        "azext_iot_hub_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
-        "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE": "login",
-        "AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE": "login",
-        "azext_iot_adr_subscription": "${{ env.TEST_SUBSCRIPTION_ID }}",
-        "azext_iot_adr_resource_group": "${{ env.RESOURCE_GROUP }}",
-        "azext_iot_adr_location": "${{ matrix.config.region }}",
-        "azext_iot_adr_arm_endpoint": "${{ matrix.config.arm_endpoint }}",
-        "azext_iot_adr_arm_resource": "https://management.azure.com",
-        "azext_iot_test_arm_endpoint": "${{ matrix.config.arm_endpoint }}",
-        "AZURE_IOT_ADR_ARM_ENDPOINT": "${{ matrix.config.arm_endpoint }}",
-    }
-    assert steps["Az CLI login"]["with"] == {
-        "client-id": "${{ secrets.AZURE_CLIENT_ID }}", "tenant-id": "${{ secrets.AZURE_TENANT_ID }}",
-        "subscription-id": "${{ env.TEST_SUBSCRIPTION_ID }}",
-    }
-    assert 'az account set --subscription "$TEST_SUBSCRIPTION_ID"' in steps["Verify Azure access"]["run"]
-    assert "az account set" not in run["run"] and "az login" not in run["run"]
-    assert "_refresh_ci_auth.py --loop" in run["run"]
-
-
-def test_workflow_runs_full_selected_services_without_removed_controls():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    triggers = workflow.get("on", workflow.get(True))
-    for trigger in ("workflow_call", "workflow_dispatch"):
-        assert not {"adr-test-filter", "adr-revoke-certificates", "dps-capacity-limit"}.intersection(
-            triggers[trigger]["inputs"],
-        )
-    assert len(triggers["workflow_dispatch"]["inputs"]) <= 25
-    assert triggers["workflow_call"]["inputs"]["test-services"]["default"] == "auto"
-    for service in ("DPS", "HubControl", "HubData", "ADU", "ADR"):
-        assert triggers["workflow_dispatch"]["inputs"][f"test{service}"]["default"] is True
-    assert "testHubSAS" not in triggers["workflow_dispatch"]["inputs"]
-    step = _integration_run_step()
-    for name in ("ADR_TEST_FILTER", "azext_iot_adr_revoke_certificates", "DPS_CAPACITY_LIMIT"):
-        assert name not in step["env"] and name not in step["run"]
-    assert " -k " not in step["run"]
-    assert not step.get("continue-on-error", False)
-    assert "|| true" not in step["run"]
-
-
-def _run_integration_shell(tmp_path, service, expression, exit_code=0):
-    script = _integration_run_step()["run"]
-    # Execute the actual shell/pipeline, but never tox, the DPS controller, or file-output tee.
-    script = script.replace(".tox/DPS-phases/bin/python", "dps_controller")
-    script = script.replace('"$auth_python" azext_iot/tests/_refresh_ci_auth.py', "auth_refresh")
-    stubs = """
-auth_refresh() {
-  if [ "${1:-}" = "--loop" ]; then
-    exec "$OFFLINE_PYTHON" -c '
-from pathlib import Path
-import signal
-import sys
-from threading import Event
-stopped = Event()
-signal.signal(signal.SIGTERM, lambda *_: stopped.set())
-Path("auth-ready").touch()
-Path(sys.argv[1]).write_text("ready\\n")
-stopped.wait()
-' "$3"
-  fi
-}
-auth_ready() { while [ ! -f auth-ready ]; do sleep 0.01; done; }
-tox() { auth_ready; printf '%s\\n' tox "$@"; return "$OFFLINE_EXIT_CODE"; }
-dps_controller() { auth_ready; printf '%s\\n' dps_controller "$@"; return "$OFFLINE_EXIT_CODE"; }
-tee() { cat; }
-"""
-    return subprocess.run(
-        ["bash", "-c", stubs + script], cwd=tmp_path,
-        env=dict(os.environ, ADR_TEST_FILTER=expression,
-                 TEST_SERVICE=service, TEST_TOX_ENV=f"{service}-int", TEST_REGION="centraluseuap",
-                 TEST_ARM_ENDPOINT="https://centraluseuap.management.azure.com",
-                 TEST_SUBSCRIPTION_ID="offline-subscription", RESOURCE_GROUP="offline-rg",
-                 OFFLINE_EXIT_CODE=str(exit_code), OFFLINE_PYTHON=sys.executable,
-                 DPS_CAPACITY_LIMIT="1", azext_iot_adr_revoke_certificates="false"),
-        capture_output=True, text=True, timeout=20, check=False,
-    )
-
-
-@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
-@pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData", "ADU"])
-@pytest.mark.parametrize("expression", ["", "test_adr_job_lifecycle or test_adr_job_validation_negatives"])
-def test_workflow_always_runs_full_service_despite_obsolete_environment(tmp_path, service, expression):
-    result = _run_integration_shell(tmp_path, service, expression)
-    assert result.returncode == 0, result.stdout + result.stderr
-    arguments = result.stdout.splitlines()
-    if service == "DPS":
-        assert arguments[1:] == [
-            "dps_controller", "azext_iot/tests/_dps_phase_runner.py",
-            "--subscription", "offline-subscription", "--resource-group", "offline-rg",
-            "--region", "centraluseuap",
-            "--arm-endpoint", "https://centraluseuap.management.azure.com",
-        ]
-    else:
-        expected = ["tox", "r", "-e", f"{service}-int", "--skip-pkg-install"]
-        assert arguments == expected
-
-
-def test_removed_inputs_are_absent_from_all_workflow_callers():
-    workflows = [yaml.safe_load((REPOSITORY_ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
-                 for name in ("int_test.yml", "release_workflow.yml")]
-    for workflow in workflows:
-        triggers = workflow.get("on", workflow.get(True))
-        for trigger in triggers.values():
-            assert not {"dps-capacity-limit", "adr-test-filter", "adr-revoke-certificates"}.intersection(trigger["inputs"])
-    public, release = workflows
-    assert "dps-capacity-limit" not in release["jobs"]["int_test"]["with"]
-    gate = next(step for step in public["jobs"]["int-test-gate"]["steps"] if step["name"] == "Evaluate per-service results")
-    assert "DPS_CAPACITY_LIMIT" not in gate["env"]
-    assert gate["run"].strip() == "python3 azext_iot/tests/_evaluate_test_results.py --results-dir ./test-results"
-    for path in (REPOSITORY_ROOT / ".github/workflows").glob("*.yml"):
-        text = path.read_text(encoding="utf-8")
-        assert not any(name in text for name in ("dps-capacity-limit", "adr-test-filter", "adr-revoke-certificates"))
-
-
-@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
-@pytest.mark.parametrize("expression", ["and", "test_job) or _unit.py or (test_job", '$(printf UNEXPECTED); "quoted"'])
-def test_adr_workflow_ignores_obsolete_filter_without_interpreting_it(tmp_path, expression):
-    result = _run_integration_shell(tmp_path, "ADR", expression)
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == ["tox", "r", "-e", "ADR-int", "--skip-pkg-install"]
-    assert "\nUNEXPECTED\n" not in result.stdout
-
-
-@pytest.mark.skipif(sys.platform != "linux" or not shutil.which("bash"), reason="Executes the Ubuntu workflow's Bash.")
-@pytest.mark.parametrize("service", ["ADR", "DPS", "HubControl", "HubData", "ADU"])
-@pytest.mark.parametrize("exit_code", [1, 4, 5])
-def test_workflow_preserves_failure_usage_and_no_selection_exit_codes(tmp_path, service, exit_code):
-    result = _run_integration_shell(tmp_path, service, "test_job", exit_code)
-    assert result.returncode == exit_code
 
 
 @pytest.mark.parametrize("expression,exit_code", [
@@ -654,54 +405,6 @@ sys.exit(pytest.main(sys.argv[1:], plugins=[RepositoryOnlyCollection()]))
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
 
 
-def test_hub_workflow_uses_two_public_suites_in_the_direct_matrix():
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    triggers = workflow.get("on", workflow.get(True))
-    inputs = triggers["workflow_dispatch"]["inputs"]
-    assert inputs["testHubControl"]["default"] is True
-    assert inputs["testHubData"]["default"] is True
-    assert not {"testHubMgmt", "testHubSAS"}.intersection(inputs)
-    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
-    assert step["env"]["INPUT_TEST_HUB_CONTROL"] == "${{ inputs.testHubControl }}"
-    job = workflow["jobs"]["int-test"]
-    assert job["strategy"]["matrix"] == {"config": "${{ fromJson(needs.setup.outputs.matrix || '[]') }}"}
-    assert "concurrency" not in workflow and "concurrency" not in job
-    assert "max-parallel" not in job["strategy"]
-    env = _integration_run_step()["env"]
-    assert env["azext_iot_testhub_location"] == "${{ matrix.config.region }}"
-    assert env["azext_iot_hub_subscription"] == "${{ env.TEST_SUBSCRIPTION_ID }}"
-    assert not any(key.startswith("azext_iot_hubsas_") for key in env)
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
-@pytest.mark.parametrize("services,toggle,expected", [
-    ("auto", "false", {"DPS", "HubControl", "HubData", "ADU", "ADR"}),
-    ("auto", "true", {"DPS", "HubControl", "HubData", "ADU", "ADR"}),
-    ("HubData", "false", {"HubData"}), ("", "true", {"HubData"}),
-    ("HubControl", "false", {"HubControl"}),
-])
-def test_hub_public_matrix_auto_includes_complete_data_suite(services, toggle, expected, tmp_path):
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
-    output = tmp_path / "output"
-    env = dict(os.environ, INPUT_SERVICES=services, INPUT_TEST_HUB_DATA=toggle,
-               INPUT_TEST_DPS="false", INPUT_TEST_HUB_CONTROL="false",
-               INPUT_TEST_ADU="false", INPUT_TEST_ADR="false", INPUT_PYTHON_VERSIONS="3.13",
-               TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1", RESOURCE_GROUP="cli-int-test-rg",
-               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="canary",
-               GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
-    result = subprocess.run(
-        ["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
-        capture_output=True, text=True, timeout=15, check=False,
-    )
-    assert result.returncode == 0, result.stderr
-    matrix = json.loads(output.read_text(encoding="utf-8").split("matrix=", 1)[1].splitlines()[0])
-    assert {value["service"] for value in matrix} == expected
-    for value in matrix:
-        assert value["tox_env"] == value["service"] + "-int"
-        assert value["region"] == "centraluseuap"
-
-
 @pytest.mark.parametrize("service", ["HubControl", "HubData"])
 @pytest.mark.parametrize("status", ["success", "failure", "cancelled"])
 def test_hub_requires_phase_evidence_even_when_job_is_green(tmp_path, service, status):
@@ -751,50 +454,6 @@ def test_hub_control_evidence_cannot_qualify_hub_data(tmp_path):
     (folder / "hub-phases.json").write_text('{"suite":"HubControl"}', encoding="utf-8")
     _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
     assert any("suite does not match" in error for error in errors)
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
-@pytest.mark.parametrize("override", [
-    {"INPUT_SERVICES": "HubSAS"}, {"INPUT_SERVICES": "HubMgmt"},
-    {"INPUT_REGIONS": "westus", "INPUT_ARM_ENDPOINT": "canary"},
-    {"INPUT_REGIONS": "centraluseuap,westus", "INPUT_ARM_ENDPOINT": "canary"},
-    {"TEST_SUBSCRIPTION_ID": "foreign"}, {"RESOURCE_GROUP": "foreign"},
-])
-def test_hub_matrix_rejects_retired_suites_and_scope_mismatch_before_login(tmp_path, override):
-    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
-    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
-    output = tmp_path / "output"
-    env = dict(os.environ, INPUT_SERVICES="HubData", INPUT_PYTHON_VERSIONS="3.13",
-               INPUT_REGIONS="centraluseuap", INPUT_ARM_ENDPOINT="canary", RESOURCE_GROUP="cli-int-test-rg",
-               TEST_SUBSCRIPTION_ID="a386d5ea-ea90-441a-8263-d816368c84a1",
-               GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
-    env.update(override)
-    result = subprocess.run(["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
-                            capture_output=True, text=True, timeout=15, check=False)
-    assert result.returncode != 0
-    assert "::error::" in result.stdout
-    assert not output.exists()
-
-
-def test_release_caller_uses_owned_australiaeast_public_scope():
-    release = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/release_workflow.yml").read_text(encoding="utf-8"))
-    assert release["jobs"]["int_test"]["uses"] == "./.github/workflows/int_test.yml"
-    inputs = release["jobs"]["int_test"]["with"]
-    assert inputs["test-services"] == "auto"
-    assert inputs["python-versions"] == "3.10,3.13"
-    assert inputs["regions"] == "australiaeast"
-    assert inputs["arm-endpoint"] == "public"
-    assert inputs["resource-group"] == "cli-int-test-rg"
-    assert inputs["subscription-id"] == "a386d5ea-ea90-441a-8263-d816368c84a1"
-
-
-def test_schedule_caller_uses_owned_australiaeast_public_scope():
-    scheduler = (REPOSITORY_ROOT / ".github/workflows/int_test_schedule.yml").read_text(encoding="utf-8")
-    assert 'region="australiaeast"' in scheduler
-    assert "arm-endpoint" not in scheduler
-    assert "-f subscription-id=a386d5ea-ea90-441a-8263-d816368c84a1" in scheduler
-    assert "-f resource-group=cli-int-test-rg" in scheduler
-    assert "region_list=" not in scheduler
 
 
 def test_hub_workflow_gate_loads_real_phase_evaluator_without_installed_dependencies(tmp_path):

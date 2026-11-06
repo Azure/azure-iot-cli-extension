@@ -9,7 +9,8 @@ import time
 import os
 from typing import Tuple
 
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import AzureResponseError, CLIInternalError, ResourceNotFoundError
+from knack.util import CLIError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
@@ -512,8 +513,13 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     == template_id
                 ):
                     return (template_id, template_name)
-            except Exception:
-                pass
+            except (AzureResponseError, ResourceNotFoundError) as error:
+                details = error.args[0] if error.args else None
+                if not isinstance(error, ResourceNotFoundError) and not (
+                    isinstance(details, dict) and details.get("code") in ("NotFound", "ResourceNotFound")
+                ):
+                    raise
+                logger.debug("The edge device template does not exist; creating it.")
 
         command = "iot central device-template create --app-id {} --device-template-id {} -k '{}'".format(
             self.app_id, template_id, template_path
@@ -551,8 +557,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     checks=[self.check("result", "success")],
                 )
                 return
-            except Exception as e:
+            except CLIError as e:
                 error = e
+                logger.warning("Template deletion failed; cleaning attached devices before retrying (%s).", type(e).__name__)
                 # delete associated devices if any.
                 devices = self.cmd(
                     command="iot central device list --app-id {}".format(self.app_id),
@@ -573,8 +580,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                                 children = self.cmd(
                                     list_children_command, api_version=api_version
                                 ).get_output_in_json()
-                            except Exception:
-                                pass
+                            except CLIError as cleanup_error:
+                                error = cleanup_error
+                                logger.warning("Cannot list child devices during template cleanup (%s).",
+                                               type(cleanup_error).__name__)
 
                             for child in children:
                                 try:
@@ -584,8 +593,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                                         ),
                                         api_version=api_version,
                                     )
-                                except Exception:
-                                    pass
+                                except CLIError as cleanup_error:
+                                    error = cleanup_error
+                                    logger.warning("Cannot delete a child device during template cleanup (%s).",
+                                                   type(cleanup_error).__name__)
 
                             time.sleep(10)
                             try:
@@ -595,8 +606,10 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                                     ),
                                     api_version=api_version,
                                 )
-                            except Exception:
-                                pass
+                            except CLIError as cleanup_error:
+                                error = cleanup_error
+                                logger.warning("Cannot delete a device during template cleanup (%s).",
+                                               type(cleanup_error).__name__)
                 time.sleep(10)
 
         raise CLIInternalError(

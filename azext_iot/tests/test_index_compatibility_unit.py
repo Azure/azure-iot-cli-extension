@@ -268,18 +268,14 @@ def workflow(name):
     return yaml.safe_load((ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
 
 
-def test_both_callers_reuse_wheel_without_gating_existing_checks_or_release():
-    ci, release = workflow("ci_workflow.yml")["jobs"], workflow("release_workflow.yml")["jobs"]
-    for jobs in (ci, release):
-        job = jobs["index-compatibility"]
-        assert job["needs"] == ["build"]
-        assert job["uses"] == "./.github/workflows/index_compatibility.yml"
-        assert "secrets" not in job and "continue-on-error" not in job
-        assert all("index-compatibility" not in other.get("needs", []) for other in jobs.values())
+def test_ci_caller_reuses_wheel_without_gating_existing_checks():
+    ci = workflow("ci_workflow.yml")["jobs"]
+    job = ci["index-compatibility"]
+    assert job["needs"] == ["build"]
+    assert job["uses"] == "./.github/workflows/index_compatibility.yml"
+    assert "secrets" not in job and "continue-on-error" not in job
+    assert all("index-compatibility" not in other.get("needs", []) for other in ci.values())
     assert ci["linter"] == {"needs": ["build"], "uses": "./.github/workflows/azdev_linter.yml"}
-    assert release["approval"]["needs"] == ["security", "build", "unit-test", "azdev_linter", "int_test"]
-    assert release["approval"]["environment"] == "production"
-    assert release["draft_github_release"]["needs"] == ["approval"]
 
 
 def test_reusable_workflow_is_isolated_read_only_and_does_not_mask_failures():

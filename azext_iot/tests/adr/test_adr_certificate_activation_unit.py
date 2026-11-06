@@ -39,8 +39,10 @@ def states(ca_pki):
     before["properties"]["uuid"] = "owned-uuid"
     before["properties"]["issuer"]["status"] = "PendingActivation"
     after = deepcopy(before)
+    # Exercise the service's SHA-1 thumbprint, not a SHA-1 certificate signature.
+    thumbprint = x509.load_pem_x509_certificate(ca_pki["leaf"].encode()).fingerprint(hashes.SHA1()).hex()  # nosec B303
     after["properties"]["issuer"].update(
-        status="Active", thumbprint=x509.load_pem_x509_certificate(ca_pki["leaf"].encode()).fingerprint(hashes.SHA1()).hex(),
+        status="Active", thumbprint=thumbprint,
     )
     return SimpleNamespace(
         before=before, after=after, chain=ca_pki["chain"],
@@ -146,8 +148,10 @@ def test_live_pending_activation_baseline_selects_resource_evidence(ca_pki):
     evidence = activation.ExternalActivationEvidence(before, ca_pki["chain"], resource_id=RID)
     assert not evidence.completed(before)
     after = deepcopy(before)
+    # Exercise the service's SHA-1 thumbprint, not a SHA-1 certificate signature.
+    thumbprint = x509.load_pem_x509_certificate(ca_pki["leaf"].encode()).fingerprint(hashes.SHA1()).hex()  # nosec B303
     after["properties"]["issuer"].update(
-        status="Active", thumbprint=x509.load_pem_x509_certificate(ca_pki["leaf"].encode()).fingerprint(hashes.SHA1()).hex(),
+        status="Active", thumbprint=thumbprint,
     )
     assert evidence.completed(after)
 

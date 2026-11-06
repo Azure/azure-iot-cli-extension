@@ -97,6 +97,20 @@ def test_no_adu_hubs_without_instance_request(adu_hubs, marker):
     assert not adu_hubs.finalizers
 
 
+@pytest.mark.parametrize("failed", [False, True])
+def test_adu_hub_cleanup_handoff_does_not_wait_for_poller(adu_hubs, tmp_path, monkeypatch, failed):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    monkeypatch.setenv(handoff.ENV, str(tmp_path / "cleanup-receipts"))
+    operation = adu_hubs.factory.return_value.__enter__.return_value.iot_hub_resource.begin_delete
+    if failed:
+        operation.side_effect = _http_error(500)
+    fixtures._iothub_removal({HUB_ID: None})
+    assert operation.call_args.kwargs["polling"] is False
+    operation.return_value.result.assert_not_called()
+    assert handoff.summary(tmp_path)[0]["status"] == ("failed" if failed else "accepted")
+
+
 @pytest.mark.parametrize("caller", [CALLER, "00000000-0000-0000-0000-000000000003"])
 def test_adu_dependency_hubs_enable_keys_and_grant_only_current_caller(adu_hubs, caller):
     adu_hubs.account["user"]["name"] = caller
