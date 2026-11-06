@@ -28,7 +28,7 @@ from msrestazure.azure_exceptions import CloudError
 from azext_iot.tests._dps_phase_runner import Redactor
 from azext_iot.tests import _focused_live as focused
 from azext_iot.tests import _cleanup_handoff as handoff
-from azext_iot.tests._integration_target import public_scope, target
+from azext_iot.tests._integration_target import arm_hosts, cloud, public_scope, target
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
 
@@ -289,8 +289,13 @@ class HubSasPhase:
                 kwargs["timeout"] = min(30, remaining)
             parsed = urlsplit(request.url)
             path = parsed.path.rstrip("/").casefold()
-            arm = parsed.hostname in ("management.azure.com", "centraluseuap.management.azure.com")
-            container = parsed.hostname == owner.storage + ".blob.core.windows.net" and parsed.path == "/devices"
+            arm = parsed.hostname in arm_hosts(owner.target_scope["endpoint"])
+            container = (
+                parsed.hostname == owner.storage + ".blob." + cloud(owner.target_scope["endpoint"])["storage"]
+                and parsed.path == "/devices"
+            )
+            if parsed.path.casefold().startswith("/subscriptions/") and not arm:
+                raise HubSasError("ARM request targets a different cloud.")
             if arm and request.method == "POST":
                 key_read = path.endswith("/listkeys") and any(
                     path.startswith(owner.ids[kind].casefold() + "/") for kind in ("hub", "storage")

@@ -109,7 +109,9 @@ def test_external_mode_is_default_off_and_normal_build_is_unchanged():
         {"publish": "dist", "displayName": "Publish wheel", "artifact": "integration-wheel-$(System.JobAttempt)"},
     ]
     assert not any(item.get("name") == "ReleasePipelineId" for item in entry["variables"])
-    assert entry["variables"][0] == {"group": "aziotcli_test_primary"}
+    assert entry["variables"][0] == {"group": "${{ parameters.variableGroup }}"}
+    group = next(item for item in entry["parameters"] if item["name"] == "variableGroup")
+    assert group["default"] == "aziotcli_test_primary"
     external = steps[1]["${{ if ne(parameters.releaseBuildId, 0) }}"]
     assert len(external) == 5
     setup, lookup, download, verify, publish = external

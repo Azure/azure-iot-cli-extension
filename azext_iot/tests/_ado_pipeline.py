@@ -34,13 +34,18 @@ GENERIC_PHASE_OVERRIDES = (
 )
 
 
-def plan(services, versions, regions, endpoint, diagnostic=False):
+def plan(services, versions, regions, endpoint, diagnostic=False, release_build_id="0"):
     if not services or len(set(services)) != len(services) or not set(services) <= set(RETRY["SERVICES"]):
         raise ValueError("Select distinct supported services.")
     if not versions or len(set(versions)) != len(versions) or not set(versions) <= {"3.10", "3.11", "3.12", "3.13"}:
         raise ValueError("Select distinct supported Python versions.")
     if not regions or len(set(regions)) != len(regions):
         raise ValueError("Select distinct regions.")
+    sovereign = TARGET["cloud"](endpoint)["name"] != "AzureCloud"
+    if sovereign and not set(services) <= {"DPS", "HubControl", "HubData"}:
+        raise ValueError("Sovereign integration cohorts support DPS, HubControl and HubData only.")
+    if sovereign and str(release_build_id) != "0":
+        raise ValueError("Sovereign cohorts are standalone validation, not public release qualification.")
     jobs = []
     for service in (["RetrySelfTest"] if diagnostic else services):
         if not diagnostic and not (ROOT / BUDGETS[service]["test_dir"]).is_dir():
@@ -49,6 +54,7 @@ def plan(services, versions, regions, endpoint, diagnostic=False):
             for region in regions:
                 target = TARGET["target"](region, endpoint)
                 jobs.append({"service": service, "python": version, **target,
+                             **(TARGET["scope"](endpoint) if sovereign else {}),
                              "minutes": 10 if diagnostic else BUDGETS[service]["job_timeout_minutes"]})
     if len(jobs) > 40:
         raise ValueError("Select at most 40 combinations per run.")
@@ -120,7 +126,7 @@ def context(service, python, region, endpoint, wheel, diagnostic):
         "wheel": hashlib.sha256(wheels[0].read_bytes()).hexdigest(),
         "dependencies": RETRY["digest"](dependencies),
         "service": service, "python": python, "region": region, "endpoint": endpoint,
-        "subscription": TARGET["SUBSCRIPTION"], "resource_group": TARGET["RESOURCE_GROUP"],
+        **TARGET["scope"](endpoint),
         "diagnostic": str(diagnostic).lower(),
     }
 
@@ -167,12 +173,16 @@ def gate(directory):
                                                      for key in ("service", "python", "region"))]
         history.sort(key=lambda value: value["sequence"])
         ctx = history[0]["context"]
+        scope = TARGET["scope"](config["endpoint"])
         if (ctx["build"] != os.environ["BUILD_BUILDID"] or ctx["commit"] != os.environ["BUILD_SOURCEVERSION"]
+                or ctx["definition"] != os.environ.get("SYSTEM_DEFINITIONID", "147")
                 or ctx["endpoint"] != config["endpoint"] or ctx["wheel"] != wheel
-                or ctx["subscription"] != TARGET["SUBSCRIPTION"] or ctx["resource_group"] != TARGET["RESOURCE_GROUP"]):
+                or any(ctx[key] != value for key, value in scope.items())
+                or TARGET["cloud"](config["endpoint"])["name"] != "AzureCloud"
+                and any(config.get(key) != value for key, value in scope.items())):
             raise ValueError("Evidence belongs to a different run/commit/target.")
         original, _, _ = RETRY["evaluate"](history, ctx)
-        owned = owned_nodes(config["service"])
+        owned = owned_nodes(config["service"], config["endpoint"])
         if owned and {phase: list(nodes) for phase, nodes in original.items()} != owned:
             raise ValueError("Original phase selection does not cover the authoritative service manifest.")
         if RETRY["pending"](history, ctx):
@@ -184,8 +194,12 @@ def gate(directory):
                     for attempt in history):
                 raise ValueError("An incomplete job still needs a full-service recovery.")
     diagnostic = any(value["context"]["diagnostic"] == "true" for value in records)
-    print("Diagnostic retry proof passed; NOT release qualification." if diagnostic
-          else "Every expected service combination passed; manual retry history is retained.")
+    if diagnostic:
+        print("Diagnostic retry proof passed; NOT release qualification.")
+    elif any(TARGET["cloud"](job["endpoint"])["name"] != "AzureCloud" for job in expected):
+        print("Every selected sovereign cohort passed; this is NOT full public-cloud suite qualification.")
+    else:
+        print("Every expected service combination passed; manual retry history is retained.")
 
 
 def coverage(directory):
@@ -197,14 +211,48 @@ def coverage(directory):
     subprocess.run([sys.executable, "-m", "coverage", "html"], check=True)
 
 
-def owned_nodes(service):
+def owned_nodes(service, endpoint=TARGET["PUBLIC_ARM"]):
+    sovereign = TARGET["cloud"](endpoint)["name"] != "AzureCloud"
     if service == "DPS":
         manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
-        return {phase: sorted("azext_iot/tests/dps/" + node for node in manifest["expected_nodeids"](phase))
-                for phase in manifest["PHASE_NAMES"]}
+        result = {}
+        for phase in manifest["PHASE_NAMES"]:
+            nodes = manifest["expected_nodeids"](phase)
+            if sovereign:
+                # Legacy registration cases embed .net hosts; CSR cases require public-only ADR APIs.
+                nodes = {
+                    node for node in nodes if node.startswith((
+                        "enrollment/", "enrollment_group/",
+                        "device_registration/test_iot_device_registration_fresh_keys_int.py::",
+                        "core/test_dps_command_happy_paths_int.py::",
+                        "core/test_dps_disable_local_auth_int.py::",
+                    ))
+                }
+            if nodes:
+                result[phase] = sorted("azext_iot/tests/dps/" + node for node in nodes)
+        return result
     if service.startswith("Hub"):
         manifest = runpy.run_path(str(ROOT / "azext_iot/tests/_hub_suite_manifest.py"))
-        return {phase: list(manifest["nodes"](service, phase)) for phase in manifest["phases"](service)}
+        selected = None
+        if sovereign:
+            modules = (
+                "core/test_iothub_certificate_int.py::",
+                "core/test_iothub_command_happy_paths_int.py::",
+                "devices/test_iothub_devices_int.py::",
+                "devices/test_iothub_device_twin_int.py::",
+                "modules/test_iothub_modules_int.py::",
+                "modules/test_iothub_module_twin_int.py::",
+                "messaging/test_iothub_c2d_messages_int.py::",
+            )
+            selected = {
+                case.node for case in manifest["CASES"]
+                if case.capability == "base" and set(case.dependencies) <= {"hub", "local-certificates"}
+                and case.node.startswith(tuple("azext_iot/tests/iothub/" + module for module in modules))
+            }
+        return {
+            phase: nodes for phase in manifest["phases"](service)
+            if (nodes := [node for node in manifest["nodes"](service, phase) if selected is None or node in selected])
+        }
     return {}
 
 
@@ -406,7 +454,8 @@ def run_attempt(args, output):
             all(value.get("identity", {}).get(key) == ctx[key] for key in ("service", "python", "region"))
             and value["identity"]["nativeAttempt"] >= last_native for value in rejections):
         plan["mode"] = "full"
-    remaining = ((owned_nodes(args.service) or {"tests": []}) if plan["mode"] == "full" else plan["phases"])
+    remaining = ((owned_nodes(args.service, args.endpoint) or {"tests": []})
+                 if plan["mode"] == "full" else plan["phases"])
     record = {
         "schema": 3, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
         "mode": plan["mode"], "missingAttempts": missing,
@@ -444,7 +493,7 @@ def run_attempt(args, output):
         def execute(item):
             name, nodes = item
             selection = output / f"{name}.json"
-            expected = list(prior_expected.get(name, owned_nodes(args.service).get(name, [])))
+            expected = list(prior_expected.get(name, owned_nodes(args.service, args.endpoint).get(name, [])))
             RETRY["write"](selection, {"context": ctx, "phase": name, "nodes": nodes, "expected": expected,
                                        "sequence": record["sequence"], "parent": record["parent"]})
             minutes = 10 if args.diagnostic else BUDGETS[args.service]["job_timeout_minutes"]
@@ -523,6 +572,7 @@ def main():
     planner.add_argument("--regions", nargs="+", required=True)
     planner.add_argument("--endpoint", required=True)
     planner.add_argument("--diagnostic", action="store_true")
+    planner.add_argument("--release-build-id", default="0")
     namer = commands.add_parser("title")
     namer.add_argument("--plan", type=Path, required=True)
     namer.add_argument("--kind", choices=["health", "integration"], required=True)
@@ -557,7 +607,8 @@ def main():
             return 1
         return 0
     if args.command == "plan":
-        print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic), indent=2))
+        print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic,
+                              args.release_build_id), indent=2))
         return 0
     if args.command == "phase":
         try:

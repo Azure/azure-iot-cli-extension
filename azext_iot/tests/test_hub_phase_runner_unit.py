@@ -798,7 +798,8 @@ def test_owned_certificate_actions_are_recorded_and_unknown_post_is_blocked(tmp_
         observer.restore()
 
 
-def test_cleanup_requires_exact_descendant_absence(tmp_path):
+@pytest.mark.parametrize("eventually_absent", [False, True])
+def test_cleanup_requires_exact_descendant_absence(tmp_path, monkeypatch, eventually_absent):
     resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-descendant").casefold()
     child_id = resource_id + "/providers/microsoft.authorization/roleassignments/owned-role"
     evidence = {"schemaVersion": 1, "installed": True, "runId": "uid", "phase": "entra", "violations": [],
@@ -806,10 +807,19 @@ def test_cleanup_requires_exact_descendant_absence(tmp_path):
     evidence["resources"][resource_id]["mutations"].append(
         {"method": "PUT", "id": child_id, "apiVersion": "role-version", "status": 201})
     reader = Reader()
-    reader.request = Mock(side_effect=lambda method, target, api: (200, {}) if target == child_id else (404, None))
-    result = runner.cleanup_regular(reader, evidence, "uid", "entra", time.monotonic() + 30, tmp_path / "owner.json")
-    assert not result["complete"] and result["absentIds"] == [resource_id]
-    assert result["descendantIds"] == [child_id] and not result["absentDescendantIds"]
+    clock = [0]
+    monkeypatch.setattr(runner.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    reader.request = Mock(side_effect=lambda method, target, api: (
+        (200, {}) if target == child_id and (not eventually_absent or clock[0] == 0) else (404, None)
+    ))
+    result = runner.cleanup_regular(reader, evidence, "uid", "entra", 11, tmp_path / "owner.json")
+    assert result["complete"] is eventually_absent and result["absentIds"] == [resource_id]
+    assert result["descendantIds"] == [child_id]
+    assert result["absentDescendantIds"] == ([child_id] if eventually_absent else [])
+    assert bool(result["errors"]) is not eventually_absent
+    assert clock[0] == (5 if eventually_absent else 11)
+    assert all(call.args[0] == "GET" for call in reader.request.call_args_list)
 
 
 def test_budgets_leave_external_setup_below_github_cap():

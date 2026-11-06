@@ -418,9 +418,14 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
     if handoff:
         return result
     for resource_id in sorted(children):
-        status, _ = arm.request("GET", resource_id, children[resource_id])
-        if status == 404:
-            result["absentDescendantIds"].append(resource_id)
+        while time.monotonic() < deadline:
+            status, _ = arm.request("GET", resource_id, children[resource_id])
+            if status == 404:
+                result["absentDescendantIds"].append(resource_id)
+                break
+            time.sleep(min(5, max(0, deadline - time.monotonic())))
+        else:
+            result["errors"].append("Owned descendant absence not observed before cleanup deadline")
     result["complete"] = (not result["errors"] and result["absentIds"] == ids
                           and result["absentDescendantIds"] == result["descendantIds"])
     return result
