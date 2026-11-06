@@ -107,6 +107,36 @@ to rerun it on a branch without starting a release or accessing Azure resources.
 
 ## Unit and Integration Testing
 
+### Sovereign ADO integrations
+
+The integration pipeline accepts `armEndpoint: fairfax` with `regions: usgovvirginia`,
+or `armEndpoint: mooncake` with `regions: chinaeast2`. Select `DPS`, `HubControl`
+and/or `HubData` explicitly, supply the sovereign `subscription` and dedicated
+`resourceGroup`, and select a cloud-specific `variableGroup`. Its
+`AzureServiceConnection` must reference an ARM connection configured for that cloud,
+with subscription discovery and permission to create/delete fixtures and assign
+their resource-scoped roles. Do not put interactive user passwords in pipeline variables.
+
+These are standalone **selected sovereign cohorts**, not the full public-cloud
+suite or release qualification. Existing IT cases and assertions are unchanged.
+The authoritative selections in `_ado_pipeline.owned_nodes` cover Hub management,
+identities/twins/C2D, DPS enrollment lifecycle, fresh-key registration and local-auth
+policy. Legacy registration cases with literal public hostnames, ADR-backed CSR,
+and the wider Hub routing/storage/preview cohorts are not included. ADR and ADU
+are rejected at planning time. Every selected case still needs passing setup,
+call and teardown; skipped or missing cases do not qualify.
+
+Plans and receipts bind the cloud endpoint, region, subscription and group.
+Retries must originate from the current ADO pipeline definition and build, retain
+the same candidate and dependencies, and preserve the exact original cohort.
+Public/canary defaults and shared-template defaults are unchanged.
+
+For local controller reproduction, use a separate `AZURE_CONFIG_DIR` per cloud
+and set `azext_iot_test_subscription` and `azext_iot_testrg` to the approved scope.
+Pass the sovereign `--region` and `--arm-endpoint`. Existing `--debug-phase` and
+`--debug-node` selections remain non-qualifying diagnostic runs. Tox forwards
+`REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE`; never disable certificate verification.
+
 Tests are organized into folders by resource in `azext_iot\tests\`:
 - Central
 - Digital Twins

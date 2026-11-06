@@ -8,6 +8,15 @@ parameters:
     type: string
   - name: regions
     type: object
+  - name: subscription
+    type: string
+    default: a386d5ea-ea90-441a-8263-d816368c84a1
+  - name: resourceGroup
+    type: string
+    default: cli-int-test-rg
+  - name: armResource
+    type: string
+    default: https://management.azure.com
 
 stages:
   - stage: ${{ parameters.service }}
@@ -90,22 +99,23 @@ stages:
               PYTHONPATH: $(Build.SourcesDirectory)
               AZEXT_IOT_CI_AUTH: ado
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-              TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
+              TEST_SUBSCRIPTION_ID: ${{ parameters.subscription }}
+              azext_iot_test_subscription: ${{ parameters.subscription }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
               AZURE_TEST_RUN_LIVE: 'True'
               PYTHONUNBUFFERED: '1'
-              azext_iot_testrg: cli-int-test-rg
+              azext_iot_testrg: ${{ parameters.resourceGroup }}
               azext_iot_testhub_location: $(region)
               azext_iot_test_arm_endpoint: $(endpoint)
               AZURE_IOT_ADR_ARM_ENDPOINT: $(endpoint)
               AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
               AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
-              azext_iot_hub_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
-              azext_iot_adr_subscription: a386d5ea-ea90-441a-8263-d816368c84a1
-              azext_iot_adr_resource_group: cli-int-test-rg
+              azext_iot_hub_subscription: ${{ parameters.subscription }}
+              azext_iot_adr_subscription: ${{ parameters.subscription }}
+              azext_iot_adr_resource_group: ${{ parameters.resourceGroup }}
               azext_iot_adr_location: $(region)
               azext_iot_adr_arm_endpoint: $(endpoint)
-              azext_iot_adr_arm_resource: https://management.azure.com
+              azext_iot_adr_arm_resource: ${{ parameters.armResource }}
           - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
             condition: succeededOrFailed()
             displayName: Record results

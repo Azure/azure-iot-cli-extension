@@ -29,14 +29,30 @@ parameters:
     displayName: ARM endpoint
     type: string
     default: public
-    values: [public, canary]
+    values: [public, canary, fairfax, mooncake]
+  - name: variableGroup
+    displayName: Cloud-specific variable group
+    type: string
+    default: aziotcli_test_primary
+  - name: subscription
+    displayName: Test subscription
+    type: string
+    default: a386d5ea-ea90-441a-8263-d816368c84a1
+  - name: resourceGroup
+    displayName: Dedicated test resource group
+    type: string
+    default: cli-int-test-rg
   - name: releaseBuildId
     displayName: Release build ID
     type: number
     default: 0
 
 variables:
-  - group: aziotcli_test_primary
+  - group: ${{ parameters.variableGroup }}
+  - name: testSubscription
+    value: ${{ parameters.subscription }}
+  - name: testResourceGroup
+    value: ${{ parameters.resourceGroup }}
   - name: servicesCsv
     ${{ if containsValue(parameters.services, 'DPS/Hub/ADR/ADU') }}:
       value: DPS,HubControl,HubData,ADU,ADR
@@ -45,8 +61,19 @@ variables:
   - name: endpoint
     ${{ if eq(parameters.armEndpoint, 'public') }}:
       value: https://management.azure.com
-    ${{ else }}:
+    ${{ elseif eq(parameters.armEndpoint, 'canary') }}:
       value: https://centraluseuap.management.azure.com
+    ${{ elseif eq(parameters.armEndpoint, 'fairfax') }}:
+      value: https://management.usgovcloudapi.net
+    ${{ else }}:
+      value: https://management.chinacloudapi.cn
+  - name: armResource
+    ${{ if eq(parameters.armEndpoint, 'fairfax') }}:
+      value: https://management.core.usgovcloudapi.net
+    ${{ elseif eq(parameters.armEndpoint, 'mooncake') }}:
+      value: https://management.core.chinacloudapi.cn
+    ${{ else }}:
+      value: https://management.azure.com
 
 pool:
   vmImage: ubuntu-24.04
@@ -65,7 +92,7 @@ stages:
               set -euo pipefail
               python azext_iot/tests/_ado_pipeline.py plan \
                 --services $SERVICES --versions $VERSIONS --regions $REGIONS \
-                --endpoint "$ENDPOINT" > plan.json
+                --endpoint "$ENDPOINT" --release-build-id "$RELEASE_BUILD_ID" > plan.json
               cat plan.json
             displayName: Check matrix
             env:
@@ -73,6 +100,9 @@ stages:
               VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
               REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
               ENDPOINT: $(endpoint)
+              RELEASE_BUILD_ID: ${{ parameters.releaseBuildId }}
+              azext_iot_test_subscription: $(testSubscription)
+              azext_iot_testrg: $(testResourceGroup)
           - publish: plan.json
             displayName: Publish plan
             artifact: integration-plan-$(System.JobAttempt)
@@ -239,6 +269,9 @@ stages:
                   service: ${{ service }}
                   pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
                   regions: ${{ split(parameters.regions, ',') }}
+                  subscription: ${{ parameters.subscription }}
+                  resourceGroup: ${{ parameters.resourceGroup }}
+                  armResource: ${{ variables.armResource }}
       - stage: Qualify
         displayName: Results
         dependsOn:
@@ -270,6 +303,8 @@ stages:
                 displayName: Check results
                 env:
                   HISTORY: $(Pipeline.Workspace)/qualification
+                  azext_iot_test_subscription: $(testSubscription)
+                  azext_iot_testrg: $(testResourceGroup)
               - task: PublishCodeCoverageResults@2
                 displayName: Publish coverage
                 inputs:

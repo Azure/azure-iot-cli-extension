@@ -142,7 +142,9 @@ class TestFactoryCredentialScopes:
 
 
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
-@pytest.mark.parametrize("factory_name,client_path,_endpoint_key", MANAGEMENT_FACTORIES)
+@pytest.mark.parametrize("factory_name,client_path,_endpoint_key", [
+    entry for entry in MANAGEMENT_FACTORIES if entry[0] in ("adr_service_factory", "adr_update_instance_service_factory")
+])
 @pytest.mark.parametrize("subscription_id", [None, "linked-sub"])
 def test_canary_rejects_sovereign_cloud_before_credentials(
     mocker, cli_profile, mocked_response, cloud_config, factory_name, client_path, _endpoint_key, subscription_id
@@ -164,6 +166,87 @@ def test_canary_rejects_sovereign_cloud_before_credentials(
     cli_profile.return_value.get_login_credentials.assert_not_called()
     client_type.assert_not_called()
     assert not mocked_response.calls
+
+
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
+@pytest.mark.parametrize("factory_name,client_path", [
+    ("iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient"),
+    ("iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient"),
+])
+def test_sovereign_management_factory(mocker, cli_profile, cloud_config, factory_name, client_path):
+    from azext_iot import _factory
+
+    client = mocker.patch(client_path)
+    cli_ctx = _build_cli_ctx(mocker, cloud_config)
+    getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+    kwargs = client.call_args.kwargs
+    assert kwargs["base_url"] == cloud_config["resource_manager"]
+    assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
+    assert kwargs["subscription_id"] == "linked-sub"
+    assert kwargs["api_version"] == (
+        _factory._ADR_IOT_HUB_API_VERSION if factory_name == "iot_hub_service_factory" else _factory._ADR_DPS_API_VERSION
+    )
+    cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="linked-sub")
+
+
+@pytest.mark.parametrize("override", [PUBLIC_ARM, CANARY_ARM, "https://management.azure.com.invalid"])
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
+def test_sovereign_factory_rejects_foreign_override(mocker, monkeypatch, cli_profile, cloud_config, override):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", override)
+    with pytest.raises(CLIError, match="must match the active sovereign"):
+        _factory.iot_hub_service_factory(_build_cli_ctx(mocker, cloud_config))
+    cli_profile.assert_not_called()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("active_directory", "https://login.microsoftonline.com"),
+    ("active_directory_resource_id", "https://management.azure.com"),
+])
+def test_sovereign_factory_rejects_mixed_credentials(mocker, cli_profile, field, value):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    cli_ctx = _build_cli_ctx(mocker, CLOUD_CONFIGS[1])
+    setattr(cli_ctx.cloud.endpoints, field, value)
+    with pytest.raises(CLIError, match="must belong to the same cloud"):
+        _factory.iot_hub_service_factory(cli_ctx)
+    cli_profile.assert_not_called()
+
+
+@pytest.mark.parametrize("cloud_config,suffix", [
+    (CLOUD_CONFIGS[0], "net"), (CLOUD_CONFIGS[1], "us"), (CLOUD_CONFIGS[2], "cn"),
+])
+@pytest.mark.parametrize("override", [None, "custom.example"])
+def test_device_registration_default_host_follows_cloud(mocker, cloud_config, suffix, override):
+    from azext_iot import _factory
+
+    client = mocker.patch("azext_iot.sdk.dps.device.ProvisioningDeviceClient")
+    _factory.dps_device_service_factory(
+        _build_cli_ctx(mocker, cloud_config), endpoint=override, registration_id="device",
+        id_scope="scope", device_symmetric_key="YWJj",
+    )
+    assert client.call_args.kwargs["endpoint"] == (
+        "https://" + (override or f"global.azure-devices-provisioning.{suffix}")
+    )
+
+
+@pytest.mark.parametrize("hostname,audience", [
+    ("test.azure-devices-provisioning.net", "https://azure-devices-provisioning.net"),
+    ("TEST.AZURE-DEVICES-PROVISIONING.US.", "https://azure-devices-provisioning.us"),
+    ("test.azure-devices-provisioning.cn", "https://azure-devices-provisioning.net"),
+])
+def test_dps_service_login_uses_audience_for_service_hostname(mocker, hostname, audience):
+    from azext_iot import _factory
+
+    auth = mocker.patch.object(_factory, "IoTOAuth")
+    mocker.patch("azext_iot.sdk.dps.service.ProvisioningServiceClient")
+    cmd = mocker.Mock()
+    resolver = _factory.SdkResolver({"entity": hostname, "policy": "login", "cmd": cmd})
+    resolver._get_dps_service_sdk()
+    auth.assert_called_once_with(cli_ctx=cmd.cli_ctx, resource_id=audience)
 
 
 @pytest.mark.parametrize("field,value", [

@@ -8,6 +8,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
@@ -107,7 +108,8 @@ def validate_context(context):
         raise ValueError("Unknown service/diagnostic identity.")
     if (context["service"] == "RetrySelfTest") != (context["diagnostic"] == "true"):
         raise ValueError("Diagnostic evidence cannot qualify an integration service.")
-    if context["definition"] != "147":
+    definition = os.getenv("SYSTEM_DEFINITIONID", "147")
+    if not re.fullmatch(r"[1-9][0-9]*", definition) or context["definition"] != definition:
         raise ValueError("Attempt evidence belongs to a different pipeline definition.")
     for key in ("wheel", "dependencies"):
         if not re.fullmatch("[a-f0-9]{64}", context[key]):

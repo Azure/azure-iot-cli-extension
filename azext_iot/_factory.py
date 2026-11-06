@@ -8,6 +8,7 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
+import os
 import ssl
 from urllib.parse import urlsplit
 
@@ -21,7 +22,13 @@ from azext_iot.common.auth import IoTOAuth, get_cli_credential
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.common.utility import ensure_azure_namespace_path
-from azext_iot.constants import IOTDPS_PROVISIONING_HOST, IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGENT
+from azext_iot.constants import (
+    IOTDPS_PROVISIONING_HOST,
+    IOTDPS_RESOURCE_ID,
+    IOTDPS_RESOURCE_ID_US_GOV,
+    IOTHUB_RESOURCE_ID,
+    USER_AGENT,
+)
 from azext_iot.dps.common import CERTIFICATE_FILE_ERROR, MISSING_DPS_CREDENTIALS_ERROR
 from azext_iot.dps.services.auth import get_dps_sas_auth_header
 
@@ -33,6 +40,12 @@ _ADR_IOT_HUB_API_VERSION = "2026-10-01-preview"
 _ADR_DPS_API_VERSION = "2026-11-01"
 
 logger = get_logger(__name__)
+
+_IOTDPS_RESOURCE_ID_BY_HOST_SUFFIX = {
+    ".azure-devices-provisioning.net": IOTDPS_RESOURCE_ID,
+    ".azure-devices-provisioning.us": IOTDPS_RESOURCE_ID_US_GOV,
+    ".azure-devices-provisioning.cn": IOTDPS_RESOURCE_ID,
+}
 
 __all__ = [
     "SdkResolver",
@@ -90,6 +103,44 @@ def _get_canary_credential_scopes(cli_ctx):
     return _get_credential_scopes(cli_ctx)
 
 
+def _get_iot_arm_endpoint(cli_ctx):
+    """Keep public/canary overrides within their cloud's credential boundary."""
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
+    endpoints = cli_ctx.cloud.endpoints
+    endpoint = endpoints.resource_manager.rstrip("/").lower()
+    sovereign = {
+        "https://management.usgovcloudapi.net": (
+            {"https://login.microsoftonline.us"}, "https://management.core.usgovcloudapi.net",
+        ),
+        "https://management.chinacloudapi.cn": (
+            {"https://login.chinacloudapi.cn", "https://login.partner.microsoftonline.cn"},
+            "https://management.core.chinacloudapi.cn",
+        ),
+    }
+    if endpoint not in sovereign:
+        _get_canary_credential_scopes(cli_ctx)
+        return get_adr_arm_endpoint()
+    authorities, audience = sovereign[endpoint]
+    if (not isinstance(endpoints.active_directory, str)
+            or endpoints.active_directory.rstrip("/").lower() not in authorities
+            or not isinstance(endpoints.active_directory_resource_id, str)
+            or endpoints.active_directory_resource_id.rstrip("/").lower() != audience):
+        raise CLIError("IoT management endpoint, Entra authority and ARM audience must belong to the same cloud.")
+    override = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT", endpoint).rstrip("/").lower()
+    if override != endpoint:
+        raise CLIError("AZURE_IOT_ADR_ARM_ENDPOINT must match the active sovereign cloud's ARM endpoint.")
+    return endpoint
+
+
+def get_dps_provisioning_host(cli_ctx):
+    endpoint = cli_ctx.cloud.endpoints.resource_manager.rstrip("/").lower()
+    return {
+        "https://management.usgovcloudapi.net": "global.azure-devices-provisioning.us",
+        "https://management.chinacloudapi.cn": "global.azure-devices-provisioning.cn",
+    }.get(endpoint, IOTDPS_PROVISIONING_HOST)
+
+
 def _iot_hub_management_client(
     cli_ctx, subscription_id, base_url, **kwargs
 ):
@@ -97,7 +148,7 @@ def _iot_hub_management_client(
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    credential_scopes = _get_canary_credential_scopes(cli_ctx)
+    credential_scopes = _get_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
@@ -125,12 +176,10 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotHubClient): operational resource for
             working with IoT Hub Service.
     """
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(),
+        _get_iot_arm_endpoint(cli_ctx),
         api_version=_ADR_IOT_HUB_API_VERSION,
     )
 
@@ -143,7 +192,7 @@ def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    credential_scopes = _get_canary_credential_scopes(cli_ctx)
+    credential_scopes = _get_credential_scopes(cli_ctx)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(
@@ -171,12 +220,10 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(),
+        _get_iot_arm_endpoint(cli_ctx),
         api_version=_ADR_DPS_API_VERSION,
     )
 
@@ -265,6 +312,14 @@ def resource_service_factory(cli_ctx, **_):
     from azure.cli.core.profiles import ResourceType
 
     return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_RESOURCE_RESOURCES)
+
+
+def _get_dps_resource_id(endpoint):
+    hostname = (urlsplit(endpoint).hostname or "").rstrip(".").casefold()
+    for suffix, resource_id in _IOTDPS_RESOURCE_ID_BY_HOST_SUFFIX.items():
+        if hostname.endswith(suffix):
+            return resource_id
+    return IOTDPS_RESOURCE_ID
 
 
 class SdkResolver(object):
@@ -359,7 +414,10 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTDPS_RESOURCE_ID)
+            credentials = IoTOAuth(
+                cli_ctx=self.target["cmd"].cli_ctx,
+                resource_id=_get_dps_resource_id(endpoint),
+            )
         else:
             credentials = SasTokenAuthentication(
                 uri=urlsplit(endpoint).netloc,
@@ -449,7 +507,7 @@ def dps_device_service_factory(
     from azext_iot.dps.services._authentication import DpsAuthenticationPolicy
     from azext_iot.sdk.dps.device import ProvisioningDeviceClient
 
-    endpoint = _as_https_endpoint(endpoint or IOTDPS_PROVISIONING_HOST)
+    endpoint = _as_https_endpoint(endpoint or get_dps_provisioning_host(cli_ctx))
     client_kwargs = {
         "endpoint": endpoint,
         "user_agent_policy": UserAgentPolicy(user_agent=USER_AGENT),

@@ -39,6 +39,39 @@ def isolated_phase_environment(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.mark.parametrize("region,endpoint", [
+    ("usgovvirginia", pipeline.TARGET["GOVERNMENT_ARM"]), ("chinaeast2", pipeline.TARGET["CHINA_ARM"]),
+])
+def test_sovereign_plan_and_cohorts_preserve_exact_existing_cases(monkeypatch, region, endpoint):
+    monkeypatch.setenv("azext_iot_test_subscription", "00000000-0000-0000-0000-000000000001")
+    monkeypatch.setenv("azext_iot_testrg", "sovereign-tests")
+    jobs = pipeline.plan(["DPS", "HubControl", "HubData"], ["3.13"], [region], endpoint)
+    for job in jobs:
+        assert job["subscription"] == "00000000-0000-0000-0000-000000000001"
+        assert job["resource_group"] == "sovereign-tests"
+        original = pipeline.owned_nodes(job["service"])
+        cohort = pipeline.owned_nodes(job["service"], endpoint)
+        assert cohort and cohort != original
+        for phase, nodes in cohort.items():
+            assert nodes and set(nodes) <= set(original[phase])
+            assert focused.select(job["service"], phase, nodes)["requestedNodes"] == nodes
+    with pytest.raises(ValueError, match="only"):
+        pipeline.plan(["ADR"], ["3.13"], [region], endpoint)
+    with pytest.raises(ValueError, match="not public release"):
+        pipeline.plan(["DPS"], ["3.13"], [region], endpoint, release_build_id="123")
+
+
+def test_new_pipeline_id_remains_bound_to_the_running_definition(monkeypatch):
+    monkeypatch.setenv("SYSTEM_DEFINITIONID", "999")
+    context = dict(CONTEXT, definition="999")
+    retry.validate_context(context)
+    with pytest.raises(ValueError, match="different pipeline"):
+        retry.validate_context(CONTEXT)
+    monkeypatch.setenv("SYSTEM_DEFINITIONID", "1000")
+    with pytest.raises(ValueError, match="different pipeline"):
+        retry.validate_context(context)
+
+
 def receipt(results):
     return {
         "finished": True, "exitstatus": int("failed" in results.values()), "collected": list(results),
@@ -451,6 +484,8 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
         "parameters": {
             "service": "${{ service }}", "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             "regions": "${{ split(parameters.regions, ',') }}",
+            "subscription": "${{ parameters.subscription }}", "resourceGroup": "${{ parameters.resourceGroup }}",
+            "armResource": "${{ variables.armResource }}",
         },
     }]}]
     gate = next(value for value in integration if value.get("stage") == "Qualify")

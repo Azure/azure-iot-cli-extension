@@ -30,7 +30,7 @@ from azext_iot.common.utility import (
     process_json_arg,
     read_file_content,
 )
-from azext_iot.constants import IOTDPS_PROVISIONING_HOST
+from azext_iot._factory import get_dps_provisioning_host
 from azext_iot.dps.common import (
     CERTIFICATE_FILE_ERROR,
     CERTIFICATE_RETRIEVAL_ERROR,
@@ -379,7 +379,7 @@ class DeviceRegistrationProvider:
         return (
             self.provisioning_host
             or (self._target or {}).get("deviceHostName")
-            or IOTDPS_PROVISIONING_HOST
+            or get_dps_provisioning_host(self.cmd.cli_ctx)
         )
 
     def _get_dps_device_sdk(self):
