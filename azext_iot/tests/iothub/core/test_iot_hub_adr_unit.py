@@ -267,6 +267,16 @@ def test_failed_or_unlinked_projection_does_not_block_identity_removal():
     )
 
 
+@pytest.mark.parametrize("identity_type", ["SystemAssigned", "UserAssigned"])
+def test_orphaned_projection_after_namespace_deletion_does_not_block_identity_removal(identity_type):
+    uami = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/selected"
+    hub = _hub(identity_type=identity_type, uami=uami, link_state="Orphaned")
+    _protect_hub_link_identity(hub, remove_system=True, remove_user_identities=[uami])
+    hub["properties"]["deviceRegistry"]["linkingProperties"]["state"] = "InProgress"
+    with pytest.raises(ArgumentUsageError, match="used by an active ADR link"):
+        _protect_hub_link_identity(hub, remove_system=True, remove_user_identities=[uami])
+
+
 def test_identity_remove_preserves_active_selected_identity_and_omits_projection(mocker):
     hub = _hub()
     other_uami = next(iter(hub["identity"]["userAssignedIdentities"]))
