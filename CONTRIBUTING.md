@@ -119,6 +119,11 @@ their resource-scoped roles. Do not put interactive user passwords in pipeline v
 
 These are standalone **selected sovereign cohorts**, not the full public-cloud
 suite or release qualification. Existing IT cases and assertions are unchanged.
+**DPS qualification is currently blocked:** live Mooncake provisioning rejects
+system-assigned DPS identities (`CannotSetResourceIdentity`), which the existing
+linked-Hub fixtures require. Fairfax DPS fixture readiness also returned service
+authorization error `401002` after role assignment. These failures are not skipped
+or treated as passing, and cloud-specific ADO service connections are still required.
 The authoritative selections in `_ado_pipeline.owned_nodes` cover Hub management,
 identities/twins/C2D, DPS enrollment lifecycle, fresh-key registration and local-auth
 policy. Legacy registration cases with literal public hostnames, ADR-backed CSR,
