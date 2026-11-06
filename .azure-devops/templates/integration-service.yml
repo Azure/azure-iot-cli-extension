@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
 parameters:
+  - name: monitor
+    type: boolean
+    default: false
   - name: service
     type: string
   - name: pythonVersions
@@ -21,26 +24,45 @@ parameters:
 stages:
   - stage: ${{ parameters.service }}
     displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
-    dependsOn:
-      - Build
-      - Lint
-      - Unit
-    condition: |
-      and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
-          eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+    ${{ if parameters.monitor }}:
+      dependsOn: [Prepare]
+      condition: >-
+        and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
+            contains(variables['MonitorServices'], '${{ parameters.service }}'))
+      variables:
+        monitorBundle: $[ stageDependencies.Prepare.Acquire.outputs['bundle.artifact'] ]
+    ${{ else }}:
+      dependsOn:
+        - Build
+        - Lint
+        - Unit
+      condition: |
+        and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
+            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
     jobs:
       - job: Tests
         displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
         timeoutInMinutes: 360
         cancelTimeoutInMinutes: 15
+        variables:
+          ${{ if parameters.monitor }}:
+            testSourceDirectory: $(Agent.TempDirectory)/iot-monitor-source
+          ${{ else }}:
+            testSourceDirectory: $(Build.SourcesDirectory)
         strategy:
           maxParallel: 1
-          matrix:
-            ${{ each python in split(parameters.pythonVersions, ' ') }}:
-              ${{ each region in parameters.regions }}:
-                ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
-                  python: ${{ python }}
-                  region: ${{ region }}
+          ${{ if parameters.monitor }}:
+            matrix:
+              monitored:
+                python: '3.13'
+                region: $(MonitorRegion)
+          ${{ else }}:
+            matrix:
+              ${{ each python in split(parameters.pythonVersions, ' ') }}:
+                ${{ each region in parameters.regions }}:
+                  ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
+                    python: ${{ python }}
+                    region: ${{ region }}
         steps:
           - checkout: self
             displayName: Checkout source
@@ -54,6 +76,17 @@ stages:
             inputs:
               buildType: current
               targetPath: $(Pipeline.Workspace)/history
+          - ${{ if parameters.monitor }}:
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install packaging
+                  python scripts/release_monitor_adapter.py stage --bundle "$BUNDLE" --output "$SOURCE"
+                displayName: Verify and stage released test source
+                env:
+                  BUNDLE: $(Pipeline.Workspace)/history/$(monitorBundle)
+                  SOURCE: $(testSourceDirectory)
+                  MONITOR_CLOUD: $(MonitorCloud)
+                  MONITOR_TRACK: $(MonitorTrack)
           - bash: |
               set -euo pipefail
               python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
@@ -71,9 +104,10 @@ stages:
               export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
               python -c "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
             displayName: Prepare tests
+            workingDirectory: $(testSourceDirectory)
             env:
               HISTORY: $(Pipeline.Workspace)/history
-              PYTHONPATH: $(Build.SourcesDirectory)
+              PYTHONPATH: $(testSourceDirectory)
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
           - task: AzureCLI@2
@@ -83,6 +117,7 @@ stages:
               addSpnToEnvironment: true
               scriptType: bash
               scriptLocation: inlineScript
+              workingDirectory: $(testSourceDirectory)
               inlineScript: |
                 set -euo pipefail
                 export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
@@ -96,7 +131,7 @@ stages:
               TEST_REGION: $(region)
               TEST_ENDPOINT: $(endpoint)
               HISTORY: $(Pipeline.Workspace)/history
-              PYTHONPATH: $(Build.SourcesDirectory)
+              PYTHONPATH: $(testSourceDirectory)
               AZEXT_IOT_CI_AUTH: ado
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               TEST_SUBSCRIPTION_ID: ${{ parameters.subscription }}
@@ -116,14 +151,17 @@ stages:
               azext_iot_adr_location: $(region)
               azext_iot_adr_arm_endpoint: $(endpoint)
               azext_iot_adr_arm_resource: ${{ parameters.armResource }}
+              ${{ if parameters.monitor }}:
+                AZEXT_IOT_MONITOR_MANIFEST: $(testSourceDirectory)/release-monitor.json
           - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
             condition: succeededOrFailed()
             displayName: Record results
+            workingDirectory: $(testSourceDirectory)
             env:
               SERVICE: ${{ parameters.service }}
               TEST_PYTHON: $(python)
               TEST_REGION: $(region)
-          - publish: attempt
+          - publish: $(testSourceDirectory)/attempt
             displayName: Publish results
             condition: succeededOrFailed()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
@@ -133,6 +171,7 @@ stages:
             inputs:
               testResultsFormat: JUnit
               testResultsFiles: attempt/final.xml
+              searchFolder: $(testSourceDirectory)
               testRunTitle: ${{ parameters.service }} $(python) $(region) attempt $(System.JobAttempt)
               failTaskOnFailedTests: true
               failTaskOnMissingResultsFile: true

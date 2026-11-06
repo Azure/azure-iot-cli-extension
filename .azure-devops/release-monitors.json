@@ -1,0 +1,43 @@
+{
+  "extension": "azure-iot",
+  "namePrefix": "Azure IoT CLI - Monitor",
+  "tracks": ["ga", "preview"],
+  "clouds": {
+    "public": {
+      "displayName": "Public",
+      "variables": {
+        "AzureServiceConnection": "aziotcli-sp-prime",
+        "MonitorSubscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+        "MonitorResourceGroup": "cli-int-test-rg",
+        "MonitorRegion": "australiaeast",
+        "MonitorEndpoint": "https://management.azure.com",
+        "MonitorArmResource": "https://management.azure.com",
+        "MonitorServices": "DPS,HubControl,HubData,ADU,ADR"
+      }
+    },
+    "fairfax": {
+      "displayName": "Fairfax",
+      "variables": {
+        "AzureServiceConnection": "",
+        "MonitorSubscription": "",
+        "MonitorResourceGroup": "",
+        "MonitorRegion": "usgovvirginia",
+        "MonitorEndpoint": "https://management.usgovcloudapi.net",
+        "MonitorArmResource": "https://management.core.usgovcloudapi.net",
+        "MonitorServices": "DPS,HubControl,HubData"
+      }
+    },
+    "mooncake": {
+      "displayName": "Mooncake",
+      "variables": {
+        "AzureServiceConnection": "",
+        "MonitorSubscription": "",
+        "MonitorResourceGroup": "",
+        "MonitorRegion": "chinaeast2",
+        "MonitorEndpoint": "https://management.chinacloudapi.cn",
+        "MonitorArmResource": "https://management.core.chinacloudapi.cn",
+        "MonitorServices": "DPS,HubControl,HubData"
+      }
+    }
+  }
+}

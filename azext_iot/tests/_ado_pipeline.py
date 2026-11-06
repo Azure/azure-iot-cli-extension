@@ -122,7 +122,7 @@ def context(service, python, region, endpoint, wheel, diagnostic):
                 (path.parent.name, hashlib.sha256(path.read_bytes()).hexdigest())
                 for path in extension.glob("*.dist-info/METADATA")
             ))
-    return {
+    result = {
         "build": os.environ["BUILD_BUILDID"], "definition": os.environ["SYSTEM_DEFINITIONID"],
         "commit": os.environ["BUILD_SOURCEVERSION"],
         "wheel": hashlib.sha256(wheels[0].read_bytes()).hexdigest(),
@@ -131,6 +131,9 @@ def context(service, python, region, endpoint, wheel, diagnostic):
         **TARGET["scope"](endpoint),
         "diagnostic": str(diagnostic).lower(),
     }
+    if os.environ.get("AZEXT_IOT_MONITOR_MANIFEST"):
+        result["monitor"] = RETRY["digest"](RETRY["read"](os.environ["AZEXT_IOT_MONITOR_MANIFEST"]))
+    return result
 
 
 def candidate(directory, output):
@@ -176,9 +179,11 @@ def gate(directory):
         history.sort(key=lambda value: value["sequence"])
         ctx = history[0]["context"]
         scope = TARGET["scope"](config["endpoint"])
+        monitor = (RETRY["digest"](RETRY["read"](os.environ["AZEXT_IOT_MONITOR_MANIFEST"]))
+                   if os.environ.get("AZEXT_IOT_MONITOR_MANIFEST") else None)
         if (ctx["build"] != os.environ["BUILD_BUILDID"] or ctx["commit"] != os.environ["BUILD_SOURCEVERSION"]
                 or ctx["definition"] != os.environ.get("SYSTEM_DEFINITIONID", "147")
-                or ctx["endpoint"] != config["endpoint"] or ctx["wheel"] != wheel
+                or ctx["endpoint"] != config["endpoint"] or ctx["wheel"] != wheel or ctx.get("monitor") != monitor
                 or any(ctx[key] != value for key, value in scope.items())
                 or TARGET["cloud"](config["endpoint"])["name"] != "AzureCloud"
                 and any(config.get(key) != value for key, value in scope.items())):

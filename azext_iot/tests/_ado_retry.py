@@ -102,6 +102,8 @@ def outcomes(receipt, *, allow_fixture_failures=False):
 def validate_context(context):
     required = {"build", "definition", "commit", "wheel", "dependencies", "service", "python", "region",
                 "endpoint", "subscription", "resource_group", "diagnostic"}
+    if "monitor" in context:
+        required.add("monitor")
     if set(context) != required or not all(isinstance(context[key], str) and context[key] for key in required):
         raise ValueError("Incomplete attempt identity.")
     if context["service"] not in (*SERVICES, "RetrySelfTest") or context["diagnostic"] not in ("true", "false"):
@@ -111,7 +113,7 @@ def validate_context(context):
     definition = os.getenv("SYSTEM_DEFINITIONID", "147")
     if not re.fullmatch(r"[1-9][0-9]*", definition) or context["definition"] != definition:
         raise ValueError("Attempt evidence belongs to a different pipeline definition.")
-    for key in ("wheel", "dependencies"):
+    for key in ("wheel", "dependencies", *(("monitor",) if "monitor" in context else ())):
         if not re.fullmatch("[a-f0-9]{64}", context[key]):
             raise ValueError("Artifact/dependency identity is invalid.")
 

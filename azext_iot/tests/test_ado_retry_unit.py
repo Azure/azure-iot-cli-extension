@@ -103,6 +103,19 @@ def test_exact_retry_preserves_passes_and_records_recovery(tmp_path):
     assert "Passed on manual retry" in (tmp_path / "final.xml").read_text()
 
 
+@pytest.mark.parametrize("other", [None, "e" * 64])
+def test_monitor_history_cannot_qualify_an_ordinary_run_or_another_release(other):
+    context = dict(CONTEXT, monitor="d" * 64)
+    first = attempt({"a": "passed", "b": "passed", "c": "passed"})
+    first["context"] = context
+    assert retry.pending([first], context) == {}
+    foreign = dict(CONTEXT)
+    if other is not None:
+        foreign["monitor"] = other
+    with pytest.raises(ValueError):
+        retry.evaluate([first], foreign)
+
+
 @pytest.mark.parametrize("defect", [
     "parent", "commit", "wheel", "dependencies", "region", "endpoint", "build", "definition",
     "sequence", "missing", "extra", "rerun-pass", "skip", "setup", "teardown", "incomplete",
@@ -462,7 +475,10 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     steps = template["stages"][0]["jobs"][0]["steps"]
     assert "diagnostic" not in {value["name"] for value in template["parameters"]}
     live = next(step for step in steps if step.get("task") == "AzureCLI@2")
-    assert live["env"]["PYTHONPATH"] == "$(Build.SourcesDirectory)"
+    assert live["env"]["PYTHONPATH"] == "$(testSourceDirectory)"
+    assert template["stages"][0]["jobs"][0]["variables"]["${{ else }}"] == {
+        "testSourceDirectory": "$(Build.SourcesDirectory)",
+    }
 
 
 def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
@@ -593,8 +609,8 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]
     assert stage["stage"] == "${{ parameters.service }}"
-    assert stage["dependsOn"] == ["Build", "Lint", "Unit"]
-    assert " ".join(stage["condition"].split()) == (
+    assert stage["${{ else }}"]["dependsOn"] == ["Build", "Lint", "Unit"]
+    assert " ".join(stage["${{ else }}"]["condition"].split()) == (
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )
@@ -602,7 +618,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     assert "$(" not in stage["jobs"][0]["displayName"]
     steps = stage["jobs"][0]["steps"]
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))
-    publish = next(step for step in steps if step.get("publish") == "attempt")
+    publish = next(step for step in steps if step.get("publish") == "$(testSourceDirectory)/attempt")
     assert steps.index(fallback) < steps.index(publish)
     assert fallback["condition"] == publish["condition"] == "succeededOrFailed()"
 
