@@ -133,6 +133,16 @@ stages:
                 inputs:
                   buildType: current
                   targetPath: $(Pipeline.Workspace)/history
+                  itemPattern: |
+                    integration-wheel-*/**
+                    integration-plan-*/**
+                    attempt-*/**
+              - task: DownloadPipelineArtifact@2
+                displayName: Download released source separately from attempt evidence
+                inputs:
+                  buildType: current
+                  artifactName: $(monitorBundle)
+                  targetPath: $(Pipeline.Workspace)/release-bundle
               - bash: |
                   set -euo pipefail
                   python -m pip install packaging
@@ -141,7 +151,7 @@ stages:
                   python azext_iot/tests/_ado_pipeline.py gate --history "$HISTORY"
                 displayName: Require every selected released cohort and cleanup
                 env:
-                  BUNDLE: $(Pipeline.Workspace)/history/$(monitorBundle)
+                  BUNDLE: $(Pipeline.Workspace)/release-bundle
                   SOURCE: $(Agent.TempDirectory)/iot-monitor-source
                   HISTORY: $(Pipeline.Workspace)/history
                   MONITOR_CLOUD: $(MonitorCloud)

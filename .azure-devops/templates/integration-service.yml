@@ -76,14 +76,25 @@ stages:
             inputs:
               buildType: current
               targetPath: $(Pipeline.Workspace)/history
+              ${{ if parameters.monitor }}:
+                itemPattern: |
+                  integration-wheel-*/**
+                  integration-plan-*/**
+                  attempt-*/**
           - ${{ if parameters.monitor }}:
+              - task: DownloadPipelineArtifact@2
+                displayName: Download released source separately from attempt evidence
+                inputs:
+                  buildType: current
+                  artifactName: $(monitorBundle)
+                  targetPath: $(Pipeline.Workspace)/release-bundle
               - bash: |
                   set -euo pipefail
                   python -m pip install packaging
                   python scripts/release_monitor_adapter.py stage --bundle "$BUNDLE" --output "$SOURCE"
                 displayName: Verify and stage released test source
                 env:
-                  BUNDLE: $(Pipeline.Workspace)/history/$(monitorBundle)
+                  BUNDLE: $(Pipeline.Workspace)/release-bundle
                   SOURCE: $(testSourceDirectory)
                   MONITOR_CLOUD: $(MonitorCloud)
                   MONITOR_TRACK: $(MonitorTrack)

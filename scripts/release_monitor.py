@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -34,6 +35,10 @@ HOSTS = {
 }
 TEMPLATE = "azext_edge/edge/providers/orchestration/template{}.py"
 MAX_BYTES = 64 * 1024 * 1024
+
+
+class NonStableRuntime(ValueError):
+    """A published CLI's bundled runtime is not a stable monitor target."""
 
 
 def validate_url(value):
@@ -134,14 +139,18 @@ def parse_runtime_profile(source, cloud):
         if "iotOperations" not in versions:
             continue
         version = Version(versions["iotOperations"])
-        if version.is_prerelease or version.is_devrelease or trains.get("iotOperations") != "stable":
-            raise ValueError("A monitored milestone must have a stable bundled runtime.")
+        train = trains.get("iotOperations")
+        if not isinstance(train, str) or not train:
+            raise ValueError("The bundled runtime is missing its release train.")
         profiles.append({
             "milestone": f"{version.major}.{version.minor}", "version": str(version),
-            "train": "stable", "template": TEMPLATE.format("_fairfax" if cloud == "fairfax" else ""),
+            "train": train, "template": TEMPLATE.format("_fairfax" if cloud == "fairfax" else ""),
         })
     if len(profiles) != 1:
         raise ValueError("The release does not contain one unambiguous stable runtime profile.")
+    version = Version(profiles[0]["version"])
+    if version.is_prerelease or version.is_devrelease or profiles[0]["train"] != "stable":
+        raise NonStableRuntime("A monitored milestone must have a stable bundled runtime.")
     return profiles[0]
 
 
@@ -198,7 +207,11 @@ def resolve(extension, cloud, track, automation_commit, releases=None):
         if extension == "azure-iot":
             selected = (version, release, source_commit)
             break
-        profile = runtime_profile(config["repository"], source_commit, "public")
+        try:
+            profile = runtime_profile(config["repository"], source_commit, "public")
+        except NonStableRuntime:
+            print(f"Skipping published CLI {release['tag_name']}: no stable bundled Public runtime.", file=sys.stderr)
+            continue
         if profile is None:
             raise ValueError("A published AIO release is missing its Public runtime profile.")
         family = profile["milestone"]
