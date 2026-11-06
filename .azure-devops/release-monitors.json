@@ -18,9 +18,9 @@
     "fairfax": {
       "displayName": "Fairfax",
       "variables": {
-        "AzureServiceConnection": "",
-        "MonitorSubscription": "",
-        "MonitorResourceGroup": "",
+        "AzureServiceConnection": "sc-iot-cli-fairfax-it",
+        "MonitorSubscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
+        "MonitorResourceGroup": "iot-cli-monitor-fairfax-{track}",
         "MonitorRegion": "usgovvirginia",
         "MonitorEndpoint": "https://management.usgovcloudapi.net",
         "MonitorArmResource": "https://management.core.usgovcloudapi.net",
