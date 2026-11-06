@@ -156,7 +156,7 @@ def bundle(monitor, manifest, tmp_path):
     manifest["wheel"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     source = tmp_path / "source/azext_iot"
     source.mkdir(parents=True)
-    (source / "__init__.py").write_text(package, encoding="utf-8")
+    (source / "__init__.py").write_bytes(package.encode("utf-8"))
     (source / "tests").mkdir()
     (source / "tests/test_case_int.py").write_text("def test_case():\n    assert True\n", encoding="utf-8")
     monitor.write_json(tmp_path / "source.json", {
