@@ -7,6 +7,10 @@ name: iot-health-$(MonitorCloud)-$(MonitorTrack)-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
 
 parameters:
+  - name: sourceBranch
+    displayName: CLI source branch (GA requires dev; Preview selects the branch to test)
+    type: string
+    default: dev
   - name: runIntegration
     displayName: Run approved live integration tests
     type: boolean
@@ -20,7 +24,7 @@ variables:
 
 stages:
   - stage: Prepare
-    displayName: Prepare released version
+    displayName: Freeze source branch
     jobs:
       - job: Acquire
         timeoutInMinutes: 30
@@ -34,44 +38,44 @@ stages:
           - bash: python -m pip install packaging
             displayName: Install resolver dependencies
           - task: DownloadPipelineArtifact@2
-            displayName: Restore frozen release on retry
+            displayName: Restore frozen source on retry
             condition: gt(variables['System.JobAttempt'], 1)
             inputs:
               buildType: current
-              itemPattern: release-selection-*/manifest.json
-              targetPath: $(Pipeline.Workspace)/release-history
+              itemPattern: source-selection-*/manifest.json
+              targetPath: $(Pipeline.Workspace)/source-history
           - bash: |
               set -euo pipefail
-              python scripts/release_monitor.py resolve \
+              python scripts/release_monitor.py resolve-source \
                 --configuration .azure-devops/release-monitors.json \
-                --extension azure-iot --cloud "$CLOUD" --track "$TRACK" \
+                --cloud "$CLOUD" --track "$TRACK" --source-branch "$SOURCE_BRANCH" \
                 --automation-commit "$BUILD_SOURCEVERSION" --attempt "$SYSTEM_JOBATTEMPT" \
                 --history "$HISTORY" --output manifest.json
-            displayName: Resolve or restore the immutable release selection
+            name: source
+            displayName: Pin the selected branch to one immutable commit
             env:
               CLOUD: $(MonitorCloud)
               TRACK: $(MonitorTrack)
-              HISTORY: $(Pipeline.Workspace)/release-history
+              SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+              HISTORY: $(Pipeline.Workspace)/source-history
           - publish: manifest.json
-            artifact: release-selection-$(System.JobAttempt)
+            artifact: source-selection-$(System.JobAttempt)
             displayName: Freeze selection before acquisition
           - bash: |
               set -euo pipefail
-              python scripts/release_monitor.py acquire --manifest manifest.json --output "$BUNDLE"
-              echo "##vso[task.setvariable variable=artifact;isOutput=true]release-bundle-$SYSTEM_JOBATTEMPT"
+              python scripts/release_monitor.py acquire-source --manifest manifest.json --output "$BUNDLE"
+              echo "##vso[task.setvariable variable=artifact;isOutput=true]source-bundle-$SYSTEM_JOBATTEMPT"
             name: bundle
-            displayName: Acquire immutable published wheel and tests
+            displayName: Acquire the pinned source and tests
             env:
-              BUNDLE: $(Pipeline.Workspace)/release-bundle
+              BUNDLE: $(Pipeline.Workspace)/source-bundle
           - ${{ if parameters.runIntegration }}:
               - bash: |
                   set -euo pipefail
                   python scripts/release_monitor_adapter.py plan --bundle "$BUNDLE" --output "$SOURCE"
-                  mkdir -p wheel
-                  cp "$BUNDLE"/*.whl wheel/
-                displayName: Validate released integration cohorts
+                displayName: Validate selected source integration cohorts
                 env:
-                  BUNDLE: $(Pipeline.Workspace)/release-bundle
+                  BUNDLE: $(Pipeline.Workspace)/source-bundle
                   SOURCE: $(Agent.TempDirectory)/iot-monitor-source
                   MONITOR_CLOUD: $(MonitorCloud)
                   MONITOR_TRACK: $(MonitorTrack)
@@ -80,15 +84,12 @@ stages:
                   MONITOR_ENDPOINT: $(MonitorEndpoint)
                   azext_iot_test_subscription: $(MonitorSubscription)
                   azext_iot_testrg: $(MonitorResourceGroup)
-              - publish: wheel
-                artifact: integration-wheel-$(System.JobAttempt)
-                displayName: Publish acquired wheel
-              - publish: $(Pipeline.Workspace)/release-bundle/plan.json
+              - publish: $(Pipeline.Workspace)/source-bundle/plan.json
                 artifact: integration-plan-$(System.JobAttempt)
                 displayName: Publish integration plan
-          - publish: $(Pipeline.Workspace)/release-bundle
-            artifact: release-bundle-$(System.JobAttempt)
-            displayName: Publish frozen release bundle
+          - publish: $(Pipeline.Workspace)/source-bundle
+            artifact: source-bundle-$(System.JobAttempt)
+            displayName: Publish frozen source bundle
 
   - ${{ if not(parameters.runIntegration) }}:
       - stage: ActivationRequired
@@ -104,6 +105,114 @@ stages:
                 displayName: Do not report preparation as healthy monitoring
 
   - ${{ if parameters.runIntegration }}:
+      - stage: Build
+        displayName: Build selected branch
+        dependsOn: Prepare
+        variables:
+          sourceBundle: $[ stageDependencies.Prepare.Acquire.outputs['bundle.artifact'] ]
+        jobs:
+          - job: Build
+            timeoutInMinutes: 40
+            steps:
+              - template: templates/source-health-setup.yml
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install build
+                  python scripts/release_monitor.py build-source --output "$BUNDLE"
+                  mkdir -p wheel
+                  cp "$BUNDLE"/*.whl wheel/
+                  echo "##vso[task.setvariable variable=artifact;isOutput=true]health-bundle-$SYSTEM_JOBATTEMPT"
+                name: bundle
+                displayName: Build and verify the selected CLI wheel
+                env:
+                  BUNDLE: $(Pipeline.Workspace)/source-bundle
+              - publish: wheel
+                artifact: integration-wheel-$(System.JobAttempt)
+              - publish: $(Pipeline.Workspace)/source-bundle
+                artifact: health-bundle-$(System.JobAttempt)
+      - stage: Lint
+        dependsOn: Prepare
+        variables:
+          sourceBundle: $[ stageDependencies.Prepare.Acquire.outputs['bundle.artifact'] ]
+        jobs:
+          - job: Lint
+            timeoutInMinutes: 25
+            steps:
+              - template: templates/source-health-setup.yml
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install tox
+                  python -m tox r -e lint -vv
+                displayName: Lint selected source
+                workingDirectory: $(Agent.TempDirectory)/iot-monitor-source
+      - stage: Unit
+        dependsOn: Prepare
+        variables:
+          sourceBundle: $[ stageDependencies.Prepare.Acquire.outputs['bundle.artifact'] ]
+          sourceCommit: $[ stageDependencies.Prepare.Acquire.outputs['source.commit'] ]
+        jobs:
+          - job: Unit
+            timeoutInMinutes: 25
+            strategy:
+              maxParallel: 4
+              matrix:
+                shard1:
+                  shard: 1
+                shard2:
+                  shard: 2
+                shard3:
+                  shard: 3
+                shard4:
+                  shard: 4
+            steps:
+              - template: templates/source-health-setup.yml
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install tox
+                  python -m tox r -e python-azcur-unit -vv -- \
+                    -p azext_iot.tests._unit_shard_plugin --unit-shard "$SHARD" \
+                    --unit-shard-output "$RESULTS" --junitxml "$RESULTS/junit.xml"
+                displayName: Test selected source
+                workingDirectory: $(Agent.TempDirectory)/iot-monitor-source
+                env:
+                  SHARD: $(shard)
+                  UNIT_RUN_ID: $(Build.BuildId)
+                  UNIT_COMMIT: $(sourceCommit)
+                  UNIT_ATTEMPT: $(System.JobAttempt)
+                  RESULTS: $(Agent.TempDirectory)/iot-monitor-source/unit-result
+                  COVERAGE_FILE: $(Agent.TempDirectory)/iot-monitor-source/unit-result/coverage.dat
+              - task: PublishTestResults@2
+                condition: succeededOrFailed()
+                inputs:
+                  testResultsFormat: JUnit
+                  testResultsFiles: $(Agent.TempDirectory)/iot-monitor-source/unit-result/junit.xml
+                  testRunTitle: Source health unit shard $(shard) attempt $(System.JobAttempt)
+                  failTaskOnFailedTests: true
+                  failTaskOnMissingResultsFile: true
+              - publish: $(Agent.TempDirectory)/iot-monitor-source/unit-result
+                condition: succeededOrFailed()
+                artifact: unit-shard-$(shard)-$(System.JobAttempt)
+          - job: UnitGate
+            dependsOn: Unit
+            steps:
+              - template: templates/source-health-setup.yml
+              - task: DownloadPipelineArtifact@2
+                inputs:
+                  buildType: current
+                  itemPattern: unit-shard-*/**
+                  targetPath: $(Pipeline.Workspace)/unit-history
+              - bash: |
+                  set -euo pipefail
+                  python -m pip install coverage
+                  python azext_iot/tests/_unit_shards.py --history "$HISTORY" --output unit-coverage
+                displayName: Require every selected-source unit shard
+                workingDirectory: $(Agent.TempDirectory)/iot-monitor-source
+                env:
+                  HISTORY: $(Pipeline.Workspace)/unit-history
+                  UNIT_RUN_ID: $(Build.BuildId)
+                  UNIT_COMMIT: $(sourceCommit)
+              - publish: $(Agent.TempDirectory)/iot-monitor-source/unit-coverage
+                artifact: integration-unit-coverage-$(System.JobAttempt)
       - ${{ each service in split('DPS,HubControl,HubData,ADU,ADR', ',') }}:
           - template: templates/integration-service.yml
             parameters:
@@ -115,11 +224,11 @@ stages:
               resourceGroup: $(MonitorResourceGroup)
               armResource: $(MonitorArmResource)
       - stage: Results
-        displayName: Verify released-version results
+        displayName: Verify source-health results
         condition: always()
-        dependsOn: [Prepare, DPS, HubControl, HubData, ADU, ADR]
+        dependsOn: [Prepare, Build, Lint, Unit, DPS, HubControl, HubData, ADU, ADR]
         variables:
-          monitorBundle: $[ stageDependencies.Prepare.Acquire.outputs['bundle.artifact'] ]
+          monitorBundle: $[ stageDependencies.Build.Build.outputs['bundle.artifact'] ]
         jobs:
           - job: Verify
             steps:
@@ -138,7 +247,7 @@ stages:
                     integration-plan-*/**
                     attempt-*/**
               - task: DownloadPipelineArtifact@2
-                displayName: Download released source separately from attempt evidence
+                displayName: Download built source separately from attempt evidence
                 inputs:
                   buildType: current
                   artifactName: $(monitorBundle)
@@ -149,7 +258,7 @@ stages:
                   python scripts/release_monitor_adapter.py stage --bundle "$BUNDLE" --output "$SOURCE"
                   cd "$SOURCE"
                   python azext_iot/tests/_ado_pipeline.py gate --history "$HISTORY"
-                displayName: Require every selected released cohort and cleanup
+                displayName: Require every selected source cohort and cleanup
                 env:
                   BUNDLE: $(Pipeline.Workspace)/release-bundle
                   SOURCE: $(Agent.TempDirectory)/iot-monitor-source

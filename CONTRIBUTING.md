@@ -119,9 +119,11 @@ their resource-scoped roles. Do not put interactive user passwords in pipeline v
 
 These are standalone **selected sovereign cohorts**, not the full public-cloud
 suite or release qualification. Existing IT cases and assertions are unchanged.
-**DPS qualification is currently blocked:** live Mooncake provisioning rejects
+**Full DPS qualification is currently blocked:** live Mooncake provisioning rejects
 system-assigned DPS identities (`CannotSetResourceIdentity`), which the existing
-linked-Hub fixtures require. Fairfax DPS fixture readiness also returned service
+linked-Hub fixtures and management happy-path test require. Mooncake therefore
+selects only the standalone local-auth-toggle case.
+Fairfax DPS fixture readiness also returned service
 authorization error `401002` after role assignment. These failures are not skipped
 or treated as passing, and cloud-specific ADO service connections are still required.
 The authoritative selections in `_ado_pipeline.owned_nodes` cover Hub management,
@@ -130,6 +132,12 @@ policy. Legacy registration cases with literal public hostnames, ADR-backed CSR,
 and the wider Hub routing/storage/preview cohorts are not included. ADR and ADU
 are rejected at planning time. Every selected case still needs passing setup,
 call and teardown; skipped or missing cases do not qualify.
+
+The Mooncake global DPS endpoint was also observed serving a chain rooted in
+`DigiCert Global Root CA` (G1), which current Mozilla-derived bundles no longer trust.
+[DigiCert's G1 removal advisory](https://docs.digicert.com/en/certcentral/order-and-manage-certificates/reports-and-advisories/review-the-g1-root-removal-advisory.html)
+requires reissuing affected service certificates to G2/G3. Escalate that chain to
+the service owner; do not restore a retired trust anchor or disable TLS verification.
 
 Plans and receipts bind the cloud endpoint, region, subscription and group.
 Retries must originate from the current ADO pipeline definition and build, retain
@@ -149,16 +157,19 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 - IoT Hub
 - Utility
 
-### Released-version monitors
+### Source-branch health monitors
 
 `.azure-devops/release-monitor.yml` is shared by six independent definitions:
 `Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
-The resolver selects the latest published GA or Preview wheel, verifies GitHub's
-SHA256 and wheel metadata, and acquires the exact tagged test-source commit.
-Published cases, service fixtures and phase manifests remain release-specific;
-only root-level native controller helpers and their tox setup are overlaid.
-Product source must match the published wheel byte-for-byte.
+GA always builds `dev`. For Preview, set `sourceBranch` in **Run pipeline** to the
+branch to build and test. The built-in ADO Branch/tag field selects the automation
+YAML, not this source target. The resolver freezes the source commit before any
+build or Azure access; retries cannot follow a moving branch.
+Build, lint and four unit shards run independently, followed by one job per selected
+service. Selected test cases, service fixtures and phase manifests remain source-specific;
+only native controller helpers and their tox setup are overlaid. The built wheel's
+product bytes must match the frozen source, and its SHA256 is bound into live evidence.
 
 Generate disabled definition payloads using an existing same-repository definition:
 
@@ -185,14 +196,26 @@ Preparation alone deliberately fails rather than reporting healthy monitoring.
 No recurring schedule is supplied before live execution and capacity are approved;
 apply the same schedule policy to the IoT and AIO monitor sets.
 
-Retries reuse the first published release selection even if a newer release appears.
 Receipts bind wheel, source, automation commit, cloud and native cohort identity.
 They cannot qualify another monitor or a release candidate. Public monitors retain
 the native DPS/Hub/ADU/ADR scope; sovereign monitors retain only the selected Hub/DPS
-cohorts documented above. A cloud-support source PR does not certify an older
-published wheel. Sovereign identity and DPS capability blockers still apply.
-Run titles include the cloud, track, resolved CLI version and build ID. Historical
-source-health runs retained on definition 166 are not released-version evidence.
+cohorts documented above, excluding ADU and ADR. Mooncake DPS runs standalone
+local-auth-toggle coverage, not the linked-Hub fixtures or management happy-path test
+requiring unavailable DPS managed identity. Authentication and TLS failures remain failures,
+never unsupported skips.
+Run titles include the cloud, track, actual CLI version, source commit and build ID.
+These are source-build health results, not published-release qualification.
+
+Service matrices have no artificial parallel limit or cross-run lock. The scheduled
+cleanup preserves untagged, excluded and recently created resources. It reaps
+resources with `intTest=true`, an owner `runUid`, and a `createdEpoch` at least 48 hours old.
+It also recognizes the existing native Hub ownership tag and SAS-phase ownership tags,
+only for the Hub harness's allowed root types/names and ARM creation times at least
+48 hours old. Ownership and creation time are rechecked before deleting each exact ID.
+Untagged ADU/ADR resources, helper storage and legacy fixtures require explicit operational
+cleanup using the original attempt's ownership evidence; names and age alone never authorize
+deletion. The daily definition covers only its configured public resource group, not sovereign groups.
+Deploy that cleanup change before overlapping workloads in its shared resource group.
 
 ### Unit Tests
 

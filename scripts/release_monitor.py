@@ -14,8 +14,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -239,6 +241,10 @@ def resolve(extension, cloud, track, automation_commit, releases=None):
 
 
 def validate_manifest(manifest, *, extension=None, cloud=None, track=None, slot=None, automation_commit=None):
+    if manifest.get("kind") == "source":
+        return validate_source_manifest(
+            manifest, extension=extension, cloud=cloud, track=track, slot=slot, automation_commit=automation_commit,
+        )
     config = settings(manifest["extension"])
     if any(manifest.get(key) != value for key, value in config.items()) or manifest.get("schema") != 1:
         raise ValueError("Invalid release manifest repository or schema.")
@@ -301,9 +307,10 @@ def verify_wheel(path, manifest):
         if len(metadata) != 1 or f"{manifest['package']}/__init__.py" not in archive.namelist():
             raise ValueError("Released artifact is not the selected CLI extension wheel.")
         headers = Parser().parsestr(archive.read(metadata[0]).decode("utf-8"))
+        version = manifest["source"]["version"] if manifest.get("kind") == "source" else manifest["release"]["version"]
         if (not headers["Name"] or not headers["Version"]
                 or headers["Name"].replace("_", "-") != manifest["extension"]
-                or Version(headers["Version"]) != Version(manifest["release"]["version"])):
+                or Version(headers["Version"]) != Version(version)):
             raise ValueError("Wheel metadata does not match the selected release.")
         if manifest["runtime"]:
             profile = parse_runtime_profile(
@@ -313,11 +320,9 @@ def verify_wheel(path, manifest):
                 raise ValueError("Wheel runtime differs from the resolved release source.")
 
 
-def verify_bundle(directory, **expected):
+def verify_bundle(directory, *, require_wheel=True, **expected):
     directory = Path(directory)
     manifest = validate_manifest(read_json(directory / "manifest.json"), **expected)
-    wheel = directory / manifest["wheel"]["name"]
-    verify_wheel(wheel, manifest)
     source = directory / "source"
     snapshot = directory / "source.json"
     if hashlib.sha256(snapshot.read_bytes()).hexdigest() != manifest.get("sourceSha256"):
@@ -325,6 +330,12 @@ def verify_bundle(directory, **expected):
     inventory = read_json(snapshot)
     if inventory["commit"] != manifest["testSourceCommit"] or inventory["files"] != source_files(source):
         raise ValueError("Released test source is missing, modified, or belongs to a different commit.")
+    if manifest["wheel"] is None:
+        if require_wheel:
+            raise ValueError("The selected source has not produced a verified wheel.")
+        return manifest
+    wheel = directory / manifest["wheel"]["name"]
+    verify_wheel(wheel, manifest)
     with ZipFile(wheel) as archive:
         prefix = manifest["package"] + "/"
         entries = {name for name in archive.namelist() if name.startswith(prefix) and not name.endswith("/")}
@@ -361,6 +372,11 @@ def acquire(manifest, output):
     wheel = output / manifest["wheel"]["name"]
     wheel.write_bytes(download(manifest["wheel"]["url"]))
     verify_wheel(wheel, manifest)
+    checkout_source(manifest, output)
+    verify_bundle(output)
+
+
+def checkout_source(manifest, output):
     source = output / "source"
     if source.exists():
         raise ValueError("Release-source destination already exists; use a fresh attempt directory.")
@@ -383,6 +399,120 @@ def acquire(manifest, output):
     if manifest.get("sourceSha256", source_digest) != source_digest:
         raise ValueError("The fixed release commit produced different test-source bytes.")
     manifest = {**manifest, "sourceSha256": source_digest}
+    write_json(output / "manifest.json", manifest)
+
+
+def source_branch(value):
+    if (not isinstance(value, str) or not value
+            or value.startswith("refs/") and not value.startswith("refs/heads/")):
+        raise ValueError("Select an explicit source branch.")
+    branch = value if value.startswith("refs/heads/") else f"refs/heads/{value}"
+    if (not re.fullmatch(r"refs/heads/[A-Za-z0-9_./-]+", branch)
+            or subprocess.run(["git", "check-ref-format", branch], check=False, capture_output=True).returncode):
+        raise ValueError("Select a valid branch name, not a tag, commit, or ref expression.")
+    return branch
+
+
+def validate_source_manifest(manifest, **expected):
+    config = settings("azure-iot")
+    if (manifest.get("kind") != "source" or manifest.get("schema") != 2
+            or any(manifest.get(key) != value for key, value in config.items())
+            or manifest.get("cloudKey") not in CLOUDS or manifest["cloud"] != CLOUDS[manifest["cloudKey"]]
+            or manifest.get("track") not in {"ga", "preview"} or manifest.get("slot") != manifest["track"]
+            or manifest.get("releaseQualified") is not False or manifest.get("runtime") is not None
+            or manifest.get("blockers") != []):
+        raise ValueError("Invalid source-health manifest.")
+    for key, field in (
+        ("extension", "extension"), ("cloud", "cloudKey"), ("track", "track"),
+        ("slot", "slot"), ("automation_commit", "automationCommit"),
+    ):
+        if expected.get(key) is not None and manifest.get(field) != expected[key]:
+            raise ValueError(f"Source manifest differs from the requested {field}.")
+    commit(manifest["automationCommit"])
+    source = manifest["source"]
+    if (source_branch(source["branch"]) != source["branch"]
+            or commit(source["commit"]) != commit(manifest["testSourceCommit"])
+            or manifest["track"] == "ga" and source["branch"] != "refs/heads/dev"):
+        raise ValueError("Source health must retain its selected branch and commit; GA always uses dev.")
+    version = str(Version(source["version"]))
+    if source["version"] != version:
+        raise ValueError("Source version must use its normalized wheel version.")
+    wheel = manifest.get("wheel")
+    if wheel is not None and (
+        wheel.get("name") != f"azure_iot-{version}-py3-none-any.whl"
+        or not re.fullmatch(r"[0-9a-f]{64}", wheel.get("sha256", "")) or set(wheel) != {"name", "sha256"}
+    ):
+        raise ValueError("Invalid source-built wheel identity.")
+    return manifest
+
+
+def frozen_source_manifest(history, cloud, track, branch, automation_commit, attempt):
+    branch = source_branch(branch)
+    if track == "ga" and branch != "refs/heads/dev":
+        raise ValueError("GA health always builds dev. Select another branch only for Preview.")
+    paths = sorted(Path(history).glob("source-selection-*/manifest.json")) if history else []
+    if paths:
+        values = [
+            validate_source_manifest(
+                read_json(path), cloud=cloud, track=track, slot=track, automation_commit=automation_commit,
+            ) for path in paths
+        ]
+        if any(value != values[0] for value in values) or values[0]["source"]["branch"] != branch:
+            raise ValueError("Source identity changed between attempts; start a new run.")
+        return values[0]
+    if attempt != 1:
+        raise ValueError("A retry cannot resolve a moving branch without its frozen source selection.")
+    repository = REPOSITORIES["azure-iot"]
+    result = subprocess.run(
+        ["git", "ls-remote", "--exit-code", f"https://github.com/{repository}.git", branch],
+        check=True, capture_output=True, text=True, timeout=60,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+    )
+    refs = dict(line.split()[::-1] for line in result.stdout.splitlines())
+    source_commit = commit(refs.get(branch))
+    tree = ast.parse(download(
+        f"https://raw.githubusercontent.com/{repository}/{source_commit}/azext_iot/constants.py",
+    ).decode("utf-8"))
+    versions = [
+        ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "VERSION" for target in node.targets)
+    ]
+    if len(versions) != 1 or not isinstance(versions[0], str):
+        raise ValueError("Selected source must declare exactly one literal VERSION.")
+    return validate_source_manifest({
+        **settings("azure-iot"), "schema": 2, "kind": "source", "cloudKey": cloud, "cloud": CLOUDS[cloud],
+        "track": track, "slot": track, "automationCommit": commit(automation_commit),
+        "testSourceCommit": source_commit,
+        "source": {"branch": branch, "commit": source_commit, "version": str(Version(versions[0]))},
+        "wheel": None, "runtime": None, "blockers": [], "releaseQualified": False,
+    })
+
+
+def acquire_source(manifest, output):
+    validate_source_manifest(manifest)
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    checkout_source(manifest, output)
+    verify_bundle(output, require_wheel=False)
+
+
+def build_source(output):
+    output = Path(output).resolve()
+    manifest = verify_bundle(output, require_wheel=False)
+    if manifest.get("kind") != "source" or manifest["wheel"] is not None or list(output.glob("*.whl")):
+        raise ValueError("Build requires an unbuilt, immutable source-health bundle.")
+    with TemporaryDirectory(prefix="iot-health-build-") as directory:
+        source = Path(directory) / "source"
+        shutil.copytree(output / "source", source, ignore=shutil.ignore_patterns(".git"))
+        subprocess.run(
+            [sys.executable, "-m", "build", "--wheel", "--outdir", str(output)], cwd=source, check=True,
+            env={**os.environ, "SOURCE_DATE_EPOCH": "315532800"},
+        )
+    wheels = list(output.glob("*.whl"))
+    if len(wheels) != 1:
+        raise ValueError("Source build must produce exactly one CLI wheel.")
+    manifest["wheel"] = {"name": wheels[0].name, "sha256": hashlib.sha256(wheels[0].read_bytes()).hexdigest()}
+    verify_wheel(wheels[0], manifest)
     write_json(output / "manifest.json", manifest)
     verify_bundle(output)
 
@@ -489,7 +619,10 @@ def run_title(manifest, build):
     if not re.fullmatch(r"[1-9][0-9]*", build):
         raise ValueError("A positive ADO build ID is required for the release-health run title.")
     prefix = "iot" if manifest["extension"] == "azure-iot" else "aio"
-    title = f"{prefix}-health-{manifest['cloudKey']}-{manifest['slot']}-cli{manifest['release']['version']}"
+    version = manifest["source"]["version"] if manifest.get("kind") == "source" else manifest["release"]["version"]
+    title = f"{prefix}-health-{manifest['cloudKey']}-{manifest['slot']}-cli{version}"
+    if manifest.get("kind") == "source":
+        title += f"-src{manifest['source']['commit'][:12]}"
     if manifest["extension"] == "azure-iot-ops":
         runtime = manifest["runtime"]["version"] if manifest["runtime"] else "unavailable"
         title += f"-runtime{runtime}"
@@ -511,16 +644,42 @@ def main(argv=None):
     plan.add_argument("--history")
     plan.add_argument("--attempt", type=int, default=1)
     plan.add_argument("--configuration")
+    source = commands.add_parser("resolve-source")
+    source.add_argument("--configuration", required=True)
+    source.add_argument("--cloud", choices=CLOUDS, required=True)
+    source.add_argument("--track", choices=["ga", "preview"], required=True)
+    source.add_argument("--source-branch", required=True)
+    source.add_argument("--automation-commit", required=True)
+    source.add_argument("--history")
+    source.add_argument("--attempt", type=int, default=1)
+    source.add_argument("--output", required=True)
     fetch = commands.add_parser("acquire")
     fetch.add_argument("--manifest", required=True)
     fetch.add_argument("--output", required=True)
+    source_fetch = commands.add_parser("acquire-source")
+    source_fetch.add_argument("--manifest", required=True)
+    source_fetch.add_argument("--output", required=True)
+    source_build = commands.add_parser("build-source")
+    source_build.add_argument("--output", required=True)
     setup = commands.add_parser("definitions")
     setup.add_argument("--configuration", required=True)
     setup.add_argument("--baseline", required=True)
     setup.add_argument("--branch", required=True)
     setup.add_argument("--output", required=True)
     args = parser.parse_args(argv)
-    if args.command == "resolve":
+    if args.command == "resolve-source":
+        check_definition(read_json(args.configuration), "azure-iot", args.cloud, args.track)
+        value = frozen_source_manifest(
+            args.history, args.cloud, args.track, args.source_branch, args.automation_commit, args.attempt,
+        )
+        write_json(args.output, value)
+        print(f"##vso[task.setvariable variable=commit;isOutput=true]{value['source']['commit']}")
+        print(f"##vso[build.updatebuildnumber]{run_title(value, os.environ['BUILD_BUILDID'])}")
+    elif args.command == "acquire-source":
+        acquire_source(read_json(args.manifest), args.output)
+    elif args.command == "build-source":
+        build_source(args.output)
+    elif args.command == "resolve":
         target, slot = args.track, None
         if args.configuration:
             config = read_json(args.configuration)

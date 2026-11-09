@@ -235,6 +235,12 @@ def owned_nodes(service, endpoint=TARGET["PUBLIC_ARM"]):
                         "core/test_dps_disable_local_auth_int.py::",
                     ))
                 }
+                if endpoint == TARGET["CHINA_ARM"]:
+                    # Linked-Hub fixtures and management happy paths require unsupported DPS identity.
+                    nodes = {
+                        node for node in nodes
+                        if node.startswith("core/test_dps_disable_local_auth_int.py::")
+                    }
             if nodes:
                 result[phase] = sorted("azext_iot/tests/dps/" + node for node in nodes)
         return result

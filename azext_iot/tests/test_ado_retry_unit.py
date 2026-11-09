@@ -72,6 +72,15 @@ def test_new_pipeline_id_remains_bound_to_the_running_definition(monkeypatch):
         retry.validate_context(context)
 
 
+def test_mooncake_dps_excludes_managed_identity_linked_fixtures_without_skipping_dps():
+    china = pipeline.owned_nodes("DPS", pipeline.TARGET["CHINA_ARM"])
+    fairfax = pipeline.owned_nodes("DPS", pipeline.TARGET["GOVERNMENT_ARM"])
+    assert set(china) == {"local-auth-toggle"}
+    assert all("test_dps_disable_local_auth_int.py::" in node for nodes in china.values() for node in nodes)
+    assert any("management_happy_paths" in node for node in fairfax["regular"])
+    assert any("/enrollment/" in node for node in fairfax["regular"])
+
+
 def receipt(results):
     return {
         "finished": True, "exitstatus": int("failed" in results.values()), "collected": list(results),
@@ -614,7 +623,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )
-    assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
+    assert stage["jobs"][0]["strategy"]["maxParallel"] == 0
     assert "$(" not in stage["jobs"][0]["displayName"]
     steps = stage["jobs"][0]["steps"]
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))

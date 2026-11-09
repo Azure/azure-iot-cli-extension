@@ -253,3 +253,83 @@ def test_staging_preserves_released_cases_manifests_and_product(monitor, bundle,
     assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
     with pytest.raises(ValueError, match="fresh"):
         adapter.stage(directory, destination)
+
+
+@pytest.fixture
+def source_manifest(monitor):
+    return {
+        **monitor.settings("azure-iot"), "schema": 2, "kind": "source", "cloudKey": "public", "cloud": "AzureCloud",
+        "track": "ga", "slot": "ga", "automationCommit": AUTOMATION, "testSourceCommit": SOURCE,
+        "source": {"branch": "refs/heads/dev", "commit": SOURCE, "version": "1.0.0"},
+        "wheel": None, "runtime": None, "blockers": [], "releaseQualified": False,
+    }
+
+
+def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor, source_manifest, tmp_path):
+    monitor.write_json(tmp_path / "source-selection-1/manifest.json", source_manifest)
+    assert monitor.frozen_source_manifest(tmp_path, "public", "ga", "dev", AUTOMATION, 2) == source_manifest
+    with pytest.raises(ValueError, match="GA health always builds dev"):
+        monitor.frozen_source_manifest(tmp_path, "public", "ga", "preview", AUTOMATION, 2)
+    with pytest.raises(ValueError, match="without its frozen"):
+        monitor.frozen_source_manifest(tmp_path / "missing", "public", "preview", "preview", AUTOMATION, 2)
+    source_manifest["track"] = source_manifest["slot"] = "preview"
+    source_manifest["source"]["branch"] = "refs/heads/users/release-next"
+    monitor.write_json(tmp_path / "source-selection-1/manifest.json", source_manifest)
+    assert monitor.frozen_source_manifest(
+        tmp_path, "public", "preview", "users/release-next", AUTOMATION, 2,
+    ) == source_manifest
+    with pytest.raises(ValueError, match="identity changed"):
+        monitor.frozen_source_manifest(tmp_path, "public", "preview", "users/other", AUTOMATION, 2)
+
+
+def test_source_selection_resolves_exact_branch_commit_and_literal_version(monitor, mocker):
+    git = monitor.subprocess.run
+
+    def run(arguments, **kwargs):
+        if arguments[1] == "ls-remote":
+            return mocker.Mock(stdout=f"{SOURCE}\trefs/heads/users/release-next\n")
+        return git(arguments, **kwargs)
+
+    mocker.patch.object(monitor.subprocess, "run", side_effect=run)
+    download = mocker.patch.object(monitor, "download", return_value=b"VERSION = '1.2.0b1'\n")
+    manifest = monitor.frozen_source_manifest(None, "fairfax", "preview", "users/release-next", AUTOMATION, 1)
+    assert manifest["source"] == {
+        "branch": "refs/heads/users/release-next", "commit": SOURCE, "version": "1.2.0b1",
+    }
+    assert manifest["wheel"] is None
+    download.assert_called_once_with(
+        f"https://raw.githubusercontent.com/Azure/azure-iot-cli-extension/{SOURCE}/azext_iot/constants.py",
+    )
+    assert monitor.run_title(manifest, "123") == "iot-health-fairfax-preview-cli1.2.0b1-srcbbbbbbbbbbbb-b123"
+
+
+def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker):
+    directory, released = bundle
+    wheel = directory / released["wheel"]["name"]
+    wheel_bytes = wheel.read_bytes()
+    wheel.unlink()
+    source_manifest["sourceSha256"] = released["sourceSha256"]
+    monitor.write_json(directory / "manifest.json", source_manifest)
+    before = monitor.source_files(directory / "source")
+    assert monitor.verify_bundle(directory, require_wheel=False) == source_manifest
+    with pytest.raises(ValueError, match="has not produced"):
+        monitor.verify_bundle(directory)
+    git = monitor.subprocess.run
+
+    def run(arguments, **kwargs):
+        if "-m" in arguments and "build" in arguments:
+            assert kwargs["cwd"] != directory / "source"
+            wheel.write_bytes(wheel_bytes)
+            (kwargs["cwd"] / "generated.txt").write_text("build output", encoding="utf-8")
+            return mocker.Mock(returncode=0)
+        return git(arguments, **kwargs)
+
+    mocker.patch.object(monitor.subprocess, "run", side_effect=run)
+    monitor.build_source(directory)
+    built = monitor.verify_bundle(directory)
+    assert built["source"] == source_manifest["source"]
+    assert built["wheel"]["sha256"] == hashlib.sha256(wheel_bytes).hexdigest()
+    assert monitor.source_files(directory / "source") == before
+    assert built["releaseQualified"] is False
+    with pytest.raises(ValueError, match="unbuilt"):
+        monitor.build_source(directory)

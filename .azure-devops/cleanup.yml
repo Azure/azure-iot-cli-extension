@@ -27,28 +27,21 @@ variables:
   - name: deleteExclusions
     value: $[variables.${{ parameters.exclusionsVar }}]
 
+pool:
+  vmImage: ubuntu-24.04
+
 steps:
-  - checkout: none
+  - checkout: self
+    clean: true
+    persistCredentials: false
 
   - task: AzureCLI@2
-    continueOnError: true
-    displayName: "Delete Test resources"
+    displayName: "Delete expired owned test resources"
     inputs:
       azureSubscription: $(AzureServiceConnection)
       scriptType: bash
       scriptLocation: inlineScript
-      inlineScript: |
-        set -x
-
-        names=($EXCLUSIONS)
-        query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-
-        echo "Resources found to delete:"
-        resources=$(az resource list -g "$RESOURCEGROUP" --query "$query[*].id" -o tsv)
-        if [[ -n "$resources" ]]; then
-          echo "Deleting Resources"
-          az resource delete --ids $resources
-        fi
+      inlineScript: python3 scripts/cleanup_test_resources.py
     env:
       RESOURCEGROUP: $(targetResourceGroup)
       EXCLUSIONS: $(deleteExclusions)
