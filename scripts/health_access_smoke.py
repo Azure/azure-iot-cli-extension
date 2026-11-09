@@ -10,6 +10,7 @@ import fnmatch
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 from urllib.parse import quote
 
@@ -105,10 +106,33 @@ def main():
                 "iot", "hub", "list", "--resource-group", group, "--query", "[].name",
             ))
             if hubs:
+                check("existing_hub_query_select_star", lambda: az(
+                    "iot", "hub", "device-identity", "list", "--hub-name", hubs[0], "--resource-group", group,
+                    "--auth-type", "login", "--top", "1", "--query", "length(@)",
+                ))
                 check("existing_hub_data_read", lambda: az(
                     "iot", "hub", "query", "--hub-name", hubs[0], "--resource-group", group,
-                    "--auth-type", "login", "--query-command", "SELECT COUNT() AS count FROM devices",
+                    "--auth-type", "login", "--query-command", "SELECT COUNT() FROM devices",
                 ))
+                host = check("read_hub_hostname", lambda: az(
+                    "iot", "hub", "show", "--name", hubs[0], "--resource-group", group,
+                    "--query", "properties.hostName",
+                ))
+                if host:
+                    suffix = {
+                        "AzureCloud": ".azure-devices.net",
+                        "AzureUSGovernment": ".azure-devices.us",
+                        "AzureChinaCloud": ".azure-devices.cn",
+                    }[cloud["name"]]
+                    if not re.fullmatch(r"[a-z0-9-]+" + re.escape(suffix), host):
+                        raise ValueError("The Hub hostname is outside the expected cloud service domain.")
+                    for api_version in ("2024-03-31", "2026-11-01"):
+                        check(f"same_query_api_{api_version}", lambda version=api_version: az(
+                            "rest", "--method", "post",
+                            "--resource", "https://iothubs.azure.net",
+                            "--url", f"https://{host}/devices/query?api-version={version}",
+                            "--body", json.dumps({"query": "SELECT COUNT() FROM devices"}),
+                        ))
             else:
                 evidence["checks"].append({
                     "name": "existing_hub_data_read", "status": "not_tested",

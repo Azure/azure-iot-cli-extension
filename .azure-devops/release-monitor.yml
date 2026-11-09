@@ -10,6 +10,10 @@ parameters:
   - name: sourceBranch
     type: string
     default: dev
+  - name: smokeServices
+    type: string
+    default: all
+    values: [all, HubData]
 
 pool:
   vmImage: ubuntu-24.04
@@ -47,7 +51,9 @@ stages:
     jobs:
       - ${{ each service in split('DPS,HubControl,HubData,ADU,ADR', ',') }}:
           - job: ${{ service }}
-            condition: and(succeeded(), contains(variables['MonitorServices'], '${{ service }}'))
+            condition: >-
+              and(succeeded(), contains(variables['MonitorServices'], '${{ service }}'),
+              or(eq('${{ parameters.smokeServices }}', 'all'), eq('${{ parameters.smokeServices }}', '${{ service }}')))
             timeoutInMinutes: 20
             cancelTimeoutInMinutes: 5
             steps:
