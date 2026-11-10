@@ -217,6 +217,42 @@ cleanup using the original attempt's ownership evidence; names and age alone nev
 deletion. The daily definition covers only its configured public resource group, not sovereign groups.
 Deploy that cleanup change before overlapping workloads in its shared resource group.
 
+### Current ADO fixed-group isolation
+
+Native, release-triggered and release-health jobs use their configured pre-created
+groups and independently named resources. No test job creates/deletes a group or
+acquires a cross-run lock. Hub/DPS retain their native ownership controllers and
+must prove exact-owned cleanup, not merely submit deletion. Current ADO Hub storage
+names use a 16-hex phase suffix rather than the legacy four-hex suffix.
+Legacy GitHub workflows and older ADO suites are unchanged.
+
+ADU/ADR publish an ownership manifest before obtaining service credentials or
+provisioning. It binds the fixed scope, source/wheel, service, region, Python and
+native retry attempt. A test-only transport records creation intents and reserves
+`cliTestOwner` tags, role descriptions and deployment parameters. It strips only its
+own metadata from test-visible responses; selected tests and product files remain
+unchanged. A guard violation cannot be hidden by an expected-negative test.
+ARM template what-if checks are pre-write checks, not atomic create conditions.
+Unique names reduce the remaining collision window without serializing pipelines.
+
+Cleanup verifies exact ownership, waits for creation/deletion to resolve, and
+records failures rather than declaring pending resources absent. Attempt artifacts
+are also published on cancellation while the agent remains available. Agent loss or
+Azure outages can still leave resources; after the attempt stops, use its original
+manifest and approved cloud profile for exact-owner recovery:
+
+```bash
+python azext_iot/tests/_owned_resources.py cleanup --manifest <original-manifest.json> \
+  --cloud <original-cloud> --subscription <original-subscription> \
+  --resource-group <original-fixed-group>
+```
+
+Retain the final journal when available. Server-side markers allow ADU/ADR resource
+recovery from the pre-provisioning manifest if the journal upload was lost; recheck
+after outstanding Azure operations settle. Recovery cannot qualify a test run.
+This does not deploy or change the legacy daily cleanup definition: its safe-cleanup
+rollout remains an operational prerequisite for overlapping runs in its shared group.
+
 ### Unit Tests
 
 You may need to install the dev_requirements for this

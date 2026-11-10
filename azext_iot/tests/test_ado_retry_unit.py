@@ -629,29 +629,90 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))
     publish = next(step for step in steps if step.get("publish") == "$(testSourceDirectory)/attempt")
     assert steps.index(fallback) < steps.index(publish)
-    assert fallback["condition"] == publish["condition"] == "succeededOrFailed()"
+    assert fallback["condition"] == publish["condition"] == "always()"
+
+
+@pytest.mark.parametrize("service", ["DPS", "HubControl", "HubData"])
+def test_native_owned_phases_require_absence_and_restore_ambient_handoff(tmp_path, mocker, monkeypatch, service):
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {"context": dict(CONTEXT, service=service)})
+    monkeypatch.setenv("azext_iot_cleanup_handoff", "original")
+
+    def execute(_selection, _output):
+        assert "azext_iot_cleanup_handoff" not in os.environ
+        raise ValueError("phase failed")
+
+    mocker.patch.object(pipeline, "_phase", side_effect=execute)
+    with pytest.raises(ValueError, match="phase failed"):
+        pipeline.phase(selection, tmp_path / "phase")
+    assert os.environ["azext_iot_cleanup_handoff"] == "original"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("resourceGroup", "foreign-group"), ("attempt", 2), ("identity", {"build": "foreign"}),
+])
+@pytest.mark.usefixtures("isolated_phase_environment")
+def test_generic_ownership_manifest_is_bound_before_any_execution(tmp_path, mocker, monkeypatch, field, value):
+    from azext_iot.tests import _owned_resources as owned
+
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {"context": CONTEXT, "phase": "tests", "nodes": [], "expected": [], "sequence": 1})
+    manifest = tmp_path / "manifest.json"
+    identity = pipeline.ownership_identity(CONTEXT, 1)
+    identity[field] = value
+    owned.create_context(manifest, **identity)
+    monkeypatch.setenv(pipeline.OWNERSHIP_MANIFEST, str(manifest))
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "1")
+    execute = mocker.patch("azext_iot.tests._dps_phase_runner.child")
+    cleanup = mocker.patch.object(owned, "cleanup")
+    with pytest.raises(ValueError, match="another job attempt"):
+        pipeline.phase(selection, tmp_path / "phase")
+    execute.assert_not_called()
+    cleanup.assert_not_called()
+
+
+def test_ownership_manifest_is_published_before_service_credentials_are_used():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    condition = "${{ if or(eq(parameters.service, 'ADU'), eq(parameters.service, 'ADR')) }}"
+    group = next(step for step in steps if condition in step)
+    prepare, publish = group[condition]
+    execution = next(step for step in steps if step.get("task") == "AzureCLI@2")
+    assert "ownership --service" in prepare["bash"]
+    assert publish["publish"] == "$(testSourceDirectory)/resource-ownership"
+    assert steps.index(group) < steps.index(execution)
+    assert execution["env"][pipeline.OWNERSHIP_MANIFEST].startswith(publish["publish"] + "/")
 
 
 @pytest.mark.parametrize("service", ["ADR", "ADU"])
 @pytest.mark.parametrize("teardown_failed", [False, True])
+@pytest.mark.parametrize("cleanup_failed", [False, True])
 @pytest.mark.usefixtures("isolated_phase_environment")
-def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mocker, monkeypatch, service, teardown_failed):
+def test_generic_phase_verifies_owned_cleanup(
+        tmp_path, mocker, monkeypatch, service, teardown_failed, cleanup_failed):
     monkeypatch.delenv("azext_iot_ado_resource_scope", raising=False)
     output = tmp_path / "phase"
     selection = tmp_path / "selection.json"
+    ctx = dict(CONTEXT, service=service)
     retry.write(selection, {
-        "context": dict(CONTEXT, service=service), "phase": "tests", "nodes": [],
+        "context": ctx, "phase": "tests", "nodes": [],
         "expected": [], "sequence": 1,
     })
-    inventory = mocker.patch.object(
-        pipeline.subprocess, "run", side_effect=AssertionError("Generic phases must not scan ARM inventory."),
-    )
+    manifest = tmp_path / "manifest.json"
+    pipeline.prepare_ownership(ctx, manifest, 1)
+    monkeypatch.setenv(pipeline.OWNERSHIP_MANIFEST, str(manifest))
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "1")
+    cleanup = mocker.patch("azext_iot.tests._owned_resources.cleanup")
+    if cleanup_failed:
+        cleanup.side_effect = RuntimeError("Owned cleanup incomplete")
 
     def execute(command, env, _log, runtime, cleanup):
         assert [arg for arg in command if arg.startswith("--timeout")] == (["--timeout=900"] if service == "ADR" else [])
         assert runtime == (pipeline.BUDGETS[service]["job_timeout_minutes"] - 20) * 60
         assert cleanup == 600
         assert "azext_iot_ado_resource_scope" not in env
+        assert env["AZEXT_TEST_OWNERSHIP"] == str(output / "ownership.json")
+        assert "azext_iot.tests._ado_ownership_plugin" in command
         value = receipt({"case": "passed"})
         value["expected"] = ["case"]
         if teardown_failed:
@@ -661,11 +722,16 @@ def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mo
         return {"exit_code": value["exitstatus"], "timed_out": False, "interrupted": False}
 
     mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
-    pipeline.phase(selection, output)
-    assert retry.read(output / "phase.json")["safe"]
-    assert retry.read(output / "phase.json")["cleanupMode"] == "handoff"
-    inventory.assert_not_called()
-    assert not (output / "cleanup.json").exists()
+    if cleanup_failed:
+        with pytest.raises(RuntimeError, match="Owned cleanup incomplete"):
+            pipeline.phase(selection, output)
+        assert not (output / "phase.json").exists()
+    else:
+        pipeline.phase(selection, output)
+        assert retry.read(output / "phase.json")["safe"]
+        assert retry.read(output / "phase.json")["cleanupMode"] == "verified"
+    cleanup.assert_called_once_with(output / "ownership.json", timeout=600)
+    assert retry.read(output / "ownership.json") == retry.read(manifest)
 
 
 @pytest.mark.parametrize("name", pipeline.GENERIC_PHASE_OVERRIDES)

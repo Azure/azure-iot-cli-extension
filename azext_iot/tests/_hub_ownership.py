@@ -88,7 +88,7 @@ def planned_root(resource_id):
         return False
     patterns = {
         ("microsoft.devices", "iothubs"): r"(test-hub-[0-9a-f]{32}|aziotclitest-hub-[0-9a-f]{18})",
-        ("microsoft.storage", "storageaccounts"): r"(hubstore[0-9a-f]{4}|aziotclitest[0-9a-f]{12})",
+        ("microsoft.storage", "storageaccounts"): r"(hubstore(?:[0-9a-f]{4}|[0-9a-f]{16})|aziotclitest[0-9a-f]{12})",
         ("microsoft.managedidentity", "userassignedidentities"): r"([0-9a-f]{32}|aziotclitest[0-9a-f]{12})",
         ("microsoft.eventhub", "namespaces"): r"aziotclitest[0-9a-f]{12}",
         ("microsoft.servicebus", "namespaces"): r"(sb[0-9a-f]{22}|aziotclitest[0-9a-f]{12})",

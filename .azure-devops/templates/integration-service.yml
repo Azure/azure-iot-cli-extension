@@ -45,7 +45,7 @@ stages:
       - job: Tests
         displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
         timeoutInMinutes: 360
-        cancelTimeoutInMinutes: 15
+        cancelTimeoutInMinutes: 20
         variables:
           ${{ if parameters.monitor }}:
             testSourceDirectory: $(Agent.TempDirectory)/iot-monitor-source
@@ -123,6 +123,27 @@ stages:
               PYTHONPATH: $(testSourceDirectory)
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+          - ${{ if or(eq(parameters.service, 'ADU'), eq(parameters.service, 'ADR')) }}:
+              - bash: |
+                  set -euo pipefail
+                  export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
+                  python azext_iot/tests/_ado_pipeline.py ownership --service "$SERVICE" \
+                    --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
+                    --wheel candidate --output resource-ownership/manifest.json
+                displayName: Record fixed-group resource ownership before provisioning
+                workingDirectory: $(testSourceDirectory)
+                env:
+                  SERVICE: ${{ parameters.service }}
+                  TEST_PYTHON: $(python)
+                  TEST_REGION: $(region)
+                  TEST_ENDPOINT: $(endpoint)
+                  PYTHONPATH: $(testSourceDirectory)
+                  AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+                  ${{ if parameters.monitor }}:
+                    AZEXT_IOT_MONITOR_MANIFEST: $(testSourceDirectory)/release-monitor.json
+              - publish: $(testSourceDirectory)/resource-ownership
+                displayName: Publish resource recovery manifest
+                artifact: ownership-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
           - task: AzureCLI@2
             displayName: Run tests
             inputs:
@@ -155,6 +176,7 @@ stages:
               TEST_SUBSCRIPTION_ID: ${{ parameters.subscription }}
               azext_iot_test_subscription: ${{ parameters.subscription }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+              AZEXT_IOT_RESOURCE_MANIFEST: $(testSourceDirectory)/resource-ownership/manifest.json
               AZURE_TEST_RUN_LIVE: 'True'
               PYTHONUNBUFFERED: '1'
               azext_iot_testrg: ${{ parameters.resourceGroup }}
@@ -171,7 +193,7 @@ stages:
               ${{ if parameters.monitor }}:
                 AZEXT_IOT_MONITOR_MANIFEST: $(testSourceDirectory)/release-monitor.json
           - bash: python azext_iot/tests/_ado_pipeline.py report-incomplete --output attempt
-            condition: succeededOrFailed()
+            condition: always()
             displayName: Record results
             workingDirectory: $(testSourceDirectory)
             env:
@@ -180,7 +202,7 @@ stages:
               TEST_REGION: $(region)
           - publish: $(testSourceDirectory)/attempt
             displayName: Publish results
-            condition: succeededOrFailed()
+            condition: always()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
           - task: PublishTestResults@2
             condition: succeededOrFailed()
