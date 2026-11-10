@@ -193,6 +193,28 @@ def resource_type(resource):
     return "/".join((parts[0], *parts[1::2]))
 
 
+def request_body(raw):
+    """Accept strict JSON or the CLI's exact unquoted deployment-template envelope."""
+    raw = raw or "{}"
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as error:
+        if raw[error.pos:error.pos + 9] != "template:":
+            raise ValueError("Invalid deployment JSON envelope.") from error
+        body = json.loads(raw[:error.pos] + '"template":' + raw[error.pos + 9:])
+        properties = body.get("properties", {})
+        template = properties.get("template")
+        envelope = json.loads(raw[:error.pos].rstrip()[:-1] + "}}")
+        if (set(envelope) - {"properties", "location", "tags"}
+                or "template" in envelope.get("properties", {})
+                or not isinstance(template, dict)
+                or properties != dict(envelope.get("properties", {}), template=template)):
+            raise ValueError("Invalid CLI deployment envelope.")
+        return body
+
+
 class Arm:
     def __init__(self, journal):
         import requests
@@ -540,7 +562,7 @@ class Observer:
                     }:
                         raise ValueError("ARM mutation targets another Azure cloud.")
                     resource = self.journal.resource_id(resource)
-                    body = json.loads(request.body) if request.body else {}
+                    body = request_body(request.body)
                     if resource_type(resource) == DEPLOYMENT_TYPE:
                         if method == "PUT":
                             created = self.prepare_deployment(resource, api, body, creation_id)

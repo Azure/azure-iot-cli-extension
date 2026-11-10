@@ -278,6 +278,58 @@ def test_deployment_checks_resolved_parents_even_when_children_come_first(journa
     assert [call.args[0] for call in arm.verify.call_args_list] == [instance]
 
 
+def test_real_cli_template_policy_is_guarded_before_deployment_transport(journal):
+    from azure.cli.command_modules.resource.custom import JsonCTemplatePolicy
+    from azure.core.pipeline import PipelineContext, PipelineRequest
+    from azure.core.pipeline.transport import HttpRequest
+
+    template = {"resources": [
+        {"type": "Microsoft.Storage/storageAccounts", "apiVersion": "2023-05-01",
+         "name": "teststore", "location": "westus2", "tags": {"note": "literal template: stays unchanged"}},
+    ]}
+    deployment = GROUP + "/providers/microsoft.resources/deployments/policy"
+    url = "https://management.azure.com" + deployment + "?api-version=2022-09-01"
+    http = HttpRequest("PUT", url)
+    http.set_json_body({"properties": {"mode": "Incremental", "template": json.dumps(template)}})
+    JsonCTemplatePolicy().on_request(PipelineRequest(http, PipelineContext(None)))
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(http.data)
+    arm = Mock(endpoint="https://management.azure.com")
+    arm.verify.return_value = None
+    arm.request.side_effect = [(404, None, {}), (200, {"status": "Succeeded", "properties": {"changes": [
+        {"resourceId": RESOURCE, "changeType": "Create"},
+    ]}}, {})]
+    observer = owned.Observer(journal, arm)
+    original_send = requests.Session.send
+    response = requests.Response()
+    response.status_code = 201
+    response._content = b"{}"
+    observer.install()
+    try:
+        observer.original_send = Mock(return_value=response)
+        requests.Session().send(requests.Request("PUT", url, data=http.data).prepare())
+        sent = observer.original_send.call_args.args[1]
+        body = json.loads(sent.body)
+        resource = body["properties"]["template"]["resources"][0]
+        assert resource["tags"] == {owned.TAG: journal.owner, "note": "literal template: stays unchanged"}
+        assert body["properties"]["parameters"][owned.PARAMETER]["value"] == journal.owner
+        assert int(sent.headers["Content-Length"]) == len(sent.body)
+        assert set(journal.records()) == {RESOURCE, deployment}
+    finally:
+        observer.original_send = original_send
+        observer.uninstall()
+
+
+@pytest.mark.parametrize("body", [
+    '{properties: {"template": {}}}',
+    '{"properties": {"template": {unquoted: "value"}}}',
+    '{"properties": {"template": {"text": "template:"}, template: {}}}',
+])
+def test_cli_envelope_support_does_not_accept_other_unquoted_keys(body):
+    with pytest.raises(ValueError):
+        owned.request_body(body)
+
+
 def test_cleanup_deletes_exact_owned_resources_and_preserves_other_attempts(journal, monkeypatch):
     other = RESOURCE + "other"
     own_resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
