@@ -1,47 +1,78 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
-# Required for schedule only trigger
 trigger: none
 pr: none
 
-# Run daily at 5 am (Pacific).
+# Scheduled runs use the report-only parameter default, regardless of source changes.
 schedules:
   - cron: "0 13 * * *"
-    displayName: "Daily Cleanup"
+    displayName: "Daily owned-resource report (13:00 UTC)"
     branches:
       include:
         - dev
     always: true
 
 parameters:
-  - name: resourceGroupVar
+  - name: mode
+    displayName: Cleanup mode
     type: string
-    default: "ResourceGroup"
-  - name: exclusionsVar
+    default: report
+    values: [report, delete]
+  - name: buildId
+    displayName: Original producer build ID (0 discovers recent runs)
     type: string
-    default: "Exclusions"
+    default: '0'
+  - name: profiles
+    displayName: Approved profiles and service connections
+    type: object
+    default:
+      - name: iot-public
+        connection: aziotcli-sp-prime
+      - name: iot-fairfax
+        connection: sc-iot-cli-fairfax-it
+      - name: iot-mooncake
+        connection: sc-iot-cli-mooncake-it
+      - name: aio-public
+        connection: az-iot-ops-int-sp-ado
+      - name: aio-fairfax
+        connection: sc-iot-ops-cli-fairfax-it
 
-variables:
-  - name: targetResourceGroup
-    value: $[variables.${{ parameters.resourceGroupVar }}]
-  - name: deleteExclusions
-    value: $[variables.${{ parameters.exclusionsVar }}]
-
-pool:
-  vmImage: ubuntu-24.04
-
-steps:
-  - checkout: self
-    clean: true
-    persistCredentials: false
-
-  - task: AzureCLI@2
-    displayName: "Delete expired owned test resources"
-    inputs:
-      azureSubscription: $(AzureServiceConnection)
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: python3 scripts/cleanup_test_resources.py
-    env:
-      RESOURCEGROUP: $(targetResourceGroup)
-      EXCLUSIONS: $(deleteExclusions)
+jobs:
+  - job: Cleanup
+    displayName: Report or clean finished owners
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 5
+    pool:
+      vmImage: ubuntu-24.04
+    steps:
+      - checkout: self
+        clean: true
+        persistCredentials: false
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.13'
+      - bash: python -m pip install azure-cli
+        displayName: Install cleanup dependencies
+      - ${{ each profile in parameters.profiles }}:
+          - task: AzureCLI@2
+            displayName: Cleanup ${{ profile.name }}
+            condition: succeededOrFailed()
+            inputs:
+              azureSubscription: ${{ profile.connection }}
+              visibleAzLogin: false
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                python scripts/cleanup_test_resources.py --profile "$PROFILE" \
+                  --mode "$MODE" --build-id "$PRODUCER_BUILD" --output cleanup-report
+            env:
+              PROFILE: ${{ profile.name }}
+              MODE: ${{ parameters.mode }}
+              PRODUCER_BUILD: ${{ parameters.buildId }}
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              EXCLUSIONS: $(Exclusions)
+      - publish: cleanup-report
+        artifact: cleanup-report-$(System.JobAttempt)
+        displayName: Retain classification and ownership evidence
+        condition: always()

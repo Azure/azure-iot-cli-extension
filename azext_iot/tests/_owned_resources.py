@@ -713,11 +713,11 @@ def cleanup_batch(journal, arm, batch):
     return failures
 
 
-def cleanup(path, timeout=600):
+def cleanup(path, timeout=600, *, arm_factory=None):
     from knack.util import CLIError
 
     journal = Journal(path)
-    arm = Arm(journal)
+    arm = (arm_factory or Arm)(journal)
     arm.deadline = time.monotonic() + timeout
     records = journal.records()
     inventories = (

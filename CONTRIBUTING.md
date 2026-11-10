@@ -206,16 +206,10 @@ never unsupported skips.
 Run titles include the cloud, track, actual CLI version, source commit and build ID.
 These are source-build health results, not published-release qualification.
 
-Service matrices have no artificial parallel limit or cross-run lock. The scheduled
-cleanup preserves untagged, excluded and recently created resources. It reaps
-resources with `intTest=true`, an owner `runUid`, and a `createdEpoch` at least 48 hours old.
-It also recognizes the existing native Hub ownership tag and SAS-phase ownership tags,
-only for the Hub harness's allowed root types/names and ARM creation times at least
-48 hours old. Ownership and creation time are rechecked before deleting each exact ID.
-Untagged ADU/ADR resources, helper storage and legacy fixtures require explicit operational
-cleanup using the original attempt's ownership evidence; names and age alone never authorize
-deletion. The daily definition covers only its configured public resource group, not sovereign groups.
-Deploy that cleanup change before overlapping workloads in its shared resource group.
+Service matrices have no artificial parallel limit or cross-run lock. Scheduled
+cleanup is report-first and never uses names or age alone to authorize deletion.
+Deploy the replacement below before overlapping workloads in a group still covered
+by the legacy broad sweep.
 
 ### Current ADO fixed-group isolation
 
@@ -252,6 +246,49 @@ recovery from the pre-provisioning manifest if the journal upload was lost; rech
 after outstanding Azure operations settle. Recovery cannot qualify a test run.
 This does not deploy or change the legacy daily cleanup definition: its safe-cleanup
 rollout remains an operational prerequisite for overlapping runs in its shared group.
+
+### Scheduled cleanup (pipeline 109)
+
+`.azure-devops/cleanup.yml` runs daily at **13:00 UTC**, with `mode: report` by
+default. One hosted agent processes the approved IoT Public/Fairfax/Mooncake and
+AIO Public/Fairfax profiles sequentially; it never uses the AIO integration pool
+or locks a test service connection. `cleanup-profiles.json` is the fixed
+subscription/group/producer allowlist. Existing `Exclusions` names remain protected;
+exact resource IDs also protect their parent from cascading deletion.
+
+Automatic eligibility currently supports the `cliTestOwner` manifests published by
+IoT ADU/ADR and AIO. The original artifact must match its actual leaf producer build,
+source commit, job and native attempt. The whole producer run must be completed;
+the original job must have successfully finalized, including a retained timeline
+for older retries. Wait at least **six hours** after the latest run/job/finalization
+finish time. Release-parent completion never substitutes for the child producer's
+status. These leaf producers do not share their attempt resources with downstream
+runs; adding such a consumer requires extending the cleanup contract first.
+
+The final attempt artifact supplies the original context and mutation journal.
+Unfinished ARM creates/deployments, changed ownership, active reruns, missing status,
+lost-agent finalization, missing artifacts and explicit exclusions prevent deletion.
+Native Hub/DPS markers, older formats, untagged resources and unmatched owners are
+**report-only regardless of age**; use their original controller evidence for manual
+review. Never reconstruct a manifest from resource tags.
+
+To roll out, replace/pause the old broad sweep with owner approval, deploy to the
+branch actually used by 109, authorize its existing service connections and ensure
+the build service can read producer builds, timelines and artifacts. No subscription-
+wide role grant is needed. Inspect report-only results for active, canceled, retried,
+lost-agent and pending-provisioning cases before manually selecting `mode: delete`.
+Use `buildId` to target an original producer. Changing the scheduled default to
+deletion is a separate reviewed rollout decision; this PR does not enable it.
+
+Delete mode uses the existing dependency-ordered helper, rechecks producer liveness
+before every DELETE, rejects resources outside its freshly inspected plan, uses
+conditional deletion where supported and confirms absence. Each profile is bounded
+to five minutes, ten owners and fifty DELETE submissions, paced at one per second.
+Discovery covers at most 100 builds from 14 days and 200 manifests; limits are
+reported, never treated as proof of absence. Select an original build explicitly
+when discovery is insufficient. Report/error artifacts retain recovery contexts
+and journals; preserve unresolved artifacts until cleanup finishes. A failed scope
+does not suppress the other scopes, but errors still fail the cleanup run.
 
 ### Unit Tests
 
