@@ -34,6 +34,12 @@ API = re.compile(r"20\d{2}-\d{2}-\d{2}(?:-preview)?")
 TERMINAL_STATES = {"succeeded", "failed", "canceled", "cancelled"}
 
 
+class CleanupIncomplete(RuntimeError):
+    def __init__(self, failures):
+        super().__init__("Owned-resource cleanup is incomplete; retain the ownership context and retry.")
+        self.failures = dict(failures)
+
+
 def cloud_endpoints(cloud):
     result = {CLOUDS[cloud]}
     if cloud == "AzureCloud":
@@ -674,11 +680,11 @@ def cleanup_submit(journal, arm, resource, record):
 def cleanup_batch(journal, arm, batch):
     from knack.util import CLIError
 
-    failures = []
+    failures = {}
     errors = (CLIError, OSError, RuntimeError, ValueError)
 
     def failed(resource, api, error):
-        failures.append(resource)
+        failures[resource] = type(error).__name__
         journal.record(resource, api, cleanup="failed", errorType=type(error).__name__)
         print(f"Cleanup pending for {resource}: {type(error).__name__}", file=sys.stderr, flush=True)
 
@@ -717,7 +723,7 @@ def cleanup(path, timeout=600, *, arm_factory=None):
     from knack.util import CLIError
 
     journal = Journal(path)
-    arm = (arm_factory or Arm)(journal)
+    arm = Arm(journal) if arm_factory is None else arm_factory(journal)
     arm.deadline = time.monotonic() + timeout
     records = journal.records()
     inventories = (
@@ -725,7 +731,7 @@ def cleanup(path, timeout=600, *, arm_factory=None):
         (journal.group + "/providers/Microsoft.Authorization/roleAssignments", "2022-04-01"),
         (journal.group + "/providers/Microsoft.Resources/deployments", "2022-09-01"),
     )
-    failures = []
+    failures = {}
     errors = (CLIError, OSError, RuntimeError, ValueError)
     for collection, api in inventories:
         try:
@@ -735,7 +741,7 @@ def cleanup(path, timeout=600, *, arm_factory=None):
                     if resource_id not in records:
                         records[resource_id] = journal.record(resource_id, arm.api_for(resource_id), recovered=True)
         except errors as error:
-            failures.append(collection)
+            failures[collection] = type(error).__name__
             print(f"Cleanup inventory failed for {collection}: {type(error).__name__}", file=sys.stderr, flush=True)
     priority = {
         ROLE_TYPE: 0, "microsoft.deviceregistry/assets": 1,
@@ -752,9 +758,9 @@ def cleanup(path, timeout=600, *, arm_factory=None):
         return priority.get(resource_type(item[0]), 9)
 
     for _, batch in groupby(sorted(records.items(), key=order), key=order):
-        failures.extend(cleanup_batch(journal, arm, batch))
+        failures.update(cleanup_batch(journal, arm, batch))
     if failures:
-        raise RuntimeError("Owned-resource cleanup is incomplete; retain the ownership context and retry.")
+        raise CleanupIncomplete(failures)
     if journal.has_violations():
         raise RuntimeError("Ownership guard rejected mutations; this attempt cannot qualify even after cleanup.")
 

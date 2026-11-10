@@ -22,20 +22,11 @@ parameters:
     displayName: Original producer build ID (0 discovers recent runs)
     type: string
     default: '0'
-  - name: profiles
-    displayName: Approved profiles and service connections
-    type: object
-    default:
-      - name: iot-public
-        connection: aziotcli-sp-prime
-      - name: iot-fairfax
-        connection: sc-iot-cli-fairfax-it
-      - name: iot-mooncake
-        connection: sc-iot-cli-mooncake-it
-      - name: aio-public
-        connection: az-iot-ops-int-sp-ado
-      - name: aio-fairfax
-        connection: sc-iot-ops-cli-fairfax-it
+  - name: profile
+    displayName: Approved cleanup profile
+    type: string
+    default: all
+    values: [all, iot-public, iot-fairfax, iot-mooncake, aio-public, aio-fairfax]
 
 jobs:
   - job: Cleanup
@@ -53,25 +44,11 @@ jobs:
           versionSpec: '3.13'
       - bash: python -m pip install azure-cli
         displayName: Install cleanup dependencies
-      - ${{ each profile in parameters.profiles }}:
-          - task: AzureCLI@2
-            displayName: Cleanup ${{ profile.name }}
-            condition: succeededOrFailed()
-            inputs:
-              azureSubscription: ${{ profile.connection }}
-              visibleAzLogin: false
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                set -euo pipefail
-                python scripts/cleanup_test_resources.py --profile "$PROFILE" \
-                  --mode "$MODE" --build-id "$PRODUCER_BUILD" --output cleanup-report
-            env:
-              PROFILE: ${{ profile.name }}
-              MODE: ${{ parameters.mode }}
-              PRODUCER_BUILD: ${{ parameters.buildId }}
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-              EXCLUSIONS: $(Exclusions)
+      - template: templates/cleanup-profiles.yml
+        parameters:
+          profile: ${{ parameters.profile }}
+          mode: ${{ parameters.mode }}
+          buildId: ${{ parameters.buildId }}
       - publish: cleanup-report
         artifact: cleanup-report-$(System.JobAttempt)
         displayName: Retain classification and ownership evidence

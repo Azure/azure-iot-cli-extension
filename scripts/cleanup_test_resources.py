@@ -40,6 +40,8 @@ class Deferred(RuntimeError):
 
 
 def timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError("Cleanup timestamps must be strings.")
     result = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if result.utcoffset() is None:
         raise ValueError("Cleanup timestamps must include their timezone.")
@@ -158,6 +160,8 @@ def producer(context):
 
 
 def manifest(context, build, artifact, profile):
+    if not isinstance(context, dict):
+        raise ValueError("Ownership context must be a JSON object.")
     OWNED["validate_context"](context)
     if (context.get("product") != profile["product"] or context["cloud"] != profile["cloud"]
             or context["subscription"].lower() != profile["subscription"].lower()
@@ -203,14 +207,12 @@ def eligible(ado, build_id, artifact, context, profile, now):
     if not jobs or any(item.get("state") != "completed" for item in jobs):
         raise Deferred("Producer still has unfinished jobs.")
     source = artifact.get("source", "").lower()
-    matches = [item for item in jobs if item["id"].lower() == source]
-    if len(matches) != 1:
-        raise Deferred("Artifact source cannot be bound to a producing job.")
-    job = matches[0]
-    if job.get("attempt") != context["attempt"]:
-        previous = [item for item in job.get("previousAttempts", []) if item["attempt"] == context["attempt"]]
-        if len(previous) != 1:
-            raise Deferred("Original retry-attempt timeline is unavailable.")
+    matches = [item for item in jobs if item["id"].lower() == source and item.get("attempt") == context["attempt"]]
+    previous = [item for job in jobs for item in job.get("previousAttempts", [])
+                if item["attempt"] == context["attempt"] and item["recordId"].lower() == source]
+    if len(matches) + len(previous) != 1:
+        raise Deferred("Artifact source cannot be bound to exactly one original job attempt.")
+    if previous:
         previous = previous[0]
         if not re.fullmatch(r"[a-fA-F0-9-]{36}", previous["timelineId"]):
             raise ValueError("Invalid previous-attempt timeline identity.")
@@ -220,10 +222,12 @@ def eligible(ado, build_id, artifact, context, profile, now):
                    and item.get("attempt") == context["attempt"]]
         if len(matches) != 1:
             raise Deferred("Original retry attempt cannot be verified.")
-        job = matches[0]
+    if len(matches) != 1:
+        raise Deferred("Artifact source has an ambiguous producing job.")
+    job = matches[0]
     finalizers = [item for item in timeline["records"] if item["type"] == "Task"
                   and item.get("parentId", "").lower() == job["id"].lower()
-                  and item.get("name") == "Finalize Job" and item.get("attempt") == context["attempt"]]
+                  and item.get("name") == "Finalize Job"]
     if (job.get("state") != "completed" or job.get("result") not in
             ("succeeded", "succeededWithIssues", "failed", "canceled")
             or len(finalizers) != 1 or finalizers[0].get("state") != "completed"
@@ -240,6 +244,8 @@ def recover(archive, context, destination):
         path = PurePosixPath(name)
         if path.name in ("ownership.json", "state.json"):
             value = json.loads(archive.read(name))
+            if not isinstance(value, dict):
+                raise ValueError("Final ownership documents must be JSON objects.")
             if value.get("ownership", value) == context:
                 matching.append(path.with_suffix(".events"))
     if not matching:
@@ -342,21 +348,28 @@ class GuardedArm(OWNED["Arm"]):
 
 
 def inspect_owner(ado, build, artifact, artifacts, profile, resources, output, report, budget, mode, exclusions):
-    with ado.archive(build["id"], artifact) as archive:
-        value = document(archive, "manifest.json" if profile["product"] == "azure-iot" else "state.json")
-    context = value.get("ownership", value)
-    # Other profiles can legitimately publish manifests in the same multi-region run.
-    if (context.get("cloud") != profile["cloud"]
-            or context.get("subscription", "").lower() != profile["subscription"].lower()
-            or context.get("resourceGroup", "").lower() not in {item.lower() for item in profile["groups"]}):
-        return
-    manifest(context, build, artifact, profile)
-    if context["owner"] not in {owner(value) for value in resources.values()}:
-        return
-    entry = {"owner": context["owner"], "build": build["id"], "artifact": artifact["name"], "status": "deferred"}
-    report["owners"].append(entry)
-    write(output / "evidence" / context["owner"] / "original.json", context)
+    entry = {"build": build["id"], "artifact": artifact["name"], "status": "deferred"}
     try:
+        with ado.archive(build["id"], artifact) as archive:
+            value = document(archive, "manifest.json" if profile["product"] == "azure-iot" else "state.json")
+        if not isinstance(value, dict) or not isinstance(value.get("ownership", value), dict):
+            raise ValueError("Original ownership documents must be JSON objects.")
+        context = value.get("ownership", value)
+        if context.get("schema") != 1:
+            raise Deferred("Unsupported ownership format; manual review is required.")
+        OWNED["validate_context"](context)
+        # A multi-region producer can publish manifests for other approved profiles.
+        if (context.get("cloud") != profile["cloud"]
+                or context["subscription"].lower() != profile["subscription"].lower()
+                or context["resourceGroup"].lower() not in {item.lower() for item in profile["groups"]}):
+            return
+        manifest(context, build, artifact, profile)
+        if context["owner"] not in {owner(value) for value in resources.values()}:
+            return
+        entry["owner"] = context["owner"]
+        report["owners"].append(entry)
+        write(output / "evidence" / context["owner"] / "original.json", context)
+
         def authorize():
             eligible(ado, build["id"], artifact, context, profile, datetime.now(timezone.utc))
 
@@ -378,21 +391,34 @@ def inspect_owner(ado, build, artifact, artifacts, profile, resources, output, r
             if budget["owners"] <= 0 or len(approved) > budget["remaining"]:
                 raise Deferred("Delete batch limit reached; retain evidence for the next cleanup.")
             budget["owners"] -= 1
-            OWNED["cleanup"](
-                journal.path, timeout=max(0, ado.deadline - time.monotonic()),
-                arm_factory=lambda source: GuardedArm(source, authorize, approved, budget),
-            )
+            try:
+                OWNED["cleanup"](
+                    journal.path, timeout=max(0, ado.deadline - time.monotonic()),
+                    arm_factory=lambda source: GuardedArm(source, authorize, approved, budget),
+                )
+            except OWNED["CleanupIncomplete"] as error:
+                records = journal.records()
+                if error.failures and all(resource in records and kind in ("Deferred", "TimeoutError")
+                                          for resource, kind in error.failures.items()):
+                    raise Deferred(
+                        "Cleanup is pending; retry after Azure operations settle and the owner is inactive.",
+                    ) from error
+                raise
             entry["status"] = "absent"
     except Deferred as error:
+        if entry not in report["owners"]:
+            report["owners"].append(entry)
         entry.update(status="deferred", reason=str(error))
     except ERRORS as error:
+        if entry not in report["owners"]:
+            report["owners"].append(entry)
         entry.update(status="error", reason=error_message(error))
-        report["errors"].append(f"Owner {context['owner']}: {error_message(error)}")
+        report["errors"].append(f"Build {build['id']} artifact {artifact['name']}: {error_message(error)}")
 
 
 def run(profile, mode, build_id, output, exclusions, *, ado=None, deadline=None):
     deadline = time.monotonic() + PROFILE_SECONDS if deadline is None else deadline
-    report = {"mode": mode, "owners": [], "resources": [], "errors": [], "limits": []}
+    report = {"mode": mode, "owners": [], "resources": [], "errors": [], "limits": [], "skippedBuilds": []}
     try:
         account = json.loads(subprocess.check_output(
             ["az", "account", "show", "--output", "json"], text=True, timeout=60,
@@ -417,7 +443,13 @@ def run(profile, mode, build_id, output, exclusions, *, ado=None, deadline=None)
             budget, count = {"remaining": MAX_DELETES, "owners": MAX_OWNERS}, 0
             for build in builds:
                 check_budget(deadline)
-                trusted_build(build, profile)
+                try:
+                    trusted_build(build, profile)
+                except (ValueError, KeyError, TypeError) as error:
+                    if build_id:
+                        raise
+                    report["skippedBuilds"].append({"build": build.get("id"), "reason": error_message(error)})
+                    continue
                 artifacts = ado.json(f"/builds/{build['id']}/artifacts")["value"]
                 for artifact in artifacts:
                     prefix = "ownership-" if profile["product"] == "azure-iot" else "ops-manifest-"
@@ -433,13 +465,13 @@ def run(profile, mode, build_id, output, exclusions, *, ado=None, deadline=None)
     except ERRORS as error:
         report["errors"].append(error_message(error))
     finally:
-        outcomes = {entry["owner"]: entry["status"] for entry in report["owners"]}
+        outcomes = {entry["owner"]: entry["status"] for entry in report["owners"] if "owner" in entry}
         for resource in report["resources"]:
             resource["status"] = outcomes.get(resource["owner"], resource["status"])
         write(output / "report.json", report)
     print(json.dumps({key: len(report[key]) for key in ("owners", "resources", "errors", "limits")}))
-    if report["limits"]:
-        print("##vso[task.logissue type=warning]Cleanup was bounded; inspect the retained report for deferred work.")
+    if report["limits"] or any(entry["status"] == "deferred" for entry in report["owners"]):
+        print("##vso[task.logissue type=warning]Cleanup has deferred work; inspect the retained report before retrying.")
     if report["errors"]:
         raise RuntimeError("Cleanup is incomplete; inspect the report and retain ownership evidence.")
     return report

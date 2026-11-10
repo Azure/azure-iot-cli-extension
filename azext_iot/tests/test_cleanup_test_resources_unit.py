@@ -122,10 +122,11 @@ def test_finalization_and_grace_are_required(cleanup, evidence, change):
 def test_old_attempt_requires_its_own_finalized_timeline(cleanup, evidence):
     previous = deepcopy(evidence["timeline"])
     current = evidence["timeline"]
-    current["records"][0].update(attempt=2, previousAttempts=[
+    current_job = "22222222-3333-4444-8555-666666666666"
+    current["records"][0].update(id=current_job, attempt=2, previousAttempts=[
         {"attempt": 1, "timelineId": TIMELINE, "recordId": JOB},
     ])
-    current["records"][1]["attempt"] = 2
+    current["records"][1]["parentId"] = current_job
     evidence["ado"].json.side_effect = lambda path: deepcopy({
         "/builds/42": evidence["build"], "/builds/42/timeline": current,
         f"/builds/42/timeline/{TIMELINE}": previous,
@@ -133,6 +134,30 @@ def test_old_attempt_requires_its_own_finalized_timeline(cleanup, evidence):
     check(cleanup, evidence)
     previous["records"].pop()
     with pytest.raises(cleanup.Deferred, match="finalization"):
+        check(cleanup, evidence)
+
+
+def test_current_retry_finalizer_has_task_attempt_one(cleanup, evidence):
+    context = evidence["context"]
+    context["attempt"] = 2
+    context["owner"] = cleanup.OWNED["digest"]({key: value for key, value in context.items() if key != "owner"})
+    evidence["artifact"]["name"] = evidence["artifact"]["name"][:-1] + "2"
+    evidence["timeline"]["records"][0]["attempt"] = 2
+    assert evidence["timeline"]["records"][1]["attempt"] == 1
+    check(cleanup, evidence)
+
+
+@pytest.mark.parametrize("change", ["current-attempt", "previous-source", "ambiguous"])
+def test_retry_binding_rejects_mismatched_or_duplicate_sources(cleanup, evidence, change):
+    job = evidence["timeline"]["records"][0]
+    job["previousAttempts"] = [{"attempt": 1, "recordId": JOB, "timelineId": TIMELINE}]
+    if change == "current-attempt":
+        job["attempt"] = 2
+        job["previousAttempts"] = []
+    elif change == "previous-source":
+        job["id"] = "different-current-job"
+        job["previousAttempts"][0]["attempt"] = 2
+    with pytest.raises(cleanup.Deferred, match="exactly one"):
         check(cleanup, evidence)
 
 
@@ -175,6 +200,9 @@ def test_recovery_imports_only_matching_context_events(cleanup, evidence, tmp_pa
     with archive({"state.json": {"ownership": {**context, "owner": "changed"}}}) as source:
         with pytest.raises(cleanup.Deferred, match="original ownership"):
             cleanup.recover(source, context, tmp_path / "other")
+    with archive({"state.json": []}) as source:
+        with pytest.raises(ValueError, match="JSON objects"):
+            cleanup.recover(source, context, tmp_path / "malformed")
 
 
 @pytest.fixture
@@ -242,15 +270,26 @@ def test_delete_guard_rechecks_live_status_etag_and_budget(cleanup, owned, mocke
         arm.request("PUT", resource, "2023-05-01")
 
 
-def test_report_classifies_without_invoking_cleanup(cleanup, evidence, owned, tmp_path, mocker):
+@pytest.fixture
+def execution(cleanup, evidence, owned, tmp_path, mocker):
     mocker.patch.object(cleanup, "datetime", wraps=datetime).now.return_value = NOW
-    journal, resource, value, arm = owned
+    _, resource, value, _ = owned
     ado = evidence["ado"]
     ado.builds.return_value = [evidence["build"]]
-    ado.json.side_effect = lambda path: deepcopy(
-        {"value": [evidence["artifact"], evidence["final_artifact"]]} if path.endswith("/artifacts")
-        else evidence["build"] if path == "/builds/42" else evidence["timeline"]
-    )
+    state = {"calls": [], "live": {resource: value}, "behavior": "normal", "buildReads": 0}
+
+    def ado_json(path):
+        if path.endswith("/artifacts"):
+            return {"value": [evidence["artifact"], evidence["final_artifact"]]}
+        if path == "/builds/42":
+            state["buildReads"] += 1
+            build = deepcopy(evidence["build"])
+            if state["behavior"] == "rerun" and state["buildReads"] > 1:
+                build["status"] = "inProgress"
+            return build
+        return deepcopy(evidence["timeline"])
+
+    ado.json.side_effect = ado_json
     initial = evidence["context"] if evidence["filename"] == "manifest.json" else {"ownership": evidence["context"]}
     ado.archive.side_effect = lambda _, item: archive(
         {evidence["filename"]: initial} if item["name"] == evidence["artifact"]["name"]
@@ -260,14 +299,126 @@ def test_report_classifies_without_invoking_cleanup(cleanup, evidence, owned, tm
         "id": evidence["profile"]["subscription"], "environmentName": evidence["profile"]["cloud"],
     }))
     mocker.patch.object(cleanup, "inventory", return_value={resource: value})
-    mocker.patch.dict(cleanup.OWNED, {"Arm": Mock(return_value=arm)})
-    deleted = Mock()
-    mocker.patch.dict(cleanup.OWNED, {"cleanup": deleted})
-    result = cleanup.run(evidence["profile"], "report", 0, tmp_path / "report", set(), ado=ado)
+    base = cleanup.GuardedArm.__bases__[0]
+
+    def initialize(arm, journal):
+        arm.journal, arm.deadline = journal, None
+
+    def request(_, method, resource_id, api, body=None, headers=None, query=None):
+        state["calls"].append((method, resource_id))
+        if method == "DELETE":
+            if state["behavior"] == "denied":
+                raise RuntimeError("Ownership DELETE failed with HTTP 403")
+            state["live"].pop(resource_id, None)
+            return 202, None, {}
+        if resource_id not in state["live"]:
+            if state["behavior"] == "timeout":
+                raise TimeoutError("Deletion still pending")
+            return 404, None, {}
+        return 200, deepcopy(state["live"][resource_id]), {}
+
+    mocker.patch.object(base, "__init__", new=initialize)
+    mocker.patch.object(base, "request", new=request)
+    mocker.patch.object(base, "api_for", return_value="2023-05-01")
+    mocker.patch.object(
+        base, "pages", side_effect=lambda path, _: list(state["live"].values()) if path.endswith("/resources") else [],
+    )
+    mocker.patch.object(cleanup.time, "sleep")
+    return state
+
+
+def test_report_classifies_without_invoking_cleanup(cleanup, evidence, owned, execution, tmp_path, mocker):
+    mocker.patch.dict(cleanup.OWNED, {"cleanup": Mock()})
+    result = cleanup.run(evidence["profile"], "report", 0, tmp_path / "report", set(), ado=evidence["ado"])
     assert result["owners"][0]["status"] == "eligible"
     assert result["resources"][0]["status"] == "eligible"
-    assert (tmp_path / "report/evidence" / journal.owner / "original.json").exists()
-    deleted.assert_not_called()
+    assert (tmp_path / "report/evidence" / owned[0].owner / "original.json").exists()
+    assert all(method == "GET" for method, _ in execution["calls"])
+    cleanup.OWNED["cleanup"].assert_not_called()
+
+
+@pytest.mark.parametrize("behavior,expected,deletes", [
+    ("normal", "absent", 1), ("rerun", "deferred", 0), ("timeout", "deferred", 1),
+])
+def test_delete_path_uses_guarded_helper_and_retains_deferred_work(
+        cleanup, evidence, execution, tmp_path, behavior, expected, deletes):
+    execution["behavior"] = behavior
+    result = cleanup.run(evidence["profile"], "delete", 0, tmp_path / "report", set(), ado=evidence["ado"])
+    assert result["owners"][0]["status"] == expected
+    assert not result["errors"]
+    assert sum(method == "DELETE" for method, _ in execution["calls"]) == deletes
+
+
+def test_delete_permission_failure_is_not_downgraded_to_deferral(cleanup, evidence, execution, tmp_path):
+    execution["behavior"] = "denied"
+    with pytest.raises(RuntimeError, match="incomplete"):
+        cleanup.run(evidence["profile"], "delete", 0, tmp_path / "report", set(), ado=evidence["ado"])
+    report = json.loads((tmp_path / "report/report.json").read_text())
+    assert report["owners"][0]["status"] == "error"
+    assert report["errors"]
+
+
+def test_bad_build_and_manifest_do_not_hide_later_valid_owner(cleanup, evidence, execution, tmp_path):
+    invalid = deepcopy(evidence["build"])
+    invalid.update(id=40, reason="pullRequest")
+    evidence["ado"].builds.return_value = [invalid, evidence["build"]]
+    original_json = evidence["ado"].json.side_effect
+
+    def responses(path):
+        value = original_json(path)
+        if path.endswith("/artifacts"):
+            value["value"].insert(0, {**evidence["artifact"], "name": evidence["artifact"]["name"] + "-broken"})
+        return value
+
+    evidence["ado"].json.side_effect = responses
+    original_archive = evidence["ado"].archive.side_effect
+
+    def archives(build, artifact):
+        if artifact["name"].endswith("-broken"):
+            raise RuntimeError("ADO read failed with HTTP 404")
+        return original_archive(build, artifact)
+
+    evidence["ado"].archive.side_effect = archives
+    with pytest.raises(RuntimeError, match="incomplete"):
+        cleanup.run(evidence["profile"], "report", 0, tmp_path / "report", set(), ado=evidence["ado"])
+    report = json.loads((tmp_path / "report/report.json").read_text())
+    assert report["skippedBuilds"][0]["build"] == 40
+    assert [entry["status"] for entry in report["owners"]] == ["error", "eligible"]
+
+
+def test_inventory_failure_cannot_be_mistaken_for_a_slow_delete(cleanup, evidence, execution, tmp_path, mocker):
+    def incomplete(*args, **kwargs):
+        raise cleanup.OWNED["CleanupIncomplete"]({"/group/resources": "TimeoutError"})
+
+    mocker.patch.dict(cleanup.OWNED, {"cleanup": incomplete})
+    with pytest.raises(RuntimeError, match="incomplete"):
+        cleanup.run(evidence["profile"], "delete", 0, tmp_path / "report", set(), ado=evidence["ado"])
+    report = json.loads((tmp_path / "report/report.json").read_text())
+    assert report["owners"][0]["status"] == "error"
+
+
+def test_stale_timeout_event_cannot_mask_current_failure(cleanup, evidence, execution, tmp_path, mocker):
+    resource = next(iter(execution["live"]))
+
+    def incomplete(path, *args, **kwargs):
+        journal = cleanup.OWNED["Journal"](path)
+        journal.record(resource, "2023-05-01", cleanup="failed", errorType="TimeoutError")
+        raise cleanup.OWNED["CleanupIncomplete"]({resource: "RuntimeError"})
+
+    mocker.patch.dict(cleanup.OWNED, {"cleanup": incomplete})
+    with pytest.raises(RuntimeError, match="incomplete"):
+        cleanup.run(evidence["profile"], "delete", 0, tmp_path / "report", set(), ado=evidence["ado"])
+    report = json.loads((tmp_path / "report/report.json").read_text())
+    assert report["owners"][0]["status"] == "error"
+
+
+def test_explicit_untrusted_build_remains_an_error(cleanup, evidence, execution, tmp_path):
+    evidence["build"]["reason"] = "pullRequest"
+    with pytest.raises(RuntimeError, match="incomplete"):
+        cleanup.run(evidence["profile"], "delete", 42, tmp_path / "report", set(), ado=evidence["ado"])
+    report = json.loads((tmp_path / "report/report.json").read_text())
+    assert report["errors"]
+    assert not report["skippedBuilds"]
 
 
 def test_unknown_native_or_untagged_resources_never_trigger_deletion(cleanup, evidence, tmp_path, mocker):
@@ -340,11 +491,14 @@ def test_pipeline_is_report_first_daily_and_does_not_mask_scope_failures():
     pipeline = yaml.safe_load((ROOT / ".azure-devops/cleanup.yml").read_text())
     defaults = {item["name"]: item["default"] for item in pipeline["parameters"]}
     assert defaults["mode"] == "report"
+    assert set(defaults) == {"mode", "buildId", "profile"}
     assert pipeline["schedules"][0]["cron"] == "0 13 * * *"
     job, = pipeline["jobs"]
     assert job["pool"] == {"vmImage": "ubuntu-24.04"}
-    loop = next(step for step in job["steps"] if "${{ each profile in parameters.profiles }}" in step)
-    task, = loop["${{ each profile in parameters.profiles }}"]
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/cleanup-profiles.yml").read_text())
+    loop, = template["steps"]
+    selector, = loop["${{ each target in parameters.targets }}"]
+    task, = next(iter(selector.values()))
     assert task["condition"] == "succeededOrFailed()"
     assert "continueOnError" not in task
     assert job["steps"][-1]["condition"] == "always()"

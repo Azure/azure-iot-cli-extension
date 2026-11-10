@@ -277,7 +277,9 @@ branch actually used by 109, authorize its existing service connections and ensu
 the build service can read producer builds, timelines and artifacts. No subscription-
 wide role grant is needed. Inspect report-only results for active, canceled, retried,
 lost-agent and pending-provisioning cases before manually selecting `mode: delete`.
-Use `buildId` to target an original producer. Changing the scheduled default to
+Select a matching `profile` and `buildId` to target an original producer. Connection
+names are fixed in the internal template, not exposed as queue-time parameters.
+Changing the scheduled default to
 deletion is a separate reviewed rollout decision; this PR does not enable it.
 
 Delete mode uses the existing dependency-ordered helper, rechecks producer liveness
@@ -287,8 +289,11 @@ to five minutes, ten owners and fifty DELETE submissions, paced at one per secon
 Discovery covers at most 100 builds from 14 days and 200 manifests; limits are
 reported, never treated as proof of absence. Select an original build explicitly
 when discovery is insufficient. Report/error artifacts retain recovery contexts
-and journals; preserve unresolved artifacts until cleanup finishes. A failed scope
-does not suppress the other scopes, but errors still fail the cleanup run.
+and journals; preserve unresolved artifacts until cleanup finishes. Pending deletes
+and liveness/budget deferrals remain warnings, using only failures from the current
+cleanup call. Authorization, inventory and ownership errors still fail the run.
+An unreadable manifest or untrusted discovered build does not hide later owners.
+A failed scope does not suppress the other scopes.
 
 ### Unit Tests
 
