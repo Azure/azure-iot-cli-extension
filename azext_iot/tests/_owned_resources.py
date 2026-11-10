@@ -31,6 +31,7 @@ CLOUDS = {
 ROLE_TYPE = "microsoft.authorization/roleassignments"
 DEPLOYMENT_TYPE = "microsoft.resources/deployments"
 API = re.compile(r"20\d{2}-\d{2}-\d{2}(?:-preview)?")
+TERMINAL_STATES = {"succeeded", "failed", "canceled", "cancelled"}
 
 
 def cloud_endpoints(cloud):
@@ -122,24 +123,25 @@ class Journal:
             if event.get("owner") != self.owner or not API.fullmatch(event.get("api", "")):
                 raise ValueError("Resource journal belongs to another attempt or has an invalid API.")
             prior = result.setdefault(resource, {})
-            confirmed = prior.get("confirmed") or event.get("confirmed")
+            evidence = {
+                name: max(prior.get(name + "Ns", 0), event["timeNs"] if event.get(name) else 0)
+                for name in ("confirmed", "settled")
+            }
             creates = {**prior.get("creates", {}), **event.get("creates", {})}
             create_times = dict(prior.get("createTimes", {}))
             for creation in event.get("creates", {}):
                 create_times.setdefault(creation, event["timeNs"])
             deployments = {**prior.get("deployments", {}), **event.get("deployments", {})}
-            confirmed_ns = prior.get("confirmedNs", 0)
-            if event.get("confirmed"):
-                confirmed_ns = max(confirmed_ns, event["timeNs"])
             prior.update(event)
             if creates:
                 prior["creates"] = creates
                 prior["createTimes"] = create_times
             if deployments:
                 prior["deployments"] = deployments
-            if confirmed:
-                prior["confirmed"] = True
-                prior["confirmedNs"] = confirmed_ns
+            for name, stamp in evidence.items():
+                if stamp:
+                    prior[name] = True
+                    prior[name + "Ns"] = stamp
         return result
 
     def record(self, resource, api, **metadata):
@@ -148,9 +150,10 @@ class Journal:
             raise ValueError("An exact ARM API version is required for ownership evidence.")
         prior = self.records().get(resource, {})
         changes = {key: value for key, value in metadata.items() if key not in prior or prior[key] != value}
-        if metadata.get("confirmed") and any(
-                stamp >= prior.get("confirmedNs", 0) for stamp in prior.get("createTimes", {}).values()):
-            changes["confirmed"] = True
+        for name in ("confirmed", "settled"):
+            if metadata.get(name) and any(
+                    stamp >= prior.get(name + "Ns", 0) for stamp in prior.get("createTimes", {}).values()):
+                changes[name] = True
         if prior and not changes and prior["api"] == api:
             return prior
         event = {
@@ -191,6 +194,11 @@ class Journal:
 def resource_type(resource):
     parts = resource.lower().rsplit("/providers/", 1)[1].split("/")
     return "/".join((parts[0], *parts[1::2]))
+
+
+def creation_settled(resource, status=200):
+    state = (resource.get("properties", {}).get("provisioningState") or "").lower()
+    return status in (200, 201) and (not state or state in TERMINAL_STATES)
 
 
 def request_body(raw):
@@ -275,9 +283,10 @@ class Arm:
             time.sleep(delay)
         raise RuntimeError("Ownership read retries were exhausted.")
 
-    def request(self, method, resource, api, body=None, headers=None):
+    def request(self, method, resource, api, body=None, headers=None, query=None):
         response = self.send(
-            method, self.endpoint + resource, params={"api-version": api}, json=body, headers=headers,
+            method, self.endpoint + resource, params={"api-version": api} if query is None else query,
+            json=body, headers=headers,
         )
         if response.status_code not in (200, 201, 202, 204, 404):
             raise RuntimeError(f"Ownership {method} failed with HTTP {response.status_code}; response body omitted.")
@@ -347,7 +356,9 @@ class Arm:
         if (status != 200 or not isinstance(value, dict)
                 or value.get("id", "").lower() != resource.lower() or not self.journal.owns(value)):
             raise ValueError("Refusing to mutate a resource without matching attempt ownership.")
-        self.journal.record(resource, api, confirmed=True)
+        self.journal.record(
+            resource, api, confirmed=True, **({"settled": True} if creation_settled(value) else {}),
+        )
         return value
 
 
@@ -437,11 +448,7 @@ class Observer:
                     or parsed.fragment or time.monotonic() >= deadline):
                 raise ValueError("ARM ownership prediction has an invalid or expired polling location.")
             time.sleep(2)
-            query = parse_qs(parsed.query)
-            if set(query) - {"api-version"}:
-                raise ValueError("ARM ownership prediction has an unsupported polling query.")
-            version = query.get("api-version", [api])[0]
-            status, prediction, headers = self.arm.request("GET", parsed.path, version)
+            status, prediction, headers = self.arm.request("GET", parsed.path, api, query=parsed.query)
             location = headers.get("Location") or headers.get("location") or location
         if status != 200 or prediction.get("status", "").lower() != "succeeded":
             raise ValueError("ARM ownership prediction did not complete successfully.")
@@ -533,6 +540,7 @@ class Observer:
                     and self.journal.owns(value)):
                 self.journal.record(
                     resource, api, confirmed=True, etag=value.get("etag") or response.headers.get("ETag"),
+                    **({"settled": True} if creation_settled(value, response.status_code) else {}),
                 )
             response._content = json.dumps(self.visible(value)).encode("utf-8")
             response.headers["Content-Length"] = str(len(response.content))
@@ -621,7 +629,7 @@ def activate(path):
 def pending_creates(record):
     return {
         creation for creation, status in record.get("creates", {}).items()
-        if record.get("createTimes", {}).get(creation, 0) >= record.get("confirmedNs", 0)
+        if record.get("createTimes", {}).get(creation, 0) >= record.get("settledNs", 0)
         and (status is None or not 400 <= status < 500 or status in (408, 429))
     }
 
@@ -634,9 +642,9 @@ def deployment_finished(journal, arm, record, creation):
     if resource_type(resource) != DEPLOYMENT_TYPE:
         raise ValueError("A template creation must reference an owned ARM deployment.")
     current = arm.verify(resource, deployment["api"])
-    return current is not None and current.get("properties", {}).get("provisioningState", "").lower() in {
-        "succeeded", "failed", "canceled", "cancelled",
-    }
+    return current is not None and (
+        current.get("properties", {}).get("provisioningState", "").lower() in TERMINAL_STATES
+    )
 
 
 def cleanup_submit(journal, arm, resource, record):
@@ -656,7 +664,7 @@ def cleanup_submit(journal, arm, resource, record):
     state = (current.get("properties", {}).get("provisioningState") or "").lower()
     if state == "deleting":
         return "deletion"
-    if state and state not in {"succeeded", "failed", "canceled", "cancelled"}:
+    if not creation_settled(current):
         return "creation"
     headers = {"If-Match": current["etag"]} if current.get("etag") else None
     arm.request("DELETE", resource, record["api"], headers=headers)

@@ -320,6 +320,28 @@ def test_real_cli_template_policy_is_guarded_before_deployment_transport(journal
         observer.uninstall()
 
 
+def test_async_whatif_preserves_the_validated_servers_opaque_query(journal, http_arm, monkeypatch):
+    deployment = GROUP + "/providers/microsoft.resources/deployments/async"
+    polling = f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.Resources/locations/westus2/operationResults/test"
+    query = "api-version=2022-09-01&operationToken=a%2Bb%3D&empty="
+    arm = Mock(endpoint="https://management.azure.com")
+    arm.request.side_effect = [
+        (404, None, {}),
+        (202, None, {"Location": arm.endpoint + polling + "?" + query}),
+        (200, {"status": "Succeeded", "properties": {"changes": []}}, {}),
+    ]
+    monkeypatch.setattr(owned.time, "sleep", lambda _: None)
+    owned.Observer(journal, arm).prepare_deployment(
+        deployment, "2022-09-01", {"properties": {"mode": "Incremental", "template": {"resources": []}}},
+    )
+    arm.request.assert_called_with("GET", polling, "2022-09-01", query=query)
+    response = requests.Response()
+    response.status_code, response._content = 200, b"{}"
+    http_arm.session.request.return_value = response
+    http_arm.request("GET", polling, "2022-09-01", query=query)
+    assert http_arm.session.request.call_args.kwargs["params"] == query
+
+
 @pytest.mark.parametrize("body", [
     '{properties: {"template": {}}}',
     '{"properties": {"template": {unquoted: "value"}}}',
@@ -350,22 +372,23 @@ def test_cleanup_deletes_exact_owned_resources_and_preserves_other_attempts(jour
 
 
 def test_journal_preserves_independent_fields_and_does_not_repeat_confirmations(journal):
-    journal.record(RESOURCE, "2023-05-01", confirmed=True, tagShape="null")
-    journal.record(RESOURCE, "2023-05-01", etag="new-etag", confirmed=False)
+    journal.record(RESOURCE, "2023-05-01", confirmed=True, settled=True, tagShape="null")
+    journal.record(RESOURCE, "2023-05-01", etag="new-etag", confirmed=False, settled=False)
     record = journal.records()[RESOURCE]
     assert record["confirmed"] is True
+    assert record["settled"] is True
     assert record["tagShape"] == "null"
     assert record["etag"] == "new-etag"
     count = len(list(journal.directory.glob("*.json")))
     for _ in range(10):
-        journal.record(RESOURCE, "2023-05-01", confirmed=True, etag="new-etag")
+        journal.record(RESOURCE, "2023-05-01", confirmed=True, settled=True, etag="new-etag")
     assert len(list(journal.directory.glob("*.json"))) == count
 
 
 @pytest.mark.parametrize("template", [False, True])
 @pytest.mark.parametrize("status", [None, 202])
 def test_recreation_cannot_inherit_an_older_incarnations_confirmation(journal, monkeypatch, template, status):
-    journal.record(RESOURCE, "2023-05-01", kind="root", confirmed=True)
+    journal.record(RESOURCE, "2023-05-01", kind="root", confirmed=True, settled=True)
     arm = Mock(endpoint="https://management.azure.com", deadline=100)
     arm.verify.return_value = None
     observer = owned.Observer(journal, arm)
@@ -389,8 +412,74 @@ def test_recreation_cannot_inherit_an_older_incarnations_confirmation(journal, m
     monkeypatch.setattr(owned.time, "monotonic", lambda: 0)
     assert owned.cleanup_submit(journal, arm, RESOURCE, journal.records()[RESOURCE]) == "creation"
 
-    journal.record(RESOURCE, "2023-05-01", confirmed=True)
+    journal.record(RESOURCE, "2023-05-01", confirmed=True, settled=True)
     assert owned.cleanup_submit(journal, arm, RESOURCE, journal.records()[RESOURCE]) is None
+
+
+@pytest.mark.parametrize("status,state", [
+    (201, "Accepted"), (202, "Accepted"), (202, "Succeeded"), (202, None),
+])
+def test_nonterminal_observations_do_not_settle_a_create(journal, http_arm, status, state):
+    http_arm.deadline = float("inf")
+    http_arm.request = Mock(return_value=(404, None, {}))
+    observer = owned.Observer(journal, http_arm)
+    observer.prepare_root(RESOURCE, "2023-05-01", {"location": "westus2"}, "PUT", creation_id="new")
+    value = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}, "properties": {"provisioningState": state}}
+    response = requests.Response()
+    response.status_code, response._content = status, json.dumps(value).encode()
+    observer.observe_response(RESOURCE, "2023-05-01", response, [RESOURCE], "new")
+    assert owned.cleanup_submit(journal, http_arm, RESOURCE, journal.records()[RESOURCE]) == "creation"
+    assert observer.prepare_root(RESOURCE, "2023-05-01", {}, "DELETE") == {}
+
+    value["properties"]["provisioningState"] = "Accepted"
+    http_arm.request.return_value = (200, value, {})
+    http_arm.verify(RESOURCE, "2023-05-01")
+    http_arm.request.return_value = (404, None, {})
+    assert owned.cleanup_submit(journal, http_arm, RESOURCE, journal.records()[RESOURCE]) == "creation"
+
+    value["properties"]["provisioningState"] = "Succeeded"
+    http_arm.request.return_value = (200, value, {})
+    http_arm.verify(RESOURCE, "2023-05-01")
+    http_arm.request.return_value = (404, None, {})
+    assert owned.cleanup_submit(journal, http_arm, RESOURCE, journal.records()[RESOURCE]) is None
+
+
+def test_synchronous_role_response_without_provisioning_state_settles_creation(journal):
+    resource = RESOURCE + "/providers/microsoft.authorization/roleassignments/test-role"
+    arm = Mock(deadline=float("inf"))
+    arm.verify.return_value = None
+    observer = owned.Observer(journal, arm)
+    body = {"properties": {"description": "test"}}
+    observer.prepare_root(resource, "2022-04-01", body, "PUT", creation_id="new")
+    response = requests.Response()
+    response.status_code, response._content = 201, json.dumps({"id": resource, **body}).encode()
+    observer.observe_response(resource, "2022-04-01", response, [resource], "new")
+    assert owned.cleanup_submit(journal, arm, resource, journal.records()[resource]) is None
+    assert journal.records()[resource]["cleanup"] == "absent"
+
+
+def test_accepted_template_root_stays_pending_until_deployment_finishes(journal):
+    deployment = GROUP + "/providers/microsoft.resources/deployments/accepted"
+    journal.record(
+        RESOURCE, "2023-05-01", kind="root", creates={"new": 202},
+        deployments={"new": {"id": deployment, "api": "2022-09-01"}},
+    )
+    arm = Mock(deadline=float("inf"))
+    response = requests.Response()
+    response.status_code, response._content = 201, json.dumps({
+        "id": RESOURCE, "tags": {owned.TAG: journal.owner}, "properties": {"provisioningState": "Accepted"},
+    }).encode()
+    owned.Observer(journal, arm).observe_response(RESOURCE, "2023-05-01", response, [], "new")
+    arm.verify.side_effect = [
+        None, {"properties": {"provisioningState": "Running"}},
+        None, {"properties": {"provisioningState": "Succeeded"}}, None,
+    ]
+    assert owned.cleanup_submit(journal, arm, RESOURCE, journal.records()[RESOURCE]) == "creation"
+    assert owned.cleanup_submit(journal, arm, RESOURCE, journal.records()[RESOURCE]) is None
+    assert [call.args[0] for call in arm.verify.call_args_list] == [
+        RESOURCE, deployment, RESOURCE, deployment, RESOURCE,
+    ]
+    arm.request.assert_not_called()
 
 
 @pytest.mark.parametrize("state", ["Succeeded", "Failed", "Canceled"])
