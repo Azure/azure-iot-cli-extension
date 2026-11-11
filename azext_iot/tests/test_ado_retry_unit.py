@@ -518,11 +518,11 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     assert title_step["displayName"] == "Set run title" and "_ado_pipeline.py title" in title_step["bash"]
     assert title_step["env"] == {
         "PLAN": "plan.json", "RUN_KIND": "integration", "RUN_MODE": "${{ parameters.mode }}",
-        "RELEASE_BUILD_ID": "${{ parameters.releaseBuildId }}",
+        "RELEASE_BUILD_ID": "$(ReleaseCandidateBuildId)",
     }
     assert "${{ if eq(parameters.mode, 'Integration tests') }}" in entry["stages"][1]
-    assert parameters["services"]["default"] == ["DPS/Hub/ADR/ADU"]
-    assert parameters["services"]["values"] == ["DPS/Hub/ADR/ADU", *retry.SERVICES]
+    assert parameters["services"]["default"] == list(retry.SERVICES)
+    assert parameters["services"]["values"] == list(retry.SERVICES)
     assert parameters["pythonVersions"]["type"] == "stringList"
     text = (ROOT / ".azure-devops/templates/integration-service.yml").read_text()
     assert "RetrySelfTest" not in entry_text + text
@@ -544,11 +544,7 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
 def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     services = next(value for value in entry["variables"] if value.get("name") == "servicesCsv")
-    assert services == {
-        "name": "servicesCsv",
-        "${{ if containsValue(parameters.services, 'DPS/Hub/ADR/ADU') }}": {"value": ",".join(retry.SERVICES)},
-        "${{ else }}": {"value": "${{ join(',', parameters.services) }}"},
-    }
+    assert services == {"name": "servicesCsv", "value": "${{ join(',', parameters.services) }}"}
     plan = next(step for step in entry["stages"][0]["jobs"][0]["steps"] if "bash" in step)
     assert plan["env"]["SERVICES"] == "${{ replace(variables.servicesCsv, ',', ' ') }}"
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
@@ -560,8 +556,9 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
         "parameters": {
             "service": "${{ service }}", "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             "regions": "${{ split(parameters.regions, ',') }}",
-            "subscription": "${{ parameters.subscription }}", "resourceGroup": "${{ parameters.resourceGroup }}",
-            "armResource": "${{ variables.armResource }}",
+            "subscription": "${{ variables.TestSubscription }}", "resourceGroup": "${{ variables.TestResourceGroup }}",
+            "armResource": "${{ variables.TestArmResource }}",
+            "azureServiceConnection": "${{ variables.TestAzureServiceConnection }}",
         },
     }]}]
     gate = next(value for value in integration if value.get("stage") == "Qualify")
@@ -621,9 +618,11 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
         assert stages[name]["dependsOn"] == "Plan"
         assert [job["job"] for job in stages[name]["jobs"]] == ([name, "UnitGate"] if name == "Unit" else [name])
     build_steps = stages["Build"]["jobs"][0]["steps"]
-    for branch in build_steps:
-        assert any(step.get("artifact") == "integration-wheel-$(System.JobAttempt)"
-                   for step in next(iter(branch.values())))
+    published = [step for step in build_steps if step.get("artifact") == "integration-wheel-$(System.JobAttempt)"]
+    assert len(published) == 2
+    assert {step["condition"] for step in published} == {
+        f"and(succeeded(), {comparison}(variables['ReleaseCandidateBuildId'], '0'))" for comparison in ("eq", "ne")
+    }
     lint = next(step["bash"] for step in stages["Lint"]["jobs"][0]["steps"] if "bash" in step)
     unit_steps = stages["Unit"]["jobs"][0]["steps"]
     unit = next(step["bash"] for step in unit_steps if "bash" in step)

@@ -612,21 +612,32 @@ def bind_profile(manifest, config):
     for key, expected in selected.items():
         if key in {"MonitorRegion", "MonitorServices"}:
             continue
-        name = "HEALTH" + key.removeprefix("Monitor").upper()
+        name = "TEST" + key.removeprefix("Monitor").upper()
         if os.environ.get(name) != expected:
             raise ValueError(f"{name} differs from the selected reviewed cloud profile.")
-    region = os.environ.get("HEALTHREGION", "")
-    services = os.environ.get("HEALTHSERVICES", "").split(",")
-    if (not re.fullmatch(r"[a-z][a-z0-9]+", region) or not all(services)
+    region = os.environ["TESTREGION"]
+    services = os.environ["TESTSERVICES"].split(",")
+    regions = region.split(",")
+    pythons = os.environ["TESTPYTHONS"].split(",")
+    mode = os.environ["TESTMODE"]
+    if (any(not re.fullmatch(r"[a-z][a-z0-9]+", value) for value in regions)
+            or len(regions) != len(set(regions)) or not all(services)
             or len(services) != len(set(services))):
-        raise ValueError("Select one valid region and distinct services/scenarios.")
+        raise ValueError("Select distinct valid regions and services/scenarios.")
+    if (not pythons or set(pythons) - {"3.10", "3.11", "3.12", "3.13"}
+            or len(pythons) != len(set(pythons)) or mode not in {"Dry run", "Integration tests"}):
+        raise ValueError("Select supported Python versions and a test mode.")
     if config["extension"] == "azure-iot" and not set(services).issubset(selected["MonitorServices"].split(",")):
         raise ValueError("Selected services are unsupported in the selected cloud.")
     expected = {
         "cloud": configured_cloud, "version": configured_track, "region": configured["MonitorRegion"],
         "services": sorted(configured.get("MonitorServices", "Default scenarios").split(",")),
+        "python": ["3.13"], "mode": "Integration tests",
     }
-    actual = {"cloud": cloud, "version": track, "region": region, "services": sorted(services)}
+    actual = {
+        "cloud": cloud, "version": track, "region": region, "services": sorted(services),
+        "python": sorted(pythons), "mode": mode,
+    }
     if manifest.get("kind") == "source":
         expected["branch"] = "refs/heads/" + (
             "dev" if configured_track == "ga" else "release/1.2.0-preview"
@@ -637,16 +648,6 @@ def bind_profile(manifest, config):
         raise ValueError("Health profile changed between attempts; start a new run.")
     manifest["profile"] = profile
     return manifest
-
-
-def qualify_profile(directory):
-    manifest = verify_bundle(Path(directory))
-    profile = manifest.get("profile")
-    if not isinstance(profile, dict) or set(profile) != {"configured", "selected"}:
-        raise ValueError("Health evidence is missing its configured and selected profiles.")
-    bind_profile(manifest, read_json(Path(__file__).resolve().parents[1] / ".azure-devops/release-monitors.json"))
-    if profile["configured"] != profile["selected"]:
-        raise ValueError("Manual profile completed; it does not qualify this pipeline's scheduled profile.")
 
 
 def definitions(config, baseline, branch):
@@ -692,6 +693,8 @@ def run_title(manifest, build):
     title += f"-b{build}"
     if "profile" in manifest and manifest["profile"]["configured"] != manifest["profile"]["selected"]:
         title += "-manual"
+    if manifest.get("profile", {}).get("selected", {}).get("mode") == "Dry run":
+        title += "-dryrun"
     if len(title) > 255:
         raise ValueError("The resolved release-health run title exceeds the ADO name limit.")
     return title
@@ -731,8 +734,6 @@ def main(argv=None):
     setup.add_argument("--baseline", required=True)
     setup.add_argument("--branch", required=True)
     setup.add_argument("--output", required=True)
-    qualify = commands.add_parser("qualify-profile")
-    qualify.add_argument("--bundle", required=True)
     args = parser.parse_args(argv)
     if args.command == "resolve-source":
         config = read_json(args.configuration)
@@ -763,8 +764,6 @@ def main(argv=None):
             print(f"##vso[build.updatebuildnumber]{run_title(value, os.environ['BUILD_BUILDID'])}")
     elif args.command == "acquire":
         acquire(read_json(args.manifest), args.output)
-    elif args.command == "qualify-profile":
-        qualify_profile(args.bundle)
     else:
         write_json(args.output, definitions(read_json(args.configuration), read_json(args.baseline), args.branch))
 

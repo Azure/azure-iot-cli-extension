@@ -20,7 +20,10 @@ SOURCE = "b" * 40
 
 
 @pytest.fixture
-def monitor():
+def monitor(monkeypatch):
+    monkeypatch.setenv("TESTPYTHONS", "3.13")
+    monkeypatch.setenv("TESTMODE", "Integration tests")
+    monkeypatch.setenv("MONITOR_PYTHONS", "3.13")
     spec = importlib.util.spec_from_file_location("release_monitor_unit", ROOT / "scripts/release_monitor.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -51,6 +54,23 @@ def profile(version, cloud="public"):
         "template": "azext_edge/edge/providers/orchestration/template"
         + ("_fairfax" if cloud == "fairfax" else "") + ".py",
     }
+
+
+def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monkeypatch, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_plan_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    mocker.patch.object(adapter, "stage")
+    plan = mocker.Mock(return_value=[])
+    mocker.patch.object(adapter.runpy, "run_path", return_value={"plan": plan})
+    for key, value in {
+        "MONITOR_SERVICES": "DPS,HubControl", "MONITOR_PYTHONS": "3.10,3.13",
+        "MONITOR_REGION": "westus2,eastus", "MONITOR_ENDPOINT": "public",
+    }.items():
+        monkeypatch.setenv(key, value)
+    adapter.plan(tmp_path, tmp_path / "source")
+    plan.assert_called_once_with(["DPS", "HubControl"], ["3.10", "3.13"], ["westus2", "eastus"], "public")
 
 
 @pytest.mark.parametrize("track,expected", [("ga", "1.0.1"), ("preview", "1.2.0b1")])
@@ -220,37 +240,49 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert all(not value["allowOverride"] for value in item["variables"].values())
         pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
         parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
-        assert set(parameters) == {"sourceBranch", "cloud", "version", "region", "services"}
+        common = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())["parameters"]
+        assert list(parameters) == [p["name"] for p in common] + ["version", "sourceBranch"]
+        for expected in common:
+            actual = parameters[expected["name"]]
+            assert {k: v for k, v in actual.items() if k != "default"} == {
+                k: v for k, v in expected.items() if k != "default"
+            }
         track = item["variables"]["MonitorTrack"]["value"]
         assert parameters["cloud"]["default"] == item["variables"]["MonitorCloud"]["value"]
         assert parameters["version"]["default"] == track
-        assert parameters["region"]["default"] == item["variables"]["MonitorRegion"]["value"]
+        assert parameters["regions"]["default"] == item["variables"]["MonitorRegion"]["value"]
         assert parameters["services"]["default"] == item["variables"]["MonitorServices"]["value"].split(",")
         assert parameters["sourceBranch"]["default"] == {
             "ga": "dev", "preview": "release/1.2.0-preview",
         }[track]
         assert pipeline["stages"] == [{
             "template": "templates/release-monitor-stages.yml",
-            "parameters": {"sourceBranch": "${{ parameters.sourceBranch }}"},
+            "parameters": {
+                **{name: "${{ parameters." + name + " }}" for name in ("mode", "sourceBranch", "regions")},
+                "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
+            },
         }]
     with pytest.raises(ValueError, match="GitHub definition"):
         monitor.definitions(config, baseline, "refs/heads/../other")
 
 
-def test_health_stages_always_plan_and_require_live_cohort_results():
+def test_health_stages_plan_or_execute_the_selected_cohorts():
     template = yaml.safe_load(
         (ROOT / ".azure-devops/templates/release-monitor-stages.yml").read_text(encoding="utf-8")
     )
-    stages = {stage["stage"]: stage for stage in template["stages"] if "stage" in stage}
+    assert next(item for item in template["parameters"] if item["name"] == "pythonVersions")["type"] == "string"
+    live = template["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
+    stages = {stage["stage"]: stage for stage in [template["stages"][0], *live] if "stage" in stage}
     assert set(stages) == {"Prepare", "Build", "Lint", "Unit", "Results"}
     steps = stages["Prepare"]["jobs"][0]["steps"]
     assert any("release_monitor_adapter.py plan" in step.get("bash", "") for step in steps)
     assert stages["Results"]["dependsOn"] == [
         "Prepare", "Build", "Lint", "Unit", "DPS", "HubControl", "HubData", "ADU", "ADR",
     ]
-    cohorts = next(stage for stage in template["stages"] if "stage" not in stage)
+    cohorts = next(stage for stage in live if "stage" not in stage)
     assert next(iter(cohorts.values()))[0]["template"] == "integration-service.yml"
     assert "runIntegration" not in str(template)
+    assert "qualify-profile" not in str(template)
 
 
 def test_staging_preserves_released_cases_manifests_and_product(monitor, bundle, mocker, monkeypatch, tmp_path):
@@ -315,8 +347,8 @@ def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor
 
 
 @pytest.mark.parametrize("override", [None, "region", "services", "cloud", "version", "branch"])
-def test_health_overrides_cannot_qualify_the_scheduled_profile(
-        monitor, source_manifest, monkeypatch, mocker, tmp_path, override):
+def test_health_overrides_preserve_selection_and_retry_identity(
+        monitor, source_manifest, monkeypatch, override):
     config = monitor.read_json(ROOT / ".azure-devops/release-monitors.json")
     manifest = source_manifest
     if override == "cloud":
@@ -332,23 +364,18 @@ def test_health_overrides_cannot_qualify_the_scheduled_profile(
     monkeypatch.setenv("MONITORCLOUD", "public")
     monkeypatch.setenv("MONITORTRACK", "ga")
     for key, value in selected.items():
-        monkeypatch.setenv("HEALTH" + key.removeprefix("Monitor").upper(), value)
+        monkeypatch.setenv("TEST" + key.removeprefix("Monitor").upper(), value)
     if override == "region":
-        monkeypatch.setenv("HEALTHREGION", "westus2")
+        monkeypatch.setenv("TESTREGION", "westus2")
     if override == "services":
-        monkeypatch.setenv("HEALTHSERVICES", "DPS")
+        monkeypatch.setenv("TESTSERVICES", "DPS")
     monitor.bind_profile(manifest, config)
-    mocker.patch.object(monitor, "verify_bundle", return_value=manifest)
     if override:
-        with pytest.raises(ValueError, match="does not qualify"):
-            monitor.qualify_profile(tmp_path)
         assert monitor.run_title(manifest, "123").endswith("-manual")
-    else:
-        monitor.qualify_profile(tmp_path)
-    monkeypatch.setenv("HEALTHREGION", "eastus")
+    monkeypatch.setenv("TESTREGION", "eastus")
     with pytest.raises(ValueError, match="changed between attempts"):
         monitor.bind_profile(manifest, config)
-    monkeypatch.setenv("HEALTHAZURESERVICECONNECTION", "unreviewed-connection")
+    monkeypatch.setenv("TESTAZURESERVICECONNECTION", "unreviewed-connection")
     with pytest.raises(ValueError, match="reviewed cloud profile"):
         monitor.bind_profile(manifest, config)
 
