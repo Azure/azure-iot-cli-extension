@@ -11,6 +11,7 @@ from typing import Dict, Iterator, Optional
 from urllib.parse import urlsplit
 import json
 import os
+import re
 import tempfile
 import uuid
 
@@ -20,6 +21,7 @@ from azure.core.exceptions import HttpResponseError
 from azure.mgmt.core.tools import parse_resource_id
 from filelock import FileLock
 from knack.log import get_logger
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
@@ -27,6 +29,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, invoke_checked
 from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
+from azext_iot.tests import _cleanup_handoff as handoff
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -154,36 +157,70 @@ def _readiness_http_error(error):
         seen.add(id(error))
         if isinstance(error, HttpResponseError):
             return error
+        # Legacy Hub errors survive CLI translation as __context__. The newer
+        # Hub adapter's CloudError omits the request; follow its native __cause__.
+        if isinstance(error, CloudError) and getattr(error.response, "request", None) is not None:
+            return error
         error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
     return None
 
 
 def _data_plane_authorization_pending(error, role, name):
+    if role not in (DPS_USER_ROLE, HUB_USER_ROLE):
+        return False
     original = _readiness_http_error(error)
     response = getattr(original, "response", None)
     request = getattr(response, "request", None)
     url = getattr(request, "url", "")
-    if not isinstance(url, str) or not url:
+    if not isinstance(url, str) or not url or any(character.isspace() for character in url):
         return False
-    target = urlsplit(url)
+    try:
+        target = urlsplit(url)
+    except ValueError:
+        return False
+    arm_endpoint = cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
+    suffix = {
+        "https://management.azure.com": "net",
+        "https://centraluseuap.management.azure.com": "net",
+        "https://management.usgovcloudapi.net": "us",
+        "https://management.chinacloudapi.cn": "cn",
+    }.get(arm_endpoint)
+    if not suffix:
+        return False
+    hosts = (
+        {f"{name}.azure-devices-provisioning.{suffix}"} if role == DPS_USER_ROLE
+        else {f"{name}.azure-devices.{suffix}", f"{name}.service.azure-devices.{suffix}"}
+    )
+    authorities = {authority.casefold() for host in hosts for authority in (host, host + ":443")}
     expected_path = "/enrollments/query" if role == DPS_USER_ROLE else "/devices/query"
-    if not (target.hostname or "").casefold().startswith(name.casefold() + ".") or target.path != expected_path:
+    if (target.scheme != "https" or target.netloc.casefold() not in authorities
+            or target.path != expected_path or target.fragment or getattr(request, "method", None) != "POST"):
         return False
-    expected = (403, "403000") if role == DPS_USER_ROLE else (401, "401002")
-    return (getattr(original, "status_code", None), _readiness_service_code(original)) == expected
+    expected = {(403, "403000")} if role == DPS_USER_ROLE else {(401, "401002"), (401, "IotHubUnauthorized")}
+    return (getattr(original, "status_code", None), _readiness_service_code(original)) in expected
 
 
 def _readiness_service_code(original):
     code = getattr(getattr(original, "error", None), "code", None)
-    if code is None:
+    # The symbolic Hub code alone is too broad: require the exact missing-role
+    # query rejection, not an expired token or another authentication failure.
+    if code in (None, "IotHubUnauthorized"):
         response = getattr(original, "response", None)
         if not callable(getattr(response, "json", None)):
             return None
         try:
             body = response.json()
             if isinstance(body, dict) and isinstance(body.get("Message"), str):
+                if re.fullmatch(
+                    r"ErrorCode:IotHubUnauthorized;Principal [^\r\n]* is not authorized for POST on "
+                    r"/devices/query due to no assigned permissions",
+                    body["Message"],
+                ):
+                    return "IotHubUnauthorized"
                 body = json.loads(body["Message"])
             code = body.get("errorCode") if isinstance(body, dict) else None
+            if code == "IotHubUnauthorized":
+                return None
         except (ValueError, TypeError):
             return None
     return str(code) if code is not None else None
@@ -193,7 +230,7 @@ def _readiness_diagnostic(error):
     original = _readiness_http_error(error)
     code = _readiness_service_code(original)
     # Only known service codes and UUID correlation headers belong in diagnostics, never response bodies.
-    code = str(code) if str(code) in {"401002", "403000", "AuthorizationFailed"} else "unclassified"
+    code = str(code) if str(code) in {"401002", "403000", "IotHubUnauthorized", "AuthorizationFailed"} else "unclassified"
     headers = getattr(getattr(original, "response", None), "headers", {}) or {}
     correlation = headers.get("x-ms-request-id") or headers.get("x-ms-correlation-request-id")
     try:
@@ -441,9 +478,24 @@ def _shared_release(run_uid: str, kind: str, delete_fn) -> None:
 
 
 def _release_phase_fixture(run_uid: str, kind: str) -> None:
+    if handoff.enabled():
+        path = _phase_receipts.settings()[0] / f"owned-{kind}.json"
+        if path.is_file():
+            resource = json.loads(path.read_text(encoding="utf-8"))
+            return handoff.cleanup(resource["id"], lambda: _release_owned_phase_fixture(run_uid, kind), accepted=False)
+    return _release_owned_phase_fixture(run_uid, kind)
+
+
+def _release_owned_phase_fixture(run_uid, kind):
     if kind in ("csrdps", "csrhub"):
         from azext_iot.tests.dps._csr_registry import require_registry_cleanup_resolved, require_namespace_cleanup_resolved
 
+        if handoff.enabled():
+            directory = _phase_receipts.settings()[0]
+            if (directory / "owned-csrns.json").exists() and not (directory / "deleted-csrns.json").exists():
+                resource = json.loads((directory / f"owned-{kind}.json").read_text(encoding="utf-8"))
+                handoff.record(resource["id"], "pending", "NamespaceDeletionPending")
+                return
         require_registry_cleanup_resolved()
         require_namespace_cleanup_resolved()
     logger.info("Releasing phase controller reference for '%s' fixture.", kind)
@@ -459,7 +511,9 @@ def _resource_handlers(kind):
         from azext_iot.tests.dps._csr_issuance import find_namespace, delete_namespace
 
         return find_namespace, delete_namespace
-    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (_find_dps_by_name, _delete_dps)
+    return (_find_hub_by_name, _delete_hub) if kind in ("hub", "csrhub") else (
+        _find_dps_by_name, _delete_fixture_dps,
+    )
 
 
 # --- Age-based garbage collection of orphans (from crashed runs) -------------------------------
@@ -557,10 +611,24 @@ def _find_dps_by_name(dps_name: str) -> Optional[dict]:
         raise
 
 
-def _delete_dps(dps_name: str) -> None:
+def _delete_fixture_dps(dps_name: str) -> None:
+    if handoff.enabled():
+        _delete_dps(dps_name, allow_handoff=True)
+    else:
+        _delete_dps(dps_name)
+
+
+def _delete_dps(dps_name: str, *, allow_handoff=False) -> None:
     if _phase_receipts.settings() and not _phase_receipts.before_delete(dps_name, _find_dps_by_name(dps_name)):
         return
     with _phase_runtime.owned_write(dps_name, "DELETE"):
+        if allow_handoff and handoff.enabled():
+            with iot_service_provisioning_factory(cli.az_cli, subscription_id=_phase_receipts.settings()[2]) as client:
+                client.iot_dps_resource.begin_delete(
+                    resource_group_name=ENTITY_RG, provisioning_service_name=dps_name, polling=False, retry_total=0,
+                )
+            _phase_receipts.after_delete(dps_name, completed=False)
+            return
         result = cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}", capture_stderr=True)
     if not result.success():
         raise CLIInternalError(f"Failed to delete DPS '{dps_name}' in resource group '{ENTITY_RG}'.")
@@ -667,7 +735,10 @@ def _create_managed_dps(
         if _phase_receipts.settings() and _find_dps_by_name(name) is not None:
             raise CLIInternalError("Isolated DPS name already exists; refusing to overwrite it.")
         _phase_receipts.before_create(name, ENTITY_RG, run_uid, kind)
-        cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_dps_by_name, _delete_dps)
+        cleanup.callback(
+            _cleanup_created_resource, name, run_uid, kind, _find_dps_by_name,
+            _delete_fixture_dps,
+        )
         with _phase_runtime.owned_write(name, "PUT"):
             target_dps = cli.invoke(
                 f"iot dps create --name {name} --resource-group {ENTITY_RG} "
@@ -714,7 +785,9 @@ def _iot_dps_provisioner(
             )
             cleanup.callback(
                 _shared_release, run_uid, kind,
-                lambda name: _cleanup_created_resource(name, run_uid, kind, _find_dps_by_name, _delete_dps),
+                lambda name: _cleanup_created_resource(
+                    name, run_uid, kind, _find_dps_by_name, _delete_fixture_dps,
+                ),
             )
             dps_name = target_dps["name"]
             hub_host_name = _hub_link_host_name(iot_hub) if iot_hub else None
@@ -764,7 +837,7 @@ def _iot_dps_removal(dps):
     run_uid = dps.get("_runUid")
     kind = dps.get("_kind")
     if run_uid and kind:
-        _shared_release(run_uid, kind, delete_fn=_delete_dps)
+        _shared_release(run_uid, kind, delete_fn=_delete_fixture_dps)
 
 
 # IoT Hub fixtures for DPS
@@ -829,6 +902,13 @@ def _delete_hub(name: str) -> None:
     if _phase_receipts.settings() and not _phase_receipts.before_delete(name, _find_hub_by_name(name)):
         return
     with _phase_runtime.owned_write(name, "DELETE"):
+        if handoff.enabled():
+            with iot_hub_service_factory(cli.az_cli, subscription_id=_phase_receipts.settings()[2]) as client:
+                client.iot_hub_resource.begin_delete(
+                    resource_group_name=ENTITY_RG, resource_name=name, polling=False, retry_total=0,
+                )
+            _phase_receipts.after_delete(name, completed=False)
+            return
         if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=True).success():
             raise CLIInternalError(f"Failed to delete iot hub resource '{name}' in resource group '{ENTITY_RG}'.")
     _phase_receipts.after_delete(name)

@@ -17,7 +17,7 @@ import traceback
 from contextlib import contextmanager
 from pathlib import Path
 from time import monotonic, sleep
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 import pytest
@@ -27,7 +27,8 @@ from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests._dps_phase_runner import Redactor
 from azext_iot.tests import _focused_live as focused
-from azext_iot.tests._integration_target import public_scope, target
+from azext_iot.tests import _cleanup_handoff as handoff
+from azext_iot.tests._integration_target import CLOUDS, arm_hosts, cloud, public_scope, target
 from azext_iot.tests.iothub._integration_helpers import is_not_found
 
 
@@ -254,6 +255,11 @@ class HubSasPhase:
         from azure.cli.core._profile import Profile
         from urllib3.util.retry import Retry
 
+        # Pin the validated target, including public/canary ARM aliases. Recognizing
+        # other clouds' Storage suffixes below permits rejection, not ownership.
+        approved_arm_hosts = arm_hosts(self.target_scope["endpoint"])
+        storage_host = self.storage + ".blob." + cloud(self.target_scope["endpoint"])["storage"]
+        blob_suffixes = tuple(".blob." + profile["storage"] for profile in CLOUDS.values())
         self.original_send = requests.Session.send
         self.original_factory = logging.getLogRecordFactory()
         owner = self
@@ -288,8 +294,11 @@ class HubSasPhase:
                 kwargs["timeout"] = min(30, remaining)
             parsed = urlsplit(request.url)
             path = parsed.path.rstrip("/").casefold()
-            arm = parsed.hostname in ("management.azure.com", "centraluseuap.management.azure.com")
-            container = parsed.hostname == owner.storage + ".blob.core.windows.net" and parsed.path == "/devices"
+            arm = parsed.hostname in approved_arm_hosts
+            owned_storage = parsed.hostname == storage_host
+            container = owned_storage and parsed.path == "/devices"
+            if parsed.path.casefold().startswith("/subscriptions/") and not arm:
+                raise HubSasError("ARM request targets a different cloud.")
             if arm and request.method == "POST":
                 key_read = path.endswith("/listkeys") and any(
                     path.startswith(owner.ids[kind].casefold() + "/") for kind in ("hub", "storage")
@@ -299,7 +308,15 @@ class HubSasPhase:
                 )
                 if not (key_read or name_read):
                     raise HubSasError("An unplanned ARM action, including provider registration, is not permitted.")
-            mutation = request.method in ("PUT", "PATCH", "DELETE") and (arm or container)
+            mutation = request.method in ("PUT", "PATCH", "DELETE")
+            container_request = parse_qs(parsed.query).get("restype") == ["container"]
+            if mutation and (container_request or (parsed.hostname or "").endswith(blob_suffixes)):
+                # Uploads beneath the owned container remain data-plane traffic,
+                # not evidence that the container itself was created or deleted.
+                owned_blob = owned_storage and parsed.path.startswith("/devices/") and not container_request
+                if not (container or owned_blob):
+                    raise HubSasError("Storage mutation is outside the exact HubSAS ownership manifest.")
+            mutation = mutation and (arm or container)
             key = None
             if mutation:
                 if arm and path not in owner.allowed:
@@ -497,6 +514,19 @@ class HubSasPhase:
         self.tasks.finish()
         if not self.sent:
             return
+        if handoff.enabled():
+            for kind in ("role", "hub", "storage", "container"):
+                resource_id = self.ids[kind]
+                result = handoff.cleanup(
+                    resource_id, lambda kind=kind: self.cleanup_one(kind, float("inf")), accepted=False,
+                )
+                if result is not None:
+                    status = self.statuses.get("DELETE " + resource_id.casefold())
+                    state = ("absent" if kind in self.absent else "deleting" if resource_id.casefold() in self.deleting
+                             else "accepted" if status in (200, 202, 204) else "pending")
+                    handoff.record(resource_id, state)
+            self.write_receipt()
+            return
         deadline = monotonic() + timeout
         self.cleanup_deadline = deadline
         pending = ["role", "hub", "storage", "container"]
@@ -618,7 +648,7 @@ class HubSasPhase:
     def check_results(self, session):
         required = {"PUT " + resource_id.casefold() for resource_id in self.ids.values()}
         if (
-            self.bad_report or self.passed != set(self.expected) or self.absent != set(self.ids)
+            self.bad_report or self.passed != set(self.expected) or not handoff.enabled() and self.absent != set(self.ids)
             or not required.issubset(self.sent)
         ):
             session.exitstatus = pytest.ExitCode.TESTS_FAILED

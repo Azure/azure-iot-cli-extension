@@ -8,6 +8,7 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
+import os
 import ssl
 from urllib.parse import urlsplit
 
@@ -100,6 +101,44 @@ def _get_canary_credential_scopes(cli_ctx):
     return _get_credential_scopes(cli_ctx)
 
 
+def _get_iot_arm_endpoint(cli_ctx):
+    """Keep public/canary overrides within their cloud's credential boundary."""
+    from azext_iot.adr.endpoints import get_adr_arm_endpoint
+
+    endpoints = cli_ctx.cloud.endpoints
+    endpoint = endpoints.resource_manager.rstrip("/").lower()
+    sovereign = {
+        "https://management.usgovcloudapi.net": (
+            {"https://login.microsoftonline.us"}, "https://management.core.usgovcloudapi.net",
+        ),
+        "https://management.chinacloudapi.cn": (
+            {"https://login.chinacloudapi.cn", "https://login.partner.microsoftonline.cn"},
+            "https://management.core.chinacloudapi.cn",
+        ),
+    }
+    if endpoint not in sovereign:
+        _get_canary_credential_scopes(cli_ctx)
+        return get_adr_arm_endpoint(endpoints.resource_manager)
+    authorities, audience = sovereign[endpoint]
+    if (not isinstance(endpoints.active_directory, str)
+            or endpoints.active_directory.rstrip("/").lower() not in authorities
+            or not isinstance(endpoints.active_directory_resource_id, str)
+            or endpoints.active_directory_resource_id.rstrip("/").lower() != audience):
+        raise CLIError("IoT management endpoint, Entra authority and ARM audience must belong to the same cloud.")
+    override = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT", endpoint).rstrip("/").lower()
+    if override != endpoint:
+        raise CLIError("AZURE_IOT_ADR_ARM_ENDPOINT must match the active sovereign cloud's ARM endpoint.")
+    return endpoint
+
+
+def get_dps_provisioning_host(cli_ctx):
+    endpoint = cli_ctx.cloud.endpoints.resource_manager.rstrip("/").lower()
+    return {
+        "https://management.usgovcloudapi.net": "global.azure-devices-provisioning.us",
+        "https://management.chinacloudapi.cn": "global.azure-devices-provisioning.cn",
+    }.get(endpoint, IOTDPS_PROVISIONING_HOST)
+
+
 def _iot_hub_management_client(
     cli_ctx, subscription_id, base_url, **kwargs
 ):
@@ -135,12 +174,10 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotHubClient): operational resource for
             working with IoT Hub Service.
     """
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(cli_ctx.cloud.endpoints.resource_manager),
+        _get_iot_arm_endpoint(cli_ctx),
         api_version=_ADR_IOT_HUB_API_VERSION,
     )
 
@@ -190,12 +227,10 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    from azext_iot.adr.endpoints import get_adr_arm_endpoint
-
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(cli_ctx.cloud.endpoints.resource_manager),
+        _get_iot_arm_endpoint(cli_ctx),
         api_version=_ADR_DPS_API_VERSION,
     )
 
@@ -436,7 +471,7 @@ def dps_device_service_factory(
     from azext_iot.dps.services._authentication import DpsAuthenticationPolicy
     from azext_iot.sdk.dps.device import ProvisioningDeviceClient
 
-    endpoint = _as_https_endpoint(endpoint or IOTDPS_PROVISIONING_HOST)
+    endpoint = _as_https_endpoint(endpoint or get_dps_provisioning_host(cli_ctx))
     client_kwargs = {
         "endpoint": endpoint,
         "user_agent_policy": UserAgentPolicy(user_agent=USER_AGENT),

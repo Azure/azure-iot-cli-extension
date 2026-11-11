@@ -6,10 +6,12 @@
 
 from pathlib import Path
 import inspect
+import json
 import runpy
 from types import SimpleNamespace
 
 import pytest
+import requests
 from azure.cli.core.azclierror import CLIInternalError
 from azure.cli.core.commands.arm import show_exception_handler
 from azure.core.credentials import AccessToken
@@ -760,7 +762,7 @@ def _data_role_error(role=dps_fixtures.DPS_USER_ROLE):
     dps = role == dps_fixtures.DPS_USER_ROLE
     error = _http_error(403 if dps else 401, "403000" if dps else "401002")
     error.response = SimpleNamespace(
-        request=SimpleNamespace(url=(
+        request=SimpleNamespace(method="POST", url=(
             "https://dps.azure-devices-provisioning.net/enrollments/query" if dps
             else "https://dps.azure-devices.net/devices/query"
         )),
@@ -769,11 +771,18 @@ def _data_role_error(role=dps_fixtures.DPS_USER_ROLE):
     return error
 
 
+@pytest.fixture
+def readiness_cloud(monkeypatch):
+    endpoints = SimpleNamespace(resource_manager="https://management.azure.com/")
+    monkeypatch.setattr(dps_fixtures.cli, "az_cli", SimpleNamespace(cloud=SimpleNamespace(endpoints=endpoints)))
+    return endpoints
+
+
 @pytest.mark.parametrize("results,calls", [
     ([True, True, True], 3),
     ([True, _data_role_error(), True, True, True], 5),
 ])
-def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, results, calls):
+def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, readiness_cloud, results, calls):
     probes = iter(results)
 
     def probe(*_, **__):
@@ -783,6 +792,7 @@ def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, resu
         return SimpleNamespace(success=lambda: value, as_json=lambda: [])
 
     cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints = readiness_cloud
     cli.invoke.side_effect = probe
     sleep = mocker.patch.object(dps_fixtures, "sleep")
     scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps"
@@ -817,7 +827,7 @@ def test_readiness_charges_calls_and_sleep_to_one_monotonic_deadline(mocker, lat
 
 
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
-def test_caller_readiness_only_retries_the_selected_data_plane_rejection(role):
+def test_caller_readiness_only_retries_the_selected_data_plane_rejection(readiness_cloud, role):
     error = _data_role_error(role)
     assert dps_fixtures._data_plane_authorization_pending(error, role, "dps")
     assert not dps_fixtures._data_plane_authorization_pending(error, role, "different-resource")
@@ -843,7 +853,7 @@ def test_caller_readiness_propagates_unexpected_failures_without_retry(mocker, e
 
 
 @pytest.mark.parametrize("role,code", [(dps_fixtures.DPS_USER_ROLE, 403000), (dps_fixtures.HUB_USER_ROLE, 401002)])
-def test_readiness_recognizes_native_json_codes_through_cli_translation(role, code):
+def test_readiness_recognizes_native_json_codes_through_cli_translation(readiness_cloud, role, code):
     from azure.cli.core.azclierror import ForbiddenError, UnauthorizedError
 
     original = _data_role_error(role)
@@ -861,7 +871,7 @@ def test_readiness_recognizes_native_json_codes_through_cli_translation(role, co
     assert not dps_fixtures._data_plane_authorization_pending(translated, role, "dps")
 
 
-def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker):
+def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker, readiness_cloud):
     error = _data_role_error()
     error.message = "secret-response-body"
     clock = [0]
@@ -878,6 +888,211 @@ def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker):
                      "correlationId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"):
         assert expected in message
     assert "secret-response-body" not in message
+
+
+HUB_MISSING_ROLE_MESSAGE = (
+    "ErrorCode:IotHubUnauthorized;Principal  is not authorized for POST on /devices/query due to no assigned permissions"
+)
+
+
+def _hub_missing_role_error(
+    *, legacy=True, status=401, message=HUB_MISSING_ROLE_MESSAGE,
+    url="https://dps.azure-devices.us/devices/query?api-version=2021-04-12",
+):
+    from azure.cli.core.azclierror import UnauthorizedError
+    from msrestazure.azure_exceptions import CloudError
+    from azext_iot.common.utility import handle_service_exception
+
+    response = requests.Response()
+    response.status_code = status
+    response.reason = "Unauthorized"
+    response.request = requests.Request("POST", url).prepare()
+    response.headers["x-ms-request-id"] = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    response._content = json.dumps({"Message": message, "ExceptionMessage": "private tracking details"}).encode()
+    if not legacy:
+        original = _http_error(status, None)
+        original.response = response
+        return original
+    original = CloudError(response)
+    try:
+        try:
+            raise original
+        except CloudError as error:
+            handle_service_exception(error)
+    except UnauthorizedError as translated:
+        assert translated.__cause__ is None
+        assert translated.__context__ is original
+        return translated
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("arm,suffix", [
+    ("https://management.azure.com/", "net"),
+    ("https://centraluseuap.management.azure.com", "net"),
+    ("https://management.usgovcloudapi.net/", "us"),
+    ("https://management.chinacloudapi.cn", "cn"),
+])
+@pytest.mark.parametrize("host_prefix", ["dps", "dps.service"])
+def test_readiness_recognizes_missing_hub_role_for_exact_cloud_target(
+    readiness_cloud, legacy, arm, suffix, host_prefix,
+):
+    readiness_cloud.resource_manager = arm
+    error = _hub_missing_role_error(
+        legacy=legacy, url=f"https://{host_prefix}.azure-devices.{suffix}/devices/query?api-version=2021-04-12",
+    )
+    assert dps_fixtures._data_plane_authorization_pending(error, dps_fixtures.HUB_USER_ROLE, "dps")
+    diagnostic = dps_fixtures._readiness_diagnostic(error)
+    assert "code=IotHubUnauthorized" in diagnostic
+    assert "correlationId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" in diagnostic
+    assert "Principal" not in diagnostic
+    assert "private" not in diagnostic
+
+
+@pytest.mark.parametrize("hostname,message,pending", [
+    ("dps.azure-devices.us", HUB_MISSING_ROLE_MESSAGE, True),
+    ("other.azure-devices.us", HUB_MISSING_ROLE_MESSAGE, False),
+    ("dps.azure-devices.net", HUB_MISSING_ROLE_MESSAGE, False),
+    ("dps.azure-devices.us", "ErrorCode:IotHubUnauthorized;token expired", False),
+])
+def test_readiness_follows_real_hub_adapter_and_cli_exception_chain(
+    mocker, mocked_response, readiness_cloud, hostname, message, pending,
+):
+    from azure.cli.core.azclierror import UnauthorizedError
+    from msrestazure.azure_exceptions import CloudError
+    from azext_iot.operations.hub import _iot_query
+
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    mocker.patch("azext_iot._factory.IoTOAuth", return_value=lambda: "Bearer offline-token")
+    mocked_response.add(
+        method="POST", url=f"https://{hostname}/devices/query", status=401,
+        json={"Message": message, "ExceptionMessage": "private tracking details"},
+    )
+    with pytest.raises(UnauthorizedError) as raised:
+        _iot_query(
+            {"entity": hostname, "policy": "login", "cmd": SimpleNamespace(cli_ctx=dps_fixtures.cli.az_cli)},
+            "select * from devices",
+        )
+    legacy = raised.value.__context__
+    assert isinstance(legacy, CloudError)
+    assert legacy.response.request is None  # The maintained adapter's requests-style copy omits the request.
+    assert isinstance(legacy.__cause__, HttpResponseError)
+    assert legacy.__cause__.response.request.url.startswith(f"https://{hostname}/devices/query?")
+    assert dps_fixtures._data_plane_authorization_pending(raised.value, dps_fixtures.HUB_USER_ROLE, "dps") is pending
+    assert len(mocked_response.calls) == 1
+
+
+@pytest.mark.parametrize("url", [
+    "https://other.azure-devices.us/devices/query",
+    "https://dps.azure-devices.net/devices/query",
+    "https://dps.azure-devices.us.invalid/devices/query",
+    "https://dps.foreign.invalid/devices/query",
+    "https://dps.device.azure-devices.us/devices/query",
+    "https://dps.azure-devices-provisioning.us/devices/query",
+    "https://management.usgovcloudapi.net/devices/query",
+    "https://dps.azure-devices.us/devices/query/other",
+    "https://dps.azure-devices.us/enrollments/query",
+    "http://dps.azure-devices.us/devices/query",
+    "https://user@dps.azure-devices.us/devices/query",
+    "https://dps.azure-devices.us:8443/devices/query",
+    "https://dps.azure-devices.us:invalid/devices/query",
+    "https://dps.azure-devices.us/devices/query#fragment",
+    "https://dps.azure-devices.us/\ndevices/query",
+    "https://[malformed",
+    "", None,
+])
+def test_readiness_rejects_foreign_or_malformed_legacy_target(readiness_cloud, url):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    error = _hub_missing_role_error()
+    error.__context__.response.request.url = url
+    assert not dps_fixtures._data_plane_authorization_pending(error, dps_fixtures.HUB_USER_ROLE, "dps")
+
+
+@pytest.mark.parametrize("message", [
+    "ErrorCode:IotHubUnauthorized;token expired",
+    HUB_MISSING_ROLE_MESSAGE.replace("no assigned permissions", "invalid credentials"),
+    HUB_MISSING_ROLE_MESSAGE.replace("/devices/query", "/devices/other"),
+    HUB_MISSING_ROLE_MESSAGE.replace("POST", "GET"),
+    HUB_MISSING_ROLE_MESSAGE.replace("IotHubUnauthorized", "OtherError"),
+    HUB_MISSING_ROLE_MESSAGE + "\nadditional failure",
+    "prefix " + HUB_MISSING_ROLE_MESSAGE,
+    '{"errorCode":"IotHubUnauthorized"}',
+    "malformed response", "", None, 401002,
+])
+def test_readiness_propagates_unrelated_legacy_authorization_without_retry(mocker, readiness_cloud, message):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    error = _hub_missing_role_error(message=message)
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints = readiness_cloud
+    cli.invoke.side_effect = error
+    pause = mocker.patch.object(dps_fixtures, "sleep")
+    with pytest.raises(type(error)) as raised:
+        dps_fixtures._wait_for_current_user_data_plane(
+            dps_fixtures.HUB_USER_ROLE, "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/IotHubs/dps",
+        )
+    assert raised.value is error
+    cli.invoke.assert_called_once()
+    pause.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["status", "method", "role", "cloud", "suppressed", "untyped", "cycle", "body", "code"])
+def test_readiness_requires_known_legacy_response_and_query(readiness_cloud, change):
+    from azure.cli.core.azclierror import UnauthorizedError
+
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    error = _hub_missing_role_error()
+    original = error.__context__
+    role = dps_fixtures.HUB_USER_ROLE
+    if change == "status":
+        original.status_code = original.response.status_code = 403
+    elif change == "method":
+        original.response.request.method = "GET"
+    elif change == "role":
+        role = "unrelated role"
+    elif change == "cloud":
+        readiness_cloud.resource_manager = "https://foreign.invalid"
+    elif change == "suppressed":
+        error.__suppress_context__ = True
+    elif change == "untyped":
+        error = UnauthorizedError(HUB_MISSING_ROLE_MESSAGE)
+        error.response = original.response
+    elif change == "cycle":
+        error.__context__ = error
+    elif change == "body":
+        original.response._content = b"not json"
+    elif change == "code":
+        original.error = SimpleNamespace(code="IotHubUnauthorized")
+        original.response._content = b'{"errorCode":"IotHubUnauthorized"}'
+    assert not dps_fixtures._data_plane_authorization_pending(error, role, "dps")
+
+
+@pytest.mark.parametrize("persistent", [False, True])
+def test_fairfax_hub_role_readiness_confirms_success_or_fails_at_deadline(mocker, monkeypatch, readiness_cloud, persistent):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    error = _hub_missing_role_error()
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints = readiness_cloud
+    success = SimpleNamespace(success=lambda: True, as_json=lambda: [])
+    cli.invoke.side_effect = error if persistent else [success, error, success, success, success]
+    clock = [0]
+    mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
+    pause = mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(dps_fixtures, "DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS", 30)
+    scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/IotHubs/dps"
+    if persistent:
+        with pytest.raises(CLIInternalError) as raised:
+            dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
+        assert raised.value.__cause__ is error
+        assert "stage=data-plane-authorization elapsed=30.0s type=UnauthorizedError code=IotHubUnauthorized" in str(raised.value)
+        assert "private" not in str(raised.value)
+        assert cli.invoke.call_count == pause.call_count == 6
+    else:
+        dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
+        assert cli.invoke.call_count == 5
+        assert pause.call_count == 4
+    assert cli.invoke.call_args.args == (
+        f"iot hub device-identity list -n dps -g {dps_fixtures.ENTITY_RG} --auth-type login",
+    )
+    assert cli.invoke.call_args.kwargs == {"capture_stderr": True}
 
 
 def test_visibility_and_authorization_use_independent_budgets(mocker, monkeypatch):

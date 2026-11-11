@@ -66,7 +66,10 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
                            "endpoint": env["azext_iot_test_arm_endpoint"]}}
     assert env["azext_iot_testhub_location"] == env["azext_iot_adr_location"] == metadata["target"]["region"]
     assert env["azext_iot_adr_arm_endpoint"] == metadata["target"]["endpoint"]
-    assert env["AZURE_IOT_ADR_ARM_ENDPOINT"] == metadata["target"]["endpoint"]
+    if RUNNER["TARGETS"]["cloud"](metadata["target"]["endpoint"])["name"] == "AzureCloud":
+        assert env["AZURE_IOT_ADR_ARM_ENDPOINT"] == metadata["target"]["endpoint"]
+    else:
+        assert "AZURE_IOT_ADR_ARM_ENDPOINT" not in env
     _json(directory / "started.json", dict(metadata, started=True))
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
     for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
@@ -270,6 +273,32 @@ def test_dps_public_preflight_rejects_ambient_or_reader_target_conflict(tmp_path
     target = RUNNER["TARGETS"]
     with pytest.raises(RUNNER["PhaseError"], match="target"):
         RUN(target["SUBSCRIPTION"], target["RESOURCE_GROUP"], tmp_path / "phases", reader, region="australiaeast")
+    assert reader.inventories == 0 and not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+@pytest.mark.parametrize("inherited", [False, True])
+def test_dps_sovereign_phases_use_active_cloud_without_adr_override(tmp_path, monkeypatch, region, inherited):
+    monkeypatch.setenv("azext_iot_test_subscription", SUB)
+    monkeypatch.setenv("azext_iot_testrg", GROUP)
+    if inherited:
+        monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", RUNNER["TARGETS"]["target"](region)["endpoint"])
+    else:
+        monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+    assert RUN(
+        SUB, GROUP, tmp_path / "dps-phases", Reader(0), execute=_execution, region=region,
+    ) == 0
+    assert not GATE(tmp_path, region)
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+def test_dps_sovereign_preflight_rejects_conflicting_override_before_removing_it(tmp_path, monkeypatch, region):
+    monkeypatch.setenv("azext_iot_test_subscription", SUB)
+    monkeypatch.setenv("azext_iot_testrg", GROUP)
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", RUNNER["TARGETS"]["PUBLIC_ARM"])
+    reader = Reader(0)
+    with pytest.raises(RUNNER["PhaseError"], match="Conflicting ambient DPS target"):
+        RUN(SUB, GROUP, tmp_path / "phases", reader, region=region)
     assert reader.inventories == 0 and not list(tmp_path.iterdir())
 
 
