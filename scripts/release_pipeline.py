@@ -36,6 +36,11 @@ INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
     "pythonVersions": ["3.10", "3.13"], "cloud": "public",
 }
+PUBLIC_REGIONS = {
+    "australiaeast": "Australia East", "japaneast": "Japan East", "centralus": "Central US",
+    "uksouth": "UK South", "westus": "West US", "westus3": "West US 3",
+    "eastus": "East US", "westeurope": "West Europe",
+}
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -447,10 +452,8 @@ def verify_candidate(directory):
 def integration_cohorts(regions=None):
     regions = regions if regions is not None else environment("RELEASE_REGION")
     selected = regions.split(",")
-    if (len(selected) != len(set(selected))
-            or any(not re.fullmatch(r"[a-z][a-z0-9]+", region)
-                   or region.startswith(("china", "usgov", "usdod")) for region in selected)):
-        raise ValueError("Select distinct public Azure regions separated by commas.")
+    if len(selected) != len(set(selected)) or any(region not in PUBLIC_REGIONS for region in selected):
+        raise ValueError("Select distinct public Azure regions from the pipeline dropdown.")
     cohorts = {
         service: {**deepcopy(INTEGRATION_PARAMETERS), "regions": regions, "services": selections}
         for service, selections in {
@@ -462,7 +465,9 @@ def integration_cohorts(regions=None):
 
 def integration_parameters(candidate, cohort=None):
     key = cohort or environment("RELEASE_COHORT")
-    return dict(candidate["cohorts"][key], releaseBuildId=candidate["producer"]["build"])
+    selection = candidate["cohorts"][key]
+    return dict(selection, releaseBuildId=candidate["producer"]["build"], cloud="Public",
+                regions=[PUBLIC_REGIONS[region] for region in selection["regions"].split(",")])
 
 
 def queued_release_build_id(build):
@@ -486,7 +491,7 @@ def validate_integration(build, candidate, cohort=None):
     parameters = dict(parameters)
     if "releaseBuildId" in parameters:
         raise ValueError("Release candidate identity must come from the internal queue variable.")
-    for key in ("services", "pythonVersions"):
+    for key in ("services", "pythonVersions", "regions"):
         if isinstance(parameters.get(key), str):
             parameters[key] = json.loads(parameters[key])
     parameters["releaseBuildId"] = identifier(queued_release_build_id(build))

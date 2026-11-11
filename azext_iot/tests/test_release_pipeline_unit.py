@@ -314,7 +314,7 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
         release.verify_candidate(directory)
 
 
-@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
+@pytest.mark.parametrize("regions", ["australiaeast", "westus,eastus"])
 @pytest.mark.parametrize("already_versioned", [False, True])
 @pytest.mark.parametrize("skipped", [False, True])
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
@@ -348,13 +348,15 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert release.verify_candidate(output) == generated
 
 
-@pytest.mark.parametrize("regions", ["", "westus2,", "westus2,westus2", "westus2, eastus", "chinaeast2", "usgovvirginia"])
+@pytest.mark.parametrize("regions", [
+    "", "westus,", "westus,westus", "westus, eastus", "chinaeast2", "usgovvirginia", "westus2",
+])
 def test_release_regions_reject_invalid_or_sovereign_selection(regions):
     with pytest.raises(ValueError, match="distinct public Azure regions"):
         release.integration_cohorts(regions)
 
 
-@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
+@pytest.mark.parametrize("regions", ["australiaeast", "westus,eastus"])
 def test_service_coordinators_preserve_full_suite_and_endpoint_routing(regions):
     cohorts = release.integration_cohorts(regions)
     assert {key: value["services"] for key, value in cohorts.items()} == {
@@ -367,10 +369,35 @@ def test_service_coordinators_preserve_full_suite_and_endpoint_routing(regions):
         assert parameters["cloud"] == "public"
 
 
+def test_release_dropdown_selections_round_trip_through_child_request(candidate, monkeypatch):
+    directory, value = candidate
+    integration = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    pipeline, _ = all_stages()
+    regions = next(item for item in pipeline["parameters"] if item["name"] == "regions")
+    assert regions == next(item for item in integration["parameters"] if item["name"] == "regions")
+    assert regions["type"] == "stringList"
+    selected = regions["values"]
+    canonical = ",".join(region.replace(" ", "").lower() for region in selected)
+    monkeypatch.setenv("RELEASE_REGION", canonical)
+    value["cohorts"] = release.integration_cohorts()
+    release.write(directory / "candidate.json", value)
+    release.verify_candidate(directory)
+    for cohort in value["cohorts"]:
+        request = release.integration_parameters(value, cohort)
+        assert request["regions"] == selected
+        assert request["cloud"] == "Public"
+        build = integration_build(value, cohort=cohort)
+        build["templateParameters"]["regions"] = json.dumps(request["regions"])
+        release.validate_integration(build, value, cohort)
+        build["templateParameters"]["regions"] = json.dumps(selected[:-1])
+        with pytest.raises(ValueError, match="exact release"):
+            release.validate_integration(build, value, cohort)
+
+
 @pytest.mark.parametrize("change", ["missing", "python", "endpoint", "services", "omitted"])
 def test_candidate_rejects_missing_or_tampered_target_cohorts(candidate, monkeypatch, change):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_REGION", "westus2,eastus")
+    monkeypatch.setenv("RELEASE_REGION", "westus,eastus")
     value["cohorts"] = release.integration_cohorts()
     if change == "missing":
         del value["cohorts"]["ADR"]
@@ -581,7 +608,7 @@ def test_duplicate_child_ownership_rejected(candidate, monkeypatch):
         release.existing_integration(value)
 
 
-@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
+@pytest.mark.parametrize("regions", ["australiaeast", "westus,eastus"])
 @pytest.mark.parametrize("duplicate", [None, "DPS", "Hub", "ADU", "ADR", "unexpected"])
 def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, regions, duplicate):
     _, value = candidate
@@ -609,7 +636,7 @@ def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, reg
 @pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
 def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monkeypatch, cohort):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_REGION", "westus2,eastus")
+    monkeypatch.setenv("RELEASE_REGION", "westus,eastus")
     monkeypatch.setenv("RELEASE_COHORT", cohort)
     monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
     value["cohorts"] = release.integration_cohorts()
@@ -1215,7 +1242,7 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
 
 def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity():
     pipeline, stages = all_stages()
-    assert pipeline["variables"]["RELEASE_REGION"] == "${{ parameters.regions }}"
+    assert pipeline["variables"]["RELEASE_REGION"] == "${{ lower(replace(join(',', parameters.regions), ' ', '')) }}"
     job = stages["Integration"]["jobs"][0]
     assert "$(" not in job["displayName"]
     assert job["strategy"] == {

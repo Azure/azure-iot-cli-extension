@@ -23,12 +23,22 @@ parameters:
     type: boolean
     default: false
   - name: regions
-    displayName: Region
-    type: string
-    default: australiaeast
+    displayName: Public region
+    type: stringList
+    default:
+      - Australia East
+    values:
+      - Australia East
+      - Japan East
+      - Central US
+      - UK South
+      - West US
+      - West US 3
+      - East US
+      - West Europe
 
 variables:
-  RELEASE_REGION: ${{ parameters.regions }}
+  RELEASE_REGION: ${{ lower(replace(join(',', parameters.regions), ' ', '')) }}
   RELEASE_SKIP_INTEGRATION_TESTS: ${{ parameters.skipIntegrationTests }}
 
 resources:
