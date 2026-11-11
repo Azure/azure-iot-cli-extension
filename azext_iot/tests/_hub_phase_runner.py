@@ -316,6 +316,9 @@ def environment(base, suite, phase, folder, run_id, subscription, group, *, debu
         azext_iot_hub_auth_phase=selection()["auth_phase"](phase),
         azext_iot_hubsas_subscription=subscription, azext_iot_hubsas_receipt=str(folder / "ownership.json"),
     )
+    # Let released clients resolve sovereign ARM from the active CLI cloud.
+    if TARGETS["cloud"](target["endpoint"])["name"] != "AzureCloud":
+        result.pop("AZURE_IOT_ADR_ARM_ENDPOINT", None)
     if debug:
         result["COVERAGE_FILE"] = str((folder / ".coverage").resolve())
     result["AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE"] = "login"
@@ -418,9 +421,14 @@ def cleanup_regular(arm, evidence, run_id, phase, deadline, path, *, region="cen
     if handoff:
         return result
     for resource_id in sorted(children):
-        status, _ = arm.request("GET", resource_id, children[resource_id])
-        if status == 404:
-            result["absentDescendantIds"].append(resource_id)
+        while time.monotonic() < deadline:
+            status, _ = arm.request("GET", resource_id, children[resource_id])
+            if status == 404:
+                result["absentDescendantIds"].append(resource_id)
+                break
+            time.sleep(min(5, max(0, deadline - time.monotonic())))
+        else:
+            result["errors"].append("Owned descendant absence not observed before cleanup deadline")
     result["complete"] = (not result["errors"] and result["absentIds"] == ids
                           and result["absentDescendantIds"] == result["descendantIds"])
     return result

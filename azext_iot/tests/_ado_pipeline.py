@@ -32,15 +32,35 @@ GENERIC_PHASE_OVERRIDES = (
     "azext_iot_adr_update_instance_disposable", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer",
     "PYTEST_ADDOPTS", "PYTEST_PLUGINS", "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
 )
+OWNERSHIP_MANIFEST = "AZEXT_IOT_RESOURCE_MANIFEST"
 
 
-def plan(services, versions, regions, endpoint, diagnostic=False):
+def ownership_identity(ctx, native_attempt):
+    return {
+        "product": "azure-iot", "cloud": TARGET["cloud"](ctx["endpoint"])["name"],
+        "endpoint": ctx["endpoint"], "subscription": ctx["subscription"], "resourceGroup": ctx["resource_group"],
+        "identity": ctx, "attempt": native_attempt,
+    }
+
+
+def prepare_ownership(ctx, output, native_attempt):
+    from azext_iot.tests import _owned_resources as owned
+
+    return owned.create_context(output, **ownership_identity(ctx, native_attempt))
+
+
+def plan(services, versions, regions, endpoint, diagnostic=False, release_build_id="0"):
     if not services or len(set(services)) != len(services) or not set(services) <= set(RETRY["SERVICES"]):
         raise ValueError("Select distinct supported services.")
     if not versions or len(set(versions)) != len(versions) or not set(versions) <= {"3.10", "3.11", "3.12", "3.13"}:
         raise ValueError("Select distinct supported Python versions.")
     if not regions or len(set(regions)) != len(regions):
         raise ValueError("Select distinct regions.")
+    sovereign = TARGET["cloud"](endpoint)["name"] != "AzureCloud"
+    if sovereign and not set(services) <= {"DPS", "HubControl", "HubData"}:
+        raise ValueError("Sovereign integration cohorts support DPS, HubControl and HubData only.")
+    if sovereign and str(release_build_id) != "0":
+        raise ValueError("Sovereign cohorts are standalone validation, not public release qualification.")
     jobs = []
     for service in (["RetrySelfTest"] if diagnostic else services):
         if not diagnostic and not (ROOT / BUDGETS[service]["test_dir"]).is_dir():
@@ -49,6 +69,7 @@ def plan(services, versions, regions, endpoint, diagnostic=False):
             for region in regions:
                 target = TARGET["target"](region, endpoint)
                 jobs.append({"service": service, "python": version, **target,
+                             **(TARGET["scope"](endpoint) if sovereign else {}),
                              "minutes": 10 if diagnostic else BUDGETS[service]["job_timeout_minutes"]})
     if len(jobs) > 40:
         raise ValueError("Select at most 40 combinations per run.")
@@ -114,15 +135,18 @@ def context(service, python, region, endpoint, wheel, diagnostic):
                 (path.parent.name, hashlib.sha256(path.read_bytes()).hexdigest())
                 for path in extension.glob("*.dist-info/METADATA")
             ))
-    return {
+    result = {
         "build": os.environ["BUILD_BUILDID"], "definition": os.environ["SYSTEM_DEFINITIONID"],
         "commit": os.environ["BUILD_SOURCEVERSION"],
         "wheel": hashlib.sha256(wheels[0].read_bytes()).hexdigest(),
         "dependencies": RETRY["digest"](dependencies),
         "service": service, "python": python, "region": region, "endpoint": endpoint,
-        "subscription": TARGET["SUBSCRIPTION"], "resource_group": TARGET["RESOURCE_GROUP"],
+        **TARGET["scope"](endpoint),
         "diagnostic": str(diagnostic).lower(),
     }
+    if os.environ.get("AZEXT_IOT_MONITOR_MANIFEST"):
+        result["monitor"] = RETRY["digest"](RETRY["read"](os.environ["AZEXT_IOT_MONITOR_MANIFEST"]))
+    return result
 
 
 def candidate(directory, output):
@@ -167,12 +191,18 @@ def gate(directory):
                                                      for key in ("service", "python", "region"))]
         history.sort(key=lambda value: value["sequence"])
         ctx = history[0]["context"]
+        scope = TARGET["scope"](config["endpoint"])
+        monitor = (RETRY["digest"](RETRY["read"](os.environ["AZEXT_IOT_MONITOR_MANIFEST"]))
+                   if os.environ.get("AZEXT_IOT_MONITOR_MANIFEST") else None)
         if (ctx["build"] != os.environ["BUILD_BUILDID"] or ctx["commit"] != os.environ["BUILD_SOURCEVERSION"]
-                or ctx["endpoint"] != config["endpoint"] or ctx["wheel"] != wheel
-                or ctx["subscription"] != TARGET["SUBSCRIPTION"] or ctx["resource_group"] != TARGET["RESOURCE_GROUP"]):
+                or ctx["definition"] != os.environ.get("SYSTEM_DEFINITIONID", "147")
+                or ctx["endpoint"] != config["endpoint"] or ctx["wheel"] != wheel or ctx.get("monitor") != monitor
+                or any(ctx[key] != value for key, value in scope.items())
+                or TARGET["cloud"](config["endpoint"])["name"] != "AzureCloud"
+                and any(config.get(key) != value for key, value in scope.items())):
             raise ValueError("Evidence belongs to a different run/commit/target.")
         original, _, _ = RETRY["evaluate"](history, ctx)
-        owned = owned_nodes(config["service"])
+        owned = owned_nodes(config["service"], config["endpoint"])
         if owned and {phase: list(nodes) for phase, nodes in original.items()} != owned:
             raise ValueError("Original phase selection does not cover the authoritative service manifest.")
         if RETRY["pending"](history, ctx):
@@ -184,8 +214,12 @@ def gate(directory):
                     for attempt in history):
                 raise ValueError("An incomplete job still needs a full-service recovery.")
     diagnostic = any(value["context"]["diagnostic"] == "true" for value in records)
-    print("Diagnostic retry proof passed; NOT release qualification." if diagnostic
-          else "Every expected service combination passed; manual retry history is retained.")
+    if diagnostic:
+        print("Diagnostic retry proof passed; NOT release qualification.")
+    elif any(TARGET["cloud"](job["endpoint"])["name"] != "AzureCloud" for job in expected):
+        print("Every selected sovereign cohort passed; this is NOT full public-cloud suite qualification.")
+    else:
+        print("Every expected service combination passed; manual retry history is retained.")
 
 
 def coverage(directory):
@@ -197,14 +231,54 @@ def coverage(directory):
     subprocess.run([sys.executable, "-m", "coverage", "html"], check=True)
 
 
-def owned_nodes(service):
+def owned_nodes(service, endpoint=TARGET["PUBLIC_ARM"]):
+    sovereign = TARGET["cloud"](endpoint)["name"] != "AzureCloud"
     if service == "DPS":
         manifest = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
-        return {phase: sorted("azext_iot/tests/dps/" + node for node in manifest["expected_nodeids"](phase))
-                for phase in manifest["PHASE_NAMES"]}
+        result = {}
+        for phase in manifest["PHASE_NAMES"]:
+            nodes = manifest["expected_nodeids"](phase)
+            if sovereign:
+                # Legacy registration cases embed .net hosts; CSR cases require public-only ADR APIs.
+                nodes = {
+                    node for node in nodes if node.startswith((
+                        "enrollment/", "enrollment_group/",
+                        "device_registration/test_iot_device_registration_fresh_keys_int.py::",
+                        "core/test_dps_command_happy_paths_int.py::",
+                        "core/test_dps_disable_local_auth_int.py::",
+                    ))
+                }
+                if endpoint == TARGET["CHINA_ARM"]:
+                    # Linked-Hub fixtures and management happy paths require unsupported DPS identity.
+                    nodes = {
+                        node for node in nodes
+                        if node.startswith("core/test_dps_disable_local_auth_int.py::")
+                    }
+            if nodes:
+                result[phase] = sorted("azext_iot/tests/dps/" + node for node in nodes)
+        return result
     if service.startswith("Hub"):
         manifest = runpy.run_path(str(ROOT / "azext_iot/tests/_hub_suite_manifest.py"))
-        return {phase: list(manifest["nodes"](service, phase)) for phase in manifest["phases"](service)}
+        selected = None
+        if sovereign:
+            modules = (
+                "core/test_iothub_certificate_int.py::",
+                "core/test_iothub_command_happy_paths_int.py::",
+                "devices/test_iothub_devices_int.py::",
+                "devices/test_iothub_device_twin_int.py::",
+                "modules/test_iothub_modules_int.py::",
+                "modules/test_iothub_module_twin_int.py::",
+                "messaging/test_iothub_c2d_messages_int.py::",
+            )
+            selected = {
+                case.node for case in manifest["CASES"]
+                if case.capability == "base" and set(case.dependencies) <= {"hub", "local-certificates"}
+                and case.node.startswith(tuple("azext_iot/tests/iothub/" + module for module in modules))
+            }
+        return {
+            phase: nodes for phase in manifest["phases"](service)
+            if (nodes := [node for node in manifest["nodes"](service, phase) if selected is None or node in selected])
+        }
     return {}
 
 
@@ -253,13 +327,10 @@ def dps_evidence(folder, selection, ctx):
                                ctx["resource_group"], baseline, region=ctx["region"], endpoint=ctx["endpoint"])
     ids = [record["id"] for record in records]
     cleanup = result["cleanup"]
-    if cleanup.get("mode") == "handoff":
-        if set(cleanup["owned_ids"]) != set(ids):
-            raise ValueError("DPS cleanup handoff does not match the owned cohort.")
-    elif (cleanup.get("complete") is not True or cleanup.get("remaining") != []
-          or set(cleanup["owned_ids"]) != set(ids) or set(cleanup["absent_ids"]) != set(ids)
-          or any(not record["creation_resolved"] for record in records)
-          or {value.casefold() for value in ids}.intersection(cleanup["inventory_ids"])):
+    if (cleanup.get("mode") == "handoff" or cleanup.get("complete") is not True or cleanup.get("remaining") != []
+            or set(cleanup["owned_ids"]) != set(ids) or set(cleanup["absent_ids"]) != set(ids)
+            or any(not record["creation_resolved"] for record in records)
+            or {value.casefold() for value in ids}.intersection(cleanup["inventory_ids"])):
         raise ValueError("DPS ownership/resource absence is unproven.")
     return receipt
 
@@ -267,7 +338,11 @@ def dps_evidence(folder, selection, ctx):
 def phase(selection_file, output):
     name = "azext_iot_cleanup_handoff"
     previous = os.environ.get(name)
-    os.environ[name] = str(Path(output).resolve() / "cleanup-receipts")
+    service = RETRY["read"](selection_file)["context"]["service"]
+    if service in ("DPS", "HubControl", "HubData"):
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = str(Path(output).resolve() / "cleanup-receipts")
     try:
         return _phase(selection_file, output)
     finally:
@@ -299,7 +374,7 @@ def _phase(selection_file, output):
         else:
             hub.run(service, ctx["subscription"], ctx["resource_group"], ctx["region"], folder / "hub-phases",
                     endpoint=ctx["endpoint"], attempt_selection=chosen)
-            check = hub.evaluate_hub_phases(folder / "hub-phases", attempt=True, allow_failures=True, handoff=True, **target)
+            check = hub.evaluate_hub_phases(folder / "hub-phases", attempt=True, allow_failures=True, **target)
             if not check["passed"]:
                 raise ValueError("Hub ownership/execution evidence is invalid: " + "; ".join(check["errors"]))
             receipt = RETRY["read"](folder / "hub-phases" / name / "pytest.json")
@@ -323,8 +398,21 @@ def _phase(selection_file, output):
             command.append("--timeout=900")
         if not diagnostic:
             command += ["-k", "_int.py", "--dist=loadgroup" if service == "ADR" else "--dist=loadfile"]
-        execution = dps.child(command, env, folder / "output.log",
-                              (10 if diagnostic else BUDGETS[service]["job_timeout_minutes"] - 20) * 60, 600)
+            from azext_iot.tests import _owned_resources as owned
+            manifest = owned.Journal(os.environ[OWNERSHIP_MANIFEST])
+            expected_owner = ownership_identity(ctx, int(os.environ["SYSTEM_JOBATTEMPT"]))
+            if any(manifest.context.get(key) != expected_value for key, expected_value in expected_owner.items()):
+                raise ValueError("Resource ownership manifest belongs to another job attempt.")
+            ownership = folder / "ownership.json"
+            owned.write_new(ownership, manifest.context)
+            env[owned.ENV] = str(ownership)
+            command += ["-p", "azext_iot.tests._ado_ownership_plugin"]
+        try:
+            execution = dps.child(command, env, folder / "output.log",
+                                  (10 if diagnostic else BUDGETS[service]["job_timeout_minutes"] - 20) * 60, 600)
+        finally:
+            if not diagnostic:
+                owned.cleanup(ownership, timeout=600)
         if execution["timed_out"] or execution["interrupted"]:
             raise ValueError("Timed out/interrupted execution cannot qualify.")
         receipt = RETRY["read"](folder / "pytest.json")
@@ -334,7 +422,7 @@ def _phase(selection_file, output):
     RETRY["outcomes"](receipt, allow_fixture_failures=True)
     RETRY["write"](folder / "phase.json", {
         "expected": expected, "receipt": receipt, "safe": True, "excluded": receipt.get("excluded", []),
-        "cleanupMode": "handoff",
+        "cleanupMode": "handoff" if service == "RetrySelfTest" else "verified",
     })
 
 
@@ -379,9 +467,20 @@ def reject(output, reason, *, recoverable=False, service=None, python=None, regi
 def cleanup_report(output):
     path = output / "cleanup-status.json"
     cleanup = RETRY["read"](path) if path.exists() else HANDOFF["summary"](output)
+    manifests = list(output.rglob("ownership.json"))
+    if manifests:
+        from azext_iot.tests import _owned_resources as owned
+        merged = {item["resource"].casefold(): item for item in cleanup}
+        for manifest in manifests:
+            for record in owned.Journal(manifest).records().values():
+                merged[record["id"]] = {
+                    "resource": record["id"], "status": record.get("cleanup", "pending"),
+                    "owner": record["owner"], "timeNs": record["timeNs"],
+                }
+        cleanup = [merged[key] for key in sorted(merged)]
     if not cleanup:
         return ""
-    if not path.exists():
+    if manifests or not path.exists():
         RETRY["write"](path, cleanup)
     text = "\nCleanup is reported separately. Accepted deletion is not proof of resource absence.\n"
     for status in ("accepted", "deleting", "absent", "pending", "failed"):
@@ -406,7 +505,8 @@ def run_attempt(args, output):
             all(value.get("identity", {}).get(key) == ctx[key] for key in ("service", "python", "region"))
             and value["identity"]["nativeAttempt"] >= last_native for value in rejections):
         plan["mode"] = "full"
-    remaining = ((owned_nodes(args.service) or {"tests": []}) if plan["mode"] == "full" else plan["phases"])
+    remaining = ((owned_nodes(args.service, args.endpoint) or {"tests": []})
+                 if plan["mode"] == "full" else plan["phases"])
     record = {
         "schema": 3, "context": ctx, "sequence": len(history) + 1, "nativeAttempt": native_attempt,
         "mode": plan["mode"], "missingAttempts": missing,
@@ -444,7 +544,7 @@ def run_attempt(args, output):
         def execute(item):
             name, nodes = item
             selection = output / f"{name}.json"
-            expected = list(prior_expected.get(name, owned_nodes(args.service).get(name, [])))
+            expected = list(prior_expected.get(name, owned_nodes(args.service, args.endpoint).get(name, [])))
             RETRY["write"](selection, {"context": ctx, "phase": name, "nodes": nodes, "expected": expected,
                                        "sequence": record["sequence"], "parent": record["parent"]})
             minutes = 10 if args.diagnostic else BUDGETS[args.service]["job_timeout_minutes"]
@@ -452,7 +552,7 @@ def run_attempt(args, output):
                 [sys.executable, str(Path(__file__)), "phase", "--selection", str(selection),
                  "--output", str(output / name)],
                 dict(os.environ, SERVICE=ctx["service"], TEST_PYTHON=ctx["python"], TEST_REGION=ctx["region"]),
-                output / f"{name}.log", minutes * 60, 120,
+                output / f"{name}.log", minutes * 60, 120 if args.diagnostic else 660,
                 lambda: cancel.is_set() or auth is not None and auth.poll() is not None,
             )
             if result["exit_code"] or result["timed_out"] or result["interrupted"]:
@@ -523,6 +623,7 @@ def main():
     planner.add_argument("--regions", nargs="+", required=True)
     planner.add_argument("--endpoint", required=True)
     planner.add_argument("--diagnostic", action="store_true")
+    planner.add_argument("--release-build-id", default="0")
     namer = commands.add_parser("title")
     namer.add_argument("--plan", type=Path, required=True)
     namer.add_argument("--kind", choices=["health", "integration"], required=True)
@@ -532,6 +633,9 @@ def main():
     for name in ("service", "python", "region", "endpoint", "wheel", "history", "output"):
         runner.add_argument("--" + name, required=True)
     runner.add_argument("--diagnostic", action="store_true")
+    owner = commands.add_parser("ownership")
+    for name in ("service", "python", "region", "endpoint", "wheel", "output"):
+        owner.add_argument("--" + name, required=True)
     phase_parser = commands.add_parser("phase")
     phase_parser.add_argument("--selection", required=True)
     phase_parser.add_argument("--output", required=True)
@@ -543,6 +647,12 @@ def main():
         if name == "candidate":
             subparser.add_argument("--output", required=True)
     args = parser.parse_args()
+    if args.command == "ownership":
+        if args.service not in ("ADU", "ADR"):
+            raise ValueError("Generic ownership is restricted to ADU and ADR.")
+        ctx = context(args.service, args.python, args.region, args.endpoint, args.wheel, False)
+        prepare_ownership(ctx, args.output, int(os.environ["SYSTEM_JOBATTEMPT"]))
+        return 0
     if args.command == "title":
         jobs = json.loads(args.plan.read_text(encoding="utf-8"))
         title = run_title(jobs, args.kind, args.mode, os.environ["BUILD_BUILDID"], args.release_build_id)
@@ -557,7 +667,8 @@ def main():
             return 1
         return 0
     if args.command == "plan":
-        print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic), indent=2))
+        print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic,
+                              args.release_build_id), indent=2))
         return 0
     if args.command == "phase":
         try:

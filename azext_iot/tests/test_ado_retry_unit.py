@@ -40,6 +40,48 @@ def isolated_phase_environment(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.mark.parametrize("region,endpoint", [
+    ("usgovvirginia", pipeline.TARGET["GOVERNMENT_ARM"]), ("chinaeast2", pipeline.TARGET["CHINA_ARM"]),
+])
+def test_sovereign_plan_and_cohorts_preserve_exact_existing_cases(monkeypatch, region, endpoint):
+    monkeypatch.setenv("azext_iot_test_subscription", "00000000-0000-0000-0000-000000000001")
+    monkeypatch.setenv("azext_iot_testrg", "sovereign-tests")
+    jobs = pipeline.plan(["DPS", "HubControl", "HubData"], ["3.13"], [region], endpoint)
+    for job in jobs:
+        assert job["subscription"] == "00000000-0000-0000-0000-000000000001"
+        assert job["resource_group"] == "sovereign-tests"
+        original = pipeline.owned_nodes(job["service"])
+        cohort = pipeline.owned_nodes(job["service"], endpoint)
+        assert cohort and cohort != original
+        for phase, nodes in cohort.items():
+            assert nodes and set(nodes) <= set(original[phase])
+            assert focused.select(job["service"], phase, nodes)["requestedNodes"] == nodes
+    with pytest.raises(ValueError, match="only"):
+        pipeline.plan(["ADR"], ["3.13"], [region], endpoint)
+    with pytest.raises(ValueError, match="not public release"):
+        pipeline.plan(["DPS"], ["3.13"], [region], endpoint, release_build_id="123")
+
+
+def test_new_pipeline_id_remains_bound_to_the_running_definition(monkeypatch):
+    monkeypatch.setenv("SYSTEM_DEFINITIONID", "999")
+    context = dict(CONTEXT, definition="999")
+    retry.validate_context(context)
+    with pytest.raises(ValueError, match="different pipeline"):
+        retry.validate_context(CONTEXT)
+    monkeypatch.setenv("SYSTEM_DEFINITIONID", "1000")
+    with pytest.raises(ValueError, match="different pipeline"):
+        retry.validate_context(context)
+
+
+def test_mooncake_dps_excludes_managed_identity_linked_fixtures_without_skipping_dps():
+    china = pipeline.owned_nodes("DPS", pipeline.TARGET["CHINA_ARM"])
+    fairfax = pipeline.owned_nodes("DPS", pipeline.TARGET["GOVERNMENT_ARM"])
+    assert set(china) == {"local-auth-toggle"}
+    assert all("test_dps_disable_local_auth_int.py::" in node for nodes in china.values() for node in nodes)
+    assert any("management_happy_paths" in node for node in fairfax["regular"])
+    assert any("/enrollment/" in node for node in fairfax["regular"])
+
+
 def receipt(results):
     return {
         "finished": True, "exitstatus": int("failed" in results.values()), "collected": list(results),
@@ -69,6 +111,19 @@ def test_exact_retry_preserves_passes_and_records_recovery(tmp_path):
     assert recovered == {("tests", "b")}
     assert retry.junit([first, second], CONTEXT, tmp_path / "final.xml") == 0
     assert "Passed on manual retry" in (tmp_path / "final.xml").read_text()
+
+
+@pytest.mark.parametrize("other", [None, "e" * 64])
+def test_monitor_history_cannot_qualify_an_ordinary_run_or_another_release(other):
+    context = dict(CONTEXT, monitor="d" * 64)
+    first = attempt({"a": "passed", "b": "passed", "c": "passed"})
+    first["context"] = context
+    assert retry.pending([first], context) == {}
+    foreign = dict(CONTEXT)
+    if other is not None:
+        foreign["monitor"] = other
+    with pytest.raises(ValueError):
+        retry.evaluate([first], foreign)
 
 
 @pytest.mark.parametrize("defect", [
@@ -475,7 +530,10 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     steps = template["stages"][0]["jobs"][0]["steps"]
     assert "diagnostic" not in {value["name"] for value in template["parameters"]}
     live = next(step for step in steps if step.get("task") == "AzureCLI@2")
-    assert live["env"]["PYTHONPATH"] == "$(Build.SourcesDirectory)"
+    assert live["env"]["PYTHONPATH"] == "$(testSourceDirectory)"
+    assert template["stages"][0]["jobs"][0]["variables"]["${{ else }}"] == {
+        "testSourceDirectory": "$(Build.SourcesDirectory)",
+    }
 
 
 def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
@@ -497,6 +555,8 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
         "parameters": {
             "service": "${{ service }}", "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             "regions": "${{ split(parameters.regions, ',') }}",
+            "subscription": "${{ parameters.subscription }}", "resourceGroup": "${{ parameters.resourceGroup }}",
+            "armResource": "${{ variables.armResource }}",
         },
     }]}]
     gate = next(value for value in integration if value.get("stage") == "Qualify")
@@ -604,40 +664,101 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
     stage, = template["stages"]
     assert stage["stage"] == "${{ parameters.service }}"
-    assert stage["dependsOn"] == ["Build", "Lint", "Unit"]
-    assert " ".join(stage["condition"].split()) == (
+    assert stage["${{ else }}"]["dependsOn"] == ["Build", "Lint", "Unit"]
+    assert " ".join(stage["${{ else }}"]["condition"].split()) == (
         "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
         "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
     )
-    assert stage["jobs"][0]["strategy"]["maxParallel"] == 1
+    assert stage["jobs"][0]["strategy"]["maxParallel"] == 0
     assert "$(" not in stage["jobs"][0]["displayName"]
     steps = stage["jobs"][0]["steps"]
     fallback = next(step for step in steps if "report-incomplete" in step.get("bash", ""))
-    publish = next(step for step in steps if step.get("publish") == "attempt")
+    publish = next(step for step in steps if step.get("publish") == "$(testSourceDirectory)/attempt")
     assert steps.index(fallback) < steps.index(publish)
-    assert fallback["condition"] == publish["condition"] == "succeededOrFailed()"
+    assert fallback["condition"] == publish["condition"] == "always()"
+
+
+@pytest.mark.parametrize("service", ["DPS", "HubControl", "HubData"])
+def test_native_owned_phases_require_absence_and_restore_ambient_handoff(tmp_path, mocker, monkeypatch, service):
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {"context": dict(CONTEXT, service=service)})
+    monkeypatch.setenv("azext_iot_cleanup_handoff", "original")
+
+    def execute(_selection, _output):
+        assert "azext_iot_cleanup_handoff" not in os.environ
+        raise ValueError("phase failed")
+
+    mocker.patch.object(pipeline, "_phase", side_effect=execute)
+    with pytest.raises(ValueError, match="phase failed"):
+        pipeline.phase(selection, tmp_path / "phase")
+    assert os.environ["azext_iot_cleanup_handoff"] == "original"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("resourceGroup", "foreign-group"), ("attempt", 2), ("identity", {"build": "foreign"}),
+])
+@pytest.mark.usefixtures("isolated_phase_environment")
+def test_generic_ownership_manifest_is_bound_before_any_execution(tmp_path, mocker, monkeypatch, field, value):
+    from azext_iot.tests import _owned_resources as owned
+
+    selection = tmp_path / "selection.json"
+    retry.write(selection, {"context": CONTEXT, "phase": "tests", "nodes": [], "expected": [], "sequence": 1})
+    manifest = tmp_path / "manifest.json"
+    identity = pipeline.ownership_identity(CONTEXT, 1)
+    identity[field] = value
+    owned.create_context(manifest, **identity)
+    monkeypatch.setenv(pipeline.OWNERSHIP_MANIFEST, str(manifest))
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "1")
+    execute = mocker.patch("azext_iot.tests._dps_phase_runner.child")
+    cleanup = mocker.patch.object(owned, "cleanup")
+    with pytest.raises(ValueError, match="another job attempt"):
+        pipeline.phase(selection, tmp_path / "phase")
+    execute.assert_not_called()
+    cleanup.assert_not_called()
+
+
+def test_ownership_manifest_is_published_before_service_credentials_are_used():
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    condition = "${{ if or(eq(parameters.service, 'ADU'), eq(parameters.service, 'ADR')) }}"
+    group = next(step for step in steps if condition in step)
+    prepare, publish = group[condition]
+    execution = next(step for step in steps if step.get("task") == "AzureCLI@2")
+    assert "ownership --service" in prepare["bash"]
+    assert publish["publish"] == "$(testSourceDirectory)/resource-ownership"
+    assert steps.index(group) < steps.index(execution)
+    assert execution["env"][pipeline.OWNERSHIP_MANIFEST].startswith(publish["publish"] + "/")
 
 
 @pytest.mark.parametrize("service", ["ADR", "ADU"])
 @pytest.mark.parametrize("teardown_failed", [False, True])
+@pytest.mark.parametrize("cleanup_failed", [False, True])
 @pytest.mark.usefixtures("isolated_phase_environment")
-def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mocker, monkeypatch, service, teardown_failed):
+def test_generic_phase_verifies_owned_cleanup(
+        tmp_path, mocker, monkeypatch, service, teardown_failed, cleanup_failed):
     monkeypatch.delenv("azext_iot_ado_resource_scope", raising=False)
     output = tmp_path / "phase"
     selection = tmp_path / "selection.json"
+    ctx = dict(CONTEXT, service=service)
     retry.write(selection, {
-        "context": dict(CONTEXT, service=service), "phase": "tests", "nodes": [],
+        "context": ctx, "phase": "tests", "nodes": [],
         "expected": [], "sequence": 1,
     })
-    inventory = mocker.patch.object(
-        pipeline.subprocess, "run", side_effect=AssertionError("Generic phases must not scan ARM inventory."),
-    )
+    manifest = tmp_path / "manifest.json"
+    pipeline.prepare_ownership(ctx, manifest, 1)
+    monkeypatch.setenv(pipeline.OWNERSHIP_MANIFEST, str(manifest))
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "1")
+    cleanup = mocker.patch("azext_iot.tests._owned_resources.cleanup")
+    if cleanup_failed:
+        cleanup.side_effect = RuntimeError("Owned cleanup incomplete")
 
     def execute(command, env, _log, runtime, cleanup):
         assert [arg for arg in command if arg.startswith("--timeout")] == (["--timeout=900"] if service == "ADR" else [])
         assert runtime == (pipeline.BUDGETS[service]["job_timeout_minutes"] - 20) * 60
         assert cleanup == 600
         assert "azext_iot_ado_resource_scope" not in env
+        assert env["AZEXT_TEST_OWNERSHIP"] == str(output / "ownership.json")
+        assert "azext_iot.tests._ado_ownership_plugin" in command
         value = receipt({"case": "passed"})
         value["expected"] = ["case"]
         if teardown_failed:
@@ -647,11 +768,16 @@ def test_generic_phase_uses_fixture_teardown_without_inventory_gate(tmp_path, mo
         return {"exit_code": value["exitstatus"], "timed_out": False, "interrupted": False}
 
     mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
-    pipeline.phase(selection, output)
-    assert retry.read(output / "phase.json")["safe"]
-    assert retry.read(output / "phase.json")["cleanupMode"] == "handoff"
-    inventory.assert_not_called()
-    assert not (output / "cleanup.json").exists()
+    if cleanup_failed:
+        with pytest.raises(RuntimeError, match="Owned cleanup incomplete"):
+            pipeline.phase(selection, output)
+        assert not (output / "phase.json").exists()
+    else:
+        pipeline.phase(selection, output)
+        assert retry.read(output / "phase.json")["safe"]
+        assert retry.read(output / "phase.json")["cleanupMode"] == "verified"
+    cleanup.assert_called_once_with(output / "ownership.json", timeout=600)
+    assert retry.read(output / "ownership.json") == retry.read(manifest)
 
 
 @pytest.mark.parametrize("name", pipeline.GENERIC_PHASE_OVERRIDES)

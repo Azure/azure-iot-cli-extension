@@ -106,6 +106,17 @@ def pytest_load_initial_conftests(early_config, parser, args):
         runtime.observer = Observer(ownership_path, run_id, phase, Arm())
         runtime.observer.install()
         early_config.add_cleanup(runtime.observer.restore)
+        isolate_attempt_names(early_config, run_id, debug)
+
+
+def isolate_attempt_names(config, run_id, selection):
+    if not selection or "attempt" not in selection:
+        return
+    from azext_iot.tests import iothub
+
+    original = iothub.STORAGE_ACCOUNT
+    iothub.STORAGE_ACCOUNT = "hubstore" + run_id[:16]
+    config.add_cleanup(lambda: setattr(iothub, "STORAGE_ACCOUNT", original))
 
 
 class PhaseReceipt:

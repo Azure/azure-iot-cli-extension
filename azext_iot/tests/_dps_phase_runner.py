@@ -228,11 +228,15 @@ class ArmReader:
         self.reading_inventory = False
         self.reads = []
         reader = self
-        profile = Profile(cli_ctx=get_default_cli())
+        cli_ctx = get_default_cli()
+        audience = TARGETS["cloud"](self.target["endpoint"])["audience"]
+        if self.target["endpoint"] in (TARGETS["GOVERNMENT_ARM"], TARGETS["CHINA_ARM"]):
+            TARGETS["check_cloud"](cli_ctx, self.target["endpoint"])
+        profile = Profile(cli_ctx=cli_ctx)
 
         class Credential:
             def get_token(self, *_scopes, **_kwargs):
-                token, _, _ = profile.get_raw_token(subscription=subscription, resource="https://management.azure.com/")
+                token, _, _ = profile.get_raw_token(subscription=subscription, resource=audience)
                 return AccessToken(token[1], int(token[2]["expires_on"]))
 
         class GetOnly(RequestsTransport):
@@ -259,7 +263,7 @@ class ArmReader:
         def client(kind, api):
             return kind(
                 Credential(), subscription, base_url=self.target["endpoint"], api_version=api,
-                credential_scopes=["https://management.azure.com/.default"],
+                credential_scopes=[audience.rstrip("/") + "/.default"],
                 transport=GetOnly(connection_timeout=5, read_timeout=20),
                 retry_total=0, retry_connect=0, retry_read=0, retry_status=0, logging_enable=False,
             )
@@ -678,7 +682,7 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    azext_iot_test_arm_endpoint=target["endpoint"],
                                    AZURE_IOT_ADR_ARM_ENDPOINT=target["endpoint"],
                                    azext_iot_adr_location=region, azext_iot_adr_arm_endpoint=target["endpoint"],
-                                   azext_iot_adr_arm_resource="https://management.azure.com",
+                                   azext_iot_adr_arm_resource=TARGETS["cloud"](target["endpoint"])["audience"].rstrip("/"),
                                    azext_iot_dps_workers=(
                                        "0" if name == "local-auth-toggle" or debug and not attempt_selection else "7"
                                    ),
@@ -689,6 +693,9 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                                    # Kept private because tox execute logs record the environment.
                                    azext_iot_tox_log_dir=str(private / name / "tox-log"),
                                    azext_iot_tox_tmp_dir=str(private / name / "tox-tmp"))
+                # Let released clients resolve sovereign ARM from the active CLI cloud.
+                if TARGETS["cloud"](target["endpoint"])["name"] != "AzureCloud":
+                    environment.pop("AZURE_IOT_ADR_ARM_ENDPOINT", None)
                 if debug:
                     environment[FOCUSED["ENV"]] = json.dumps(debug)
                     # These args follow tox's base 300s dump option. Only debug
