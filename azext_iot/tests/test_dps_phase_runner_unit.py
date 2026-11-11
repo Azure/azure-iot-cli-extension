@@ -1107,6 +1107,19 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker, regio
     assert reader.dps._config.base_url == RUNNER["TARGETS"]["target"](region)["endpoint"]
 
 
+@pytest.mark.parametrize("api_version", ["2026-11-01", "2026-11-02-preview"])
+def test_reader_uses_selected_adr_sdk_default(mocker, api_version):
+    from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+
+    def selected_client(*args, **kwargs):
+        kwargs.setdefault("api_version", api_version)
+        return DeviceRegistryMgmtClient(*args, **kwargs)
+
+    mocker.patch("azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient", side_effect=selected_client)
+    reader = RUNNER["ArmReader"](SUB, region="australiaeast")
+    assert reader.adr._config.api_version == api_version  # pylint: disable=protected-access
+
+
 @responses.activate
 @pytest.mark.parametrize("kind", ["csrdps", "csrhub", "csrns"])
 @pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
