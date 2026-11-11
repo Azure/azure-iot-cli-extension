@@ -46,7 +46,7 @@ def http_arm(journal):
     return arm
 
 
-def test_root_intent_precedes_creation_and_retains_user_tag_shape(journal):
+def test_root_intent_precedes_creation_and_hides_only_ownership_tags(journal):
     arm = Mock()
     arm.verify.return_value = None
     observer = owned.Observer(journal, arm)
@@ -54,8 +54,8 @@ def test_root_intent_precedes_creation_and_retains_user_tag_shape(journal):
     headers = observer.prepare_root(RESOURCE, "2023-05-01", body, "PUT")
     assert headers == {"If-None-Match": "*"}
     assert body["tags"] == {owned.TAG: journal.owner}
-    assert journal.records()[RESOURCE]["tagShape"] == "null"
-    assert observer.visible({"id": RESOURCE, **body})["tags"] is None
+    assert RESOURCE in journal.records()
+    assert observer.visible({"id": RESOURCE, **body})["tags"] == {}
 
     arm.verify.return_value = {"id": RESOURCE, **body}
     update = {"tags": {"user-tag": "value"}}
@@ -63,6 +63,21 @@ def test_root_intent_precedes_creation_and_retains_user_tag_shape(journal):
     assert observer.visible({"id": RESOURCE, **update})["tags"] == {"user-tag": "value"}
     observer.prepare_root(RESOURCE, "2023-05-01", {"tags": {}}, "PATCH")
     assert observer.visible({"id": RESOURCE, "tags": {owned.TAG: journal.owner}})["tags"] == {}
+
+
+@pytest.mark.parametrize("tags", [None, {}, {"user-tag": "value"}, {"cliTestOwner": "another-owner"}])
+def test_visible_tags_preserve_server_values_without_our_marker(journal, tags):
+    observer = owned.Observer(journal, Mock())
+    value = {"value": [{"id": RESOURCE, "tags": tags}, {"id": RESOURCE + "other"}]}
+    assert observer.visible(value) == value
+
+
+def test_visible_tags_do_not_restore_null_from_legacy_ownership_records(journal):
+    journal.record(RESOURCE, "2023-05-01", kind="root", tagShape="null")
+    observer = owned.Observer(journal, Mock())
+    value = {"value": [{"id": RESOURCE, "tags": {owned.TAG: journal.owner}}]}
+    assert observer.visible(value) == {"value": [{"id": RESOURCE, "tags": {}}]}
+    assert value["value"][0]["tags"] == {owned.TAG: journal.owner}
 
 
 def test_foreign_resource_is_rejected_without_recording_ownership(journal):
@@ -276,6 +291,7 @@ def test_deployment_checks_resolved_parents_even_when_children_come_first(journa
     assert body["properties"]["template"]["resources"]["instance"]["tags"][owned.TAG] == journal.owner
     assert set(journal.records()) == {instance, resource.lower()}
     assert [call.args[0] for call in arm.verify.call_args_list] == [instance]
+    assert observer.visible({"id": instance, "tags": {owned.TAG: journal.owner}})["tags"] == {}
 
 
 def test_real_cli_template_policy_is_guarded_before_deployment_transport(journal):
