@@ -5,12 +5,15 @@ parameters:
     displayName: Mode
     type: string
     default: Plan
-    values: [Plan, Validate, Release]
+    values: [Plan, Validate, StageDraft, Release]
   - name: sourceBranch
     displayName: Source branch
     type: string
     default: release/1.2.0-preview
   - name: createIndexPr
+    type: boolean
+    default: false
+  - name: skipIntegrationTests
     type: boolean
     default: false
 
@@ -408,6 +411,7 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
+  - ${{ if and(ne(parameters.mode, 'Plan'), not(parameters.skipIntegrationTests)) }}:
       - stage: Integration
         displayName: Integration
         dependsOn: [Resolve, Build, Security, CommandLint, IndexCompatibility]
@@ -487,16 +491,24 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
-  - ${{ if eq(parameters.mode, 'Release') }}:
+  - ${{ if in(parameters.mode, 'StageDraft', 'Release') }}:
       - stage: Publish
-        displayName: Publish
-        dependsOn: [Resolve, Build, Unit, Security, CommandLint, IndexCompatibility, Integration]
+        displayName: Stage draft or publish
+        dependsOn:
+          - Resolve
+          - Build
+          - Unit
+          - Security
+          - CommandLint
+          - IndexCompatibility
+          - ${{ if not(parameters.skipIntegrationTests) }}:
+              - Integration
         condition: >-
           and(not(canceled()), eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
           eq(dependencies.Resolve.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'),
           eq(dependencies.Unit.result, 'Succeeded'), eq(dependencies.Security.result, 'Succeeded'),
           eq(dependencies.CommandLint.result, 'Succeeded'), eq(dependencies.IndexCompatibility.result, 'Succeeded'),
-          eq(dependencies.Integration.result, 'Succeeded'))
+          or(${{ parameters.skipIntegrationTests }}, eq(dependencies.Integration.result, 'Succeeded')))
         variables:
           - group: aziotcli_release_publish
           - name: sourceCommit
@@ -525,7 +537,7 @@ stages:
                   --directory "$(Pipeline.Workspace)/release-candidate"
                   --record "$(Agent.TempDirectory)/publication/release.json"
                   --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
-                displayName: Publish release
+                displayName: Stage draft or publish release
                 env:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)

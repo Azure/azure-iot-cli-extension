@@ -9,13 +9,17 @@ parameters:
     displayName: Mode
     type: string
     default: Plan
-    values: [Plan, Validate, Release]
+    values: [Plan, Validate, StageDraft, Release]
   - name: sourceBranch
     displayName: Source branch
     type: string
     default: release/1.2.0-preview
   - name: createIndexPr
     displayName: Create index PR
+    type: boolean
+    default: false
+  - name: skipIntegrationTests
+    displayName: Skip all integration tests (release waiver)
     type: boolean
     default: false
   - name: dpsTarget
@@ -26,6 +30,7 @@ parameters:
 
 variables:
   RELEASE_DPS_TARGET: ${{ parameters.dpsTarget }}
+  RELEASE_SKIP_INTEGRATION_TESTS: ${{ parameters.skipIntegrationTests }}
 
 resources:
   repositories:
@@ -52,3 +57,4 @@ extends:
           mode: ${{ parameters.mode }}
           sourceBranch: ${{ parameters.sourceBranch }}
           createIndexPr: ${{ parameters.createIndexPr }}
+          skipIntegrationTests: ${{ parameters.skipIntegrationTests }}

@@ -38,6 +38,7 @@ def candidate(tmp_path, monkeypatch):
         "RELEASE_SOURCE_BRANCH": "release/1.2.0-preview", "RELEASE_SOURCE_COMMIT": SOURCE_SHA,
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
+        "RELEASE_SKIP_INTEGRATION_TESTS": "false",
         "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "Hub",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
@@ -141,12 +142,46 @@ def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkey
     release.github.assert_not_called()
 
 
+def test_draft_rejects_index_opt_in(candidate, monkeypatch):
+    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "true")
+    with pytest.raises(ValueError, match="createIndexPr requires Release"):
+        release.release_options()
+    release.github.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["", "yes", "1", "$(skipIntegrationTests)"])
+def test_invalid_waiver_is_not_silently_disabled(candidate, monkeypatch, value):
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", value)
+    with pytest.raises(ValueError, match="explicit boolean"):
+        release.release_options()
+
+
+def test_waiver_is_bound_to_candidate_and_prevents_child_execution(candidate, monkeypatch, tmp_path):
+    directory, value = candidate
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", "true")
+    with pytest.raises(ValueError, match="waiver"):
+        release.verify_candidate(directory)
+    value.update(skipIntegrationTests=True, cohorts={})
+    release.write(directory / "candidate.json", value)
+    assert release.verify_candidate(directory) == value
+    with pytest.raises(ValueError, match="waived"):
+        release.integrate(directory, tmp_path / "receipt")
+    release.ado.assert_not_called()
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", "false")
+    with pytest.raises(ValueError, match="waiver"):
+        release.verify_candidate(directory)
+
+
 @pytest.mark.parametrize("mode,source", [
-    ("Release", "release/1.2.0-preview"), ("Validate", "users/test/release-validation"),
+    ("Release", "release/1.2.0-preview"), ("StageDraft", "release/1.2.0-preview"),
+    ("Validate", "users/test/release-validation"),
 ])
+@pytest.mark.parametrize("skipped", [False, True])
 def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
-        candidate, tmp_path, monkeypatch, capsys, mode, source):
+        candidate, tmp_path, monkeypatch, capsys, mode, source, skipped):
     monkeypatch.setenv("RELEASE_MODE", mode)
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
     monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
     repository = tmp_path / "source-repository"
     release.subprocess.run(["git", "init", "--quiet", "--initial-branch=" + source, str(repository)],
@@ -155,6 +190,8 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
         ".azure-devops/templates/integration-service.yml", ".azure-devops/integration_tests.yml",
         "azext_iot/tests/_ado_pipeline.py", "scripts/check_index_compatibility.py", "scripts/select-openssl.sh",
     ):
+        if skipped and not relative.startswith("scripts/"):
+            continue
         path = repository / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("releaseBuildId\n", encoding="utf-8")
@@ -277,10 +314,12 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
 
 @pytest.mark.parametrize("target", ["public", "canary"])
 @pytest.mark.parametrize("already_versioned", [False, True])
+@pytest.mark.parametrize("skipped", [False, True])
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
-        candidate, tmp_path, monkeypatch, capsys, target, already_versioned):
+        candidate, tmp_path, monkeypatch, capsys, target, already_versioned, skipped):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_DPS_TARGET", target)
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
     title = "iot-release-20261104.1"
     versioned_title = f"{title} ({value['wheel']['version']})"
     monkeypatch.setenv("BUILD_BUILDNUMBER", versioned_title if already_versioned else title)
@@ -296,7 +335,8 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     generated = release.create_candidate(source, output)
     assert generated["wheel"] == value["wheel"]
     assert generated["producer"] == value["producer"]
-    assert generated["cohorts"] == release.integration_cohorts(target)
+    assert generated["cohorts"] == ({} if skipped else release.integration_cohorts(target))
+    assert generated["skipIntegrationTests"] is skipped
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == f"##vso[build.updatebuildnumber]{versioned_title}"
     matrix = json.loads(lines[-1].split("]", 1)[1])
@@ -676,16 +716,19 @@ def test_integration_artifact_proof_requires_original_bytes_and_manifest(candida
 
 
 @pytest.mark.parametrize("source_branch", ["refs/heads/feature/test", "refs/heads/preview", "refs/tags/v1"])
-def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, source_branch):
+@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, source_branch, mode):
     directory, _ = candidate
+    monkeypatch.setenv("RELEASE_MODE", mode)
     monkeypatch.setenv("BUILD_SOURCEBRANCH", source_branch)
     with pytest.raises(ValueError, match="reviewed release automation"):
         release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     release.github.assert_not_called()
 
 
-def test_release_mode_fails_before_checkout_on_feature_automation(candidate, tmp_path, monkeypatch):
-    monkeypatch.setenv("RELEASE_MODE", "Release")
+@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+def test_release_mode_fails_before_checkout_on_feature_automation(candidate, tmp_path, monkeypatch, mode):
+    monkeypatch.setenv("RELEASE_MODE", mode)
     monkeypatch.setenv("BUILD_SOURCEBRANCH", "refs/heads/feature/test")
     with pytest.raises(ValueError, match="reviewed release automation"):
         release.checkout(tmp_path / "checkout", resolving=True)
@@ -721,8 +764,18 @@ def test_existing_release_conflicts_are_never_overwritten(candidate, tmp_path, m
     release.github.assert_not_called()
 
 
-def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+@pytest.mark.parametrize("skipped", [False, True])
+def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path, monkeypatch, mode, skipped):
     directory, value = candidate
+    monkeypatch.setenv("RELEASE_MODE", mode)
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
+    if skipped:
+        value.update(skipIntegrationTests=True, cohorts={})
+        release.write(directory / "candidate.json", value)
+        prepared = release.read(tmp_path / "publication.json")
+        prepared["candidate"] = value
+        release.write(tmp_path / "publication.json", prepared)
     staged = public_release(value, draft=True)
     staged["assets"] = []
     events = []
@@ -733,7 +786,9 @@ def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path
         events.append((method, resource, data))
         if method == "PATCH":
             assert len(staged["assets"]) == 2
-            staged["draft"] = False
+            staged.update(data)
+        if method == "POST" and resource.endswith("/releases"):
+            staged.update(data)
         return staged
 
     def upload(_url, _token, **kwargs):
@@ -747,11 +802,27 @@ def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path
     monkeypatch.setattr(release, "api", upload)
     result = release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     assert result["candidate"] == value
-    assert [method for method, _, _ in events] == ["POST", "POST", "PATCH", "GET"]
-    assert events[1][2] == {"ref": "refs/tags/v1.1.0b1", "sha": SOURCE_SHA}
+    assert ("Integration tests skipped" in staged["body"]) is skipped
+    if mode == "StageDraft":
+        assert [method for method, _, _ in events] == ["POST", "GET"]
+        assert result["draft"] is True
+        assert staged["draft"] is True
+        assert "wheelUrl" not in result
+        monkeypatch.setattr(release, "find_release", Mock(return_value=staged))
+        monkeypatch.setattr(release, "tag_commit", Mock(return_value=None))
+        monkeypatch.setattr(release, "api", Mock(side_effect=AssertionError("Unexpected duplicate upload")))
+        events.clear()
+        assert release.publish(directory, tmp_path / "retry.json", tmp_path / "publication.json") == result
+        assert [method for method, _, _ in events] == ["GET"]
+    else:
+        assert [method for method, _, _ in events] == ["POST", "POST", "PATCH", "GET"]
+        assert events[1][2] == {"ref": "refs/tags/v1.1.0b1", "sha": SOURCE_SHA}
+        assert result["draft"] is False
 
 
-def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch, mode):
+    monkeypatch.setenv("RELEASE_MODE", mode)
     directory, value = candidate
     staged = public_release(value, draft=True)
     staged["assets"] = []
@@ -761,6 +832,63 @@ def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="remains a draft"):
         release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     release.github.assert_not_called()
+
+
+def test_draft_mode_rejects_already_public_release(candidate, tmp_path, monkeypatch):
+    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    monkeypatch.setattr(release, "find_release", Mock(return_value=public_release(candidate[1])))
+    monkeypatch.setattr(release, "tag_commit", Mock(return_value=SOURCE_SHA))
+    with pytest.raises(ValueError, match="already published"):
+        release.publish(candidate[0], tmp_path / "receipt", tmp_path / "publication.json")
+    release.github.assert_not_called()
+
+
+@pytest.mark.parametrize("draft", [False, True])
+def test_waiver_updates_existing_draft_notes_but_never_public_notes(candidate, tmp_path, monkeypatch, draft):
+    directory, value = candidate
+    monkeypatch.setenv("RELEASE_MODE", "StageDraft" if draft else "Release")
+    monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", "true")
+    value.update(skipIntegrationTests=True, cohorts={})
+    release.write(directory / "candidate.json", value)
+    prepared = release.read(tmp_path / "publication.json")
+    prepared["candidate"] = value
+    release.write(tmp_path / "publication.json", prepared)
+    staged = public_release(value, draft=draft)
+    staged["body"] = "Existing notes."
+    monkeypatch.setattr(release, "tag_commit", Mock(return_value=SOURCE_SHA))
+    monkeypatch.setattr(release, "find_release", Mock(return_value=staged))
+
+    def github(_resource, method="GET", data=None):
+        if method == "PATCH":
+            assert set(data) == {"body"}
+            staged.update(data)
+        return staged
+
+    network = Mock(side_effect=github)
+    monkeypatch.setattr(release, "github", network)
+    if draft:
+        result = release.publish(directory, tmp_path / "receipt", tmp_path / "publication.json")
+        assert result["draft"] is True
+        assert staged["body"] == "Integration tests skipped by release waiver.\n\nExisting notes."
+        assert [call.kwargs.get("method", "GET") for call in network.call_args_list] == ["PATCH", "GET"]
+    else:
+        with pytest.raises(ValueError, match="refusing to edit"):
+            release.publish(directory, tmp_path / "receipt", tmp_path / "publication.json")
+        network.assert_not_called()
+
+
+@pytest.mark.parametrize("change", [{"draft": False}, {"target_commitish": "f" * 40}, {"assets": []}])
+def test_draft_requires_fresh_identity_and_asset_verification(candidate, tmp_path, monkeypatch, change):
+    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    staged = public_release(candidate[1], draft=True)
+    monkeypatch.setattr(release, "find_release", Mock(return_value=staged))
+    monkeypatch.setattr(release, "tag_commit", Mock(return_value=None))
+    network = Mock(return_value={**staged, **change})
+    monkeypatch.setattr(release, "github", network)
+    with pytest.raises(ValueError):
+        release.publish(candidate[0], tmp_path / "receipt", tmp_path / "publication.json")
+    assert not (tmp_path / "receipt").exists()
+    assert all("method" not in call.kwargs for call in network.call_args_list)
 
 
 def test_required_index_check_overrides_advisory_summary(candidate, tmp_path, monkeypatch):
@@ -949,7 +1077,7 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert pipeline["pr"] == "none"
     assert pipeline["parameters"][0]["default"] == "Plan"
     assert {parameter["name"] for parameter in pipeline["parameters"]} == {
-        "mode", "sourceBranch", "createIndexPr", "dpsTarget",
+        "mode", "sourceBranch", "createIndexPr", "dpsTarget", "skipIntegrationTests",
     }
     assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
@@ -1004,15 +1132,32 @@ def test_yaml_selects_compliant_images_and_windows_source_analysis():
     assert "container" not in stages["Security"]["jobs"][0]
 
 
-def test_yaml_publication_is_excluded_unless_release_mode_is_selected():
+def test_yaml_publication_requires_explicit_mode_and_waiver_only_removes_integration():
+    pipeline, stages = all_stages()
+    parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
+    assert parameters["skipIntegrationTests"]["default"] is False
+    assert parameters["mode"]["values"] == ["Plan", "Validate", "StageDraft", "Release"]
+    assert pipeline["variables"]["RELEASE_SKIP_INTEGRATION_TESTS"] == "${{ parameters.skipIntegrationTests }}"
+    assert pipeline["extends"]["parameters"]["stages"][0]["parameters"]["skipIntegrationTests"] == (
+        "${{ parameters.skipIntegrationTests }}"
+    )
     template = yaml.safe_load((ROOT / ".azure-devops/templates/release-stages.yml").read_text(encoding="utf-8"))
+    assert list(template["stages"][-2]) == [
+        "${{ if and(ne(parameters.mode, 'Plan'), not(parameters.skipIntegrationTests)) }}"
+    ]
     publication = template["stages"][-1]
-    assert list(publication) == ["${{ if eq(parameters.mode, 'Release') }}"]
+    assert list(publication) == ["${{ if in(parameters.mode, 'StageDraft', 'Release') }}"]
     assert [stage["stage"] for stage in next(iter(publication.values()))] == ["Publish"]
     nonpublishing = json.dumps(template["stages"][:-1])
     assert "aziotcli_release_publish" not in nonpublishing
     assert "ReleaseGitHubToken" not in nonpublishing
     assert "INDEX_FORK_REPOSITORY" not in nonpublishing
+    assert stages["Publish"]["dependsOn"][-1] == {
+        "${{ if not(parameters.skipIntegrationTests) }}": ["Integration"],
+    }
+    assert "or(${{ parameters.skipIntegrationTests }}, eq(dependencies.Integration.result, 'Succeeded'))" in (
+        stages["Publish"]["condition"]
+    )
 
 
 @pytest.mark.parametrize("name", ["Integration", "Publish"])
@@ -1020,6 +1165,8 @@ def test_yaml_requires_every_dependency_to_succeed_not_skip_or_partial(name):
     _, stages = all_stages()
     stage = stages[name]
     for dependency in stage["dependsOn"]:
+        if isinstance(dependency, dict):
+            continue
         assert f"eq(dependencies.{dependency}.result, 'Succeeded')" in stage["condition"]
     assert "not(canceled())" in stage["condition"]
 
@@ -1058,7 +1205,8 @@ def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity(
     assert stages["Integration"]["dependsOn"] == ["Resolve", "Build", "Security", "CommandLint", "IndexCompatibility"]
     assert "dependencies.Unit" not in stages["Integration"]["condition"]
     assert stages["Publish"]["dependsOn"] == [
-        "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility", "Integration",
+        "Resolve", "Build", "Unit", "Security", "CommandLint", "IndexCompatibility",
+        {"${{ if not(parameters.skipIntegrationTests) }}": ["Integration"]},
     ]
     assert "eq(dependencies.Unit.result, 'Succeeded')" in stages["Publish"]["condition"]
     assert job["timeoutInMinutes"] >= 9 * 60 + 7 * 60
