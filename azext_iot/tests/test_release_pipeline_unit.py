@@ -39,7 +39,7 @@ def candidate(tmp_path, monkeypatch):
         "PIP_INDEX_URL": release.FEED.replace("https://", "https://build:offline-placeholder@"),
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
         "RELEASE_SKIP_INTEGRATION_TESTS": "false",
-        "RELEASE_DPS_TARGET": "public", "RELEASE_COHORT": "Hub",
+        "RELEASE_REGION": "australiaeast", "RELEASE_COHORT": "Hub",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -312,13 +312,13 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
         release.verify_candidate(directory)
 
 
-@pytest.mark.parametrize("target", ["public", "canary"])
+@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
 @pytest.mark.parametrize("already_versioned", [False, True])
 @pytest.mark.parametrize("skipped", [False, True])
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
-        candidate, tmp_path, monkeypatch, capsys, target, already_versioned, skipped):
+        candidate, tmp_path, monkeypatch, capsys, regions, already_versioned, skipped):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_DPS_TARGET", target)
+    monkeypatch.setenv("RELEASE_REGION", regions)
     monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
     title = "iot-release-20261104.1"
     versioned_title = f"{title} ({value['wheel']['version']})"
@@ -335,7 +335,7 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     generated = release.create_candidate(source, output)
     assert generated["wheel"] == value["wheel"]
     assert generated["producer"] == value["producer"]
-    assert generated["cohorts"] == ({} if skipped else release.integration_cohorts(target))
+    assert generated["cohorts"] == ({} if skipped else release.integration_cohorts(regions))
     assert generated["skipIntegrationTests"] is skipped
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == f"##vso[build.updatebuildnumber]{versioned_title}"
@@ -346,24 +346,29 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert release.verify_candidate(output) == generated
 
 
-@pytest.mark.parametrize("target", ["public", "canary"])
-def test_service_coordinators_preserve_full_suite_and_endpoint_routing(target):
-    cohorts = release.integration_cohorts(target)
+@pytest.mark.parametrize("regions", ["", "westus2,", "westus2,westus2", "westus2, eastus", "chinaeast2", "usgovvirginia"])
+def test_release_regions_reject_invalid_or_sovereign_selection(regions):
+    with pytest.raises(ValueError, match="distinct public Azure regions"):
+        release.integration_cohorts(regions)
+
+
+@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
+def test_service_coordinators_preserve_full_suite_and_endpoint_routing(regions):
+    cohorts = release.integration_cohorts(regions)
     assert {key: value["services"] for key, value in cohorts.items()} == {
         "DPS": ["DPS"], "Hub": ["HubControl", "HubData"], "ADU": ["ADU"], "ADR": ["ADR"],
     }
-    for service, parameters in cohorts.items():
+    for parameters in cohorts.values():
         assert parameters["mode"] == "Integration tests"
         assert parameters["pythonVersions"] == ["3.10", "3.13"]
-        canary = service == "DPS" and target == "canary"
-        assert parameters["regions"] == ("centraluseuap" if canary else "australiaeast")
-        assert parameters["armEndpoint"] == ("canary" if canary else "public")
+        assert parameters["regions"] == regions
+        assert parameters["armEndpoint"] == "public"
 
 
 @pytest.mark.parametrize("change", ["missing", "python", "endpoint", "services", "omitted"])
 def test_candidate_rejects_missing_or_tampered_target_cohorts(candidate, monkeypatch, change):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
+    monkeypatch.setenv("RELEASE_REGION", "westus2,eastus")
     value["cohorts"] = release.integration_cohorts()
     if change == "missing":
         del value["cohorts"]["ADR"]
@@ -562,11 +567,11 @@ def test_duplicate_child_ownership_rejected(candidate, monkeypatch):
         release.existing_integration(value)
 
 
-@pytest.mark.parametrize("target", ["public", "canary"])
+@pytest.mark.parametrize("regions", ["australiaeast", "westus2,eastus"])
 @pytest.mark.parametrize("duplicate", [None, "DPS", "Hub", "ADU", "ADR", "unexpected"])
-def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, target, duplicate):
+def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, regions, duplicate):
     _, value = candidate
-    value["cohorts"] = release.integration_cohorts(target)
+    value["cohorts"] = release.integration_cohorts(regions)
     monkeypatch.setenv("RELEASE_COHORT", "DPS")
     builds = [
         {**integration_build(value, cohort=cohort), "id": 901 + index}
@@ -590,7 +595,7 @@ def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, tar
 @pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
 def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monkeypatch, cohort):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_DPS_TARGET", "canary")
+    monkeypatch.setenv("RELEASE_REGION", "westus2,eastus")
     monkeypatch.setenv("RELEASE_COHORT", cohort)
     monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
     value["cohorts"] = release.integration_cohorts()
@@ -707,7 +712,7 @@ def test_integration_artifact_proof_requires_original_bytes_and_manifest(candida
     release.write(wheel_dir / "candidate.json", value)
     release.verify_integration_artifacts(directory, artifacts)
     if asset == "cohorts":
-        value["cohorts"] = release.integration_cohorts("canary")
+        value["cohorts"] = release.integration_cohorts("eastus")
         release.write(wheel_dir / "candidate.json", value)
     else:
         (wheel_dir / value[asset]["file"]).write_bytes(b"rebuilt")
@@ -1077,7 +1082,7 @@ def test_yaml_is_manual_plan_by_default_and_never_continues_on_error():
     assert pipeline["pr"] == "none"
     assert pipeline["parameters"][0]["default"] == "Plan"
     assert {parameter["name"] for parameter in pipeline["parameters"]} == {
-        "mode", "sourceBranch", "createIndexPr", "dpsTarget", "skipIntegrationTests",
+        "mode", "sourceBranch", "createIndexPr", "regions", "skipIntegrationTests",
     }
     assert "RELEASE_SOURCE_COMMIT" not in json.dumps(stages["Resolve"])
     assert set(stages) == {
@@ -1195,7 +1200,7 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
 
 def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity():
     pipeline, stages = all_stages()
-    assert pipeline["variables"]["RELEASE_DPS_TARGET"] == "${{ parameters.dpsTarget }}"
+    assert pipeline["variables"]["RELEASE_REGION"] == "${{ parameters.regions }}"
     job = stages["Integration"]["jobs"][0]
     assert "$(" not in job["displayName"]
     assert job["strategy"] == {

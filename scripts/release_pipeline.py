@@ -444,18 +444,19 @@ def verify_candidate(directory):
     return value
 
 
-def integration_cohorts(target=None):
-    target = target or environment("RELEASE_DPS_TARGET")
-    if target not in {"public", "canary"}:
-        raise ValueError("DPS target must be public or canary.")
+def integration_cohorts(regions=None):
+    regions = regions if regions is not None else environment("RELEASE_REGION")
+    selected = regions.split(",")
+    if (len(selected) != len(set(selected))
+            or any(not re.fullmatch(r"[a-z][a-z0-9]+", region)
+                   or region.startswith(("china", "usgov", "usdod")) for region in selected)):
+        raise ValueError("Select distinct public Azure regions separated by commas.")
     cohorts = {
-        service: {**deepcopy(INTEGRATION_PARAMETERS), "services": selections}
+        service: {**deepcopy(INTEGRATION_PARAMETERS), "regions": regions, "services": selections}
         for service, selections in {
             "DPS": ["DPS"], "Hub": ["HubControl", "HubData"], "ADU": ["ADU"], "ADR": ["ADR"],
         }.items()
     }
-    if target == "canary":
-        cohorts["DPS"].update(regions="centraluseuap", armEndpoint="canary")
     return cohorts
 
 

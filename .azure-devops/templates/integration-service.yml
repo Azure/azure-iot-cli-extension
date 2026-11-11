@@ -20,6 +20,9 @@ parameters:
   - name: armResource
     type: string
     default: https://management.azure.com
+  - name: azureServiceConnection
+    type: string
+    default: $(AzureServiceConnection)
 
 stages:
   - stage: ${{ parameters.service }}
@@ -30,7 +33,7 @@ stages:
         and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
             eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Lint.result, 'Succeeded'),
             eq(dependencies.Unit.result, 'Succeeded'),
-            contains(variables['MonitorServices'], '${{ parameters.service }}'))
+            contains(variables['HealthServices'], '${{ parameters.service }}'))
       variables:
         monitorBundle: $[ stageDependencies.Build.Build.outputs['bundle.artifact'] ]
     ${{ else }}:
@@ -57,7 +60,7 @@ stages:
             matrix:
               monitored:
                 python: '3.13'
-                region: $(MonitorRegion)
+                region: $(HealthRegion)
           ${{ else }}:
             matrix:
               ${{ each python in split(parameters.pythonVersions, ' ') }}:
@@ -98,8 +101,8 @@ stages:
                 env:
                   BUNDLE: $(Pipeline.Workspace)/release-bundle
                   SOURCE: $(testSourceDirectory)
-                  MONITOR_CLOUD: $(MonitorCloud)
-                  MONITOR_TRACK: $(MonitorTrack)
+                  MONITOR_CLOUD: $(HealthCloud)
+                  MONITOR_TRACK: $(HealthTrack)
           - bash: |
               set -euo pipefail
               python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
@@ -147,7 +150,7 @@ stages:
           - task: AzureCLI@2
             displayName: Run tests
             inputs:
-              azureSubscription: $(AzureServiceConnection)
+              azureSubscription: ${{ parameters.azureServiceConnection }}
               addSpnToEnvironment: true
               scriptType: bash
               scriptLocation: inlineScript

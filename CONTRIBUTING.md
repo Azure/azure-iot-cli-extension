@@ -162,11 +162,15 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 Six independent definitions use shared health stages:
 `Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
-GA uses `.azure-devops/release-monitor.yml`, with **Test branch** set to `dev`.
-Preview uses `.azure-devops/release-monitor-preview.yml`, with **Test branch**
-set to `release/1.2.0-preview`. Both use `templates/release-monitor-stages.yml`.
-GA always builds `dev`; Preview accepts an explicit branch override in
-**Run pipeline**. The built-in ADO Branch/tag field selects the automation
+Each cloud/track has a thin `release-monitor*.yml` entry point sharing
+`templates/release-monitor-stages.yml`. **Cloud**, **Version**, **Region** and
+**Services** default to that definition's reviewed profile. **Test branch**
+defaults to `dev` for GA and `release/1.2.0-preview` for Preview.
+Manual overrides use the selected cloud's reviewed connection and resource group,
+which must be authorized for the calling pipeline. Selected services must be
+supported in that cloud. Overrides are frozen with the source, marked `-manual`
+in the run title, and cannot pass the scheduled-profile qualification gate.
+The built-in ADO Branch/tag field selects the automation
 YAML, not this source target. The resolver freezes the source commit before any
 build or Azure access; retries cannot follow a moving branch.
 Build, lint and four unit shards run independently, followed by one job per selected
@@ -208,6 +212,14 @@ requiring unavailable DPS managed identity. Authentication and TLS failures rema
 never unsupported skips.
 Run titles include the cloud, track, actual CLI version, source commit and build ID.
 These are source-build health results, not published-release qualification.
+
+Release pipeline **Region** selects the public regions passed to every integration
+cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
+Integration **Region** retains comma-separated multi-region selection.
+Its variable group supplies environment settings and the service connection;
+subscription and resource group scope live fixtures. `releaseBuildId=0` builds
+a standalone wheel; a release build ID acquires and verifies that exact candidate
+instead of rebuilding it.
 
 Service matrices have no artificial parallel limit or cross-run lock. Scheduled
 cleanup is report-first and never uses names or age alone to authorize deletion.
