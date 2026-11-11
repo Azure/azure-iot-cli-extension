@@ -9,9 +9,9 @@ parameters:
     displayName: Mode
     type: string
     default: Plan
-    values: [Plan, Validate, StageDraft, Release]
+    values: [Plan, Validate, Draft, Release]
   - name: sourceBranch
-    displayName: Source branch
+    displayName: Release branch
     type: string
     default: release/1.2.0-preview
   - name: createIndexPr
@@ -19,7 +19,7 @@ parameters:
     type: boolean
     default: false
   - name: skipIntegrationTests
-    displayName: Skip all integration tests (release waiver)
+    displayName: Skip integration tests
     type: boolean
     default: false
   - name: dpsTarget

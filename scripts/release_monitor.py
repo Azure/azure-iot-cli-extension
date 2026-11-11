@@ -447,8 +447,6 @@ def validate_source_manifest(manifest, **expected):
 
 
 def frozen_source_manifest(history, cloud, track, branch, automation_commit, attempt):
-    if branch == "default":
-        branch = {"ga": "dev", "preview": "release/1.2.0-preview"}.get(track)
     branch = source_branch(branch)
     if track == "ga" and branch != "refs/heads/dev":
         raise ValueError("GA health always builds dev. Select another branch only for Preview.")
@@ -608,7 +606,14 @@ def definitions(config, baseline, branch):
         "name": item["name"], "path": "\\official\\release-health", "type": "build",
         "queueStatus": "disabled", "triggers": [], "repository": source,
         "queue": {"id": baseline["queue"]["id"]},
-        "process": {"type": 2, "yamlFilename": ".azure-devops/release-monitor.yml"},
+        "process": {
+            "type": 2,
+            "yamlFilename": (
+                ".azure-devops/release-monitor-preview.yml"
+                if config["extension"] == "azure-iot" and item["variables"]["MonitorTrack"] == "preview"
+                else ".azure-devops/release-monitor.yml"
+            ),
+        },
         "variables": {
             name: {"value": value, "isSecret": False, "allowOverride": False}
             for name, value in item["variables"].items()

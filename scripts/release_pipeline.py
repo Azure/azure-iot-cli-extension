@@ -124,7 +124,7 @@ def github(resource, **kwargs):
 
 def checkout(destination, resolving=False):
     if resolving:
-        if environment("RELEASE_MODE") in {"StageDraft", "Release"}:
+        if environment("RELEASE_MODE") in {"Draft", "Release"}:
             automation_allowed()
     source_branch = branch(environment("RELEASE_SOURCE_BRANCH"))
     source_commit = None if resolving else commit(environment("RELEASE_SOURCE_COMMIT"))
@@ -613,7 +613,7 @@ def release_options():
     mode = environment("RELEASE_MODE")
     index = os.environ.get("RELEASE_CREATE_INDEX_PR", "false").lower()
     skip_integration_tests()
-    if mode not in {"Plan", "Validate", "StageDraft", "Release"} or index not in {"true", "false"}:
+    if mode not in {"Plan", "Validate", "Draft", "Release"} or index not in {"true", "false"}:
         raise ValueError("Invalid release mode or createIndexPr option.")
     if index == "true" and mode != "Release":
         raise ValueError("createIndexPr requires Release mode and a public GitHub release.")
@@ -621,8 +621,8 @@ def release_options():
 
 
 def publication_allowed(*, draft=False):
-    if release_options()[0] != ("StageDraft" if draft else "Release"):
-        raise ValueError("Publication requires explicit Release mode; staging requires StageDraft.")
+    if release_options()[0] != ("Draft" if draft else "Release"):
+        raise ValueError("Publication requires explicit Release mode; staging requires Draft.")
     automation_allowed()
     environment("RELEASE_GITHUB_TOKEN")
 
@@ -769,7 +769,7 @@ def verify_publication_inputs(directory, prepared):
 
 
 def publish(directory, receipt, prepared):
-    draft_only = release_options()[0] == "StageDraft"
+    draft_only = release_options()[0] == "Draft"
     publication_allowed(draft=draft_only)
     candidate, preparation = verify_publication_inputs(directory, prepared)
     waiver = "Integration tests skipped by release waiver." if candidate.get("skipIntegrationTests") else ""
@@ -786,7 +786,7 @@ def publish(directory, receipt, prepared):
             "prerelease": preparation["prerelease"], "generate_release_notes": True, "body": waiver,
         })
     if draft_only and not release["draft"]:
-        raise ValueError("StageDraft cannot reuse or modify an already published release.")
+        raise ValueError("Draft cannot reuse or modify an already published release.")
     if (release["target_commitish"] != candidate["sourceCommit"] and existing_tag != candidate["sourceCommit"]
             or release["prerelease"] != preparation["prerelease"]):
         raise ValueError("Existing release has different source or prerelease metadata.")

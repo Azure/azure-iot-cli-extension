@@ -11,6 +11,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -217,8 +218,35 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert "Secret" not in item["variables"]
         assert item["repository"]["properties"] == {"connectedServiceId": "github-connection"}
         assert all(not value["allowOverride"] for value in item["variables"].values())
+        pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
+        parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
+        assert set(parameters) == {"sourceBranch"}
+        track = item["variables"]["MonitorTrack"]["value"]
+        assert parameters["sourceBranch"]["default"] == {
+            "ga": "dev", "preview": "release/1.2.0-preview",
+        }[track]
+        assert pipeline["stages"] == [{
+            "template": "templates/release-monitor-stages.yml",
+            "parameters": {"sourceBranch": "${{ parameters.sourceBranch }}"},
+        }]
     with pytest.raises(ValueError, match="GitHub definition"):
         monitor.definitions(config, baseline, "refs/heads/../other")
+
+
+def test_health_stages_always_plan_and_require_live_cohort_results():
+    template = yaml.safe_load(
+        (ROOT / ".azure-devops/templates/release-monitor-stages.yml").read_text(encoding="utf-8")
+    )
+    stages = {stage["stage"]: stage for stage in template["stages"] if "stage" in stage}
+    assert set(stages) == {"Prepare", "Build", "Lint", "Unit", "Results"}
+    steps = stages["Prepare"]["jobs"][0]["steps"]
+    assert any("release_monitor_adapter.py plan" in step.get("bash", "") for step in steps)
+    assert stages["Results"]["dependsOn"] == [
+        "Prepare", "Build", "Lint", "Unit", "DPS", "HubControl", "HubData", "ADU", "ADR",
+    ]
+    cohorts = next(stage for stage in template["stages"] if "stage" not in stage)
+    assert next(iter(cohorts.values()))[0]["template"] == "integration-service.yml"
+    assert "runIntegration" not in str(template)
 
 
 def test_staging_preserves_released_cases_manifests_and_product(monitor, bundle, mocker, monkeypatch, tmp_path):
@@ -282,26 +310,26 @@ def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor
         monitor.frozen_source_manifest(tmp_path, "public", "preview", "users/other", AUTOMATION, 2)
 
 
-@pytest.mark.parametrize("track,branch,resolved", [
-    ("ga", "default", "dev"),
-    ("preview", "default", "release/1.2.0-preview"),
-    ("preview", "users/release-next", "users/release-next"),
+@pytest.mark.parametrize("track,branch", [
+    ("ga", "dev"),
+    ("preview", "release/1.2.0-preview"),
+    ("preview", "users/release-next"),
 ])
-def test_source_selection_resolves_exact_branch_commit_and_literal_version(monitor, mocker, track, branch, resolved):
+def test_source_selection_resolves_exact_branch_commit_and_literal_version(monitor, mocker, track, branch):
     git = monitor.subprocess.run
     version = "1.0.0" if track == "ga" else "1.2.0b1"
 
     def run(arguments, **kwargs):
         if arguments[1] == "ls-remote":
-            assert arguments[-1] == f"refs/heads/{resolved}"
-            return mocker.Mock(stdout=f"{SOURCE}\trefs/heads/{resolved}\n")
+            assert arguments[-1] == f"refs/heads/{branch}"
+            return mocker.Mock(stdout=f"{SOURCE}\trefs/heads/{branch}\n")
         return git(arguments, **kwargs)
 
     mocker.patch.object(monitor.subprocess, "run", side_effect=run)
     download = mocker.patch.object(monitor, "download", return_value=f"VERSION = '{version}'\n".encode())
     manifest = monitor.frozen_source_manifest(None, "fairfax", track, branch, AUTOMATION, 1)
     assert manifest["source"] == {
-        "branch": f"refs/heads/{resolved}", "commit": SOURCE, "version": version,
+        "branch": f"refs/heads/{branch}", "commit": SOURCE, "version": version,
     }
     assert manifest["wheel"] is None
     download.assert_called_once_with(
