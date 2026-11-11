@@ -205,6 +205,38 @@ def test_sovereign_management_factory(mocker, cli_profile, cloud_config, factory
     cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="linked-sub")
 
 
+@pytest.mark.parametrize("factory_name,client_path", [
+    ("iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient"),
+    ("iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient"),
+])
+@pytest.mark.parametrize("override", [None, PUBLIC_ARM, CANARY_ARM])
+def test_custom_cloud_management_preserves_endpoint_credential_boundary(
+    mocker, monkeypatch, cli_profile, factory_name, client_path, override,
+):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    cloud = {
+        "id": "custom",
+        "resource_manager": "https://management.custom.example",
+        "active_directory": "https://login.custom.example",
+        "active_directory_resource_id": "https://management.custom.example",
+    }
+    cli_ctx = _build_cli_ctx(mocker, cloud)
+    client = mocker.patch(client_path)
+    if override:
+        monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", override)
+        with pytest.raises(CLIError, match="Azure public cloud only"):
+            getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+        cli_profile.assert_not_called()
+        client.assert_not_called()
+    else:
+        getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+        assert client.call_args.kwargs["base_url"] == cloud["resource_manager"]
+        assert client.call_args.kwargs["credential_scopes"] == ["https://management.custom.example/.default"]
+        cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="linked-sub")
+
+
 @pytest.mark.parametrize("override", [PUBLIC_ARM, CANARY_ARM, "https://management.azure.com.invalid"])
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
 @pytest.mark.parametrize("factory_name", ["iot_hub_service_factory", "iot_service_provisioning_factory"])

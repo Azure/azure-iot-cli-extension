@@ -117,7 +117,6 @@ def _get_iot_arm_endpoint(cli_ctx):
         ),
     }
     if endpoint not in sovereign:
-        _get_canary_credential_scopes(cli_ctx)
         return get_adr_arm_endpoint(endpoints.resource_manager)
     authorities, audience = sovereign[endpoint]
     if (not isinstance(endpoints.active_directory, str)
