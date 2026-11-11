@@ -260,16 +260,16 @@ class ArmReader:
                         raise PhaseError("Incomplete DPS inventory response; an empty inventory cannot be assumed.")
                 return response
 
-        def client(kind, api):
+        def client(kind, **kwargs):
             return kind(
-                Credential(), subscription, base_url=self.target["endpoint"], api_version=api,
+                Credential(), subscription, base_url=self.target["endpoint"],
                 credential_scopes=[audience.rstrip("/") + "/.default"],
                 transport=GetOnly(connection_timeout=5, read_timeout=20),
-                retry_total=0, retry_connect=0, retry_read=0, retry_status=0, logging_enable=False,
+                retry_total=0, retry_connect=0, retry_read=0, retry_status=0, logging_enable=False, **kwargs,
             )
-        self.dps = client(IotDpsClient, _ADR_DPS_API_VERSION)
-        self.hub = client(IotHubClient, _ADR_IOT_HUB_API_VERSION)
-        self.adr = client(DeviceRegistryMgmtClient, "2026-11-02-preview")
+        self.dps = client(IotDpsClient, api_version=_ADR_DPS_API_VERSION)
+        self.hub = client(IotHubClient, api_version=_ADR_IOT_HUB_API_VERSION)
+        self.adr = client(DeviceRegistryMgmtClient)
 
     @staticmethod
     def snapshot(resource):
