@@ -397,16 +397,13 @@ class Observer:
             return headers
         if previous is None and "location" not in body:
             raise ValueError("Unrecognized top-level resource; ownership tagging cannot be assumed.")
-        shape = record.get("tagShape", "null")
-        if "tags" in body:
-            shape = "null" if body["tags"] is None else "object"
         tags = body.get("tags") if "tags" in body else (previous or {}).get("tags")
         tags = dict(tags or {})
         if tags.get(TAG, self.journal.owner) != self.journal.owner:
             raise ValueError("A resource requested another attempt's ownership tag.")
         tags[TAG] = self.journal.owner
         body["tags"] = tags
-        self.journal.record(resource, api, kind="root", tagShape=shape, confirmed=previous is not None, **creation)
+        self.journal.record(resource, api, kind="root", confirmed=previous is not None, **creation)
         return headers
 
     def prepare_deployment(self, resource, api, body, creation_id=None):
@@ -469,7 +466,7 @@ class Observer:
                 if root not in targets or resource_type(root) not in apis:
                     raise ValueError("ARM deployment references an unowned parent resource.")
                 self.journal.record(
-                    root, root_api, kind="root", tagShape="null", creates={creation_id: None},
+                    root, root_api, kind="root", creates={creation_id: None},
                     deployments={creation_id: {"id": resource, "api": api}},
                 )
                 created.append(root)
@@ -507,25 +504,16 @@ class Observer:
             tags[TAG] = self.journal.owner
         else:
             raise ValueError("Unsupported ownership tag operation.")
-        self.journal.record(root, root_api, tagShape="object")
 
-    def visible(self, value, resource="", records=None):
-        if records is None:
-            records = self.journal.records()
+    def visible(self, value):
         if isinstance(value, list):
-            return [self.visible(item, resource, records) for item in value]
+            return [self.visible(item) for item in value]
         if not isinstance(value, dict):
             return value
-        resource = value.get("id", resource)
-        resource = resource.lower() if isinstance(resource, str) else ""
-        resource = resource.removesuffix("/providers/microsoft.resources/tags/default")
-        value = {key: self.visible(item, resource, records) for key, item in value.items()}
+        value = {key: self.visible(item) for key, item in value.items()}
         tags = value.get("tags")
         if isinstance(tags, dict) and tags.get(TAG) == self.journal.owner:
             tags.pop(TAG)
-            record = records.get(resource, {})
-            if not tags and record.get("tagShape", "null") == "null":
-                value["tags"] = None
         description = value.get("description")
         if isinstance(description, str) and description.startswith(self.journal.role_prefix):
             value["description"] = description.removeprefix(self.journal.role_prefix) or None
