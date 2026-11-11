@@ -447,6 +447,8 @@ def validate_source_manifest(manifest, **expected):
 
 
 def frozen_source_manifest(history, cloud, track, branch, automation_commit, attempt):
+    if branch == "default":
+        branch = {"ga": "dev", "preview": "release/1.2.0-preview"}.get(track)
     branch = source_branch(branch)
     if track == "ga" and branch != "refs/heads/dev":
         raise ValueError("GA health always builds dev. Select another branch only for Preview.")

@@ -282,25 +282,32 @@ def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor
         monitor.frozen_source_manifest(tmp_path, "public", "preview", "users/other", AUTOMATION, 2)
 
 
-def test_source_selection_resolves_exact_branch_commit_and_literal_version(monitor, mocker):
+@pytest.mark.parametrize("track,branch,resolved", [
+    ("ga", "default", "dev"),
+    ("preview", "default", "release/1.2.0-preview"),
+    ("preview", "users/release-next", "users/release-next"),
+])
+def test_source_selection_resolves_exact_branch_commit_and_literal_version(monitor, mocker, track, branch, resolved):
     git = monitor.subprocess.run
+    version = "1.0.0" if track == "ga" else "1.2.0b1"
 
     def run(arguments, **kwargs):
         if arguments[1] == "ls-remote":
-            return mocker.Mock(stdout=f"{SOURCE}\trefs/heads/users/release-next\n")
+            assert arguments[-1] == f"refs/heads/{resolved}"
+            return mocker.Mock(stdout=f"{SOURCE}\trefs/heads/{resolved}\n")
         return git(arguments, **kwargs)
 
     mocker.patch.object(monitor.subprocess, "run", side_effect=run)
-    download = mocker.patch.object(monitor, "download", return_value=b"VERSION = '1.2.0b1'\n")
-    manifest = monitor.frozen_source_manifest(None, "fairfax", "preview", "users/release-next", AUTOMATION, 1)
+    download = mocker.patch.object(monitor, "download", return_value=f"VERSION = '{version}'\n".encode())
+    manifest = monitor.frozen_source_manifest(None, "fairfax", track, branch, AUTOMATION, 1)
     assert manifest["source"] == {
-        "branch": "refs/heads/users/release-next", "commit": SOURCE, "version": "1.2.0b1",
+        "branch": f"refs/heads/{resolved}", "commit": SOURCE, "version": version,
     }
     assert manifest["wheel"] is None
     download.assert_called_once_with(
         f"https://raw.githubusercontent.com/Azure/azure-iot-cli-extension/{SOURCE}/azext_iot/constants.py",
     )
-    assert monitor.run_title(manifest, "123") == "iot-health-fairfax-preview-cli1.2.0b1-srcbbbbbbbbbbbb-b123"
+    assert monitor.run_title(manifest, "123") == f"iot-health-fairfax-{track}-cli{version}-srcbbbbbbbbbbbb-b123"
 
 
 def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker):

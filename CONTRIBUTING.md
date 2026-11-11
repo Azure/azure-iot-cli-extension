@@ -162,8 +162,9 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 `.azure-devops/release-monitor.yml` is shared by six independent definitions:
 `Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
-GA always builds `dev`. For Preview, set `sourceBranch` in **Run pipeline** to the
-branch to build and test. The built-in ADO Branch/tag field selects the automation
+The `sourceBranch` default selects `dev` for GA and `release/1.2.0-preview` for
+Preview. GA always builds `dev`; Preview accepts an explicit branch override in
+**Run pipeline**. The built-in ADO Branch/tag field selects the automation
 YAML, not this source target. The resolver freezes the source commit before any
 build or Azure access; retries cannot follow a moving branch.
 Build, lint and four unit shards run independently, followed by one job per selected

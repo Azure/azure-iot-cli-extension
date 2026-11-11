@@ -8,9 +8,9 @@ appendCommitMessageToRunName: false
 
 parameters:
   - name: sourceBranch
-    displayName: CLI source branch (GA requires dev; Preview selects the branch to test)
+    displayName: CLI source branch (default selects the GA or Preview branch)
     type: string
-    default: dev
+    default: default
   - name: runIntegration
     displayName: Run approved live integration tests
     type: boolean
