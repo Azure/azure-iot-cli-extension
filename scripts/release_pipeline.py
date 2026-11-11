@@ -34,7 +34,7 @@ FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/si
 BRANCHES = {"dev", "preview", "release/1.2.0-preview"}
 INTEGRATION_PARAMETERS = {
     "mode": "Integration tests", "services": ["DPS/Hub/ADR/ADU"],
-    "pythonVersions": ["3.10", "3.13"], "regions": "australiaeast", "armEndpoint": "public",
+    "pythonVersions": ["3.10", "3.13"], "cloud": "public",
 }
 
 
@@ -149,7 +149,7 @@ def checkout(destination, resolving=False):
                 raise ValueError(f"Source branch needs the migration/index-check prerequisites: {relative}")
         if not skip_integration_tests():
             integration = (destination / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8")
-            if "releaseBuildId" not in integration:
+            if "ReleaseCandidateBuildId" not in integration:
                 raise ValueError("The selected source does not support pipeline 147's release-candidate handoff.")
         print(f"##vso[task.setvariable variable=commit;isOutput=true]{selected}", flush=True)
     return selected
@@ -465,15 +465,31 @@ def integration_parameters(candidate, cohort=None):
     return dict(candidate["cohorts"][key], releaseBuildId=candidate["producer"]["build"])
 
 
+def queued_release_build_id(build):
+    variables = build.get("parameters")
+    if variables is None:
+        return "0"
+    if isinstance(variables, str):
+        variables = json.loads(variables)
+    if not isinstance(variables, dict):
+        raise ValueError("Invalid queued integration variables.")
+    value = str(variables.get("ReleaseCandidateBuildId", "0"))
+    if not re.fullmatch(r"0|[1-9][0-9]*", value):
+        raise ValueError("Invalid queued release candidate ID.")
+    return value
+
+
 def validate_integration(build, candidate, cohort=None):
     parameters = build.get("templateParameters")
     if isinstance(parameters, str):
         parameters = json.loads(parameters)
     parameters = dict(parameters)
+    if "releaseBuildId" in parameters:
+        raise ValueError("Release candidate identity must come from the internal queue variable.")
     for key in ("services", "pythonVersions"):
         if isinstance(parameters.get(key), str):
             parameters[key] = json.loads(parameters[key])
-    parameters["releaseBuildId"] = identifier(parameters.get("releaseBuildId"))
+    parameters["releaseBuildId"] = identifier(queued_release_build_id(build))
     expected = integration_parameters(candidate, cohort)
     repository = build["repository"]
     if (build["definition"]["id"] != 147 or repository.get("id") != REPOSITORY
@@ -498,10 +514,7 @@ def existing_integration(candidate) -> dict | None:
         raise ValueError("Too many child builds to prove unique ownership; inspect pipeline 147 before retrying.")
     matches = {key: [] for key in candidate["cohorts"]}
     for build in builds:
-        parameters = build.get("templateParameters", {})
-        if isinstance(parameters, str):
-            parameters = json.loads(parameters)
-        if str(parameters.get("releaseBuildId", "")) == candidate["producer"]["build"]:
+        if queued_release_build_id(build) == candidate["producer"]["build"]:
             scopes = []
             for key in candidate["cohorts"]:
                 try:
@@ -545,9 +558,10 @@ def integrate(directory, record, timeout=25200):
     payload = {
         "definition": {"id": 147}, "sourceBranch": candidate["sourceBranch"],
         "sourceVersion": candidate["sourceCommit"],
+        "parameters": json.dumps({"ReleaseCandidateBuildId": candidate["producer"]["build"]}),
         "templateParameters": {
             key: value if isinstance(value, str) else json.dumps(value)
-            for key, value in integration_parameters(candidate).items()
+            for key, value in integration_parameters(candidate).items() if key != "releaseBuildId"
         },
     }
     run = existing_integration(candidate)

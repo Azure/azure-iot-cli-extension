@@ -48,7 +48,8 @@ def plan(bundle, output):
     stage(bundle, output, source_only=True)
     native = runpy.run_path(str(Path(output) / "azext_iot/tests/_ado_pipeline.py"))
     jobs = native["plan"](
-        os.environ["MONITOR_SERVICES"].split(","), ["3.13"], [os.environ["MONITOR_REGION"]],
+        os.environ["MONITOR_SERVICES"].split(","), os.environ["MONITOR_PYTHONS"].split(","),
+        os.environ["MONITOR_REGION"].split(","),
         os.environ["MONITOR_ENDPOINT"],
     )
     # Resolve the full version-specific selection before an Azure service connection is used.

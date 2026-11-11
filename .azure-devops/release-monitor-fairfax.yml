@@ -3,57 +3,81 @@
 trigger: none
 pr: none
 schedules: []
-name: iot-health-$(HealthCloud)-$(HealthTrack)-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
 parameters:
-- name: cloud
-  displayName: Cloud
-  type: string
-  default: fairfax
-  values:
-  - public
-  - fairfax
-  - mooncake
-- name: version
-  displayName: Version
-  type: string
-  default: ga
-  values:
-  - ga
-  - preview
-- name: sourceBranch
-  displayName: Test branch
-  type: string
-  default: dev
-- name: region
-  displayName: Region
-  type: string
-  default: usgovvirginia
-- name: services
-  displayName: Services
-  type: stringList
-  default:
-  - DPS
-  - HubControl
-  - HubData
-  values:
-  - DPS
-  - HubControl
-  - HubData
-  - ADU
-  - ADR
+  - name: mode
+    displayName: Mode
+    type: string
+    default: Integration tests
+    values:
+      - Dry run
+      - Integration tests
+  - name: cloud
+    displayName: Cloud
+    type: string
+    default: fairfax
+    values:
+      - public
+      - fairfax
+      - mooncake
+  - name: regions
+    displayName: Region
+    type: string
+    default: usgovvirginia
+  - name: services
+    displayName: Services
+    type: stringList
+    default:
+      - DPS
+      - HubControl
+      - HubData
+    values:
+      - DPS
+      - HubControl
+      - HubData
+      - ADU
+      - ADR
+  - name: pythonVersions
+    displayName: Python
+    type: stringList
+    default:
+      - '3.13'
+    values:
+      - '3.10'
+      - '3.11'
+      - '3.12'
+      - '3.13'
+  - name: version
+    displayName: Version
+    type: string
+    default: ga
+    values:
+      - ga
+      - preview
+  - name: sourceBranch
+    displayName: Test branch
+    type: string
+    default: dev
 pool:
   vmImage: ubuntu-24.04
 variables:
-- template: templates/release-monitor-profile.yml
-  parameters:
-    cloud: ${{ parameters.cloud }}
-    version: ${{ parameters.version }}
-    region: ${{ parameters.region }}
-    services: ${{ parameters.services }}
-- name: endpoint
-  value: $(HealthEndpoint)
+  - template: templates/integration-profile.yml
+    parameters:
+      cloud: ${{ parameters.cloud }}
+      version: ${{ parameters.version }}
+      region: ${{ parameters.regions }}
+      services: ${{ parameters.services }}
+  - name: TestMode
+    value: ${{ parameters.mode }}
+  - name: TestPythons
+    value: ${{ join(',', parameters.pythonVersions) }}
+  - name: endpoint
+    value: $(TestEndpoint)
 stages:
-- template: templates/release-monitor-stages.yml
-  parameters:
-    sourceBranch: ${{ parameters.sourceBranch }}
+  - template: templates/release-monitor-stages.yml
+    parameters:
+      mode: ${{ parameters.mode }}
+      sourceBranch: ${{ parameters.sourceBranch }}
+      pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
+      regions: ${{ parameters.regions }}

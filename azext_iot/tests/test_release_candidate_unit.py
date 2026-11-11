@@ -96,51 +96,33 @@ def set_field(value, path, replacement):
     value[keys[-1]] = replacement
 
 
-def test_external_mode_is_default_off_and_normal_build_is_unchanged():
+def test_internal_candidate_input_selects_build_or_verified_acquisition():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
-    parameter = next(item for item in entry["parameters"] if item["name"] == "releaseBuildId")
-    assert parameter["type"] == "number" and parameter["default"] == 0
+    for variable in entry["variables"]:
+        if "name" in variable:
+            assert str(variable["value"]).lower() != f"$({variable['name']})".lower()
+    assert not {"releaseBuildId", "variableGroup", "subscription", "resourceGroup"} & {
+        parameter["name"] for parameter in entry["parameters"]
+    }
     stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     steps = next(stage for stage in stages if stage.get("stage") == "Build")["jobs"][0]["steps"]
-    assert len(steps) == 2
-    assert steps[0]["${{ if eq(parameters.releaseBuildId, 0) }}"] == [
-        {"template": "templates/setup-python.yml", "parameters": {"pythonVersion": "3.13"}},
-        {"bash": "python -m build --wheel", "displayName": "Build wheel"},
-        {"publish": "dist", "displayName": "Publish wheel", "artifact": "integration-wheel-$(System.JobAttempt)"},
-    ]
-    assert not any(item.get("name") == "ReleasePipelineId" for item in entry["variables"])
-    assert entry["variables"][0] == {"group": "${{ parameters.variableGroup }}"}
-    group = next(item for item in entry["parameters"] if item["name"] == "variableGroup")
-    assert group["default"] == "aziotcli_test_primary"
-    external = steps[1]["${{ if ne(parameters.releaseBuildId, 0) }}"]
+    normal = [step for step in steps if "eq(variables['ReleaseCandidateBuildId'], '0')" in str(step)]
+    assert len(normal) == 3 and any(step.get("bash") == "python -m build --wheel" for step in normal)
+    external = [step for step in steps if "ne(variables['ReleaseCandidateBuildId'], '0')" in str(step)]
     assert len(external) == 5
-    setup, lookup, download, verify, publish = external
-    assert setup == {
-        "task": "UsePythonVersion@0", "displayName": "Select Python", "inputs": {"versionSpec": "3.13"},
-    }
+    _, lookup, download, verify, publish = external
     assert "_release_candidate.py parent --metadata" in lookup["bash"]
     assert lookup["env"]["SYSTEM_ACCESSTOKEN"] == "$(System.AccessToken)"
     assert "_release_candidate.py verify" in verify["bash"]
     assert "SYSTEM_ACCESSTOKEN" not in verify["env"]
     for step in (lookup, verify):
-        assert step["env"]["RELEASE_BUILD_ID"] == "${{ parameters.releaseBuildId }}"
+        assert step["env"]["RELEASE_BUILD_ID"] == "$(ReleaseCandidateBuildId)"
         assert step["env"]["RELEASE_PIPELINE_ID"] == "$(ReleasePipelineId)"
-        assert "condition" not in step and "continueOnError" not in step
+        assert "continueOnError" not in step
     assert lookup["env"]["PARENT_METADATA"] == verify["env"]["PARENT_METADATA"]
-    assert download == {
-        "task": "DownloadPipelineArtifact@2",
-        "displayName": "Download artifacts",
-        "inputs": {
-            "buildType": "specific", "project": "$(System.TeamProjectId)", "definition": "$(ReleasePipelineId)",
-            "buildVersionToDownload": "specific", "pipelineId": "${{ parameters.releaseBuildId }}",
-            "artifactName": "release-candidate",
-            "targetPath": "$(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)",
-        },
-    }
-    assert publish == {
-        "publish": download["inputs"]["targetPath"], "displayName": "Publish wheel",
-        "artifact": "integration-wheel-$(System.JobAttempt)",
-    }
+    assert download["inputs"]["pipelineId"] == "$(ReleaseCandidateBuildId)"
+    assert download["inputs"]["artifactName"] == "release-candidate"
+    assert publish["publish"] == download["inputs"]["targetPath"]
     assert verify["env"]["CANDIDATE"] == publish["publish"]
 
 

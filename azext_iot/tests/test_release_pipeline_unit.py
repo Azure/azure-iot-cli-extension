@@ -77,8 +77,10 @@ def integration_build(value, result="succeeded", cohort="Hub"):
         "repository": {"id": release.REPOSITORY, "type": "GitHub"},
         "sourceVersion": value["sourceCommit"], "sourceBranch": value["sourceBranch"],
         "status": "completed", "result": result,
+        "parameters": json.dumps({"ReleaseCandidateBuildId": value["producer"]["build"]}),
         "templateParameters": {
-            **release.integration_parameters(value, cohort),
+            **{key: item for key, item in release.integration_parameters(value, cohort).items()
+               if key != "releaseBuildId"},
             "services": json.dumps(value["cohorts"][cohort]["services"], indent=2),
             "pythonVersions": '["3.10", "3.13"]',
         },
@@ -194,7 +196,7 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
             continue
         path = repository / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("releaseBuildId\n", encoding="utf-8")
+        path.write_text("ReleaseCandidateBuildId\n", encoding="utf-8")
     release.subprocess.run(["git", "add", "."], cwd=repository, check=True)
     commit_command = ["git", "-c", "user.name=Release Test", "-c", "user.email=release-test@example.invalid",
                       "commit", "--quiet", "-m",
@@ -226,7 +228,7 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
     monkeypatch.setenv("RELEASE_SOURCE_COMMIT", resolved)
     downstream = tmp_path / "downstream"
     assert release.checkout(downstream) == resolved
-    assert (downstream / "scripts/select-openssl.sh").read_text(encoding="utf-8") == "releaseBuildId\n"
+    assert (downstream / "scripts/select-openssl.sh").read_text(encoding="utf-8") == "ReleaseCandidateBuildId\n"
     assert fetches == ["refs/heads/" + source, resolved]
 
 
@@ -362,7 +364,7 @@ def test_service_coordinators_preserve_full_suite_and_endpoint_routing(regions):
         assert parameters["mode"] == "Integration tests"
         assert parameters["pythonVersions"] == ["3.10", "3.13"]
         assert parameters["regions"] == regions
-        assert parameters["armEndpoint"] == "public"
+        assert parameters["cloud"] == "public"
 
 
 @pytest.mark.parametrize("change", ["missing", "python", "endpoint", "services", "omitted"])
@@ -516,6 +518,18 @@ def test_real_ado_repository_and_serialized_parameter_shape(candidate):
     release.validate_integration(integration_build(value), value)
 
 
+@pytest.mark.parametrize("variables", [
+    None, "[]", "invalid-json", {}, {"ReleaseCandidateBuildId": "899"},
+    {"ReleaseCandidateBuildId": "0900"}, {"ReleaseCandidateBuildId": True},
+])
+def test_internal_candidate_identity_fails_closed(candidate, variables):
+    _, value = candidate
+    build = integration_build(value)
+    build["parameters"] = variables
+    with pytest.raises(ValueError):
+        release.validate_integration(build, value)
+
+
 @pytest.mark.parametrize("field,bad", [
     ("definition", {"id": 11}), ("repository", {"id": "other/repo", "type": "GitHub"}),
     ("project", {"id": "other-project"}), ("sourceVersion", AUTOMATION_SHA),
@@ -545,7 +559,7 @@ def test_existing_child_is_found_by_parent_not_latest_build(candidate, monkeypat
     _, value = candidate
     owned = integration_build(value)
     unrelated = integration_build(value)
-    unrelated["templateParameters"]["releaseBuildId"] = "899"
+    unrelated["parameters"] = json.dumps({"ReleaseCandidateBuildId": "899"})
     responses = [
         {"definition": {"id": 150}, "sourceVersion": AUTOMATION_SHA, "queueTime": "2026-10-08T00:00:00Z"},
         {"value": [unrelated, owned]},
@@ -629,7 +643,8 @@ def test_integration_queues_exact_candidate_once_without_admission(candidate, tm
     assert payload["definition"] == {"id": 147}
     assert payload["sourceBranch"] == value["sourceBranch"]
     assert payload["sourceVersion"] == SOURCE_SHA
-    assert payload["templateParameters"]["releaseBuildId"] == "900"
+    assert json.loads(payload["parameters"]) == {"ReleaseCandidateBuildId": "900"}
+    assert "releaseBuildId" not in payload["templateParameters"]
     assert json.loads(payload["templateParameters"]["services"]) == value["cohorts"][cohort]["services"]
     assert json.loads(payload["templateParameters"]["pythonVersions"]) == ["3.10", "3.13"]
     assert release.read(record)["producer"] == value["producer"]

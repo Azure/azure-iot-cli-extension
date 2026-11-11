@@ -33,7 +33,7 @@ stages:
         and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
             eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Lint.result, 'Succeeded'),
             eq(dependencies.Unit.result, 'Succeeded'),
-            contains(variables['HealthServices'], '${{ parameters.service }}'))
+            contains(variables['TestServices'], '${{ parameters.service }}'))
       variables:
         monitorBundle: $[ stageDependencies.Build.Build.outputs['bundle.artifact'] ]
     ${{ else }}:
@@ -56,18 +56,12 @@ stages:
             testSourceDirectory: $(Build.SourcesDirectory)
         strategy:
           maxParallel: 0
-          ${{ if parameters.monitor }}:
-            matrix:
-              monitored:
-                python: '3.13'
-                region: $(HealthRegion)
-          ${{ else }}:
-            matrix:
-              ${{ each python in split(parameters.pythonVersions, ' ') }}:
-                ${{ each region in parameters.regions }}:
-                  ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
-                    python: ${{ python }}
-                    region: ${{ region }}
+          matrix:
+            ${{ each python in split(parameters.pythonVersions, ' ') }}:
+              ${{ each region in parameters.regions }}:
+                ${{ format('py{0}_{1}', replace(python, '.', ''), region) }}:
+                  python: ${{ python }}
+                  region: ${{ region }}
         steps:
           - checkout: self
             displayName: Checkout source
@@ -101,8 +95,8 @@ stages:
                 env:
                   BUNDLE: $(Pipeline.Workspace)/release-bundle
                   SOURCE: $(testSourceDirectory)
-                  MONITOR_CLOUD: $(HealthCloud)
-                  MONITOR_TRACK: $(HealthTrack)
+                  MONITOR_CLOUD: $(TestCloud)
+                  MONITOR_TRACK: $(TestTrack)
           - bash: |
               set -euo pipefail
               python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
