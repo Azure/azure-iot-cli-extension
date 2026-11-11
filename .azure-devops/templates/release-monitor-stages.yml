@@ -36,8 +36,8 @@ stages:
             name: source
             displayName: Pin the selected branch to one immutable commit
             env:
-              CLOUD: $(MonitorCloud)
-              TRACK: $(MonitorTrack)
+              CLOUD: $(HealthCloud)
+              TRACK: $(HealthTrack)
               SOURCE_BRANCH: ${{ parameters.sourceBranch }}
               HISTORY: $(Pipeline.Workspace)/source-history
           - publish: manifest.json
@@ -58,13 +58,13 @@ stages:
             env:
               BUNDLE: $(Pipeline.Workspace)/source-bundle
               SOURCE: $(Agent.TempDirectory)/iot-monitor-source
-              MONITOR_CLOUD: $(MonitorCloud)
-              MONITOR_TRACK: $(MonitorTrack)
-              MONITOR_SERVICES: $(MonitorServices)
-              MONITOR_REGION: $(MonitorRegion)
-              MONITOR_ENDPOINT: $(MonitorEndpoint)
-              azext_iot_test_subscription: $(MonitorSubscription)
-              azext_iot_testrg: $(MonitorResourceGroup)
+              MONITOR_CLOUD: $(HealthCloud)
+              MONITOR_TRACK: $(HealthTrack)
+              MONITOR_SERVICES: $(HealthServices)
+              MONITOR_REGION: $(HealthRegion)
+              MONITOR_ENDPOINT: $(HealthEndpoint)
+              azext_iot_test_subscription: $(HealthSubscription)
+              azext_iot_testrg: $(HealthResourceGroup)
           - publish: $(Pipeline.Workspace)/source-bundle/plan.json
             artifact: integration-plan-$(System.JobAttempt)
             displayName: Publish integration plan
@@ -187,9 +187,10 @@ stages:
           service: ${{ service }}
           pythonVersions: '3.13'
           regions: []
-          subscription: $(MonitorSubscription)
-          resourceGroup: $(MonitorResourceGroup)
-          armResource: $(MonitorArmResource)
+          subscription: $(HealthSubscription)
+          resourceGroup: $(HealthResourceGroup)
+          armResource: $(HealthArmResource)
+          azureServiceConnection: $(HealthAzureServiceConnection)
   - stage: Results
     displayName: Verify source-health results
     condition: always()
@@ -230,8 +231,12 @@ stages:
               BUNDLE: $(Pipeline.Workspace)/release-bundle
               SOURCE: $(Agent.TempDirectory)/iot-monitor-source
               HISTORY: $(Pipeline.Workspace)/history
-              MONITOR_CLOUD: $(MonitorCloud)
-              MONITOR_TRACK: $(MonitorTrack)
+              MONITOR_CLOUD: $(HealthCloud)
+              MONITOR_TRACK: $(HealthTrack)
               AZEXT_IOT_MONITOR_MANIFEST: $(Agent.TempDirectory)/iot-monitor-source/release-monitor.json
-              azext_iot_test_subscription: $(MonitorSubscription)
-              azext_iot_testrg: $(MonitorResourceGroup)
+              azext_iot_test_subscription: $(HealthSubscription)
+              azext_iot_testrg: $(HealthResourceGroup)
+          - bash: python scripts/release_monitor.py qualify-profile --bundle "$BUNDLE"
+            displayName: Require the complete configured health profile
+            env:
+              BUNDLE: $(Pipeline.Workspace)/release-bundle

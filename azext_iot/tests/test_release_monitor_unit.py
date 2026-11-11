@@ -220,8 +220,12 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert all(not value["allowOverride"] for value in item["variables"].values())
         pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
         parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
-        assert set(parameters) == {"sourceBranch"}
+        assert set(parameters) == {"sourceBranch", "cloud", "version", "region", "services"}
         track = item["variables"]["MonitorTrack"]["value"]
+        assert parameters["cloud"]["default"] == item["variables"]["MonitorCloud"]["value"]
+        assert parameters["version"]["default"] == track
+        assert parameters["region"]["default"] == item["variables"]["MonitorRegion"]["value"]
+        assert parameters["services"]["default"] == item["variables"]["MonitorServices"]["value"].split(",")
         assert parameters["sourceBranch"]["default"] == {
             "ga": "dev", "preview": "release/1.2.0-preview",
         }[track]
@@ -296,7 +300,7 @@ def source_manifest(monitor):
 def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor, source_manifest, tmp_path):
     monitor.write_json(tmp_path / "source-selection-1/manifest.json", source_manifest)
     assert monitor.frozen_source_manifest(tmp_path, "public", "ga", "dev", AUTOMATION, 2) == source_manifest
-    with pytest.raises(ValueError, match="GA health always builds dev"):
+    with pytest.raises(ValueError, match="identity changed"):
         monitor.frozen_source_manifest(tmp_path, "public", "ga", "preview", AUTOMATION, 2)
     with pytest.raises(ValueError, match="without its frozen"):
         monitor.frozen_source_manifest(tmp_path / "missing", "public", "preview", "preview", AUTOMATION, 2)
@@ -308,6 +312,45 @@ def test_source_selection_freezes_branch_and_retries_without_rediscovery(monitor
     ) == source_manifest
     with pytest.raises(ValueError, match="identity changed"):
         monitor.frozen_source_manifest(tmp_path, "public", "preview", "users/other", AUTOMATION, 2)
+
+
+@pytest.mark.parametrize("override", [None, "region", "services", "cloud", "version", "branch"])
+def test_health_overrides_cannot_qualify_the_scheduled_profile(
+        monitor, source_manifest, monkeypatch, mocker, tmp_path, override):
+    config = monitor.read_json(ROOT / ".azure-devops/release-monitors.json")
+    manifest = source_manifest
+    if override == "cloud":
+        manifest.update(cloudKey="fairfax", cloud="AzureUSGovernment")
+    if override == "version":
+        manifest.update(track="preview", slot="preview")
+        manifest["source"]["branch"] = "refs/heads/release/1.2.0-preview"
+    if override == "branch":
+        manifest["source"]["branch"] = "refs/heads/users/test"
+    selected = next(item["variables"] for item in monitor.configurations(config)
+                    if item["variables"]["MonitorCloud"] == manifest["cloudKey"]
+                    and item["variables"]["MonitorTrack"] == manifest["slot"])
+    monkeypatch.setenv("MONITORCLOUD", "public")
+    monkeypatch.setenv("MONITORTRACK", "ga")
+    for key, value in selected.items():
+        monkeypatch.setenv("HEALTH" + key.removeprefix("Monitor").upper(), value)
+    if override == "region":
+        monkeypatch.setenv("HEALTHREGION", "westus2")
+    if override == "services":
+        monkeypatch.setenv("HEALTHSERVICES", "DPS")
+    monitor.bind_profile(manifest, config)
+    mocker.patch.object(monitor, "verify_bundle", return_value=manifest)
+    if override:
+        with pytest.raises(ValueError, match="does not qualify"):
+            monitor.qualify_profile(tmp_path)
+        assert monitor.run_title(manifest, "123").endswith("-manual")
+    else:
+        monitor.qualify_profile(tmp_path)
+    monkeypatch.setenv("HEALTHREGION", "eastus")
+    with pytest.raises(ValueError, match="changed between attempts"):
+        monitor.bind_profile(manifest, config)
+    monkeypatch.setenv("HEALTHAZURESERVICECONNECTION", "unreviewed-connection")
+    with pytest.raises(ValueError, match="reviewed cloud profile"):
+        monitor.bind_profile(manifest, config)
 
 
 @pytest.mark.parametrize("track,branch", [

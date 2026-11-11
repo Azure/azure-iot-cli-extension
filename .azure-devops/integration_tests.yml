@@ -22,7 +22,7 @@ parameters:
     default: ['3.13']
     values: ['3.10', '3.11', '3.12', '3.13']
   - name: regions
-    displayName: Regions (CSV)
+    displayName: Region
     type: string
     default: australiaeast
   - name: armEndpoint

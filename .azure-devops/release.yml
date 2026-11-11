@@ -22,14 +22,13 @@ parameters:
     displayName: Skip integration tests
     type: boolean
     default: false
-  - name: dpsTarget
-    displayName: DPS target
+  - name: regions
+    displayName: Region
     type: string
-    default: public
-    values: [public, canary]
+    default: australiaeast
 
 variables:
-  RELEASE_DPS_TARGET: ${{ parameters.dpsTarget }}
+  RELEASE_REGION: ${{ parameters.regions }}
   RELEASE_SKIP_INTEGRATION_TESTS: ${{ parameters.skipIntegrationTests }}
 
 resources:

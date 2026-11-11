@@ -3,22 +3,59 @@
 trigger: none
 pr: none
 schedules: []
-name: iot-health-$(MonitorCloud)-$(MonitorTrack)-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-health-$(HealthCloud)-$(HealthTrack)-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
-
 parameters:
-  - name: sourceBranch
-    displayName: Test branch
-    type: string
-    default: release/1.2.0-preview
-
+- name: cloud
+  displayName: Cloud
+  type: string
+  default: public
+  values:
+  - public
+  - fairfax
+  - mooncake
+- name: version
+  displayName: Version
+  type: string
+  default: preview
+  values:
+  - ga
+  - preview
+- name: sourceBranch
+  displayName: Test branch
+  type: string
+  default: release/1.2.0-preview
+- name: region
+  displayName: Region
+  type: string
+  default: australiaeast
+- name: services
+  displayName: Services
+  type: stringList
+  default:
+  - DPS
+  - HubControl
+  - HubData
+  - ADU
+  - ADR
+  values:
+  - DPS
+  - HubControl
+  - HubData
+  - ADU
+  - ADR
 pool:
   vmImage: ubuntu-24.04
-
 variables:
-  endpoint: $(MonitorEndpoint)
-
+- template: templates/release-monitor-profile.yml
+  parameters:
+    cloud: ${{ parameters.cloud }}
+    version: ${{ parameters.version }}
+    region: ${{ parameters.region }}
+    services: ${{ parameters.services }}
+- name: endpoint
+  value: $(HealthEndpoint)
 stages:
-  - template: templates/release-monitor-stages.yml
-    parameters:
-      sourceBranch: ${{ parameters.sourceBranch }}
+- template: templates/release-monitor-stages.yml
+  parameters:
+    sourceBranch: ${{ parameters.sourceBranch }}
