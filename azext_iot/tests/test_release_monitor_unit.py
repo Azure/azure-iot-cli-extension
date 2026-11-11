@@ -241,16 +241,18 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
         parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
         common = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())["parameters"]
-        assert list(parameters) == [p["name"] for p in common] + ["version", "sourceBranch"]
+        assert list(parameters) == [p["name"] for p in common] + ["sourceBranch"]
         for expected in common:
             actual = parameters[expected["name"]]
             assert {k: v for k, v in actual.items() if k != "default"} == {
                 k: v for k, v in expected.items() if k != "default"
             }
         track = item["variables"]["MonitorTrack"]["value"]
-        assert parameters["cloud"]["default"] == item["variables"]["MonitorCloud"]["value"]
-        assert parameters["version"]["default"] == track
-        assert parameters["regions"]["default"] == item["variables"]["MonitorRegion"]["value"]
+        assert parameters["cloud"]["default"] == item["variables"]["MonitorCloud"]["value"].capitalize()
+        profile = next(value for value in pipeline["variables"] if "template" in value)
+        assert profile["parameters"]["version"] == track
+        assert profile["parameters"]["region"] == "${{ join(',', parameters.regions) }}"
+        assert parameters["regions"]["default"] == ["Australia East"]
         assert parameters["services"]["default"] == item["variables"]["MonitorServices"]["value"].split(",")
         assert parameters["sourceBranch"]["default"] == {
             "ga": "dev", "preview": "release/1.2.0-preview",
@@ -258,7 +260,8 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert pipeline["stages"] == [{
             "template": "templates/release-monitor-stages.yml",
             "parameters": {
-                **{name: "${{ parameters." + name + " }}" for name in ("mode", "sourceBranch", "regions")},
+                **{name: "${{ parameters." + name + " }}" for name in ("mode", "sourceBranch")},
+                "regions": "${{ variables.TestRegion }}",
                 "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             },
         }]

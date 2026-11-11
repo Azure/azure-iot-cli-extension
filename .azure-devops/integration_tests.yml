@@ -15,15 +15,25 @@ parameters:
   - name: cloud
     displayName: Cloud
     type: string
-    default: public
+    default: Public
     values:
-      - public
-      - fairfax
-      - mooncake
+      - Public
+      - Fairfax
+      - Mooncake
   - name: regions
-    displayName: Region
-    type: string
-    default: australiaeast
+    displayName: Public region
+    type: stringList
+    default:
+      - Australia East
+    values:
+      - Australia East
+      - Japan East
+      - Central US
+      - UK South
+      - West US
+      - West US 3
+      - East US
+      - West Europe
   - name: services
     displayName: Services
     type: stringList
@@ -53,9 +63,9 @@ variables:
   - group: aziotcli_test_primary
   - template: templates/integration-profile.yml
     parameters:
-      cloud: ${{ parameters.cloud }}
+      cloud: ${{ lower(parameters.cloud) }}
       version: ga
-      region: ${{ parameters.regions }}
+      region: ${{ join(',', parameters.regions) }}
       services: ${{ parameters.services }}
   - name: servicesCsv
     value: ${{ join(',', parameters.services) }}
@@ -85,7 +95,7 @@ stages:
             env:
               SERVICES: ${{ replace(variables.servicesCsv, ',', ' ') }}
               VERSIONS: ${{ join(' ', parameters.pythonVersions) }}
-              REGIONS: ${{ replace(parameters.regions, ',', ' ') }}
+              REGIONS: ${{ replace(variables.TestRegion, ',', ' ') }}
               ENDPOINT: $(endpoint)
               RELEASE_BUILD_ID: $(ReleaseCandidateBuildId)
               azext_iot_test_subscription: $(TestSubscription)
@@ -256,7 +266,7 @@ stages:
                 parameters:
                   service: ${{ service }}
                   pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
-                  regions: ${{ split(parameters.regions, ',') }}
+                  regions: ${{ split(variables.TestRegion, ',') }}
                   subscription: ${{ variables.TestSubscription }}
                   resourceGroup: ${{ variables.TestResourceGroup }}
                   armResource: ${{ variables.TestArmResource }}

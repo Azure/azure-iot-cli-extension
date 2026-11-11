@@ -16,15 +16,25 @@ parameters:
   - name: cloud
     displayName: Cloud
     type: string
-    default: public
+    default: Public
     values:
-      - public
-      - fairfax
-      - mooncake
+      - Public
+      - Fairfax
+      - Mooncake
   - name: regions
-    displayName: Region
-    type: string
-    default: australiaeast
+    displayName: Public region
+    type: stringList
+    default:
+      - Australia East
+    values:
+      - Australia East
+      - Japan East
+      - Central US
+      - UK South
+      - West US
+      - West US 3
+      - East US
+      - West Europe
   - name: services
     displayName: Services
     type: stringList
@@ -50,13 +60,6 @@ parameters:
       - '3.11'
       - '3.12'
       - '3.13'
-  - name: version
-    displayName: Version
-    type: string
-    default: ga
-    values:
-      - ga
-      - preview
   - name: sourceBranch
     displayName: Test branch
     type: string
@@ -66,9 +69,9 @@ pool:
 variables:
   - template: templates/integration-profile.yml
     parameters:
-      cloud: ${{ parameters.cloud }}
-      version: ${{ parameters.version }}
-      region: ${{ parameters.regions }}
+      cloud: ${{ lower(parameters.cloud) }}
+      version: ga
+      region: ${{ join(',', parameters.regions) }}
       services: ${{ parameters.services }}
   - name: TestMode
     value: ${{ parameters.mode }}
@@ -82,4 +85,4 @@ stages:
       mode: ${{ parameters.mode }}
       sourceBranch: ${{ parameters.sourceBranch }}
       pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
-      regions: ${{ parameters.regions }}
+      regions: ${{ variables.TestRegion }}

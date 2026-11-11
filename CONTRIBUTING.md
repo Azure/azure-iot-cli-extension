@@ -109,11 +109,9 @@ to rerun it on a branch without starting a release or accessing Azure resources.
 
 ### Sovereign ADO integrations
 
-The integration pipeline accepts `armEndpoint: fairfax` with `regions: usgovvirginia`,
-or `armEndpoint: mooncake` with `regions: chinaeast2`. Select `DPS`, `HubControl`
-and/or `HubData` explicitly, supply the sovereign `subscription` and dedicated
-`resourceGroup`, and select a cloud-specific `variableGroup`. Its
-`AzureServiceConnection` must reference an ARM connection configured for that cloud,
+Select **Cloud: Fairfax** or **Cloud: Mooncake** and select `DPS`, `HubControl`
+and/or `HubData` explicitly. The reviewed cloud profile supplies the subscription,
+dedicated resource group and ARM service connection. The connection must be configured for that cloud,
 with subscription discovery and permission to create/delete fixtures and assign
 their resource-scoped roles. Do not put interactive user passwords in pipeline variables.
 
@@ -164,8 +162,9 @@ Six independent definitions use shared health stages:
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
 Each cloud/track has a thin `release-monitor*.yml` entry point sharing
 `templates/release-monitor-stages.yml`. Integration and health share **Mode**,
-**Cloud**, **Region**, **Services** and **Python**, in that order. Health also
-selects **Version** and **Test branch**. Health's default mode executes tests;
+**Cloud**, **Public region**, **Services** and **Python**, in that order. Health also
+selects **Test branch**; its GA/Preview profile is fixed by the entry point, not a
+separate Version selector. Health's default mode executes tests;
 **Dry run** only resolves and publishes the selected plan. **Test branch**
 defaults to `dev` for GA and `release/1.2.0-preview` for Preview.
 Manual overrides use the selected cloud's reviewed connection and resource group,
@@ -216,9 +215,13 @@ never unsupported skips.
 Run titles include the cloud, track, actual CLI version, source commit and build ID.
 These are source-build health results, not published-release qualification.
 
-Release pipeline **Region** selects the public regions passed to every integration
+Release pipeline **Public region** selects the public regions passed to every integration
 cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
-Integration and health **Region** support comma-separated multi-region selection.
+Release, integration and health use the same named, multiselect region dropdown:
+Australia East, Japan East, Central US, UK South, West US, West US 3, East US and West Europe.
+**Cloud** choices are **Public**, **Fairfax** and **Mooncake**. Fairfax always uses
+`usgovvirginia`; Mooncake always uses `chinaeast2`. ADO cannot dynamically hide the
+**Public region** field, so it remains visible but is ignored for sovereign clouds.
 `templates/integration-profile.yml` resolves the reviewed connection, subscription
 and resource group from the cloud; these are not user inputs.
 Pipeline 147 defines the queue-time variable `ReleaseCandidateBuildId=0`.

@@ -547,6 +547,7 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
     assert services == {"name": "servicesCsv", "value": "${{ join(',', parameters.services) }}"}
     plan = next(step for step in entry["stages"][0]["jobs"][0]["steps"] if "bash" in step)
     assert plan["env"]["SERVICES"] == "${{ replace(variables.servicesCsv, ',', ' ') }}"
+    assert plan["env"]["REGIONS"] == "${{ replace(variables.TestRegion, ',', ' ') }}"
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
     nonempty = "${{ if ne(variables.servicesCsv, '') }}"
     each = "${{ each service in split(variables.servicesCsv, ',') }}"
@@ -555,7 +556,7 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
         "template": "templates/integration-service.yml",
         "parameters": {
             "service": "${{ service }}", "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
-            "regions": "${{ split(parameters.regions, ',') }}",
+            "regions": "${{ split(variables.TestRegion, ',') }}",
             "subscription": "${{ variables.TestSubscription }}", "resourceGroup": "${{ variables.TestResourceGroup }}",
             "armResource": "${{ variables.TestArmResource }}",
             "azureServiceConnection": "${{ variables.TestAzureServiceConnection }}",
@@ -563,6 +564,21 @@ def test_service_preset_uses_one_expansion_for_plan_stages_and_gate():
     }]}]
     gate = next(value for value in integration if value.get("stage") == "Qualify")
     assert gate["dependsOn"] == ["Plan", "Build", "Lint", "Unit", {nonempty: [{each: ["${{ service }}"]}]}]
+
+
+def test_cloud_profile_fixes_sovereign_regions_independently_of_public_selection():
+    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
+    profile = next(value for value in entry["variables"] if "template" in value)
+    assert profile["parameters"]["cloud"] == "${{ lower(parameters.cloud) }}"
+    assert profile["parameters"]["region"] == "${{ join(',', parameters.regions) }}"
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-profile.yml").read_text())
+    for cloud, region in {
+        "public": "${{ lower(replace(parameters.region, ' ', '')) }}",
+        "fairfax": "usgovvirginia", "mooncake": "chinaeast2",
+    }.items():
+        settings = next(value["${{ if eq(parameters.cloud, '" + cloud + "') }}"]
+                        for value in template["variables"] if "${{ if eq(parameters.cloud, '" + cloud + "') }}" in value)
+        assert next(value["value"] for value in settings if value["name"] == "TestRegion") == region
 
 
 @pytest.mark.parametrize("step_name", ["install", "live"])

@@ -14,11 +14,11 @@ variables:
     value: ${{ parameters.cloud }}
   - name: TestTrack
     value: ${{ parameters.version }}
-  - name: TestRegion
-    value: ${{ parameters.region }}
   - name: TestServices
     value: ${{ join(',', parameters.services) }}
   - ${{ if eq(parameters.cloud, 'public') }}:
+      - name: TestRegion
+        value: ${{ lower(replace(parameters.region, ' ', '')) }}
       - name: TestAzureCloud
         value: AzureCloud
       - name: TestAzureServiceConnection
@@ -32,6 +32,8 @@ variables:
       - name: TestArmResource
         value: https://management.azure.com
   - ${{ if eq(parameters.cloud, 'fairfax') }}:
+      - name: TestRegion
+        value: usgovvirginia
       - name: TestAzureCloud
         value: AzureUSGovernment
       - name: TestAzureServiceConnection
@@ -45,6 +47,8 @@ variables:
       - name: TestArmResource
         value: https://management.core.usgovcloudapi.net
   - ${{ if eq(parameters.cloud, 'mooncake') }}:
+      - name: TestRegion
+        value: chinaeast2
       - name: TestAzureCloud
         value: AzureChinaCloud
       - name: TestAzureServiceConnection
