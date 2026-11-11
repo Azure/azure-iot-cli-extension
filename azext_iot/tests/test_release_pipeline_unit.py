@@ -143,7 +143,7 @@ def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkey
 
 
 def test_draft_rejects_index_opt_in(candidate, monkeypatch):
-    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    monkeypatch.setenv("RELEASE_MODE", "Draft")
     monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "true")
     with pytest.raises(ValueError, match="createIndexPr requires Release"):
         release.release_options()
@@ -174,7 +174,7 @@ def test_waiver_is_bound_to_candidate_and_prevents_child_execution(candidate, mo
 
 
 @pytest.mark.parametrize("mode,source", [
-    ("Release", "release/1.2.0-preview"), ("StageDraft", "release/1.2.0-preview"),
+    ("Release", "release/1.2.0-preview"), ("Draft", "release/1.2.0-preview"),
     ("Validate", "users/test/release-validation"),
 ])
 @pytest.mark.parametrize("skipped", [False, True])
@@ -716,7 +716,7 @@ def test_integration_artifact_proof_requires_original_bytes_and_manifest(candida
 
 
 @pytest.mark.parametrize("source_branch", ["refs/heads/feature/test", "refs/heads/preview", "refs/tags/v1"])
-@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+@pytest.mark.parametrize("mode", ["Draft", "Release"])
 def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, source_branch, mode):
     directory, _ = candidate
     monkeypatch.setenv("RELEASE_MODE", mode)
@@ -726,7 +726,7 @@ def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, sou
     release.github.assert_not_called()
 
 
-@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+@pytest.mark.parametrize("mode", ["Draft", "Release"])
 def test_release_mode_fails_before_checkout_on_feature_automation(candidate, tmp_path, monkeypatch, mode):
     monkeypatch.setenv("RELEASE_MODE", mode)
     monkeypatch.setenv("BUILD_SOURCEBRANCH", "refs/heads/feature/test")
@@ -764,7 +764,7 @@ def test_existing_release_conflicts_are_never_overwritten(candidate, tmp_path, m
     release.github.assert_not_called()
 
 
-@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+@pytest.mark.parametrize("mode", ["Draft", "Release"])
 @pytest.mark.parametrize("skipped", [False, True])
 def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path, monkeypatch, mode, skipped):
     directory, value = candidate
@@ -803,7 +803,7 @@ def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path
     result = release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     assert result["candidate"] == value
     assert ("Integration tests skipped" in staged["body"]) is skipped
-    if mode == "StageDraft":
+    if mode == "Draft":
         assert [method for method, _, _ in events] == ["POST", "GET"]
         assert result["draft"] is True
         assert staged["draft"] is True
@@ -820,7 +820,7 @@ def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path
         assert result["draft"] is False
 
 
-@pytest.mark.parametrize("mode", ["StageDraft", "Release"])
+@pytest.mark.parametrize("mode", ["Draft", "Release"])
 def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch, mode):
     monkeypatch.setenv("RELEASE_MODE", mode)
     directory, value = candidate
@@ -835,7 +835,7 @@ def test_bad_upload_never_promotes_draft(candidate, tmp_path, monkeypatch, mode)
 
 
 def test_draft_mode_rejects_already_public_release(candidate, tmp_path, monkeypatch):
-    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    monkeypatch.setenv("RELEASE_MODE", "Draft")
     monkeypatch.setattr(release, "find_release", Mock(return_value=public_release(candidate[1])))
     monkeypatch.setattr(release, "tag_commit", Mock(return_value=SOURCE_SHA))
     with pytest.raises(ValueError, match="already published"):
@@ -846,7 +846,7 @@ def test_draft_mode_rejects_already_public_release(candidate, tmp_path, monkeypa
 @pytest.mark.parametrize("draft", [False, True])
 def test_waiver_updates_existing_draft_notes_but_never_public_notes(candidate, tmp_path, monkeypatch, draft):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_MODE", "StageDraft" if draft else "Release")
+    monkeypatch.setenv("RELEASE_MODE", "Draft" if draft else "Release")
     monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", "true")
     value.update(skipIntegrationTests=True, cohorts={})
     release.write(directory / "candidate.json", value)
@@ -879,7 +879,7 @@ def test_waiver_updates_existing_draft_notes_but_never_public_notes(candidate, t
 
 @pytest.mark.parametrize("change", [{"draft": False}, {"target_commitish": "f" * 40}, {"assets": []}])
 def test_draft_requires_fresh_identity_and_asset_verification(candidate, tmp_path, monkeypatch, change):
-    monkeypatch.setenv("RELEASE_MODE", "StageDraft")
+    monkeypatch.setenv("RELEASE_MODE", "Draft")
     staged = public_release(candidate[1], draft=True)
     monkeypatch.setattr(release, "find_release", Mock(return_value=staged))
     monkeypatch.setattr(release, "tag_commit", Mock(return_value=None))
@@ -1136,7 +1136,7 @@ def test_yaml_publication_requires_explicit_mode_and_waiver_only_removes_integra
     pipeline, stages = all_stages()
     parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
     assert parameters["skipIntegrationTests"]["default"] is False
-    assert parameters["mode"]["values"] == ["Plan", "Validate", "StageDraft", "Release"]
+    assert parameters["mode"]["values"] == ["Plan", "Validate", "Draft", "Release"]
     assert pipeline["variables"]["RELEASE_SKIP_INTEGRATION_TESTS"] == "${{ parameters.skipIntegrationTests }}"
     assert pipeline["extends"]["parameters"]["stages"][0]["parameters"]["skipIntegrationTests"] == (
         "${{ parameters.skipIntegrationTests }}"
@@ -1146,7 +1146,7 @@ def test_yaml_publication_requires_explicit_mode_and_waiver_only_removes_integra
         "${{ if and(ne(parameters.mode, 'Plan'), not(parameters.skipIntegrationTests)) }}"
     ]
     publication = template["stages"][-1]
-    assert list(publication) == ["${{ if in(parameters.mode, 'StageDraft', 'Release') }}"]
+    assert list(publication) == ["${{ if in(parameters.mode, 'Draft', 'Release') }}"]
     assert [stage["stage"] for stage in next(iter(publication.values()))] == ["Publish"]
     nonpublishing = json.dumps(template["stages"][:-1])
     assert "aziotcli_release_publish" not in nonpublishing

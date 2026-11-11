@@ -159,11 +159,13 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 
 ### Source-branch health monitors
 
-`.azure-devops/release-monitor.yml` is shared by six independent definitions:
+Six independent definitions use shared health stages:
 `Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
-The `sourceBranch` default selects `dev` for GA and `release/1.2.0-preview` for
-Preview. GA always builds `dev`; Preview accepts an explicit branch override in
+GA uses `.azure-devops/release-monitor.yml`, with **Test branch** set to `dev`.
+Preview uses `.azure-devops/release-monitor-preview.yml`, with **Test branch**
+set to `release/1.2.0-preview`. Both use `templates/release-monitor-stages.yml`.
+GA always builds `dev`; Preview accepts an explicit branch override in
 **Run pipeline**. The built-in ADO Branch/tag field selects the automation
 YAML, not this source target. The resolver freezes the source commit before any
 build or Azure access; retries cannot follow a moving branch.
@@ -192,8 +194,8 @@ Never store personal account passwords or tokens in these files.
 
 Keep all definitions disabled until an owner approves automation connections,
 resource scopes/RBAC, shared-subscription capacity, cleanup windows and live
-qualification. Then enable queueing and explicitly select `runIntegration: true`.
-Preparation alone deliberately fails rather than reporting healthy monitoring.
+qualification. Then enable queueing. Every health run executes the selected
+integration cohorts and requires their results and cleanup evidence.
 No recurring schedule is supplied before live execution and capacity are approved;
 apply the same schedule policy to the IoT and AIO monitor sets.
 

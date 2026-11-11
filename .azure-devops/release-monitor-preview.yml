@@ -1,0 +1,24 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+trigger: none
+pr: none
+schedules: []
+name: iot-health-$(MonitorCloud)-$(MonitorTrack)-$(Date:yyyyMMdd).$(Rev:r)
+appendCommitMessageToRunName: false
+
+parameters:
+  - name: sourceBranch
+    displayName: Test branch
+    type: string
+    default: release/1.2.0-preview
+
+pool:
+  vmImage: ubuntu-24.04
+
+variables:
+  endpoint: $(MonitorEndpoint)
+
+stages:
+  - template: templates/release-monitor-stages.yml
+    parameters:
+      sourceBranch: ${{ parameters.sourceBranch }}
