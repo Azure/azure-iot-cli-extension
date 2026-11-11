@@ -34,6 +34,11 @@ CONTEXT = {
 }
 
 
+@pytest.fixture(autouse=True)
+def isolated_pipeline_definition(monkeypatch):
+    monkeypatch.setenv("SYSTEM_DEFINITIONID", CONTEXT["definition"])
+
+
 @pytest.fixture
 def isolated_phase_environment(monkeypatch):
     for name in pipeline.GENERIC_PHASE_OVERRIDES:
