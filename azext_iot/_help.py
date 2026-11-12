@@ -36,6 +36,14 @@ helps[
     long-summary: |
                   This command uses azure-eventhub's AMQP implementation.
 
+                  The built-in Event Hub-compatible endpoint requires SAS authentication. This command
+                  cannot monitor events when local authentication is disabled (disableLocalAuth=true).
+                  Microsoft Entra authentication is not supported by this endpoint, and this command
+                  does not support --auth-type login. Signing in with az login does not remove this limitation.
+
+                  To monitor telemetry without local authentication, route messages to a custom Event Hub
+                  and use a Microsoft Entra-authenticated Event Hubs consumer.
+
                   Note: The event will be displayed even if the message body is non-unicode decodable, in
                   this case the event payload portion will be displayed as {{non-decodable payload}} with
                   the rest of the event properties that are available.
