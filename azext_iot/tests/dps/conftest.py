@@ -197,7 +197,25 @@ def _data_plane_authorization_pending(error, role, name):
             or target.path != expected_path or target.fragment or getattr(request, "method", None) != "POST"):
         return False
     expected = {(403, "403000")} if role == DPS_USER_ROLE else {(401, "401002"), (401, "IotHubUnauthorized")}
-    return (getattr(original, "status_code", None), _readiness_service_code(original)) in expected
+    return (getattr(original, "status_code", None), _readiness_service_code(original)) in expected or (
+        role == DPS_USER_ROLE and getattr(original, "status_code", None) == 401
+        and _dps_authorization_failed_response(response)
+    )
+
+
+def _dps_authorization_failed_response(response):
+    if not callable(getattr(response, "json", None)):
+        return False
+    try:
+        body = response.json()
+    except (ValueError, TypeError):
+        return False
+    if isinstance(body, dict):
+        body = body.get("error") or body
+    return (
+        isinstance(body, dict) and body.get("errorCode") in (401002, "401002")
+        and body.get("message") == "Authorization failed for the request"
+    )
 
 
 def _readiness_service_code(original):
@@ -229,6 +247,9 @@ def _readiness_service_code(original):
 def _readiness_diagnostic(error):
     original = _readiness_http_error(error)
     code = _readiness_service_code(original)
+    if (code is None and getattr(original, "status_code", None) == 401
+            and _dps_authorization_failed_response(getattr(original, "response", None))):
+        code = "401002"
     # Only known service codes and UUID correlation headers belong in diagnostics, never response bodies.
     code = str(code) if str(code) in {"401002", "403000", "IotHubUnauthorized", "AuthorizationFailed"} else "unclassified"
     headers = getattr(getattr(original, "response", None), "headers", {}) or {}

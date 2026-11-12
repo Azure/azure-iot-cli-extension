@@ -771,6 +771,26 @@ def _data_role_error(role=dps_fixtures.DPS_USER_ROLE):
     return error
 
 
+def _dps_authorization_error(*, body=None):
+    from azure.cli.core.azclierror import UnauthorizedError
+
+    response = requests.Response()
+    response.status_code = 401
+    response.reason = "Unauthorized"
+    response.request = requests.Request(
+        "POST", "https://dps.azure-devices-provisioning.us/enrollments/query?api-version=2026-03-01"
+    ).prepare()
+    response.headers["x-ms-request-id"] = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    response._content = json.dumps(body if body is not None else {
+        "errorCode": 401002, "message": "Authorization failed for the request",
+    }).encode()
+    translated = UnauthorizedError("private guidance")
+    original = _http_error(401, None)
+    original.response = response
+    translated.__cause__ = original
+    return translated
+
+
 @pytest.fixture
 def readiness_cloud(monkeypatch):
     endpoints = SimpleNamespace(resource_manager="https://management.azure.com/")
@@ -803,6 +823,51 @@ def test_caller_data_plane_readiness_requires_consecutive_successes(mocker, read
     assert sleep.call_count == calls - 1
 
 
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_dps_new_grant_401002_uses_the_existing_readiness_wait(mocker, readiness_cloud, wrapped):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net/"
+    body = {"errorCode": 401002, "message": "Authorization failed for the request"}
+    error = _dps_authorization_error(body={"error": body} if wrapped else body)
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints = readiness_cloud
+    cli.invoke.side_effect = [error] + [SimpleNamespace(success=lambda: True, as_json=lambda: [])] * 3
+    pause = mocker.patch.object(dps_fixtures, "sleep")
+
+    dps_fixtures._wait_for_current_user_data_plane(
+        dps_fixtures.DPS_USER_ROLE, "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps",
+    )
+
+    assert cli.invoke.call_count == 4
+    assert pause.call_count == 3
+    assert all("--auth-type login" in call.args[0] for call in cli.invoke.call_args_list)
+    assert "code=401002" in dps_fixtures._readiness_diagnostic(error)
+
+
+@pytest.mark.parametrize("body", [
+    {"errorCode": 401002, "message": "Local authentication (SAS) is disabled for this DPS instance."},
+    {"errorCode": 401002, "message": "Token expired"},
+    {"errorCode": 401003, "message": "Authorization failed for the request"},
+    {"errorCode": 401002, "message": None},
+])
+def test_dps_readiness_does_not_retry_other_401_responses(mocker, readiness_cloud, body):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net/"
+    error = _dps_authorization_error(body=body)
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints = readiness_cloud
+    cli.invoke.side_effect = error
+    pause = mocker.patch.object(dps_fixtures, "sleep")
+
+    with pytest.raises(type(error)) as raised:
+        dps_fixtures._wait_for_current_user_data_plane(
+            dps_fixtures.DPS_USER_ROLE,
+            "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/provisioningServices/dps",
+        )
+
+    assert raised.value is error
+    cli.invoke.assert_called_once()
+    pause.assert_not_called()
+
+
 @pytest.mark.parametrize("late_stage", ["call", "confirmation", "sleep"])
 def test_readiness_charges_calls_and_sleep_to_one_monotonic_deadline(mocker, late_stage):
     clock = [0]
@@ -826,12 +891,20 @@ def test_readiness_charges_calls_and_sleep_to_one_monotonic_deadline(mocker, lat
     assert pause.call_count == {"call": 0, "confirmation": 2, "sleep": 1}[late_stage]
 
 
-@pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])
-def test_caller_readiness_only_retries_the_selected_data_plane_rejection(readiness_cloud, role):
-    error = _data_role_error(role)
+@pytest.mark.parametrize("role,dps_401", [
+    (dps_fixtures.DPS_USER_ROLE, False), (dps_fixtures.HUB_USER_ROLE, False), (dps_fixtures.DPS_USER_ROLE, True),
+])
+def test_caller_readiness_only_retries_the_selected_data_plane_rejection(readiness_cloud, role, dps_401):
+    error = _dps_authorization_error() if dps_401 else _data_role_error(role)
+    if dps_401:
+        readiness_cloud.resource_manager = "https://management.usgovcloudapi.net/"
     assert dps_fixtures._data_plane_authorization_pending(error, role, "dps")
     assert not dps_fixtures._data_plane_authorization_pending(error, role, "different-resource")
-    error.response.request.url = "https://management.azure.com/subscriptions/s"
+    original = error.__cause__ if dps_401 else error
+    original.response.request.method = "DELETE"
+    assert not dps_fixtures._data_plane_authorization_pending(error, role, "dps")
+    original.response.request.method = "POST"
+    original.response.request.url = "https://management.azure.com/subscriptions/s"
     assert not dps_fixtures._data_plane_authorization_pending(error, role, "dps")
 
 
@@ -871,8 +944,23 @@ def test_readiness_recognizes_native_json_codes_through_cli_translation(readines
     assert not dps_fixtures._data_plane_authorization_pending(translated, role, "dps")
 
 
-def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker, readiness_cloud):
-    error = _data_role_error()
+@pytest.mark.parametrize("role,code,message", [
+    (dps_fixtures.HUB_USER_ROLE, 401002, "Token expired"),
+    (dps_fixtures.DPS_USER_ROLE, 403000, "Authorization failed for the request"),
+])
+def test_dps_401_fix_preserves_other_wrapped_authorization_rejections(readiness_cloud, role, code, message):
+    error = _data_role_error(role)
+    error.error = None
+    error.response.json = lambda: {"error": {"errorCode": code, "message": message}}
+
+    assert not dps_fixtures._data_plane_authorization_pending(error, role, "dps")
+
+
+@pytest.mark.parametrize("dps_401", [False, True])
+def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker, readiness_cloud, dps_401):
+    error = _dps_authorization_error() if dps_401 else _data_role_error()
+    if dps_401:
+        readiness_cloud.resource_manager = "https://management.usgovcloudapi.net/"
     error.message = "secret-response-body"
     clock = [0]
     mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
@@ -884,7 +972,8 @@ def test_readiness_timeout_retains_cause_and_safe_stage_diagnostics(mocker, read
         )
     assert raised.value.__cause__ is error
     message = str(raised.value)
-    for expected in ("stage=data-plane-authorization", "elapsed=5.0s", "type=HttpResponseError", "code=403000",
+    for expected in ("stage=data-plane-authorization", "elapsed=5.0s", f"type={type(error).__name__}",
+                     f"code={401002 if dps_401 else 403000}",
                      "correlationId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"):
         assert expected in message
     assert "secret-response-body" not in message
