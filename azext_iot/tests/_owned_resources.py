@@ -32,6 +32,7 @@ ROLE_TYPE = "microsoft.authorization/roleassignments"
 DEPLOYMENT_TYPE = "microsoft.resources/deployments"
 API = re.compile(r"20\d{2}-\d{2}-\d{2}(?:-preview)?")
 TERMINAL_STATES = {"succeeded", "failed", "canceled", "cancelled"}
+NULL_USER_TAGS = {"microsoft.deviceupdate/accounts", "microsoft.deviceregistry/schemaregistries"}
 
 
 class CleanupIncomplete(RuntimeError):
@@ -398,12 +399,17 @@ class Observer:
         if previous is None and "location" not in body:
             raise ValueError("Unrecognized top-level resource; ownership tagging cannot be assumed.")
         tags = body.get("tags") if "tags" in body else (previous or {}).get("tags")
+        requested = {}
+        if previous is None or "tags" in body:
+            requested["requestedTags"] = (
+                "omitted" if "tags" not in body else "null" if body["tags"] is None else "mapping"
+            )
         tags = dict(tags or {})
         if tags.get(TAG, self.journal.owner) != self.journal.owner:
             raise ValueError("A resource requested another attempt's ownership tag.")
         tags[TAG] = self.journal.owner
         body["tags"] = tags
-        self.journal.record(resource, api, kind="root", confirmed=previous is not None, **creation)
+        self.journal.record(resource, api, kind="root", confirmed=previous is not None, **creation, **requested)
         return headers
 
     def prepare_deployment(self, resource, api, body, creation_id=None):
@@ -504,6 +510,7 @@ class Observer:
             tags[TAG] = self.journal.owner
         else:
             raise ValueError("Unsupported ownership tag operation.")
+        self.journal.record(root, root_api, requestedTags="mapping")
 
     def visible(self, value):
         if isinstance(value, list):
@@ -514,6 +521,12 @@ class Observer:
         tags = value.get("tags")
         if isinstance(tags, dict) and tags.get(TAG) == self.journal.owner:
             tags.pop(TAG)
+            resource = value.get("id")
+            record = self.journal.records().get(resource.lower(), {}) if isinstance(resource, str) else {}
+            # Only restore the known service shape from recorded request intent, never a guessed legacy tagShape.
+            if (not tags and record.get("requestedTags") in {"omitted", "null"}
+                    and resource_type(resource) in NULL_USER_TAGS):
+                value["tags"] = None
         description = value.get("description")
         if isinstance(description, str) and description.startswith(self.journal.role_prefix):
             value["description"] = description.removeprefix(self.journal.role_prefix) or None
