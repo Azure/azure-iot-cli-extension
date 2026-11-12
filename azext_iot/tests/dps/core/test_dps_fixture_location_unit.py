@@ -1171,9 +1171,9 @@ def test_fairfax_hub_role_readiness_confirms_success_or_fails_at_deadline(mocker
         with pytest.raises(CLIInternalError) as raised:
             dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
         assert raised.value.__cause__ is error
-        assert "stage=data-plane-authorization elapsed=30.0s type=UnauthorizedError code=IotHubUnauthorized" in str(raised.value)
+        assert "stage=data-plane-authorization elapsed=90.0s type=UnauthorizedError code=IotHubUnauthorized" in str(raised.value)
         assert "private" not in str(raised.value)
-        assert cli.invoke.call_count == pause.call_count == 6
+        assert cli.invoke.call_count == pause.call_count == 18
     else:
         dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
         assert cli.invoke.call_count == 5
@@ -1195,6 +1195,24 @@ def test_visibility_and_authorization_use_independent_budgets(mocker, monkeypatc
     )
     assert wait.call_args.kwargs["timeout"] == 47
     assert wait.call_args.kwargs["confirmations"] == 3
+
+
+@pytest.mark.parametrize("endpoint,role,expected", [
+    ("https://management.usgovcloudapi.net/", "hub", 900),
+    ("https://management.usgovcloudapi.net", "dps", 300),
+    ("https://management.azure.com", "hub", 300),
+    ("https://management.chinacloudapi.cn", "hub", 300),
+])
+def test_extended_diagnostic_wait_only_targets_fairfax_hub(mocker, endpoint, role, expected):
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints.resource_manager = endpoint
+    wait = mocker.patch.object(dps_fixtures, "_wait_for_readiness")
+    chosen_role = dps_fixtures.HUB_USER_ROLE if role == "hub" else dps_fixtures.DPS_USER_ROLE
+    scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/IotHubs/dps"
+    dps_fixtures._wait_for_current_user_data_plane(chosen_role, scope)
+    assert wait.call_args.kwargs["timeout"] == expected
+    assert wait.call_args.kwargs["confirmations"] == 3
+    assert callable(wait.call_args.kwargs["retry_error"])
 
 
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])

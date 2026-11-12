@@ -9,6 +9,7 @@
 import argparse
 import ast
 import hashlib
+import json
 import os
 from pathlib import Path
 import runpy
@@ -22,10 +23,14 @@ COMPATIBILITY = {
     "azext_iot/tests/dps/conftest.py": {
         "symbols": (
             "_readiness_http_error", "_data_plane_authorization_pending",
-            "_readiness_service_code", "_readiness_diagnostic",
+            "_readiness_service_code", "_readiness_diagnostic", "_wait_for_current_user_data_plane",
         ),
+        "helpers": ("_dps_authorization_failed_response",),
         "imports": ("import re", "from msrestazure.azure_exceptions import CloudError"),
-        "reason": "Recognize exact cloud-scoped Hub/DPS role-propagation responses within the existing readiness deadline.",
+        "reason": (
+            "Diagnostic experiment: allow 15 minutes for Fairfax Hub caller authorization; "
+            "retain existing error predicates, three-success confirmation and all other readiness deadlines."
+        ),
     },
     "azext_iot/tests/iothub/_sas_phase.py": {
         "symbols": ("HubSasPhase.install",),
@@ -61,13 +66,20 @@ def adapt_harness(output, manifest):
         current = (ROOT / relative).read_text(encoding="utf-8")
         tree, donor = ast.parse(original), ast.parse(current)
         lines, replacements = original.splitlines(keepends=True), []
-        for symbol in adapter["symbols"]:
-            previous, replacement = function(tree, symbol), function(donor, symbol)
-            if ast.dump(previous.args) != ast.dump(replacement.args) or previous.decorator_list or replacement.decorator_list:
+        symbols = adapter["symbols"] + adapter.get("helpers", ())
+        for symbol in symbols:
+            replacement = function(donor, symbol)
+            missing_helper = symbol in adapter.get("helpers", ()) and not any(
+                getattr(item, "name", None) == symbol for item in tree.body
+            )
+            previous = None if missing_helper else function(tree, symbol)
+            if (replacement.decorator_list or previous is not None
+                    and (ast.dump(previous.args) != ast.dump(replacement.args) or previous.decorator_list)):
                 raise ValueError(f"Selected source has an incompatible test-adapter signature: {symbol}")
+            content = current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno]
             replacements.append((
-                previous.lineno - 1, previous.end_lineno,
-                current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno],
+                previous.lineno - 1 if previous else len(lines), previous.end_lineno if previous else len(lines),
+                content if previous else ["\n\n", *content, "\n"],
             ))
         for start, end, replacement in sorted(replacements, reverse=True):
             lines[start:end] = replacement
@@ -94,7 +106,7 @@ def adapt_harness(output, manifest):
         if text != original:
             path.write_text(text, encoding="utf-8")
             changes.append({
-                "path": relative, "symbols": list(adapter["symbols"]), "reason": adapter["reason"],
+                "path": relative, "symbols": list(symbols), "reason": adapter["reason"],
                 "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
                 "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
             })
@@ -102,6 +114,36 @@ def adapt_harness(output, manifest):
         "version": 1, "sourceCommit": manifest["testSourceCommit"],
         "automationCommit": manifest["automationCommit"], "files": changes,
     }
+
+
+def diagnostic_budgets(output):
+    changes = []
+    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json"):
+        path = output / relative
+        original = path.read_text(encoding="utf-8")
+        if relative == "tox.ini":
+            command = "DPS: python -m pytest -vv --timeout=900 "
+            if original.count(command) != 1:
+                raise ValueError("Unexpected DPS pytest timeout command in diagnostic source.")
+            text = original.replace(command, command.replace("900", "2100"), 1)
+        else:
+            budgets = json.loads(original)
+            phases = budgets["DPS"]["phases"]
+            if {phase["name"]: phase["runtime_minutes"] for phase in phases} != {
+                "regular": 35, "service-sas": 25, "local-auth-toggle": 15,
+            } or len(phases) != 3:
+                raise ValueError("Unexpected DPS runtime budgets in diagnostic source.")
+            for phase in phases:
+                phase["runtime_minutes"] = 40
+            text = json.dumps(budgets, indent=2) + "\n"
+        path.write_text(text, encoding="utf-8")
+        changes.append({
+            "path": relative, "symbols": ["DPS runtime budget"],
+            "reason": "Diagnostic-only outer deadlines permit the full 15-minute Fairfax Hub authorization window.",
+            "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+            "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+        })
+    return changes
 
 
 def stage(bundle, output, *, source_only=False):
@@ -131,6 +173,8 @@ def stage(bundle, output, *, source_only=False):
         # Build/unit stages retain the original fixtures and their matching unit
         # doubles. These transport adapters apply only to live execution and its gate.
         compatibility = adapt_harness(output, manifest)
+        if manifest["cloud"] == "AzureUSGovernment":
+            compatibility["files"].extend(diagnostic_budgets(output))
         manifest = {**manifest, "testCompatibility": compatibility}
         for change in compatibility["files"]:
             print(f"Test-only compatibility: {change['path']}: {change['reason']}", flush=True)

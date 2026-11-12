@@ -304,10 +304,15 @@ def _wait_for_current_user_data_plane(role: str, scope: str):
         invoke_checked(cli, command, description="Caller data-plane readiness").as_json()
         return True
 
+    timeout = DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS
+    if (role == HUB_USER_ROLE
+            and cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
+            == "https://management.usgovcloudapi.net"):
+        timeout *= 3
     _wait_for_readiness(
         f"{role} data-plane authorization for '{name}'",
         authorized,
-        timeout=DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS,
+        timeout=timeout,
         stage="data-plane-authorization",
         retry_error=lambda error: _data_plane_authorization_pending(error, role, name),
         # One success may come from an already-refreshed front end; require a short stable streak.

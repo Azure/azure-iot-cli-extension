@@ -4,9 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 from copy import deepcopy
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -289,11 +291,13 @@ def test_health_stages_plan_or_execute_the_selected_cohorts():
 
 
 @pytest.mark.parametrize("source_only", [False, True])
+@pytest.mark.parametrize("cloud", ["public", "fairfax"])
 def test_staging_preserves_released_cases_manifests_and_product(
-        monitor, bundle, mocker, monkeypatch, tmp_path, source_only):
+        monitor, bundle, mocker, monkeypatch, tmp_path, source_only, cloud):
     import sys
 
     directory, manifest = bundle
+    manifest = {**manifest, "cloud": "AzureUSGovernment" if cloud == "fairfax" else "AzureCloud"}
     monkeypatch.setitem(sys.modules, "release_monitor", monitor)
     spec = importlib.util.spec_from_file_location("monitor_adapter_unit", ROOT / "scripts/release_monitor_adapter.py")
     adapter = importlib.util.module_from_spec(spec)
@@ -304,13 +308,16 @@ def test_staging_preserves_released_cases_manifests_and_product(
     (helpers / "_ado_pipeline.py").write_text("current protocol", encoding="utf-8")
     (helpers / "_phase_manifest.py").write_text("different release", encoding="utf-8")
     (helpers / "test_case_int.py").write_text("different assertions", encoding="utf-8")
-    (automation / "tox.ini").write_text("current controller setup", encoding="utf-8")
+    (automation / "tox.ini").write_text("DPS: python -m pytest -vv --timeout=900 tests\n", encoding="utf-8")
+    (directory / "source/azext_iot/tests/ci_budgets.json").write_bytes(
+        (ROOT / "azext_iot/tests/ci_budgets.json").read_bytes()
+    )
     released_manifest = directory / "source/azext_iot/tests/_phase_manifest.py"
     released_manifest.write_text("released selection", encoding="utf-8")
     monkeypatch.setattr(adapter, "ROOT", automation)
     mocker.patch.object(adapter, "verify_bundle", return_value=manifest)
     monkeypatch.setenv("BUILD_SOURCEVERSION", AUTOMATION)
-    monkeypatch.setenv("MONITOR_CLOUD", "public")
+    monkeypatch.setenv("MONITOR_CLOUD", cloud)
     monkeypatch.setenv("MONITOR_TRACK", "ga")
     destination = tmp_path / "stage"
     compatibility = mocker.spy(adapter, "adapt_harness")
@@ -327,12 +334,53 @@ def test_staging_preserves_released_cases_manifests_and_product(
         assert "testCompatibility" not in staged
     else:
         compatibility.assert_called_once()
-        assert staged["testCompatibility"] == {
-            "version": 1, "sourceCommit": manifest["testSourceCommit"],
-            "automationCommit": AUTOMATION, "files": [],
-        }
+        assert staged["testCompatibility"]["sourceCommit"] == manifest["testSourceCommit"]
+        assert staged["testCompatibility"]["automationCommit"] == AUTOMATION
+        if cloud == "fairfax":
+            assert {item["path"] for item in staged["testCompatibility"]["files"]} == {
+                "tox.ini", "azext_iot/tests/ci_budgets.json",
+            }
+            assert "--timeout=2100" in (destination / "tox.ini").read_text()
+        else:
+            assert staged["testCompatibility"]["files"] == []
+    if source_only or cloud == "public":
+        assert "--timeout=900" in (destination / "tox.ini").read_text()
+        assert (destination / "azext_iot/tests/ci_budgets.json").read_bytes() == (
+            directory / "source/azext_iot/tests/ci_budgets.json"
+        ).read_bytes()
     with pytest.raises(ValueError, match="fresh"):
         adapter.stage(directory, destination)
+
+
+def test_diagnostic_deadlines_include_fixture_setup_and_preserve_cleanup(monitor, mocker, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_budgets_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json"):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+    original = json.loads((tmp_path / "azext_iot/tests/ci_budgets.json").read_text())
+    changes = adapter.diagnostic_budgets(tmp_path)
+    staged = json.loads((tmp_path / "azext_iot/tests/ci_budgets.json").read_text())
+    timeout = int(next(
+        line for line in (tmp_path / "tox.ini").read_text().splitlines() if "DPS: python -m pytest" in line
+    ).split("--timeout=")[1].split()[0])
+    assert timeout > 900 + 2 * 300 + 300  # Hub auth, two role-visibility windows, DPS auth.
+    for phase in staged["DPS"]["phases"]:
+        assert phase["runtime_minutes"] * 60 > timeout
+    budget = staged["DPS"]
+    total = max(p["runtime_minutes"] + p["cleanup_minutes"] for p in budget["phases"])
+    total += sum(p["cleanup_minutes"] for p in budget["phases"]) + budget["reserve_minutes"] + budget["setup_minutes"]
+    assert total <= budget["job_timeout_minutes"]
+    for before, after in zip(original["DPS"]["phases"], staged["DPS"]["phases"]):
+        assert after["runtime_minutes"] > before["runtime_minutes"]
+        after["runtime_minutes"] = before["runtime_minutes"]
+    assert staged == original
+    assert len(changes) == 2 and all(item["originalSha256"] != item["adaptedSha256"] for item in changes)
+    with pytest.raises(ValueError, match="Unexpected DPS pytest timeout"):
+        adapter.diagnostic_budgets(tmp_path)
 
 
 @pytest.mark.parametrize("relative", ["azext_iot/tests/dps/conftest.py", "azext_iot/tests/iothub/_sas_phase.py"])
@@ -348,7 +396,8 @@ def test_harness_compatibility_records_only_allowlisted_function_changes(monitor
     donor.parent.mkdir(parents=True)
     header = '# Frozen header\n"""Frozen module."""\nfrom __future__ import annotations\n\n'
     methods = []
-    for symbol in adapter.COMPATIBILITY[relative]["symbols"]:
+    symbols = adapter.COMPATIBILITY[relative]["symbols"] + adapter.COMPATIBILITY[relative].get("helpers", ())
+    for symbol in symbols:
         prefix, name = ("    ", symbol.split(".")[1]) if "." in symbol else ("", symbol)
         methods.append(f"{prefix}def {name}(value):\n{prefix}    return 'original'\n\n")
     strict = "def test_required_assertion():\n    assert 1 == 2\n"
@@ -363,8 +412,35 @@ def test_harness_compatibility_records_only_allowlisted_function_changes(monitor
     change, = result["files"]
     assert change["originalSha256"] == hashlib.sha256(original.encode()).hexdigest()
     assert change["adaptedSha256"] == hashlib.sha256(changed.encode()).hexdigest()
-    assert change["symbols"] == list(adapter.COMPATIBILITY[relative]["symbols"])
+    assert change["symbols"] == list(symbols)
     assert adapter.adapt_harness(output, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
+
+
+def test_harness_includes_missing_dps_authorization_helper(monitor, mocker, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_helper_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/dps/conftest.py"
+    original = (ROOT / relative).read_text()
+    tree = ast.parse(original)
+    helper = adapter.function(tree, "_dps_authorization_failed_response")
+    lines = original.splitlines(keepends=True)
+    del lines[helper.lineno - 1:helper.end_lineno]
+    source = tmp_path / relative
+    source.parent.mkdir(parents=True)
+    source.write_text("".join(lines))
+    result = adapter.adapt_harness(tmp_path, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+    staged = ast.parse(source.read_text())
+    added = adapter.function(staged, "_dps_authorization_failed_response")
+    assert ast.dump(added) == ast.dump(helper)
+    namespace = {}
+    exec(compile(ast.Module(body=[added], type_ignores=[]), str(source), "exec"), namespace)
+    assert namespace["_dps_authorization_failed_response"](mocker.Mock(json=lambda: {
+        "errorCode": 401002, "message": "Authorization failed for the request",
+    }))
+    assert "_dps_authorization_failed_response" in result["files"][0]["symbols"]
+    assert adapter.adapt_harness(tmp_path, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
 
 
 @pytest.mark.parametrize("replacement", ["def renamed(value):\n    pass\n", "def _readiness_http_error():\n    pass\n"])
