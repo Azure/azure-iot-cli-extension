@@ -115,6 +115,31 @@ def isolated_environment(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.mark.parametrize("issues", [("error", "failure"), ("error", "error")])
+def test_attempt_junit_counts_every_preserved_issue(tmp_path, issues):
+    node = sorted(RUNNER["MANIFEST"]["expected_nodeids"]("regular"))[0]
+    module, name = node.split("::")
+    suite = ET.Element("testsuite")
+    case = ET.SubElement(
+        suite, "testcase", name=name, classname="azext_iot.tests.dps." + module[:-3].replace("/", "."),
+    )
+    for issue in issues:
+        ET.SubElement(case, issue, message="private diagnostic")
+    raw, destination = tmp_path / "raw.xml", tmp_path / "safe.xml"
+    ET.ElementTree(suite).write(raw)
+    result = RUNNER["safe_junit"](
+        raw, destination, "regular", 1,
+        debug={"requestedNodes": ["azext_iot/tests/dps/" + node], "attempt": "a" * 64},
+    )
+    assert result["valid"]
+    output = ET.parse(destination).getroot()
+    assert [child.tag for child in output.find("testcase")] == list(issues)
+    for kind, counter in (("error", "errors"), ("failure", "failures")):
+        assert result[counter] == issues.count(kind)
+        assert output.get(counter) == str(issues.count(kind))
+    assert "private diagnostic" not in destination.read_text()
+
+
 def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts(tmp_path):
     reader = Reader()
     assert RUN(SUB, GROUP, tmp_path / "dps-phases", reader, execute=_execution) == 0

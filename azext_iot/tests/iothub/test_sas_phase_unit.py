@@ -678,6 +678,43 @@ def test_pytest_report_and_junit_are_sanitized_before_artifacts(phase, tmp_path)
     assert "secret-value" not in output.read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("cleanup_failure", [False, True])
+def test_sas_report_hooks_preserve_retry_classification(phase, tmp_path, cleanup_failure):
+    from _pytest.reports import TestReport
+    from azext_iot.tests import _ado_retry as retry
+    from azext_iot.tests._hub_suite_plugin import PhaseReceipt
+
+    node = subject.NODES[0]
+    receipt = PhaseReceipt(
+        "HubData", "sas", [node], tmp_path / "phase.json", "offline", debug={"attempt": "a" * 64},
+    )
+    report = TestReport(
+        nodeid=node, location=("example.py", 1, "test"), keywords={},
+        outcome="failed", longrepr="Bearer secret-value", when="call",
+        user_properties=[("diagnostic", "Bearer secret-value")],
+    )
+    manager = pytest.PytestPluginManager()
+    manager.register(phase)
+    manager.register(receipt)
+    manager.register(SimpleNamespace(pytest_runtest_makereport=lambda item, call: report))
+    error = retry.CleanupFailure("private cleanup detail") if cleanup_failure else AssertionError("private failure")
+    result = manager.hook.pytest_runtest_makereport(
+        item=SimpleNamespace(), call=SimpleNamespace(excinfo=SimpleNamespace(value=error)),
+    )
+    receipt.pytest_runtest_logreport(result)
+    for stage in ("setup", "teardown"):
+        receipt.pytest_runtest_logreport(SimpleNamespace(nodeid=node, when=stage, outcome="passed"))
+    receipt.data.update(collected=[node], finished=True, exitstatus=1)
+    assert retry.outcomes(receipt.data, allow_fixture_failures=True) == {node: "failed"}
+    assert receipt.data["retryableFailures"][node] is (not cleanup_failure)
+    assert "secret-value" not in str(result.user_properties) + result.longrepr
+    if cleanup_failure:
+        with pytest.raises(ValueError, match="full-service recovery"):
+            retry.outcomes(receipt.data)
+    else:
+        assert retry.outcomes(receipt.data) == {node: "failed"}
+
+
 def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
     from azext_iot.tests.iothub.messaging import test_iothub_c2d_messages_int as messaging
     monkeypatch.setattr(messaging, "sleep", Mock())
