@@ -601,6 +601,12 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
         if os.environ.get(name) and os.environ[name] != expected:
             raise PhaseError("Conflicting ambient DPS target: " + name)
     phases = tuple(value for value in PHASES if not debug or value[0] == debug["phase"])
+    fairfax = target["endpoint"] == TARGETS["GOVERNMENT_ARM"]
+    if fairfax:
+        phases = tuple(
+            (name, max(runtime, 35 * 60) if name == "service-sas" else runtime, cleanup)
+            for name, runtime, cleanup in phases
+        )
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)  # A rerun must not overwrite phase evidence.
     summary_path = output.parent / "dps-phases.json"
@@ -707,6 +713,12 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                         f"--cov-report=xml:{folder / 'coverage.xml'}",
                         "--capture=fd", *debug["requestedNodes"],
                     ])
+                if fairfax and name in ("regular", "service-sas"):
+                    # Preserve selection while allowing Hub readiness plus DPS/setup time.
+                    arguments = shlex.split(environment.get(
+                        FOCUSED["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps",
+                    ))
+                    environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join(["--timeout=1800", *arguments])
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)
                 result.pop("reason", None)

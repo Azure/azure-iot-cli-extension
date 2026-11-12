@@ -1165,15 +1165,14 @@ def test_fairfax_hub_role_readiness_confirms_success_or_fails_at_deadline(mocker
     clock = [0]
     mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
     pause = mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
-    monkeypatch.setattr(dps_fixtures, "DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS", 30)
     scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/IotHubs/dps"
     if persistent:
         with pytest.raises(CLIInternalError) as raised:
             dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
         assert raised.value.__cause__ is error
-        assert "stage=data-plane-authorization elapsed=30.0s type=UnauthorizedError code=IotHubUnauthorized" in str(raised.value)
+        assert "stage=data-plane-authorization elapsed=600.0s type=UnauthorizedError code=IotHubUnauthorized" in str(raised.value)
         assert "private" not in str(raised.value)
-        assert cli.invoke.call_count == pause.call_count == 6
+        assert cli.invoke.call_count == pause.call_count == 120
     else:
         dps_fixtures._wait_for_current_user_data_plane(dps_fixtures.HUB_USER_ROLE, scope)
         assert cli.invoke.call_count == 5
@@ -1195,6 +1194,106 @@ def test_visibility_and_authorization_use_independent_budgets(mocker, monkeypatc
     )
     assert wait.call_args.kwargs["timeout"] == 47
     assert wait.call_args.kwargs["confirmations"] == 3
+
+
+@pytest.mark.parametrize("endpoint,role,expected", [
+    ("https://management.usgovcloudapi.net/", "hub", 600),
+    ("https://management.usgovcloudapi.net", "dps", 300),
+    ("https://management.azure.com", "hub", 300),
+    ("https://management.azure.com", "dps", 300),
+    ("https://management.chinacloudapi.cn", "hub", 300),
+    ("https://management.chinacloudapi.cn", "dps", 300),
+])
+def test_extended_wait_only_targets_fairfax_hub(mocker, endpoint, role, expected):
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.az_cli.cloud.endpoints.resource_manager = endpoint
+    wait = mocker.patch.object(dps_fixtures, "_wait_for_readiness")
+    chosen_role = dps_fixtures.HUB_USER_ROLE if role == "hub" else dps_fixtures.DPS_USER_ROLE
+    scope = "/subscriptions/s/resourceGroups/g/providers/Microsoft.Devices/IotHubs/dps"
+    dps_fixtures._wait_for_current_user_data_plane(chosen_role, scope)
+    assert wait.call_args.kwargs["timeout"] == expected
+    assert wait.call_args.kwargs["confirmations"] == 3
+    assert callable(wait.call_args.kwargs["retry_error"])
+
+
+@pytest.mark.parametrize("outcome", ["ready", "timeout", "error", "late-success"])
+def test_fairfax_readiness_retains_safe_probe_timing_after_capture(
+        mocker, monkeypatch, tmp_path, readiness_cloud, outcome):
+    readiness_cloud.resource_manager = "https://management.usgovcloudapi.net"
+    for key, value in {
+        "azext_iot_dps_phase_receipts": str(tmp_path),
+        "azext_iot_dps_run_uid": "a" * 32,
+        "azext_iot_dps_test_subscription": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "azext_iot_dps_test_resource_group": "test-group",
+        "azext_iot_test_subscription": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "azext_iot_testrg": "test-group",
+        "azext_iot_dps_test_phase": "regular",
+        "azext_iot_dps_test_location": "usgovvirginia",
+        "azext_iot_test_arm_endpoint": readiness_cloud.resource_manager,
+    }.items():
+        monkeypatch.setenv(key, value)
+    error = _dps_authorization_error()
+    error.message = "secret-response-body"
+    clock = [0]
+    mocker.patch.object(dps_fixtures, "monotonic", side_effect=lambda: clock[0])
+    mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    results = iter([error, True, error, True, True, True])
+
+    def probe():
+        saved = json.loads(next(tmp_path.glob("readiness-*.json")).read_text())
+        assert saved["events"][-1]["event"] == "probe-start"
+        clock[0] += 60 if outcome == "late-success" else 2
+        result = next(results) if outcome == "ready" else True if outcome == "late-success" else error
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def wait():
+        dps_fixtures._wait_for_readiness(
+            "Device Provisioning Service Data Contributor data-plane authorization for 'test-dps'",
+            probe, timeout=60, stage="data-plane-authorization", confirmations=3,
+            retry_error=lambda _: outcome != "error",
+        )
+
+    if outcome == "ready":
+        wait()
+    elif outcome == "error":
+        with pytest.raises(type(error)) as raised:
+            wait()
+        assert raised.value is error
+    else:
+        with pytest.raises(CLIInternalError):
+            wait()
+    path, = tmp_path.glob("readiness-*.json")
+    trace = json.loads(path.read_text())
+    assert "secret-response-body" not in path.read_text()
+    assert trace["phase"] == "regular" and trace["target"]["region"] == "usgovvirginia"
+    assert trace["events"][0]["event"] == "start"
+    assert trace["events"][-1]["event"] == ("timeout" if outcome == "late-success" else outcome)
+    assert all(event["at"] and event["remaining_seconds"] >= 0 for event in trace["events"])
+    if outcome == "ready":
+        assert trace["first_success_elapsed_seconds"] == 9
+        assert trace["last_rejection_elapsed_seconds"] == 16
+        assert trace["ready_elapsed_seconds"] == 37
+        assert trace["events"][-1]["attempt"] == 6
+        assert trace["events"][-1]["consecutive_successes"] == 3
+        assert {event["probe_seconds"] for event in trace["events"] if event["event"] == "probe-complete"} == {2}
+    else:
+        assert trace["ready_elapsed_seconds"] is None
+    if outcome in ("ready", "timeout", "error"):
+        assert "code=401002" in path.read_text()
+
+
+@pytest.mark.parametrize("endpoint,stage", [
+    ("https://management.azure.com", "data-plane-authorization"),
+    ("https://management.chinacloudapi.cn", "data-plane-authorization"),
+    ("https://management.usgovcloudapi.net", "assignment-visibility"),
+])
+def test_readiness_timing_does_not_change_other_clouds_or_visibility(mocker, readiness_cloud, endpoint, stage):
+    readiness_cloud.resource_manager = endpoint
+    write = mocker.patch.object(dps_fixtures._phase_receipts, "write")
+    dps_fixtures._wait_for_readiness("caller", lambda: True, timeout=5, stage=stage)
+    write.assert_not_called()
 
 
 @pytest.mark.parametrize("role", [dps_fixtures.DPS_USER_ROLE, dps_fixtures.HUB_USER_ROLE])

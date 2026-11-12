@@ -265,25 +265,72 @@ def _wait_for_readiness(description, check, *, timeout, stage, confirmations=1, 
     started = monotonic()
     deadline = started + timeout
     streak = 0
+    attempts = 0
     last_error = None
     observation = "not observed"
+    trace = None
+    if (stage == "data-plane-authorization"
+            and cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
+            == "https://management.usgovcloudapi.net" and _phase_receipts.settings()):
+        trace = {
+            "schema": 1, "description": description, "stage": stage,
+            "timing_origin": "Data-plane readiness start, after the role-assignment helper returned.",
+            "timeout_seconds": timeout, "poll_seconds": ROLE_PROPAGATION_POLL_SECONDS,
+            "required_confirmations": confirmations, "first_success_elapsed_seconds": None,
+            "last_rejection_elapsed_seconds": None, "ready_elapsed_seconds": None, "events": [],
+        }
+        trace_name = f"readiness-{uuid.uuid4().hex}.json"
+
+    def record(event, probe_started=None):
+        if trace is None:
+            return
+        now = monotonic()
+        elapsed = round(now - started, 3)
+        if event == "probe-complete" and streak and trace["first_success_elapsed_seconds"] is None:
+            trace["first_success_elapsed_seconds"] = elapsed
+        if event in ("rejected", "error"):
+            trace["last_rejection_elapsed_seconds"] = elapsed
+        if event == "ready":
+            trace["ready_elapsed_seconds"] = elapsed
+        trace["events"].append({
+            "event": event, "at": datetime.now(timezone.utc).isoformat(),
+            "attempt": attempts, "elapsed_seconds": elapsed,
+            "remaining_seconds": round(max(0, deadline - now), 3),
+            "probe_seconds": round(now - probe_started, 3) if probe_started is not None else None,
+            "consecutive_successes": streak, "observation": observation,
+        })
+        # Persist every probe independently of pytest's capture of successful fixture output.
+        _phase_receipts.write(trace_name, trace)
+        logger.info("Readiness %s: %s stage=%s elapsed=%.3fs attempt=%s %s",
+                    event, description, stage, elapsed, attempts, observation)
+
+    record("start")
     while monotonic() < deadline:
+        attempts += 1
+        record("probe-start")
+        probe_started = monotonic()
         try:
             streak = streak + 1 if check() else 0
             observation = f"consecutive_successes={streak}/{confirmations}"
         except (HttpResponseError, UnauthorizedError, ForbiddenError) as error:
-            if retry_error is None or not retry_error(error):
-                raise
-            last_error = error
             observation = _readiness_diagnostic(error)
             streak = 0
+            if retry_error is None or not retry_error(error):
+                record("error", probe_started)
+                raise
+            last_error = error
+            record("rejected", probe_started)
+        else:
+            record("probe-complete", probe_started)
         remaining = deadline - monotonic()
         if remaining <= 0:
             break
         if streak >= confirmations:
+            record("ready")
             return
         logger.info("Readiness pending: stage=%s elapsed=%.1fs %s", stage, monotonic() - started, observation)
         sleep(min(ROLE_PROPAGATION_POLL_SECONDS, remaining))
+    record("timeout")
     raise CLIInternalError(
         f"{description} was not ready within {timeout} seconds. "
         f"stage={stage} elapsed={monotonic() - started:.1f}s {observation}"
@@ -304,10 +351,14 @@ def _wait_for_current_user_data_plane(role: str, scope: str):
         invoke_checked(cli, command, description="Caller data-plane readiness").as_json()
         return True
 
+    timeout = DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS
+    if (role == HUB_USER_ROLE and cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
+            == "https://management.usgovcloudapi.net"):
+        timeout = 600
     _wait_for_readiness(
         f"{role} data-plane authorization for '{name}'",
         authorized,
-        timeout=DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS,
+        timeout=timeout,
         stage="data-plane-authorization",
         retry_error=lambda error: _data_plane_authorization_pending(error, role, name),
         # One success may come from an already-refreshed front end; require a short stable streak.
