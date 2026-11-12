@@ -58,21 +58,32 @@ def profile(version, cloud="public"):
     }
 
 
-def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monkeypatch, tmp_path):
+@pytest.mark.parametrize("endpoint,dps_minutes", [
+    ("https://management.azure.com", 90), ("https://management.usgovcloudapi.net", 100),
+    ("https://management.chinacloudapi.cn", 90),
+])
+def test_health_plan_forwards_python_and_region_selections(
+        monitor, mocker, monkeypatch, tmp_path, endpoint, dps_minutes):
     mocker.patch.dict("sys.modules", {"release_monitor": monitor})
     spec = importlib.util.spec_from_file_location("monitor_plan_unit", ROOT / "scripts/release_monitor_adapter.py")
     adapter = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
     mocker.patch.object(adapter, "stage")
-    plan = mocker.Mock(return_value=[])
-    mocker.patch.object(adapter.runpy, "run_path", return_value={"plan": plan})
+    plan = mocker.Mock(return_value=[
+        {"service": "DPS", "endpoint": endpoint, "minutes": 90},
+        {"service": "HubControl", "endpoint": endpoint, "minutes": 130},
+    ])
+    mocker.patch.object(adapter.runpy, "run_path", return_value={
+        "plan": plan, "owned_nodes": mocker.Mock(return_value={}),
+    })
     for key, value in {
         "MONITOR_SERVICES": "DPS,HubControl", "MONITOR_PYTHONS": "3.10,3.13",
-        "MONITOR_REGION": "westus2,eastus", "MONITOR_ENDPOINT": "public",
+        "MONITOR_REGION": "westus2,eastus", "MONITOR_ENDPOINT": endpoint,
     }.items():
         monkeypatch.setenv(key, value)
     adapter.plan(tmp_path, tmp_path / "source")
-    plan.assert_called_once_with(["DPS", "HubControl"], ["3.10", "3.13"], ["westus2", "eastus"], "public")
+    plan.assert_called_once_with(["DPS", "HubControl"], ["3.10", "3.13"], ["westus2", "eastus"], endpoint)
+    assert [job["minutes"] for job in json.loads((tmp_path / "plan.json").read_text())] == [dps_minutes, 130]
 
 
 @pytest.mark.parametrize("track,expected", [("ga", "1.0.1"), ("preview", "1.2.0b1")])
@@ -312,6 +323,10 @@ def test_staging_preserves_released_cases_manifests_and_product(
     (directory / "source/azext_iot/tests/ci_budgets.json").write_bytes(
         (ROOT / "azext_iot/tests/ci_budgets.json").read_bytes()
     )
+    local_auth = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    local_auth_source = directory / "source" / local_auth
+    local_auth_source.parent.mkdir(parents=True, exist_ok=True)
+    local_auth_source.write_bytes((ROOT / local_auth).read_bytes())
     released_manifest = directory / "source/azext_iot/tests/_phase_manifest.py"
     released_manifest.write_text("released selection", encoding="utf-8")
     monkeypatch.setattr(adapter, "ROOT", automation)
@@ -338,13 +353,14 @@ def test_staging_preserves_released_cases_manifests_and_product(
         assert staged["testCompatibility"]["automationCommit"] == AUTOMATION
         if cloud == "fairfax":
             assert {item["path"] for item in staged["testCompatibility"]["files"]} == {
-                "tox.ini", "azext_iot/tests/ci_budgets.json",
+                "tox.ini", "azext_iot/tests/ci_budgets.json", local_auth,
             }
-            assert "--timeout=2100" in (destination / "tox.ini").read_text()
+            assert "--timeout=2700" in (destination / "tox.ini").read_text()
         else:
             assert staged["testCompatibility"]["files"] == []
     if source_only or cloud == "public":
         assert "--timeout=900" in (destination / "tox.ini").read_text()
+        assert (destination / local_auth).read_bytes() == local_auth_source.read_bytes()
         assert (destination / "azext_iot/tests/ci_budgets.json").read_bytes() == (
             directory / "source/azext_iot/tests/ci_budgets.json"
         ).read_bytes()
@@ -357,7 +373,8 @@ def test_diagnostic_deadlines_include_fixture_setup_and_preserve_cleanup(monitor
     spec = importlib.util.spec_from_file_location("monitor_budgets_unit", ROOT / "scripts/release_monitor_adapter.py")
     adapter = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json"):
+    local_auth = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json", local_auth):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / relative).read_bytes())
@@ -367,7 +384,7 @@ def test_diagnostic_deadlines_include_fixture_setup_and_preserve_cleanup(monitor
     timeout = int(next(
         line for line in (tmp_path / "tox.ini").read_text().splitlines() if "DPS: python -m pytest" in line
     ).split("--timeout=")[1].split()[0])
-    assert timeout > 900 + 2 * 300 + 300  # Hub auth, two role-visibility windows, DPS auth.
+    assert timeout > 900 + 2 * 300 + 900  # Hub auth, two role-visibility windows, DPS auth.
     for phase in staged["DPS"]["phases"]:
         assert phase["runtime_minutes"] * 60 > timeout
     budget = staged["DPS"]
@@ -377,9 +394,34 @@ def test_diagnostic_deadlines_include_fixture_setup_and_preserve_cleanup(monitor
     for before, after in zip(original["DPS"]["phases"], staged["DPS"]["phases"]):
         assert after["runtime_minutes"] > before["runtime_minutes"]
         after["runtime_minutes"] = before["runtime_minutes"]
+    assert staged["DPS"]["job_timeout_minutes"] == adapter.FAIRFAX_DPS_JOB_MINUTES
+    staged["DPS"]["job_timeout_minutes"] = original["DPS"]["job_timeout_minutes"]
     assert staged == original
-    assert len(changes) == 2 and all(item["originalSha256"] != item["adaptedSha256"] for item in changes)
+    before_functions = ast.parse((ROOT / local_auth).read_text()).body
+    after_functions = ast.parse((tmp_path / local_auth).read_text()).body
+    for before, after in zip(before_functions, after_functions):
+        if isinstance(after, ast.FunctionDef) and after.name.startswith("test_"):
+            marker, = after.decorator_list
+            assert marker.args[0].value == timeout
+            marker.args[0].value = before.decorator_list[0].args[0].value
+        assert ast.dump(before) == ast.dump(after)
+    assert len(changes) == 3 and all(item["originalSha256"] != item["adaptedSha256"] for item in changes)
     with pytest.raises(ValueError, match="Unexpected DPS pytest timeout"):
+        adapter.diagnostic_budgets(tmp_path)
+
+
+def test_diagnostic_deadlines_reject_unreviewed_local_auth_markers(monitor, mocker, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_marker_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    local_auth = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json", local_auth):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+    target.write_text(target.read_text().replace("timeout(600", "timeout(700", 1))
+    with pytest.raises(ValueError, match="Unexpected DPS local-auth timeout markers"):
         adapter.diagnostic_budgets(tmp_path)
 
 

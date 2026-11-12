@@ -19,17 +19,19 @@ from release_monitor import verify_bundle, write_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
+FAIRFAX_DPS_JOB_MINUTES = 100
 COMPATIBILITY = {
     "azext_iot/tests/dps/conftest.py": {
         "symbols": (
             "_readiness_http_error", "_data_plane_authorization_pending",
-            "_readiness_service_code", "_readiness_diagnostic", "_wait_for_current_user_data_plane",
+            "_readiness_service_code", "_readiness_diagnostic", "_wait_for_readiness",
+            "_wait_for_current_user_data_plane",
         ),
         "helpers": ("_dps_authorization_failed_response",),
         "imports": ("import re", "from msrestazure.azure_exceptions import CloudError"),
         "reason": (
-            "Diagnostic experiment: allow 15 minutes for Fairfax Hub caller authorization; "
-            "retain existing error predicates, three-success confirmation and all other readiness deadlines."
+            "Diagnostic experiment: allow 15 minutes each for Fairfax Hub and DPS caller authorization, "
+            "persist safe per-probe timing receipts, and retain exact error predicates and three-success confirmation."
         ),
     },
     "azext_iot/tests/iothub/_sas_phase.py": {
@@ -118,28 +120,44 @@ def adapt_harness(output, manifest):
 
 def diagnostic_budgets(output):
     changes = []
-    for relative in ("tox.ini", "azext_iot/tests/ci_budgets.json"):
+    for relative in (
+        "tox.ini", "azext_iot/tests/ci_budgets.json",
+        "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py",
+    ):
         path = output / relative
         original = path.read_text(encoding="utf-8")
         if relative == "tox.ini":
             command = "DPS: python -m pytest -vv --timeout=900 "
             if original.count(command) != 1:
                 raise ValueError("Unexpected DPS pytest timeout command in diagnostic source.")
-            text = original.replace(command, command.replace("900", "2100"), 1)
-        else:
+            text = original.replace(command, command.replace("900", "2700"), 1)
+        elif relative.endswith("ci_budgets.json"):
             budgets = json.loads(original)
             phases = budgets["DPS"]["phases"]
             if {phase["name"]: phase["runtime_minutes"] for phase in phases} != {
                 "regular": 35, "service-sas": 25, "local-auth-toggle": 15,
-            } or len(phases) != 3:
+            } or len(phases) != 3 or budgets["DPS"]["job_timeout_minutes"] != 90:
                 raise ValueError("Unexpected DPS runtime budgets in diagnostic source.")
             for phase in phases:
-                phase["runtime_minutes"] = 40
+                phase["runtime_minutes"] = 50
+            budgets["DPS"]["job_timeout_minutes"] = FAIRFAX_DPS_JOB_MINUTES
             text = json.dumps(budgets, indent=2) + "\n"
+        else:
+            marker = "pytest.mark.timeout(600, func_only=False)"
+            marked = {
+                node.name for node in ast.parse(original).body if isinstance(node, ast.FunctionDef)
+                for decorator in node.decorator_list if ast.get_source_segment(original, decorator) == marker
+            }
+            if marked != {
+                "test_dps_create_disable_local_auth", "test_dps_update_disable_local_auth",
+                "test_dps_disable_local_auth_dataplane",
+            } or original.count("@" + marker) != 3:
+                raise ValueError("Unexpected DPS local-auth timeout markers in diagnostic source.")
+            text = original.replace("@" + marker, "@" + marker.replace("600", "2700"))
         path.write_text(text, encoding="utf-8")
         changes.append({
             "path": relative, "symbols": ["DPS runtime budget"],
-            "reason": "Diagnostic-only outer deadlines permit the full 15-minute Fairfax Hub authorization window.",
+            "reason": "Diagnostic-only outer deadlines permit 15-minute Fairfax Hub and DPS authorization windows.",
             "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
             "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
         })
@@ -190,6 +208,9 @@ def plan(bundle, output):
         os.environ["MONITOR_REGION"].split(","),
         os.environ["MONITOR_ENDPOINT"],
     )
+    for job in jobs:
+        if job["service"] == "DPS" and job["endpoint"].rstrip("/").lower() == "https://management.usgovcloudapi.net":
+            job["minutes"] = FAIRFAX_DPS_JOB_MINUTES
     # Resolve the full version-specific selection before an Azure service connection is used.
     for job in jobs:
         for nodes in native["owned_nodes"](job["service"], job["endpoint"]).values():
