@@ -191,6 +191,7 @@ def _evaluate(history, context):
             original = next((item["phases"][phase] for item in history[:index]
                              if phase in item["phases"] and not item.get("executionErrors")), value)
             if (excluded != original.get("excluded", []) or len(set(excluded)) != len(excluded)
+                    or value.get("exclusionReasons", {}) != original.get("exclusionReasons", {})
                     or set(excluded).intersection(collection[phase])):
                 raise ValueError("Committed skip exclusions changed or overlap enabled coverage.")
             selected = (set(collection[phase]) if mode == "full" else
@@ -279,6 +280,72 @@ def verify_artifacts(path, record):
         name = phase + "/phase.json"
         if name not in hashes or read(directory / name) != value:
             raise ValueError("Attempt ledger disagrees with its phase evidence.")
+
+
+def _write_execution_suite(suite, path):
+    suite.set("tests", str(len(suite.findall("testcase"))))
+    for tag, attribute in (("failure", "failures"), ("error", "errors"), ("skipped", "skipped")):
+        suite.set(attribute, str(sum(case.find(tag) is not None for case in suite.findall("testcase"))))
+    ET.ElementTree(suite).write(path, encoding="utf-8", xml_declaration=True)
+
+
+def published_junit(source, path):
+    suite = ET.parse(source).getroot()
+    if suite.tag != "testsuite":
+        raise ValueError("Unexpected qualification report format.")
+    for case in suite.findall("testcase"):
+        if case.get("classname") == "pipeline" and case.get("name") == "Full-service recovery required":
+            suite.remove(case)
+    _write_execution_suite(suite, path)
+
+
+def execution_junit(directory, path):
+    """Report observed cases without interpreting them as qualified or reusable coverage."""
+    directory = Path(directory).resolve()
+    patterns = (
+        "pytest.json", "*/pytest.json", "hub-phases/*/pytest.json", "*/hub-phases/*/pytest.json",
+        "dps-phases/*/receipts/pytest.json", "*/dps-phases/*/receipts/pytest.json",
+    )
+    suite = ET.Element("testsuite", name="Observed test execution (not release qualification)")
+    for source in sorted({source for pattern in patterns for source in directory.glob(pattern)}):
+        if not source.resolve().is_relative_to(directory) or source.stat().st_size > 8 * 1024 * 1024:
+            raise ValueError("Execution receipt is outside the attempt or exceeds the size limit.")
+        receipt = read(source)
+        names = case_names(receipt)
+        reports = receipt["reports"]
+        collected = receipt.get("collected", [])
+        excluded = receipt.get("excluded", [])
+        if (not isinstance(reports, dict) or not isinstance(collected, list) or not isinstance(excluded, list)
+                or len(set(collected)) != len(collected) or len(set(excluded)) != len(excluded)
+                or set(excluded).intersection(reports)):
+            raise ValueError("Execution receipt has invalid or duplicate cases.")
+        for node in dict.fromkeys([*collected, *reports, *excluded]):
+            identifier = node if re.fullmatch("[a-f0-9]{64}", node) else case_id(node)
+            name = names.get(node) or node.split("[", 1)[0].rsplit("::", 1)[-1]
+            if not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", name):
+                name = identifier
+            case = ET.SubElement(
+                suite, "testcase", classname=source.parent.relative_to(directory).as_posix(),
+                name=f"{name} [sha256:{identifier}]",
+            )
+            if node in excluded:
+                ET.SubElement(case, "skipped", message=receipt.get("exclusionReasons", {}).get(
+                    node, "Committed collection exclusion; not counted as passed coverage.",
+                ))
+                continue
+            stages = reports.get(node, {})
+            if (not isinstance(stages, dict) or not set(stages) <= set(STAGES)
+                    or any(value not in (["passed"], ["failed"], ["skipped"], ["xfail"])
+                           for value in stages.values())):
+                ET.SubElement(case, "error", message="Invalid or duplicate execution-stage evidence.")
+            elif ["failed"] in stages.values():
+                tag = "error" if any(stages.get(stage) == ["failed"] for stage in ("setup", "teardown")) else "failure"
+                ET.SubElement(case, tag, message="Test execution failed; see immutable phase logs.")
+            elif any(value in (["skipped"], ["xfail"]) for value in stages.values()):
+                ET.SubElement(case, "skipped", message="Skipped or expected-failure execution; see phase logs.")
+            elif stages != dict.fromkeys(STAGES, ["passed"]):
+                ET.SubElement(case, "error", message="Test execution did not produce all terminal stages.")
+    _write_execution_suite(suite, path)
 
 
 def junit(history, context, path):

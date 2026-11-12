@@ -433,8 +433,9 @@ def test_cleanup_report_rejects_mismatched_hub_absence_receipt(tmp_path):
 
 @pytest.mark.parametrize("reported", [False, True])
 def test_real_incomplete_execution_report_is_failing_and_never_overwrites_results(tmp_path, reported):
+    original = '<testsuite tests="1"><testcase name="test_original" /></testsuite>'
     if reported:
-        (tmp_path / "final.xml").write_text("original terminal report", encoding="utf-8")
+        (tmp_path / "final.xml").write_text(original, encoding="utf-8")
     completed = subprocess.run(
         [sys.executable, "-I", str(ROOT / "azext_iot/tests/_ado_pipeline.py"),
          "report-incomplete", "--output", str(tmp_path)],
@@ -442,12 +443,111 @@ def test_real_incomplete_execution_report_is_failing_and_never_overwrites_result
     )
     assert completed.returncode == int(not reported), completed.stdout + completed.stderr
     if reported:
-        assert (tmp_path / "final.xml").read_text() == "original terminal report"
+        assert (tmp_path / "final.xml").read_text() == original
         assert not (tmp_path / "rejection.json").exists()
     else:
         assert 'errors="1"' in (tmp_path / "final.xml").read_text()
         assert retry.read(tmp_path / "rejection.json")["qualifies"] is False
         assert "installation, login or execution" in (tmp_path / "summary.md").read_text()
+    assert ET.parse(tmp_path / "published.xml").getroot().get("tests") == str(int(reported))
+
+
+@pytest.mark.parametrize("layout", [
+    "tests/pytest.json", "regular/hub-phases/regular/pytest.json", "regular/dps-phases/regular/receipts/pytest.json",
+])
+def test_rejected_attempt_publishes_actual_cases_without_qualifying(tmp_path, layout):
+    nodes = {
+        outcome: f"test_cases.py::test_{outcome}[secret-parameter]"
+        for outcome in ("passed", "failed", "error", "skipped", "incomplete", "not_run")
+    }
+    reports = {node: dict.fromkeys(retry.STAGES, ["passed"]) for outcome, node in nodes.items() if outcome != "not_run"}
+    reports[nodes["failed"]]["call"] = ["failed"]
+    reports[nodes["error"]] = {"setup": ["failed"], "teardown": ["passed"]}
+    reports[nodes["skipped"]] = {"setup": ["skipped"], "teardown": ["passed"]}
+    reports[nodes["incomplete"]] = {"setup": ["passed"]}
+    retry.write(tmp_path / layout, {"collected": list(nodes.values()), "reports": reports})
+    pipeline.reject(tmp_path, "Cleanup remains unproven.", recoverable=True)
+    original = (tmp_path / "final.xml").read_bytes()
+    completed = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "azext_iot/tests/_ado_pipeline.py"),
+         "report-incomplete", "--output", str(tmp_path)],
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = ET.parse(tmp_path / "published.xml").getroot()
+    assert {key: result.get(key) for key in ("tests", "failures", "errors", "skipped")} == {
+        "tests": "6", "failures": "1", "errors": "3", "skipped": "1",
+    }
+    assert "secret-parameter" not in (tmp_path / "published.xml").read_text()
+    assert "Attempt execution evidence" not in (tmp_path / "published.xml").read_text()
+    assert (tmp_path / "final.xml").read_bytes() == original
+    assert retry.read(tmp_path / "rejection.json")["qualifies"] is False
+
+
+def test_published_results_remove_only_synthetic_recovery_case(tmp_path):
+    first = attempt({"a": "passed", "b": "failed", "c": "passed"})
+    first["phases"]["tests"]["receipt"]["reports"]["b"] = {"setup": ["failed"], "teardown": ["passed"]}
+    assert retry.junit([first], CONTEXT, tmp_path / "final.xml") > 0
+    original = (tmp_path / "final.xml").read_bytes()
+    retry.published_junit(tmp_path / "final.xml", tmp_path / "published.xml")
+    result = ET.parse(tmp_path / "published.xml").getroot()
+    assert result.get("tests") == "3" and result.get("failures") == "1"
+    assert "Full-service recovery required" not in (tmp_path / "published.xml").read_text()
+    assert (tmp_path / "final.xml").read_bytes() == original
+    assert retry.pending([first], CONTEXT) == {"tests": ["a", "b", "c"]}
+
+
+@pytest.mark.parametrize("region,node,condition,reason,excluded", [
+    ("australiaeast", "regional", True, "regional", True),
+    ("centraluseuap", "regional", True, "regional", False),
+    ("", "regional", True, "regional", False),
+    ("australiaeast", "other", True, "regional", False),
+    ("australiaeast", "regional", False, "regional", False),
+    ("australiaeast", "regional", True, "other", False),
+])
+def test_regional_exclusion_is_limited_to_the_exact_case_and_marker(monkeypatch, region, node, condition, reason, excluded):
+    from azext_iot.tests import _ado_retry_plugin as plugin
+
+    monkeypatch.setenv("TEST_REGION", region)
+    item = Mock(nodeid=plugin.ADR_REGIONAL_NODE if node == "regional" else "test_other.py::test_other")
+    item.iter_markers.return_value = [pytest.mark.skipif(
+        condition, reason=plugin.ADR_REGIONAL_REASON if reason == "regional" else "A different precondition",
+    ).mark]
+    assert plugin.regional_exclusion(item) == (plugin.ADR_REGIONAL_REASON if excluded else None)
+
+
+@pytest.mark.parametrize("region", ["australiaeast", "centraluseuap"])
+def test_real_parallel_plugin_records_regional_exclusion(tmp_path, region):
+    from azext_iot.tests import _ado_retry_plugin as plugin
+
+    source = tmp_path / plugin.ADR_REGIONAL_NODE.split("::", 1)[0]
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "import os\nimport pytest\n"
+        "@pytest.mark.xdist_group('adr-g4-mixed-delete-su')\n"
+        f"@pytest.mark.skipif(os.environ['TEST_REGION'] != 'centraluseuap', reason={plugin.ADR_REGIONAL_REASON!r})\n"
+        "class TestADRLinkDeletedHubIdentityChanges:\n"
+        "    def test_adr_link_deleted_hub_identity_changes(self):\n"
+        "        pass\n"
+        "def test_other():\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+    path = tmp_path / "receipt.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", str(source), "--rootdir", str(tmp_path), "-q", "-n", "2",
+         "--dist=loadgroup", "-p", "azext_iot.tests._ado_retry_plugin"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60, check=False,
+        env=dict(os.environ, TEST_REGION=region, azext_iot_ado_receipt=str(path), PYTEST_ADDOPTS="",
+                 PYTHONPATH=os.pathsep.join(dict.fromkeys([str(ROOT), *map(os.path.abspath, sys.path)]))),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    value = retry.read(path)
+    assert len(retry.outcomes(value)) == (1 if region == "australiaeast" else 2)
+    assert list(value["exclusionReasons"].values()) == (
+        [plugin.ADR_REGIONAL_REASON] if region == "australiaeast" else []
+    )
+    assert set(value["exclusionReasons"]) == set(value["excluded"])
 
 
 def test_parameter_case_hashes_preserve_identity_without_persisting_secrets():
