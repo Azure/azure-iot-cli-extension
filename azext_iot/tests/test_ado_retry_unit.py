@@ -87,6 +87,81 @@ def test_mooncake_dps_excludes_managed_identity_linked_fixtures_without_skipping
     assert any("/enrollment/" in node for node in fairfax["regular"])
 
 
+@pytest.mark.parametrize("endpoint,region", [
+    (pipeline.TARGET["PUBLIC_ARM"], "australiaeast"),
+    (pipeline.TARGET["GOVERNMENT_ARM"], "usgovvirginia"),
+    (pipeline.TARGET["CHINA_ARM"], "chinaeast2"),
+])
+def test_dps_tls_exclusion_preserves_management_tests_and_other_clouds(endpoint, region, tmp_path):
+    phase = "local-auth-toggle"
+    enabled = pipeline.owned_nodes("DPS", endpoint)[phase]
+    exclusions = pipeline.phase_exclusions("DPS", endpoint, phase)
+    assert focused.DPS_LOCAL_AUTH_MANAGEMENT_NODES <= set(enabled)
+    if endpoint == pipeline.TARGET["CHINA_ARM"]:
+        assert exclusions == {focused.DPS_MOONCAKE_TLS_NODE: focused.DPS_MOONCAKE_TLS_REASON}
+        assert set(enabled) == focused.DPS_LOCAL_AUTH_MANAGEMENT_NODES
+    else:
+        assert not exclusions
+        assert focused.DPS_MOONCAKE_TLS_NODE in enabled
+    context = dict(CONTEXT, service="DPS", endpoint=endpoint, region=region)
+    record = attempt(dict.fromkeys(enabled, "passed"))
+    record["context"] = context
+    record["phases"] = {phase: {
+        "expected": enabled, "safe": True, "receipt": receipt(dict.fromkeys(enabled, "passed")),
+        "excluded": list(exclusions), "exclusionReasons": exclusions,
+    }}
+    assert retry.junit([record], context, tmp_path / "final.xml") == 0
+    report = ET.parse(tmp_path / "final.xml").getroot()
+    assert int(report.get("tests")) == 3
+    assert int(report.get("skipped")) == len(exclusions)
+    assert len(report.findall("testcase[skipped]")) == len(exclusions)
+    if exclusions:
+        assert report.find("testcase[skipped]").get("name") == focused.DPS_MOONCAKE_TLS_NODE
+        assert report.find("testcase/skipped").get("message") == focused.DPS_MOONCAKE_TLS_REASON
+
+
+@pytest.mark.parametrize("defect", [None, "missing-skip", "wrong-reason", "missing-management"])
+def test_mooncake_gate_requires_management_coverage_and_exact_skip(tmp_path, monkeypatch, defect):
+    phase = "local-auth-toggle"
+    endpoint = pipeline.TARGET["CHINA_ARM"]
+    enabled = pipeline.owned_nodes("DPS", endpoint)[phase]
+    exclusions = pipeline.phase_exclusions("DPS", endpoint, phase)
+    if defect == "missing-management":
+        enabled = enabled[:1]
+    if defect == "missing-skip":
+        exclusions = {}
+    if defect == "wrong-reason":
+        exclusions = {focused.DPS_MOONCAKE_TLS_NODE: "Different exception"}
+    context = dict(CONTEXT, service="DPS", endpoint=endpoint, region="chinaeast2",
+                   wheel=pipeline.hashlib.sha256(b"wheel").hexdigest())
+    record = attempt(dict.fromkeys(enabled, "passed"))
+    record["context"] = context
+    record["phases"] = {phase: {
+        "expected": enabled, "safe": True, "receipt": receipt(dict.fromkeys(enabled, "passed")),
+        "excluded": list(exclusions), "exclusionReasons": exclusions,
+    }}
+    for key, value in {
+        "BUILD_BUILDID": context["build"], "BUILD_SOURCEVERSION": context["commit"],
+        "azext_iot_test_subscription": context["subscription"], "azext_iot_testrg": context["resource_group"],
+    }.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.delenv("AZEXT_IOT_MONITOR_MANIFEST", raising=False)
+    retry.write(tmp_path / "integration-plan-1/plan.json", [context])
+    wheel = tmp_path / "integration-wheel-1/test.whl"
+    wheel.parent.mkdir()
+    wheel.write_bytes(b"wheel")
+    output = tmp_path / "attempt-DPS"
+    retry.write(output / phase / "phase.json", record["phases"][phase])
+    record["evidence"] = retry.evidence(output)
+    retry.write(output / "attempt.json", record)
+    if defect:
+        message = "authoritative service manifest" if defect == "missing-management" else "skip evidence"
+        with pytest.raises(ValueError, match=message):
+            pipeline.gate(tmp_path)
+    else:
+        pipeline.gate(tmp_path)
+
+
 def receipt(results):
     return {
         "finished": True, "exitstatus": int("failed" in results.values()), "collected": list(results),

@@ -59,6 +59,39 @@ def nodes(suite, phase):
     return list(hub.selection()["nodes"](suite, phase))
 
 
+@pytest.mark.parametrize("endpoint,selection,fixture_name,adapted", [
+    (dps_plugin.target.CHINA_ARM, "management", "provisioned_iot_dps_local_auth_module", True),
+    (dps_plugin.target.PUBLIC_ARM, "management", "provisioned_iot_dps_local_auth_module", False),
+    (dps_plugin.target.GOVERNMENT_ARM, "management", "provisioned_iot_dps_local_auth_module", False),
+    (dps_plugin.target.CHINA_ARM, "dataplane", "provisioned_iot_dps_local_auth_module", False),
+    (dps_plugin.target.CHINA_ARM, "management", "other_fixture", False),
+])
+def test_mooncake_management_fixture_avoids_only_unused_dps_probe(
+        monkeypatch, endpoint, selection, fixture_name, adapted):
+    monkeypatch.setenv(dps_plugin.target.ENDPOINT_ENV, endpoint)
+    monkeypatch.setenv("azext_iot_dps_test_phase", "local-auth-toggle")
+    selected = (sorted(focused.DPS_LOCAL_AUTH_MANAGEMENT_NODES)
+                if selection == "management" else [focused.DPS_MOONCAKE_TLS_NODE])
+    monkeypatch.setenv(focused.ENV, json.dumps(focused.attempt("DPS", "local-auth-toggle", selected, "a" * 64)))
+    probe = Mock(return_value="checked")
+    namespace = {
+        "cli": SimpleNamespace(az_cli=SimpleNamespace(
+            cloud=SimpleNamespace(endpoints=SimpleNamespace(resource_manager=endpoint)))),
+        "DPS_USER_ROLE": "DPS role", "_wait_for_current_user_data_plane": probe, "logger": Mock(),
+    }
+    fixture = SimpleNamespace(argname=fixture_name, func=SimpleNamespace(__globals__=namespace))
+    hook = dps_plugin.pytest_fixture_setup(fixture)
+    next(hook)
+    assert namespace["_wait_for_current_user_data_plane"]("DPS role", "/dps") == (
+        None if adapted else "checked"
+    )
+    assert namespace["_wait_for_current_user_data_plane"]("Hub role", "/hub") == "checked"
+    assert probe.call_count == (1 if adapted else 2)
+    with pytest.raises(RuntimeError, match="fixture failed"):
+        hook.throw(RuntimeError("fixture failed"))
+    assert namespace["_wait_for_current_user_data_plane"] is probe
+
+
 @pytest.mark.parametrize("suite,phase", [
     ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
     ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
