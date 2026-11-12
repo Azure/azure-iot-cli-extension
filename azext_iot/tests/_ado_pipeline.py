@@ -476,9 +476,14 @@ def reject(output, reason, *, recoverable=False, service=None, python=None, regi
     ET.ElementTree(suite).write(output / "final.xml", encoding="utf-8", xml_declaration=True)
     action = ("Manually rerun the affected service with fresh fixtures." if recoverable
               else "Start a new run after correcting the immutable identity/artifact problem.")
+    try:
+        cleanup = cleanup_report(output)
+    except (ValueError, RuntimeError, OSError, KeyError) as error:
+        cleanup = f"\nCleanup reporting also failed ({type(error).__name__}); resource absence is unproven.\n"
+        print(f"##vso[task.logissue type=error]{cleanup.strip()}")
     (output / "summary.md").write_text(
         f"## Attempt rejected\n\n{reason}\n\nNo successful recovery was recorded. "
-        f"See the original attempt artifacts and task logs. {action}\n" + cleanup_report(output),
+        f"See the original attempt artifacts and task logs. {action}\n" + cleanup,
         encoding="utf-8",
     )
     if publish_summary:
@@ -487,27 +492,70 @@ def reject(output, reason, *, recoverable=False, service=None, python=None, regi
 
 def cleanup_report(output):
     path = output / "cleanup-status.json"
-    cleanup = RETRY["read"](path) if path.exists() else HANDOFF["summary"](output)
-    manifests = list(output.rglob("ownership.json"))
-    if manifests:
-        from azext_iot.tests import _owned_resources as owned
+    if path.exists():
+        cleanup = RETRY["read"](path)
+    else:
+        cleanup = HANDOFF["summary"](output)
         merged = {item["resource"].casefold(): item for item in cleanup}
-        for manifest in manifests:
-            for record in owned.Journal(manifest).records().values():
-                merged[record["id"]] = {
-                    "resource": record["id"], "status": record.get("cleanup", "pending"),
-                    "owner": record["owner"], "timeNs": record["timeNs"],
-                }
+        for manifest in sorted(output.rglob("ownership.json")):
+            for record in ownership_cleanup(manifest):
+                merged[record["resource"].casefold()] = record
         cleanup = [merged[key] for key in sorted(merged)]
+        if cleanup:
+            RETRY["write"](path, cleanup)
     if not cleanup:
         return ""
-    if manifests or not path.exists():
-        RETRY["write"](path, cleanup)
     text = "\nCleanup is reported separately. Accepted deletion is not proof of resource absence.\n"
     for status in ("accepted", "deleting", "absent", "pending", "failed"):
         text += f"- Cleanup {status}: {sum(item['status'] == status for item in cleanup)}\n"
     return text + ("\nExact IDs and submission failures are in `cleanup-status.json`; "
                    "pending leftovers need operational cleanup.\n")
+
+
+def ownership_cleanup(path):
+    """Render producer-specific absence evidence without granting cleanup or qualification."""
+    data = RETRY["read"](path)
+    if data.get("schema") == 1:
+        owned = runpy.run_path(str(ROOT / "azext_iot/tests/_owned_resources.py"))
+        return [
+            {"resource": record["id"], "status": record.get("cleanup", "pending"),
+             "owner": record["owner"], "timeNs": record["timeNs"]}
+            for record in owned["Journal"](path).records().values()
+        ]
+    if data.get("schemaVersion") == 1 and isinstance(data.get("resources"), dict) and data.get("runId"):
+        owner = data["runId"]
+        ids = set(data["resources"])
+        receipt_path = path.with_name("cleanup.json")
+        receipt = RETRY["read"](receipt_path) if receipt_path.exists() else {}
+        if receipt and receipt.get("runId") != owner:
+            raise ValueError("Hub cleanup report belongs to another run.")
+        if "ownedIds" in receipt and set(receipt["ownedIds"]) != ids:
+            raise ValueError("Hub cleanup report has different owned resources.")
+        absent = set(receipt.get("absentIds", []))
+        children = set(receipt.get("descendantIds", []))
+        if any(not any(child.startswith(root + "/") for root in ids) for child in children):
+            raise ValueError("Hub cleanup report has a descendant outside its owned resources.")
+        if not absent <= ids or not set(receipt.get("absentDescendantIds", [])) <= children:
+            raise ValueError("Hub cleanup report has unrecognized absence evidence.")
+        ids |= children
+        absent |= set(receipt.get("absentDescendantIds", []))
+    elif data.get("phase") == "local-auth" and data.get("runUid") and isinstance(data.get("ids"), dict):
+        owner = data["runUid"]
+        if set(data["ids"]) != {"hub", "storage", "container", "role"}:
+            raise ValueError("SAS cleanup report has an incomplete resource manifest.")
+        absent_keys = set(data.get("absent", []))
+        if not absent_keys <= set(data["ids"]):
+            raise ValueError("SAS cleanup report has unrecognized absence evidence.")
+        ids = set(data["ids"].values())
+        absent = {data["ids"][key] for key in absent_keys}
+    else:
+        raise ValueError("Unrecognized cleanup ownership receipt schema.")
+    if any(not isinstance(resource, str) or not resource.lower().startswith("/subscriptions/") for resource in ids):
+        raise ValueError("Cleanup report has an invalid resource ID.")
+    return [
+        {"resource": resource, "status": "absent" if resource in absent else "pending", "owner": owner}
+        for resource in sorted(ids)
+    ]
 
 
 def run_attempt(args, output):
@@ -609,6 +657,7 @@ def run_attempt(args, output):
             raise ValueError("Attempt was cancelled; full-service recovery is required.")
         record["executionErrors"] = []
     finally:
+        execution_failed = sys.exc_info()[0] is not None
         try:
             if auth is not None:
                 if auth.poll() is None:
@@ -617,12 +666,19 @@ def run_attempt(args, output):
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
+            reporting_error = None
+            try:
+                cleanup_report(output)
+            except (ValueError, RuntimeError, OSError, KeyError) as error:
+                reporting_error = error
+                record["executionErrors"].append(f"Cleanup reporting failed ({type(error).__name__}).")
             RETRY["write"](output / "execution.json", {
                 "mode": record["mode"], "nativeAttempt": native_attempt, "executionErrors": record["executionErrors"],
             })
-            cleanup_report(output)
             record["evidence"] = RETRY["evidence"](output)
             RETRY["write"](output / "attempt.json", record)
+            if reporting_error is not None and not execution_failed:
+                raise ValueError("Cleanup reporting failed; resource absence is unproven.") from reporting_error
     history.append(record)
     failures = RETRY["junit"](history, ctx, output / "final.xml")
     _, effective, recovered = RETRY["evaluate"](history, ctx)

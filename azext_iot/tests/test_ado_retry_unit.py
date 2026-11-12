@@ -379,6 +379,58 @@ def test_child_rejection_keeps_evidence_without_forwarding_logging_commands(tmp_
     assert f"##vso[task.uploadsummary]{tmp_path / 'parent/summary.md'}" in capsys.readouterr().out
 
 
+def test_cleanup_report_reuses_immutable_generic_snapshot(tmp_path):
+    from azext_iot.tests import _owned_resources as owned
+
+    manifest = tmp_path / "tests/ownership.json"
+    identity = pipeline.ownership_identity(CONTEXT, 1)
+    owned.create_context(manifest, **identity)
+    journal = owned.Journal(manifest)
+    resource = journal.group + "/providers/microsoft.deviceupdate/accounts/test-account"
+    journal.record(resource, "2023-07-01", cleanup="absent")
+    first = pipeline.cleanup_report(tmp_path)
+    snapshot = (tmp_path / "cleanup-status.json").read_bytes()
+    assert "Cleanup absent: 1" in first
+    assert pipeline.cleanup_report(tmp_path) == first
+    assert (tmp_path / "cleanup-status.json").read_bytes() == snapshot
+
+
+@pytest.mark.parametrize("kind", ["hub", "sas"])
+@pytest.mark.parametrize("complete", [False, True])
+def test_cleanup_report_dispatches_hub_receipts_without_generic_journal(tmp_path, kind, complete):
+    prefix = f"/subscriptions/{CONTEXT['subscription']}/resourceGroups/{CONTEXT['resource_group']}/providers/"
+    hub = prefix + "Microsoft.Devices/IotHubs/test-hub"
+    manifest = tmp_path / "phase/hub-phases/phase/ownership.json"
+    if kind == "hub":
+        retry.write(manifest, {"schemaVersion": 1, "runId": "run", "resources": {hub: {}}})
+        if complete:
+            child = hub + "/eventHubEndpoints/events/ConsumerGroups/test"
+            retry.write(manifest.with_name("cleanup.json"), {
+                "runId": "run", "ownedIds": [hub], "absentIds": [hub],
+                "descendantIds": [child], "absentDescendantIds": [child],
+            })
+        count = 2 if complete else 1
+    else:
+        storage = prefix + "Microsoft.Storage/storageAccounts/teststorage"
+        ids = {"hub": hub, "storage": storage, "container": storage + "/blobServices/default/containers/devices",
+               "role": hub + "/providers/Microsoft.Authorization/roleAssignments/role"}
+        retry.write(manifest, {"phase": "local-auth", "runUid": "run", "ids": ids,
+                               "absent": list(ids) if complete else []})
+        count = 4
+    report = pipeline.cleanup_report(tmp_path)
+    assert f"Cleanup {'absent' if complete else 'pending'}: {count}" in report
+    assert pipeline.cleanup_report(tmp_path) == report
+
+
+def test_cleanup_report_rejects_mismatched_hub_absence_receipt(tmp_path):
+    manifest = tmp_path / "phase/ownership.json"
+    retry.write(manifest, {"schemaVersion": 1, "runId": "run", "resources": {}})
+    retry.write(manifest.with_name("cleanup.json"), {"runId": "another-run"})
+    with pytest.raises(ValueError, match="another run"):
+        pipeline.cleanup_report(tmp_path)
+    assert not (tmp_path / "cleanup-status.json").exists()
+
+
 @pytest.mark.parametrize("reported", [False, True])
 def test_real_incomplete_execution_report_is_failing_and_never_overwrites_results(tmp_path, reported):
     if reported:
@@ -771,6 +823,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     publish = next(step for step in steps if step.get("publish") == "$(testSourceDirectory)/attempt")
     assert steps.index(fallback) < steps.index(publish)
     assert fallback["condition"] == publish["condition"] == "always()"
+    assert fallback["env"]["PYTHONPATH"] == "$(testSourceDirectory)"
 
 
 @pytest.mark.parametrize("service", ["DPS", "HubControl", "HubData"])
@@ -1060,7 +1113,8 @@ def test_missing_intermediate_native_attempt_forces_full_service(tmp_path, monke
     assert not retry.pending([first, record], ctx)
 
 
-def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, monkeypatch, mocker):
+@pytest.mark.parametrize("reporting_failure", [False, True])
+def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, monkeypatch, mocker, reporting_failure):
     ctx = dict(CONTEXT, service="RetrySelfTest", diagnostic="true")
     mocker.patch.object(pipeline, "context", return_value=ctx)
     mocker.patch.object(pipeline, "owned_nodes", return_value={name: ["case"] for name in ("bad", "one", "two")})
@@ -1070,6 +1124,8 @@ def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, 
         wheel=tmp_path, diagnostic=True, history=tmp_path / "history", output=tmp_path / "attempt",
     )
     (tmp_path / "candidate.whl").write_bytes(b"offline")
+    if reporting_failure:
+        mocker.patch.object(pipeline, "cleanup_report", side_effect=ValueError("Invalid cleanup evidence"))
 
     def execute(command, _env, _log, *_args):
         folder = Path(command[command.index("--output") + 1])
@@ -1085,11 +1141,15 @@ def test_controller_keeps_all_completed_sibling_phases_when_one_fails(tmp_path, 
         pipeline.run(args)
     record = retry.read(args.output / "attempt.json")
     assert set(record["phases"]) == {"one", "two"}
-    assert len(record["executionErrors"]) == 1
-    assert record["executionErrors"] == ["bad: Independent cleanup proof is missing."]
+    assert record["executionErrors"] == [
+        "bad: Independent cleanup proof is missing.",
+        *(["Cleanup reporting failed (ValueError)."] if reporting_failure else []),
+    ]
     retry.verify_artifacts(args.output / "attempt.json", record)
     assert (args.output / "rejection.json").is_file()
     assert (args.output / "final.xml").is_file()
+    if reporting_failure:
+        assert "Cleanup reporting also failed" in (args.output / "summary.md").read_text()
 
 
 def test_full_fallback_dispatches_every_service_phase(tmp_path, monkeypatch, mocker):

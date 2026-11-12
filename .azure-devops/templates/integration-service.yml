@@ -197,6 +197,7 @@ stages:
               SERVICE: ${{ parameters.service }}
               TEST_PYTHON: $(python)
               TEST_REGION: $(region)
+              PYTHONPATH: $(testSourceDirectory)
           - publish: $(testSourceDirectory)/attempt
             displayName: Publish results
             condition: always()

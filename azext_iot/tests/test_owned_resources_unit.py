@@ -80,6 +80,31 @@ def test_visible_tags_do_not_restore_null_from_legacy_ownership_records(journal)
     assert value["value"][0]["tags"] == {owned.TAG: journal.owner}
 
 
+@pytest.mark.parametrize("kind", [
+    "microsoft.deviceupdate/accounts", "microsoft.deviceregistry/schemaregistries",
+    "microsoft.iotoperations/instances",
+])
+@pytest.mark.parametrize("requested", [{}, {"tags": None}, {"tags": {}}, {"tags": {"user": "value"}}])
+def test_visible_tags_follow_recorded_request_and_service_shape(journal, kind, requested):
+    resource = journal.group + f"/providers/{kind}/test-resource"
+    arm = Mock()
+    arm.verify.return_value = None
+    observer = owned.Observer(journal, arm)
+    body = {"location": "westus2", **requested}
+    observer.prepare_root(resource, "2023-05-01", body, "PUT")
+    response = {"id": resource, "tags": dict(body["tags"])}
+    expected = requested.get("tags") or {}
+    if kind in owned.NULL_USER_TAGS and requested.get("tags") is None:
+        expected = None
+    assert observer.visible({"value": [response]})["value"][0]["tags"] == expected
+    assert response["tags"][owned.TAG] == journal.owner
+    arm.verify.return_value = response
+    observer.prepare_root(resource, "2023-05-01", {}, "PATCH")
+    assert observer.visible(response)["tags"] == expected
+    observer.prepare_root(resource, "2023-05-01", {"tags": {}}, "PATCH")
+    assert observer.visible({"id": resource, "tags": {owned.TAG: journal.owner}})["tags"] == {}
+
+
 def test_foreign_resource_is_rejected_without_recording_ownership(journal):
     arm = Mock()
     arm.verify.side_effect = ValueError("foreign owner")
