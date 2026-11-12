@@ -745,6 +745,9 @@ def cleanup(path, timeout=600, *, arm_factory=None):
             failures[collection] = type(error).__name__
             print(f"Cleanup inventory failed for {collection}: {type(error).__name__}", file=sys.stderr, flush=True)
     priority = {
+        # Remove private endpoints before their network dependencies and linked service accounts.
+        "microsoft.network/privateendpoints": 1, "microsoft.network/networkinterfaces": 2,
+        "microsoft.network/virtualnetworks": 3, "microsoft.network/networksecuritygroups": 4,
         ROLE_TYPE: 0, "microsoft.deviceregistry/assets": 1,
         "microsoft.iotoperations/instances": 2, "microsoft.deviceregistry/assetendpointprofiles": 3,
         "microsoft.secretsync/secretsyncs": 4,
