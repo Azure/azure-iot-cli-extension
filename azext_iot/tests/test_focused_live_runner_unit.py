@@ -296,7 +296,8 @@ def test_hub_debug_preserves_stage_ownership_and_no_replay_failures(tmp_path, mo
         assert not reader.calls
 
 
-def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, attempt_id=None):
+def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=None, chosen=None, attempt_id=None,
+            region="centraluseuap"):
     if chosen is None:
         chosen = nodes("DPS", phase) if whole else nodes("DPS", phase)[:1]
     captured = []
@@ -310,7 +311,10 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         assert shlex.split(env[focused.DPS_ARGS_ENV])[-len(expected):] == expected
         report = Path(env["azext_iot_dps_coverage_file"]).with_name("coverage.xml")
         assert f"--cov-report=xml:{report}" in shlex.split(env[focused.DPS_ARGS_ENV])
-        assert (runtime, cleanup) == {name: (run, clean) for name, run, clean in dps.PHASES}[phase]
+        expected_runtime, expected_cleanup = {name: (run, clean) for name, run, clean in dps.PHASES}[phase]
+        if region == "usgovvirginia" and phase == "service-sas":
+            expected_runtime = 35 * 60
+        assert (runtime, cleanup) == (expected_runtime, expected_cleanup)
         # Reuse the existing fake ARM/JUnit producer, then retain only the requested collection.
         regular_env = dict(env, azext_iot_dps_workers="0" if phase == "local-auth-toggle" else "7")
         result = _execution(command, regular_env, log, runtime, cleanup, cancelled)
@@ -356,10 +360,26 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
 
     with monkeypatch.context() as patch:
         patch.setattr(dps.signal, "signal", lambda *_: None)
-        result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute,
+        result = dps.run(SUB, GROUP, tmp_path / "dps-phases", reader or DpsReader(), execute=execute, region=region,
                          debug_phase=None if attempt_id else phase, debug_nodes=None if attempt_id else chosen,
                          attempt_selection=focused.attempt("DPS", phase, chosen, attempt_id) if attempt_id else None)
     return result, hub.read_json(tmp_path / "dps-phases.json"), captured
+
+
+@pytest.mark.parametrize("phase", ["regular", "service-sas", "local-auth-toggle"])
+@pytest.mark.parametrize("attempt_id", [None, "a" * 64])
+def test_fairfax_hub_deadlines_preserve_focused_selection_and_cleanup(tmp_path, monkeypatch, phase, attempt_id):
+    monkeypatch.setenv("azext_iot_test_subscription", SUB)
+    monkeypatch.setenv("azext_iot_testrg", GROUP)
+    result, summary, captured = run_dps(
+        tmp_path, monkeypatch, phase, attempt_id=attempt_id, region="usgovvirginia",
+    )
+    assert result == 0
+    arguments = shlex.split(captured[0][focused.DPS_ARGS_ENV])
+    assert ("--timeout=1800" in arguments) is (phase != "local-auth-toggle")
+    assert summary["phases"][0]["cleanup"]["complete"] is True
+    assert summary["runner_seconds"] <= dps.RUNNER_SECONDS
+    assert GATE["evaluate_dps_phases"](tmp_path, region="usgovvirginia")
 
 
 @pytest.mark.parametrize("suite,phase", [

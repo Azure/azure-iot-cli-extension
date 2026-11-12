@@ -22,10 +22,15 @@ COMPATIBILITY = {
     "azext_iot/tests/dps/conftest.py": {
         "symbols": (
             "_readiness_http_error", "_data_plane_authorization_pending",
-            "_readiness_service_code", "_readiness_diagnostic",
+            "_readiness_service_code", "_readiness_diagnostic", "_wait_for_readiness",
+            "_wait_for_current_user_data_plane",
         ),
+        "helpers": ("_dps_authorization_failed_response",),
         "imports": ("import re", "from msrestazure.azure_exceptions import CloudError"),
-        "reason": "Recognize exact cloud-scoped Hub/DPS role-propagation responses within the existing readiness deadline.",
+        "reason": (
+            "Allow ten minutes for Fairfax Hub caller authorization and retain safe per-probe timing receipts; "
+            "preserve DPS deadlines, exact error predicates and three-success confirmation."
+        ),
     },
     "azext_iot/tests/iothub/_sas_phase.py": {
         "symbols": ("HubSasPhase.install",),
@@ -61,13 +66,20 @@ def adapt_harness(output, manifest):
         current = (ROOT / relative).read_text(encoding="utf-8")
         tree, donor = ast.parse(original), ast.parse(current)
         lines, replacements = original.splitlines(keepends=True), []
-        for symbol in adapter["symbols"]:
-            previous, replacement = function(tree, symbol), function(donor, symbol)
-            if ast.dump(previous.args) != ast.dump(replacement.args) or previous.decorator_list or replacement.decorator_list:
+        symbols = adapter["symbols"] + adapter.get("helpers", ())
+        for symbol in symbols:
+            replacement = function(donor, symbol)
+            missing_helper = symbol in adapter.get("helpers", ()) and not any(
+                getattr(item, "name", None) == symbol for item in tree.body
+            )
+            previous = None if missing_helper else function(tree, symbol)
+            if (replacement.decorator_list or previous is not None
+                    and (ast.dump(previous.args) != ast.dump(replacement.args) or previous.decorator_list)):
                 raise ValueError(f"Selected source has an incompatible test-adapter signature: {symbol}")
+            content = current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno]
             replacements.append((
-                previous.lineno - 1, previous.end_lineno,
-                current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno],
+                previous.lineno - 1 if previous else len(lines), previous.end_lineno if previous else len(lines),
+                content if previous else ["\n\n", *content, "\n"],
             ))
         for start, end, replacement in sorted(replacements, reverse=True):
             lines[start:end] = replacement
@@ -94,7 +106,7 @@ def adapt_harness(output, manifest):
         if text != original:
             path.write_text(text, encoding="utf-8")
             changes.append({
-                "path": relative, "symbols": list(adapter["symbols"]), "reason": adapter["reason"],
+                "path": relative, "symbols": list(symbols), "reason": adapter["reason"],
                 "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
                 "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
             })

@@ -228,6 +228,37 @@ def test_dps_budgets_come_from_ci_budget_source():
     assert RUNNER["RUNNER_SECONDS"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
 
 
+@pytest.mark.parametrize("region", ["australiaeast", "usgovvirginia", "chinaeast2"])
+def test_fairfax_hub_wait_fits_outer_deadlines_without_changing_other_phases(tmp_path, monkeypatch, region):
+    import shlex
+
+    target = RUNNER["TARGETS"]
+    subscription, group = (target["SUBSCRIPTION"], target["RESOURCE_GROUP"]) if region == "australiaeast" else (SUB, GROUP)
+    monkeypatch.setenv("azext_iot_test_subscription", subscription)
+    monkeypatch.setenv("azext_iot_testrg", group)
+    seen = {}
+
+    def execute(command, env, log, runtime, cleanup, cancelled):
+        phase = env["azext_iot_dps_test_phase"]
+        arguments = shlex.split(env.get(RUNNER["FOCUSED"]["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps"))
+        before_runtime, before_cleanup = {name: (run, clean) for name, run, clean in RUNNER["PHASES"]}[phase]
+        extended = region == "usgovvirginia" and phase != "local-auth-toggle"
+        assert arguments == (["--timeout=1800"] if extended else []) + ["-k", "_int.py", "./azext_iot/tests/dps"]
+        assert cleanup == before_cleanup
+        assert runtime == (35 * 60 if extended and phase == "service-sas" else before_runtime)
+        if extended:
+            assert 600 + 2 * 300 + 300 < 1800 < runtime
+        seen[phase] = runtime
+        return _execution(command, env, log, runtime, cleanup, cancelled)
+
+    assert RUN(subscription, group, tmp_path / "dps-phases", Reader(0), execute=execute, region=region) == 0
+    assert set(seen) == {phase[0] for phase in RUNNER["PHASES"]}
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    budget = RUNNER["DPS_CI_BUDGET"]
+    assert summary["runner_seconds"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
+    assert not GATE(tmp_path, region)
+
+
 @pytest.mark.parametrize("damage", [None, "wrong-matrix", "wrong-target", "missing-target"])
 @pytest.mark.parametrize("region,endpoint", [
     ("australiaeast", None), ("westeurope", None), ("centraluseuap", "https://management.azure.com"),

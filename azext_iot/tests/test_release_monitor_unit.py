@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from copy import deepcopy
+import ast
 import hashlib
 import importlib.util
 from pathlib import Path
@@ -348,7 +349,8 @@ def test_harness_compatibility_records_only_allowlisted_function_changes(monitor
     donor.parent.mkdir(parents=True)
     header = '# Frozen header\n"""Frozen module."""\nfrom __future__ import annotations\n\n'
     methods = []
-    for symbol in adapter.COMPATIBILITY[relative]["symbols"]:
+    symbols = adapter.COMPATIBILITY[relative]["symbols"] + adapter.COMPATIBILITY[relative].get("helpers", ())
+    for symbol in symbols:
         prefix, name = ("    ", symbol.split(".")[1]) if "." in symbol else ("", symbol)
         methods.append(f"{prefix}def {name}(value):\n{prefix}    return 'original'\n\n")
     strict = "def test_required_assertion():\n    assert 1 == 2\n"
@@ -363,8 +365,35 @@ def test_harness_compatibility_records_only_allowlisted_function_changes(monitor
     change, = result["files"]
     assert change["originalSha256"] == hashlib.sha256(original.encode()).hexdigest()
     assert change["adaptedSha256"] == hashlib.sha256(changed.encode()).hexdigest()
-    assert change["symbols"] == list(adapter.COMPATIBILITY[relative]["symbols"])
+    assert change["symbols"] == list(symbols)
     assert adapter.adapt_harness(output, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
+
+
+def test_harness_includes_missing_dps_authorization_helper(monitor, mocker, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_helper_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/dps/conftest.py"
+    original = (ROOT / relative).read_text()
+    tree = ast.parse(original)
+    helper = adapter.function(tree, "_dps_authorization_failed_response")
+    lines = original.splitlines(keepends=True)
+    del lines[helper.lineno - 1:helper.end_lineno]
+    source = tmp_path / relative
+    source.parent.mkdir(parents=True)
+    source.write_text("".join(lines))
+    result = adapter.adapt_harness(tmp_path, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+    staged = ast.parse(source.read_text())
+    added = adapter.function(staged, "_dps_authorization_failed_response")
+    assert ast.dump(added) == ast.dump(helper)
+    namespace = {}
+    exec(compile(ast.Module(body=[added], type_ignores=[]), str(source), "exec"), namespace)
+    assert namespace["_dps_authorization_failed_response"](mocker.Mock(json=lambda: {
+        "errorCode": 401002, "message": "Authorization failed for the request",
+    }))
+    assert "_dps_authorization_failed_response" in result["files"][0]["symbols"]
+    assert adapter.adapt_harness(tmp_path, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
 
 
 @pytest.mark.parametrize("replacement", ["def renamed(value):\n    pass\n", "def _readiness_http_error():\n    pass\n"])
