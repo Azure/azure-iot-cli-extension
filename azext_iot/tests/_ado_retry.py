@@ -318,7 +318,10 @@ def junit(history, context, path):
         for node in value.get("excluded", []):
             excluded += 1
             case = ET.SubElement(suite, "testcase", classname=phase, name=title(phase, node))
-            ET.SubElement(case, "skipped", message="Committed unconditional skip; not counted as passed coverage.")
+            reason = value.get("exclusionReasons", {}).get(
+                node, "Committed unconditional skip; not counted as passed coverage.",
+            )
+            ET.SubElement(case, "skipped", message=reason)
     suite.set("tests", str(sum(map(len, effective.values())) + excluded + int(full_required)))
     suite.set("skipped", str(excluded))
     suite.set("failures", str(failures - int(full_required)))

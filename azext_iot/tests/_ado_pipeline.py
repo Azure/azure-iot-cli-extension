@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RETRY = runpy.run_path(str(ROOT / "azext_iot/tests/_ado_retry.py"))
 HANDOFF = runpy.run_path(str(ROOT / "azext_iot/tests/_cleanup_handoff.py"))
 TARGET = runpy.run_path(str(ROOT / "azext_iot/tests/_integration_target.py"))
+FOCUSED = runpy.run_path(str(ROOT / "azext_iot/tests/_focused_live.py"))
 BUDGETS = json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 GENERIC_PHASE_OVERRIDES = (
     "azext_iot_testhub", "azext_iot_testdps", "azext_iot_testdps_hub", "azext_iot_adr_update_instance_id",
@@ -205,6 +206,13 @@ def gate(directory):
         owned = owned_nodes(config["service"], config["endpoint"])
         if owned and {phase: list(nodes) for phase, nodes in original.items()} != owned:
             raise ValueError("Original phase selection does not cover the authoritative service manifest.")
+        if config["service"] == "DPS":
+            for attempt in history:
+                for phase_name, value in attempt["phases"].items():
+                    exclusions = phase_exclusions("DPS", config["endpoint"], phase_name)
+                    if (value.get("excluded", []) != list(exclusions)
+                            or value.get("exclusionReasons", {}) != exclusions):
+                        raise ValueError("DPS cloud-specific skip evidence does not match the committed policy.")
         if RETRY["pending"](history, ctx):
             raise ValueError("Unresolved failures remain.")
         for rejected in rejections:
@@ -231,6 +239,12 @@ def coverage(directory):
     subprocess.run([sys.executable, "-m", "coverage", "html"], check=True)
 
 
+def phase_exclusions(service, endpoint, phase_name):
+    if service == "DPS" and endpoint == TARGET["CHINA_ARM"] and phase_name == "local-auth-toggle":
+        return {FOCUSED["DPS_MOONCAKE_TLS_NODE"]: FOCUSED["DPS_MOONCAKE_TLS_REASON"]}
+    return {}
+
+
 def owned_nodes(service, endpoint=TARGET["PUBLIC_ARM"]):
     sovereign = TARGET["cloud"](endpoint)["name"] != "AzureCloud"
     if service == "DPS":
@@ -254,6 +268,8 @@ def owned_nodes(service, endpoint=TARGET["PUBLIC_ARM"]):
                         node for node in nodes
                         if node.startswith("core/test_dps_disable_local_auth_int.py::")
                     }
+            nodes = {node for node in nodes
+                     if FOCUSED["DPS_PREFIX"] + node not in phase_exclusions(service, endpoint, phase)}
             if nodes:
                 result[phase] = sorted("azext_iot/tests/dps/" + node for node in nodes)
         return result
@@ -420,10 +436,15 @@ def _phase(selection_file, output):
             raise ValueError("Execution status disagrees with test evidence.")
         expected = receipt["expected"]
     RETRY["outcomes"](receipt, allow_fixture_failures=True)
-    RETRY["write"](folder / "phase.json", {
-        "expected": expected, "receipt": receipt, "safe": True, "excluded": receipt.get("excluded", []),
+    exclusions = phase_exclusions(service, ctx["endpoint"], name)
+    phase_result = {
+        "expected": expected, "receipt": receipt, "safe": True,
+        "excluded": receipt.get("excluded", []) + list(exclusions),
         "cleanupMode": "handoff" if service == "RetrySelfTest" else "verified",
-    })
+    }
+    if exclusions:
+        phase_result["exclusionReasons"] = exclusions
+    RETRY["write"](folder / "phase.json", phase_result)
 
 
 def run(args):
@@ -609,6 +630,9 @@ def run_attempt(args, output):
                f"{sum(map(len, effective.values()))} required cases; {failures} unresolved; "
                f"{len(recovered)} passed on manual retry. Mode: {plan['mode']}. Diagnostic: {ctx['diagnostic']}.\n")
     summary += cleanup_report(output)
+    for value in record["phases"].values():
+        for node, reason in value.get("exclusionReasons", {}).items():
+            summary += f"\nSkipped `{node}`: {reason}\n"
     (output / "summary.md").write_text(summary, encoding="utf-8")
     print(f"##vso[task.uploadsummary]{output / 'summary.md'}")
     return 1 if failures else 0

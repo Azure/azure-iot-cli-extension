@@ -16,6 +16,18 @@ ROOT = Path(__file__).resolve().parents[2]
 ENV = "azext_iot_debug_selection"
 DPS_ARGS_ENV = "azext_iot_dps_node_args"
 DPS_PREFIX = "azext_iot/tests/dps/"
+# Mooncake's DPS data-plane certificate chain currently fails normal TLS verification.
+# Exclude only this data-plane contract; keep the two ARM-only policy tests.
+# Remove this exception and its fixture probe adjustment once that chain is trusted.
+DPS_MOONCAKE_TLS_NODE = DPS_PREFIX + "core/test_dps_disable_local_auth_int.py::test_dps_disable_local_auth_dataplane"
+DPS_MOONCAKE_TLS_REASON = (
+    "Mooncake DPS data-plane TLS certificate chain is not trusted (CERTIFICATE_VERIFY_FAILED); "
+    "restore this test when azure-devices-provisioning.cn presents a trusted chain."
+)
+DPS_LOCAL_AUTH_MANAGEMENT_NODES = frozenset(
+    DPS_PREFIX + "core/test_dps_disable_local_auth_int.py::" + name
+    for name in ("test_dps_create_disable_local_auth", "test_dps_update_disable_local_auth")
+)
 
 
 def select(suite, phase=None, nodes=None):

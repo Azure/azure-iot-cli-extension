@@ -23,7 +23,7 @@ parameters:
     type: boolean
     default: false
   - name: regions
-    displayName: Public region
+    displayName: Region (Public cloud only)
     type: stringList
     default:
       - Australia East
