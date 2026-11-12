@@ -561,6 +561,10 @@ def ownership_cleanup(path):
 def run_attempt(args, output):
     from azext_iot.tests import _dps_phase_runner as dps
     ctx = context(args.service, args.python, args.region, args.endpoint, args.wheel, args.diagnostic)
+    if os.environ.get("AZEXT_IOT_MONITOR_MANIFEST"):
+        manifest = RETRY["read"](os.environ["AZEXT_IOT_MONITOR_MANIFEST"])
+        if "testCompatibility" in manifest:
+            RETRY["write"](output / "test-compatibility.json", manifest["testCompatibility"])
     history = RETRY["load_history"](args.history, ctx)
     native_attempt = int(os.environ["SYSTEM_JOBATTEMPT"])
     last_native = history[-1]["nativeAttempt"] if history else 0

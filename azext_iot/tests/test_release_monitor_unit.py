@@ -288,7 +288,9 @@ def test_health_stages_plan_or_execute_the_selected_cohorts():
     assert "qualify-profile" not in str(template)
 
 
-def test_staging_preserves_released_cases_manifests_and_product(monitor, bundle, mocker, monkeypatch, tmp_path):
+@pytest.mark.parametrize("source_only", [False, True])
+def test_staging_preserves_released_cases_manifests_and_product(
+        monitor, bundle, mocker, monkeypatch, tmp_path, source_only):
     import sys
 
     directory, manifest = bundle
@@ -311,15 +313,76 @@ def test_staging_preserves_released_cases_manifests_and_product(monitor, bundle,
     monkeypatch.setenv("MONITOR_CLOUD", "public")
     monkeypatch.setenv("MONITOR_TRACK", "ga")
     destination = tmp_path / "stage"
-    adapter.stage(directory, destination)
+    compatibility = mocker.spy(adapter, "adapt_harness")
+    adapter.stage(directory, destination, source_only=source_only)
     assert not (destination / "candidate").exists()
     for relative in (
         "azext_iot/__init__.py", "azext_iot/tests/test_case_int.py", "azext_iot/tests/_phase_manifest.py",
     ):
         assert (destination / relative).read_bytes() == (directory / "source" / relative).read_bytes()
     assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
+    staged = monitor.read_json(destination / "release-monitor.json")
+    if source_only:
+        compatibility.assert_not_called()
+        assert "testCompatibility" not in staged
+    else:
+        compatibility.assert_called_once()
+        assert staged["testCompatibility"] == {
+            "version": 1, "sourceCommit": manifest["testSourceCommit"],
+            "automationCommit": AUTOMATION, "files": [],
+        }
     with pytest.raises(ValueError, match="fresh"):
         adapter.stage(directory, destination)
+
+
+@pytest.mark.parametrize("relative", ["azext_iot/tests/dps/conftest.py", "azext_iot/tests/iothub/_sas_phase.py"])
+def test_harness_compatibility_records_only_allowlisted_function_changes(monitor, mocker, monkeypatch, tmp_path, relative):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_harness_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    monkeypatch.setattr(adapter, "ROOT", tmp_path / "automation")
+    output = tmp_path / "stage"
+    source, donor = output / relative, adapter.ROOT / relative
+    source.parent.mkdir(parents=True)
+    donor.parent.mkdir(parents=True)
+    header = '# Frozen header\n"""Frozen module."""\nfrom __future__ import annotations\n\n'
+    methods = []
+    for symbol in adapter.COMPATIBILITY[relative]["symbols"]:
+        prefix, name = ("    ", symbol.split(".")[1]) if "." in symbol else ("", symbol)
+        methods.append(f"{prefix}def {name}(value):\n{prefix}    return 'original'\n\n")
+    strict = "def test_required_assertion():\n    assert 1 == 2\n"
+    original = header + ("class HubSasPhase:\n" if "iothub" in relative else "") + "".join(methods) + strict
+    source.write_text(original, encoding="utf-8")
+    donor.write_text(original.replace("'original'", "'adapted'").replace("assert 1 == 2", "assert True"), encoding="utf-8")
+    result = adapter.adapt_harness(output, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+    changed = source.read_text(encoding="utf-8")
+    assert changed.startswith(header)
+    assert strict in changed and "assert True" not in changed
+    assert "'original'" not in changed and "'adapted'" in changed
+    change, = result["files"]
+    assert change["originalSha256"] == hashlib.sha256(original.encode()).hexdigest()
+    assert change["adaptedSha256"] == hashlib.sha256(changed.encode()).hexdigest()
+    assert change["symbols"] == list(adapter.COMPATIBILITY[relative]["symbols"])
+    assert adapter.adapt_harness(output, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
+
+
+@pytest.mark.parametrize("replacement", ["def renamed(value):\n    pass\n", "def _readiness_http_error():\n    pass\n"])
+def test_harness_compatibility_rejects_missing_or_changed_functions(monitor, mocker, monkeypatch, tmp_path, replacement):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_harness_rejection_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    monkeypatch.setattr(adapter, "ROOT", tmp_path / "automation")
+    relative = "azext_iot/tests/dps/conftest.py"
+    source, donor = tmp_path / "stage" / relative, adapter.ROOT / relative
+    source.parent.mkdir(parents=True)
+    donor.parent.mkdir(parents=True)
+    source.write_text("def _readiness_http_error(value):\n    pass\n", encoding="utf-8")
+    donor.write_text(replacement, encoding="utf-8")
+    with pytest.raises(ValueError, match="adapter"):
+        adapter.adapt_harness(tmp_path / "stage", {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+    assert source.read_text() == "def _readiness_http_error(value):\n    pass\n"
 
 
 @pytest.fixture
