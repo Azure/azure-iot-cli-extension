@@ -83,6 +83,14 @@ MANAGEMENT_FACTORIES = [
     ),
 ]
 
+IOT_MANAGEMENT_FACTORIES = [
+    factory for factory in MANAGEMENT_FACTORIES
+    if factory[0] in {
+        "iot_hub_service_factory", "iot_service_provisioning_factory",
+        "adr_iot_hub_service_factory", "adr_iot_service_provisioning_factory",
+    }
+]
+
 
 @pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
 class TestFactoryCredentialScopes:
@@ -145,7 +153,8 @@ class TestFactoryCredentialScopes:
 @pytest.mark.parametrize("factory_name,client_path,_endpoint_key", MANAGEMENT_FACTORIES)
 @pytest.mark.parametrize("subscription_id", [None, "linked-sub"])
 def test_canary_rejects_sovereign_cloud_before_credentials(
-    mocker, cli_profile, mocked_response, cloud_config, factory_name, client_path, _endpoint_key, subscription_id
+    monkeypatch, mocker, cli_profile, mocked_response, cloud_config,
+    factory_name, client_path, _endpoint_key, subscription_id,
 ):
     from knack.util import CLIError
     from azext_iot import _factory
@@ -154,8 +163,9 @@ def test_canary_rejects_sovereign_cloud_before_credentials(
     get_subscription = mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id")
     get_credential = mocker.spy(_factory, "get_cli_credential")
     cli_ctx = _build_cli_ctx(mocker, cloud_config)
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", CANARY_ARM)
 
-    with pytest.raises(CLIError, match="Azure public cloud only"):
+    with pytest.raises(CLIError, match="Azure public cloud only|AZURE_IOT_ADR_ARM_ENDPOINT must be"):
         getattr(_factory, factory_name)(cli_ctx, subscription_id=subscription_id)
 
     get_subscription.assert_not_called()
@@ -164,6 +174,43 @@ def test_canary_rejects_sovereign_cloud_before_credentials(
     cli_profile.return_value.get_login_credentials.assert_not_called()
     client_type.assert_not_called()
     assert not mocked_response.calls
+
+
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
+@pytest.mark.parametrize("factory_name,client_path,endpoint_key", IOT_MANAGEMENT_FACTORIES)
+@pytest.mark.parametrize("subscription_id", [None, "linked-sub"])
+def test_iot_management_uses_sovereign_arm_and_credentials(
+    mocker, cli_profile, cloud_config, factory_name, client_path, endpoint_key, subscription_id,
+):
+    from azext_iot import _factory
+
+    client_type = mocker.patch(client_path)
+    get_subscription = mocker.patch(
+        "azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub",
+    )
+    cli_ctx = _build_cli_ctx(mocker, cloud_config)
+    assert getattr(_factory, factory_name)(cli_ctx, subscription_id=subscription_id) is client_type.return_value
+    expected_subscription = subscription_id or "test-sub"
+    if subscription_id:
+        get_subscription.assert_not_called()
+    else:
+        get_subscription.assert_called_once_with(cli_ctx)
+    cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id=expected_subscription)
+    kwargs = client_type.call_args.kwargs
+    assert kwargs[endpoint_key] == cloud_config["resource_manager"]
+    assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
+    assert kwargs["subscription_id"] == expected_subscription
+
+
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
+@pytest.mark.parametrize("factory_name", ["adr_service_factory", "adr_update_instance_service_factory"])
+def test_unavailable_adr_apis_still_reject_sovereign_credentials(mocker, cli_profile, cloud_config, factory_name):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    with pytest.raises(CLIError, match="Azure public cloud only"):
+        getattr(_factory, factory_name)(_build_cli_ctx(mocker, cloud_config), subscription_id="sub")
+    cli_profile.assert_not_called()
 
 
 @pytest.mark.parametrize("field,value", [

@@ -109,7 +109,7 @@ def _iot_hub_management_client(
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    credential_scopes = _get_canary_credential_scopes(cli_ctx)
+    credential_scopes = _get_iot_management_credential_scopes(cli_ctx, base_url)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
@@ -142,7 +142,7 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(),
+        get_adr_arm_endpoint(cli_ctx),
         api_version=_ADR_IOT_HUB_API_VERSION,
     )
 
@@ -150,12 +150,20 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
 adr_iot_hub_service_factory = iot_hub_service_factory
 
 
+def _get_iot_management_credential_scopes(cli_ctx, endpoint):
+    from azext_iot.adr.endpoints import PUBLIC_ARM_ENDPOINT
+
+    if endpoint in {PUBLIC_ARM_ENDPOINT, _ADR_CANARY_ARM_ENDPOINT}:
+        return _get_canary_credential_scopes(cli_ctx)
+    return _get_credential_scopes(cli_ctx)
+
+
 def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    credential_scopes = _get_canary_credential_scopes(cli_ctx)
+    credential_scopes = _get_iot_management_credential_scopes(cli_ctx, base_url)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(
@@ -188,7 +196,7 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        get_adr_arm_endpoint(),
+        get_adr_arm_endpoint(cli_ctx),
         api_version=_ADR_DPS_API_VERSION,
     )
 

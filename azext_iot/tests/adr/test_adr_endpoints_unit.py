@@ -106,6 +106,55 @@ def test_management_requests_keep_endpoint_and_api_without_fallback(
     assert parse_qs(urlsplit(request.url).query)["api-version"] == [api]
 
 
+@pytest.mark.parametrize("endpoint,audience,authority", [
+    ("https://management.usgovcloudapi.net", "https://management.core.usgovcloudapi.net/",
+     "https://login.microsoftonline.us"),
+    ("https://management.chinacloudapi.cn", "https://management.core.chinacloudapi.cn/",
+     "https://login.chinacloudapi.cn"),
+])
+@pytest.mark.parametrize("factory_name,operations,resource_type,names,api", FACTORIES[2:])
+@pytest.mark.parametrize("status", [200, 400])
+def test_sovereign_iot_requests_keep_endpoint_and_preview_api(
+    monkeypatch, mocked_response, cli_ctx, endpoint, audience, authority,
+    factory_name, operations, resource_type, names, api, status,
+):
+    monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+    cli_ctx.cloud.endpoints.resource_manager = endpoint
+    cli_ctx.cloud.endpoints.active_directory_resource_id = audience
+    cli_ctx.cloud.endpoints.active_directory = authority
+    url = f"{endpoint}/subscriptions/sub/resourceGroups/rg/providers/{resource_type}/target"
+    body = {"name": "target"}
+    mocked_response.add(
+        method="GET", url=url, status=status,
+        json=body if status == 200 else {"error": {"code": "InvalidApiVersionParameter", "message": "Unsupported API"}},
+    )
+    with getattr(_factory, factory_name)(cli_ctx, subscription_id="sub") as client:
+        if status == 200:
+            assert getattr(client, operations).get(resource_group_name="rg", **names) == body
+        else:
+            with pytest.raises(HttpResponseError):
+                getattr(client, operations).get(resource_group_name="rg", **names)
+    assert len(mocked_response.calls) == 1
+    request = mocked_response.calls[0].request
+    assert request.url.split("?")[0] == url
+    assert parse_qs(urlsplit(request.url).query)["api-version"] == [api]
+
+
+@pytest.mark.parametrize("override", [
+    PUBLIC_ARM_ENDPOINT, CANARY_ARM_ENDPOINT, "https://management.chinacloudapi.cn",
+])
+@pytest.mark.parametrize("factory_name", [row[0] for row in FACTORIES[2:]])
+def test_sovereign_iot_rejects_cross_cloud_override(monkeypatch, mocker, cli_ctx, override, factory_name):
+    cli_ctx.cloud.endpoints.resource_manager = "https://management.usgovcloudapi.net"
+    cli_ctx.cloud.endpoints.active_directory = "https://login.microsoftonline.us"
+    cli_ctx.cloud.endpoints.active_directory_resource_id = "https://management.core.usgovcloudapi.net/"
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", override)
+    credential = mocker.spy(_factory, "get_cli_credential")
+    with pytest.raises(InvalidArgumentValueError, match="AZURE_IOT_ADR_ARM_ENDPOINT must be"):
+        getattr(_factory, factory_name)(cli_ctx, subscription_id="sub")
+    credential.assert_not_called()
+
+
 def test_public_namespace_write_keeps_australiaeast_in_body(monkeypatch, mocked_response, cli_ctx):
     monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", PUBLIC_ARM_ENDPOINT)
     url = f"{PUBLIC_ARM_ENDPOINT}/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/target"
