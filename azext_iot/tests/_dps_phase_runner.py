@@ -433,8 +433,8 @@ def safe_junit(raw, destination, phase, selected, *, debug=None):
         issues = ([child.tag for child in case if child.tag in ("error", "failure", "skipped")]
                   if debug and "attempt" in debug else [outcome] if outcome else [])
         if outcome:
-            counts[{"error": "errors", "failure": "failures", "skipped": "skipped"}[outcome]] += 1
             for issue in issues:
+                counts[{"error": "errors", "failure": "failures", "skipped": "skipped"}[issue]] += 1
                 ET.SubElement(clean_case, issue, message="Diagnostic omitted; consult the redacted phase log.")
         else:
             counts["passed"] += 1

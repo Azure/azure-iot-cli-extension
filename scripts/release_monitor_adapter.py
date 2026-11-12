@@ -33,12 +33,15 @@ COMPATIBILITY = {
         ),
     },
     "azext_iot/tests/iothub/_sas_phase.py": {
-        "symbols": ("HubSasPhase.install",),
+        "symbols": ("HubSasPhase.install", "HubSasPhase.pytest_runtest_makereport"),
         "imports": (
             "from urllib.parse import parse_qs",
             "from azext_iot.tests._integration_target import CLOUDS, arm_hosts, cloud",
         ),
-        "reason": "Observe sovereign ARM and Storage mutations without changing SAS cases or cleanup assertions.",
+        "reason": (
+            "Observe sovereign ARM and Storage mutations and preserve boolean retry metadata during redaction "
+            "without changing SAS cases or cleanup assertions."
+        ),
     },
 }
 
@@ -73,8 +76,10 @@ def adapt_harness(output, manifest):
                 getattr(item, "name", None) == symbol for item in tree.body
             )
             previous = None if missing_helper else function(tree, symbol)
-            if (replacement.decorator_list or previous is not None
-                    and (ast.dump(previous.args) != ast.dump(replacement.args) or previous.decorator_list)):
+            if (previous is None and replacement.decorator_list or previous is not None
+                    and (ast.dump(previous.args) != ast.dump(replacement.args)
+                         or [ast.dump(item) for item in previous.decorator_list]
+                         != [ast.dump(item) for item in replacement.decorator_list])):
                 raise ValueError(f"Selected source has an incompatible test-adapter signature: {symbol}")
             content = current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno]
             replacements.append((

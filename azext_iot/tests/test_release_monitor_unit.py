@@ -369,6 +369,41 @@ def test_harness_compatibility_records_only_allowlisted_function_changes(monitor
     assert adapter.adapt_harness(output, {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})["files"] == []
 
 
+@pytest.mark.parametrize("changed_decorator", [False, True])
+def test_sas_report_adapter_requires_identical_hook_decorators(monitor, mocker, monkeypatch, tmp_path, changed_decorator):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("monitor_hook_unit", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/iothub/_sas_phase.py"
+    monkeypatch.setattr(adapter, "ROOT", tmp_path / "automation")
+    monkeypatch.setattr(adapter, "COMPATIBILITY", {relative: {
+        "symbols": ("HubSasPhase.pytest_runtest_makereport",), "imports": (), "reason": "Preserve report metadata.",
+    }})
+    source, donor = tmp_path / "stage" / relative, adapter.ROOT / relative
+    source.parent.mkdir(parents=True)
+    donor.parent.mkdir(parents=True)
+    original = (
+        "class HubSasPhase:\n"
+        "    @pytest.hookimpl(hookwrapper=True, tryfirst=True)\n"
+        "    def pytest_runtest_makereport(self):\n"
+        "        yield 'original'\n"
+    )
+    source.write_text(original, encoding="utf-8")
+    replacement = original.replace("'original'", "'adapted'")
+    if changed_decorator:
+        replacement = replacement.replace("tryfirst=True", "tryfirst=False")
+    donor.write_text(replacement, encoding="utf-8")
+    if changed_decorator:
+        with pytest.raises(ValueError, match="signature"):
+            adapter.adapt_harness(tmp_path / "stage", {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+        assert source.read_text() == original
+    else:
+        changes = adapter.adapt_harness(tmp_path / "stage", {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION})
+        assert source.read_text() == replacement
+        assert changes["files"][0]["symbols"] == ["HubSasPhase.pytest_runtest_makereport"]
+
+
 def test_harness_includes_missing_dps_authorization_helper(monitor, mocker, tmp_path):
     mocker.patch.dict("sys.modules", {"release_monitor": monitor})
     spec = importlib.util.spec_from_file_location("monitor_helper_unit", ROOT / "scripts/release_monitor_adapter.py")

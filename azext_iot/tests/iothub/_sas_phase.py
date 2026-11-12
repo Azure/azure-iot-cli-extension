@@ -625,7 +625,9 @@ class HubSasPhase:
         if report.longrepr is not None:
             report.longrepr = sanitize(report.longreprtext)
         report.sections = [(name, sanitize(content)) for name, content in report.sections]
-        report.user_properties = [(name, sanitize(value)) for name, value in report.user_properties]
+        report.user_properties = [
+            (name, value if isinstance(value, bool) else sanitize(value)) for name, value in report.user_properties
+        ]
         if report.when == "call" and report.passed:
             self.passed.add(report.nodeid)
             self.write_receipt()
