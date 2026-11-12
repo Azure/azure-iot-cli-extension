@@ -618,6 +618,46 @@ def test_cleanup_waits_for_dependencies_before_deleting_roots(journal, monkeypat
     ]
 
 
+@pytest.mark.parametrize("automatic_nic_cleanup", [False, True])
+def test_cleanup_waits_for_private_endpoint_and_network_dependencies(journal, automatic_nic_cleanup):
+    endpoint = GROUP + "/providers/microsoft.network/privateendpoints/endpoint"
+    nic = GROUP + "/providers/microsoft.network/networkinterfaces/nic"
+    network = GROUP + "/providers/microsoft.network/virtualnetworks/network"
+    security = GROUP + "/providers/microsoft.network/networksecuritygroups/security"
+    account = GROUP + "/providers/microsoft.deviceupdate/accounts/account"
+    dependencies = {
+        endpoint: set(), nic: {endpoint}, network: {endpoint, nic},
+        security: {network}, account: {endpoint}, RESOURCE: {account},
+    }
+    remaining = set(dependencies)
+    deleting = set()
+    for resource in reversed(dependencies):
+        journal.record(resource, "2023-05-01", kind="root")
+
+    def request(method, resource, _api, **_kwargs):
+        if method == "DELETE":
+            assert not dependencies[resource].intersection(remaining), "A dependency is still present."
+            deleting.add(resource)
+            return 202, None, {}
+        assert method == "GET" and resource in deleting
+        remaining.remove(resource)
+        if resource == endpoint and automatic_nic_cleanup:
+            remaining.remove(nic)
+        return 404, None, {}
+
+    arm = Mock()
+    arm.pages.return_value = []
+    arm.verify.side_effect = lambda resource, _api: (
+        {"id": resource, "tags": {owned.TAG: journal.owner}} if resource in remaining else None
+    )
+    arm.request.side_effect = request
+    owned.cleanup(journal.path, arm_factory=lambda _journal: arm)
+    assert not remaining
+    assert all(record["cleanup"] == "absent" for record in journal.records().values())
+    if automatic_nic_cleanup:
+        assert nic not in deleting
+
+
 def test_inventory_failure_still_attempts_journaled_cleanup(journal, monkeypatch):
     journal.record(RESOURCE, "2023-05-01", kind="root")
     arm = Mock()
