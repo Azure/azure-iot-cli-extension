@@ -3,16 +3,41 @@
 Release History
 ===============
 
-Unreleased
-++++++++++
+1.0.0
++++++
 
 **IoT Hub updates**
 
 * Fixed ``az iot hub monitor-events`` to fail immediately with an actionable error when hub discovery detects that local authentication is disabled, instead of attempting SAS authentication to the built-in Event Hub-compatible endpoint.
 
-**IoT Hub Device Provisioning Service (DPS) updates**
+**API compatibility**
 
-* **[Breaking Change]** Fixed ``az iot dps enrollment-group compute-device-key`` (and its deprecated ``az iot dps compute-device-key`` alias) to return a string. TSV output no longer includes the Python ``b'...'`` wrapper, and YAML output is a string instead of binary. Scripts that unconditionally strip the wrapper must remove that workaround. JSON output is unchanged.
+* Updated Device Registry/CMS, IoT Hub management/service/device, and DPS management/service/device SDKs to ``2026-11-01``. Azure CLI 2.73.0 or later is required.
+* Hub and DPS management use the active cloud's ARM endpoint. ADR/CMS is public-cloud-only; API availability remains dependent on service rollout.
+* Removed preview labels from GA Hub routing/Fabric endpoints, hostname selection, distributed tracing, and message payload-file options.
+
+**Device Registry and certificate management**
+
+* Added GA namespace, identity, certificate authority/policy, registry-device, schema registry/schema/version, and Hub/DPS linking commands.
+* Fixed linking an existing DPS with Hubs, retrying failed DPS/Hub pairs, isolated endpoint removal, allocation updates, identity-rotation waits, and preservation of existing namespace configuration.
+* Link operations provide role preflight and actionable recovery guidance. Removal protects concurrent updates with ETags and retains unrelated endpoints; optional Reader grants require ``--grant-reader``.
+* Fixed ``az iot adr ns link dps update`` and ``az iot adr ns update --outbound-*`` being blocked when the linked DPS still lists a deleted IoT Hub in its classic ``iotHubs``, or when a linked Hub or DPS was deleted.
+* ``az iot adr ns link hub add|update`` follow ADR when the linked DPS was deleted but its link remains: Hub identity updates are no longer blocked, and Hub add/retry is allowed with removal guidance.
+* Fixed ``az iot dps linked-hub show|delete --linked-hub <hub-name>`` failing for a deleted IoT Hub, so its stale DPS entry can be removed by name. ADR link guidance now covers stale entries.
+* ``az iot adr ns link wait`` and ``link hub|dps wait`` stop with removal guidance when a linked Hub or DPS was deleted, instead of polling until timeout. ``--created|--updated|--deleted`` waits also stop on ``Canceled``.
+* Fixed ``az iot dps identity remove`` being blocked after the linked ADR namespace was deleted (link reported as ``Orphaned``). ``az iot hub identity remove`` no longer suggests link rotation for an orphaned Hub.
+* Added DPS certificate issuance during device registration and operation-status recovery after timeouts.
+* Preview-only ADR Software Updates, groups/jobs, reports, device child commands, and namespace observability are not included in the GA API.
+
+**Important behavior changes**
+
+* **[Breaking Change]** New IoT Hubs disable Hub-policy SAS by default; specify ``--disable-local-auth false`` to enable it. Hub connection-string/SAS and DPS linked-Hub creation commands default to automatic hostname selection.
+* DPS enrollment-group create/update redact keys by default; use ``--show-keys`` to include them. Enrollment table output includes ADR namespace/certificate fields; JSON/YAML output remains unchanged.
+* **[Breaking Change]** ``az iot dps enrollment-group compute-device-key`` returns a string: TSV no longer includes the Python ``b'...'`` wrapper, and YAML no longer represents it as binary.
+* **[Breaking Change]** Removed deprecated DPS command aliases, ``az dt reset``, obsolete ``--repair`` and ``--storage-authentication-type`` options, and deprecated ADR enrollment option spellings.
+* Fixed ``az iot hub monitor-events --login`` for Event Hub-compatible connection strings from Azure US Government and Azure China.
+* Fixed DPS data-plane commands using ``--auth-type login`` to select the Fairfax Microsoft Entra audience for Azure US Government (``.azure-devices-provisioning.us``) endpoints while retaining the public-cloud audience for Azure China (``.azure-devices-provisioning.cn``) endpoints.
+* DPS data-plane commands report a clear error instead of ``KeyError`` when the DPS has no service hostname yet (still provisioning).
 
 0.33.0b1 (Preview)
 ++++++++++++++++++

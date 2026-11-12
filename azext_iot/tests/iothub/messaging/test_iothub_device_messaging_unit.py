@@ -4,12 +4,17 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import logging
+from contextlib import closing
 from types import SimpleNamespace
 
 import pytest
+import responses
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AuthenticationError,
+    AzureConnectionError,
     CLIInternalError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
@@ -22,6 +27,8 @@ from azext_iot.iothub.providers.device_messaging import (
     _simulate_get_default_properties,
 )
 from azext_iot.common.shared import DeviceAuthApiType, SettleType, ProtocolType
+from azext_iot.tests.iothub.test_dataplane_adapter_unit import adapter
+from azext_iot.tests.iothub.test_dataplane_wire_unit import ENDPOINT
 
 logging.disable(logging.CRITICAL)
 
@@ -228,15 +235,48 @@ class TestC2DMessageSend:
 
 
 class TestDeviceSendMessage:
+    @pytest.mark.parametrize("operation", ["device_send_message", "simulate_device"])
+    @pytest.mark.parametrize("x509", [False, True])
+    @pytest.mark.parametrize("error_name,cli_error", [
+        ("CredentialError", AuthenticationError),
+        ("ConnectionFailedError", AzureConnectionError),
+    ])
+    def test_sdk_failure_cleans_up_and_uses_device_endpoint(
+        self, mocker, operation, x509, error_name, cli_error,
+    ):
+        from azure.iot.device import exceptions
+
+        p = _provider(mocker)
+        p.target["deviceHostName"] = "device-endpoint.example"
+        build = mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
+        sdk = mocker.patch("azure.iot.device.IoTHubDeviceClient")
+        mocker.patch("azure.iot.device.X509")
+        mocker.patch("azext_iot.iothub.providers.mqtt.ensure_azure_namespace_path")
+        factory = sdk.create_from_x509_certificate if x509 else sdk.create_from_connection_string
+        error = getattr(exceptions, error_name)("SDK failure")
+        factory.return_value.send_message.side_effect = error
+        auth = {"certificate_file": "cert.pem", "key_file": "key.pem"} if x509 else {
+            "device_symmetric_key": "key"
+        }
+
+        with pytest.raises(cli_error) as raised:
+            getattr(p, operation)(msg_count=1, **auth)
+
+        assert raised.value.__cause__ is error
+        assert "device-endpoint.example" in str(raised.value)
+        assert build.call_args.kwargs["hostname_override"] == "device-endpoint.example"
+        factory.return_value.shutdown.assert_called_once()
+
     def test_send_message_symmetric(self, mocker):
         p = _provider(mocker)
         mqtt_cls = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        mqtt_cls.return_value.__enter__.return_value = mqtt_cls.return_value
         mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
         p.device_send_message(
             data="hi", device_symmetric_key="key", properties="a=b", msg_count=2
         )
         assert mqtt_cls.return_value.send_d2c_message.call_count == 2
-        mqtt_cls.return_value.shutdown.assert_called_once()
+        mqtt_cls.return_value.__exit__.assert_called_once_with(None, None, None)
 
 
 class TestDeviceAuthProps:
@@ -275,7 +315,7 @@ class TestUploadFile:
     def test_upload_success(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         p.device_sdk.device.create_file_upload_sas_uri.return_value.response.json.return_value = {
             "hostName": "host",
@@ -293,7 +333,7 @@ class TestUploadFile:
     def test_upload_error(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         handler = mocker.patch(f"{dm_path}.handle_service_exception")
         p.device_sdk.device.create_file_upload_sas_uri.side_effect = _cloud_error(mocker)
@@ -330,6 +370,26 @@ class TestHandleC2DMsg:
 
 
 class TestSimulateDevice:
+    @pytest.mark.parametrize("operation", ["simulate_device", "device_send_message"])
+    @pytest.mark.parametrize("auth_args", [
+        {"certificate_file": "certificate.pem"},
+        {"key_file": "key.pem"},
+        {"passphrase": "passphrase"},
+    ])
+    def test_incomplete_x509_auth_preserves_validation_error(self, mocker, operation, auth_args):
+        p = _provider(mocker)
+        mqtt = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        lookup = mocker.patch(f"{dm_path}._iot_device_show")
+
+        with pytest.raises(
+            RequiredArgumentMissingError,
+            match="Both 'certificate-file' and 'key-file' required",
+        ):
+            getattr(p, operation)(**auth_args)
+
+        mqtt.assert_not_called()
+        lookup.assert_not_called()
+
     def test_simulate_mqtt_invalid_settle(self, mocker):
         p = _provider(mocker)
         with pytest.raises(InvalidArgumentValueError):
@@ -373,6 +433,7 @@ class TestSimulateDevice:
     def test_simulate_mqtt_success(self, mocker):
         p = _provider(mocker)
         mqtt_cls = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        mqtt_cls.return_value.__enter__.return_value = mqtt_cls.return_value
         mocker.patch(f"{dm_path}._build_device_or_module_connection_string", return_value="cs")
         mocker.patch.object(p, "_d2c_get_device_auth_props", return_value={"authentication": {}})
         p.simulate_device(
@@ -383,7 +444,7 @@ class TestSimulateDevice:
             init_reported_properties="{}",
         )
         mqtt_cls.return_value.execute.assert_called_once()
-        mqtt_cls.return_value.shutdown.assert_called_once()
+        mqtt_cls.return_value.__exit__.assert_called_once_with(None, None, None)
 
     def test_simulate_http_success(self, mocker):
         p = _provider(mocker)
@@ -395,6 +456,45 @@ class TestSimulateDevice:
         p.simulate_device(protocol_type="http", msg_count=1, msg_interval=1, receive_settle="complete")
         thread.return_value.start.assert_called_once()
         handle.assert_called_once_with("complete")
+
+    @pytest.mark.parametrize("cancelled", [False, True])
+    def test_simulate_http_sends_json_through_real_transport(self, mocker, cancelled):
+        p = _provider(mocker)
+        mocker.patch("tqdm.tqdm", side_effect=lambda items, **_: items)
+        mocker.patch.object(p, "_d2c_get_device_auth_props", return_value={"authentication": {}})
+        event = mocker.patch("threading.Event")
+        event.return_value.wait.return_value = cancelled
+        thread = mocker.patch("threading.Thread")
+        thread.return_value.is_alive.return_value = False
+        thread.return_value.start.side_effect = lambda: thread.call_args.kwargs["target"](
+            *thread.call_args.kwargs["args"]
+        )
+        data = "value = + & \u00e9\n"
+
+        with closing(adapter("device")) as client, responses.RequestsMock() as network:
+            p.device_sdk = client
+            network.add("POST", ENDPOINT + "/devices/dev1/messages/events", status=204)
+            p.simulate_device(protocol_type="http", data=data, msg_count=2, msg_interval=1)
+
+            message_count = 1 if cancelled else 2
+            assert len(network.calls) == message_count
+            for index, call in enumerate(network.calls, start=1):
+                payload = json.loads(call.request.body)
+                assert payload["data"] == f"{data} #{index}"
+                assert isinstance(payload["id"], str) and payload["id"]
+                assert isinstance(payload["timestamp"], str) and payload["timestamp"]
+                assert call.request.headers["content-type"] == "application/json"
+                assert call.request.headers["content-encoding"] == "utf-8"
+            assert event.return_value.wait.call_count == message_count
+        event.return_value.set.assert_called_once()
+
+    def test_simulate_interrupt_cancels_sender(self, mocker):
+        p = _provider(mocker)
+        event = mocker.patch("threading.Event")
+        mocker.patch.object(p, "_d2c_get_device_auth_props", side_effect=KeyboardInterrupt)
+        with pytest.raises(SystemExit):
+            p.simulate_device(protocol_type="http", msg_count=1, msg_interval=1)
+        event.return_value.set.assert_called_once()
 
     def test_simulate_internal_error(self, mocker):
         p = _provider(mocker)

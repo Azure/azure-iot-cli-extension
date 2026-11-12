@@ -8,9 +8,9 @@ from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
-from azext_iot.common.base_discovery import BaseDiscovery
+from azext_iot.common.base_discovery import BaseDiscovery, ResourceDiscoveryError
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane, GatewayVersion
-from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string
+from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string, valid_hostname
 from azext_iot.iothub.models.iothub_target import IotHubTarget, derive_iot_hub_hostnames
 from azext_iot._factory import iot_hub_service_factory
 from typing import Any, Dict
@@ -48,6 +48,27 @@ class IotHubDiscovery(BaseDiscovery):
                 "The built-in Event Hub-compatible endpoint requires SAS authentication, which is disabled on this hub. "
                 "Route telemetry to a custom Event Hub and use a Microsoft Entra-authenticated Event Hubs consumer."
             )
+
+    def get_target(self, resource_name: str, resource_group_name: str = None, **kwargs) -> Dict[str, str]:
+        if (
+            resource_name
+            and not kwargs.get("login")
+            and kwargs.get("auth_type") == AuthenticationTypeDataplane.login.value
+            and (resource_group_name or kwargs.get("rg") or kwargs.get("force_find_resource"))
+        ):
+            hostname = resource_name
+            for prefix in ("https://", "http://"):
+                if hostname.lower().startswith(prefix):
+                    hostname = hostname[len(prefix):]
+                    break
+            if valid_hostname(hostname) and "." in hostname:
+                service_hostname, _ = derive_iot_hub_hostnames(hostname)
+                # A classic FQDN cannot tell us whether ARM exposes GWv2 split
+                # hostnames. An explicit RG permits a targeted metadata lookup.
+                # Split FQDNs and unscoped hostname-only calls remain ARM-free.
+                if not service_hostname or kwargs.get("force_find_resource"):
+                    resource_name = hostname.split(".")[0]
+        return super().get_target(resource_name, resource_group_name, **kwargs)
 
     @classmethod
     def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
@@ -97,14 +118,23 @@ class IotHubDiscovery(BaseDiscovery):
         # but that will be better served aligning with vNext pattern for Iot Hub
 
         include_events = kwargs.get("include_events", False)
-        rg = resource.get("resourcegroup")
+        rg = self.resolve_resource_group(
+            resource, fallback=kwargs.get("resource_group_name")
+        )
+        subscription_id = self.resolve_subscription_id(resource)
 
-        props = resource.get("properties", {})
+        props = resource.get("properties") or {}
         tls_device = props.get("deviceHostName")
         tls_service = props.get("serviceHostName")
-        gw_version = props.get("iotHubDetails", {}).get("gatewayVersion")
+        gw_version = (props.get("iotHubDetails") or {}).get("gatewayVersion")
         service_hostname = tls_service if gw_version == GatewayVersion.V2.value else None
         hostname = service_hostname or props.get("hostName")
+        if not isinstance(hostname, str) or not hostname.strip():
+            raise ResourceDiscoveryError(
+                f"No usable hostname could be resolved for IoT Hub '{resource['name']}'. "
+                f"Check 'az iot hub show --name {resource['name']} --resource-group {rg}' "
+                "and retry when a hostname is available."
+            )
 
         target = {}
         target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
@@ -117,7 +147,7 @@ class IotHubDiscovery(BaseDiscovery):
         target["policy"] = policy["keyName"]
         target["primarykey"] = policy["primaryKey"]
         target["secondarykey"] = policy["secondaryKey"]
-        target["subscription"] = self.sub_id
+        target["subscription"] = subscription_id
         target["resourcegroup"] = rg
         target["location"] = resource["location"]
         target["sku_tier"] = resource["sku"]["tier"]

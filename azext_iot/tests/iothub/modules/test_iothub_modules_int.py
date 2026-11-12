@@ -4,22 +4,48 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+from shlex import quote
+
+import pytest
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, device_method_responder, wait_for_query_ids
+from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.common.utility import generate_key
-from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
     DEVICE_TYPES,
 )
+from azext_iot.tests.helpers import ScenarioBudget
 
 
 class TestIoTHubModules(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModules, self).__init__(test_case)
 
+    @pytest.mark.skipif(not sas_phase_enabled(), reason="Module method qualification requires the owned service-SAS phase.")
+    def test_iothub_invoke_module_method(self):
+        device = self.generate_device_names(1)[0]
+        module = self.generate_module_names(1)[0]
+        target = f"-d {device} -n {self.entity_name} -g {self.entity_rg} --auth-type key"
+        self.cmd(f"iot hub device-identity create {target}")
+        self.cmd(f"iot hub module-identity create {target} -m {module}")
+        payload = {"request": module}
+        literal = quote(json.dumps(payload)).replace("{", "{{").replace("}", "}}")
+        with device_method_responder(self, device, module_id=module):
+            result = self.cmd(
+                f"iot hub invoke-module-method {target} -m {module} --method-name echo "
+                f"--method-payload {literal} --timeout 30"
+            ).get_output_in_json()
+            assert result["status"] == 200
+            assert result["payload"] == {"method": "echo", "received": payload}
+
+    @pytest.mark.timeout(2700, func_only=False)
     def test_iothub_module_identity(self):
+        budget = ScenarioBudget(45 * 60)
         for auth_phase in DATAPLANE_AUTH_TYPES:
             for device_type in DEVICE_TYPES:
                 device_count = 1
@@ -190,15 +216,28 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     query_checks.append(self.exists("[?moduleId=='$edgeAgent']"))
                     query_checks.append(self.exists("[?moduleId=='$edgeHub']"))
 
-                module_query_result = wait_for_assertion(
+                expected_modules = module_ids + (["$edgeAgent", "$edgeHub"] if device_type == "edge" else [])
+                wait_for_query_ids(
                     lambda: self.cmd(
                         self.set_cmd_auth_type(
                             f"iot hub query -n {self.host_name} -g {self.entity_rg} "
                             f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
                             auth_type=auth_phase,
-                        ),
-                        checks=query_checks,
-                    )
+                        )
+                    ).get_output_in_json(),
+                    expected_modules,
+                    id_key="moduleId",
+                    timeout=budget.remaining(QUERY_VISIBILITY_TIMEOUT),
+                )
+
+                # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.
+                module_query_result = self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub query -n {self.host_name} -g {self.entity_rg} "
+                        f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
+                        auth_type=auth_phase,
+                    ),
+                    checks=query_checks,
                 ).get_output_in_json()
 
                 target_module_count = (
@@ -299,10 +338,11 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             ).get_output_in_json()
             assert renew_result.get("policyKey") == "secondaryKey"
             # only one sas module, one result
+            assert len(renew_result["rotatedKeys"]) == 1
             device_result = renew_result["rotatedKeys"][0]
             assert device_result["id"] == device_ids[0]
             assert device_result["moduleId"] == module_ids[0]
-            assert not device_result["primaryKey"]
+            assert not device_result.get("primaryKey")
             assert device_result["secondaryKey"]
 
     def test_iothub_module_connection_string_show(self):
@@ -430,11 +470,14 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-        # Mixed case connection string
-        cstring = self.connection_string
+        # Obtain module credentials using Entra; offline SAS does not authenticate as a Hub policy.
+        cstring = self.cmd(
+            f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
         mixed_case_cstring = cstring.replace("HostName", "hostname", 1)
         self.cmd(
-            f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} --login {mixed_case_cstring}",
+            f"iot hub generate-sas-token --connection-string {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
 

@@ -9,7 +9,6 @@ common: Define shared data types(enums) and constant strings.
 
 from enum import Enum
 from typing import NamedTuple, Optional, List, Dict
-from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
 class EdgeContainerAuth(NamedTuple):
@@ -26,7 +25,7 @@ class EdgeDeviceConfig(NamedTuple):
     Individual Edge device configuration data format.
     """
     device_id: str
-    deployment: Optional[ConfigurationContent] = None
+    deployment: Optional[dict] = None
     parent_id: Optional[str] = None
     hostname: Optional[str] = None
     parent_hostname: Optional[str] = None
@@ -199,7 +198,10 @@ class RouteSourceType(Enum):
 
     @classmethod
     def list_valid_types(cls):
-        return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
+        return [
+            source.value for source in cls
+            if source not in (cls.Invalid, cls.DigitalTwinChangeEvents)
+        ]
 
 
 class IoTHubSDKVersion(Enum):

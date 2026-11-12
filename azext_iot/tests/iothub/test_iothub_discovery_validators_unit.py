@@ -8,12 +8,17 @@ import logging
 from argparse import Namespace
 
 import pytest
-from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    InvalidArgumentValueError,
+    ResourceNotFoundError,
+)
 
 from azext_iot.iothub._validators import validate_device_model_id
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.shared import GatewayVersion
+from azext_iot.common.base_discovery import ResourceDiscoveryError
 
 logging.disable(logging.CRITICAL)
 
@@ -44,6 +49,7 @@ def _disc(mocker):
     disc.cmd = mocker.MagicMock()
     disc.sub_id = "sub-123"
     disc.client = None
+    disc.resource_type = "IoT Hub"
     return disc
 
 
@@ -148,8 +154,11 @@ class TestBuildTargetFromHostname:
 class TestBuildTarget:
     def _resource(self, gw_version=None):
         return {
+            "id": (
+                "/subscriptions/sub-from-id/resourceGroups/rg/providers/"
+                "Microsoft.Devices/IotHubs/myhub"
+            ),
             "name": "myhub",
-            "resourcegroup": "rg",
             "location": "westus",
             "sku": {"tier": "Standard"},
             "properties": {
@@ -177,6 +186,8 @@ class TestBuildTarget:
         assert result["name"] == "myhub"
         assert result["policy"] == "pol"
         assert result["entity"] == "myhub.azure-devices.net"
+        assert result["resourcegroup"] == "rg"
+        assert result["subscription"] == "sub-from-id"
 
     def test_build_secondary(self, mocker):
         disc = _disc(mocker)
@@ -198,3 +209,197 @@ class TestBuildTarget:
         assert result["events"]["endpoint"] == "eh-endpoint"
         assert result["events"]["partition_count"] == 2
         assert result["events"]["path"] == "events-path"
+
+    @pytest.mark.parametrize("auth_type", ["key", "login"])
+    @pytest.mark.parametrize("hostname", [None, "", " \t", 42])
+    def test_get_target_rejects_unusable_hostname(self, mocker, auth_type, hostname):
+        disc = _disc(mocker)
+        resource = self._resource()
+        resource["properties"]["hostName"] = hostname
+        disc.find_resource = mocker.Mock(return_value=resource)
+        disc.find_policy = mocker.Mock(return_value=self._policy())
+
+        with pytest.raises(ResourceDiscoveryError, match="No usable hostname") as error:
+            disc.get_target("myhub", "rg", auth_type=auth_type)
+
+        assert "az iot hub show --name myhub --resource-group rg" in str(error.value)
+        if auth_type == "login":
+            disc.find_policy.assert_not_called()
+
+    @pytest.mark.parametrize("properties", [{}, None])
+    def test_build_rejects_missing_hostname_metadata(self, mocker, properties):
+        resource = self._resource()
+        resource["properties"] = properties
+        with pytest.raises(ResourceDiscoveryError, match="No usable hostname"):
+            _disc(mocker)._build_target(resource, self._policy(), include_events=True)
+
+    @pytest.mark.parametrize(
+        "classic,service,expected",
+        [
+            (None, "myhub.service.azure-devices.net", "myhub.service.azure-devices.net"),
+            ("myhub.azure-devices.net", None, "myhub.azure-devices.net"),
+        ],
+    )
+    def test_build_preserves_gwv2_hostname_selection(self, mocker, classic, service, expected):
+        resource = self._resource(gw_version=GatewayVersion.V2.value)
+        resource["properties"].update(hostName=classic, serviceHostName=service)
+        target = _disc(mocker)._build_target(resource, self._policy(), key_type="primary")
+        assert target["entity"] == expected
+        assert target["cs"].startswith(f"HostName={expected};")
+
+    def test_build_preserves_classic_hostname_with_null_hub_details(self, mocker):
+        resource = self._resource()
+        resource["properties"]["iotHubDetails"] = None
+        target = _disc(mocker)._build_target(resource, self._policy())
+        assert target["entity"] == resource["properties"]["hostName"]
+
+    @pytest.mark.parametrize("auth_type", ["key", "login"])
+    def test_get_targets_warns_and_continues_after_missing_hostname(self, mocker, auth_type):
+        disc = _disc(mocker)
+        unavailable = self._resource()
+        unavailable["name"] = "unavailable"
+        unavailable["id"] = unavailable["id"].replace("/myhub", "/unavailable")
+        unavailable["properties"].pop("hostName")
+        healthy = self._resource()
+        disc.get_resources = mocker.Mock(return_value=[unavailable, healthy])
+        disc.find_resource = mocker.Mock(side_effect=[unavailable, healthy])
+        disc.find_policy = mocker.Mock(return_value=self._policy())
+        warning = mocker.patch("azext_iot.common.base_discovery.logger.warning")
+
+        targets = disc.get_targets(auth_type=auth_type)
+
+        assert [target["name"] for target in targets] == ["myhub"]
+        assert targets[0]["entity"] == healthy["properties"]["hostName"]
+        assert disc.find_resource.call_count == 2
+        warning.assert_called_once()
+        assert warning.call_args.args[1] == "unavailable"
+        assert isinstance(warning.call_args.args[2], ResourceDiscoveryError)
+
+    def test_get_targets_does_not_hide_other_response_errors(self, mocker):
+        disc = _disc(mocker)
+        disc.get_resources = mocker.Mock(return_value=[self._resource()])
+        disc.get_target = mocker.Mock(side_effect=AzureResponseError("unexpected failure"))
+        with pytest.raises(AzureResponseError, match="unexpected failure"):
+            disc.get_targets()
+
+    def test_query_rejects_missing_hostname_before_creating_service_client(self, mocker):
+        from azext_iot.operations import hub
+
+        disc = _disc(mocker)
+        resource = self._resource()
+        resource["properties"].pop("hostName")
+        disc.find_resource = mocker.Mock(return_value=resource)
+        mocker.patch.object(hub, "IotHubDiscovery", return_value=disc)
+        resolver = mocker.patch.object(hub, "SdkResolver")
+
+        with pytest.raises(ResourceDiscoveryError, match="No usable hostname"):
+            hub.iot_query(
+                cmd=disc.cmd, query_command="SELECT * FROM devices", hub_name_or_hostname="myhub",
+                resource_group_name="rg", auth_type_dataplane="login",
+            )
+        resolver.assert_not_called()
+
+    def test_get_target_derives_policy_resource_group_from_arm_id(
+        self, mocker
+    ):
+        disc = _disc(mocker)
+        resource = self._resource()
+        disc.find_resource = mocker.MagicMock(return_value=resource)
+        disc.find_policy = mocker.MagicMock(return_value=self._policy())
+
+        target = disc.get_target(resource_name="myhub")
+
+        disc.find_policy.assert_called_once_with(
+            resource_name="myhub",
+            rg="rg",
+            policy_name="auto",
+        )
+        assert target["resourcegroup"] == "rg"
+        assert target["subscription"] == "sub-from-id"
+
+    @pytest.mark.parametrize(
+        "resource_name",
+        [
+            "https://myhub.azure-devices.net",
+            "http://myhub.azure-devices.net",
+        ],
+    )
+    def test_get_target_normalizes_url_and_short_name(
+        self, mocker, resource_name
+    ):
+        disc = _disc(mocker)
+        resource = self._resource()
+        disc.find_resource = mocker.MagicMock(return_value=resource)
+        disc.find_policy = mocker.MagicMock(return_value=self._policy())
+
+        target = disc.get_target(resource_name=resource_name)
+
+        disc.find_resource.assert_called_once_with(
+            resource_name="myhub", rg=None
+        )
+        assert target["name"] == "myhub"
+
+    def test_get_target_forced_aad_lookup_derives_metadata(
+        self, mocker
+    ):
+        disc = _disc(mocker)
+        resource = self._resource()
+        disc.find_resource = mocker.MagicMock(return_value=resource)
+
+        target = disc.get_target(
+            resource_name="myhub.azure-devices.net",
+            auth_type="login",
+            force_find_resource=True,
+        )
+
+        assert target["policy"] == "login"
+        assert target["resourcegroup"] == "rg"
+        assert target["subscription"] == "sub-from-id"
+
+    def test_get_targets_uses_each_resource_id_without_mutating_resources(
+        self, mocker
+    ):
+        disc = _disc(mocker)
+        first = self._resource()
+        second = self._resource()
+        second["id"] = (
+            "/subscriptions/sub-from-id/resourceGroups/other-rg/providers/"
+            "Microsoft.Devices/IotHubs/other"
+        )
+        second["name"] = "other"
+        second["properties"]["hostName"] = "other.azure-devices.net"
+        disc.get_resources = mocker.MagicMock(return_value=[first, second])
+        disc.find_resource = mocker.MagicMock(
+            side_effect=[first, second]
+        )
+        disc.find_policy = mocker.MagicMock(return_value=self._policy())
+
+        targets = disc.get_targets()
+
+        assert [target["resourcegroup"] for target in targets] == [
+            "rg",
+            "other-rg",
+        ]
+        assert "resourcegroup" not in first
+        assert "resourcegroup" not in second
+
+    def test_get_targets_skips_inaccessible_resource(
+        self, mocker
+    ):
+        disc = _disc(mocker)
+        first = self._resource()
+        second = self._resource()
+        second["id"] = (
+            "/subscriptions/sub-from-id/resourceGroups/other-rg/providers/"
+            "Microsoft.Devices/IotHubs/other"
+        )
+        second["name"] = "other"
+        disc.get_resources = mocker.MagicMock(return_value=[first, second])
+        disc.get_target = mocker.MagicMock(
+            side_effect=[
+                {"name": "myhub"},
+                ResourceNotFoundError("denied"),
+            ]
+        )
+
+        assert disc.get_targets() == [{"name": "myhub"}]

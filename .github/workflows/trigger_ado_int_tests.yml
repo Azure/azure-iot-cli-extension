@@ -17,7 +17,7 @@ on:
         type: boolean
         default: true
       testHub:
-        description: Run Hub tests
+        description: Run HubControl and full HubData (owned Linux phases; Windows unsupported)
         type: boolean
         default: true
       testADU:
@@ -56,7 +56,7 @@ on:
         type: boolean
         default: true
       testHub:
-        description: Run Hub tests
+        description: Run HubControl and full HubData (owned Linux phases; Windows unsupported)
         type: boolean
         default: true
       testADU:

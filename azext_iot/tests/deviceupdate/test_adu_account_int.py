@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from knack.util import CLIError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.deviceupdate.conftest import (
     ACCOUNT_RG,
@@ -15,6 +16,21 @@ from typing import Dict
 
 
 cli = EmbeddedCLI()
+
+
+@pytest.mark.adu_infrastructure(location="eastus2euap")
+def test_account_wait_timeout(provisioned_accounts: Dict[str, dict]):
+    account_name = next(iter(provisioned_accounts["accounts"]))
+    command = f"iot du account wait -n {account_name} -g {ACCOUNT_RG} --timeout 1 --interval 1"
+    for condition in ("--deleted", "--custom 'name == `\"never-matches\"`'"):
+        result = cli.invoke(f"{command} {condition}", capture_stderr=False)
+        assert not result.success(), "An unmet wait condition must not succeed."
+        assert isinstance(result.get_error(), CLIError)
+        assert "Wait operation timed-out after 1 seconds" in str(result.get_error())
+        assert result.output == ""
+
+    assert cli.invoke(f"{command} --exists").success()
+    assert cli.invoke(f"{command} --created").success()
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", count=2, delete=False)
@@ -102,13 +118,6 @@ def test_account_list(provisioned_accounts: Dict[str, dict]):
         assert acct_name in group_acct_map
 
 
-@pytest.mark.skip(
-    reason="Service-side regression in eastus2euap: the DeviceUpdate RP"
-    " rejects the privateEndpointConnections PUT with ResourceCreationValidateFailed/BadRequest unless"
-    " privateLinkServiceConnectionState.actionsRequired is sent, though the REST spec marks it optional."
-    " The identical request succeeds in westus2, so there is no CLI-side defect and no CLI change is being"
-    " made. Re-enable when the RP fix is deployed."
-)
 @pytest.mark.adu_infrastructure(location="eastus2euap")
 def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[str, dict]):
     target_account_name = list(provisioned_accounts["accounts"].keys())[0]

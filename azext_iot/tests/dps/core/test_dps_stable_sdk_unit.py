@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Exercise handwritten DPS handlers against the real, synchronous stable SDK."""
+"""Retained wire tests against the real, synchronous June DPS management SDK."""
 
 import base64
 from copy import deepcopy
@@ -62,7 +62,7 @@ def dps_resource():
 def assert_stable_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-08-31"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-01"]
 
 
 @pytest.mark.parametrize(
@@ -70,7 +70,7 @@ def assert_stable_requests(mocked_response):
     [
         ({}, None),
         ({"mi_system_assigned": False}, None),
-        ({"mi_system_assigned": True}, {"type": "SystemAssigned", "userAssignedIdentities": None}),
+        ({"mi_system_assigned": True}, {"type": "SystemAssigned"}),
         ({"mi_user_assigned": [USER_ID]}, {"type": "UserAssigned", "userAssignedIdentities": {USER_ID: {}}}),
         (
             {"mi_system_assigned": True, "mi_user_assigned": [USER_ID]},
@@ -78,8 +78,23 @@ def assert_stable_requests(mocked_response):
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "property_args,expected_properties",
+    [
+        ({}, {}),
+        (
+            {"disable_local_auth": True, "enable_data_residency": False},
+            {"disableLocalAuth": True, "enableDataResidency": False},
+        ),
+        (
+            {"disable_local_auth": False, "enable_data_residency": True},
+            {"disableLocalAuth": False, "enableDataResidency": True},
+        ),
+    ],
+)
 def test_create_serializes_stable_resource(
-    fixture_cmd, stable_client, mocked_response, dps_resource, identity_args, expected_identity
+    fixture_cmd, stable_client, mocked_response, dps_resource, identity_args, expected_identity,
+    property_args, expected_properties,
 ):
     mocked_response.add(
         "POST", f"{BASE_URL}/providers/Microsoft.Devices/checkProvisioningServiceNameAvailability",
@@ -88,7 +103,7 @@ def test_create_serializes_stable_resource(
     mocked_response.add("PUT", RESOURCE_URL, json=dps_resource)
 
     result = custom.iot_dps_create(
-        fixture_cmd, stable_client, "test-dps", "test-rg", location="westus2", **identity_args
+        fixture_cmd, stable_client, "test-dps", "test-rg", location="westus2", **identity_args, **property_args
     ).result()
 
     assert result == dps_resource
@@ -96,12 +111,12 @@ def test_create_serializes_stable_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {}
+    assert body["properties"] == expected_properties
+    assert "tags" not in body
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body
     assert "deviceRegistryNamespace" not in body["properties"]
-    assert "disableLocalAuth" not in body["properties"]
     assert_stable_requests(mocked_response)
 
 
@@ -118,18 +133,17 @@ def test_get_put_update_preserves_supported_properties(
     ).result()
 
     assert result == dps_resource
-    body = json.loads(mocked_response.calls[1].request.body)
-    assert mocked_response.calls[1].request.method == "PUT"
-    assert body["properties"] == dps_resource["properties"]
+    # The ADR identity guard re-reads the original identity before the PUT.
+    assert [call.request.method for call in mocked_response.calls] == ["GET", "GET", "PUT"]
+    body = json.loads(mocked_response.calls[-1].request.body)
+    assert body["properties"] == custom._dps_description_for_write(dps_resource)["properties"]
     assert body["properties"]["disableLocalAuth"] is True
     assert "deviceRegistryNamespace" not in body["properties"]
     assert body["tags"] == (dps_resource["tags"] if tags is None else tags)
-    assert body["id"] == dps_resource["id"]
-    assert body["etag"] == dps_resource["etag"]
-    if not identity_args:
-        assert body["identity"] == dps_resource["identity"]
-    else:
-        assert body["identity"]["type"] == ("SystemAssigned" if "mi_system_assigned" in identity_args else "UserAssigned")
+    assert "id" not in body
+    assert "etag" not in body
+    # Partial identity options must not remove an unmentioned linked identity.
+    assert body["identity"] == dps_resource["identity"]
     assert_stable_requests(mocked_response)
 
 
@@ -141,7 +155,7 @@ def test_identity_roundtrip_preserves_local_auth(stable_client, mocked_response,
     assert handler(stable_client, "test-dps", "test-rg", system_assigned=True).result() == dps_resource
 
     body = json.loads(mocked_response.calls[1].request.body)
-    assert body["properties"] == dps_resource["properties"]
+    assert body["properties"] == custom._dps_description_for_write(dps_resource)["properties"]
     assert body["identity"]["userAssignedIdentities"] == {USER_ID: {}}
     assert body["identity"]["type"] == (
         "SystemAssigned,UserAssigned" if handler is custom.dps_identity_assign else "UserAssigned"
@@ -253,6 +267,42 @@ def test_certificate_stale_etag_raises_sdk_error(stable_client, mocked_response)
     with pytest.raises(ResourceModifiedError, match="etag is stale"):
         custom.iot_dps_certificate_delete(stable_client, "test-dps", "test-cert", '"stale"', "test-rg")
     assert mocked_response.calls[0].request.headers["If-Match"] == '"stale"'
+    assert_stable_requests(mocked_response)
+
+
+@pytest.mark.parametrize("action,suffix", [("gen_code", "generateVerificationCode"), ("verify", "verify")])
+@pytest.mark.parametrize("etag", [None, '"explicit-etag"', "*"])
+@pytest.mark.parametrize("status", [200, 412])
+def test_certificate_verification_optional_etag_wire_contract(
+    stable_client, mocked_response, mocker, action, suffix, etag, status,
+):
+    current_etag = '"current-etag"'
+    if etag is None:
+        mocked_response.add("GET", CERTIFICATE_URL, json={"name": "test-cert", "etag": current_etag})
+    response = (
+        {"name": "test-cert", "etag": '"new-etag"', "properties": {"isVerified": True}}
+        if status == 200 else {"error": {"code": "PreconditionFailed", "message": "Certificate changed."}}
+    )
+    mocked_response.add("POST", f"{CERTIFICATE_URL}/{suffix}", status=status, json=response)
+    mocker.patch.object(custom, "open_certificate", return_value=CERTIFICATE)
+    arguments = {"resource_group_name": "test-rg", "etag": etag}
+    if action == "verify":
+        arguments["certificate_path"] = "proof.pem"
+    handler = getattr(custom, f"iot_dps_certificate_{action}")
+
+    if status == 412:
+        with pytest.raises(ResourceModifiedError, match="Certificate changed"):
+            handler(stable_client, "test-dps", "test-cert", **arguments)
+    else:
+        assert handler(stable_client, "test-dps", "test-cert", **arguments) == response
+
+    assert [call.request.method for call in mocked_response.calls] == (
+        ["GET", "POST"] if etag is None else ["POST"]
+    )
+    request = mocked_response.calls[-1].request
+    assert request.headers["If-Match"] == (current_etag if etag is None else etag)
+    if action == "verify":
+        assert json.loads(request.body) == {"certificate": CERTIFICATE}
     assert_stable_requests(mocked_response)
 
 
