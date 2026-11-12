@@ -437,13 +437,14 @@ def _phase(selection_file, output):
         expected = receipt["expected"]
     RETRY["outcomes"](receipt, allow_fixture_failures=True)
     exclusions = phase_exclusions(service, ctx["endpoint"], name)
+    exclusion_reasons = {**receipt.get("exclusionReasons", {}), **exclusions}
     phase_result = {
         "expected": expected, "receipt": receipt, "safe": True,
         "excluded": receipt.get("excluded", []) + list(exclusions),
         "cleanupMode": "handoff" if service == "RetrySelfTest" else "verified",
     }
-    if exclusions:
-        phase_result["exclusionReasons"] = exclusions
+    if exclusion_reasons:
+        phase_result["exclusionReasons"] = exclusion_reasons
     RETRY["write"](folder / "phase.json", phase_result)
 
 
@@ -745,11 +746,17 @@ def main():
             print("Device Update uses title regions for dependency Hubs only; account locations are fixture-defined.")
         return 0
     if args.command == "report-incomplete":
-        if not (Path(args.output) / "final.xml").is_file():
+        output = Path(args.output)
+        incomplete = not (output / "final.xml").is_file()
+        if incomplete:
             reject(args.output, "No terminal report was produced; installation, login or execution did not complete.",
                    recoverable=True)
-            return 1
-        return 0
+        # Test percentages describe execution; final.xml and the ledger still enforce qualification.
+        if (output / "rejection.json").is_file():
+            RETRY["execution_junit"](output, output / "published.xml")
+        else:
+            RETRY["published_junit"](output / "final.xml", output / "published.xml")
+        return int(incomplete)
     if args.command == "plan":
         print(json.dumps(plan(args.services, args.versions, args.regions, args.endpoint, args.diagnostic,
                               args.release_build_id), indent=2))

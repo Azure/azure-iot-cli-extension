@@ -207,7 +207,7 @@ stages:
             displayName: Publish results
             inputs:
               testResultsFormat: JUnit
-              testResultsFiles: attempt/final.xml
+              testResultsFiles: attempt/published.xml
               searchFolder: $(testSourceDirectory)
               testRunTitle: ${{ parameters.service }} $(python) $(region) attempt $(System.JobAttempt)
               failTaskOnFailedTests: true

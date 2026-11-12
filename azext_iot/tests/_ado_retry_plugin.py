@@ -15,6 +15,23 @@ import pytest
 from azext_iot.tests._ado_retry import retryable_failure, case_id, case_names
 
 
+ADR_REGIONAL_NODE = (
+    "azext_iot/tests/adr/test_adr_link_int.py::TestADRLinkDeletedHubIdentityChanges"
+    "::test_adr_link_deleted_hub_identity_changes"
+)
+ADR_REGIONAL_REASON = "ADR LinkedResourceDeleted is not rolled out in this region yet"
+
+
+def regional_exclusion(item):
+    region = os.getenv("TEST_REGION", "").casefold()
+    # xdist loadgroup appends its scheduling group to the node ID.
+    if item.nodeid.split("@", 1)[0] == ADR_REGIONAL_NODE and region and region != "centraluseuap":
+        if any(mark.args == (True,) and mark.kwargs.get("reason") == ADR_REGIONAL_REASON
+               for mark in item.iter_markers("skipif")):
+            return ADR_REGIONAL_REASON
+    return None
+
+
 def pytest_configure(config):
     path = os.environ.get("azext_iot_ado_receipt")
     if not path:
@@ -30,7 +47,7 @@ class Receipt:
         self.path = path
         self.data = {
             "finished": False, "exitstatus": None, "expected": [], "collected": [], "reports": {},
-            "excluded": [], "retryableFailures": {},
+            "excluded": [], "exclusionReasons": {}, "retryableFailures": {},
         }
         self.expected = json.loads(os.environ.get("azext_iot_ado_expected", "[]"))
         self.selected = json.loads(os.environ.get("azext_iot_ado_selected", "[]"))
@@ -49,7 +66,8 @@ class Receipt:
 
     @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, session, config, items):
-        excluded = [item for item in items if list(item.iter_markers("skip"))]
+        reasons = {case_id(item.nodeid): reason for item in items if (reason := regional_exclusion(item))}
+        excluded = [item for item in items if list(item.iter_markers("skip")) or case_id(item.nodeid) in reasons]
         enabled = [item for item in items if item not in excluded]
         nodes = [case_id(item.nodeid) for item in enabled]
         if not nodes or len(set(nodes)) != len(nodes) or self.expected and nodes != self.expected:
@@ -58,6 +76,7 @@ class Receipt:
             raise pytest.UsageError("Retry selection is not an exact subset of the original collection.")
         self.data["expected"] = nodes
         self.data["excluded"] = [case_id(item.nodeid) for item in excluded]
+        self.data["exclusionReasons"] = reasons
         self.data["caseNames"] = case_names({
             **self.data, "caseNames": {case_id(item.nodeid): item.originalname for item in items},
         })
@@ -80,15 +99,18 @@ class Receipt:
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error):
         value = getattr(node, "workeroutput", {}).get("ado_receipt", {})
-        collection = (value.get("expected"), value.get("excluded"), value.get("caseNames"))
+        collection = (value.get("expected"), value.get("excluded"), value.get("caseNames"),
+                      value.get("exclusionReasons"))
         if (error or value.get("finished") is not True or value.get("exitstatus") not in (0, 1)
                 or not collection[0] or not isinstance(collection[1], list) or not isinstance(collection[2], dict)
+                or not isinstance(collection[3], dict)
                 or self.worker_collection is not None and self.worker_collection != collection
                 or value.get("collected") != self.data["collected"]):
             self.data.setdefault("workerErrors", []).append("Worker execution or collection evidence is incomplete.")
         else:
             self.worker_collection = collection
-            self.data["expected"], self.data["excluded"], self.data["caseNames"] = collection
+            (self.data["expected"], self.data["excluded"], self.data["caseNames"],
+             self.data["exclusionReasons"]) = collection
         self.save()
 
     @pytest.hookimpl(hookwrapper=True)
@@ -112,7 +134,8 @@ class Receipt:
         outcome = yield
         if self.worker:
             session.config.workeroutput["ado_receipt"] = {
-                key: self.data[key] for key in ("expected", "excluded", "collected", "caseNames") if key in self.data
+                key: self.data[key] for key in
+                ("expected", "excluded", "collected", "caseNames", "exclusionReasons") if key in self.data
             }
             session.config.workeroutput["ado_receipt"].update(
                 finished=outcome.excinfo is None, exitstatus=int(session.exitstatus),
