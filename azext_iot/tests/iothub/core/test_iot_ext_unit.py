@@ -16,7 +16,7 @@ import json
 import os
 import responses
 import re
-from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.core.azclierror import BadRequestError
 from argparse import Namespace
 from copy import deepcopy
 from azext_iot._validators import process_top
@@ -2050,7 +2050,7 @@ class TestMonitorEvents:
         query = mocker.patch.object(subject, "iot_query")
         start_monitor = mocker.patch("azext_iot.monitor.telemetry.start_single_monitor")
 
-        with pytest.raises(InvalidArgumentValueError, match="disableLocalAuth=true"):
+        with pytest.raises(BadRequestError, match="disableLocalAuth=true"):
             subject.iot_hub_monitor_events(
                 fixture_cmd,
                 hub_name_or_hostname="myhub",
