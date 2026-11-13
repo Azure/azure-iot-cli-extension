@@ -1,0 +1,63 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: cloud
+    type: string
+  - name: version
+    type: string
+  - name: region
+    type: string
+  - name: services
+    type: object
+variables:
+  - name: TestCloud
+    value: ${{ parameters.cloud }}
+  - name: TestTrack
+    value: ${{ parameters.version }}
+  - name: TestServices
+    value: ${{ join(',', parameters.services) }}
+  - ${{ if eq(parameters.cloud, 'public') }}:
+      - name: TestRegion
+        value: ${{ lower(replace(parameters.region, ' ', '')) }}
+      - name: TestAzureCloud
+        value: AzureCloud
+      - name: TestAzureServiceConnection
+        value: aziotcli-sp-prime
+      - name: TestSubscription
+        value: a386d5ea-ea90-441a-8263-d816368c84a1
+      - name: TestResourceGroup
+        value: cli-int-test-rg
+      - name: TestEndpoint
+        value: https://management.azure.com
+      - name: TestArmResource
+        value: https://management.azure.com
+  - ${{ if eq(parameters.cloud, 'fairfax') }}:
+      - name: TestRegion
+        value: usgovvirginia
+      - name: TestAzureCloud
+        value: AzureUSGovernment
+      - name: TestAzureServiceConnection
+        value: sc-iot-cli-fairfax-it
+      - name: TestSubscription
+        value: a32cd71f-10e6-4c80-944c-039bdaac7cab
+      - name: TestResourceGroup
+        value: ${{ format('iot-cli-monitor-fairfax-{0}', parameters.version) }}
+      - name: TestEndpoint
+        value: https://management.usgovcloudapi.net
+      - name: TestArmResource
+        value: https://management.core.usgovcloudapi.net
+  - ${{ if eq(parameters.cloud, 'mooncake') }}:
+      - name: TestRegion
+        value: chinaeast2
+      - name: TestAzureCloud
+        value: AzureChinaCloud
+      - name: TestAzureServiceConnection
+        value: sc-iot-cli-mooncake-it
+      - name: TestSubscription
+        value: cdb4095c-5c92-410e-90ec-a99dc68d2b51
+      - name: TestResourceGroup
+        value: ${{ format('iot-cli-monitor-mooncake-{0}', parameters.version) }}
+      - name: TestEndpoint
+        value: https://management.chinacloudapi.cn
+      - name: TestArmResource
+        value: https://management.core.chinacloudapi.cn

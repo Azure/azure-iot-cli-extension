@@ -22,6 +22,28 @@ from azext_iot.tests import _hub_suite_plugin as plugin
 ROOT = Path(manifest.__file__).resolve().parents[2]
 
 
+def test_current_ado_storage_names_are_isolated_without_changing_legacy_runs(monkeypatch):
+    monkeypatch.setenv("azext_iot_testrg", "unit-test-rg")
+    from azext_iot.tests import iothub
+    from azext_iot.tests import _hub_ownership as owned
+
+    original = iothub.STORAGE_ACCOUNT
+    callbacks = []
+    config = SimpleNamespace(add_cleanup=callbacks.append)
+    plugin.isolate_attempt_names(config, "ab" * 16, None)
+    assert iothub.STORAGE_ACCOUNT == original
+    assert not callbacks
+    plugin.isolate_attempt_names(config, "ab" * 16, {"attempt": "a" * 64})
+    try:
+        assert iothub.STORAGE_ACCOUNT == "hubstore" + "ab" * 8
+        resource = (f"/subscriptions/{owned.SUBSCRIPTION}/resourceGroups/{owned.GROUP}"
+                    f"/providers/Microsoft.Storage/storageAccounts/{iothub.STORAGE_ACCOUNT}")
+        assert owned.planned_root(resource)
+    finally:
+        callbacks[0]()
+    assert iothub.STORAGE_ACCOUNT == original
+
+
 def test_complete_behavior_ownership_and_phase_membership(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     cases = manifest.contract()

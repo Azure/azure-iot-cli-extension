@@ -671,6 +671,30 @@ def test_hub_environment_refuses_conflicting_endpoint_before_child(tmp_path, key
         )
 
 
+@pytest.mark.parametrize("region", ["centraluseuap", "australiaeast", "usgovvirginia", "chinaeast2"])
+@pytest.mark.parametrize("inherited", [False, True])
+def test_hub_environment_uses_active_sovereign_cloud_without_adr_override(tmp_path, region, inherited):
+    target = runner.TARGETS["target"](region)
+    base = {"AZURE_IOT_ADR_ARM_ENDPOINT": target["endpoint"]} if inherited else {}
+    environment = runner.environment(
+        base, "HubData", "sas", tmp_path, "uid", ownership.SUBSCRIPTION, ownership.GROUP, region=region,
+    )
+    assert environment["azext_iot_test_arm_endpoint"] == target["endpoint"]
+    if runner.TARGETS["cloud"](target["endpoint"])["name"] == "AzureCloud":
+        assert environment["AZURE_IOT_ADR_ARM_ENDPOINT"] == target["endpoint"]
+    else:
+        assert "AZURE_IOT_ADR_ARM_ENDPOINT" not in environment
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+def test_hub_sovereign_environment_rejects_conflicting_override_before_removing_it(tmp_path, region):
+    with pytest.raises(ValueError, match="Conflicting ambient resource scope"):
+        runner.environment(
+            {"AZURE_IOT_ADR_ARM_ENDPOINT": runner.TARGETS["PUBLIC_ARM"]},
+            "HubData", "sas", tmp_path, "uid", ownership.SUBSCRIPTION, ownership.GROUP, region=region,
+        )
+
+
 @pytest.mark.parametrize("subscription,group", [
     ("foreign", ownership.GROUP), (ownership.SUBSCRIPTION, "foreign"),
 ])
@@ -798,7 +822,8 @@ def test_owned_certificate_actions_are_recorded_and_unknown_post_is_blocked(tmp_
         observer.restore()
 
 
-def test_cleanup_requires_exact_descendant_absence(tmp_path):
+@pytest.mark.parametrize("eventually_absent", [False, True])
+def test_cleanup_requires_exact_descendant_absence(tmp_path, monkeypatch, eventually_absent):
     resource_id = (PREFIX + "Microsoft.Devices/IotHubs/test-hub-descendant").casefold()
     child_id = resource_id + "/providers/microsoft.authorization/roleassignments/owned-role"
     evidence = {"schemaVersion": 1, "installed": True, "runId": "uid", "phase": "entra", "violations": [],
@@ -806,10 +831,19 @@ def test_cleanup_requires_exact_descendant_absence(tmp_path):
     evidence["resources"][resource_id]["mutations"].append(
         {"method": "PUT", "id": child_id, "apiVersion": "role-version", "status": 201})
     reader = Reader()
-    reader.request = Mock(side_effect=lambda method, target, api: (200, {}) if target == child_id else (404, None))
-    result = runner.cleanup_regular(reader, evidence, "uid", "entra", time.monotonic() + 30, tmp_path / "owner.json")
-    assert not result["complete"] and result["absentIds"] == [resource_id]
-    assert result["descendantIds"] == [child_id] and not result["absentDescendantIds"]
+    clock = [0]
+    monkeypatch.setattr(runner.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(runner.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    reader.request = Mock(side_effect=lambda method, target, api: (
+        (200, {}) if target == child_id and (not eventually_absent or clock[0] == 0) else (404, None)
+    ))
+    result = runner.cleanup_regular(reader, evidence, "uid", "entra", 11, tmp_path / "owner.json")
+    assert result["complete"] is eventually_absent and result["absentIds"] == [resource_id]
+    assert result["descendantIds"] == [child_id]
+    assert result["absentDescendantIds"] == ([child_id] if eventually_absent else [])
+    assert bool(result["errors"]) is not eventually_absent
+    assert clock[0] == (5 if eventually_absent else 11)
+    assert all(call.args[0] == "GET" for call in reader.request.call_args_list)
 
 
 def test_budgets_leave_external_setup_below_github_cap():

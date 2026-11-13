@@ -105,8 +105,8 @@ class DeviceUpdateClientHandler(object):
         # Adding IoT Ext User-Agent is done with best attempt.
         try:
             client._config.user_agent_policy.add_user_agent(USER_AGENT)
-        except Exception:
-            pass
+        except AttributeError:
+            logger.debug("Cannot add the IoT extension User-Agent: the client policy is unavailable.")
         return client
 
 

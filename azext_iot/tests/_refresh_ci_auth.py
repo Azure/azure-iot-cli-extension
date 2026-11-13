@@ -27,11 +27,43 @@ import signal
 import sys
 from threading import Event
 from types import SimpleNamespace
+from uuid import UUID
 
 import requests
 
 
 HTTP_TIMEOUT = (10, 30)
+
+
+def assertion():
+    if os.environ.get("AZEXT_IOT_CI_AUTH") == "ado":
+        connection = str(UUID(os.environ["AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"]))
+        project, plan, job = (str(UUID(os.environ[name])) for name in (
+            "SYSTEM_TEAMPROJECTID", "SYSTEM_PLANID", "SYSTEM_JOBID",
+        ))
+        url = (f"https://dev.azure.com/azureiotdevxp/{project}/_apis/distributedtask/hubs/build/"
+               f"plans/{plan}/jobs/{job}/oidctoken")
+        with requests.post(
+            url, params={"serviceConnectionId": connection, "api-version": "7.1-preview.1"},
+            headers={"Authorization": "Bearer " + os.environ["SYSTEM_ACCESSTOKEN"]},
+            json={}, timeout=HTTP_TIMEOUT, allow_redirects=False,
+        ) as response:
+            if response.status_code != 200:
+                raise RuntimeError("ADO OIDC token request failed.")
+            value = response.json()["oidcToken"]
+    else:
+        with requests.get(
+            os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"],
+            params={"audience": "api://AzureADTokenExchange"},
+            headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
+            timeout=HTTP_TIMEOUT, allow_redirects=False,
+        ) as response:
+            if response.status_code != 200:
+                raise RuntimeError("GitHub OIDC token request failed.")
+            value = response.json()["value"]
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("OIDC response has no assertion.")
+    return value
 
 
 def refresh():
@@ -76,24 +108,13 @@ def refresh():
     client, tenant = user["name"], account["tenantId"]
 
     # No tokens in argv, stdout or shell substitutions; the entrypoint sanitizes errors.
-    with requests.get(
-        os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"],
-        params={"audience": "api://AzureADTokenExchange"},
-        headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
-        timeout=HTTP_TIMEOUT,
-        allow_redirects=False,
-    ) as response:
-        if response.status_code != 200:
-            raise RuntimeError("GitHub OIDC token request failed.")
-        assertion = response.json()["value"]
-    if not isinstance(assertion, str) or not assertion.strip():
-        raise ValueError("GitHub OIDC response has no assertion.")
+    token = assertion()
     identity = _create_identity_instance(cli_ctx, cli_ctx.cloud.endpoints.active_directory, tenant_id=tenant)
     # Mirror Identity.login_with_service_principal: that method cannot pass a
     # timeout, leaving MSAL's discovery and token HTTP requests unbounded.
     # Keep CLI's cache/config kwargs and persist the SP only after token success.
     sp_auth = ServicePrincipalAuth.build_from_credential(
-        identity.tenant_id, client, ServicePrincipalAuth.build_credential(client_assertion=assertion),
+        identity.tenant_id, client, ServicePrincipalAuth.build_credential(client_assertion=token),
     )
     credential = ServicePrincipalCredential(
         client, sp_auth.get_msal_client_credential(), timeout=HTTP_TIMEOUT,

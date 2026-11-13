@@ -33,6 +33,7 @@ def test_real_adr_tox_binds_product_factory_endpoint_to_fixture_endpoint(tmp_pat
     expected = override or "https://centraluseuap.management.azure.com"
     assert f"AZURE_IOT_ADR_ARM_ENDPOINT={expected}" in result.stdout
     assert f"azext_iot_adr_arm_endpoint={expected}" in result.stdout
+    assert "azext_iot_adr_api_version=" not in result.stdout
 
 
 def test_integration_environments_discover_the_candidate_extension():
