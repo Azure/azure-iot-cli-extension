@@ -292,7 +292,11 @@ def test_monitor_query_filters_actual_event_callbacks(rows, mocker, capsys):
     if rows == []:
         with pytest.raises(ResourceNotFoundError, match="No devices matched"):
             hub.iot_hub_monitor_events(**options)
-        discovery.assert_not_called()
+        discovery.assert_called_once_with(cmd)
+        discovery.return_value.get_target.assert_called_once_with(
+            resource_name="hub", resource_group_name="rg",
+            include_events=True, monitor_events=True, login=None,
+        )
         builder.assert_not_called()
         monitor.assert_not_called()
         assert capsys.readouterr().out == ""

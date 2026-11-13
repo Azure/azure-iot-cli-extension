@@ -6,6 +6,10 @@ Release History
 1.0.0
 +++++
 
+**IoT Hub updates**
+
+* Fixed ``az iot hub monitor-events`` to fail immediately with an actionable error when hub discovery detects that local authentication is disabled, instead of attempting SAS authentication to the built-in Event Hub-compatible endpoint.
+
 **API compatibility**
 
 * Updated Device Registry/CMS, IoT Hub management/service/device, and DPS management/service/device SDKs to ``2026-11-01``. Azure CLI 2.73.0 or later is required.
