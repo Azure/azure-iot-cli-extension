@@ -98,15 +98,18 @@ jobs:
                   (if $adu then "ADU" else empty end),
                   (if $adr then "ADR" else empty end)
                 ],
-                pythonVersions: ($python | split(",") | map(gsub("^\\s+|\\s+$"; "")))
+                pythonVersions: ($python | split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")))
               }
             }
             | if (.templateParameters.services | length) == 0 then
                 error("Select at least one supported integration service.")
-              elif all(.templateParameters.pythonVersions[];
+              elif (.templateParameters.pythonVersions | length) > 0 and
+                all(.templateParameters.pythonVersions[];
                 . == "3.10" or . == "3.11" or . == "3.12" or . == "3.13") then .
               else error("Python versions must be a comma-separated selection of 3.10,3.11,3.12,3.13.")
-              end' > "$request"
+              end
+            | .templateParameters.services |= tojson
+            | .templateParameters.pythonVersions |= tojson' > "$request"
           res=$(az devops invoke --org "https://dev.azure.com/$ORG" \
             --area pipelines --resource runs \
             --route-parameters project="$PROJECT" pipelineId="$DEFINITION_ID" \
@@ -116,9 +119,9 @@ jobs:
             else error("ADO did not return a valid run ID.") end' <<< "$res")
           portalUrl="https://dev.azure.com/$ORG/$PROJECT/_build/results?buildId=$runId&view=results"
           url="https://dev.azure.com/$ORG/$PROJECT/_apis/build/builds/$runId"
-          echo "runId=$runId" >> $GITHUB_OUTPUT
-          echo "portalUrl=$portalUrl" >> $GITHUB_OUTPUT
-          echo "url=$url" >> $GITHUB_OUTPUT
+          echo "runId=$runId" >> "$GITHUB_OUTPUT"
+          echo "portalUrl=$portalUrl" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Summary
         id: summary
         run: |-

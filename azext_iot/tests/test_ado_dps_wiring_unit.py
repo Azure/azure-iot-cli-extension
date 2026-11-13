@@ -79,12 +79,18 @@ def test_github_ado_dispatch_preserves_typed_selections_and_exact_source(tmp_pat
     assert payload["resources"]["repositories"]["self"] == {
         "refName": "refs/heads/preview", "version": "a" * 40,
     }
-    assert payload["templateParameters"] == {
+    parameters = payload["templateParameters"]
+    assert all(isinstance(value, str) for value in parameters.values())
+    parsed = {
+        key: json.loads(value) if key in {"services", "pythonVersions"} else value
+        for key, value in parameters.items()
+    }
+    assert parsed == {
         "mode": "Integration tests", "services": services, "pythonVersions": versions,
     }
     pipeline = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
     definitions = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
-    for name, value in payload["templateParameters"].items():
+    for name, value in parsed.items():
         assert name in definitions
         assert set(value if isinstance(value, list) else [value]) <= set(definitions[name]["values"])
     args = arguments.read_text(encoding="utf-8").splitlines()
@@ -94,20 +100,22 @@ def test_github_ado_dispatch_preserves_typed_selections_and_exact_source(tmp_pat
     assert "runId=123" in output.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("overrides", [
-    {"TEST_DPS": "false", "TEST_HUB": "false", "TEST_ADU": "false", "TEST_ADR": "false"},
-    {"PYTHON_VERSIONS": "3.14"},
-    {"PYTHON_VERSIONS": "3.13; echo unexpected"},
+@pytest.mark.parametrize("overrides,error", [
+    ({"TEST_DPS": "false", "TEST_HUB": "false", "TEST_ADU": "false", "TEST_ADR": "false"},
+     "Select at least one supported integration service."),
+    ({"PYTHON_VERSIONS": ""}, "Python versions must be a comma-separated selection"),
+    ({"PYTHON_VERSIONS": "3.14"}, "Python versions must be a comma-separated selection"),
+    ({"PYTHON_VERSIONS": "3.13; echo unexpected"}, "Python versions must be a comma-separated selection"),
 ])
-def test_github_ado_dispatch_rejects_invalid_selection_before_submission(tmp_path, overrides):
+def test_github_ado_dispatch_rejects_invalid_selection_before_submission(tmp_path, overrides, error):
     result, request, arguments, output = _dispatch_github_ado(tmp_path, overrides)
-    assert result.returncode != 0 and "error" in result.stderr
+    assert result.returncode != 0 and error in result.stderr
     assert not request.exists() and not arguments.exists() and not output.exists()
 
 
 def test_github_ado_dispatch_rejects_missing_run_id(tmp_path):
     result, _, arguments, output = _dispatch_github_ado(tmp_path, {"ADO_RESPONSE": "{}"})
-    assert result.returncode != 0
+    assert result.returncode != 0 and "ADO did not return a valid run ID." in result.stderr
     assert arguments.exists() and not output.exists()
 
 
