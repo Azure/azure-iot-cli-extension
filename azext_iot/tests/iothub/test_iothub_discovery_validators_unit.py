@@ -227,11 +227,15 @@ class TestBuildTarget:
             disc.find_policy.assert_not_called()
 
     @pytest.mark.parametrize("properties", [{}, None])
-    def test_build_rejects_missing_hostname_metadata(self, mocker, properties):
+    def test_monitor_discovery_rejects_missing_hostname_metadata(self, mocker, properties):
+        disc = _disc(mocker)
         resource = self._resource()
         resource["properties"] = properties
-        with pytest.raises(ResourceDiscoveryError, match="No usable hostname"):
-            _disc(mocker)._build_target(resource, self._policy(), include_events=True)
+        disc.find_resource = mocker.Mock(return_value=resource)
+        disc.find_policy = mocker.Mock(return_value=self._policy())
+        with pytest.raises(ResourceDiscoveryError, match="No usable hostname") as error:
+            disc.get_target("myhub", "rg", include_events=True, monitor_events=True)
+        assert "az iot hub show --name myhub --resource-group rg" in str(error.value)
 
     @pytest.mark.parametrize(
         "classic,service,expected",

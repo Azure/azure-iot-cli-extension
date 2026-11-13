@@ -42,7 +42,7 @@ class IotHubDiscovery(BaseDiscovery):
         return kwargs
 
     def _validate_resource(self, resource, **kwargs):
-        if kwargs.get("monitor_events") and resource.get("properties", {}).get("disableLocalAuth") is True:
+        if kwargs.get("monitor_events") and (resource.get("properties") or {}).get("disableLocalAuth") is True:
             raise InvalidArgumentValueError(
                 f"IoT Hub '{resource['name']}' has disableLocalAuth=true. "
                 "The built-in Event Hub-compatible endpoint requires SAS authentication, which is disabled on this hub. "
