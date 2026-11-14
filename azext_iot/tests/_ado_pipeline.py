@@ -109,6 +109,14 @@ def run_title(jobs, kind, mode, build_id, parent="0"):
     return title
 
 
+def results_title(service, python, region, wheel, attempt):
+    """Name a published test run by what separates failures in dashboard trend legends."""
+    wheels = list(Path(wheel).rglob("*.whl")) if Path(wheel).is_dir() else []
+    version = wheels[0].name.split("-")[1] if len(wheels) == 1 else "unknown"
+    # Publishing must not depend on naming, so normalize instead of rejecting unexpected values.
+    return re.sub(r"[^A-Za-z0-9._+/#-]", "-", f"{service}/{version}/{region}/py{python}/#{attempt}")[:255]
+
+
 def context(service, python, region, endpoint, wheel, diagnostic):
     wheels = list(Path(wheel).rglob("*.whl"))
     if len(wheels) != 1:
@@ -714,6 +722,9 @@ def main():
     namer.add_argument("--kind", choices=["health", "integration"], required=True)
     namer.add_argument("--mode", choices=["Dry run", "Integration tests"], required=True)
     namer.add_argument("--release-build-id", default="0")
+    labeler = commands.add_parser("results-title")
+    for name in ("service", "python", "region", "wheel"):
+        labeler.add_argument("--" + name, required=True)
     runner = commands.add_parser("run")
     for name in ("service", "python", "region", "endpoint", "wheel", "history", "output"):
         runner.add_argument("--" + name, required=True)
@@ -744,6 +755,10 @@ def main():
         print(f"##vso[build.updatebuildnumber]{title}", flush=True)
         if any(job["service"] == "ADU" for job in jobs):
             print("Device Update uses title regions for dependency Hubs only; account locations are fixture-defined.")
+        return 0
+    if args.command == "results-title":
+        title = results_title(args.service, args.python, args.region, args.wheel, os.environ["SYSTEM_JOBATTEMPT"])
+        print(f"##vso[task.setvariable variable=testRunTitle]{title}", flush=True)
         return 0
     if args.command == "report-incomplete":
         output = Path(args.output)
