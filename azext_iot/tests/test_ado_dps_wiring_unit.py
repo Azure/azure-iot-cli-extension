@@ -36,6 +36,89 @@ def _ci_budgets():
     return json.loads((ROOT / "azext_iot/tests/ci_budgets.json").read_text(encoding="utf-8"))
 
 
+def _dispatch_github_ado(tmp_path, overrides=None):
+    bash = shutil.which("bash")
+    if not bash or not shutil.which("jq"):
+        pytest.skip("Offline GitHub dispatch checks require bash and jq.")
+    workflow = yaml.safe_load((ROOT / ".github/workflows/trigger_ado_int_tests.yml").read_text(encoding="utf-8"))
+    step = next(item for item in workflow["jobs"]["call-ado-pipeline"]["steps"] if item.get("id") == "start")
+    request, arguments, output = (tmp_path / name for name in ("request.json", "arguments", "output"))
+    environment = {
+        **os.environ, "ORG": "offline-org", "PROJECT": "offline-project", "DEFINITION_ID": "147",
+        "TEST_DPS": "true", "TEST_HUB": "true", "TEST_ADU": "true", "TEST_ADR": "true",
+        "PYTHON_VERSIONS": "3.10,3.11,3.12,3.13", "SOURCE_REF": "refs/heads/preview",
+        "SOURCE_SHA": "a" * 40, "ADO_REQUEST": str(request), "ADO_ARGUMENTS": str(arguments),
+        "GITHUB_OUTPUT": str(output), "ADO_RESPONSE": '{"id":123}', **(overrides or {}),
+    }
+    stub = """
+az() {
+    printf '%s\\n' "$@" > "$ADO_ARGUMENTS"
+    while [ "$#" -gt 0 ]; do
+        if [ "$1" = "--in-file" ]; then cp "$2" "$ADO_REQUEST"; break; fi
+        shift
+    done
+    printf '%s\\n' "$ADO_RESPONSE"
+}
+"""
+    result = subprocess.run(
+        [bash, "-c", stub + step["run"]], env=environment, cwd=tmp_path,
+        capture_output=True, text=True, timeout=OFFLINE_BASH_TIMEOUT, check=False,
+    )
+    return result, request, arguments, output
+
+
+@pytest.mark.parametrize("overrides,services,versions", [
+    ({}, ["DPS", "HubControl", "HubData", "ADU", "ADR"], ["3.10", "3.11", "3.12", "3.13"]),
+    ({"TEST_DPS": "false", "TEST_ADU": "false", "TEST_ADR": "false", "PYTHON_VERSIONS": "3.13, 3.11"},
+     ["HubControl", "HubData"], ["3.13", "3.11"]),
+])
+def test_github_ado_dispatch_preserves_typed_selections_and_exact_source(tmp_path, overrides, services, versions):
+    result, request, arguments, output = _dispatch_github_ado(tmp_path, overrides)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    assert payload["resources"]["repositories"]["self"] == {
+        "refName": "refs/heads/preview", "version": "a" * 40,
+    }
+    parameters = payload["templateParameters"]
+    assert all(isinstance(value, str) for value in parameters.values())
+    parsed = {
+        key: json.loads(value) if key in {"services", "pythonVersions"} else value
+        for key, value in parameters.items()
+    }
+    assert parsed == {
+        "mode": "Integration tests", "services": services, "pythonVersions": versions,
+    }
+    pipeline = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
+    definitions = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
+    for name, value in parsed.items():
+        assert name in definitions
+        assert set(value if isinstance(value, list) else [value]) <= set(definitions[name]["values"])
+    args = arguments.read_text(encoding="utf-8").splitlines()
+    assert args[:2] == ["devops", "invoke"]
+    assert args[args.index("--http-method") + 1] == "POST"
+    assert "pipelineId=147" in args
+    assert "runId=123" in output.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("overrides,error", [
+    ({"TEST_DPS": "false", "TEST_HUB": "false", "TEST_ADU": "false", "TEST_ADR": "false"},
+     "Select at least one supported integration service."),
+    ({"PYTHON_VERSIONS": ""}, "Python versions must be a comma-separated selection"),
+    ({"PYTHON_VERSIONS": "3.14"}, "Python versions must be a comma-separated selection"),
+    ({"PYTHON_VERSIONS": "3.13; echo unexpected"}, "Python versions must be a comma-separated selection"),
+])
+def test_github_ado_dispatch_rejects_invalid_selection_before_submission(tmp_path, overrides, error):
+    result, request, arguments, output = _dispatch_github_ado(tmp_path, overrides)
+    assert result.returncode != 0 and error in result.stderr
+    assert not request.exists() and not arguments.exists() and not output.exists()
+
+
+def test_github_ado_dispatch_rejects_missing_run_id(tmp_path):
+    result, _, arguments, output = _dispatch_github_ado(tmp_path, {"ADO_RESPONSE": "{}"})
+    assert result.returncode != 0 and "ADO did not return a valid run ID." in result.stderr
+    assert arguments.exists() and not output.exists()
+
+
 def test_ado_hub_suite_has_a_nonempty_constrained_unset_default():
     text = TEMPLATE.read_text(encoding="utf-8")
     template = yaml.safe_load(text)
@@ -119,10 +202,9 @@ def test_ado_callers_do_not_supply_the_canary_owned_controller_contract():
     call = dps["steps"][0]
     assert call["parameters"]["serviceConnection"] == "$(AzureServiceConnection)"
     assert call["parameters"]["path"] == "azext_iot/tests/dps"
-    entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8"))
-    test_stage = next(stage for stage in entry["stages"] if stage["stage"] == "test")
-    assert any("msi" in condition for condition in test_stage["pool"])
-    assert test_stage["jobs"][0]["parameters"]["maxParallelDPS"] == 2
+    entry = (ROOT / ".azure-devops/integration_tests.yml").read_text(encoding="utf-8")
+    assert "templates/trigger-tests.yml" not in entry
+    assert "templates/integration-service.yml" in entry
 
 
 def _execute(tmp_path, overrides=None, exit_code=0):

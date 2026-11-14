@@ -1,0 +1,25 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.13'
+  - task: DownloadPipelineArtifact@2
+    displayName: Download frozen source selection
+    inputs:
+      buildType: current
+      artifactName: $(sourceBundle)
+      targetPath: $(Pipeline.Workspace)/source-bundle
+  - bash: |
+      set -euo pipefail
+      python -m pip install packaging
+      python scripts/release_monitor_adapter.py stage --source-only --bundle "$BUNDLE" --output "$SOURCE"
+    displayName: Verify and stage selected branch tests
+    env:
+      BUNDLE: $(Pipeline.Workspace)/source-bundle
+      SOURCE: $(Agent.TempDirectory)/iot-monitor-source
+      MONITOR_CLOUD: $(TestCloud)
+      MONITOR_TRACK: $(TestTrack)

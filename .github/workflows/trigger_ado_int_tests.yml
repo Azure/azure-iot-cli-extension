@@ -1,17 +1,9 @@
-# checkov:skip=CKV_GHA_7:workflow_dispatch inputs are typed booleans controlling test selection, not injected into build output
+# checkov:skip=CKV_GHA_7:workflow_dispatch selections are validated and serialized as pipeline parameters
 name: Run Azure DevOps Integration Tests
 permissions: {}
 on:
   workflow_call:
     inputs:
-      testCentral:
-        description: Run Central tests
-        type: boolean
-        default: true
-      testADT:
-        description: Run ADT tests
-        type: boolean
-        default: true
       testDPS:
         description: Run DPS tests
         type: boolean
@@ -29,28 +21,14 @@ on:
         type: boolean
         default: true
       python_versions:
-        description: "Python versions to test"
+        description: "Comma-separated Python versions to test"
         type: string
-        default: >
-          "{
-              Python310: { python: '3.10' },
-              Python311: { python: '3.11' },
-              Python312: { python: '3.12' },
-              Python313: { python: '3.13' }
-          }"
+        default: "3.10,3.11,3.12,3.13"
     secrets:
       ADO_PAT:
         required: true
   workflow_dispatch:
     inputs:
-      testCentral:
-        description: Run Central tests
-        type: boolean
-        default: true
-      testADT:
-        description: Run ADT tests
-        type: boolean
-        default: true
       testDPS:
         description: Run DPS tests
         type: boolean
@@ -68,16 +46,10 @@ on:
         type: boolean
         default: true
       python_versions:
-        description: "Python versions to test"
+        description: "Comma-separated Python versions to test"
         required: true
         type: string
-        default: >
-          "{
-              Python310: { python: '3.10' },
-              Python311: { python: '3.11' },
-              Python312: { python: '3.12' },
-              Python313: { python: '3.13' }
-          }"
+        default: "3.10,3.11,3.12,3.13"
 env:
   DEFAULT_TITLE: "Azure DevOps Pipeline"
   AZURE_DEVOPS_EXT_PAT: ${{ secrets.ADO_PAT }}
@@ -97,48 +69,59 @@ jobs:
       - shell: bash
         id: start
         name: Trigger the pipeline
+        env:
+          TEST_DPS: ${{ inputs.testDPS }}
+          TEST_HUB: ${{ inputs.testHub }}
+          TEST_ADU: ${{ inputs.testADU }}
+          TEST_ADR: ${{ inputs.testADR }}
+          PYTHON_VERSIONS: ${{ inputs.python_versions }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |-
-          set -ex
-          if [ -z "$ORG" ]; then
-            echo "::error::Organization is required"
-            exit 1
-          fi
-          if [ -z "$PROJECT" ]; then
-            echo "::error::Project is required"
-            exit 1
-          fi
-
-          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "${{ github.ref }}")
-
-          if [ -n "$DEFINITION_ID" ]; then
-            cmdArgs+=(--id "$DEFINITION_ID")
-          else
-            echo "::error::Pipeline definition ID must be provided"
-            exit 1
-          fi
-
-          python_versions=${{inputs.python_versions}}
-          python_version_strings=$(echo $python_versions | jq -R .)
-          cmdArgs+=("--parameters")
-          cmdArgs+=("pythonVersionsTestingMatrix=$python_version_strings")
-          cmdArgs+=("testCentral=${{inputs.testCentral}}")
-          cmdArgs+=("testADT=${{inputs.testADT}}")
-          cmdArgs+=("testDPS=${{inputs.testDPS}}")
-          cmdArgs+=("testHub=${{inputs.testHub}}")
-          cmdArgs+=("testADU=${{inputs.testADU}}")
-          cmdArgs+=("testADR=${{inputs.testADR}}")
-          echo "Running: az pipelines run ${cmdArgs[@]}"
-          res=$(az pipelines run "${cmdArgs[@]}")
-
-          if [ -z "$res" ]; then
-            echo "::error::Failed to trigger the pipeline"
-          fi
-          runId=$(echo $res | jq -r '.id')
+          set -euo pipefail
+          : "${ORG:?Organization is required}"
+          : "${PROJECT:?Project is required}"
+          : "${DEFINITION_ID:?Pipeline definition ID is required}"
+          request=$(mktemp)
+          trap 'rm -f "$request"' EXIT
+          jq -n \
+            --argjson dps "$TEST_DPS" --argjson hub "$TEST_HUB" \
+            --argjson adu "$TEST_ADU" --argjson adr "$TEST_ADR" \
+            --arg python "$PYTHON_VERSIONS" --arg ref "$SOURCE_REF" --arg sha "$SOURCE_SHA" '
+            {
+              resources: {repositories: {self: {refName: $ref, version: $sha}}},
+              templateParameters: {
+                mode: "Integration tests",
+                services: [
+                  (if $dps then "DPS" else empty end),
+                  (if $hub then "HubControl", "HubData" else empty end),
+                  (if $adu then "ADU" else empty end),
+                  (if $adr then "ADR" else empty end)
+                ],
+                pythonVersions: ($python | split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")))
+              }
+            }
+            | if (.templateParameters.services | length) == 0 then
+                error("Select at least one supported integration service.")
+              elif (.templateParameters.pythonVersions | length) > 0 and
+                all(.templateParameters.pythonVersions[];
+                . == "3.10" or . == "3.11" or . == "3.12" or . == "3.13") then .
+              else error("Python versions must be a comma-separated selection of 3.10,3.11,3.12,3.13.")
+              end
+            | .templateParameters.services |= tojson
+            | .templateParameters.pythonVersions |= tojson' > "$request"
+          res=$(az devops invoke --org "https://dev.azure.com/$ORG" \
+            --area pipelines --resource runs \
+            --route-parameters project="$PROJECT" pipelineId="$DEFINITION_ID" \
+            --api-version 7.1 --http-method POST --in-file "$request" --output json)
+          runId=$(jq -er '
+            if (.id | type) == "number" and .id > 0 and .id == (.id | floor) then .id
+            else error("ADO did not return a valid run ID.") end' <<< "$res")
           portalUrl="https://dev.azure.com/$ORG/$PROJECT/_build/results?buildId=$runId&view=results"
-          url=$(echo $res | jq -r '.url')
-          echo "runId=$runId" >> $GITHUB_OUTPUT
-          echo "portalUrl=$portalUrl" >> $GITHUB_OUTPUT
-          echo "url=$url" >> $GITHUB_OUTPUT
+          url="https://dev.azure.com/$ORG/$PROJECT/_apis/build/builds/$runId"
+          echo "runId=$runId" >> "$GITHUB_OUTPUT"
+          echo "portalUrl=$portalUrl" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Summary
         id: summary
         run: |-
