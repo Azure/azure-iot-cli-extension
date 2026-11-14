@@ -642,6 +642,34 @@ def test_run_title_labels_fixture_region_dry_run_and_canary(parent):
     )
 
 
+@pytest.mark.parametrize("wheels,version", [
+    (["azure_iot-0.25.0-py3-none-any.whl"], "0.25.0"),
+    (["azure_iot-0.26.0b1-py3-none-any.whl"], "0.26.0b1"),
+    ([], "unknown"),
+    (["azure_iot-0.25.0-py3-none-any.whl", "azure_iot-0.26.0-py3-none-any.whl"], "unknown"),
+])
+def test_results_title_names_service_cli_version_region_python_and_attempt(tmp_path, monkeypatch, wheels, version):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    for name in wheels:
+        (candidate / name).write_bytes(b"wheel")
+    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
+    completed = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "azext_iot/tests/_ado_pipeline.py"), "results-title",
+         "--service", "HubData", "--python", "3.13", "--region", "usgovvirginia", "--wheel", "candidate"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert completed.stdout.splitlines() == [
+        f"##vso[task.setvariable variable=testRunTitle]HubData/{version}/usgovvirginia/py3.13/#2"
+    ]
+
+
+def test_results_title_normalizes_values_that_could_break_logging_commands(tmp_path):
+    title = pipeline.results_title("DPS", "3.13", "east us;]x", tmp_path / "missing", "1")
+    assert title == "DPS/unknown/east-us--x/py3.13/#1"
+
+
 def test_run_title_compacts_whole_regions_and_retains_unique_build():
     regions = [f"region{index:02d}" + "x" * 56 for index in range(40)]
     jobs = pipeline.plan(["DPS"], ["3.13"], regions, pipeline.TARGET["PUBLIC_ARM"])

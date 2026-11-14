@@ -202,6 +202,16 @@ stages:
             displayName: Publish results
             condition: always()
             artifact: attempt-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
+          - bash: >-
+              python azext_iot/tests/_ado_pipeline.py results-title --service "$SERVICE"
+              --python "$TEST_PYTHON" --region "$TEST_REGION" --wheel candidate
+            condition: succeededOrFailed()
+            displayName: Name test results
+            workingDirectory: $(testSourceDirectory)
+            env:
+              SERVICE: ${{ parameters.service }}
+              TEST_PYTHON: $(python)
+              TEST_REGION: $(region)
           - task: PublishTestResults@2
             condition: succeededOrFailed()
             displayName: Publish results
@@ -209,6 +219,6 @@ stages:
               testResultsFormat: JUnit
               testResultsFiles: attempt/published.xml
               searchFolder: $(testSourceDirectory)
-              testRunTitle: ${{ parameters.service }} $(python) $(region) attempt $(System.JobAttempt)
+              testRunTitle: $(testRunTitle)
               failTaskOnFailedTests: true
               failTaskOnMissingResultsFile: true
