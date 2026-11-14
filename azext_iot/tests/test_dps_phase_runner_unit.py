@@ -66,7 +66,10 @@ def _execution(command, env, log, _runtime, cleanup, _cancelled):
                            "endpoint": env["azext_iot_test_arm_endpoint"]}}
     assert env["azext_iot_testhub_location"] == env["azext_iot_adr_location"] == metadata["target"]["region"]
     assert env["azext_iot_adr_arm_endpoint"] == metadata["target"]["endpoint"]
-    assert env["AZURE_IOT_ADR_ARM_ENDPOINT"] == metadata["target"]["endpoint"]
+    if RUNNER["TARGETS"]["cloud"](metadata["target"]["endpoint"])["name"] == "AzureCloud":
+        assert env["AZURE_IOT_ADR_ARM_ENDPOINT"] == metadata["target"]["endpoint"]
+    else:
+        assert "AZURE_IOT_ADR_ARM_ENDPOINT" not in env
     _json(directory / "started.json", dict(metadata, started=True))
     _json(directory / "selection-gw0.json", {"selected": count, "nodeids": nodeids})
     for kind in RUNNER["MANIFEST"]["resource_kinds"](phase):
@@ -110,6 +113,31 @@ def isolated_environment(monkeypatch):
         "azext_iot_dps_workers",
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.parametrize("issues", [("error", "failure"), ("error", "error")])
+def test_attempt_junit_counts_every_preserved_issue(tmp_path, issues):
+    node = sorted(RUNNER["MANIFEST"]["expected_nodeids"]("regular"))[0]
+    module, name = node.split("::")
+    suite = ET.Element("testsuite")
+    case = ET.SubElement(
+        suite, "testcase", name=name, classname="azext_iot.tests.dps." + module[:-3].replace("/", "."),
+    )
+    for issue in issues:
+        ET.SubElement(case, issue, message="private diagnostic")
+    raw, destination = tmp_path / "raw.xml", tmp_path / "safe.xml"
+    ET.ElementTree(suite).write(raw)
+    result = RUNNER["safe_junit"](
+        raw, destination, "regular", 1,
+        debug={"requestedNodes": ["azext_iot/tests/dps/" + node], "attempt": "a" * 64},
+    )
+    assert result["valid"]
+    output = ET.parse(destination).getroot()
+    assert [child.tag for child in output.find("testcase")] == list(issues)
+    for kind, counter in (("error", "errors"), ("failure", "failures")):
+        assert result[counter] == issues.count(kind)
+        assert output.get(counter) == str(issues.count(kind))
+    assert "private diagnostic" not in destination.read_text()
 
 
 def test_serial_success_preserves_real_baseline_and_distinct_sanitized_artifacts(tmp_path):
@@ -225,6 +253,37 @@ def test_dps_budgets_come_from_ci_budget_source():
     assert RUNNER["RUNNER_SECONDS"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
 
 
+@pytest.mark.parametrize("region", ["australiaeast", "usgovvirginia", "chinaeast2"])
+def test_fairfax_hub_wait_fits_outer_deadlines_without_changing_other_phases(tmp_path, monkeypatch, region):
+    import shlex
+
+    target = RUNNER["TARGETS"]
+    subscription, group = (target["SUBSCRIPTION"], target["RESOURCE_GROUP"]) if region == "australiaeast" else (SUB, GROUP)
+    monkeypatch.setenv("azext_iot_test_subscription", subscription)
+    monkeypatch.setenv("azext_iot_testrg", group)
+    seen = {}
+
+    def execute(command, env, log, runtime, cleanup, cancelled):
+        phase = env["azext_iot_dps_test_phase"]
+        arguments = shlex.split(env.get(RUNNER["FOCUSED"]["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps"))
+        before_runtime, before_cleanup = {name: (run, clean) for name, run, clean in RUNNER["PHASES"]}[phase]
+        extended = region == "usgovvirginia" and phase != "local-auth-toggle"
+        assert arguments == (["--timeout=1800"] if extended else []) + ["-k", "_int.py", "./azext_iot/tests/dps"]
+        assert cleanup == before_cleanup
+        assert runtime == (35 * 60 if extended and phase == "service-sas" else before_runtime)
+        if extended:
+            assert 600 + 2 * 300 + 300 < 1800 < runtime
+        seen[phase] = runtime
+        return _execution(command, env, log, runtime, cleanup, cancelled)
+
+    assert RUN(subscription, group, tmp_path / "dps-phases", Reader(0), execute=execute, region=region) == 0
+    assert set(seen) == {phase[0] for phase in RUNNER["PHASES"]}
+    summary = json.loads((tmp_path / "dps-phases.json").read_text())
+    budget = RUNNER["DPS_CI_BUDGET"]
+    assert summary["runner_seconds"] + budget["setup_minutes"] * 60 <= budget["job_timeout_minutes"] * 60
+    assert not GATE(tmp_path, region)
+
+
 @pytest.mark.parametrize("damage", [None, "wrong-matrix", "wrong-target", "missing-target"])
 @pytest.mark.parametrize("region,endpoint", [
     ("australiaeast", None), ("westeurope", None), ("centraluseuap", "https://management.azure.com"),
@@ -270,6 +329,32 @@ def test_dps_public_preflight_rejects_ambient_or_reader_target_conflict(tmp_path
     target = RUNNER["TARGETS"]
     with pytest.raises(RUNNER["PhaseError"], match="target"):
         RUN(target["SUBSCRIPTION"], target["RESOURCE_GROUP"], tmp_path / "phases", reader, region="australiaeast")
+    assert reader.inventories == 0 and not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+@pytest.mark.parametrize("inherited", [False, True])
+def test_dps_sovereign_phases_use_active_cloud_without_adr_override(tmp_path, monkeypatch, region, inherited):
+    monkeypatch.setenv("azext_iot_test_subscription", SUB)
+    monkeypatch.setenv("azext_iot_testrg", GROUP)
+    if inherited:
+        monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", RUNNER["TARGETS"]["target"](region)["endpoint"])
+    else:
+        monkeypatch.delenv("AZURE_IOT_ADR_ARM_ENDPOINT", raising=False)
+    assert RUN(
+        SUB, GROUP, tmp_path / "dps-phases", Reader(0), execute=_execution, region=region,
+    ) == 0
+    assert not GATE(tmp_path, region)
+
+
+@pytest.mark.parametrize("region", ["usgovvirginia", "chinaeast2"])
+def test_dps_sovereign_preflight_rejects_conflicting_override_before_removing_it(tmp_path, monkeypatch, region):
+    monkeypatch.setenv("azext_iot_test_subscription", SUB)
+    monkeypatch.setenv("azext_iot_testrg", GROUP)
+    monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", RUNNER["TARGETS"]["PUBLIC_ARM"])
+    reader = Reader(0)
+    with pytest.raises(RUNNER["PhaseError"], match="Conflicting ambient DPS target"):
+        RUN(SUB, GROUP, tmp_path / "phases", reader, region=region)
     assert reader.inventories == 0 and not list(tmp_path.iterdir())
 
 
@@ -1076,6 +1161,19 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker, regio
     assert reader.hub._config.api_version == "2026-11-01"  # pylint: disable=protected-access
     assert reader.adr._config.api_version == "2026-11-01"  # pylint: disable=protected-access
     assert reader.dps._config.base_url == RUNNER["TARGETS"]["target"](region)["endpoint"]
+
+
+@pytest.mark.parametrize("api_version", ["2026-11-01", "2026-11-02-preview"])
+def test_reader_uses_selected_adr_sdk_default(mocker, api_version):
+    from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
+
+    def selected_client(*args, **kwargs):
+        kwargs.setdefault("api_version", api_version)
+        return DeviceRegistryMgmtClient(*args, **kwargs)
+
+    mocker.patch("azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient", side_effect=selected_client)
+    reader = RUNNER["ArmReader"](SUB, region="australiaeast")
+    assert reader.adr._config.api_version == api_version  # pylint: disable=protected-access
 
 
 @responses.activate

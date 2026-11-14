@@ -141,7 +141,9 @@ def test_dps_endpoint_validation(host):
 def test_dps_device_factory_renews_sas_and_blocks_redirects(mocker):
     tokens = mocker.patch.object(_factory, "get_dps_sas_auth_header", side_effect=["one", "two"])
     constructor = mocker.patch("azext_iot.sdk.dps.device.ProvisioningDeviceClient")
-    _factory.dps_device_service_factory(None, id_scope="scope", registration_id="reg", device_symmetric_key="key")
+    _factory.dps_device_service_factory(
+        None, endpoint="dps.invalid", id_scope="scope", registration_id="reg", device_symmetric_key="key",
+    )
     options = constructor.call_args.kwargs
     assert options["redirect_max"] == 0
     tokens.assert_not_called()
@@ -184,7 +186,7 @@ def test_x509_transport_legacy_requests_and_certificate_failure(mocker):
 @pytest.mark.parametrize("args", [{}, {"device_symmetric_key": "key"}, {"certificate_file": "cert"}])
 def test_device_factory_incomplete_auth(args):
     with pytest.raises(RequiredArgumentMissingError):
-        _factory.dps_device_service_factory(None, **args)
+        _factory.dps_device_service_factory(None, endpoint="dps.invalid", **args)
 
 
 @pytest.mark.parametrize("top", [0, -2, -1, True, "1"])
@@ -683,7 +685,7 @@ def test_worker_missing_dependency_diagnostic_is_allowlisted(name):
 def test_factory_x509_branch_and_non_json_error(mocker):
     transport = mocker.patch.object(_factory, "_dps_x509_transport").return_value
     client = mocker.patch("azext_iot.sdk.dps.device.ProvisioningDeviceClient")
-    _factory.dps_device_service_factory(None, certificate_file="cert", key_file="key")
+    _factory.dps_device_service_factory(None, endpoint="dps.invalid", certificate_file="cert", key_file="key")
     assert client.call_args.kwargs["transport"] is transport
     error = HttpResponseError("not JSON")
     error.response = Mock()

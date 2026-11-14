@@ -1,0 +1,88 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+trigger: none
+pr: none
+schedules: []
+name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
+appendCommitMessageToRunName: false
+parameters:
+  - name: mode
+    displayName: Mode
+    type: string
+    default: Integration tests
+    values:
+      - Dry run
+      - Integration tests
+  - name: cloud
+    displayName: Cloud
+    type: string
+    default: Public
+    values:
+      - Public
+      - Fairfax
+      - Mooncake
+  - name: regions
+    displayName: Region (Public cloud only)
+    type: stringList
+    default:
+      - Australia East
+    values:
+      - Australia East
+      - Japan East
+      - Central US
+      - UK South
+      - West US
+      - West US 3
+      - East US
+      - West Europe
+  - name: services
+    displayName: Services
+    type: stringList
+    default:
+      - DPS
+      - HubControl
+      - HubData
+      - ADU
+      - ADR
+    values:
+      - DPS
+      - HubControl
+      - HubData
+      - ADU
+      - ADR
+  - name: pythonVersions
+    displayName: Python
+    type: stringList
+    default:
+      - '3.13'
+    values:
+      - '3.10'
+      - '3.11'
+      - '3.12'
+      - '3.13'
+  - name: sourceBranch
+    displayName: Test branch
+    type: string
+    default: release/1.2.0-preview
+pool:
+  vmImage: ubuntu-24.04
+variables:
+  - template: templates/integration-profile.yml
+    parameters:
+      cloud: ${{ lower(parameters.cloud) }}
+      version: preview
+      region: ${{ join(',', parameters.regions) }}
+      services: ${{ parameters.services }}
+  - name: TestMode
+    value: ${{ parameters.mode }}
+  - name: TestPythons
+    value: ${{ join(',', parameters.pythonVersions) }}
+  - name: endpoint
+    value: $(TestEndpoint)
+stages:
+  - template: templates/release-monitor-stages.yml
+    parameters:
+      mode: ${{ parameters.mode }}
+      sourceBranch: ${{ parameters.sourceBranch }}
+      pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
+      regions: ${{ variables.TestRegion }}

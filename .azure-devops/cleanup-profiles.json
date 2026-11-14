@@ -1,0 +1,42 @@
+{
+  "iot-public": {
+    "product": "azure-iot",
+    "repository": "Azure/azure-iot-cli-extension",
+    "cloud": "AzureCloud",
+    "subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+    "groups": ["cli-int-test-rg"],
+    "definitions": [147, 166, 169]
+  },
+  "iot-fairfax": {
+    "product": "azure-iot",
+    "repository": "Azure/azure-iot-cli-extension",
+    "cloud": "AzureUSGovernment",
+    "subscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
+    "groups": ["iot-cli-monitor-fairfax-ga", "iot-cli-monitor-fairfax-preview"],
+    "definitions": [147, 170, 171]
+  },
+  "iot-mooncake": {
+    "product": "azure-iot",
+    "repository": "Azure/azure-iot-cli-extension",
+    "cloud": "AzureChinaCloud",
+    "subscription": "cdb4095c-5c92-410e-90ec-a99dc68d2b51",
+    "groups": ["iot-cli-monitor-mooncake-ga", "iot-cli-monitor-mooncake-preview"],
+    "definitions": [147, 172, 173]
+  },
+  "aio-public": {
+    "product": "azure-iot-ops",
+    "repository": "Azure/azure-iot-ops-cli-extension",
+    "cloud": "AzureCloud",
+    "subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+    "groups": ["ops-cli-int-test-rg"],
+    "definitions": [164, 167, 175, 176]
+  },
+  "aio-fairfax": {
+    "product": "azure-iot-ops",
+    "repository": "Azure/azure-iot-ops-cli-extension",
+    "cloud": "AzureUSGovernment",
+    "subscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
+    "groups": ["ops-cli-monitor-fairfax-v1"],
+    "definitions": [164, 177]
+  }
+}
