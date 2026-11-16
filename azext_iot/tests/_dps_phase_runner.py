@@ -604,7 +604,13 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
     fairfax = target["endpoint"] == TARGETS["GOVERNMENT_ARM"]
     if fairfax:
         phases = tuple(
-            (name, max(runtime, 35 * 60) if name == "service-sas" else runtime, cleanup)
+            (
+                name,
+                max(runtime, 40 * 60) if name in ("regular", "service-sas")
+                else max(runtime, 20 * 60) if name == "local-auth-toggle"
+                else runtime,
+                cleanup,
+            )
             for name, runtime, cleanup in phases
         )
     output = Path(output).resolve()
@@ -713,12 +719,16 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                         f"--cov-report=xml:{folder / 'coverage.xml'}",
                         "--capture=fd", *debug["requestedNodes"],
                     ])
-                if fairfax and name in ("regular", "service-sas"):
-                    # Preserve selection while allowing Hub readiness plus DPS/setup time.
+                if fairfax:
+                    # Preserve selection while allowing Fairfax Hub/DPS readiness plus setup time.
                     arguments = shlex.split(environment.get(
                         FOCUSED["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps",
                     ))
-                    extra = ["--timeout=1800", *([] if debug else ["-o", "faulthandler_timeout=1860"])]
+                    timeout_seconds = 1080 if name == "local-auth-toggle" else 2100
+                    extra = [
+                        f"--timeout={timeout_seconds}",
+                        *([] if debug else ["-o", f"faulthandler_timeout={timeout_seconds + 60}"]),
+                    ]
                     environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join([*extra, *arguments])
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)

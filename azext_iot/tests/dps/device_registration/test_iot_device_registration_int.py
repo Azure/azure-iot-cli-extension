@@ -6,6 +6,7 @@
 
 """Deadline registration and self-contained, receipt-owned certificate issuance."""
 
+import os
 from shlex import quote
 
 import pytest
@@ -15,9 +16,16 @@ from azext_iot.tests.dps._csr_issuance import enrollment, invoke
 from azext_iot.tests.dps._registry_assertions import assert_registry_registration
 from azext_iot.tests.generators import generate_names
 
+_GOVERNMENT_ARM = "https://management.usgovcloudapi.net"
+_REGISTRATION_TIMEOUT = (
+    2100
+    if os.environ.get("azext_iot_test_arm_endpoint", "").rstrip("/").lower() == _GOVERNMENT_ARM
+    else 1800
+)
+
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
-@pytest.mark.timeout(1800, func_only=False)
+@pytest.mark.timeout(_REGISTRATION_TIMEOUT, func_only=False)
 def test_register_without_csr_deadline_contract(provisioned_csr_issuance, timeout):
     resource = provisioned_csr_issuance
     dps = resource["dps"]
@@ -42,7 +50,7 @@ def test_register_without_csr_deadline_contract(provisioned_csr_issuance, timeou
 
 
 @pytest.mark.parametrize("timeout", [None, 180], ids=["default", "deadline"])
-@pytest.mark.timeout(1800, func_only=False)
+@pytest.mark.timeout(_REGISTRATION_TIMEOUT, func_only=False)
 def test_register_and_issue_certificate_contract(provisioned_csr_issuance, tmp_path, timeout):
     resource = provisioned_csr_issuance
     dps = resource["dps"]

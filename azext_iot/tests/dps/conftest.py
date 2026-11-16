@@ -352,7 +352,8 @@ def _wait_for_current_user_data_plane(role: str, scope: str):
         return True
 
     timeout = DATA_PLANE_AUTHORIZATION_TIMEOUT_SECONDS
-    if (role == HUB_USER_ROLE and cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
+    if (role in (HUB_USER_ROLE, DPS_USER_ROLE)
+            and cli.az_cli.cloud.endpoints.resource_manager.rstrip("/").lower()
             == "https://management.usgovcloudapi.net"):
         timeout = 600
     _wait_for_readiness(

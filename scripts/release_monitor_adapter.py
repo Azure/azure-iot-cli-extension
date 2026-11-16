@@ -28,8 +28,8 @@ COMPATIBILITY = {
         "helpers": ("_dps_authorization_failed_response",),
         "imports": ("import re", "from msrestazure.azure_exceptions import CloudError"),
         "reason": (
-            "Allow ten minutes for Fairfax Hub caller authorization and retain safe per-probe timing receipts; "
-            "preserve DPS deadlines, exact error predicates and three-success confirmation."
+            "Allow ten minutes for Fairfax Hub and DPS caller authorization and retain safe per-probe timing receipts; "
+            "preserve non-Fairfax deadlines, exact error predicates and three-success confirmation."
         ),
     },
     "azext_iot/tests/iothub/_sas_phase.py": {
