@@ -568,6 +568,142 @@ def test_registry_ownership_client_preserves_hub_context(mocker):
     assert kwargs["auth_type_dataplane"] == "login"
 
 
+@pytest.mark.parametrize("not_found_count", [7, 12])
+def test_servicebus_export_retries_auth_rule_keys_and_skips_uncreated_endpoint_delete(
+    mocker, tmp_path, not_found_count
+):
+    output = tmp_path / "state.json"
+    mocker.patch.object(subject, "delete_system_endpoints")
+    mocker.patch.object(controlplane.time, "sleep")
+    mocker.patch("azext_iot.tests.iothub._integration_helpers.sleep")
+    ids = iter(["nsid", "epid"])
+    mocker.patch.object(controlplane, "generate_generic_id", side_effect=lambda: next(ids))
+    commands = []
+    remaining = [not_found_count]
+
+    def invoke(cmd):
+        commands.append(cmd)
+        result = mocker.Mock()
+        if cmd.startswith("servicebus topic authorization-rule keys list"):
+            if remaining[0] > 0:
+                remaining[0] -= 1
+                raise ResourceNotFoundError("ParentResourceNotFound")
+            result.as_json.return_value = {
+                "primaryConnectionString": "Endpoint=sb://sbnsid.servicebus.windows.net/;SharedAccessKey=abc"
+            }
+        return result
+
+    mocker.patch.object(subject.cli, "invoke", side_effect=invoke)
+    mocker.patch.object(
+        subject,
+        "_invoke_state",
+        side_effect=lambda _cmd: output.write_text(json.dumps({
+            "arm": {"resources": [{"properties": {"routing": {"endpoints": {"serviceBusTopics": [{
+                "name": "epid",
+                "connectionString": "Endpoint=sb://sbnsid.servicebus.windows.net/;SharedAccessKey=****",
+            }]}}}}]}
+        }), encoding="utf-8"),
+    )
+    hubs = [{"name": "owned-hub", "rg": "owned-rg"}]
+
+    if not_found_count >= 12:
+        with pytest.raises(ResourceNotFoundError, match="ParentResourceNotFound"):
+            controlplane.test_export_endpoint_resource_name_starting_with_scheme_char(hubs, str(output))
+        assert sum(cmd.startswith("servicebus topic authorization-rule keys list") for cmd in commands) == 12
+        assert not any(cmd.startswith("iot hub message-endpoint") for cmd in commands)
+        assert commands[-1] == "servicebus namespace delete --name sbnsid -g owned-rg"
+    else:
+        controlplane.test_export_endpoint_resource_name_starting_with_scheme_char(hubs, str(output))
+        assert sum(cmd.startswith("servicebus topic authorization-rule keys list") for cmd in commands) == 8
+        assert commands[-2] == "iot hub message-endpoint delete -n owned-hub -g owned-rg --en epid -y"
+        assert commands[-1] == "servicebus namespace delete --name sbnsid -g owned-rg"
+
+
+@pytest.mark.parametrize("fail_before_endpoint,fail_endpoint_delete", [
+    (True, False),
+    (False, True),
+])
+def test_cosmosdb_and_servicebus_export_cleanup_preserves_backing_resource_teardown(
+    mocker, tmp_path, fail_before_endpoint, fail_endpoint_delete
+):
+    output = tmp_path / "cosmos.json"
+    mocker.patch.object(subject, "delete_system_endpoints")
+    mocker.patch.object(controlplane.time, "sleep")
+    mocker.patch("azext_iot.tests.iothub._integration_helpers.sleep")
+    ids = iter(["acctid", "epid", "nsid", "sbepid"])
+    mocker.patch.object(controlplane, "generate_generic_id", side_effect=lambda: next(ids))
+    hubs = [{"name": "owned-hub", "rg": "owned-rg"}]
+
+    cosmos_commands = []
+
+    def invoke_cosmos(cmd):
+        cosmos_commands.append(cmd)
+        result = mocker.Mock()
+        if fail_before_endpoint and cmd.startswith("cosmosdb keys list"):
+            raise BadRequestError("Cosmos keys unavailable")
+        if fail_endpoint_delete and cmd.startswith("iot hub message-endpoint delete"):
+            raise BadRequestError("Endpoint delete failed")
+        if cmd.startswith("cosmosdb keys list"):
+            result.as_json.return_value = {
+                "connectionStrings": [{
+                    "connectionString": "AccountEndpoint=https://scosacctid.documents.azure.com:443/;AccountKey=abc;"
+                }]
+            }
+        return result
+
+    mocker.patch.object(subject.cli, "invoke", side_effect=invoke_cosmos)
+    mocker.patch.object(
+        subject,
+        "_invoke_state",
+        side_effect=lambda _cmd: output.write_text(json.dumps({
+            "arm": {"resources": [{"properties": {"routing": {"endpoints": {"cosmosDBSqlContainers": [{
+                "name": "epid",
+                "endpointUri": "https://scosacctid.documents.azure.com:443/",
+                "primaryKey": "****",
+                "secondaryKey": "****",
+            }]}}}}]}
+        }), encoding="utf-8"),
+    )
+
+    with pytest.raises(BadRequestError, match="Cosmos keys unavailable" if fail_before_endpoint else "Endpoint delete failed"):
+        controlplane.test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(hubs, str(output))
+    if fail_before_endpoint:
+        assert not any(cmd.startswith("iot hub message-endpoint") for cmd in cosmos_commands)
+    else:
+        assert any(cmd.startswith("iot hub message-endpoint delete") for cmd in cosmos_commands)
+    assert cosmos_commands[-1] == "cosmosdb delete --name scosacctid -g owned-rg -y"
+
+    if fail_endpoint_delete:
+        sb_commands = []
+
+        def invoke_sb(cmd):
+            sb_commands.append(cmd)
+            result = mocker.Mock()
+            if cmd.startswith("servicebus topic authorization-rule keys list"):
+                result.as_json.return_value = {
+                    "primaryConnectionString": "Endpoint=sb://sbnsid.servicebus.windows.net/;SharedAccessKey=abc"
+                }
+            elif cmd.startswith("iot hub message-endpoint delete"):
+                raise BadRequestError("SB endpoint delete failed")
+            return result
+
+        mocker.patch.object(subject.cli, "invoke", side_effect=invoke_sb)
+        mocker.patch.object(
+            subject,
+            "_invoke_state",
+            side_effect=lambda _cmd: output.write_text(json.dumps({
+                "arm": {"resources": [{"properties": {"routing": {"endpoints": {"serviceBusTopics": [{
+                    "name": "sbepid",
+                    "connectionString": "Endpoint=sb://sbnsid.servicebus.windows.net/;SharedAccessKey=****",
+                }]}}}}]}
+            }), encoding="utf-8"),
+        )
+        with pytest.raises(BadRequestError, match="SB endpoint delete failed"):
+            controlplane.test_export_endpoint_resource_name_starting_with_scheme_char(hubs, str(output))
+        assert any(cmd.startswith("iot hub message-endpoint delete") for cmd in sb_commands)
+        assert sb_commands[-1] == "servicebus namespace delete --name sbnsid -g owned-rg"
+
+
 @pytest.fixture
 def bounded_query_wait(mocker):
     return mocker.patch.object(

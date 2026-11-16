@@ -267,15 +267,34 @@ def test_fairfax_hub_wait_fits_outer_deadlines_without_changing_other_phases(tmp
         phase = env["azext_iot_dps_test_phase"]
         arguments = shlex.split(env.get(RUNNER["FOCUSED"]["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps"))
         before_runtime, before_cleanup = {name: (run, clean) for name, run, clean in RUNNER["PHASES"]}[phase]
-        extended = region == "usgovvirginia" and phase != "local-auth-toggle"
-        expected_prefix = ["--timeout=1800", "-o", "faulthandler_timeout=1860"] if extended else []
+        fairfax = region == "usgovvirginia"
+        timeout_seconds = 1080 if phase == "local-auth-toggle" else 2100
+        expected_prefix = (
+            [f"--timeout={timeout_seconds}", "-o", f"faulthandler_timeout={timeout_seconds + 60}"]
+            if fairfax else []
+        )
         assert arguments == expected_prefix + ["-k", "_int.py", "./azext_iot/tests/dps"]
         assert cleanup == before_cleanup
-        assert runtime == (35 * 60 if extended and phase == "service-sas" else before_runtime)
-        if extended:
-            assert 600 + 2 * 300 + 300 < 1800 < runtime
+        expected_runtime = (
+            max(before_runtime, 40 * 60) if fairfax and phase in ("regular", "service-sas")
+            else max(before_runtime, 20 * 60) if fairfax and phase == "local-auth-toggle"
+            else before_runtime
+        )
+        assert runtime == expected_runtime
+        if fairfax and phase != "local-auth-toggle":
+            assert 600 + 600 + 300 + 300 < 2100 < runtime
+        elif fairfax:
+            assert 600 + 300 + 120 < 1080 < runtime
         seen[phase] = runtime
         return _execution(command, env, log, runtime, cleanup, cancelled)
+
+    if region == "usgovvirginia":
+        # Verify frozen/pre-fix 35m regular budgets still receive 40m (> 2100s --timeout) on Fairfax.
+        monkeypatch.setitem(
+            RUNNER,
+            "PHASES",
+            tuple((n, 35 * 60 if n == "regular" else r, c) for n, r, c in RUNNER["PHASES"]),
+        )
 
     assert RUN(subscription, group, tmp_path / "dps-phases", Reader(0), execute=execute, region=region) == 0
     assert set(seen) == {phase[0] for phase in RUNNER["PHASES"]}

@@ -199,7 +199,10 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
     sb_namespace = ("sb" + generate_generic_id())[:24]
     topic_name = "topic1"
     endpoint_name = generate_generic_id()
+    namespace_attempted = False
+    endpoint_attempted = False
     try:
+        namespace_attempted = True
         state.cli.invoke(
             f"servicebus namespace create --name {sb_namespace} -g {hub_rg} --sku Standard --location {HUB_TEST_LOCATION}"
         )
@@ -210,11 +213,12 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
             f"servicebus topic authorization-rule create --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute --rights Send"
         )
-        # Service Bus can briefly report a just-created topic as missing.
+        # Regional Service Bus ARM propagation can lag past a 50s window for topic auth-rule keys.
         endpoint_cstring = retry_not_found(lambda: state.cli.invoke(
             f"servicebus topic authorization-rule keys list --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute"
-        ).as_json())["primaryConnectionString"]
+        ).as_json(), attempts=12)["primaryConnectionString"]
+        endpoint_attempted = True
         state.cli.invoke(
             f"iot hub message-endpoint create servicebus-topic -n {hub_name} -g {hub_rg} "
             f"--en {endpoint_name} -c '{endpoint_cstring}' --erg {hub_rg}"
@@ -231,8 +235,12 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
         assert len(exported) == 1, "endpoint was dropped from export (namespace likely corrupted)"
         assert sb_namespace in exported[0]["connectionString"]
     finally:
-        state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
-        state.cli.invoke(f"servicebus namespace delete --name {sb_namespace} -g {hub_rg}")
+        try:
+            if endpoint_attempted:
+                state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        finally:
+            if namespace_attempted:
+                state.cli.invoke(f"servicebus namespace delete --name {sb_namespace} -g {hub_rg}")
 
 
 @pytest.mark.hub_infrastructure(count=1)
@@ -250,7 +258,10 @@ def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
     database_name = "routedb"
     container_name = "routecontainer"
     endpoint_name = generate_generic_id()
+    cosmos_attempted = False
+    endpoint_attempted = False
     try:
+        cosmos_attempted = True
         state.cli.invoke(
             f"cosmosdb create --name {cosmos_account} -g {hub_rg} "
             f"--locations regionName={HUB_TEST_LOCATION} failoverPriority=0"
@@ -265,6 +276,7 @@ def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
         endpoint_cstring = state.cli.invoke(
             f"cosmosdb keys list --name {cosmos_account} -g {hub_rg} --type connection-strings"
         ).as_json()["connectionStrings"][0]["connectionString"]
+        endpoint_attempted = True
         state.cli.invoke(
             f"iot hub message-endpoint create cosmosdb-container -n {hub_name} -g {hub_rg} "
             f"--en {endpoint_name} --db {database_name} --container {container_name} "
@@ -282,5 +294,9 @@ def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
         assert len(exported) == 1, "endpoint was dropped from export (account name likely corrupted)"
         assert cosmos_account in exported[0]["endpointUri"]
     finally:
-        state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
-        state.cli.invoke(f"cosmosdb delete --name {cosmos_account} -g {hub_rg} -y")
+        try:
+            if endpoint_attempted:
+                state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        finally:
+            if cosmos_attempted:
+                state.cli.invoke(f"cosmosdb delete --name {cosmos_account} -g {hub_rg} -y")

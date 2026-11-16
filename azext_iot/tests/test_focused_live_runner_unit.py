@@ -312,8 +312,11 @@ def run_dps(tmp_path, monkeypatch, phase, *, defect=None, whole=False, reader=No
         report = Path(env["azext_iot_dps_coverage_file"]).with_name("coverage.xml")
         assert f"--cov-report=xml:{report}" in shlex.split(env[focused.DPS_ARGS_ENV])
         expected_runtime, expected_cleanup = {name: (run, clean) for name, run, clean in dps.PHASES}[phase]
-        if region == "usgovvirginia" and phase == "service-sas":
-            expected_runtime = 35 * 60
+        if region == "usgovvirginia":
+            if phase in ("regular", "service-sas"):
+                expected_runtime = max(expected_runtime, 40 * 60)
+            elif phase == "local-auth-toggle":
+                expected_runtime = max(expected_runtime, 20 * 60)
         assert (runtime, cleanup) == (expected_runtime, expected_cleanup)
         # Reuse the existing fake ARM/JUnit producer, then retain only the requested collection.
         regular_env = dict(env, azext_iot_dps_workers="0" if phase == "local-auth-toggle" else "7")
@@ -376,7 +379,8 @@ def test_fairfax_hub_deadlines_preserve_focused_selection_and_cleanup(tmp_path, 
     )
     assert result == 0
     arguments = shlex.split(captured[0][focused.DPS_ARGS_ENV])
-    assert ("--timeout=1800" in arguments) is (phase != "local-auth-toggle")
+    expected_timeout = "--timeout=1080" if phase == "local-auth-toggle" else "--timeout=2100"
+    assert expected_timeout in arguments
     assert summary["phases"][0]["cleanup"]["complete"] is True
     assert summary["runner_seconds"] <= dps.RUNNER_SECONDS
     assert GATE["evaluate_dps_phases"](tmp_path, region="usgovvirginia")
