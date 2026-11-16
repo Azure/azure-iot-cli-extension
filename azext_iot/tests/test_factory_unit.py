@@ -84,7 +84,8 @@ MANAGEMENT_FACTORIES = [
 ]
 
 
-@pytest.mark.parametrize("cloud_config", PUBLIC_CLOUD_CONFIGS, ids=[c["id"] for c in PUBLIC_CLOUD_CONFIGS])
+@pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS + PUBLIC_CLOUD_CONFIGS[1:],
+                         ids=[c["id"] for c in CLOUD_CONFIGS + PUBLIC_CLOUD_CONFIGS[1:]])
 class TestFactoryCredentialScopes:
     """Preserve scopes/endpoints while authenticating in the hosting CLI."""
 
@@ -100,6 +101,14 @@ class TestFactoryCredentialScopes:
         )
 
         cli_ctx = _build_cli_ctx(mocker, cloud_config)
+        public_only = ("adr_service_factory", "adr_update_instance_service_factory")
+        if factory_name in public_only and cloud_config["id"] in ("usgov", "china"):
+            from knack.util import CLIError
+            with pytest.raises(CLIError, match="Azure public cloud only"):
+                getattr(_factory, factory_name)(cli_ctx)
+            cli_profile.assert_not_called()
+            client_type.assert_not_called()
+            return
         assert getattr(_factory, factory_name)(cli_ctx) is client_type.return_value
 
         get_subscription.assert_called_once_with(cli_ctx)
@@ -110,7 +119,9 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential"] is mocker.sentinel.credential
         assert call_kwargs["subscription_id"] == "test-sub"
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs[endpoint_key] == PUBLIC_ARM
+        assert call_kwargs[endpoint_key] == (
+            PUBLIC_ARM if factory_name in public_only else cloud_config["resource_manager"]
+        )
         assert "user_agent_policy" in call_kwargs
         assert "http_logging_policy" in call_kwargs
 
@@ -129,6 +140,14 @@ class TestFactoryCredentialScopes:
         )
 
         cli_ctx = _build_cli_ctx(mocker, cloud_config)
+        public_only = ("adr_service_factory", "adr_update_instance_service_factory")
+        if factory_name in public_only and cloud_config["id"] in ("usgov", "china"):
+            from knack.util import CLIError
+            with pytest.raises(CLIError, match="Azure public cloud only"):
+                getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+            cli_profile.assert_not_called()
+            client_type.assert_not_called()
+            return
         getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
 
         get_subscription.assert_not_called()
@@ -138,7 +157,9 @@ class TestFactoryCredentialScopes:
         assert kwargs["subscription_id"] == "linked-sub"
         assert kwargs["credential"] is mocker.sentinel.credential
         assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert kwargs[endpoint_key] == PUBLIC_ARM
+        assert kwargs[endpoint_key] == (
+            PUBLIC_ARM if factory_name in public_only else cloud_config["resource_manager"]
+        )
 
 
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS[1:], ids=[c["id"] for c in CLOUD_CONFIGS[1:]])
@@ -187,6 +208,38 @@ def test_sovereign_management_factory(mocker, cli_profile, cloud_config, factory
         _factory._ADR_IOT_HUB_API_VERSION if factory_name == "iot_hub_service_factory" else _factory._ADR_DPS_API_VERSION
     )
     cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="linked-sub")
+
+
+@pytest.mark.parametrize("factory_name,client_path", [
+    ("iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient"),
+    ("iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient"),
+])
+@pytest.mark.parametrize("override", [None, PUBLIC_ARM, CANARY_ARM])
+def test_custom_cloud_management_preserves_endpoint_credential_boundary(
+    mocker, monkeypatch, cli_profile, factory_name, client_path, override,
+):
+    from knack.util import CLIError
+    from azext_iot import _factory
+
+    cloud = {
+        "id": "custom",
+        "resource_manager": "https://management.custom.example",
+        "active_directory": "https://login.custom.example",
+        "active_directory_resource_id": "https://management.custom.example",
+    }
+    cli_ctx = _build_cli_ctx(mocker, cloud)
+    client = mocker.patch(client_path)
+    if override:
+        monkeypatch.setenv("AZURE_IOT_ADR_ARM_ENDPOINT", override)
+        with pytest.raises(CLIError, match="Azure public cloud only"):
+            getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+        cli_profile.assert_not_called()
+        client.assert_not_called()
+    else:
+        getattr(_factory, factory_name)(cli_ctx, subscription_id="linked-sub")
+        assert client.call_args.kwargs["base_url"] == cloud["resource_manager"]
+        assert client.call_args.kwargs["credential_scopes"] == ["https://management.custom.example/.default"]
+        cli_profile.return_value.get_login_credentials.assert_called_once_with(subscription_id="linked-sub")
 
 
 @pytest.mark.parametrize("override", [PUBLIC_ARM, CANARY_ARM, "https://management.azure.com.invalid"])
@@ -598,7 +651,7 @@ def test_ordinary_management_factory_routes_real_requests_without_harness_or_fal
     credential = mocker.Mock(spec=["get_token"])
     credential.get_token.return_value = AccessToken("offline-token", 4102444800)
     cli_profile.return_value.get_login_credentials.return_value = (credential, "test-sub-id", "tenant")
-    endpoint = override or PUBLIC_ARM
+    endpoint = override or PUBLIC_CLOUD_CONFIGS[1]["resource_manager"]
     url = f"{endpoint}/subscriptions/test-sub-id/resourceGroups/rg/providers/Microsoft.Devices/{resource_type}/target"
     body = {"name": "target", "location": region}
     mocked_response.add(

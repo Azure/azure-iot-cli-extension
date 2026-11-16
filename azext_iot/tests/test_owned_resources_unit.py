@@ -741,3 +741,135 @@ def test_cleanup_waits_for_absence_with_a_bounded_budget(journal, monkeypatch, s
         owned.cleanup(journal.path, timeout=15)
         assert journal.records()[RESOURCE]["cleanup"] == "absent"
     assert clock[0] == min(stale_reads, 3) * 5
+
+
+def test_private_endpoint_delete_omits_if_match_while_other_types_preserve_it(journal):
+    endpoint = GROUP + "/providers/microsoft.network/privateendpoints/pe1"
+    arm = Mock(deadline=float("inf"))
+    arm.verify.side_effect = [
+        {"id": endpoint, "etag": "pe-etag", "tags": {owned.TAG: journal.owner}},
+        None,
+        {"id": endpoint, "etag": "pe-etag", "tags": {owned.TAG: journal.owner}},
+        {"id": RESOURCE, "etag": "st-etag", "tags": {owned.TAG: journal.owner}},
+        {"id": RESOURCE, "etag": "st-etag", "tags": {owned.TAG: journal.owner}},
+    ]
+    observer = owned.Observer(journal, arm)
+    assert observer.prepare_root(endpoint, "2023-05-01", {}, "DELETE") == {}
+    assert observer.prepare_root(endpoint, "2023-05-01", {}, "DELETE") == {}
+    assert owned.cleanup_submit(journal, arm, endpoint, {"api": "2023-05-01"}) == "deletion"
+    assert observer.prepare_root(RESOURCE, "2023-05-01", {}, "DELETE") == {"If-Match": "st-etag"}
+    assert owned.cleanup_submit(journal, arm, RESOURCE, {"api": "2023-05-01"}) == "deletion"
+    assert [call.kwargs["headers"] for call in arm.request.call_args_list] == [None, {"If-Match": "st-etag"}]
+
+
+@pytest.mark.parametrize("mode", [
+    "async-op-failed-recovers",
+    "async-op-failed-twice",
+    "deleting-to-failed-twice",
+    "initial-failed-then-absent",
+    "bad-op-url-ignored",
+])
+def test_cleanup_retries_once_and_fails_fast_on_terminal_async_delete(journal, monkeypatch, mode):
+    op_path = f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.SecretsSync/locations/westus2/operationStatuses/op1"
+    op_url = f"https://management.azure.com{op_path}?api-version=2024-08-21-preview"
+    initial_state = "Failed" if mode == "initial-failed-then-absent" else "Succeeded"
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}, "properties": {"provisioningState": initial_state}}
+    journal.record(RESOURCE, "2024-08-21-preview", kind="root")
+    arm = Mock(endpoint="https://management.azure.com", journal=journal)
+    arm.pages.side_effect = [[resource], [], []]
+    arm.verify.return_value = resource
+    op_failed = requests.Response()
+    op_failed.status_code = 200
+    op_failed._content = b'{"status":"Failed"}'
+    arm.send.return_value = op_failed
+    if mode == "async-op-failed-recovers":
+        arm.verify.side_effect = [
+            resource,
+            {**resource, "properties": {"provisioningState": "Deleting"}},
+            {**resource, "properties": {"provisioningState": "Failed"}},
+        ]
+        arm.request.side_effect = [
+            (202, None, {"Azure-AsyncOperation": op_url}),
+            (200, {**resource, "properties": {"provisioningState": "Deleting"}}, {}),
+            (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
+            (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
+            (202, None, {}),
+            (404, None, {}),
+        ]
+    elif mode == "async-op-failed-twice":
+        arm.request.side_effect = [
+            (202, None, {"Azure-AsyncOperation": op_url}),
+            (200, resource, {}),
+            (202, None, {"Azure-AsyncOperation": op_url}),
+            (200, resource, {}),
+        ]
+    elif mode == "deleting-to-failed-twice":
+        arm.request.side_effect = [
+            (202, None, {}),
+            (200, {**resource, "properties": {"provisioningState": "Deleting"}}, {}),
+            (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
+            (202, None, {}),
+            (200, {**resource, "properties": {"provisioningState": "Deleting"}}, {}),
+            (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
+        ]
+    elif mode == "initial-failed-then-absent":
+        arm.request.side_effect = [
+            (202, None, {}),
+            (200, resource, {}),
+            (404, None, {}),
+        ]
+    else:
+        arm.request.side_effect = [
+            (202, None, {"Azure-AsyncOperation": "https://evil.example/subscriptions/x?a=1"}),
+            (404, None, {}),
+        ]
+    clock = [0]
+    monkeypatch.setattr(owned, "Arm", Mock(return_value=arm))
+    monkeypatch.setattr(owned.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(owned.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay))
+    if mode in ("async-op-failed-recovers", "initial-failed-then-absent", "bad-op-url-ignored"):
+        owned.cleanup(journal.path, timeout=600)
+        assert journal.records()[RESOURCE]["cleanup"] == "absent"
+        if mode == "bad-op-url-ignored":
+            arm.send.assert_not_called()
+    else:
+        with pytest.raises(owned.CleanupIncomplete):
+            owned.cleanup(journal.path, timeout=600)
+        assert journal.records()[RESOURCE]["cleanup"] == "failed"
+        assert clock[0] <= 20
+
+
+@pytest.mark.parametrize("method,recover", [("GET", True), ("GET", False), ("DELETE", True)])
+def test_transient_non_json_arm_404_retries_only_reads_and_stays_fail_closed(http_arm, monkeypatch, method, recover):
+    bad = requests.Response()
+    bad.status_code = 404
+    bad._content = b"<html>gateway 404</html>"
+    good = requests.Response()
+    good.status_code = 404
+    good._content = json.dumps({"error": {"code": "ResourceNotFound"}}).encode()
+    http_arm.session.request.side_effect = [bad, good] if recover else [bad, bad, bad]
+    monkeypatch.setattr(owned.time, "sleep", lambda _: None)
+    if method == "GET" and recover:
+        assert http_arm.request("GET", RESOURCE, "2023-05-01")[0] == 404
+        assert http_arm.session.request.call_count == 2
+    else:
+        with pytest.raises(RuntimeError, match="Unverifiable ARM 404"):
+            http_arm.request(method, RESOURCE, "2023-05-01")
+        assert http_arm.session.request.call_count == (1 if method == "DELETE" else 3)
+
+
+def test_prepare_root_retries_extended_non_json_404_propagation_window(journal, http_arm, monkeypatch):
+    bad = requests.Response()
+    bad.status_code = 404
+    bad._content = b""
+    good = requests.Response()
+    good.status_code = 404
+    good._content = json.dumps({"error": {"code": "ResourceNotFound"}}).encode()
+    http_arm.session.request.side_effect = [bad] * 5 + [good]
+    sleeps = []
+    monkeypatch.setattr(owned.time, "sleep", sleeps.append)
+    payload = {"location": "westus2", "tags": {"env": "test"}}
+    owned.Observer(journal, http_arm).prepare_root(RESOURCE, "2023-05-01", payload, "PUT")
+    assert http_arm.session.request.call_count == 6
+    assert sleeps == [1, 2, 2, 1, 2]
+    assert payload["tags"][owned.TAG] == journal.owner

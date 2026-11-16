@@ -1344,7 +1344,7 @@ def test_real_full_coverage_still_appends_prior_phase_data_to_checkout_default(t
     ("HubControl", "regular"), ("HubData", "entra"), ("HubData", "sas"),
     ("DPS", "regular"), ("DPS", "service-sas"), ("DPS", "local-auth-toggle"),
 ])
-@pytest.mark.parametrize("debug", [False, True], ids=["full-300s", "debug-no-periodic-dumps"])
+@pytest.mark.parametrize("debug", [False, True], ids=["full-960s", "debug-no-periodic-dumps"])
 def test_effective_faulthandler_options_keep_deadlines_and_failure_tracebacks(
     tmp_path, monkeypatch, service, phase, debug,
 ):
@@ -1367,9 +1367,9 @@ def test_effective_faulthandler_options_keep_deadlines_and_failure_tracebacks(
         value for previous, value in zip(command, command[1:])
         if previous == "-o" and value.startswith("faulthandler_timeout=")
     ]
-    expected = 0 if debug else 300
+    expected = 0 if debug else 960
     assert dumps == (
-        ["faulthandler_timeout=300", "faulthandler_timeout=0"] if service == "DPS" and debug
+        ["faulthandler_timeout=960", "faulthandler_timeout=0"] if service == "DPS" and debug
         else [f"faulthandler_timeout={expected}"]
     )
     assert "--timeout=900" in command

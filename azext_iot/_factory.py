@@ -83,7 +83,7 @@ def _get_credential_scopes(cli_ctx):
 
 
 def _get_canary_credential_scopes(cli_ctx):
-    """Reject incompatible credentials before using the public canary host."""
+    """Reject incompatible credentials before using a public ARM host."""
     endpoints = cli_ctx.cloud.endpoints
     for endpoint, public_endpoints in (
         (
@@ -97,7 +97,7 @@ def _get_canary_credential_scopes(cli_ctx):
     ):
         if not isinstance(endpoint, str) or endpoint.rstrip("/").casefold() not in public_endpoints:
             raise CLIError(
-                "The preview IoT management APIs support Azure public cloud only. "
+                "The selected public ARM endpoint supports Azure public cloud only. "
                 "Use an AzureCloud-compatible Microsoft Entra authority and ARM audience."
             )
     return _get_credential_scopes(cli_ctx)
@@ -119,8 +119,7 @@ def _get_iot_arm_endpoint(cli_ctx):
         ),
     }
     if endpoint not in sovereign:
-        _get_canary_credential_scopes(cli_ctx)
-        return get_adr_arm_endpoint()
+        return get_adr_arm_endpoint(endpoints.resource_manager)
     authorities, audience = sovereign[endpoint]
     if (not isinstance(endpoints.active_directory, str)
             or endpoints.active_directory.rstrip("/").lower() not in authorities
@@ -141,6 +140,15 @@ def get_dps_provisioning_host(cli_ctx):
     }.get(endpoint, IOTDPS_PROVISIONING_HOST)
 
 
+def _get_management_credential_scopes(cli_ctx, endpoint):
+    cloud_endpoint = cli_ctx.cloud.endpoints.resource_manager.rstrip("/").casefold()
+    if endpoint.casefold() in ("https://management.azure.com", _ADR_CANARY_ARM_ENDPOINT) or (
+        endpoint.casefold() != cloud_endpoint
+    ):
+        return _get_canary_credential_scopes(cli_ctx)
+    return _get_credential_scopes(cli_ctx)
+
+
 def _iot_hub_management_client(
     cli_ctx, subscription_id, base_url, **kwargs
 ):
@@ -148,7 +156,7 @@ def _iot_hub_management_client(
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    credential_scopes = _get_credential_scopes(cli_ctx)
+    credential_scopes = _get_management_credential_scopes(cli_ctx, base_url)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
@@ -192,7 +200,7 @@ def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    credential_scopes = _get_credential_scopes(cli_ctx)
+    credential_scopes = _get_management_credential_scopes(cli_ctx, base_url)
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(

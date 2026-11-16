@@ -15,9 +15,12 @@ from azext_iot._factory import _ADR_CANARY_ARM_ENDPOINT as CANARY_ARM_ENDPOINT
 PUBLIC_ARM_ENDPOINT = "https://management.azure.com"
 
 
-def get_adr_arm_endpoint():
-    """Use public ARM by default; canary is opt-in and never inferred from a resource location."""
-    endpoint = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT", PUBLIC_ARM_ENDPOINT).rstrip("/").lower()
+def get_adr_arm_endpoint(default_endpoint=PUBLIC_ARM_ENDPOINT):
+    """Use the active cloud's ARM endpoint unless an explicit override is supplied."""
+    override = os.getenv("AZURE_IOT_ADR_ARM_ENDPOINT")
+    if override is None:
+        return default_endpoint.rstrip("/")
+    endpoint = override.rstrip("/").lower()
     if endpoint not in {CANARY_ARM_ENDPOINT, PUBLIC_ARM_ENDPOINT}:
         raise InvalidArgumentValueError(
             "AZURE_IOT_ADR_ARM_ENDPOINT must be https://management.azure.com "
