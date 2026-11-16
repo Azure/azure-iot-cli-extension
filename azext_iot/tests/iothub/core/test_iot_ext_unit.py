@@ -16,6 +16,7 @@ import json
 import os
 import responses
 import re
+from azure.cli.core.azclierror import BadRequestError
 from argparse import Namespace
 from copy import deepcopy
 from azext_iot._validators import process_top
@@ -2039,6 +2040,28 @@ class TestSasTokenAuth:
 
 
 class TestMonitorEvents:
+    def test_disabled_local_auth_rejected_before_keys_query_and_receiver(self, mocker, fixture_cmd):
+        fixture_cmd.cli_ctx.invocation = mocker.Mock(data={})
+        mocker.patch.object(
+            subject.IotHubDiscovery, "find_resource",
+            return_value={"name": "myhub", "properties": {"disableLocalAuth": True}},
+        )
+        find_policy = mocker.patch.object(subject.IotHubDiscovery, "find_policy")
+        query = mocker.patch.object(subject, "iot_query")
+        start_monitor = mocker.patch("azext_iot.monitor.telemetry.start_single_monitor")
+
+        with pytest.raises(BadRequestError, match="disableLocalAuth=true"):
+            subject.iot_hub_monitor_events(
+                fixture_cmd,
+                hub_name_or_hostname="myhub",
+                resource_group_name="myrg",
+                device_query="select deviceId from devices",
+            )
+
+        find_policy.assert_not_called()
+        query.assert_not_called()
+        start_monitor.assert_not_called()
+
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
         service_client = mocker.patch(path_service_client)
