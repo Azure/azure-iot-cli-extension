@@ -45,7 +45,7 @@ def cleanup(resource, operation, *, accepted=True):
 
     try:
         result = operation()
-    except (AzureError, CLIError, CloudError, RuntimeError, AssertionError, OSError):
+    except (AzureError, CLIError, CloudError, RuntimeError, AssertionError, OSError, SystemExit):
         record(resource, "failed", type(sys.exc_info()[1]).__name__)
         return None
     if accepted:

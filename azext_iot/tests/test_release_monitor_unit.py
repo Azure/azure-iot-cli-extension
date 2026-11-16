@@ -306,6 +306,7 @@ def test_staging_preserves_released_cases_manifests_and_product(
     (helpers / "_phase_manifest.py").write_text("different release", encoding="utf-8")
     (helpers / "test_case_int.py").write_text("different assertions", encoding="utf-8")
     (automation / "tox.ini").write_text("current controller setup", encoding="utf-8")
+    (directory / "source/tox.ini").write_text("released tox setup", encoding="utf-8")
     released_manifest = directory / "source/azext_iot/tests/_phase_manifest.py"
     released_manifest.write_text("released selection", encoding="utf-8")
     monkeypatch.setattr(adapter, "ROOT", automation)
@@ -324,9 +325,11 @@ def test_staging_preserves_released_cases_manifests_and_product(
     assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
     staged = monitor.read_json(destination / "release-monitor.json")
     if source_only:
+        assert (destination / "tox.ini").read_text(encoding="utf-8") == "released tox setup"
         compatibility.assert_not_called()
         assert "testCompatibility" not in staged
     else:
+        assert (destination / "tox.ini").read_text(encoding="utf-8") == "current controller setup"
         compatibility.assert_called_once()
         assert staged["testCompatibility"] == {
             "version": 1, "sourceCommit": manifest["testSourceCommit"],
