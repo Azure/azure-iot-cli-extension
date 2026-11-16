@@ -7,7 +7,6 @@
 """Attempt-local ARM ownership for live tests in pre-created resource groups."""
 
 import argparse
-from collections.abc import Mapping
 import hashlib
 from itertools import groupby
 import json
@@ -396,7 +395,7 @@ def delete_headers(resource, etag):
 
 
 def operation_url(arm, headers):
-    if not isinstance(headers, Mapping) or not isinstance(getattr(arm, "endpoint", None), str):
+    if not headers or not hasattr(headers, "items") or not isinstance(getattr(arm, "endpoint", None), str):
         return None
     lowered = {str(key).lower(): value for key, value in headers.items() if isinstance(value, str)}
     raw = lowered.get("azure-asyncoperation") or lowered.get("operation-location")
