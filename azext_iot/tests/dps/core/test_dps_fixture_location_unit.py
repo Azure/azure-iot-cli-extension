@@ -1198,13 +1198,14 @@ def test_visibility_and_authorization_use_independent_budgets(mocker, monkeypatc
 
 @pytest.mark.parametrize("endpoint,role,expected", [
     ("https://management.usgovcloudapi.net/", "hub", 600),
-    ("https://management.usgovcloudapi.net", "dps", 300),
+    ("https://management.usgovcloudapi.net", "dps", 600),
+    ("https://MANAGEMENT.USGOVCLOUDAPI.NET/", "dps", 600),
     ("https://management.azure.com", "hub", 300),
     ("https://management.azure.com", "dps", 300),
     ("https://management.chinacloudapi.cn", "hub", 300),
     ("https://management.chinacloudapi.cn", "dps", 300),
 ])
-def test_extended_wait_only_targets_fairfax_hub(mocker, endpoint, role, expected):
+def test_extended_wait_targets_fairfax_hub_and_dps(mocker, endpoint, role, expected):
     cli = mocker.patch.object(dps_fixtures, "cli")
     cli.az_cli.cloud.endpoints.resource_manager = endpoint
     wait = mocker.patch.object(dps_fixtures, "_wait_for_readiness")

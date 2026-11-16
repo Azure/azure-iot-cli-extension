@@ -7,7 +7,7 @@
     "phases": [
       {
         "name": "regular",
-        "runtime_minutes": 35,
+        "runtime_minutes": 40,
         "cleanup_minutes": 10
       },
       {
