@@ -334,8 +334,8 @@ def command(suite, phase, *, debug=None, folder=None):
         sys.executable, "-m", "pytest", "-c", str(ROOT / "setup.cfg"),
         "--rootdir", str(ROOT), "--confcutdir", str(ROOT), "-p", "azext_iot.tests._hub_suite_plugin",
         "-p", "no:rerunfailures", "-n", "0", "--timeout=900", "--integration-progress-interval=60",
-        # Debug keeps real deadlines/tracebacks, but opts out of periodic stack dumps.
-        "-o", "faulthandler_timeout=0" if debug else "faulthandler_timeout=300",
+        # Debug keeps real deadlines/tracebacks, but opts out of the post-timeout native backstop.
+        "-o", "faulthandler_timeout=0" if debug else "faulthandler_timeout=960",
         "-o", "addopts=", "-o", "env=", "-o", "log_cli=false",
         "--cov=azext_iot", "--cov-append", "--cov-config", str(ROOT / ".coveragerc"),
         f"--cov-report=xml:{(folder / 'coverage.xml').resolve()}" if debug and folder else "--cov-report=",

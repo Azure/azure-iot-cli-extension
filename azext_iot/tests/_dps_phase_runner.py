@@ -718,7 +718,8 @@ def run(subscription, group, output, reader, execute=child, clock=time.monotonic
                     arguments = shlex.split(environment.get(
                         FOCUSED["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps",
                     ))
-                    environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join(["--timeout=1800", *arguments])
+                    extra = ["--timeout=1800", *([] if debug else ["-o", "faulthandler_timeout=1860"])]
+                    environment[FOCUSED["DPS_ARGS_ENV"]] = shlex.join([*extra, *arguments])
                 result.update(status="running", run_uid=uid, started_at=utc(),
                               runtime_seconds=runtime, cleanup_seconds=cleanup)
                 result.pop("reason", None)

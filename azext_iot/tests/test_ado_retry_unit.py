@@ -1029,7 +1029,8 @@ def test_generic_phase_verifies_owned_cleanup(
         cleanup.side_effect = RuntimeError("Owned cleanup incomplete")
 
     def execute(command, env, _log, runtime, cleanup):
-        assert [arg for arg in command if arg.startswith("--timeout")] == (["--timeout=900"] if service == "ADR" else [])
+        assert [arg for arg in command if arg.startswith("--timeout")] == ["--timeout=900"]
+        assert "faulthandler_timeout=960" in command
         assert runtime == (pipeline.BUDGETS[service]["job_timeout_minutes"] - 20) * 60
         assert cleanup == 600
         assert "azext_iot_ado_resource_scope" not in env

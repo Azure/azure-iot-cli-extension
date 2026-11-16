@@ -268,7 +268,8 @@ def test_fairfax_hub_wait_fits_outer_deadlines_without_changing_other_phases(tmp
         arguments = shlex.split(env.get(RUNNER["FOCUSED"]["DPS_ARGS_ENV"], "-k _int.py ./azext_iot/tests/dps"))
         before_runtime, before_cleanup = {name: (run, clean) for name, run, clean in RUNNER["PHASES"]}[phase]
         extended = region == "usgovvirginia" and phase != "local-auth-toggle"
-        assert arguments == (["--timeout=1800"] if extended else []) + ["-k", "_int.py", "./azext_iot/tests/dps"]
+        expected_prefix = ["--timeout=1800", "-o", "faulthandler_timeout=1860"] if extended else []
+        assert arguments == expected_prefix + ["-k", "_int.py", "./azext_iot/tests/dps"]
         assert cleanup == before_cleanup
         assert runtime == (35 * 60 if extended and phase == "service-sas" else before_runtime)
         if extended:
