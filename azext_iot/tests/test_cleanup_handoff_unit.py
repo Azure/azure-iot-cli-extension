@@ -38,6 +38,16 @@ def test_submission_acknowledgment_and_failure_are_not_absence(records, capsys):
     assert (records / "cleanup-status.json").is_file()
 
 
+def test_cleanup_records_system_exit_and_propagates_keyboard_interrupt(records):
+    assert handoff.cleanup("/owned/cli-exit", Mock(side_effect=SystemExit(2))) is None
+    with pytest.raises(KeyboardInterrupt):
+        handoff.cleanup("/owned/interrupt", Mock(side_effect=KeyboardInterrupt()))
+    values = handoff.summary(records)
+    assert [(value["resource"], value["status"], value.get("errorType")) for value in values] == [
+        ("/owned/cli-exit", "failed", "SystemExit"),
+    ]
+
+
 def test_latest_cleanup_state_supersedes_pending_without_erasing_events(records):
     handoff.record("/owned/one", "pending")
     handoff.record("/OWNED/one", "accepted")

@@ -143,8 +143,8 @@ def stage(bundle, output, *, source_only=False):
         destination = output / path.relative_to(ROOT)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, destination)
-    shutil.copyfile(ROOT / "tox.ini", output / "tox.ini")
     if not source_only:
+        shutil.copyfile(ROOT / "tox.ini", output / "tox.ini")
         # Build/unit stages retain the original fixtures and their matching unit
         # doubles. These transport adapters apply only to live execution and its gate.
         compatibility = adapt_harness(output, manifest)
