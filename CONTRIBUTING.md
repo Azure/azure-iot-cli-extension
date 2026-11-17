@@ -210,6 +210,9 @@ Branch Health definitions. Payloads use `\official\release-health` or
 `\official\branch-health` respectively,
 disabled queueing, no triggers/schedules, and non-overridable variables. The runner
 also checks definition name, repository and every configured target variable.
+Health definitions report failures in ADO and CLI Vitals, not as GitHub checks on
+the automation commit: their product branch or published wheel may be different.
+Normal PR CI and PR integration checks continue reporting to GitHub.
 Never store personal account passwords or tokens in these files.
 
 Keep all definitions disabled until an owner approves automation connections,
