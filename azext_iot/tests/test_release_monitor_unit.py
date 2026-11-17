@@ -277,11 +277,15 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor, kind)
         if kind == "branch":
             assert item["path"] == "\\official\\branch-health"
             assert list(parameters) == ["mode"]
-            assert pipeline["extends"]["parameters"] == {
+            assert pipeline["pool"] == {"vmImage": "ubuntu-24.04"}
+            profile = next(value for value in pipeline["variables"] if "template" in value)
+            assert profile["parameters"] == {
                 "cloud": item["variables"]["MonitorCloud"]["value"],
-                "track": item["variables"]["MonitorTrack"]["value"],
-                "mode": "${{ parameters.mode }}",
+                "version": item["variables"]["MonitorTrack"]["value"],
+                "region": "Australia East",
+                "services": item["variables"]["MonitorServices"]["value"].split(","),
             }
+            assert pipeline["stages"][0]["parameters"]["source"] is True
             continue
         common = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())["parameters"]
         assert list(parameters) == [p["name"] for p in common]
