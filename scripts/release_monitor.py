@@ -683,7 +683,9 @@ def definitions(config, baseline, branch):
         key: repository[key] for key in ("id", "name", "type", "url")
     }
     source["defaultBranch"] = branch
-    source["properties"] = {"connectedServiceId": repository["properties"]["connectedServiceId"]}
+    source["properties"] = {
+        "connectedServiceId": repository["properties"]["connectedServiceId"], "reportBuildStatus": "false",
+    }
     return [{
         "name": item["name"],
         "path": "\\official\\branch-health" if config.get("kind") == "branch" else "\\official\\release-health",

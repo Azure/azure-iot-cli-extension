@@ -268,7 +268,9 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor, kind)
     for item in definitions:
         assert item["queueStatus"] == "disabled" and item["triggers"] == []
         assert "Secret" not in item["variables"]
-        assert item["repository"]["properties"] == {"connectedServiceId": "github-connection"}
+        assert item["repository"]["properties"] == {
+            "connectedServiceId": "github-connection", "reportBuildStatus": "false",
+        }
         assert all(not value["allowOverride"] for value in item["variables"].values())
         pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
         parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
