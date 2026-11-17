@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+trigger: none
+pr: none
+schedules: []
+name: iot-branch-fairfax-preview-$(Date:yyyyMMdd).$(Rev:r)
+appendCommitMessageToRunName: false
+parameters:
+  - name: mode
+    type: string
+    default: Integration tests
+    values: [Dry run, Integration tests]
+extends:
+  template: templates/branch-health-pipeline.yml
+  parameters:
+    cloud: fairfax
+    track: preview
+    mode: ${{ parameters.mode }}

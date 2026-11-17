@@ -473,7 +473,8 @@ def _storage_provisioner(request):
             target_name = generate_linked_storage_id()
             _record_planned_resource("Microsoft.Storage/storageAccounts", target_name)
             create_result = cli.invoke(
-                f"storage account create -g {ACCOUNT_RG} -n {target_name} --allow-shared-key-access true"
+                f"storage account create -g {ACCOUNT_RG} -n {target_name} "
+                "--allow-shared-key-access true --allow-blob-public-access false"
             )
             if not create_result.success():
                 raise RuntimeError(f"Failed to provision storage account resource {target_name}.")

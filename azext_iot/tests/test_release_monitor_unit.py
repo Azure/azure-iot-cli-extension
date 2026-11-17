@@ -80,6 +80,29 @@ def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monk
     assert (tmp_path / "source/azext_iot/tests/_ado_pipeline.py").read_text(encoding="utf-8") == "current protocol"
 
 
+def test_frozen_storage_fixture_adaptation_preserves_auth_and_is_idempotent(monitor, mocker, tmp_path):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("storage_adapter", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    path = tmp_path / "azext_iot/tests/helpers.py"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        'def command(name):\n'
+        '    return (f"storage account create -n {name} "\n'
+        '            "--allow-shared-key-access true --public-network-access Enabled")\n',
+        encoding="utf-8",
+    )
+    changes = adapter.adapt_storage_fixtures(tmp_path)
+    namespace = {}
+    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)  # pylint: disable=exec-used
+    result = namespace["command"]("owned-storage")
+    assert "--allow-blob-public-access false" in result
+    assert "--allow-shared-key-access true --public-network-access Enabled" in result
+    assert changes[0]["originalSha256"] != changes[0]["adaptedSha256"]
+    assert adapter.adapt_storage_fixtures(tmp_path) == []
+
+
 @pytest.mark.parametrize("track,expected", [("ga", "1.0.1"), ("preview", "1.2.0b1")])
 def test_select_published_track_without_drafts(monitor, mocker, track, expected):
     mocker.patch.object(monitor, "tag_commit", return_value=SOURCE)
@@ -226,8 +249,10 @@ def test_definition_binding_rejects_scope_overrides(monitor, monkeypatch):
         monitor.check_definition(config, config["extension"], "public", item["variables"]["MonitorTrack"])
 
 
-def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
-    config = monitor.read_json(ROOT / ".azure-devops/release-monitors.json")
+@pytest.mark.parametrize("kind", ["release", "branch"])
+def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor, kind):
+    filename = "branch-health" if kind == "branch" else "release-monitors"
+    config = monitor.read_json(ROOT / f".azure-devops/{filename}.json")
     repository = monitor.REPOSITORIES[config["extension"]]
     baseline = {
         "queue": {"id": 1},
@@ -239,7 +264,7 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         "triggers": [{"triggerType": "schedule"}],
     }
     definitions = monitor.definitions(config, baseline, "refs/heads/monitor-test")
-    assert len(definitions) == 6
+    assert len(definitions) == (4 if kind == "branch" else 6)
     for item in definitions:
         assert item["queueStatus"] == "disabled" and item["triggers"] == []
         assert "Secret" not in item["variables"]
@@ -247,8 +272,17 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert all(not value["allowOverride"] for value in item["variables"].values())
         pipeline = yaml.safe_load((ROOT / item["process"]["yamlFilename"]).read_text(encoding="utf-8"))
         parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
+        if kind == "branch":
+            assert item["path"] == "\\official\\branch-health"
+            assert list(parameters) == ["mode"]
+            assert pipeline["extends"]["parameters"] == {
+                "cloud": item["variables"]["MonitorCloud"]["value"],
+                "track": item["variables"]["MonitorTrack"]["value"],
+                "mode": "${{ parameters.mode }}",
+            }
+            continue
         common = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())["parameters"]
-        assert list(parameters) == [p["name"] for p in common] + ["sourceBranch"]
+        assert list(parameters) == [p["name"] for p in common]
         for expected in common:
             actual = parameters[expected["name"]]
             assert {k: v for k, v in actual.items() if k != "default"} == {
@@ -261,24 +295,24 @@ def test_definition_generation_cannot_enable_runs_or_copy_secrets(monitor):
         assert profile["parameters"]["region"] == "${{ join(',', parameters.regions) }}"
         assert parameters["regions"]["default"] == ["Australia East"]
         assert parameters["services"]["default"] == item["variables"]["MonitorServices"]["value"].split(",")
-        assert parameters["sourceBranch"]["default"] == {
-            "ga": "dev", "preview": "release/1.2.0-preview",
-        }[track]
         assert pipeline["stages"] == [{
             "template": "templates/release-monitor-stages.yml",
             "parameters": {
-                **{name: "${{ parameters." + name + " }}" for name in ("mode", "sourceBranch")},
+                "mode": "${{ parameters.mode }}",
                 "regions": "${{ variables.TestRegion }}",
                 "pythonVersions": "${{ join(' ', parameters.pythonVersions) }}",
             },
         }]
     with pytest.raises(ValueError, match="GitHub definition"):
         monitor.definitions(config, baseline, "refs/heads/../other")
+    if kind == "branch":
+        config["sourceBranches"]["preview"] = "release/1.3.0-preview"
+        assert monitor.definitions(config, baseline, "refs/heads/monitor-test") == definitions
 
 
 def test_health_stages_plan_or_execute_the_selected_cohorts():
     template = yaml.safe_load(
-        (ROOT / ".azure-devops/templates/release-monitor-stages.yml").read_text(encoding="utf-8")
+        (ROOT / ".azure-devops/templates/health-stages.yml").read_text(encoding="utf-8")
     )
     assert next(item for item in template["parameters"] if item["name"] == "pythonVersions")["type"] == "string"
     live = template["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
@@ -550,10 +584,10 @@ def test_source_selection_resolves_exact_branch_commit_and_literal_version(monit
     download.assert_called_once_with(
         f"https://raw.githubusercontent.com/Azure/azure-iot-cli-extension/{SOURCE}/azext_iot/constants.py",
     )
-    assert monitor.run_title(manifest, "123") == f"iot-health-fairfax-{track}-cli{version}-srcbbbbbbbbbbbb-b123"
+    assert monitor.run_title(manifest, "123") == f"iot-branch-health-fairfax-{track}-cli{version}-srcbbbbbbbbbbbb-b123"
 
 
-def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker):
+def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker, tmp_path):
     directory, released = bundle
     wheel = directory / released["wheel"]["name"]
     wheel_bytes = wheel.read_bytes()
@@ -583,3 +617,16 @@ def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_ma
     assert built["releaseQualified"] is False
     with pytest.raises(ValueError, match="unbuilt"):
         monitor.build_source(directory)
+    history = tmp_path / "history"
+    retained = history / "health-bundle-1"
+    retained.mkdir(parents=True)
+    monitor.write_json(retained / "manifest.json", built)
+    (retained / wheel.name).write_bytes(wheel_bytes)
+    wheel.unlink()
+    monitor.write_json(directory / "manifest.json", source_manifest)
+    monitor.subprocess.run.reset_mock()
+    monitor.build_source(directory, history)
+    assert not any("-m" in call.args[0] and "build" in call.args[0]
+                   for call in monitor.subprocess.run.call_args_list)
+    assert wheel.read_bytes() == wheel_bytes
+    assert monitor.verify_bundle(directory) == built

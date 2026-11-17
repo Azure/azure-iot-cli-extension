@@ -1,0 +1,33 @@
+{
+  "extension": "azure-iot",
+  "kind": "branch",
+  "namePrefix": "Azure IoT CLI - Branch Health",
+  "tracks": {"ga": "ga", "preview": "preview"},
+  "sourceBranches": {"ga": "dev", "preview": "release/1.2.0-preview"},
+  "clouds": {
+    "public": {
+      "displayName": "Public",
+      "variables": {
+        "AzureServiceConnection": "aziotcli-sp-prime",
+        "MonitorSubscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+        "MonitorResourceGroup": "cli-int-test-rg",
+        "MonitorRegion": "australiaeast",
+        "MonitorEndpoint": "https://management.azure.com",
+        "MonitorArmResource": "https://management.azure.com",
+        "MonitorServices": "DPS,HubControl,HubData,ADU,ADR"
+      }
+    },
+    "fairfax": {
+      "displayName": "Fairfax",
+      "variables": {
+        "AzureServiceConnection": "sc-iot-cli-fairfax-it",
+        "MonitorSubscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
+        "MonitorResourceGroup": "iot-cli-monitor-fairfax-{track}",
+        "MonitorRegion": "usgovvirginia",
+        "MonitorEndpoint": "https://management.usgovcloudapi.net",
+        "MonitorArmResource": "https://management.core.usgovcloudapi.net",
+        "MonitorServices": "DPS,HubControl,HubData"
+      }
+    }
+  }
+}
