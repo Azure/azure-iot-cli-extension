@@ -9,9 +9,25 @@ parameters:
     type: string
     default: Integration tests
     values: [Dry run, Integration tests]
-extends:
-  template: templates/branch-health-pipeline.yml
-  parameters:
-    cloud: public
-    track: ga
-    mode: ${{ parameters.mode }}
+pool:
+  vmImage: ubuntu-24.04
+variables:
+  - template: templates/integration-profile.yml
+    parameters:
+      cloud: public
+      version: ga
+      region: Australia East
+      services: [DPS, HubControl, HubData, ADU, ADR]
+  - name: TestMode
+    value: ${{ parameters.mode }}
+  - name: TestPythons
+    value: '3.13'
+  - name: endpoint
+    value: $(TestEndpoint)
+stages:
+  - template: templates/health-stages.yml
+    parameters:
+      source: true
+      mode: ${{ parameters.mode }}
+      pythonVersions: '3.13'
+      regions: ${{ variables.TestRegion }}
