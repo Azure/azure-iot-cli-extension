@@ -195,7 +195,7 @@ class TestADRSchemaLifecycle(_SchemaScenario):
                 f"storage account create -n {storage_name} -g {TEST_RG} "
                 f"--location {TEST_LOCATION} --sku Standard_LRS --kind StorageV2 "
                 "--enable-hierarchical-namespace true --allow-shared-key-access false "
-                "--public-network-access Enabled"
+                "--public-network-access Enabled --allow-blob-public-access false"
             ).get_output_in_json()
             assert storage["isHnsEnabled"] is True
             container = self.cmd(

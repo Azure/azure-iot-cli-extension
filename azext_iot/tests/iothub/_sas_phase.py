@@ -483,7 +483,7 @@ class HubSasPhase:
             raise HubSasError("A planned HubSAS ID already exists; refusing adoption or cleanup.")
         self.command(
             f"storage account create -n {self.storage} -g {self.group} --location {self.location} "
-            f"--allow-shared-key-access true --tags runUid={UID} authPhase=local-auth"
+            f"--allow-shared-key-access true --allow-blob-public-access false --tags runUid={UID} authPhase=local-auth"
         )
         from azext_iot.tests.helpers import create_storage_account
         scenario.storage_account_name, scenario.storage_container = self.storage, "devices"

@@ -18,6 +18,14 @@ from release_monitor import verify_bundle, write_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
+STORAGE_FIXTURES = (
+    "azext_iot/tests/helpers.py",
+    "azext_iot/tests/iothub/_sas_phase.py",
+    "azext_iot/tests/iothub/conftest.py",
+    "azext_iot/tests/deviceupdate/conftest.py",
+    "azext_iot/tests/adr/test_adr_schema_int.py",
+    "azext_iot/tests/adr/test_adr_software_update_int.py",
+)
 COMPATIBILITY = {
     "azext_iot/tests/dps/conftest.py": {
         "symbols": (
@@ -56,6 +64,47 @@ def function(tree, symbol):
     if not isinstance(node, ast.FunctionDef):
         raise ValueError(f"Test adapter does not target a function: {symbol}")
     return node
+
+
+def adapt_storage_fixtures(output):
+    changes = []
+    for relative in STORAGE_FIXTURES:
+        path = output / relative
+        if not path.is_file():
+            continue
+        original = path.read_text(encoding="utf-8")
+        tree = ast.parse(original)
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+        replacements = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.JoinedStr):
+                literal = "".join(
+                    part.value for part in node.values if isinstance(part, ast.Constant)
+                    and isinstance(part.value, str)
+                )
+            elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                  and not isinstance(parents.get(node), ast.JoinedStr)):
+                literal = node.value
+            else:
+                continue
+            if "storage account create " in literal and "--allow-blob-public-access" not in literal:
+                segment = ast.get_source_segment(original, node)
+                replacements.append((segment, segment.replace(
+                    "storage account create ", "storage account create --allow-blob-public-access false ", 1,
+                )))
+        text = original
+        for old, new in replacements:
+            text = text.replace(old, new, 1)
+        if text != original:
+            ast.parse(text)
+            path.write_text(text, encoding="utf-8")
+            changes.append({
+                "path": relative, "symbols": ["Storage fixture creation"],
+                "reason": "Explicitly disable anonymous blob access without changing network or shared-key access.",
+                "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+                "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+            })
+    return changes
 
 
 def adapt_harness(output, manifest):
@@ -115,6 +164,7 @@ def adapt_harness(output, manifest):
                 "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
                 "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
             })
+    changes.extend(adapt_storage_fixtures(output))
     return {
         "version": 1, "sourceCommit": manifest["testSourceCommit"],
         "automationCommit": manifest["automationCommit"], "files": changes,
