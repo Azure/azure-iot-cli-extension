@@ -4,6 +4,9 @@ parameters:
   - name: monitor
     type: boolean
     default: false
+  - name: sourceChecks
+    type: boolean
+    default: true
   - name: service
     type: string
   - name: pythonVersions
@@ -29,11 +32,17 @@ stages:
     displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
     ${{ if parameters.monitor }}:
       dependsOn: [Prepare, Build, Lint, Unit]
-      condition: >-
-        and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
-            eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Lint.result, 'Succeeded'),
-            eq(dependencies.Unit.result, 'Succeeded'),
-            contains(variables['TestServices'], '${{ parameters.service }}'))
+      ${{ if parameters.sourceChecks }}:
+        condition: >-
+          and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
+              eq(dependencies.Build.result, 'Succeeded'), eq(dependencies.Lint.result, 'Succeeded'),
+              eq(dependencies.Unit.result, 'Succeeded'),
+              contains(variables['TestServices'], '${{ parameters.service }}'))
+      ${{ else }}:
+        condition: >-
+          and(not(canceled()), eq(dependencies.Prepare.result, 'Succeeded'),
+              eq(dependencies.Build.result, 'Succeeded'),
+              contains(variables['TestServices'], '${{ parameters.service }}'))
       variables:
         monitorBundle: $[ stageDependencies.Build.Build.outputs['bundle.artifact'] ]
     ${{ else }}:
@@ -80,6 +89,7 @@ stages:
                   integration-wheel-*/**
                   integration-plan-*/**
                   attempt-*/**
+                  dependencies-*/**
           - ${{ if parameters.monitor }}:
               - task: DownloadPipelineArtifact@2
                 displayName: Download built source separately from attempt evidence
@@ -99,18 +109,32 @@ stages:
                   MONITOR_TRACK: $(TestTrack)
           - bash: |
               set -euo pipefail
-              python -m pip install -r dev_requirements azure-cli azure-cli-testsdk tox
               python azext_iot/tests/_ado_pipeline.py candidate --history "$HISTORY" --output candidate
-              az extension add --source candidate/*.whl -y
+              environments=(--environment main --environment extension)
               if [ "$SERVICE" = DPS ]; then
-                python -m tox r -e DPS-int --notest
+                environments+=(--environment dps --environment dps-extension)
+              fi
+              python "$DEPENDENCIES" restore --history "$HISTORY" --output dependency-lock \
+                --key "$DEPENDENCY_KEY" --wheel candidate --attempt "$SYSTEM_JOBATTEMPT" "${environments[@]}"
+              locks="$(realpath dependency-lock)"
+              PIP_CONSTRAINT="$locks/main.txt" python -m pip install \
+                -r "$locks/main.txt" -r dev_requirements azure-cli azure-cli-testsdk tox
+              PIP_CONSTRAINT="$locks/extension.txt" az extension add --source candidate/*.whl -y
+              snapshots=(--python "main=$(command -v python)" --target "extension=$AZURE_EXTENSION_DIR/azure-iot")
+              if [ "$SERVICE" = DPS ]; then
+                PIP_CONSTRAINT="$locks/dps.txt" python -m tox r -e DPS-int --notest
+                PIP_CONSTRAINT="$locks/dps.txt" .tox/DPS-int/bin/python -m pip install -r "$locks/dps.txt"
                 export azext_iot_candidate_wheel="$(realpath candidate/*.whl)"
                 extension=$(.tox/DPS-int/bin/python -c \
                   'import sysconfig; print(sysconfig.get_path("purelib") + "/azure-cli-extensions/azure-iot")')
-                .tox/DPS-int/bin/python azext_iot/tests/_locked_install.py "$extension"
+                PIP_CONSTRAINT="$locks/dps-extension.txt" \
+                  .tox/DPS-int/bin/python azext_iot/tests/_locked_install.py "$extension"
                 PYTHONPATH="$PYTHONPATH:$extension" .tox/DPS-int/bin/python -c \
                   "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
+                snapshots+=(--python "dps=$PWD/.tox/DPS-int/bin/python" --target "dps-extension=$extension")
               fi
+              python "$DEPENDENCIES" capture --output dependency-lock --key "$DEPENDENCY_KEY" \
+                --wheel candidate "${snapshots[@]}"
               export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
               python -c "from azext_iot import _factory; from azext_iot.tests import _ado_retry_plugin"
             displayName: Prepare tests
@@ -120,6 +144,12 @@ stages:
               PYTHONPATH: $(testSourceDirectory)
               SERVICE: ${{ parameters.service }}
               AZURE_EXTENSION_DIR: $(Agent.TempDirectory)/iot-extensions
+              DEPENDENCIES: $(Build.SourcesDirectory)/scripts/dependency_lock.py
+              DEPENDENCY_KEY: ${{ parameters.service }}-$(python)-$(region)
+          - publish: $(testSourceDirectory)/dependency-lock
+            displayName: Publish immutable dependency snapshot
+            artifact: dependencies-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
+            condition: and(succeededOrFailed(), eq(variables['dependencyLockReady'], 'true'))
           - ${{ if or(eq(parameters.service, 'ADU'), eq(parameters.service, 'ADR')) }}:
               - bash: |
                   set -euo pipefail

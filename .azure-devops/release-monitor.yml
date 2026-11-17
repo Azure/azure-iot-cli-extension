@@ -60,10 +60,6 @@ parameters:
       - '3.11'
       - '3.12'
       - '3.13'
-  - name: sourceBranch
-    displayName: Test branch
-    type: string
-    default: dev
 pool:
   vmImage: ubuntu-24.04
 variables:
@@ -83,6 +79,5 @@ stages:
   - template: templates/release-monitor-stages.yml
     parameters:
       mode: ${{ parameters.mode }}
-      sourceBranch: ${{ parameters.sourceBranch }}
       pythonVersions: ${{ join(' ', parameters.pythonVersions) }}
       regions: ${{ variables.TestRegion }}

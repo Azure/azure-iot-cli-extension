@@ -189,7 +189,7 @@ def create_storage_account(
         if not target_storage:
             create_command = (
                 f"storage account create -n {account_name} -g {rg} "
-                f"--allow-shared-key-access true --tags iot_resource={resource_name}"
+                f"--allow-shared-key-access true --allow-blob-public-access false --tags iot_resource={resource_name}"
             )
             if location:
                 create_command += f" --location {location}"

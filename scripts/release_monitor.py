@@ -493,11 +493,23 @@ def acquire_source(manifest, output):
     verify_bundle(output, require_wheel=False)
 
 
-def build_source(output):
+def build_source(output, history=None):
     output = Path(output).resolve()
     manifest = verify_bundle(output, require_wheel=False)
     if manifest.get("kind") != "source" or manifest["wheel"] is not None or list(output.glob("*.whl")):
         raise ValueError("Build requires an unbuilt, immutable source-health bundle.")
+    previous = sorted(Path(history).glob("health-bundle-*/manifest.json")) if history else []
+    if previous:
+        saved = [validate_source_manifest(read_json(path)) for path in previous]
+        if (any(value != saved[0] for value in saved)
+                or {**saved[0], "wheel": None} != manifest or saved[0]["wheel"] is None):
+            raise ValueError("Previously built source wheel does not match the frozen selection.")
+        wheel = previous[0].parent / saved[0]["wheel"]["name"]
+        verify_wheel(wheel, saved[0])
+        shutil.copyfile(wheel, output / wheel.name)
+        write_json(output / "manifest.json", saved[0])
+        verify_bundle(output)
+        return
     with TemporaryDirectory(prefix="iot-health-build-") as directory:
         source = Path(directory) / "source"
         shutil.copytree(output / "source", source, ignore=shutil.ignore_patterns(".git"))
@@ -555,7 +567,17 @@ def configured_tracks(config):
 def configurations(config):
     extension = config["extension"]
     tracks = configured_tracks(config)
-    expected_clouds = {"public", "fairfax", "mooncake"} if extension == "azure-iot" else {"public", "fairfax"}
+    if config.get("kind", "release") not in {"release", "branch"}:
+        raise ValueError("Select release or branch health explicitly.")
+    branch_health = config.get("kind") == "branch"
+    if branch_health:
+        if extension != "azure-iot" or set(config.get("sourceBranches", {})) != set(tracks):
+            raise ValueError("Branch Health requires one reviewed source branch per track.")
+        for branch in config["sourceBranches"].values():
+            source_branch(branch)
+    expected_clouds = (
+        {"public", "fairfax", "mooncake"} if extension == "azure-iot" and not branch_health else {"public", "fairfax"}
+    )
     if set(config["clouds"]) != expected_clouds:
         raise ValueError("Monitor clouds do not match the product's supported cloud matrix.")
     result = []
@@ -588,13 +610,14 @@ def check_definition(config, extension, cloud, track):
             raise ValueError(f"{name} differs from the reviewed monitor configuration.")
 
 
-def health_yaml(extension, cloud, track):
+def health_yaml(extension, cloud, track, *, branch=False):
     suffix = "" if cloud == "public" else "-" + cloud
     if extension == "azure-iot":
         suffix += "-preview" if track == "preview" else ""
     elif track != "v1":
         suffix += "-" + track
-    return f".azure-devops/release-monitor{suffix}.yml"
+    prefix = "branch-health" if branch else "release-monitor"
+    return f".azure-devops/{prefix}{suffix}.yml"
 
 
 def bind_profile(manifest, config):
@@ -639,9 +662,9 @@ def bind_profile(manifest, config):
         "python": sorted(pythons), "mode": mode,
     }
     if manifest.get("kind") == "source":
-        expected["branch"] = "refs/heads/" + (
-            "dev" if configured_track == "ga" else "release/1.2.0-preview"
-        )
+        expected["branch"] = source_branch(config.get("sourceBranches", {
+            "ga": "dev", "preview": "release/1.2.0-preview",
+        })[configured_track])
         actual["branch"] = manifest["source"]["branch"]
     profile = {"configured": expected, "selected": actual}
     if "profile" in manifest and manifest["profile"] != profile:
@@ -662,13 +685,16 @@ def definitions(config, baseline, branch):
     source["defaultBranch"] = branch
     source["properties"] = {"connectedServiceId": repository["properties"]["connectedServiceId"]}
     return [{
-        "name": item["name"], "path": "\\official\\release-health", "type": "build",
+        "name": item["name"],
+        "path": "\\official\\branch-health" if config.get("kind") == "branch" else "\\official\\release-health",
+        "type": "build",
         "queueStatus": "disabled", "triggers": [], "repository": source,
         "queue": {"id": baseline["queue"]["id"]},
         "process": {
             "type": 2,
             "yamlFilename": health_yaml(
                 config["extension"], item["variables"]["MonitorCloud"], item["variables"]["MonitorTrack"],
+                branch=config.get("kind") == "branch",
             ),
         },
         "variables": {
@@ -684,7 +710,8 @@ def run_title(manifest, build):
         raise ValueError("A positive ADO build ID is required for the release-health run title.")
     prefix = "iot" if manifest["extension"] == "azure-iot" else "aio"
     version = manifest["source"]["version"] if manifest.get("kind") == "source" else manifest["release"]["version"]
-    title = f"{prefix}-health-{manifest['cloudKey']}-{manifest['slot']}-cli{version}"
+    family = "branch-health" if manifest.get("kind") == "source" else "health"
+    title = f"{prefix}-{family}-{manifest['cloudKey']}-{manifest['slot']}-cli{version}"
     if manifest.get("kind") == "source":
         title += f"-src{manifest['source']['commit'][:12]}"
     if manifest["extension"] == "azure-iot-ops":
@@ -716,7 +743,7 @@ def main(argv=None):
     source.add_argument("--configuration", required=True)
     source.add_argument("--cloud", choices=CLOUDS, required=True)
     source.add_argument("--track", choices=["ga", "preview"], required=True)
-    source.add_argument("--source-branch", required=True)
+    source.add_argument("--source-branch")
     source.add_argument("--automation-commit", required=True)
     source.add_argument("--history")
     source.add_argument("--attempt", type=int, default=1)
@@ -729,6 +756,7 @@ def main(argv=None):
     source_fetch.add_argument("--output", required=True)
     source_build = commands.add_parser("build-source")
     source_build.add_argument("--output", required=True)
+    source_build.add_argument("--history")
     setup = commands.add_parser("definitions")
     setup.add_argument("--configuration", required=True)
     setup.add_argument("--baseline", required=True)
@@ -738,8 +766,11 @@ def main(argv=None):
     if args.command == "resolve-source":
         config = read_json(args.configuration)
         check_definition(config, "azure-iot", os.environ["MONITORCLOUD"], os.environ["MONITORTRACK"])
+        branch = config.get("sourceBranches", {}).get(args.track, args.source_branch)
+        if args.source_branch and source_branch(branch) != source_branch(args.source_branch):
+            raise ValueError("Branch Health cannot override its reviewed source mapping.")
         value = frozen_source_manifest(
-            args.history, args.cloud, args.track, args.source_branch, args.automation_commit, args.attempt,
+            args.history, args.cloud, args.track, branch, args.automation_commit, args.attempt,
         )
         bind_profile(value, config)
         write_json(args.output, value)
@@ -748,16 +779,18 @@ def main(argv=None):
     elif args.command == "acquire-source":
         acquire_source(read_json(args.manifest), args.output)
     elif args.command == "build-source":
-        build_source(args.output)
+        build_source(args.output, args.history)
     elif args.command == "resolve":
         target, slot = args.track, None
         if args.configuration:
             config = read_json(args.configuration)
-            check_definition(config, args.extension, args.cloud, args.track)
+            check_definition(config, args.extension, os.environ["MONITORCLOUD"], os.environ["MONITORTRACK"])
             target, slot = configured_tracks(config)[args.track], args.track
         value = frozen_manifest(
             args.history, args.extension, args.cloud, target, args.automation_commit, args.attempt, slot=slot,
         )
+        if args.configuration:
+            bind_profile(value, config)
         write_json(args.output, value)
         print(json.dumps(value, indent=2))
         if args.configuration:

@@ -1,0 +1,40 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: cloud
+    type: string
+    values: [public, fairfax]
+  - name: track
+    type: string
+    values: [ga, preview]
+  - name: mode
+    type: string
+    values: [Dry run, Integration tests]
+
+pool:
+  vmImage: ubuntu-24.04
+
+variables:
+  - template: integration-profile.yml
+    parameters:
+      cloud: ${{ parameters.cloud }}
+      version: ${{ parameters.track }}
+      region: Australia East
+      ${{ if eq(parameters.cloud, 'public') }}:
+        services: [DPS, HubControl, HubData, ADU, ADR]
+      ${{ else }}:
+        services: [DPS, HubControl, HubData]
+  - name: TestMode
+    value: ${{ parameters.mode }}
+  - name: TestPythons
+    value: '3.13'
+  - name: endpoint
+    value: $(TestEndpoint)
+
+stages:
+  - template: health-stages.yml
+    parameters:
+      source: true
+      mode: ${{ parameters.mode }}
+      pythonVersions: '3.13'
+      regions: ${{ variables.TestRegion }}

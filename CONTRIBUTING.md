@@ -155,30 +155,42 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 - IoT Hub
 - Utility
 
-### Source-branch health monitors
+### Release Health and Branch Health
 
 Six independent definitions use shared health stages:
 `Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
 `.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
 Each cloud/track has a thin `release-monitor*.yml` entry point sharing
 `templates/release-monitor-stages.yml`. Integration and health share **Mode**,
-**Cloud**, **Public region**, **Services** and **Python**, in that order. Health also
-selects **Test branch**; its GA/Preview profile is fixed by the entry point, not a
-separate Version selector. Health's default mode executes tests;
-**Dry run** only resolves and publishes the selected plan. **Test branch**
-defaults to `dev` for GA and `release/1.2.0-preview` for Preview.
+**Cloud**, **Public region**, **Services** and **Python**, in that order.
+Release Health resolves an exact published GA/Preview wheel, verifies its GitHub
+SHA256 and matching source, and never rebuilds or patches the product.
+Health's default mode executes tests; **Dry run** only resolves and publishes the plan.
 Manual overrides use the selected cloud's reviewed connection and resource group,
 which must be authorized for the calling pipeline. Selected services must be
-supported in that cloud. Overrides are frozen with the source, marked `-manual`
+supported in that cloud. Overrides are frozen with the selection, marked `-manual`
 in the run title, and pass or fail on the selected tests and their required evidence.
 There is no gate requiring manual selections to match scheduled defaults.
-The built-in ADO Branch/tag field selects the automation
-YAML, not this source target. The resolver freezes the source commit before any
-build or Azure access; retries cannot follow a moving branch.
-Build, lint and four unit shards run independently, followed by one job per selected
-service. Selected test cases, service fixtures and phase manifests remain source-specific;
-only native controller helpers and their tox setup are overlaid. The built wheel's
-product bytes must match the frozen source, and its SHA256 is bound into live evidence.
+The built-in ADO Branch/tag field selects the automation YAML, not the product
+under test.
+
+Four separate `Azure IoT CLI - Branch Health (<Public|Fairfax> <GA|Preview>)`
+definitions use `.azure-devops/branch-health.json` and `branch-health*.yml`.
+GA maps to `dev`; Preview maps to the active preview release branch. Advance that
+reviewed mapping when the preview branch changes, without renaming pipelines.
+These fixed-track wrappers expose Mode only; use integration 147 for arbitrary PRs.
+The resolver freezes the product/test commit before building or accessing Azure.
+Build, lint and four source-unit shards run independently, followed by the supported
+service cohorts. Build retries restore the original wheel rather than rebuilding.
+Each run records the automation commit separately from the product/test commit.
+
+Both families retain source-specific tests and use reviewed, recorded test-only
+adapters for native controllers and fixture compatibility. Storage fixtures explicitly
+disable anonymous blob access without changing network access or authentication.
+Product bytes must match the frozen source/wheel. Each integration job snapshots
+host, extension and (for DPS) tox dependencies separately; retries restore the
+original versions and reject missing or changed inventories before running tests.
+New runs may resolve newer dependencies.
 
 Generate disabled definition payloads using an existing same-repository definition:
 
@@ -193,7 +205,9 @@ python scripts/release_monitor.py definitions \
 Apply each payload through the ADO build-definitions API after the reviewed branch
 exists. Reuse definition **166** for Public GA; update matching definitions rather
 than creating duplicates. Integration **147** and Release **161** stay separate.
-Payloads use `\official\release-health`,
+Use `--configuration .azure-devops/branch-health.json` to generate the four new
+Branch Health definitions. Payloads use `\official\release-health` or
+`\official\branch-health` respectively,
 disabled queueing, no triggers/schedules, and non-overridable variables. The runner
 also checks definition name, repository and every configured target variable.
 Never store personal account passwords or tokens in these files.
