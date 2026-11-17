@@ -121,6 +121,17 @@ def adapt_harness(output, manifest):
     }
 
 
+def overlay_controllers(output, manifest):
+    for path in (ROOT / "azext_iot/tests").glob("_*.py"):
+        if (path.name == "__init__.py" or path.name.endswith("_manifest.py")
+                or path.name.startswith("_release_")
+                or path.name.startswith("_unit_") and manifest.get("kind") != "source"):
+            continue
+        destination = output / path.relative_to(ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, destination)
+
+
 def stage(bundle, output, *, source_only=False):
     bundle, output = Path(bundle).resolve(), Path(output).resolve()
     manifest = verify_bundle(
@@ -133,20 +144,10 @@ def stage(bundle, output, *, source_only=False):
     if any(path.is_symlink() for path in source.rglob("*")):
         raise ValueError("Released source must not contain symbolic links.")
     shutil.copytree(source, output, ignore=shutil.ignore_patterns(".git"))
-    # Keep selected cases and fixtures; controller overlays and the narrow adapters
-    # below are independently recorded, never a replacement of the released product.
-    for path in (ROOT / "azext_iot/tests").glob("_*.py"):
-        if (path.name == "__init__.py" or path.name.endswith("_manifest.py")
-                or path.name.startswith("_release_")
-                or path.name.startswith("_unit_") and manifest.get("kind") != "source"):
-            continue
-        destination = output / path.relative_to(ROOT)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(path, destination)
     if not source_only:
+        overlay_controllers(output, manifest)
         shutil.copyfile(ROOT / "tox.ini", output / "tox.ini")
-        # Build/unit stages retain the original fixtures and their matching unit
-        # doubles. These transport adapters apply only to live execution and its gate.
+        # Source-only build/unit workspaces retain controllers matching their frozen tests.
         compatibility = adapt_harness(output, manifest)
         manifest = {**manifest, "testCompatibility": compatibility}
         for change in compatibility["files"]:
@@ -156,7 +157,8 @@ def stage(bundle, output, *, source_only=False):
 
 
 def plan(bundle, output):
-    stage(bundle, output, source_only=True)
+    manifest = stage(bundle, output, source_only=True)
+    overlay_controllers(Path(output), manifest)
     native = runpy.run_path(str(Path(output) / "azext_iot/tests/_ado_pipeline.py"))
     jobs = native["plan"](
         os.environ["MONITOR_SERVICES"].split(","), os.environ["MONITOR_PYTHONS"].split(","),
