@@ -62,7 +62,12 @@ def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monk
     spec = importlib.util.spec_from_file_location("monitor_plan_unit", ROOT / "scripts/release_monitor_adapter.py")
     adapter = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    mocker.patch.object(adapter, "stage")
+    mocker.patch.object(adapter, "stage", return_value={"kind": "source"})
+    automation = tmp_path / "automation"
+    helpers = automation / "azext_iot/tests"
+    helpers.mkdir(parents=True)
+    (helpers / "_ado_pipeline.py").write_text("current protocol", encoding="utf-8")
+    monkeypatch.setattr(adapter, "ROOT", automation)
     plan = mocker.Mock(return_value=[])
     mocker.patch.object(adapter.runpy, "run_path", return_value={"plan": plan})
     for key, value in {
@@ -72,6 +77,7 @@ def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monk
         monkeypatch.setenv(key, value)
     adapter.plan(tmp_path, tmp_path / "source")
     plan.assert_called_once_with(["DPS", "HubControl"], ["3.10", "3.13"], ["westus2", "eastus"], "public")
+    assert (tmp_path / "source/azext_iot/tests/_ado_pipeline.py").read_text(encoding="utf-8") == "current protocol"
 
 
 @pytest.mark.parametrize("track,expected", [("ga", "1.0.1"), ("preview", "1.2.0b1")])
@@ -303,12 +309,15 @@ def test_staging_preserves_released_cases_manifests_and_product(
     helpers = automation / "azext_iot/tests"
     helpers.mkdir(parents=True)
     (helpers / "_ado_pipeline.py").write_text("current protocol", encoding="utf-8")
+    (helpers / "_hub_phase_runner.py").write_text("current watchdog setup", encoding="utf-8")
     (helpers / "_phase_manifest.py").write_text("different release", encoding="utf-8")
     (helpers / "test_case_int.py").write_text("different assertions", encoding="utf-8")
     (automation / "tox.ini").write_text("current controller setup", encoding="utf-8")
     (directory / "source/tox.ini").write_text("released tox setup", encoding="utf-8")
     released_manifest = directory / "source/azext_iot/tests/_phase_manifest.py"
     released_manifest.write_text("released selection", encoding="utf-8")
+    released_controller = directory / "source/azext_iot/tests/_hub_phase_runner.py"
+    released_controller.write_text("released watchdog setup", encoding="utf-8")
     monkeypatch.setattr(adapter, "ROOT", automation)
     mocker.patch.object(adapter, "verify_bundle", return_value=manifest)
     monkeypatch.setenv("BUILD_SOURCEVERSION", AUTOMATION)
@@ -322,14 +331,17 @@ def test_staging_preserves_released_cases_manifests_and_product(
         "azext_iot/__init__.py", "azext_iot/tests/test_case_int.py", "azext_iot/tests/_phase_manifest.py",
     ):
         assert (destination / relative).read_bytes() == (directory / "source" / relative).read_bytes()
-    assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
     staged = monitor.read_json(destination / "release-monitor.json")
     if source_only:
         assert (destination / "tox.ini").read_text(encoding="utf-8") == "released tox setup"
+        assert (destination / "azext_iot/tests/_hub_phase_runner.py").read_bytes() == released_controller.read_bytes()
+        assert not (destination / "azext_iot/tests/_ado_pipeline.py").exists()
         compatibility.assert_not_called()
         assert "testCompatibility" not in staged
     else:
         assert (destination / "tox.ini").read_text(encoding="utf-8") == "current controller setup"
+        assert (destination / "azext_iot/tests/_hub_phase_runner.py").read_text() == "current watchdog setup"
+        assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
         compatibility.assert_called_once()
         assert staged["testCompatibility"] == {
             "version": 1, "sourceCommit": manifest["testSourceCommit"],
