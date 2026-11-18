@@ -1,0 +1,43 @@
+{
+  "extension": "azure-iot",
+  "namePrefix": "Azure IoT CLI - Release Health",
+  "tracks": {"ga": "ga", "preview": "preview"},
+  "clouds": {
+    "public": {
+      "displayName": "Public",
+      "variables": {
+        "AzureServiceConnection": "aziotcli-sp-prime",
+        "MonitorSubscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
+        "MonitorResourceGroup": "cli-int-test-rg",
+        "MonitorRegion": "australiaeast",
+        "MonitorEndpoint": "https://management.azure.com",
+        "MonitorArmResource": "https://management.azure.com",
+        "MonitorServices": "DPS,HubControl,HubData,ADU,ADR"
+      }
+    },
+    "fairfax": {
+      "displayName": "Fairfax",
+      "variables": {
+        "AzureServiceConnection": "sc-iot-cli-fairfax-it",
+        "MonitorSubscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
+        "MonitorResourceGroup": "iot-cli-monitor-fairfax-{track}",
+        "MonitorRegion": "usgovvirginia",
+        "MonitorEndpoint": "https://management.usgovcloudapi.net",
+        "MonitorArmResource": "https://management.core.usgovcloudapi.net",
+        "MonitorServices": "DPS,HubControl,HubData"
+      }
+    },
+    "mooncake": {
+      "displayName": "Mooncake",
+      "variables": {
+        "AzureServiceConnection": "sc-iot-cli-mooncake-it",
+        "MonitorSubscription": "cdb4095c-5c92-410e-90ec-a99dc68d2b51",
+        "MonitorResourceGroup": "iot-cli-monitor-mooncake-{track}",
+        "MonitorRegion": "chinaeast2",
+        "MonitorEndpoint": "https://management.chinacloudapi.cn",
+        "MonitorArmResource": "https://management.core.chinacloudapi.cn",
+        "MonitorServices": "DPS,HubControl,HubData"
+      }
+    }
+  }
+}

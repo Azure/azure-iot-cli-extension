@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: mode
+    type: string
+  - name: pythonVersions
+    type: string
+  - name: regions
+    type: string
+
+stages:
+  - template: health-stages.yml
+    parameters:
+      source: false
+      mode: ${{ parameters.mode }}
+      pythonVersions: ${{ parameters.pythonVersions }}
+      regions: ${{ parameters.regions }}

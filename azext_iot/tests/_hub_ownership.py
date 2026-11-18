@@ -28,10 +28,15 @@ ARM_HOSTS = {"management.azure.com", "centraluseuap.management.azure.com"}
 
 
 def configure_target(region="centraluseuap", endpoint=None):
-    global ARM, REGION
+    global ARM, REGION, SUBSCRIPTION, GROUP, AUDIENCE, ARM_HOSTS
     target = TARGETS["target"](region, endpoint)
     ARM, REGION = target["endpoint"], target["region"]
-    return {"ARM": ARM, "REGION": REGION}
+    scope = TARGETS["scope"](ARM)
+    SUBSCRIPTION, GROUP = scope["subscription"], scope["resource_group"]
+    AUDIENCE = TARGETS["cloud"](ARM)["audience"]
+    ARM_HOSTS = TARGETS["arm_hosts"](ARM)
+    return {"ARM": ARM, "REGION": REGION, "SUBSCRIPTION": SUBSCRIPTION, "GROUP": GROUP,
+            "AUDIENCE": AUDIENCE, "ARM_HOSTS": ARM_HOSTS}
 
 
 OWNER_TAG = "azextHubRunId"
@@ -83,7 +88,7 @@ def planned_root(resource_id):
         return False
     patterns = {
         ("microsoft.devices", "iothubs"): r"(test-hub-[0-9a-f]{32}|aziotclitest-hub-[0-9a-f]{18})",
-        ("microsoft.storage", "storageaccounts"): r"(hubstore[0-9a-f]{4}|aziotclitest[0-9a-f]{12})",
+        ("microsoft.storage", "storageaccounts"): r"(hubstore(?:[0-9a-f]{4}|[0-9a-f]{16})|aziotclitest[0-9a-f]{12})",
         ("microsoft.managedidentity", "userassignedidentities"): r"([0-9a-f]{32}|aziotclitest[0-9a-f]{12})",
         ("microsoft.eventhub", "namespaces"): r"aziotclitest[0-9a-f]{12}",
         ("microsoft.servicebus", "namespaces"): r"(sb[0-9a-f]{22}|aziotclitest[0-9a-f]{12})",
@@ -217,7 +222,7 @@ def _arm_read_location(url):
         raise OwnershipError("Unplanned ARM polling URL") from error
     checks = (
         ("scheme", parsed.scheme == "https"),
-        ("origin", parsed.netloc in ("management.azure.com", urlsplit(ARM).netloc)),
+        ("origin", parsed.netloc in ARM_HOSTS),
         ("subscription", parsed.path.casefold().startswith(f"/subscriptions/{SUBSCRIPTION}/")),
         ("fragment", not parsed.fragment),
         ("path", bool(re.fullmatch(r"/[A-Za-z0-9_.()=/-]+", parsed.path))),
@@ -237,7 +242,7 @@ def arm_location(url):
     parsed = _arm_read_location(url)
     parts = parsed.path.casefold().split("/")
     if (any(not part for part in parts[1:])
-            or (parts[3] == "resourcegroups" and (len(parts) < 5 or parts[4] != GROUP))):
+            or (parts[3] == "resourcegroups" and (len(parts) < 5 or parts[4] != GROUP.casefold()))):
         raise OwnershipError("Unplanned ARM polling URL")
     return parsed
 
@@ -496,7 +501,7 @@ def write(path, data):
     temporary.replace(path)
 
 
-def ownership_errors(data, run_id, phase):
+def ownership_errors(data, run_id, phase, *, allow_pending_cleanup=False):
     errors = []
     if not TARGETS["matches"](data, {"region": REGION, "endpoint": ARM}):
         errors.append("ownership target mismatch")
@@ -524,16 +529,23 @@ def ownership_errors(data, run_id, phase):
                 or record.get("before") != 404 or not record.get("apiVersion")
                 or not record.get("attempted") or record.get("ownerTag") != run_id):
             errors.append("invalid pre-create evidence")
-        if (record.get("uncertain") or not record.get("resolved")
-                or any(mutation_uncertain(record, m) for m in record.get("mutations", []))):
-            errors.append("unresolved mutation; no replay permitted")
+
+        def pending_cleanup(mutation):
+            return (allow_pending_cleanup and record.get("resolved") and mutation.get("method") == "DELETE"
+                    and (mutation.get("status") in (200, 202, 204, 404) or uncertain_delete(record, mutation))
+                    and not mutation.get("responseError") and not mutation.get("pollingFailed"))
+
         mutations = record.get("mutations", [])
+        if (not record.get("resolved")
+                or record.get("uncertain") and not any(pending_cleanup(m) for m in mutations)
+                or any(mutation_uncertain(record, m) and not pending_cleanup(m) for m in mutations)):
+            errors.append("unresolved mutation; no replay permitted")
         if not mutations or mutations[0].get("method") != "PUT":
             errors.append("missing initial mutation")
         if any(m.get("status") not in (200, 201, 202, 204, 404)
                and not expected_rejection(m) and not uncertain_delete(record, m) for m in mutations):
             errors.append("missing/failed mutation response")
-        if any(pending_mutation(m) for m in mutations):
+        if any(pending_mutation(m) and not pending_cleanup(m) for m in mutations):
             errors.append("unreconciled asynchronous acceptance")
         for mutation in mutations:
             target = mutation.get("id", "")
@@ -572,7 +584,10 @@ class Arm:
         import requests
         from azure.cli.core import get_default_cli
         from azure.cli.core._profile import Profile
-        self.profile = Profile(cli_ctx=get_default_cli())
+        cli_ctx = get_default_cli()
+        if ARM in (TARGETS["GOVERNMENT_ARM"], TARGETS["CHINA_ARM"]):
+            TARGETS["check_cloud"](cli_ctx, ARM)
+        self.profile = Profile(cli_ctx=cli_ctx)
         self.session = requests.Session()
         # Internal verification must not reenter the observer transport/lock.
         # In particular, a timed-out offloaded GET must never update its ledger.
@@ -982,14 +997,16 @@ class Observer:
                         self.require_owned_reference(item, "microsoft.managedidentity/userassignedidentities")
                     if key == "subscriptionId" and item.casefold() != SUBSCRIPTION:
                         self.reject("Foreign deployment subscription reference")
-                    if key == "resourceGroup" and item.casefold() != GROUP:
+                    if key == "resourceGroup" and item.casefold() != GROUP.casefold():
                         self.reject("Foreign deployment resource-group reference")
                     if key == "endpointUri" and item:
                         self.require_owned_endpoint(urlsplit(item).hostname)
                     if key == "connectionString" and item:
                         fields = dict(part.split("=", 1) for part in item.split(";") if "=" in part)
                         if fields.get("AccountName"):
-                            self.require_owned_endpoint(fields["AccountName"] + ".blob.core.windows.net")
+                            self.require_owned_endpoint(
+                                fields["AccountName"] + ".blob." + TARGETS["cloud"](ARM)["storage"]
+                            )
                         elif fields.get("Endpoint") or fields.get("AccountEndpoint"):
                             self.require_owned_endpoint(urlsplit(fields.get("Endpoint") or fields["AccountEndpoint"]).hostname)
                         else:
@@ -1059,11 +1076,12 @@ class Observer:
                 self.reject("Export descendant identity changed")
 
     def require_owned_endpoint(self, hostname):
+        cloud = TARGETS["cloud"](ARM)
         suffixes = {
-            "microsoft.eventhub/namespaces": ".servicebus.windows.net",
-            "microsoft.servicebus/namespaces": ".servicebus.windows.net",
-            "microsoft.documentdb/databaseaccounts": ".documents.azure.com",
-            "microsoft.storage/storageaccounts": ".blob.core.windows.net",
+            "microsoft.eventhub/namespaces": "." + cloud["servicebus"],
+            "microsoft.servicebus/namespaces": "." + cloud["servicebus"],
+            "microsoft.documentdb/databaseaccounts": "." + cloud["cosmos"],
+            "microsoft.storage/storageaccounts": ".blob." + cloud["storage"],
         }
         for root in self.data["resources"]:
             for kind, suffix in suffixes.items():
@@ -1199,7 +1217,7 @@ class Observer:
                 action_root = resource_id.rsplit("/", 1)[0]
                 readonly = False
                 if method == "POST" and action == "exporttemplate":
-                    group_id = f"/subscriptions/{SUBSCRIPTION}/resourcegroups/{GROUP}"
+                    group_id = f"/subscriptions/{SUBSCRIPTION}/resourcegroups/{GROUP}".casefold()
                     resources = body.get("resources", [])
                     if (resource_id != group_id + "/exporttemplate"
                             or set(body) - {"resources", "options", "outputFormat"}
@@ -1328,7 +1346,9 @@ class ProcessScope:
         def token(profile, resource=None, scopes=None, subscription=None, *args, **kwargs):
             if subscription and subscription.casefold() != SUBSCRIPTION:
                 raise OwnershipError("Foreign token subscription override")
-            arm_hosts = ARM_HOSTS | {"management.core.windows.net"}
+            arm_hosts = ARM_HOSTS | {urlsplit(AUDIENCE).hostname}
+            if TARGETS["cloud"](ARM)["name"] == "AzureCloud":
+                arm_hosts.add("management.core.windows.net")
             if scopes and all(urlsplit(value).hostname in arm_hosts for value in scopes):
                 resource, scopes = None, [AUDIENCE + ".default"]
             elif not scopes and (resource is None or urlsplit(resource).hostname in arm_hosts):

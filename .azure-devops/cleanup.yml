@@ -1,54 +1,55 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
-# Required for schedule only trigger
 trigger: none
 pr: none
 
-# Run daily at 5 am (Pacific).
+# Scheduled runs use the report-only parameter default, regardless of source changes.
 schedules:
   - cron: "0 13 * * *"
-    displayName: "Daily Cleanup"
+    displayName: "Daily owned-resource report (13:00 UTC)"
     branches:
       include:
         - dev
     always: true
 
 parameters:
-  - name: resourceGroupVar
+  - name: mode
+    displayName: Cleanup mode
     type: string
-    default: "ResourceGroup"
-  - name: exclusionsVar
+    default: report
+    values: [report, delete]
+  - name: buildId
+    displayName: Original producer build ID (0 discovers recent runs)
     type: string
-    default: "Exclusions"
+    default: '0'
+  - name: profile
+    displayName: Approved cleanup profile
+    type: string
+    default: all
+    values: [all, iot-public, iot-fairfax, iot-mooncake, aio-public, aio-fairfax]
 
-variables:
-  - name: targetResourceGroup
-    value: $[variables.${{ parameters.resourceGroupVar }}]
-  - name: deleteExclusions
-    value: $[variables.${{ parameters.exclusionsVar }}]
-
-steps:
-  - checkout: none
-
-  - task: AzureCLI@2
-    continueOnError: true
-    displayName: "Delete Test resources"
-    inputs:
-      azureSubscription: $(AzureServiceConnection)
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
-        set -x
-
-        names=($EXCLUSIONS)
-        query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-
-        echo "Resources found to delete:"
-        resources=$(az resource list -g "$RESOURCEGROUP" --query "$query[*].id" -o tsv)
-        if [[ -n "$resources" ]]; then
-          echo "Deleting Resources"
-          az resource delete --ids $resources
-        fi
-    env:
-      RESOURCEGROUP: $(targetResourceGroup)
-      EXCLUSIONS: $(deleteExclusions)
+jobs:
+  - job: Cleanup
+    displayName: Report or clean finished owners
+    timeoutInMinutes: 60
+    cancelTimeoutInMinutes: 5
+    pool:
+      vmImage: ubuntu-24.04
+    steps:
+      - checkout: self
+        clean: true
+        persistCredentials: false
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.13'
+      - bash: python -m pip install azure-cli
+        displayName: Install cleanup dependencies
+      - template: templates/cleanup-profiles.yml
+        parameters:
+          profile: ${{ parameters.profile }}
+          mode: ${{ parameters.mode }}
+          buildId: ${{ parameters.buildId }}
+      - publish: cleanup-report
+        artifact: cleanup-report-$(System.JobAttempt)
+        displayName: Retain classification and ownership evidence
+        condition: always()

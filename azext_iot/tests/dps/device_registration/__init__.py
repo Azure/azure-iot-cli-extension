@@ -60,7 +60,7 @@ def register_fresh_generated_credential(
     cli, resource, kind, key_name, request, endpoint=None, auth_type="login", connection_string=None,
 ):
     """Authenticate once with service-generated keys on an independent identity/group."""
-    from azext_iot.constants import IOTDPS_PROVISIONING_HOST
+    from azext_iot._factory import get_dps_provisioning_host
     from azext_iot.tests.generators import generate_names
     from azext_iot.tests.helpers import invoke_checked, set_cmd_auth_type
 
@@ -96,7 +96,7 @@ def register_fresh_generated_credential(
     target = context
     if endpoint is not None:
         properties = resource["dps"]["properties"]
-        host = properties["deviceProvisioningHostName"] if endpoint == "configured" else IOTDPS_PROVISIONING_HOST
+        host = properties["deviceProvisioningHostName"] if endpoint == "configured" else get_dps_provisioning_host(cli.az_cli)
         assert host
         target = f"--id-scope {properties['idScope']} --host {host}"
     registration = invoke(

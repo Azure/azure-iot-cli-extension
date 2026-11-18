@@ -1,0 +1,287 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+"""Stage frozen health-test sources and reuse the native IoT integration controller."""
+
+import argparse
+import ast
+import hashlib
+import os
+from pathlib import Path
+import runpy
+import shutil
+
+from release_monitor import verify_bundle, write_json
+
+
+ROOT = Path(__file__).resolve().parents[1]
+STORAGE_FIXTURES = (
+    "azext_iot/tests/helpers.py",
+    "azext_iot/tests/iothub/_sas_phase.py",
+    "azext_iot/tests/iothub/conftest.py",
+    "azext_iot/tests/deviceupdate/conftest.py",
+    "azext_iot/tests/adr/test_adr_schema_int.py",
+    "azext_iot/tests/adr/test_adr_software_update_int.py",
+)
+COMPATIBILITY = {
+    "azext_iot/tests/dps/conftest.py": {
+        "symbols": (
+            "_readiness_http_error", "_data_plane_authorization_pending",
+            "_readiness_service_code", "_readiness_diagnostic", "_wait_for_readiness",
+            "_wait_for_current_user_data_plane",
+        ),
+        "helpers": ("_dps_authorization_failed_response",),
+        "imports": ("import re", "from msrestazure.azure_exceptions import CloudError"),
+        "reason": (
+            "Allow ten minutes for Fairfax Hub and DPS caller authorization and retain safe per-probe timing receipts; "
+            "preserve non-Fairfax deadlines, exact error predicates and three-success confirmation."
+        ),
+    },
+    "azext_iot/tests/iothub/_sas_phase.py": {
+        "symbols": ("HubSasPhase.install", "HubSasPhase.pytest_runtest_makereport"),
+        "imports": (
+            "from urllib.parse import parse_qs",
+            "from azext_iot.tests._integration_target import CLOUDS, arm_hosts, cloud",
+        ),
+        "reason": (
+            "Observe sovereign ARM and Storage mutations and preserve boolean retry metadata during redaction "
+            "without changing SAS cases or cleanup assertions."
+        ),
+    },
+}
+
+
+def function(tree, symbol):
+    node = tree
+    for name in symbol.split("."):
+        matches = [item for item in node.body if isinstance(item, (ast.ClassDef, ast.FunctionDef)) and item.name == name]
+        if len(matches) != 1:
+            raise ValueError(f"Selected source cannot apply the reviewed test adapter: {symbol}")
+        node = matches[0]
+    if not isinstance(node, ast.FunctionDef):
+        raise ValueError(f"Test adapter does not target a function: {symbol}")
+    return node
+
+
+def adapt_storage_fixtures(output):
+    changes = []
+    for relative in STORAGE_FIXTURES:
+        path = output / relative
+        if not path.is_file():
+            continue
+        original = path.read_text(encoding="utf-8")
+        tree = ast.parse(original)
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+        replacements = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.JoinedStr):
+                literal = "".join(
+                    part.value for part in node.values if isinstance(part, ast.Constant)
+                    and isinstance(part.value, str)
+                )
+            elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                  and not isinstance(parents.get(node), ast.JoinedStr)):
+                literal = node.value
+            else:
+                continue
+            if "storage account create " in literal and "--allow-blob-public-access" not in literal:
+                segment = ast.get_source_segment(original, node)
+                replacements.append((segment, segment.replace(
+                    "storage account create ", "storage account create --allow-blob-public-access false ", 1,
+                )))
+        text = original
+        for old, new in replacements:
+            text = text.replace(old, new, 1)
+        if text != original:
+            ast.parse(text)
+            path.write_text(text, encoding="utf-8")
+            changes.append({
+                "path": relative, "symbols": ["Storage fixture creation"],
+                "reason": "Explicitly disable anonymous blob access without changing network or shared-key access.",
+                "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+                "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+            })
+    return changes
+
+
+def adapt_harness(output, manifest):
+    """Replace only reviewed instrumentation functions, retaining all other frozen source."""
+    changes = []
+    for relative, adapter in COMPATIBILITY.items():
+        path = output / relative
+        if not path.exists():
+            continue
+        original = path.read_text(encoding="utf-8")
+        current = (ROOT / relative).read_text(encoding="utf-8")
+        tree, donor = ast.parse(original), ast.parse(current)
+        lines, replacements = original.splitlines(keepends=True), []
+        symbols = adapter["symbols"] + adapter.get("helpers", ())
+        for symbol in symbols:
+            replacement = function(donor, symbol)
+            missing_helper = symbol in adapter.get("helpers", ()) and not any(
+                getattr(item, "name", None) == symbol for item in tree.body
+            )
+            previous = None if missing_helper else function(tree, symbol)
+            if (previous is None and replacement.decorator_list or previous is not None
+                    and (ast.dump(previous.args) != ast.dump(replacement.args)
+                         or [ast.dump(item) for item in previous.decorator_list]
+                         != [ast.dump(item) for item in replacement.decorator_list])):
+                raise ValueError(f"Selected source has an incompatible test-adapter signature: {symbol}")
+            content = current.splitlines(keepends=True)[replacement.lineno - 1:replacement.end_lineno]
+            replacements.append((
+                previous.lineno - 1 if previous else len(lines), previous.end_lineno if previous else len(lines),
+                content if previous else ["\n\n", *content, "\n"],
+            ))
+        for start, end, replacement in sorted(replacements, reverse=True):
+            lines[start:end] = replacement
+        text = "".join(lines)
+        tree = ast.parse(text)
+        imports = {
+            (getattr(node, "module", None), alias.name, alias.asname)
+            for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom)) for alias in node.names
+        }
+        additions = []
+        for statement in adapter["imports"]:
+            node = ast.parse(statement).body[0]
+            if any((getattr(node, "module", None), alias.name, alias.asname) not in imports for alias in node.names):
+                additions.append(statement + "\n")
+        if additions:
+            first = next(node for node in tree.body if not (
+                isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+                or isinstance(node, ast.ImportFrom) and node.module == "__future__"
+            ))
+            lines = text.splitlines(keepends=True)
+            lines[first.lineno - 1:first.lineno - 1] = additions
+            text = "".join(lines)
+        ast.parse(text)
+        if text != original:
+            path.write_text(text, encoding="utf-8")
+            changes.append({
+                "path": relative, "symbols": list(symbols), "reason": adapter["reason"],
+                "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+                "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+            })
+    changes.extend(adapt_storage_fixtures(output))
+    if manifest.get("cloudKey") == "fairfax":
+        changes.extend(adapt_fairfax_timeouts(output))
+    return {
+        "version": 1, "sourceCommit": manifest["testSourceCommit"],
+        "automationCommit": manifest["automationCommit"], "files": changes,
+    }
+
+
+def adapt_fairfax_timeouts(output):
+    """Raise only reviewed legacy local-auth markers, without replacing test bodies."""
+    relative = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    path = output / relative
+    if not path.is_file():
+        return []
+    original = path.read_text(encoding="utf-8")
+    tree = ast.parse(original)
+    lines, symbols = original.splitlines(keepends=True), []
+    for symbol in (
+        "test_dps_create_disable_local_auth",
+        "test_dps_update_disable_local_auth",
+        "test_dps_disable_local_auth_dataplane",
+    ):
+        node = function(tree, symbol)
+        markers = [item for item in node.decorator_list if isinstance(item, ast.Call)
+                   and ast.unparse(item.func) == "pytest.mark.timeout"]
+        if len(markers) != 1:
+            raise ValueError(f"Selected source has an incompatible Fairfax timeout marker: {symbol}")
+        marker = markers[0]
+        if len(marker.args) != 1 or not isinstance(marker.args[0], ast.Constant) or marker.args[0].value != 600:
+            continue
+        if len(marker.keywords) != 1 or ast.dump(marker.keywords[0]) != ast.dump(
+            ast.keyword(arg="func_only", value=ast.Constant(value=False))
+        ):
+            raise ValueError(f"Selected source has an incompatible Fairfax timeout marker: {symbol}")
+        value = marker.args[0]
+        line = lines[value.lineno - 1]
+        lines[value.lineno - 1] = line[:value.col_offset] + "1080" + line[value.end_col_offset:]
+        symbols.append(symbol)
+    if not symbols:
+        return []
+    text = "".join(lines)
+    ast.parse(text)
+    path.write_text(text, encoding="utf-8")
+    return [{
+        "path": relative, "symbols": symbols,
+        "reason": "Allow Fairfax local-auth setup and assertions to outlive the 600-second readiness budget.",
+        "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+        "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+    }]
+
+
+def overlay_controllers(output, manifest):
+    for path in (ROOT / "azext_iot/tests").glob("_*.py"):
+        if (path.name == "__init__.py" or path.name.endswith("_manifest.py")
+                or path.name.startswith("_release_")
+                or path.name.startswith("_unit_") and manifest.get("kind") != "source"):
+            continue
+        destination = output / path.relative_to(ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, destination)
+
+
+def stage(bundle, output, *, source_only=False):
+    bundle, output = Path(bundle).resolve(), Path(output).resolve()
+    manifest = verify_bundle(
+        bundle, require_wheel=not source_only, extension="azure-iot", automation_commit=os.environ["BUILD_SOURCEVERSION"],
+        cloud=os.environ["MONITOR_CLOUD"], track=os.environ["MONITOR_TRACK"], slot=os.environ["MONITOR_TRACK"],
+    )
+    if output.exists():
+        raise ValueError("Monitor test workspace must be fresh for this attempt.")
+    source = bundle / "source"
+    if any(path.is_symlink() for path in source.rglob("*")):
+        raise ValueError("Released source must not contain symbolic links.")
+    shutil.copytree(source, output, ignore=shutil.ignore_patterns(".git"))
+    if not source_only:
+        overlay_controllers(output, manifest)
+        shutil.copyfile(ROOT / "tox.ini", output / "tox.ini")
+        # Source-only build/unit workspaces retain controllers matching their frozen tests.
+        compatibility = adapt_harness(output, manifest)
+        manifest = {**manifest, "testCompatibility": compatibility}
+        for change in compatibility["files"]:
+            print(f"Test-only compatibility: {change['path']}: {change['reason']}", flush=True)
+    write_json(output / "release-monitor.json", manifest)
+    return manifest
+
+
+def plan(bundle, output):
+    manifest = stage(bundle, output, source_only=True)
+    overlay_controllers(Path(output), manifest)
+    native = runpy.run_path(str(Path(output) / "azext_iot/tests/_ado_pipeline.py"))
+    jobs = native["plan"](
+        os.environ["MONITOR_SERVICES"].split(","), os.environ["MONITOR_PYTHONS"].split(","),
+        os.environ["MONITOR_REGION"].split(","),
+        os.environ["MONITOR_ENDPOINT"],
+    )
+    # Resolve the full version-specific selection before an Azure service connection is used.
+    for job in jobs:
+        for nodes in native["owned_nodes"](job["service"], job["endpoint"]).values():
+            for node in nodes:
+                path = Path(output) / node.split("::", maxsplit=1)[0]
+                if not path.is_file():
+                    raise ValueError(f"Released test source cannot execute the selected native cohort: {node}")
+    write_json(Path(bundle) / "plan.json", jobs)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=["plan", "stage"])
+    parser.add_argument("--bundle", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-only", action="store_true")
+    args = parser.parse_args(argv)
+    if args.command == "plan":
+        plan(args.bundle, args.output)
+    else:
+        stage(args.bundle, args.output, source_only=args.source_only)
+
+
+if __name__ == "__main__":
+    main()

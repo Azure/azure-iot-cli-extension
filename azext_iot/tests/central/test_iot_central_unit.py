@@ -13,6 +13,7 @@ from datetime import datetime
 from knack.util import CLIError, todict
 
 from azure.cli.core.mock import DummyCli
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
 from azext_iot.central.providers import CentralDeviceProvider
@@ -50,12 +51,86 @@ from azext_iot.central.providers import (
     CentralExportProvider,
 )
 from azext_iot.central.common import API_VERSION, API_VERSION_PREVIEW
+from azext_iot.tests import central as live
 
 device_id = "mydevice"
 app_id = "myapp"
 device_twin_result = {"deviceId": "{}".format(device_id)}
 resource = "shared_resource"
 success_resp = {"result": "success"}
+
+
+@pytest.mark.parametrize("error,create", [
+    (ResourceNotFoundError("missing"), True),
+    (AzureResponseError({"code": "NotFound"}), True),
+    (AzureResponseError({"code": "ResourceNotFound"}), True),
+    (AzureResponseError({"code": "Forbidden"}), False),
+    (AzureResponseError("unexpected response"), False),
+    (ValueError("invalid response"), False),
+])
+def test_edge_template_fixture_only_creates_after_not_found(mocker, error, create):
+    scenario = mocker.Mock(spec=live.CentralLiveScenarioTest)
+    scenario.app_id = "app"
+    scenario._get_template_id_key.return_value = "id"
+    mocker.patch.object(live.utility, "process_json_arg", return_value={"displayName": "template"})
+    response = mocker.Mock()
+    response.get_output_in_json.return_value = {"id": "templateid;1"}
+    scenario.cmd.side_effect = [error, response]
+
+    if create:
+        assert live.CentralLiveScenarioTest._create_device_template(scenario, API_VERSION_PREVIEW, edge=True) == (
+            "templateid;1", "template",
+        )
+        assert scenario.cmd.call_count == 2
+    else:
+        with pytest.raises(type(error)) as raised:
+            live.CentralLiveScenarioTest._create_device_template(scenario, API_VERSION_PREVIEW, edge=True)
+        assert raised.value is error
+        scenario.cmd.assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["children list", "child delete", "parent delete"])
+@pytest.mark.parametrize("error_type", [AzureResponseError, RuntimeError])
+def test_template_cleanup_reports_cli_errors_and_preserves_unexpected_errors(mocker, operation, error_type):
+    scenario = mocker.Mock(spec=live.CentralLiveScenarioTest)
+    scenario.app_id = "app"
+    mocker.patch.object(live.time, "sleep")
+    log = mocker.patch.object(live.logger, "warning")
+    failure = error_type("response details must not enter cleanup logs")
+    template_deletes = []
+
+    def command_result(command, **_kwargs):
+        response = mocker.Mock()
+        if "device-template delete" in command:
+            template_deletes.append(command)
+            if len(template_deletes) == 1:
+                raise AzureResponseError({"code": "Conflict"})
+        elif "device list" in command:
+            response.get_output_in_json.return_value = [{"id": "parent", "template": "template"}]
+        elif "children list" in command:
+            if operation == "children list":
+                raise failure
+            response.get_output_in_json.return_value = [{"id": "child"}]
+        elif "device delete" in command:
+            device = "child" if "--device-id child" in command else "parent"
+            if operation == f"{device} delete":
+                raise failure
+        else:
+            pytest.fail(f"Unexpected cleanup command: {command}")
+        return response
+
+    scenario.cmd.side_effect = command_result
+    if error_type is RuntimeError:
+        with pytest.raises(RuntimeError) as raised:
+            live.CentralLiveScenarioTest._delete_device_template(scenario, API_VERSION_PREVIEW, "template")
+        assert raised.value is failure
+        assert len(template_deletes) == 1
+    else:
+        live.CentralLiveScenarioTest._delete_device_template(scenario, API_VERSION_PREVIEW, "template")
+        assert len(template_deletes) == 2
+        assert log.call_count == 2
+        assert "AzureResponseError" in log.call_args.args
+    assert "response details" not in str(log.call_args_list)
 
 
 @pytest.fixture()

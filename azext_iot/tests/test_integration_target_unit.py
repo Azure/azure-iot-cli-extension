@@ -48,3 +48,51 @@ def test_explicit_public_overrides_central_default_without_allowing_legacy_recei
     assert public == {"region": "centraluseuap", "endpoint": subject.PUBLIC_ARM}
     assert not subject.matches({}, public)
     assert subject.target("centraluseuap", "") == subject.target()
+
+
+@pytest.mark.parametrize("region,endpoint", [
+    ("usgovvirginia", subject.GOVERNMENT_ARM), ("chinaeast2", subject.CHINA_ARM),
+])
+def test_sovereign_target_requires_exact_scope_and_receipt(monkeypatch, region, endpoint):
+    expected = {"region": region, "endpoint": endpoint}
+    assert subject.target(region) == expected
+    assert not subject.matches({}, expected)
+    monkeypatch.delenv("azext_iot_test_subscription", raising=False)
+    with pytest.raises(ValueError, match="explicit subscription"):
+        subject.scope(endpoint)
+    subscription, group = "00000000-0000-0000-0000-000000000001", "sovereign-tests"
+    monkeypatch.setenv("azext_iot_test_subscription", subscription)
+    monkeypatch.setenv("azext_iot_testrg", group)
+    subject.public_scope(subscription, group, **expected)
+    with pytest.raises(ValueError, match="authorized subscription"):
+        subject.public_scope(subscription, "foreign", **expected)
+    assert subject.matches({"target": expected}, expected)
+    assert not subject.matches({"target": subject.target()}, expected)
+
+
+@pytest.mark.parametrize("region,endpoint", [
+    ("usgovvirginia", subject.PUBLIC_ARM), ("chinaeast2", subject.GOVERNMENT_ARM),
+    ("australiaeast", subject.CHINA_ARM),
+])
+def test_cross_cloud_region_is_rejected(region, endpoint):
+    with pytest.raises(ValueError, match="same cloud"):
+        subject.target(region, endpoint)
+
+
+@pytest.mark.parametrize("group", ["sovereign-tests", "Fairfax-IoT-RG"])
+def test_sovereign_ownership_keeps_scope_and_cloud_boundaries(monkeypatch, group):
+    import runpy
+    from pathlib import Path
+
+    subscription = "00000000-0000-0000-0000-000000000001"
+    monkeypatch.setenv("azext_iot_test_subscription", subscription)
+    monkeypatch.setenv("azext_iot_testrg", group)
+    owned = runpy.run_path(str(Path(subject.__file__).with_name("_hub_ownership.py")))
+    owned.update(owned["configure_target"]("usgovvirginia"))
+    resource = f"/subscriptions/{subscription}/resourceGroups/{group}/providers/Microsoft.Devices/IotHubs/test"
+    assert owned["scope_id"](resource)
+    assert not owned["scope_id"](resource.replace(group, "foreign"))
+    assert owned["arm_location"](subject.GOVERNMENT_ARM + resource).hostname == "management.usgovcloudapi.net"
+    with pytest.raises(owned["OwnershipError"], match="Unplanned ARM"):
+        owned["arm_location"](subject.PUBLIC_ARM + resource)
+    assert owned["AUDIENCE"] == subject.CLOUDS[subject.GOVERNMENT_ARM]["audience"]

@@ -6,10 +6,9 @@
 
 """Portable observer proofs with real SDK/CLI calls over an in-memory transport."""
 
-import ast
 from copy import deepcopy
+from inspect import signature
 import json
-from pathlib import Path
 import sys
 import time
 from types import SimpleNamespace
@@ -19,7 +18,7 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 from azure.cli.core._profile import Profile
-from azure.cli.core.azclierror import RequiredArgumentMissingError, ResourceNotFoundError
+from azure.cli.core.azclierror import ResourceNotFoundError
 
 from azext_iot.tests import _hub_ownership as ownership, _hub_phase_runner as runner
 from azext_iot.tests.test_hub_ownership_transport_unit import Wire, Credential, HUB, create_hub
@@ -27,7 +26,6 @@ from azext_iot.tests.test_hub_ownership_transport_unit import Wire, Credential, 
 
 pytest_plugins = ["pytester"]
 
-ROOT = Path(__file__).resolve().parents[2]
 OPERATION = HUB + "/operations/offline"
 NEGATIVE = HUB.replace(ownership.GROUP, "fakerg").rsplit("/", 1)[0] + "/fakehub"
 INVALID_POLL_URLS = [
@@ -369,7 +367,7 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
 ):
     from azext_iot.iothub.providers import discovery
     from azext_iot.sdk.iothub.mgmt import IotHubClient
-    from azext_iot.tests.iothub.state import _state_helpers
+    from azext_iot.tests.iothub.state import test_hub_state_int as live_state
 
     observer, _, wire = transport
     create_hub(wire)
@@ -382,20 +380,10 @@ def test_actual_negative_state_body_retains_assertions_without_poisoning_ownersh
     cli = owned_cli
     cli.capture_stderr = False
     cli.user_subscription = ownership.SUBSCRIPTION
-    source = ROOT / "azext_iot/tests/iothub/state/test_hub_state_int.py"
-    definition = next(
-        node for node in ast.parse(source.read_text(encoding="utf-8")).body
-        if isinstance(node, ast.FunctionDef) and node.name == test_name
-    )
-    definition.decorator_list = []
-    namespace = {
-        "ResourceNotFoundError": ResourceNotFoundError,
-        "RequiredArgumentMissingError": RequiredArgumentMissingError,
-        "state": SimpleNamespace(cli=cli, DATAPLANE=_state_helpers.DATAPLANE),
-    }
-    exec(compile(ast.fix_missing_locations(ast.Module(body=[definition], type_ignores=[])), str(source), "exec"), namespace)
-    arguments = [{"name": HUB.rsplit("/", 1)[1], "rg": ownership.GROUP}] if definition.args.args else []
-    namespace[definition.name](*arguments)
+    monkeypatch.setattr(live_state.state, "cli", cli)
+    test_body = getattr(live_state, test_name)
+    arguments = [{"name": HUB.rsplit("/", 1)[1], "rg": ownership.GROUP}] if signature(test_body).parameters else []
+    test_body(*arguments)
     assert isinstance(cli.get_error(), ResourceNotFoundError)
     assert sum(
         method == "GET" and urlsplit(url).path.casefold() == NEGATIVE for method, url, *_ in wire.calls

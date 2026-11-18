@@ -9,12 +9,25 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 import runpy
 
 ROOT = Path(__file__).resolve().parents[2]
 ENV = "azext_iot_debug_selection"
 DPS_ARGS_ENV = "azext_iot_dps_node_args"
 DPS_PREFIX = "azext_iot/tests/dps/"
+# Mooncake's DPS data-plane certificate chain currently fails normal TLS verification.
+# Exclude only this data-plane contract; keep the two ARM-only policy tests.
+# Remove this exception and its fixture probe adjustment once that chain is trusted.
+DPS_MOONCAKE_TLS_NODE = DPS_PREFIX + "core/test_dps_disable_local_auth_int.py::test_dps_disable_local_auth_dataplane"
+DPS_MOONCAKE_TLS_REASON = (
+    "Mooncake DPS data-plane TLS certificate chain is not trusted (CERTIFICATE_VERIFY_FAILED); "
+    "restore this test when azure-devices-provisioning.cn presents a trusted chain."
+)
+DPS_LOCAL_AUTH_MANAGEMENT_NODES = frozenset(
+    DPS_PREFIX + "core/test_dps_disable_local_auth_int.py::" + name
+    for name in ("test_dps_create_disable_local_auth", "test_dps_update_disable_local_auth")
+)
 
 
 def select(suite, phase=None, nodes=None):
@@ -51,12 +64,16 @@ def from_environment(environment, suite, phase):
     if not isinstance(value, dict) or value.get("suite") != suite or value.get("phase") != phase:
         raise ValueError("Focused live selection suite/auth phase mismatch.")
     expected = select(suite, phase, value.get("requestedNodes"))
+    if "attempt" in value:
+        expected = attempt(suite, phase, value.get("requestedNodes"), value["attempt"])
     if value != expected:
         raise ValueError("Focused live selection does not match this checkout's manifest.")
     return expected
 
 
 def provenance(debug):
+    if debug and "attempt" in debug:
+        return {"mode": "attempt", "qualifiesFullSuite": False, "attemptSelection": debug}
     return {"mode": "debug", "qualifiesFullSuite": False, "debug": debug} if debug else {}
 
 
@@ -75,3 +92,10 @@ def add_arguments(parser):
     parser.add_argument("--debug-phase", help="Run only this auth phase as non-qualifying live debug evidence.")
     parser.add_argument("--debug-node", action="append",
                         help="Exact manifest-known repo-relative pytest node ID; repeat to select several cases.")
+
+
+def attempt(suite, phase, nodes, identity):
+    """A selected execution is evidence, never standalone full-suite qualification."""
+    if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
+        raise ValueError("Attempt selection requires a SHA256 identity.")
+    return dict(select(suite, phase, nodes), attempt=identity)

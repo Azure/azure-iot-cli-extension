@@ -139,7 +139,8 @@ class TestADRSoftwareUpdateLinked(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 storage_created = True
                 self.cmd(
-                    f"storage account create -n {storage_account} -g {TEST_RG} --location {TEST_LOCATION}"
+                    f"storage account create -n {storage_account} -g {TEST_RG} --location {TEST_LOCATION} "
+                    "--allow-blob-public-access false"
                 )
 
             with timed_step("Setup 2/3 ❯ Grant roles while the Update Instance provisions"):

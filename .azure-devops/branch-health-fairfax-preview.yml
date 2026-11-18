@@ -1,0 +1,33 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+trigger: none
+pr: none
+schedules: []
+name: iot-branch-fairfax-preview-$(Date:yyyyMMdd).$(Rev:r)
+appendCommitMessageToRunName: false
+parameters:
+  - name: mode
+    type: string
+    default: Integration tests
+    values: [Dry run, Integration tests]
+pool:
+  vmImage: ubuntu-24.04
+variables:
+  - template: templates/integration-profile.yml
+    parameters:
+      cloud: fairfax
+      version: preview
+      region: Australia East
+      services: [DPS, HubControl, HubData]
+  - name: TestMode
+    value: ${{ parameters.mode }}
+  - name: TestPythons
+    value: '3.13'
+  - name: endpoint
+    value: $(TestEndpoint)
+stages:
+  - template: templates/health-stages.yml
+    parameters:
+      source: true
+      mode: ${{ parameters.mode }}
+      pythonVersions: '3.13'
+      regions: ${{ variables.TestRegion }}

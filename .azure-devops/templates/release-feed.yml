@@ -1,0 +1,10 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+steps:
+  - task: PipAuthenticate@1
+    displayName: Authenticate feed
+    inputs:
+      artifactFeeds: aziotcli/pip
+      onlyAddExtraIndex: false
+  - script: python scripts/release_pipeline.py feed-environment
+    displayName: Configure feed

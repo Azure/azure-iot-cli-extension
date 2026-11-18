@@ -54,12 +54,20 @@ def test_client_handler_get_data_client(mocker):
     assert client is patched_client.return_value
 
 
-def test_client_handler_add_useragents_handles_exception():
+def test_client_handler_add_useragents_handles_missing_policy(mocker):
+    handler = DeviceUpdateClientHandler(cmd=MagicMock())
+    client = object()
+    log = mocker.patch.object(subject.logger, "debug")
+    assert handler._add_useragents(client) is client
+    log.assert_called_once_with("Cannot add the IoT extension User-Agent: the client policy is unavailable.")
+
+
+def test_client_handler_add_useragents_preserves_unexpected_errors():
     handler = DeviceUpdateClientHandler(cmd=MagicMock())
     client = MagicMock()
-    client._config.user_agent_policy.add_user_agent.side_effect = Exception("nope")
-    # Should swallow the exception and return the client.
-    assert handler._add_useragents(client) is client
+    client._config.user_agent_policy.add_user_agent.side_effect = RuntimeError("policy failed")
+    with pytest.raises(RuntimeError, match="policy failed"):
+        handler._add_useragents(client)
 
 
 # ---- DeviceUpdateAccountManager.find_account ----

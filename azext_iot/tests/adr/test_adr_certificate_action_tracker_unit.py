@@ -95,9 +95,10 @@ def test_actual_waited_activation_recipe_formats_and_projects_one_post(
     before = dict(sdk._ca_resource(ca_pki, "activate"), id=resource_id, name="ica")
     after = dict(sdk._ca_resource(ca_pki, "activate", completed=True), id=resource_id, name="ica")
     before["properties"]["issuer"]["status"] = "PendingActivation"
+    # Exercise the service's SHA-1 thumbprint, not a SHA-1 certificate signature.
     after["properties"]["issuer"]["thumbprint"] = x509.load_pem_x509_certificate(
         ca_pki["leaf"].encode()
-    ).fingerprint(hashes.SHA1()).hex()
+    ).fingerprint(hashes.SHA1()).hex()  # nosec B303
     scenario._owned_ca_ids = {resource_id, resource_id.rsplit("/certificateAuthorities/", 1)[0]}
     scenario.kwargs.update(namespace_name="namespace", resource_group="rg")
 
