@@ -143,10 +143,13 @@ def after_create(name, resource):
 
 
 def before_delete(name, resource=None):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
     record = _owned(name)
     if not record:
         return True
     if resource is None:
+        handoff.record(record["id"], "pending", "ResourceNotObserved")
         return False
     if (resource.get("id", "").lower() != record["id"].lower()
             or not location_matches(resource)
@@ -154,12 +157,19 @@ def before_delete(name, resource=None):
         raise RuntimeError("DPS phase refuses deletion: current resource ownership does not match its receipt.")
     if str((resource.get("properties") or {}).get("provisioningState", "")).lower() == "deleting":
         write(f"deleting-{record['kind']}.json", {"id": record["id"], "already_deleting": True})
+        handoff.record(record["id"], "deleting")
         return False
     write(f"delete-{record['kind']}.json", {"id": record["id"], "delete_attempted": True}, exclusive=True)
     return True
 
 
-def after_delete(name):
+def after_delete(name, *, completed=True):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
     record = _owned(name)
     if record:
-        write(f"deleted-{record['kind']}.json", {"id": record["id"], "delete_completed": True}, exclusive=True)
+        if completed:
+            write(f"deleted-{record['kind']}.json", {"id": record["id"], "delete_completed": True}, exclusive=True)
+        else:
+            write(f"delete-accepted-{record['kind']}.json", {"id": record["id"], "delete_accepted": True}, exclusive=True)
+        handoff.record(record["id"], "absent" if completed else "accepted")

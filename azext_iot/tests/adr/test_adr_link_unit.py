@@ -724,7 +724,7 @@ def test_dps_profile_lookup_failure_keeps_namespace_inspection(fixture_link_prov
     (AZURE_CHINA_CLOUD, None),
     (AZURE_PUBLIC_CLOUD, "https://management.usgovcloudapi.net"),
 ])
-def test_dps_optional_inspection_preserves_real_factory_cloud_guard(
+def test_dps_optional_inspection_keeps_adr_cloud_guard_before_factory(
     fixture_link_provider, mocker, monkeypatch, caplog, cloud, arm_audience,
 ):
     from azext_iot.adr.providers import link
@@ -739,9 +739,6 @@ def test_dps_optional_inspection_preserves_real_factory_cloud_guard(
         "azext_iot._factory.get_cli_credential", side_effect=AssertionError("Unexpected credential lookup"),
     )
     factory = mocker.spy(link, "adr_iot_service_provisioning_factory")
-    with pytest.raises(CLIError, match="Azure public cloud only"):
-        factory(cli_ctx, subscription_id="sub")
-    factory.reset_mock()
 
     with pytest.raises(CLIError, match="Azure public cloud only"):
         fixture_link_provider._side_get_dps_resource(DPS_ID)

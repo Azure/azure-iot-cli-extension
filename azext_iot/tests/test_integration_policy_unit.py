@@ -155,6 +155,7 @@ def test_storage_creation_preserves_optional_location(mocker, location):
     assert result == "test-storage-connection"
     create_command = cmd.call_args_list[1].args[0]
     assert create_command.startswith("storage account create -n account -g rg ")
+    assert "--allow-blob-public-access false" in create_command
     if location:
         assert create_command.endswith(f"--location {location}")
     else:

@@ -283,12 +283,20 @@ class RegistryDeviceOwnership:
         if _completed(self.intent):
             return
         try:
-            self._cleanup()
+            from azext_iot.tests import _cleanup_handoff as handoff
+            if handoff.enabled():
+                handoff.cleanup(self.namespace["id"], self._cleanup, accepted=False)
+            else:
+                self._cleanup()
         finally:
             if not _completed(self.intent):
                 self._write("quarantine", {
                     "reason": "RegistryDevice cleanup unresolved; preserve the original error and intent.",
                 })
+
+    @property
+    def cleanup_complete(self):
+        return _completed(self.intent)
 
     def read_device(self):
         """Resolve current identity without freezing a cleanup ETag before profile actions."""
@@ -315,7 +323,7 @@ class RegistryDeviceOwnership:
         yield
         self._write("profile-action", {**action, "completed": True})
 
-    def _resolve_candidate(self, external_id):
+    def _resolve_candidate(self, external_id, *, observe_once=False):
         def match():
             matches = [device for device in self._list() if device["external_id"] == external_id]
             if len(matches) > 1:
@@ -326,10 +334,13 @@ class RegistryDeviceOwnership:
                 raise AssertionError("Ambiguous RegistryDevice external ID; no device will be deleted.")
             return matches
 
-        device = wait_for_condition(
+        matches = match() if observe_once else wait_for_condition(
             match, bool, description="owned RegistryDevice materialization",
             timeout=RESOLVE_TIMEOUT, interval=5, is_retryable_error=lambda _error: False,
-        )[0]
+        )
+        if not matches:
+            raise AssertionError("RegistryDevice is not yet observable; retain ownership evidence for later cleanup.")
+        device = matches[0]
         if any(old["id"].casefold() == device["id"].casefold() or old["external_id"] == external_id
                for old in self.intent["baseline"]):
             raise AssertionError("RegistryDevice predates this registration; refusing unowned deletion.")
@@ -346,6 +357,7 @@ class RegistryDeviceOwnership:
         return device
 
     def _cleanup(self):
+        from azext_iot.tests import _cleanup_handoff as handoff
         action = _read(self._name("profile-action"))
         if (receipts.settings()[0] / self._name("profile-action")).exists():
             if (not isinstance(action, dict) or action.get("completed") is not True
@@ -355,22 +367,35 @@ class RegistryDeviceOwnership:
         external_id = self._external_id()
         resolved = _read(self._name("resolved"))
         if not resolved:
-            device = self._resolve_candidate(external_id)
+            device = self._resolve_candidate(external_id, observe_once=handoff.enabled())
             self._write("resolved", {"device": device}, exclusive=True)
         else:
             device = resolved["device"]
             if device["external_id"] != external_id:
                 raise AssertionError("RegistryDevice receipt and registration external ID disagree.")
         if not _read(self._name("delete")):
-            current = wait_for_condition(
+            current = self._get(device) if handoff.enabled() else wait_for_condition(
                 lambda: self._get(device), lambda value: value is not None, description="owned RegistryDevice GET",
                 timeout=RESOLVE_TIMEOUT, interval=5, is_retryable_error=lambda _error: False,
             )
+            if current is None:
+                handoff.record(device["id"], "pending", "RegistryDeviceNotObserved")
+                return
             if current.get("etag") != device["etag"]:
                 raise AssertionError("RegistryDevice changed before delete; refusing a concurrent update.")
             self._write("delete", {"device_id": device["id"]}, exclusive=True)
             if current["properties"].get("provisioningState") != "Deleting":
                 self.client.registry_devices.begin_delete(**self.scope, registry_device_name=device["name"], polling=False)
+                handoff.record(device["id"], "accepted")
+            else:
+                handoff.record(device["id"], "deleting")
+        if handoff.enabled():
+            if self._get(device) is not None:
+                handoff.record(device["id"], "pending")
+                return
+            self._write("completed", {"device_id": device["id"], "absent": True}, exclusive=True)
+            handoff.record(device["id"], "absent")
+            return
         wait_for_condition(
             lambda: self._get(device), lambda value: value is None, description="owned RegistryDevice absence",
             timeout=DELETE_TIMEOUT, interval=10, is_retryable_error=lambda _error: False,

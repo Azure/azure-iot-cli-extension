@@ -13,6 +13,7 @@ Without azext_iot_dps_install_token (standalone tox use) every invocation instal
 
 import argparse
 from contextlib import contextmanager
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -58,7 +59,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
     args = parser.parse_args()
-    return install(args.target, os.environ.get(TOKEN_ENV) or None)
+    source = os.environ.get("azext_iot_candidate_wheel")
+    if source and (not Path(source).is_file() or Path(source).suffix != ".whl"):
+        parser.error("The explicit integration candidate must be an existing wheel.")
+    token = "candidate:" + hashlib.sha256(Path(source).read_bytes()).hexdigest() if source else os.environ.get(TOKEN_ENV)
+    return install(args.target, token or None, source=source or ROOT)
 
 
 if __name__ == "__main__":

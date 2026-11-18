@@ -46,8 +46,10 @@ class ExternalActivationEvidence:
         properties, issuer = self._identity(before)
         self._uuid = properties.get("uuid")
         certificate = x509.load_pem_x509_certificate(chain.encode("utf-8"))
+        # Match service thumbprints, including SHA-1; never use these digests for signing.
+        algorithms = (hashes.SHA1(), hashes.SHA256())  # nosec B303
         self._thumbprints = {
-            certificate.fingerprint(algorithm).hex() for algorithm in (hashes.SHA1(), hashes.SHA256())
+            certificate.fingerprint(algorithm).hex() for algorithm in algorithms
         }
         if self._matches_thumbprint(issuer.get("thumbprint")):
             raise AzureResponseError(

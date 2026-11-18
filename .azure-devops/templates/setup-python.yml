@@ -2,15 +2,21 @@ parameters:
   - name: pythonVersion
     type: string
     default: "3.13"
+  - name: condition
+    type: string
+    default: succeeded()
 
 steps:
   - task: UsePythonVersion@0
+    condition: ${{ parameters.condition }}
     inputs:
       versionSpec: ${{ parameters.pythonVersion }}
   - task: PipAuthenticate@1
+    condition: ${{ parameters.condition }}
     inputs:
       artifactFeeds: "$(ARTIFACT_FEED)"
   - task: PowerShell@2
+    condition: ${{ parameters.condition }}
     displayName: "Upgrade pip, install dev_requirements and cryptography"
     inputs:
       targetType: "inline"

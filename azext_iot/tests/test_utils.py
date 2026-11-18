@@ -22,9 +22,11 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 def certificate_fingerprints(pem_certificate):
     certificate = x509.load_pem_x509_certificate(pem_certificate.encode())
+    # Services return SHA-1 or SHA-256 thumbprints; these digests do not sign certificates.
+    algorithms = (hashes.SHA1(), hashes.SHA256())  # nosec B303
     return {
         certificate.fingerprint(algorithm).hex().upper()
-        for algorithm in (hashes.SHA1(), hashes.SHA256())
+        for algorithm in algorithms
     }
 
 

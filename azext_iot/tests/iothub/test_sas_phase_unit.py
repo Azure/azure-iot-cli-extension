@@ -82,6 +82,26 @@ def test_default_is_regular(monkeypatch):
     assert not subject.enabled()
 
 
+def test_sas_handoff_stops_tasks_and_submits_each_cleanup_once(phase, tmp_path, monkeypatch):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    monkeypatch.setenv(handoff.ENV, str(tmp_path / "cleanup-receipts"))
+    phase.tasks.finish = Mock()
+    phase.sent = {"PUT " + resource_id.casefold() for resource_id in phase.ids.values()}
+
+    def cleanup_one(kind, _deadline):
+        phase.tasks.finish.assert_called_once()
+        phase.statuses["DELETE " + phase.ids[kind].casefold()] = 202
+        return False
+
+    phase.cleanup_one = Mock(side_effect=cleanup_one)
+    monkeypatch.setattr(subject, "sleep", Mock(side_effect=AssertionError("No cleanup polling")))
+    phase.cleanup()
+    assert phase.cleanup_one.call_count == 4
+    assert all(value["status"] == "accepted" for value in handoff.summary(tmp_path))
+    assert not phase.absent
+
+
 @pytest.mark.parametrize("location,endpoint,allowed", [
     ("australiaeast", "https://management.azure.com", True),
     ("australiaeast", "https://centraluseuap.management.azure.com", False),
@@ -312,6 +332,111 @@ def test_unowned_transport_fails_before_send(phase, monkeypatch):
     with pytest.raises(subject.HubSasError):
         requests.Session().send(outside)
     transport.assert_not_called()
+
+
+@pytest.fixture(params=[
+    ("australiaeast", "https://management.azure.com", "core.windows.net"),
+    ("centraluseuap", "https://centraluseuap.management.azure.com", "core.windows.net"),
+    ("usgovvirginia", "https://management.usgovcloudapi.net", "core.usgovcloudapi.net"),
+    ("chinaeast2", "https://management.chinacloudapi.cn", "core.chinacloudapi.cn"),
+], ids=["public", "canary", "government", "china"])
+def cloud_phase(tmp_path, monkeypatch, request):
+    from azext_iot.tests._integration_target import SUBSCRIPTION, RESOURCE_GROUP
+
+    location, endpoint, suffix = request.param
+    monkeypatch.setenv("azext_iot_test_subscription", SUBSCRIPTION)
+    monkeypatch.setenv("azext_iot_hubsas_subscription", SUBSCRIPTION)
+    monkeypatch.setenv("azext_iot_testrg", RESOURCE_GROUP)
+    monkeypatch.setenv("azext_iot_test_arm_endpoint", endpoint)
+    monkeypatch.setenv("azext_iot_hubsas_receipt", str(tmp_path / "receipt.json"))
+    runtime = subject.HubSasPhase(configuration(), "hub", "storage", RESOURCE_GROUP, location)
+    try:
+        yield runtime, endpoint, "https://storage.blob." + suffix
+    finally:
+        runtime.restore()
+
+
+@pytest.mark.parametrize("kind", ["hub", "storage", "container"])
+def test_cloud_transport_journals_owned_writes_before_and_after_send(cloud_phase, kind):
+    from azure.core.pipeline.transport import HttpRequest, RequestsTransport
+
+    runtime, endpoint, blob = cloud_phase
+    runtime.install()
+    url = blob + "/devices?restype=container" if kind == "container" else endpoint + runtime.ids[kind]
+    key = "PUT " + runtime.ids[kind].casefold()
+
+    def accepted(_request):
+        receipt = json.loads(runtime.path.read_text(encoding="utf-8"))
+        assert receipt["target"] == {"region": runtime.location, "endpoint": endpoint}
+        assert receipt["mutations"] == [key]
+        assert receipt["statuses"] == {}
+        return 201, {}, ""
+
+    body = {
+        "location": runtime.location, "tags": {"runUid": subject.UID},
+        "properties": {"disableLocalAuth": False}, "sku": {"name": "S1"},
+    }
+    http_request = HttpRequest("PUT", url)
+    http_request.set_json_body(body)
+    with responses.RequestsMock() as wire, RequestsTransport() as transport:
+        wire.add_callback("PUT", url, callback=accepted)
+        assert transport.send(http_request).status_code == 201
+        assert transport.session.get_adapter(url).max_retries.total == 0
+        with pytest.raises(subject.HubSasError, match="Repeated/uncertain"):
+            transport.send(http_request)
+        assert len(wire.calls) == 1
+    receipt = json.loads(runtime.path.read_text(encoding="utf-8"))
+    assert receipt["mutations"] == [key]
+    assert receipt["statuses"] == {key: 201}
+    assert receipt["absent"] == []
+
+
+@pytest.mark.parametrize("outside", [
+    "arm", "arm-cloud", "arm-endpoint", "storage-account", "storage-container", "storage-cloud", "storage-endpoint",
+])
+def test_cloud_transport_rejects_unowned_writes_without_evidence(cloud_phase, monkeypatch, outside):
+    runtime, endpoint, blob = cloud_phase
+    other_endpoint = (
+        "https://management.usgovcloudapi.net"
+        if endpoint == "https://management.azure.com" or "centraluseuap" in endpoint
+        else "https://management.azure.com"
+    )
+    other_blob = (
+        "https://storage.blob.core.usgovcloudapi.net"
+        if blob.endswith(".core.windows.net") else "https://storage.blob.core.windows.net"
+    )
+    urls = {
+        "arm": endpoint + runtime.ids["hub"] + "-unowned",
+        "arm-cloud": other_endpoint + runtime.ids["hub"],
+        "arm-endpoint": "https://management.example.invalid" + runtime.ids["hub"],
+        "storage-account": blob.replace("storage.blob.", "unowned.blob.") + "/devices?restype=container",
+        "storage-container": blob + "/unowned?restype=container",
+        "storage-cloud": other_blob + "/devices?restype=container",
+        "storage-endpoint": "https://storage.example.invalid/devices?restype=container",
+    }
+    transport = Mock(return_value=SimpleNamespace(status_code=204))
+    monkeypatch.setattr(requests.Session, "send", transport)
+    runtime.install()
+    with pytest.raises(subject.HubSasError, match="ownership manifest|different cloud"):
+        requests.Session().send(requests.Request("DELETE", urls[outside]).prepare())
+    transport.assert_not_called()
+    receipt = json.loads(runtime.path.read_text(encoding="utf-8"))
+    assert receipt["mutations"] == []
+    assert receipt["statuses"] == {}
+    assert receipt["absent"] == []
+
+
+def test_cloud_transport_preserves_owned_blob_upload_without_container_receipt(cloud_phase, monkeypatch):
+    runtime, _endpoint, blob = cloud_phase
+    transport = Mock(return_value=SimpleNamespace(status_code=201))
+    monkeypatch.setattr(requests.Session, "send", transport)
+    runtime.install()
+    upload = requests.Request("PUT", blob + "/devices/device/file.json", data=b"{}").prepare()
+    assert requests.Session().send(upload).status_code == 201
+    transport.assert_called_once()
+    receipt = json.loads(runtime.path.read_text(encoding="utf-8"))
+    assert receipt["mutations"] == []
+    assert receipt["statuses"] == {}
 
 
 @pytest.mark.parametrize("wrong", ["location", "owner", "dla", "sku"])
@@ -551,6 +676,43 @@ def test_pytest_report_and_junit_are_sanitized_before_artifacts(phase, tmp_path)
     junit.pytest_runtest_logreport(report)
     junit.pytest_sessionfinish()
     assert "secret-value" not in output.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("cleanup_failure", [False, True])
+def test_sas_report_hooks_preserve_retry_classification(phase, tmp_path, cleanup_failure):
+    from _pytest.reports import TestReport
+    from azext_iot.tests import _ado_retry as retry
+    from azext_iot.tests._hub_suite_plugin import PhaseReceipt
+
+    node = subject.NODES[0]
+    receipt = PhaseReceipt(
+        "HubData", "sas", [node], tmp_path / "phase.json", "offline", debug={"attempt": "a" * 64},
+    )
+    report = TestReport(
+        nodeid=node, location=("example.py", 1, "test"), keywords={},
+        outcome="failed", longrepr="Bearer secret-value", when="call",
+        user_properties=[("diagnostic", "Bearer secret-value")],
+    )
+    manager = pytest.PytestPluginManager()
+    manager.register(phase)
+    manager.register(receipt)
+    manager.register(SimpleNamespace(pytest_runtest_makereport=lambda item, call: report))
+    error = retry.CleanupFailure("private cleanup detail") if cleanup_failure else AssertionError("private failure")
+    result = manager.hook.pytest_runtest_makereport(
+        item=SimpleNamespace(), call=SimpleNamespace(excinfo=SimpleNamespace(value=error)),
+    )
+    receipt.pytest_runtest_logreport(result)
+    for stage in ("setup", "teardown"):
+        receipt.pytest_runtest_logreport(SimpleNamespace(nodeid=node, when=stage, outcome="passed"))
+    receipt.data.update(collected=[node], finished=True, exitstatus=1)
+    assert retry.outcomes(receipt.data, allow_fixture_failures=True) == {node: "failed"}
+    assert receipt.data["retryableFailures"][node] is (not cleanup_failure)
+    assert "secret-value" not in str(result.user_properties) + result.longrepr
+    if cleanup_failure:
+        with pytest.raises(ValueError, match="full-service recovery"):
+            retry.outcomes(receipt.data)
+    else:
+        assert retry.outcomes(receipt.data) == {node: "failed"}
 
 
 def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):

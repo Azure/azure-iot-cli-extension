@@ -706,7 +706,8 @@ def _storage_provisioner():
 
     # The generated name is new; no subscription/RG enumeration is necessary.
     target_storage = cli.invoke(
-        f"storage account create -n {account_name} -g {RG} --location {HUB_TEST_LOCATION}",
+        f"storage account create -n {account_name} -g {RG} --location {HUB_TEST_LOCATION} "
+        "--allow-blob-public-access false",
         capture_stderr=True,
     ).as_json()
 

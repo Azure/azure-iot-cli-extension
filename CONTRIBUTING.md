@@ -107,12 +107,233 @@ to rerun it on a branch without starting a release or accessing Azure resources.
 
 ## Unit and Integration Testing
 
+### Sovereign ADO integrations
+
+Select **Cloud: Fairfax** or **Cloud: Mooncake** and select `DPS`, `HubControl`
+and/or `HubData` explicitly. The reviewed cloud profile supplies the subscription,
+dedicated resource group and ARM service connection. The connection must be configured for that cloud,
+with subscription discovery and permission to create/delete fixtures and assign
+their resource-scoped roles. Do not put interactive user passwords in pipeline variables.
+
+These are standalone **selected sovereign cohorts**, not the full public-cloud
+suite or release qualification. Existing IT cases and assertions are unchanged.
+**Full DPS qualification is currently blocked:** live Mooncake provisioning rejects
+system-assigned DPS identities (`CannotSetResourceIdentity`), which the existing
+linked-Hub fixtures and management happy-path test require. Mooncake therefore
+selects only the standalone local-auth-toggle case.
+Fairfax DPS fixture readiness also returned service
+authorization error `401002` after role assignment. These failures are not skipped
+or treated as passing, and cloud-specific ADO service connections are still required.
+The authoritative selections in `_ado_pipeline.owned_nodes` cover Hub management,
+identities/twins/C2D, DPS enrollment lifecycle, fresh-key registration and local-auth
+policy. Legacy registration cases with literal public hostnames, ADR-backed CSR,
+and the wider Hub routing/storage/preview cohorts are not included. ADR and ADU
+are rejected at planning time. Every selected case still needs passing setup,
+call and teardown; skipped or missing cases do not qualify.
+
+The Mooncake global DPS endpoint was also observed serving a chain rooted in
+`DigiCert Global Root CA` (G1), which current Mozilla-derived bundles no longer trust.
+[DigiCert's G1 removal advisory](https://docs.digicert.com/en/certcentral/order-and-manage-certificates/reports-and-advisories/review-the-g1-root-removal-advisory.html)
+requires reissuing affected service certificates to G2/G3. Escalate that chain to
+the service owner; do not restore a retired trust anchor or disable TLS verification.
+
+Plans and receipts bind the cloud endpoint, region, subscription and group.
+Retries must originate from the current ADO pipeline definition and build, retain
+the same candidate and dependencies, and preserve the exact original cohort.
+Public/canary defaults and shared-template defaults are unchanged.
+
+For local controller reproduction, use a separate `AZURE_CONFIG_DIR` per cloud
+and set `azext_iot_test_subscription` and `azext_iot_testrg` to the approved scope.
+Pass the sovereign `--region` and `--arm-endpoint`. Existing `--debug-phase` and
+`--debug-node` selections remain non-qualifying diagnostic runs. Tox forwards
+`REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE`; never disable certificate verification.
+
 Tests are organized into folders by resource in `azext_iot\tests\`:
 - Central
 - Digital Twins
 - Device Provisioning Service
 - IoT Hub
 - Utility
+
+### Release Health and Branch Health
+
+Six independent definitions use shared health stages:
+`Azure IoT CLI - Release Health (<Public|Fairfax|Mooncake> <GA|Preview>)`.
+`.azure-devops/release-monitors.json` is their reviewed, nonsecret configuration.
+Each cloud/track has a thin `release-monitor*.yml` entry point sharing
+`templates/release-monitor-stages.yml`. Integration and health share **Mode**,
+**Cloud**, **Public region**, **Services** and **Python**, in that order.
+Release Health resolves an exact published GA/Preview wheel, verifies its GitHub
+SHA256 and matching source, and never rebuilds or patches the product.
+Health's default mode executes tests; **Dry run** only resolves and publishes the plan.
+Manual overrides use the selected cloud's reviewed connection and resource group,
+which must be authorized for the calling pipeline. Selected services must be
+supported in that cloud. Overrides are frozen with the selection, marked `-manual`
+in the run title, and pass or fail on the selected tests and their required evidence.
+There is no gate requiring manual selections to match scheduled defaults.
+The built-in ADO Branch/tag field selects the automation YAML, not the product
+under test.
+
+Four separate `Azure IoT CLI - Branch Health (<Public|Fairfax> <GA|Preview>)`
+definitions use `.azure-devops/branch-health.json` and `branch-health*.yml`.
+GA maps to `dev`; Preview maps to the active preview release branch. Advance that
+reviewed mapping when the preview branch changes, without renaming pipelines.
+These fixed-track wrappers expose Mode only; use integration 147 for arbitrary PRs.
+The resolver freezes the product/test commit before building or accessing Azure.
+Build, lint and four source-unit shards run independently, followed by the supported
+service cohorts. Build retries restore the original wheel rather than rebuilding.
+Each run records the automation commit separately from the product/test commit.
+
+Both families retain source-specific tests and use reviewed, recorded test-only
+adapters for native controllers and fixture compatibility. Storage fixtures explicitly
+disable anonymous blob access without changing network access or authentication.
+Product bytes must match the frozen source/wheel. Each integration job snapshots
+host, extension and (for DPS) tox dependencies separately; retries restore the
+original versions and reject missing or changed inventories before running tests.
+New runs may resolve newer dependencies.
+
+Generate disabled definition payloads using an existing same-repository definition:
+
+```bash
+az pipelines build definition show --id 166 --org https://dev.azure.com/azureiotdevxp \
+  --project 9c543948-e573-4146-832a-bf16b1531204 > baseline.json
+python scripts/release_monitor.py definitions \
+  --configuration .azure-devops/release-monitors.json --baseline baseline.json \
+  --branch refs/heads/<reviewed-automation-branch> --output definitions.json
+```
+
+Apply each payload through the ADO build-definitions API after the reviewed branch
+exists. Reuse definition **166** for Public GA; update matching definitions rather
+than creating duplicates. Integration **147** and Release **161** stay separate.
+Use `--configuration .azure-devops/branch-health.json` to generate the four new
+Branch Health definitions. Payloads use `\official\release-health` or
+`\official\branch-health` respectively,
+disabled queueing, no triggers/schedules, and non-overridable variables. The runner
+also checks definition name, repository and every configured target variable.
+Health definitions report failures in ADO and CLI Vitals, not as GitHub checks on
+the automation commit: their product branch or published wheel may be different.
+Normal PR CI and PR integration checks continue reporting to GitHub.
+Never store personal account passwords or tokens in these files.
+
+Keep all definitions disabled until an owner approves automation connections,
+resource scopes/RBAC, shared-subscription capacity, cleanup windows and live
+qualification. Then enable queueing. Every health run executes the selected
+integration cohorts and requires their results and cleanup evidence.
+No recurring schedule is supplied before live execution and capacity are approved;
+apply the same schedule policy to the IoT and AIO monitor sets.
+
+Receipts bind wheel, source, automation commit, cloud and native cohort identity.
+They cannot qualify another monitor or a release candidate. Public monitors retain
+the native DPS/Hub/ADU/ADR scope; sovereign monitors retain only the selected Hub/DPS
+cohorts documented above, excluding ADU and ADR. Mooncake DPS runs standalone
+local-auth-toggle coverage, not the linked-Hub fixtures or management happy-path test
+requiring unavailable DPS managed identity. Authentication and TLS failures remain failures,
+never unsupported skips.
+Run titles include the cloud, track, actual CLI version, source commit and build ID.
+These are source-build health results, not published-release qualification.
+
+Release pipeline **Public region** selects the public regions passed to every integration
+cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
+Release, integration and health use the same named, multiselect region dropdown:
+Australia East, Japan East, Central US, UK South, West US, West US 3, East US and West Europe.
+**Cloud** choices are **Public**, **Fairfax** and **Mooncake**. Fairfax always uses
+`usgovvirginia`; Mooncake always uses `chinaeast2`. ADO cannot dynamically hide the
+**Public region** field, so it remains visible but is ignored for sovereign clouds.
+`templates/integration-profile.yml` resolves the reviewed connection, subscription
+and resource group from the cloud; these are not user inputs.
+Pipeline 147 defines the queue-time variable `ReleaseCandidateBuildId=0`.
+Release automation supplies that variable when queueing a child; the child verifies
+the exact candidate instead of rebuilding it. It is not a Run pipeline parameter,
+and standalone users do not need to supply it.
+
+Service matrices have no artificial parallel limit or cross-run lock. Scheduled
+cleanup is report-first and never uses names or age alone to authorize deletion.
+Deploy the replacement below before overlapping workloads in a group still covered
+by the legacy broad sweep.
+
+### Current ADO fixed-group isolation
+
+Native, release-triggered and release-health jobs use their configured pre-created
+groups and independently named resources. No test job creates/deletes a group or
+acquires a cross-run lock. Hub/DPS retain their native ownership controllers and
+must prove exact-owned cleanup, not merely submit deletion. Current ADO Hub storage
+names use a 16-hex phase suffix rather than the legacy four-hex suffix.
+Legacy GitHub workflows and older ADO suites are unchanged.
+
+ADU/ADR publish an ownership manifest before obtaining service credentials or
+provisioning. It binds the fixed scope, source/wheel, service, region, Python and
+native retry attempt. A test-only transport records creation intents and reserves
+`cliTestOwner` tags, role descriptions and deployment parameters. It strips only its
+own metadata from test-visible responses; selected tests and product files remain
+unchanged. A guard violation cannot be hidden by an expected-negative test.
+ARM template what-if checks are pre-write checks, not atomic create conditions.
+Unique names reduce the remaining collision window without serializing pipelines.
+
+Cleanup verifies exact ownership, waits for creation/deletion to resolve, and
+records failures rather than declaring pending resources absent. Attempt artifacts
+are also published on cancellation while the agent remains available. Agent loss or
+Azure outages can still leave resources; after the attempt stops, use its original
+manifest and approved cloud profile for exact-owner recovery:
+
+```bash
+python azext_iot/tests/_owned_resources.py cleanup --manifest <original-manifest.json> \
+  --cloud <original-cloud> --subscription <original-subscription> \
+  --resource-group <original-fixed-group>
+```
+
+Retain the final journal when available. Server-side markers allow ADU/ADR resource
+recovery from the pre-provisioning manifest if the journal upload was lost; recheck
+after outstanding Azure operations settle. Recovery cannot qualify a test run.
+This does not deploy or change the legacy daily cleanup definition: its safe-cleanup
+rollout remains an operational prerequisite for overlapping runs in its shared group.
+
+### Scheduled cleanup (pipeline 109)
+
+`.azure-devops/cleanup.yml` runs daily at **13:00 UTC**, with `mode: report` by
+default. One hosted agent processes the approved IoT Public/Fairfax/Mooncake and
+AIO Public/Fairfax profiles sequentially; it never uses the AIO integration pool
+or locks a test service connection. `cleanup-profiles.json` is the fixed
+subscription/group/producer allowlist. Existing `Exclusions` names remain protected;
+exact resource IDs also protect their parent from cascading deletion.
+
+Automatic eligibility currently supports the `cliTestOwner` manifests published by
+IoT ADU/ADR and AIO. The original artifact must match its actual leaf producer build,
+source commit, job and native attempt. The whole producer run must be completed;
+the original job must have successfully finalized, including a retained timeline
+for older retries. Wait at least **six hours** after the latest run/job/finalization
+finish time. Release-parent completion never substitutes for the child producer's
+status. These leaf producers do not share their attempt resources with downstream
+runs; adding such a consumer requires extending the cleanup contract first.
+
+The final attempt artifact supplies the original context and mutation journal.
+Unfinished ARM creates/deployments, changed ownership, active reruns, missing status,
+lost-agent finalization, missing artifacts and explicit exclusions prevent deletion.
+Native Hub/DPS markers, older formats, untagged resources and unmatched owners are
+**report-only regardless of age**; use their original controller evidence for manual
+review. Never reconstruct a manifest from resource tags.
+
+To roll out, replace/pause the old broad sweep with owner approval, deploy to the
+branch actually used by 109, authorize its existing service connections and ensure
+the build service can read producer builds, timelines and artifacts. No subscription-
+wide role grant is needed. Inspect report-only results for active, canceled, retried,
+lost-agent and pending-provisioning cases before manually selecting `mode: delete`.
+Select a matching `profile` and `buildId` to target an original producer. Connection
+names are fixed in the internal template, not exposed as queue-time parameters.
+Changing the scheduled default to
+deletion is a separate reviewed rollout decision; this PR does not enable it.
+
+Delete mode uses the existing dependency-ordered helper, rechecks producer liveness
+before every DELETE, rejects resources outside its freshly inspected plan, uses
+conditional deletion where supported and confirms absence. Each profile is bounded
+to five minutes, ten owners and fifty DELETE submissions, paced at one per second.
+Discovery covers at most 100 builds from 14 days and 200 manifests; limits are
+reported, never treated as proof of absence. Select an original build explicitly
+when discovery is insufficient. Report/error artifacts retain recovery contexts
+and journals; preserve unresolved artifacts until cleanup finishes. Pending deletes
+and liveness/budget deferrals remain warnings, using only failures from the current
+cleanup call. Authorization, inventory and ownership errors still fail the run.
+An unreadable manifest or untrusted discovered build does not hide later owners.
+A failed scope does not suppress the other scopes.
 
 ### Unit Tests
 

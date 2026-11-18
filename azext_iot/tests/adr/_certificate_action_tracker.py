@@ -23,6 +23,7 @@ from urllib3.util import Timeout
 
 from azext_iot.adr.providers.base import _retry_after_seconds
 from azext_iot.adr.providers.certificate_activation import ExternalActivationEvidence
+from azext_iot.tests._ado_retry import InfrastructureFailure
 
 
 def _protect_action_logs():
@@ -77,7 +78,7 @@ class CertificateActionTracker:
             or action not in ("activate", "revokeAndRotate") or timeout <= 0
             or not re.fullmatch(r"[a-z0-9]+", location)
         ):
-            raise AssertionError("CA action tracker requires an owned target and approved ARM scope.")
+            raise InfrastructureFailure("CA action tracker requires an owned target and approved ARM scope.")
         self.resource_id = resource_id
         self._subscription = subscription
         self._endpoint = endpoint.rstrip("/")
@@ -113,7 +114,7 @@ class CertificateActionTracker:
             self._posts or self._deadline is not None or not self._action_path.endswith("/activate")
             or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", api_version)
         ):
-            raise AssertionError("CA activation resource tracking requires pre-submission activation scope.")
+            raise InfrastructureFailure("CA activation resource tracking requires pre-submission activation scope.")
         self._activation = ExternalActivationEvidence(before, chain, resource_id=self.resource_id)
         self._url = f"{self._endpoint}{self.resource_id}?api-version={api_version}"
 
@@ -192,7 +193,9 @@ class CertificateActionTracker:
 
     def assert_no_submission(self):
         if self._posts:
-            raise AssertionError("Unexpected owned action POST during negative validation; reconciliation/quarantine required.")
+            raise InfrastructureFailure(
+                "Unexpected owned action POST during negative validation; reconciliation/quarantine required."
+            )
 
     @property
     def submitted(self):
@@ -201,7 +204,7 @@ class CertificateActionTracker:
     def _remaining(self, deadline):
         remaining = deadline - self._clock()
         if remaining <= 0:
-            raise AssertionError("Timed out reconciling owned CA action; completion is uncertain.")
+            raise InfrastructureFailure("Timed out reconciling owned CA action; completion is uncertain.")
         return remaining
 
     def _fetch(self, deadline, checkpoint):
@@ -212,14 +215,14 @@ class CertificateActionTracker:
                 resource=self._audience, subscription=self._subscription,
             )
         except (CLIError, AzureError, requests.RequestException, ValueError):
-            raise AssertionError("Owned CA action authentication failed; credentials suppressed.") from None
+            raise InfrastructureFailure("Owned CA action authentication failed; credentials suppressed.") from None
         checkpoint()
         remaining = self._remaining(deadline)
         if (
             not isinstance(subscription, str) or subscription.casefold() != self._subscription.casefold()
             or not isinstance(token, tuple) or len(token) < 2 or token[0] != "Bearer" or not token[1]
         ):
-            raise AssertionError("Owned CA action authentication returned an unapproved subscription or token type.")
+            raise InfrastructureFailure("Owned CA action authentication returned an unapproved subscription or token type.")
         try:
             with requests.Session() as session:
                 checkpoint()
@@ -230,20 +233,20 @@ class CertificateActionTracker:
                     allow_redirects=False, timeout=Timeout(total=remaining),
                 )
         except requests.RequestException:
-            raise AssertionError("Owned CA action status GET failed; transport details suppressed.") from None
+            raise InfrastructureFailure("Owned CA action status GET failed; transport details suppressed.") from None
         checkpoint()
         body = None
         if response.status_code in (200, 202):
             try:
                 body = response.json() if response.content else {}
             except ValueError:
-                raise AssertionError("Invalid owned CA action status JSON; body suppressed.") from None
+                raise InfrastructureFailure("Invalid owned CA action status JSON; body suppressed.") from None
         checkpoint()
         return response, body
 
     def _read(self, deadline):
         if self._reader is not None and self._reader.is_alive():
-            raise AssertionError("Previous owned CA action read is still in flight; quarantine required.")
+            raise InfrastructureFailure("Previous owned CA action read is still in flight; quarantine required.")
         limit = monotonic() + self._remaining(deadline)
         cancelled, done = Event(), Event()
         result, errors = [], []
@@ -251,7 +254,7 @@ class CertificateActionTracker:
         def checkpoint():
             self._remaining(deadline)
             if cancelled.is_set() or monotonic() >= limit:
-                raise AssertionError("Timed out reconciling owned CA action; completion is uncertain.")
+                raise InfrastructureFailure("Timed out reconciling owned CA action; completion is uncertain.")
 
         def read():
             try:
@@ -267,7 +270,7 @@ class CertificateActionTracker:
         self._reader.start()
         try:
             if not done.wait(max(0, limit - monotonic())):
-                raise AssertionError("Timed out reconciling owned CA action; completion is uncertain.")
+                raise InfrastructureFailure("Timed out reconciling owned CA action; completion is uncertain.")
             self._reader.join(max(0, limit - monotonic()))
             checkpoint()
             if errors:
@@ -280,36 +283,36 @@ class CertificateActionTracker:
         code = response.status_code
         if self._activation and code in (200, 202, 204):
             if code != 200:
-                raise AssertionError("CA activation resource GET requires HTTP 200; completion is uncertain.")
+                raise InfrastructureFailure("CA activation resource GET requires HTTP 200; completion is uncertain.")
             try:
                 self.succeeded = self.terminal = self._activation.completed(body)
             except AzureResponseError as error:
-                raise AssertionError(str(error)) from None
+                raise InfrastructureFailure(str(error)) from None
             return
         if code == 204:
             self.terminal = self.succeeded = True
             return
         if code in (200, 202):
             if not isinstance(body, dict) or not isinstance(body.get("properties", {}), dict):
-                raise AssertionError("Invalid owned CA action status shape; body suppressed.")
+                raise InfrastructureFailure("Invalid owned CA action status shape; body suppressed.")
             states = (body.get("status"), body.get("properties", {}).get("provisioningState"))
             if any(state in ("Failed", "Canceled") for state in states):
                 self.terminal = True
                 return
             state = states[0] or states[1]
             if code == 200 and state is None and body:
-                raise AssertionError("Owned CA action status has no completion evidence; body suppressed.")
+                raise InfrastructureFailure("Owned CA action status has no completion evidence; body suppressed.")
             if code == 200 and state in (None, "Succeeded"):
                 self.terminal = self.succeeded = True
             return
         # Match ADR Location polling's transient reads, but never replay the action.
         if code not in (404, 408, 429) and code < 500:
-            raise AssertionError(f"Owned CA action status GET rejected with HTTP {code}; details suppressed.")
+            raise InfrastructureFailure(f"Owned CA action status GET rejected with HTTP {code}; details suppressed.")
 
     def wait(self, *, cleanup=False):
         if self._problem or self._posts != 1:
             reason = self._problem or "No exact owned action POST acknowledgement observed"
-            raise AssertionError(f"{reason}; quarantine required.")
+            raise InfrastructureFailure(f"{reason}; quarantine required.")
         if cleanup and self.terminal:
             return
         if cleanup and self._cleanup_deadline is None:
@@ -318,7 +321,7 @@ class CertificateActionTracker:
         self._remaining(deadline)
         while not self.terminal:
             if not self._url:
-                raise AssertionError("Owned CA action has no tracking URL; quarantine required.")
+                raise InfrastructureFailure("Owned CA action has no tracking URL; quarantine required.")
             remaining = self._remaining(deadline)
             self._sleep(min(self._retry_after or 1, remaining))
             response, body = self._read(deadline)
@@ -326,4 +329,4 @@ class CertificateActionTracker:
             self._inspect(response, body)
             self._retry_after = _retry_after_seconds(response, 1)
         if not cleanup and not self.succeeded:
-            raise AssertionError("Owned CA action reached terminal Failed/Canceled; service body suppressed.")
+            raise InfrastructureFailure("Owned CA action reached terminal Failed/Canceled; service body suppressed.")

@@ -1004,6 +1004,8 @@ class TestMonitorProxySupport:
             return ["0", "1"]
 
     def test_query_partition_count_passes_http_proxy(self, mocker, monkeypatch):
+        monkeypatch.delenv("HTTPS_PROXY", raising=False)
+        monkeypatch.delenv("https_proxy", raising=False)
         monkeypatch.setenv("HTTP_PROXY", "http://proxy.local:8888")
 
         captured = {}

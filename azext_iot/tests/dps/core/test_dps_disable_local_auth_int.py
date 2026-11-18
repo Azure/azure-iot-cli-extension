@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 import re
 
 import pytest
@@ -18,6 +19,12 @@ from azext_iot.tests.helpers import invoke_checked, set_cmd_auth_type
 cli = EmbeddedCLI()
 pytestmark = pytest.mark.dps_local_auth_toggle
 AUTH_TYPES = (AuthenticationTypeDataplane.login.value, AuthenticationTypeDataplane.key.value, "cstring")
+_GOVERNMENT_ARM = "https://management.usgovcloudapi.net"
+_LOCAL_AUTH_TIMEOUT = (
+    1080
+    if os.environ.get("azext_iot_test_arm_endpoint", "").rstrip("/").lower() == _GOVERNMENT_ARM
+    else 900
+)
 
 
 def _invoke(command):
@@ -56,7 +63,7 @@ def local_auth_dps(provisioned_iot_dps_local_auth_module):
         assert _invoke(disable_local_auth).success()
 
 
-@pytest.mark.timeout(600, func_only=False)
+@pytest.mark.timeout(_LOCAL_AUTH_TIMEOUT, func_only=False)
 def test_dps_create_disable_local_auth(provisioned_iot_dps_local_auth_module):
     dps_name = provisioned_iot_dps_local_auth_module["name"]
     dps_rg = provisioned_iot_dps_local_auth_module["resourceGroup"]
@@ -66,7 +73,7 @@ def test_dps_create_disable_local_auth(provisioned_iot_dps_local_auth_module):
     assert dps["properties"]["disableLocalAuth"] is True
 
 
-@pytest.mark.timeout(600, func_only=False)
+@pytest.mark.timeout(_LOCAL_AUTH_TIMEOUT, func_only=False)
 def test_dps_update_disable_local_auth(local_auth_dps):
     dps_name = local_auth_dps["name"]
     dps_rg = local_auth_dps["resourceGroup"]
@@ -96,7 +103,7 @@ def test_dps_update_disable_local_auth(local_auth_dps):
     assert dps["properties"]["disableLocalAuth"] is False
 
 
-@pytest.mark.timeout(600, func_only=False)
+@pytest.mark.timeout(_LOCAL_AUTH_TIMEOUT, func_only=False)
 def test_dps_disable_local_auth_dataplane(local_auth_dps):
     dps_name = local_auth_dps["name"]
     dps_rg = local_auth_dps["resourceGroup"]

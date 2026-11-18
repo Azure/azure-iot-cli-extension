@@ -33,6 +33,7 @@ def test_real_adr_tox_binds_product_factory_endpoint_to_fixture_endpoint(tmp_pat
     expected = override or "https://centraluseuap.management.azure.com"
     assert f"AZURE_IOT_ADR_ARM_ENDPOINT={expected}" in result.stdout
     assert f"azext_iot_adr_arm_endpoint={expected}" in result.stdout
+    assert "azext_iot_adr_api_version=" not in result.stdout
 
 
 def test_integration_environments_discover_the_candidate_extension():
@@ -76,7 +77,7 @@ def test_dps_controller_dependencies_are_isolated_from_the_managed_environment()
     assert "DPS: ." not in managed["deps"]
 
 
-@pytest.mark.parametrize("service", ["ADR", "DPS"])
+@pytest.mark.parametrize("service", ["ADR", "ADU", "DPS"])
 def test_preview_integration_environments_bound_each_test_and_select_only_integration_files(service):
     config = ConfigParser(interpolation=None)
     root = Path(__file__).resolve().parents[2]
@@ -89,7 +90,7 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
     )
     assert "--timeout=900" in command
     assert "--integration-progress-interval=60" in command
-    assert "-o faulthandler_timeout=300" in command
+    assert "-o faulthandler_timeout=960" in command
     assert "-k _int.py " in command
     assert "PYTHONUNBUFFERED=1" in {line.strip() for line in section["setenv"].splitlines()}
     service_lines = [

@@ -1,0 +1,44 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: mode
+    type: string
+  - name: buildId
+    type: string
+  - name: profile
+    type: string
+  - name: targets
+    type: object
+    default:
+      - name: iot-public
+        connection: aziotcli-sp-prime
+      - name: iot-fairfax
+        connection: sc-iot-cli-fairfax-it
+      - name: iot-mooncake
+        connection: sc-iot-cli-mooncake-it
+      - name: aio-public
+        connection: az-iot-ops-int-sp-ado
+      - name: aio-fairfax
+        connection: sc-iot-ops-cli-fairfax-it
+
+steps:
+  - ${{ each target in parameters.targets }}:
+      - ${{ if or(eq(parameters.profile, 'all'), eq(parameters.profile, target.name)) }}:
+          - task: AzureCLI@2
+            displayName: Cleanup ${{ target.name }}
+            condition: succeededOrFailed()
+            inputs:
+              azureSubscription: ${{ target.connection }}
+              visibleAzLogin: false
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                python scripts/cleanup_test_resources.py --profile "$PROFILE" \
+                  --mode "$MODE" --build-id "$PRODUCER_BUILD" --output cleanup-report
+            env:
+              PROFILE: ${{ target.name }}
+              MODE: ${{ parameters.mode }}
+              PRODUCER_BUILD: ${{ parameters.buildId }}
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              EXCLUSIONS: $(Exclusions)
