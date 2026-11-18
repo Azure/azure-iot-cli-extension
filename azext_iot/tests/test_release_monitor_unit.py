@@ -103,6 +103,69 @@ def test_frozen_storage_fixture_adaptation_preserves_auth_and_is_idempotent(moni
     assert adapter.adapt_storage_fixtures(tmp_path) == []
 
 
+@pytest.mark.parametrize("cloud", ["public", "fairfax", "mooncake"])
+def test_frozen_local_auth_timeout_adaptation_is_cloud_scoped_and_audited(monitor, mocker, tmp_path, cloud):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("timeout_adapter", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    symbols = (
+        "test_dps_create_disable_local_auth", "test_dps_update_disable_local_auth",
+        "test_dps_disable_local_auth_dataplane",
+    )
+    original = "".join(
+        f"@pytest.mark.timeout(600, func_only=False)\ndef {symbol}(fixture):\n    assert fixture == 600\n\n"
+        for symbol in (*symbols, "test_unrelated")
+    )
+    path.write_text(original, encoding="utf-8")
+    manifest = {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION, "cloud": cloud}
+    result = adapter.adapt_harness(tmp_path, manifest)
+    changed = path.read_text(encoding="utf-8")
+    if cloud == "fairfax":
+        expected = original
+        for symbol in symbols:
+            expected = expected.replace(
+                f"@pytest.mark.timeout(600, func_only=False)\ndef {symbol}(",
+                f"@pytest.mark.timeout(1080, func_only=False)\ndef {symbol}(",
+            )
+        assert changed == expected
+        change, = result["files"]
+        assert change["path"] == relative and change["symbols"] == list(symbols)
+        assert change["originalSha256"] == hashlib.sha256(original.encode()).hexdigest()
+        assert change["adaptedSha256"] == hashlib.sha256(changed.encode()).hexdigest()
+    else:
+        assert changed == original and result["files"] == []
+    assert adapter.adapt_harness(tmp_path, manifest)["files"] == []
+
+
+@pytest.mark.parametrize("incompatible", [False, True])
+def test_fairfax_timeout_adapter_preserves_current_budgets_and_rejects_changed_legacy_contract(
+        monitor, mocker, tmp_path, incompatible):
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("timeout_contract", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    original = (ROOT / relative).read_text(encoding="utf-8")
+    if incompatible:
+        original = original.replace(
+            "@pytest.mark.timeout(_LOCAL_AUTH_TIMEOUT, func_only=False)",
+            "@pytest.mark.timeout(600, func_only=True)",
+        )
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(original, encoding="utf-8")
+    if incompatible:
+        with pytest.raises(ValueError, match="incompatible Fairfax timeout"):
+            adapter.adapt_fairfax_timeouts(tmp_path)
+    else:
+        assert adapter.adapt_fairfax_timeouts(tmp_path) == []
+    assert path.read_text(encoding="utf-8") == original
+
+
 @pytest.mark.parametrize("track,expected", [("ga", "1.0.1"), ("preview", "1.2.0b1")])
 def test_select_published_track_without_drafts(monitor, mocker, track, expected):
     mocker.patch.object(monitor, "tag_commit", return_value=SOURCE)
