@@ -165,7 +165,7 @@ def adapt_harness(output, manifest):
                 "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
             })
     changes.extend(adapt_storage_fixtures(output))
-    if manifest.get("cloud") == "fairfax":
+    if manifest.get("cloudKey") == "fairfax":
         changes.extend(adapt_fairfax_timeouts(output))
     return {
         "version": 1, "sourceCommit": manifest["testSourceCommit"],

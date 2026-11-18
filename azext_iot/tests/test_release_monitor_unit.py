@@ -121,7 +121,8 @@ def test_frozen_local_auth_timeout_adaptation_is_cloud_scoped_and_audited(monito
         for symbol in (*symbols, "test_unrelated")
     )
     path.write_text(original, encoding="utf-8")
-    manifest = {"testSourceCommit": SOURCE, "automationCommit": AUTOMATION, "cloud": cloud}
+    mocker.patch.object(monitor, "tag_commit", return_value=SOURCE)
+    manifest = monitor.resolve("azure-iot", cloud, "ga", AUTOMATION, [release("1.0.0")])
     result = adapter.adapt_harness(tmp_path, manifest)
     changed = path.read_text(encoding="utf-8")
     if cloud == "fairfax":
