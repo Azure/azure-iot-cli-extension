@@ -325,8 +325,11 @@ def _remove_namespace_self_role(name):
 
 
 def _remove_namespace_group_reader_roles(name, namespace):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
     record = receipts._owned(name)  # pylint: disable=protected-access
     directory = receipts.settings()[0]
+    pending = False
     for path in directory.glob("mutation-*.json"):
         journal = json.loads(path.read_text(encoding="utf-8"))
         binding = journal.get("readerGrant")
@@ -353,21 +356,33 @@ def _remove_namespace_group_reader_roles(name, namespace):
         }
         assert journal["id"].casefold() == expected["id"].casefold()
         with _auth_client_factory(fixtures.cli.az_cli, scope=scope) as client:
-            if not journal.get("readerDeleteAttempted"):
+            if not journal.get("readerDeleteAttempted") and not handoff.enabled():
                 wait_for_condition(
                     lambda: _get_namespace_role(client, expected), lambda value: value is not None,
                     description="uncertain native RG Reader creation reconciliation", timeout=300, interval=5,
                     is_retryable_error=lambda _error: False,
                 )
-            if _get_namespace_role(client, expected) is not None:
+            current = _get_namespace_role(client, expected)
+            if current is None and not journal.get("readerDeleteAttempted") and handoff.enabled():
+                handoff.record(expected["id"], "pending", "RoleCreationUnresolved")
+                pending = True
+                continue
+            if current is not None:
                 assert not journal.get("readerDeleted"), "Completed namespace RG Reader assignment reappeared."
                 if not journal.get("readerDeleteAttempted"):
                     journal["readerDeleteAttempted"] = True
                     receipts.write(path.name, journal)
                     with runtime.owned_namespace_group_reader(namespace):
                         invoke(f"role assignment delete --ids {quote(expected['id'])} --subscription {record['subscription']}")
-                _wait_arm_absent(lambda: _get_namespace_role(client, expected), "owned namespace RG Reader absence")
+                if handoff.enabled():
+                    if _get_namespace_role(client, expected) is not None:
+                        handoff.record(expected["id"], "pending", "RoleDeletionPending")
+                        pending = True
+                        continue
+                else:
+                    _wait_arm_absent(lambda: _get_namespace_role(client, expected), "owned namespace RG Reader absence")
         receipts.write(path.name, {**journal, "readerDeleted": True})
+    return not pending
 
 
 def delete_namespace(name):
@@ -434,7 +449,9 @@ def delete_namespace(name):
     if handoff.enabled() and role_path.is_file() and not json.loads(role_path.read_text(encoding="utf-8"))["deleted"]:
         handoff.record(record["id"], "pending", "NamespaceRoleCleanupUnresolved")
         return
-    _remove_namespace_group_reader_roles(name, current)
+    if not _remove_namespace_group_reader_roles(name, current):
+        handoff.record(record["id"], "pending", "NamespaceGroupReaderCleanupUnresolved")
+        return
     if not handoff.enabled():
         _delete_owned_namespace(name, record)
         return

@@ -188,6 +188,10 @@ stages:
                   unset AZURE_IOT_ADR_ARM_ENDPOINT
                 fi
                 export PYTHONPATH="$PYTHONPATH:$AZURE_EXTENSION_DIR/azure-iot"
+                if [ "$SERVICE" = DPS ]; then
+                  PIP_CONSTRAINT="$(realpath -e dependency-lock/dps.txt)"
+                  export PIP_CONSTRAINT
+                fi
                 python azext_iot/tests/_ado_pipeline.py run --service "$SERVICE" \
                   --python "$TEST_PYTHON" --region "$TEST_REGION" --endpoint "$TEST_ENDPOINT" \
                   --wheel candidate --history "$HISTORY" --output attempt

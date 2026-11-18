@@ -497,6 +497,47 @@ def test_native_reader_cleanup_never_adopts_another_grant_or_drops_uncertain_own
     assert not any(command.startswith("role assignment delete") for command in namespace_commands.commands)
 
 
+@pytest.mark.parametrize("unobserved", [False, True])
+def test_native_reader_handoff_retains_namespace_without_polling_or_replaying_delete(
+    namespace_commands, resource, scope, monkeypatch, mocker, unobserved,
+):
+    from azext_iot.tests import _cleanup_handoff as handoff
+
+    name, _ = csr._create_namespace(UID, "csrns", resource["dps"], resource["hub"])
+    role = _native_reader_journal(scope, namespace_commands, name, None if unobserved else 201)
+    if unobserved:
+        namespace_commands.roles.clear()
+    monkeypatch.setenv(handoff.ENV, str(scope / "cleanup-receipts"))
+    mocker.patch.object(csr, "wait_for_condition", side_effect=AssertionError("Handoff must not poll"))
+    mocker.patch.object(csr, "_wait_arm_absent", side_effect=AssertionError("Handoff must not poll"))
+
+    def submit(command):
+        if command.startswith("role assignment delete"):
+            namespace_commands.commands.append(command)
+            return SimpleNamespace(as_json=lambda: None)
+        return namespace_commands(command)
+
+    mocker.patch.object(csr, "invoke", side_effect=submit)
+    for _ in range(2):
+        csr.delete_namespace(name)
+        assert "namespace" in namespace_commands.resources
+        assert not json.loads((scope / "mutation-reader.json").read_text()).get("readerDeleted")
+    deletes = [command for command in namespace_commands.commands if command.startswith("role assignment delete")]
+    assert len(deletes) == (0 if unobserved else 1)
+    statuses = {value["resource"]: value["status"] for value in handoff.summary(scope)}
+    assert statuses[role["id"]] == statuses[namespace_commands.namespace_id] == "pending"
+    if unobserved:
+        namespace_commands.roles[role["id"]] = role
+        csr.delete_namespace(name)
+        assert sum(command.startswith("role assignment delete") for command in namespace_commands.commands) == 1
+        assert "namespace" in namespace_commands.resources
+    namespace_commands.roles.clear()
+    csr.delete_namespace(name)
+    assert "namespace" not in namespace_commands.resources
+    assert json.loads((scope / "mutation-reader.json").read_text())["readerDeleted"]
+    assert sum(command.startswith("role assignment delete") for command in namespace_commands.commands) == 1
+
+
 def test_real_arm_show_handler_exits_on_sdk_404_but_scoped_probe_returns_absent(arm_commands, resource, mocker):
     mocker.patch("azure.cli.core.azclierror.ResourceNotFoundError.send_telemetry")
     with pytest.raises(HttpResponseError) as missing:

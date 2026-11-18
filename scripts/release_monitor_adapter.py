@@ -165,10 +165,55 @@ def adapt_harness(output, manifest):
                 "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
             })
     changes.extend(adapt_storage_fixtures(output))
+    if manifest.get("cloud") == "fairfax":
+        changes.extend(adapt_fairfax_timeouts(output))
     return {
         "version": 1, "sourceCommit": manifest["testSourceCommit"],
         "automationCommit": manifest["automationCommit"], "files": changes,
     }
+
+
+def adapt_fairfax_timeouts(output):
+    """Raise only reviewed legacy local-auth markers, without replacing test bodies."""
+    relative = "azext_iot/tests/dps/core/test_dps_disable_local_auth_int.py"
+    path = output / relative
+    if not path.is_file():
+        return []
+    original = path.read_text(encoding="utf-8")
+    tree = ast.parse(original)
+    lines, symbols = original.splitlines(keepends=True), []
+    for symbol in (
+        "test_dps_create_disable_local_auth",
+        "test_dps_update_disable_local_auth",
+        "test_dps_disable_local_auth_dataplane",
+    ):
+        node = function(tree, symbol)
+        markers = [item for item in node.decorator_list if isinstance(item, ast.Call)
+                   and ast.unparse(item.func) == "pytest.mark.timeout"]
+        if len(markers) != 1:
+            raise ValueError(f"Selected source has an incompatible Fairfax timeout marker: {symbol}")
+        marker = markers[0]
+        if len(marker.args) != 1 or not isinstance(marker.args[0], ast.Constant) or marker.args[0].value != 600:
+            continue
+        if len(marker.keywords) != 1 or ast.dump(marker.keywords[0]) != ast.dump(
+            ast.keyword(arg="func_only", value=ast.Constant(value=False))
+        ):
+            raise ValueError(f"Selected source has an incompatible Fairfax timeout marker: {symbol}")
+        value = marker.args[0]
+        line = lines[value.lineno - 1]
+        lines[value.lineno - 1] = line[:value.col_offset] + "1080" + line[value.end_col_offset:]
+        symbols.append(symbol)
+    if not symbols:
+        return []
+    text = "".join(lines)
+    ast.parse(text)
+    path.write_text(text, encoding="utf-8")
+    return [{
+        "path": relative, "symbols": symbols,
+        "reason": "Allow Fairfax local-auth setup and assertions to outlive the 600-second readiness budget.",
+        "originalSha256": hashlib.sha256(original.encode()).hexdigest(),
+        "adaptedSha256": hashlib.sha256(text.encode()).hexdigest(),
+    }]
 
 
 def overlay_controllers(output, manifest):
