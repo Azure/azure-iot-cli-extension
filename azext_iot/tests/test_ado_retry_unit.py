@@ -910,6 +910,37 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert "condition" not in stages["Qualify"]
 
 
+@pytest.mark.parametrize("service", ["DPS", "HubControl", "ADU"])
+@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu AzureCLI Bash step offline.")
+def test_live_dps_keeps_its_own_constraint_and_rejects_missing_snapshot(tmp_path, service, missing):
+    template = yaml.safe_load((ROOT / ".azure-devops/templates/integration-service.yml").read_text())
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    live = next(step["inputs"]["inlineScript"] for step in steps if step.get("task") == "AzureCLI@2")
+    locks = tmp_path / "dependency-lock"
+    locks.mkdir()
+    constraint = locks / "dps.txt"
+    if not missing:
+        constraint.write_text("azure-cli==2.93.0\n", encoding="utf-8")
+    probe = tmp_path / "constraint-used"
+    environment = dict(
+        os.environ, SERVICE=service, servicePrincipalId="offline", tenantId="offline",
+        TEST_ENDPOINT="https://management.usgovcloudapi.net", PYTHONPATH="", AZURE_EXTENSION_DIR=str(tmp_path),
+        TEST_PYTHON="3.13", TEST_REGION="usgovvirginia", HISTORY=str(tmp_path), PROBE=str(probe),
+    )
+    environment.pop("PIP_CONSTRAINT", None)
+    result = subprocess.run(
+        ["bash", "-c", 'python() { printf "%s" "${PIP_CONSTRAINT-}" > "$PROBE"; }\n' + live],
+        cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=30, check=False,
+    )
+    if service == "DPS" and missing:
+        assert result.returncode != 0 and not probe.exists()
+        assert "dps.txt" in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+        assert probe.read_text() == (str(constraint) if service == "DPS" else "")
+
+
 def test_pipeline_adapts_shared_four_shards_and_unit_gate_without_cross_job_cache():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]

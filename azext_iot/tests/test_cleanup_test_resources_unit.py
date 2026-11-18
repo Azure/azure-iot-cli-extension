@@ -88,6 +88,28 @@ def test_finished_original_job_is_eligible_even_when_tests_failed(cleanup, evide
     check(cleanup, evidence)
 
 
+@pytest.mark.parametrize("profile_name,definition", [
+    ("iot-public", 182), ("iot-public", 183), ("iot-fairfax", 184), ("iot-fairfax", 185),
+    ("aio-public", 180), ("aio-public", 186), ("aio-public", 188), ("aio-fairfax", 187),
+])
+def test_health_producers_are_discovered_and_trusted_only_in_their_profile(cleanup, profile_name, definition):
+    profiles = json.loads((ROOT / ".azure-devops/cleanup-profiles.json").read_text())
+    profile = profiles[profile_name]
+    build = {
+        "definition": {"id": definition}, "repository": {"id": profile["repository"], "type": "GitHub"},
+        "sourceBranch": "refs/heads/approved", "reason": "manual",
+    }
+    cleanup.trusted_build(build, profile)
+    ado = Mock()
+    ado.get.return_value = ({"value": [build]}, {})
+    assert cleanup.Ado.builds(ado, profile, None, NOW) == [build]
+    assert str(definition) in ado.get.call_args.kwargs["params"]["definitions"].split(",")
+    for other_name, other in profiles.items():
+        if other_name != profile_name:
+            with pytest.raises(ValueError, match="approved leaf"):
+                cleanup.trusted_build(build, other)
+
+
 @pytest.mark.parametrize("state", ["inProgress", "cancelling", "notStarted", None])
 def test_active_or_unknown_producer_never_inherits_parent_completion(cleanup, evidence, state):
     evidence["build"]["status"] = state

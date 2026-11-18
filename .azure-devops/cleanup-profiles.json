@@ -5,7 +5,7 @@
     "cloud": "AzureCloud",
     "subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
     "groups": ["cli-int-test-rg"],
-    "definitions": [147, 166, 169]
+    "definitions": [147, 166, 169, 182, 183]
   },
   "iot-fairfax": {
     "product": "azure-iot",
@@ -13,7 +13,7 @@
     "cloud": "AzureUSGovernment",
     "subscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
     "groups": ["iot-cli-monitor-fairfax-ga", "iot-cli-monitor-fairfax-preview"],
-    "definitions": [147, 170, 171]
+    "definitions": [147, 170, 171, 184, 185]
   },
   "iot-mooncake": {
     "product": "azure-iot",
@@ -29,7 +29,7 @@
     "cloud": "AzureCloud",
     "subscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
     "groups": ["ops-cli-int-test-rg"],
-    "definitions": [164, 167, 175, 176]
+    "definitions": [164, 167, 175, 176, 180, 186, 188]
   },
   "aio-fairfax": {
     "product": "azure-iot-ops",
@@ -37,6 +37,6 @@
     "cloud": "AzureUSGovernment",
     "subscription": "a32cd71f-10e6-4c80-944c-039bdaac7cab",
     "groups": ["ops-cli-monitor-fairfax-v1"],
-    "definitions": [164, 177]
+    "definitions": [164, 177, 187]
   }
 }
