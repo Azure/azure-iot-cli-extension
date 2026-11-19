@@ -7,8 +7,6 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
-- This branch prepares **azure-iot 1.1.1b1 (Preview)** from the `release/1.2.0-preview` source line, retaining its MQTT 5 and Semantic Model preview features. Azure CLI 2.73.0 or later is required. See [HISTORY.rst](HISTORY.rst) for details; this version update does not announce publication or completed live qualification.
-
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
 - 🆕 **`1.0.0b2` Preview** fixes ADR certificate policy validity (1 through 90 days) and preserves the original service failure when namespace-link recovery stops. See [HISTORY.rst](HISTORY.rst) for details.
