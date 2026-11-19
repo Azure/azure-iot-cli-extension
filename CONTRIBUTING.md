@@ -254,6 +254,17 @@ never unsupported skips.
 Run titles include the cloud, track, actual CLI version, source commit and build ID.
 These are source-build health results, not published-release qualification.
 
+For release pipeline **161**, **Branch/tag** selects the automation and must remain
+`dev` for Upload wheel only, Draft and Release. **Release branch** selects product
+source and accepts any existing branch in `Azure/azure-iot-cli-extension`, including
+`dev`, `release/*` and topic branches. Tags, pull-request refs and repository URLs
+are not source branches. Resolve fetches the explicit branch from that fixed
+repository and freezes its commit; later jobs use that commit, not a moving tip.
+The source must contain the release-build prerequisites and, unless integration is
+explicitly waived, pipeline 147's candidate handoff. Qualification, Draft/Release
+approval and no-overwrite checks are unchanged. This does not change GitHub branch
+protections or permit publication from feature-branch automation.
+
 Release pipeline **Public region** selects the public regions passed to every integration
 cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
 Release, integration and health use the same named, multiselect region dropdown:
