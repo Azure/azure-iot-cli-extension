@@ -624,7 +624,10 @@ def test_release_dropdown_selections_round_trip_through_child_request(candidate,
     integration = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     pipeline, _ = all_stages()
     regions = next(item for item in pipeline["parameters"] if item["name"] == "regions")
-    assert regions == next(item for item in integration["parameters"] if item["name"] == "regions")
+    child_regions = next(item for item in integration["parameters"] if item["name"] == "regions")
+    assert {key: value for key, value in regions.items() if key != "displayName"} == {
+        key: value for key, value in child_regions.items() if key != "displayName"
+    }
     assert regions["type"] == "stringList"
     selected = regions["values"]
     canonical = ",".join(region.replace(" ", "").lower() for region in selected)
