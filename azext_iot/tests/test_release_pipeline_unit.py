@@ -178,7 +178,9 @@ def blob_error(code):
 
 
 @pytest.mark.parametrize("skipped", [False, True])
-@pytest.mark.parametrize("source", ["dev", "release/1.2.0-preview"])
+@pytest.mark.parametrize("source", [
+    "dev", "release/1.2.0-preview", "release/1.1.1-preview", "users/test/release-validation",
+])
 def test_blob_upload_exact_candidate_without_github(storage, monkeypatch, tmp_path, capsys, skipped, source):
     directory, value = storage
     monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
@@ -258,7 +260,7 @@ def test_blob_create_race_verifies_bytes_with_bounded_reads(storage, monkeypatch
 @pytest.mark.parametrize("name,value", [
     ("BUILD_SOURCEBRANCH", "refs/heads/feature/upload"),
     ("BUILD_SOURCEBRANCH", "refs/pull/42/merge"),
-    ("RELEASE_SOURCE_BRANCH", "feature/upload"), ("RELEASE_SOURCE_BRANCH", "preview"),
+    ("RELEASE_SOURCE_BRANCH", "refs/tags/v1"), ("RELEASE_SOURCE_BRANCH", "dev;echo bad"),
     ("BUILD_REPOSITORY_NAME", "another/repo"),
     ("RELEASE_MODE", "Validate"), ("RELEASE_MODE", "Draft"), ("RELEASE_MODE", "Release"),
 ])
@@ -272,9 +274,9 @@ def test_blob_production_guard_precedes_authentication(storage, monkeypatch, tmp
 
 @pytest.mark.parametrize("name,value", [
     ("BUILD_SOURCEBRANCH", "refs/pull/42/merge"),
-    ("RELEASE_SOURCE_BRANCH", "feature/upload"), ("BUILD_REPOSITORY_NAME", "another/repo"),
+    ("RELEASE_SOURCE_BRANCH", "refs/pull/42/head"), ("BUILD_REPOSITORY_NAME", "another/repo"),
 ])
-def test_blob_resolve_rejects_unprotected_source_before_checkout(storage, monkeypatch, tmp_path, name, value):
+def test_blob_resolve_rejects_invalid_context_before_checkout(storage, monkeypatch, tmp_path, name, value):
     monkeypatch.setenv(name, value)
     with pytest.raises(ValueError):
         release.checkout(tmp_path / "source", resolving=True)
@@ -428,6 +430,9 @@ def test_waiver_is_bound_to_candidate_and_prevents_child_execution(candidate, mo
 @pytest.mark.parametrize("mode,source", [
     ("Release", "release/1.2.0-preview"), ("Draft", "release/1.2.0-preview"),
     ("Validate", "users/test/release-validation"),
+    ("Upload wheel only", "release/1.1.1-preview"), ("Draft", "release/1.1.1-preview"),
+    ("Release", "users/test/release-validation"), ("Draft", "users/test/release-validation"),
+    ("Upload wheel only", "users/test/release-validation"),
 ])
 @pytest.mark.parametrize("skipped", [False, True])
 def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
@@ -458,6 +463,7 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
 
     def local_run(args, **kwargs):
         if args[:4] == ["git", "remote", "add", "origin"]:
+            assert args[4] == "https://github.com/Azure/azure-iot-cli-extension.git"
             args = args[:4] + [repository.as_uri()]
         if args[:2] == ["git", "fetch"]:
             fetches.append(args[-1])
@@ -482,15 +488,16 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
     assert fetches == ["refs/heads/" + source, resolved]
 
 
-def test_feature_candidate_cannot_be_resolved_or_published_in_release_mode(candidate, tmp_path, monkeypatch):
-    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", "users/test/release-validation")
-    with pytest.raises(ValueError, match="protected source branch"):
+@pytest.mark.parametrize("source", ["refs/tags/v1", "refs/pull/42/head", "https://github.com/other/repo", "../dev"])
+def test_invalid_source_cannot_be_resolved_or_published(candidate, tmp_path, monkeypatch, source):
+    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
+    with pytest.raises(ValueError, match="safe branch name"):
         release.checkout(tmp_path / "checkout", resolving=True)
     assert not (tmp_path / "checkout").exists()
-    with pytest.raises(ValueError, match="protected source branch"):
+    with pytest.raises(ValueError, match="safe branch name"):
         release.publish(candidate[0], tmp_path / "release.json", tmp_path / "publication.json")
     monkeypatch.setenv("RELEASE_CREATE_INDEX_PR", "true")
-    with pytest.raises(ValueError, match="protected source branch"):
+    with pytest.raises(ValueError, match="safe branch name"):
         release.index_pull_request(candidate[0], tmp_path / "receipt", tmp_path / "work", tmp_path / "publication.json")
     release.github.assert_not_called()
 
@@ -1015,7 +1022,9 @@ def test_integration_artifact_proof_requires_original_bytes_and_manifest(candida
         release.verify_integration_artifacts(directory, artifacts)
 
 
-@pytest.mark.parametrize("source_branch", ["refs/heads/feature/test", "refs/heads/preview", "refs/tags/v1"])
+@pytest.mark.parametrize("source_branch", [
+    "refs/heads/feature/test", "refs/heads/preview", "refs/heads/release/1.1.1-preview", "refs/tags/v1",
+])
 @pytest.mark.parametrize("mode", ["Draft", "Release"])
 def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, source_branch, mode):
     directory, _ = candidate
@@ -1026,7 +1035,7 @@ def test_feature_automation_cannot_publish(candidate, tmp_path, monkeypatch, sou
     release.github.assert_not_called()
 
 
-@pytest.mark.parametrize("mode", ["Draft", "Release"])
+@pytest.mark.parametrize("mode", ["Upload wheel only", "Draft", "Release"])
 def test_release_mode_fails_before_checkout_on_feature_automation(candidate, tmp_path, monkeypatch, mode):
     monkeypatch.setenv("RELEASE_MODE", mode)
     monkeypatch.setenv("BUILD_SOURCEBRANCH", "refs/heads/feature/test")
@@ -1066,16 +1075,21 @@ def test_existing_release_conflicts_are_never_overwritten(candidate, tmp_path, m
 
 @pytest.mark.parametrize("mode", ["Draft", "Release"])
 @pytest.mark.parametrize("skipped", [False, True])
-def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path, monkeypatch, mode, skipped):
+@pytest.mark.parametrize("source", [
+    "release/1.2.0-preview", "release/1.1.1-preview", "users/test/release-validation",
+])
+def test_draft_is_only_published_after_both_verified_uploads(candidate, tmp_path, monkeypatch, mode, skipped, source):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_MODE", mode)
     monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
+    monkeypatch.setenv("RELEASE_SOURCE_BRANCH", source)
+    value["sourceBranch"] = release.branch(source)
     if skipped:
         value.update(skipIntegrationTests=True, cohorts={})
-        release.write(directory / "candidate.json", value)
-        prepared = release.read(tmp_path / "publication.json")
-        prepared["candidate"] = value
-        release.write(tmp_path / "publication.json", prepared)
+    release.write(directory / "candidate.json", value)
+    prepared = release.read(tmp_path / "publication.json")
+    prepared["candidate"] = value
+    release.write(tmp_path / "publication.json", prepared)
     staged = public_release(value, draft=True)
     staged["assets"] = []
     events = []

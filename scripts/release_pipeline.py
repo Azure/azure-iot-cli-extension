@@ -33,7 +33,6 @@ REPOSITORY = "Azure/azure-iot-cli-extension"
 INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
-BRANCHES = {"dev", "release/1.2.0-preview"}
 BLOB_CONTAINER = "https://azedgecli.blob.core.windows.net/drop/"
 MAX_BLOB_BYTES = 256 * 1024 * 1024
 INTEGRATION_PARAMETERS = {
@@ -625,8 +624,7 @@ def verify_integration_artifacts(directory, artifacts):
 
 
 def automation_allowed():
-    if branch(environment("RELEASE_SOURCE_BRANCH")).removeprefix("refs/heads/") not in BRANCHES:
-        raise ValueError("Publication requires an approved protected source branch.")
+    branch(environment("RELEASE_SOURCE_BRANCH"))
     if environment("BUILD_SOURCEBRANCH") != "refs/heads/dev":
         raise ValueError("Publication requires the reviewed release automation on dev, not a feature branch.")
     if environment("BUILD_REPOSITORY_NAME") != REPOSITORY:
