@@ -255,7 +255,7 @@ Run titles include the cloud, track, actual CLI version, source commit and build
 These are source-build health results, not published-release qualification.
 
 For release pipeline **161**, **Branch/tag** selects the automation and must remain
-`dev` for Upload wheel only, Draft and Release. **Release branch** selects product
+`dev` for Draft/Release or when **Upload wheel to Blob** is checked. **Release branch** selects product
 source and accepts any existing branch in `Azure/azure-iot-cli-extension`, including
 `dev`, `release/*` and topic branches. Tags, pull-request refs and repository URLs
 are not source branches. Resolve fetches the explicit branch from that fixed
@@ -264,6 +264,20 @@ The source must contain the release-build prerequisites and, unless integration 
 explicitly waived, pipeline 147's candidate handoff. Qualification, Draft/Release
 approval and no-overwrite checks are unchanged. This does not change GitHub branch
 protections or permit publication from feature-branch automation.
+
+Release modes are **Validate** (default), **Draft** and **Release**.
+The **Upload wheel to Blob** checkbox (`uploadWheelToBlob`, default `false`) is
+the first checkbox below **Integration gate region**, before **Skip integration tests**
+and **Create index PR**. It replaces the former **Upload wheel only** mode:
+use Validate with the checkbox selected for an approval-free Blob upload after
+qualification. Draft/Release with upload selected wait for their existing approval
+before either write, then upload the same qualified wheel to Blob before GitHub.
+A failed Blob upload stops GitHub publication. A later GitHub failure does not roll
+back Blob; retry the same candidate rather than rebuilding it.
+Duplicate handling is unchanged: identical content is a no-op, conflicting content
+is never overwritten. Download logs for `blob-upload.json` (Blob) and `release.json`
+(GitHub); both retain candidate provenance. With upload unchecked, Validate publishes
+nothing. Existing branch restrictions, integration waivers and index-PR rules remain.
 
 Release pipeline **Public region** selects the public regions passed to every integration
 cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
