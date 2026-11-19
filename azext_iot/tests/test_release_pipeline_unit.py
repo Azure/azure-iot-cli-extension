@@ -1175,7 +1175,7 @@ def test_draft_is_only_published_after_both_verified_uploads(
             "length": (directory / value["wheel"]["file"]).stat().st_size,
         }))
         assert release.upload_wheel(directory, blob_receipt)["status"] == "already-present"
-        assert events == []
+        assert not events
     result = release.publish(directory, tmp_path / "release.json", tmp_path / "publication.json")
     assert result["candidate"] == value
     assert blob_receipt.exists() is upload_blob
