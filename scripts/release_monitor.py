@@ -55,13 +55,17 @@ def scheduled_overlap_guard():
     current = os.environ.get("BUILD_BUILDID", "")
     project = os.environ.get("SYSTEM_TEAMPROJECTID", "")
     token = os.environ.get("SYSTEM_ACCESSTOKEN", "")
+    attempts = [os.environ.get(name, "") for name in ("SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT")]
     if (os.environ.get("SYSTEM_COLLECTIONURI", "").rstrip("/") + "/" != ADO_COLLECTION
             or os.environ.get("SYSTEM_TEAMPROJECT") != ADO_PROJECT
             or not re.fullmatch(r"[1-9][0-9]*", definition)
             or not re.fullmatch(r"[1-9][0-9]*", current)
+            or any(not re.fullmatch(r"[1-9][0-9]*", attempt) for attempt in attempts)
             or not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", project)
             or not token.strip() or "$(" in token or any(char.isspace() for char in token)):
-        raise ValueError("Scheduled overlap check requires the current aziotcli build context and job token.")
+        raise ValueError("Scheduled overlap check requires current aziotcli build context, positive stage/job attempts "
+                         "and a job token.")
+    retry = any(int(attempt) > 1 for attempt in attempts)
     query = urlencode({
         "definitions": definition, "statusFilter": ",".join(sorted(ACTIVE_BUILD_STATUSES)),
         "queryOrder": "queueTimeAscending", "$top": 1000, "api-version": "7.1",
@@ -87,7 +91,7 @@ def scheduled_overlap_guard():
             or type(result.get("count")) is not int or result["count"] != len(result["value"])
             or result["count"] >= 1000):
         raise ValueError("Scheduled overlap check returned incomplete or invalid build evidence.")
-    older, seen = [], set()
+    seen = set()
     for build in result["value"]:
         if (not isinstance(build, dict) or type(build.get("id")) is not int or build["id"] <= 0
                 or build["id"] in seen or not isinstance(build.get("definition"), dict)
@@ -97,13 +101,13 @@ def scheduled_overlap_guard():
                 or build.get("status") not in ACTIVE_BUILD_STATUSES):
             raise ValueError("Scheduled overlap check returned untrusted build identity or status.")
         seen.add(build["id"])
-        if build["id"] < int(current):
-            older.append(build["id"])
     if int(current) not in seen:
         raise ValueError("Scheduled overlap check could not establish this run in the active-build inventory.")
-    if older:
-        raise RuntimeError(f"Scheduled overlap: older active builds {sorted(older)}; refusing to provision.")
-    print("Scheduled overlap check passed: no older active build of this definition.")
+    conflicts = sorted(number for number in seen if number != int(current) and (retry or number < int(current)))
+    relation = "other" if retry else "older"
+    if conflicts:
+        raise RuntimeError(f"Scheduled overlap: {relation} active builds {conflicts}; refusing to provision.")
+    print(f"Scheduled overlap check passed: no {relation} active build of this definition.")
 
 
 class NonStableRuntime(ValueError):

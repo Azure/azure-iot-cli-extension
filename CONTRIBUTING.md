@@ -232,13 +232,17 @@ Sovereign wrappers retain `schedules: []`; their comments record planned daily
 cron values only. Keep automatic sovereign execution held until explicit policy,
 connection authorization, resource scopes, capacity and live qualification approval.
 Every health run still requires its selected tests and cleanup evidence.
-The Prepare step uses `System.AccessToken` to query only this definition's active
-builds in `azureiotdevxp/aziotcli` and requires the current build to be visible.
-An older active build rejects a scheduled run
-before acquisition/provisioning; manual runs are unaffected. Missing credentials,
-failed queries, redirects or incomplete evidence fail closed, never report a skip
-as success. `batch: true` would not prevent overlap with `always: true`; this
-explicit check is required. Public test jobs use **sc-iot-cli-public-it**.
+Prepare and each health test job immediately before provisioning use
+`System.AccessToken` to query this definition's active builds in `azureiotdevxp/aziotcli`.
+First attempts reject older active builds. If either `System.StageAttempt` or
+`System.JobAttempt` is greater than 1, any other active build blocks the retry,
+including newer builds. The current build and positive attempt counters must be
+present; missing credentials, failed queries, redirects or incomplete evidence
+fail closed. Manual runs remain unchanged, and existing ownership-checked cleanup
+is not disabled. This is a point-in-time check, not an atomic lock or a guarantee
+against every race. `batch: true` would not prevent overlap with `always: true`.
+Old runs retain their original automation and are not retroactively protected.
+Public test jobs use **sc-iot-cli-public-it**.
 
 Receipts bind wheel, source, automation commit, cloud and native cohort identity.
 They cannot qualify another monitor or a release candidate. Public monitors retain
