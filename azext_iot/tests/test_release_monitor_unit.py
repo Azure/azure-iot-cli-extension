@@ -43,6 +43,7 @@ def scheduled(monitor, monkeypatch):
         "SYSTEM_COLLECTIONURI": "https://dev.azure.com/azureiotdevxp/",
         "SYSTEM_TEAMPROJECT": "aziotcli", "SYSTEM_TEAMPROJECTID": PROJECT,
         "SYSTEM_ACCESSTOKEN": "secret-offline-token",
+        "SYSTEM_STAGEATTEMPT": "1", "SYSTEM_JOBATTEMPT": "1",
     }.items():
         monkeypatch.setenv(name, value)
     opener = Mock()
@@ -93,11 +94,41 @@ def test_scheduled_guard_rejects_older_active_build_including_manual_runs(schedu
         monitor.main(["prepare"])
 
 
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+@pytest.mark.parametrize("status", ["notStarted", "inProgress", "cancelling", "postponed"])
+def test_scheduled_retry_rejects_newer_active_build(scheduled, monkeypatch, attempt, status):
+    monitor, opener = scheduled
+    monkeypatch.setenv(attempt, "2")
+    opener.open.return_value = build_response([active_build(900), active_build(901, status)])
+    with pytest.raises(RuntimeError, match="other active builds.*901.*refusing to provision"):
+        monitor.main(["prepare"])
+
+
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+def test_scheduled_retry_allows_only_the_current_build(scheduled, monkeypatch, attempt):
+    monitor, opener = scheduled
+    monkeypatch.setenv(attempt, "2")
+    opener.open.return_value = build_response([active_build(900)])
+    monitor.main(["prepare"])
+    opener.open.assert_called_once()
+
+
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+def test_scheduled_guard_requires_attempt_context(scheduled, monkeypatch, attempt):
+    monitor, opener = scheduled
+    monkeypatch.delenv(attempt)
+    with pytest.raises(ValueError, match="positive stage/job attempts"):
+        monitor.main(["prepare"])
+    opener.open.assert_not_called()
+
+
 @pytest.mark.parametrize("reason", ["Manual", "IndividualCI", "PullRequest", ""])
 def test_manual_runs_never_query_or_require_overlap_token(scheduled, monkeypatch, reason):
     monitor, opener = scheduled
     monkeypatch.setenv("BUILD_REASON", reason)
     monkeypatch.delenv("SYSTEM_ACCESSTOKEN")
+    monkeypatch.delenv("SYSTEM_STAGEATTEMPT")
+    monkeypatch.delenv("SYSTEM_JOBATTEMPT")
     monitor.main(["prepare"])
     opener.open.assert_not_called()
 
@@ -108,6 +139,8 @@ def test_manual_runs_never_query_or_require_overlap_token(scheduled, monkeypatch
     ("BUILD_BUILDID", "0"), ("SYSTEM_TEAMPROJECTID", "another-project"),
     ("SYSTEM_COLLECTIONURI", "https://dev.azure.com/other/"),
     ("SYSTEM_TEAMPROJECT", "other"),
+    ("SYSTEM_STAGEATTEMPT", "0"), ("SYSTEM_STAGEATTEMPT", "$(System.StageAttempt)"),
+    ("SYSTEM_JOBATTEMPT", "-1"), ("SYSTEM_JOBATTEMPT", "invalid"),
 ])
 def test_scheduled_guard_requires_current_project_identity_and_token(scheduled, monkeypatch, name, value):
     monitor, opener = scheduled
@@ -570,6 +603,22 @@ def test_health_stages_plan_or_execute_the_selected_cohorts():
     assert next(iter(cohorts.values()))[0]["template"] == "integration-service.yml"
     assert "runIntegration" not in str(template)
     assert "qualify-profile" not in str(template)
+
+
+def test_health_job_retries_recheck_overlap_before_provisioning():
+    template = yaml.safe_load(
+        (ROOT / ".azure-devops/templates/integration-service.yml").read_text(encoding="utf-8")
+    )
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    run_index = next(index for index, step in enumerate(steps) if step.get("displayName") == "Run tests")
+    conditional = steps[run_index - 1]
+    assert list(conditional) == ["${{ if parameters.monitor }}"]
+    guard, = conditional["${{ if parameters.monitor }}"]
+    assert guard["bash"] == "python scripts/release_monitor.py prepare"
+    assert guard["workingDirectory"] == "$(Build.SourcesDirectory)"
+    assert guard["env"] == {"SYSTEM_ACCESSTOKEN": "$(System.AccessToken)"}
+    assert "condition" not in guard and "continueOnError" not in guard
+    assert steps[run_index].get("condition", "succeeded()") == "succeeded()"
 
 
 @pytest.mark.parametrize("source_only", [False, True])
