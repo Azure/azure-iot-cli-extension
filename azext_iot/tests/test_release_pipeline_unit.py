@@ -1471,10 +1471,18 @@ def test_yaml_upload_uses_only_storage_wif_and_frozen_verified_artifacts():
     context = job["templateContext"]
     assert context["type"] == "releaseJob" and context["isProduction"]
     assert {item["artifactName"] for item in context["inputs"]} == {"release-candidate", "release-tooling"}
-    assert context["outputs"] == [{
-        "output": "pipelineArtifact", "path": "$(Agent.TempDirectory)/publication",
-        "artifact": "release-publication-$(System.JobAttempt)",
-    }]
+    for name in ("Upload", "Publish"):
+        release_job = stages[name]["jobs"][0]
+        assert "outputs" not in release_job["templateContext"]
+        receipt = next(step for step in release_job["steps"] if "task.uploadfile" in step.get("bash", ""))
+        assert receipt["env"]["RELEASE_RECEIPT"] == "$(Agent.TempDirectory)/publication/release.json"
+        assert 'if [ ! -s "$RELEASE_RECEIPT" ]' in receipt["bash"]
+        assert "task.logissue type=error" in receipt["bash"] and "exit 1" in receipt["bash"]
+        assert receipt.get("condition", "succeeded()") == "succeeded()"
+    publish_steps = stages["Publish"]["jobs"][0]["steps"]
+    assert next(i for i, step in enumerate(publish_steps) if "task.uploadfile" in step.get("bash", "")) < next(
+        i for i, step in enumerate(publish_steps) if "${{ if parameters.createIndexPr }}" in step
+    )
     assert [step["checkout"] for step in job["steps"] if "checkout" in step] == ["none"]
     task = next(step for step in job["steps"] if step.get("task") == "AzureCLI@2")
     assert task["inputs"]["azureSubscription"] == "sc-cli-release-storage"
@@ -1567,10 +1575,7 @@ def test_production_publication_consumes_scanned_artifacts_without_source_checko
     assert context["type"] == "releaseJob"
     assert context["isProduction"] is True
     assert {item["artifactName"] for item in context["inputs"]} == {"release-candidate", "release-tooling"}
-    assert context["outputs"] == [{
-        "output": "pipelineArtifact", "path": "$(Agent.TempDirectory)/publication",
-        "artifact": "release-publication-$(System.JobAttempt)",
-    }]
+    assert "outputs" not in context
     assert [step["checkout"] for step in job["steps"] if "checkout" in step] == ["none"]
     scripts = [step["script"] for step in job["steps"] if "script" in step]
     assert 'release-tooling/release_pipeline.py" publish' in scripts[-1]
