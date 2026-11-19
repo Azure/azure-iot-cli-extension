@@ -3,6 +3,14 @@
 Release History
 ===============
 
+1.1.1b1 (Preview)
++++++++++++++++++
+
+**Release preparation**
+
+* Bumped the extension package version from ``1.1.0b1`` to ``1.1.1b1``, retaining preview status.
+* This version update introduces no CLI command, SDK API version, or minimum Azure CLI requirement changes.
+
 1.1.0b1 (Preview)
 +++++++++++++++++
 
