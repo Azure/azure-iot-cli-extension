@@ -7,7 +7,7 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## News
 
-- This branch prepares **azure-iot 1.0.1**, retaining the GA command surface and `2026-11-01` SDK API versions from 1.0.0. Azure CLI 2.73.0 or later is required. See [HISTORY.rst](HISTORY.rst) for details; this version update does not announce publication or completed live qualification.
+- This branch prepares **azure-iot 1.0.0** using `2026-11-01` for all seven ADR/CMS, IoT Hub control/data-plane, and DPS control/data-plane SDK packages. See [HISTORY.rst](HISTORY.rst) for the supported scope. Deployment and live qualification remain deferred; this is not a publication or deployment announcement.
 
 - To unlink, run `az iot adr ns link hub|dps remove`; delete the linked resource first only for a `Succeeded` link, not a `Failed` link. Hub endpoints in any state also require clearing Registry Device IoT Hub capability references first, for example by deleting the referencing Registry Devices with `az iot adr ns device delete`; deleting the Hub does not clear these references. Remove deletes only the namespace endpoint and waits for completion by default. Use `--no-wait` to return after submission.
 
