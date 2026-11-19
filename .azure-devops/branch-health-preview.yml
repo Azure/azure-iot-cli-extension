@@ -1,7 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 trigger: none
 pr: none
-schedules: []
+schedules:
+  - cron: "30 6 * * *"
+    displayName: "Public Preview branch health (183, 06:30 UTC)"
+    branches:
+      include: [dev]
+    always: true
 name: iot-branch-public-preview-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
 parameters:

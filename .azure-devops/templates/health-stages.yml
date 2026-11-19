@@ -36,6 +36,10 @@ stages:
               versionSpec: '3.13'
           - bash: python -m pip install packaging
             displayName: Install resolver dependencies
+          - bash: python scripts/release_monitor.py prepare
+            displayName: Refuse overlapping scheduled runs
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
           - task: DownloadPipelineArtifact@2
             displayName: Restore immutable selection on retry
             condition: gt(variables['System.JobAttempt'], 1)

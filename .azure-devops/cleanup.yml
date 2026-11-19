@@ -3,10 +3,10 @@
 trigger: none
 pr: none
 
-# Scheduled runs use the report-only parameter default, regardless of source changes.
+# Scheduled runs report Public only; sovereign profiles are held pending policy and authorization.
 schedules:
   - cron: "0 13 * * *"
-    displayName: "Daily owned-resource report (13:00 UTC)"
+    displayName: "Daily Public owned-resource report (13:00 UTC)"
     branches:
       include:
         - dev
@@ -25,8 +25,8 @@ parameters:
   - name: profile
     displayName: Approved cleanup profile
     type: string
-    default: all
-    values: [all, iot-public, iot-fairfax, iot-mooncake, aio-public, aio-fairfax]
+    default: public
+    values: [public, all, iot-public, iot-fairfax, iot-mooncake, aio-public, aio-fairfax]
 
 jobs:
   - job: Cleanup

@@ -8,8 +8,8 @@ parameters:
   - name: mode
     displayName: Mode
     type: string
-    default: Plan
-    values: [Plan, Validate, Draft, Release]
+    default: Validate
+    values: [Validate, Upload wheel only, Draft, Release]
   - name: sourceBranch
     displayName: Release branch
     type: string
