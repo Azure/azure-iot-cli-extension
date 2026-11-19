@@ -1,0 +1,59 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+trigger: none
+pr: none
+schedules: []
+name: cli-identity-probe-$(Date:yyyyMMdd).$(Rev:r)
+parameters:
+  - name: targets
+    type: object
+    default:
+      - name: IoT
+        connection: sc-iot-cli-public-it
+        group: cli-int-test-rg
+      - name: Operations
+        connection: sc-iot-ops-cli-public-it
+        group: ops-cli-int-test-rg
+      - name: Publisher
+        connection: sc-cli-release-storage
+        group: ''
+pool:
+  vmImage: ubuntu-24.04
+jobs:
+  - ${{ each target in parameters.targets }}:
+      - job: ${{ target.name }}
+        timeoutInMinutes: 20
+        steps:
+          - checkout: self
+            clean: true
+            persistCredentials: false
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.13'
+          - bash: python -m pip install azure-cli
+            displayName: Install authentication probe dependencies
+          - task: AzureCLI@2
+            displayName: Verify UAMI login, renewal and read access
+            inputs:
+              azureSubscription: ${{ target.connection }}
+              addSpnToEnvironment: true
+              visibleAzLogin: false
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                export AZURE_CLIENT_ID="$servicePrincipalId" AZURE_TENANT_ID="$tenantId"
+                az account show --query '{subscription:id,identityType:user.type}' --output json
+                python azext_iot/tests/_refresh_ci_auth.py
+                if [ -n "$PROBE_GROUP" ]; then
+                  az group show --name "$PROBE_GROUP" --query id --output tsv
+                else
+                  az storage blob exists --account-name azedgecli --container-name drop \
+                    --name "ado-probes/nonexistent-auth-probe-$BUILD_BUILDID" --auth-mode login \
+                    --query exists --output json
+                fi
+                echo "Verified current ADO-only UAMI login, fresh assertion exchange and scoped read."
+            env:
+              AZEXT_IOT_CI_AUTH: ado
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
+              PROBE_GROUP: ${{ target.group }}
