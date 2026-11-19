@@ -27,7 +27,7 @@ separate Validate run before uploading or releasing.
 3. **Release branch** (product code): `release/1.2.0-preview` for Preview
    (default) or `dev` for GA. Upload, Draft and Release reject other branches.
 4. **Mode**: choose from the table above.
-5. **Region (Public cloud only)**: one or more regions; default Australia East.
+5. **Integration gate region**: one or more Public cloud regions; default Australia East.
 6. **Skip integration tests**: leave unchecked. Checking it is an explicit
    waiver that skips only integration; it is recorded in the candidate and
    receipt.
