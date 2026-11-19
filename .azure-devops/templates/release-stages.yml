@@ -528,10 +528,6 @@ stages:
                 - input: pipelineArtifact
                   artifactName: release-tooling
                   targetPath: $(Pipeline.Workspace)/release-tooling
-              outputs:
-                - output: pipelineArtifact
-                  path: $(Agent.TempDirectory)/publication
-                  artifact: release-publication-$(System.JobAttempt)
             steps:
               - checkout: none
               - task: UsePythonVersion@0
@@ -554,6 +550,16 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_MODE: ${{ parameters.mode }}
+              - bash: |
+                  set -euo pipefail
+                  if [ ! -s "$RELEASE_RECEIPT" ]; then
+                    echo "##vso[task.logissue type=error]Publication receipt is missing or empty."
+                    exit 1
+                  fi
+                  echo "##vso[task.uploadfile]$RELEASE_RECEIPT"
+                displayName: Retain publication receipt in task logs
+                env:
+                  RELEASE_RECEIPT: $(Agent.TempDirectory)/publication/release.json
 
   - ${{ if in(parameters.mode, 'Draft', 'Release') }}:
       - stage: Publish
@@ -589,10 +595,6 @@ stages:
                 - input: pipelineArtifact
                   artifactName: release-tooling
                   targetPath: $(Pipeline.Workspace)/release-tooling
-              outputs:
-                - output: pipelineArtifact
-                  path: $(Agent.TempDirectory)/publication
-                  artifact: release-publication-$(System.JobAttempt)
             steps:
               - checkout: none
               - task: UsePythonVersion@0
@@ -611,6 +613,16 @@ stages:
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
                   RELEASE_MODE: ${{ parameters.mode }}
+              - bash: |
+                  set -euo pipefail
+                  if [ ! -s "$RELEASE_RECEIPT" ]; then
+                    echo "##vso[task.logissue type=error]Publication receipt is missing or empty."
+                    exit 1
+                  fi
+                  echo "##vso[task.uploadfile]$RELEASE_RECEIPT"
+                displayName: Retain publication receipt in task logs
+                env:
+                  RELEASE_RECEIPT: $(Agent.TempDirectory)/publication/release.json
               - ${{ if parameters.createIndexPr }}:
                   - script: >-
                       python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" index
