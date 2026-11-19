@@ -65,6 +65,13 @@ def skip_integration_tests():
     return value == "true"
 
 
+def upload_wheel_to_blob():
+    value = os.environ.get("RELEASE_UPLOAD_WHEEL_TO_BLOB", "false").lower()
+    if value not in {"true", "false"}:
+        raise ValueError("uploadWheelToBlob must be an explicit boolean.")
+    return value == "true"
+
+
 def identifier(value):
     if not re.fullmatch(r"[1-9][0-9]*", str(value)):
         raise ValueError("Expected a positive build or pipeline ID.")
@@ -132,7 +139,7 @@ def github(resource, **kwargs):
 
 def checkout(destination, resolving=False):
     if resolving:
-        if release_options()[0] in {"Upload wheel only", "Draft", "Release"}:
+        if release_options()[0] in {"Draft", "Release"} or upload_wheel_to_blob():
             automation_allowed()
     source_branch = branch(environment("RELEASE_SOURCE_BRANCH"))
     source_commit = None if resolving else commit(environment("RELEASE_SOURCE_COMMIT"))
@@ -402,6 +409,7 @@ def create_candidate(source, directory):
         "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")), "sourceCommit": source_commit,
         "producer": producer(),
         "skipIntegrationTests": skip_integration_tests(),
+        "uploadWheelToBlob": upload_wheel_to_blob(),
         "cohorts": {} if skip_integration_tests() else integration_cohorts(),
         "wheel": {"file": wheel.name, "sha256": digest(wheel), "version": wheel_metadata(wheel)},
         "sbom": {"file": "SBOM.zip", "sha256": digest(directory / "SBOM.zip")},
@@ -427,6 +435,9 @@ def verify_candidate(directory):
     skipped = value.get("skipIntegrationTests", False)
     if type(skipped) is not bool or skipped != skip_integration_tests():
         raise ValueError("Candidate integration waiver does not match this release run.")
+    upload = value.get("uploadWheelToBlob", False)
+    if type(upload) is not bool or upload != upload_wheel_to_blob():
+        raise ValueError("Candidate Blob upload option does not match this release run.")
     if value.get("cohorts") != ({} if skipped else integration_cohorts()):
         raise ValueError("Candidate cohort inventory does not match the complete requested qualification.")
     wheel = value["wheel"]
@@ -635,7 +646,8 @@ def release_options():
     mode = os.environ.get("RELEASE_MODE", "Validate")
     index = os.environ.get("RELEASE_CREATE_INDEX_PR", "false").lower()
     skip_integration_tests()
-    if mode not in {"Validate", "Upload wheel only", "Draft", "Release"} or index not in {"true", "false"}:
+    upload_wheel_to_blob()
+    if mode not in {"Validate", "Draft", "Release"} or index not in {"true", "false"}:
         raise ValueError("Invalid release mode or createIndexPr option.")
     if index == "true" and mode != "Release":
         raise ValueError("createIndexPr requires Release mode and a public GitHub release.")
@@ -643,9 +655,14 @@ def release_options():
 
 
 def publication_allowed(*, draft=False, upload=False):
-    expected = "Upload wheel only" if upload else "Draft" if draft else "Release"
-    if release_options()[0] != expected:
-        raise ValueError(f"Publication requires explicit {expected} mode.")
+    mode, _ = release_options()
+    if upload:
+        if not upload_wheel_to_blob():
+            raise ValueError("Blob upload requires explicit uploadWheelToBlob opt-in.")
+    else:
+        expected = "Draft" if draft else "Release"
+        if mode != expected:
+            raise ValueError(f"Publication requires explicit {expected} mode.")
     automation_allowed()
     if not upload:
         environment("RELEASE_GITHUB_TOKEN")
@@ -757,7 +774,7 @@ def upload_wheel(directory, receipt):
     if observed["sha256"] != wheel["sha256"] or observed["length"] != size:
         raise ValueError("Existing Blob differs from the qualified candidate; refusing overwrite.")
     result = {
-        "mode": "Upload wheel only", "status": status, "wheelUrl": url,
+        "mode": release_options()[0], "status": status, "wheelUrl": url,
         "sha256": wheel["sha256"], "length": size, "candidate": candidate,
     }
     write(receipt, result)
@@ -1086,7 +1103,8 @@ def main():
         skipped = skip_integration_tests()
         if skipped:
             print("##vso[task.logissue type=warning]Integration tests skipped by release waiver.")
-        print(json.dumps({"mode": mode, "createIndexPr": create_index_pr, "skipIntegrationTests": skipped}))
+        print(json.dumps({"mode": mode, "createIndexPr": create_index_pr, "skipIntegrationTests": skipped,
+                          "uploadWheelToBlob": upload_wheel_to_blob()}))
     elif args.operation in ("resolve", "checkout"):
         checkout(args.source, resolving=args.operation == "resolve")
     elif args.operation == "candidate":
