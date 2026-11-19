@@ -23,7 +23,7 @@ parameters:
     type: boolean
     default: false
   - name: regions
-    displayName: Region (Public cloud only)
+    displayName: Integration gate region
     type: stringList
     default:
       - Australia East
