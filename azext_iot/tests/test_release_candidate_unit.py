@@ -138,6 +138,20 @@ def test_valid_parent_and_candidate_do_not_require_completed_parent_or_identical
     assert original == {path.name: path.read_bytes() for path in directory.iterdir()}
 
 
+@pytest.mark.parametrize("mode", ["Validate", "Upload wheel only", "Draft", "Release"])
+@pytest.mark.parametrize("serialized", [False, True])
+def test_pipeline_147_accepts_161_candidate_in_all_qualifying_modes(parent, environment, artifact, mode, serialized):
+    directory, manifest = artifact
+    parameters = {"mode": mode, "skipIntegrationTests": False, "sourceBranch": "release/1.2.0-preview"}
+    parent["templateParameters"] = json.dumps(parameters) if serialized else parameters
+    parent["definition"]["id"] = 161
+    environment["RELEASE_PIPELINE_ID"] = "161"
+    environment["BUILD_SOURCEBRANCH"] = manifest["sourceBranch"] = "refs/heads/release/1.2.0-preview"
+    manifest["producer"]["definition"] = "161"
+    write_manifest(directory, manifest)
+    release.verify_candidate(directory, parent, environment)
+
+
 @pytest.mark.parametrize("field,value,reason", [
     ("id", 2469, "build ID"), ("id", "2468", "build ID"), ("id", True, "build ID"),
     ("definition.id", 223, "definition"), ("definition.id", "222", "definition"),

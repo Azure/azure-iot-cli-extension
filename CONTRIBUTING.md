@@ -1,5 +1,7 @@
 # Contributing
 
+For an IoT release, follow the [pipeline 161 step guide](docs/release-pipeline.md).
+
 ## Dev Setup
 
 1. Get Python 3: https://www.python.org/downloads/
@@ -176,7 +178,7 @@ under test.
 
 Four separate `Azure IoT CLI - Branch Health (<Public|Fairfax> <GA|Preview>)`
 definitions use `.azure-devops/branch-health.json` and `branch-health*.yml`.
-GA maps to `dev`; Preview maps to the active preview release branch. Advance that
+GA maps to `dev`; Preview maps to `release/1.2.0-preview`, never bare `preview`. Advance that
 reviewed mapping when the preview branch changes, without renaming pipelines.
 These fixed-track wrappers expose Mode only; use integration 147 for arbitrary PRs.
 The resolver freezes the product/test commit before building or accessing Azure.
@@ -215,12 +217,30 @@ the automation commit: their product branch or published wheel may be different.
 Normal PR CI and PR integration checks continue reporting to GitHub.
 Never store personal account passwords or tokens in these files.
 
-Keep all definitions disabled until an owner approves automation connections,
-resource scopes/RBAC, shared-subscription capacity, cleanup windows and live
-qualification. Then enable queueing. Every health run executes the selected
-integration cohorts and requires their results and cleanup evidence.
-No recurring schedule is supplied before live execution and capacity are approved;
-apply the same schedule policy to the IoT and AIO monitor sets.
+Public schedules become eligible when this YAML is merged into `dev`, subject to
+owner-managed queueing and connection authorization. They run daily with
+`always: true`, full **Integration tests** and Python **3.13** defaults.
+Only `dev` is included, preventing duplicate scheduling from the Preview branch.
+
+| Family/cloud | GA definition / UTC | Preview definition / UTC | Status |
+| --- | --- | --- | --- |
+| Branch Public | 182 / 00:30 | 183 / 06:30 | Scheduled on `dev` merge |
+| Release Public | 166 / 12:30 | 169 / 18:30 | Scheduled on `dev` merge |
+| Branch Fairfax | 184 / 01:00 | 185 / 07:00 | Held |
+| Release Fairfax | 170 / 13:30 | 171 / 19:30 | Held |
+| Release Mooncake | 172 / 02:30 | 173 / 08:30 | Held |
+
+Sovereign wrappers retain `schedules: []`; their comments record planned daily
+cron values only. Keep automatic sovereign execution held until explicit policy,
+connection authorization, resource scopes, capacity and live qualification approval.
+Every health run still requires its selected tests and cleanup evidence.
+The Prepare step uses `System.AccessToken` to query only this definition's active
+builds in `azureiotdevxp/aziotcli` and requires the current build to be visible.
+An older active build rejects a scheduled run
+before acquisition/provisioning; manual runs are unaffected. Missing credentials,
+failed queries, redirects or incomplete evidence fail closed, never report a skip
+as success. `batch: true` would not prevent overlap with `always: true`; this
+explicit check is required. Public test jobs use **sc-iot-cli-public-it**.
 
 Receipts bind wheel, source, automation commit, cloud and native cohort identity.
 They cannot qualify another monitor or a release candidate. Public monitors retain
@@ -289,9 +309,12 @@ rollout remains an operational prerequisite for overlapping runs in its shared g
 
 ### Scheduled cleanup (pipeline 109)
 
-`.azure-devops/cleanup.yml` runs daily at **13:00 UTC**, with `mode: report` by
-default. One hosted agent processes the approved IoT Public/Fairfax/Mooncake and
-AIO Public/Fairfax profiles sequentially; it never uses the AIO integration pool
+`.azure-devops/cleanup.yml` runs daily at **13:00 UTC**, with `mode: report` and
+`profile: public` by default. This aggregate processes only `iot-public` and
+`aio-public`, using **sc-iot-cli-public-it** and **sc-iot-ops-cli-public-it**.
+Manual `all` and individual sovereign profiles remain available but are held
+until policy approval and connection authorization; they never fall back to success.
+One hosted agent processes the selected profiles sequentially; it never uses the AIO integration pool
 or locks a test service connection. `cleanup-profiles.json` is the fixed
 subscription/group/producer allowlist. Existing `Exclusions` names remain protected;
 exact resource IDs also protect their parent from cascading deletion.
@@ -313,7 +336,7 @@ Native Hub/DPS markers, older formats, untagged resources and unmatched owners a
 review. Never reconstruct a manifest from resource tags.
 
 To roll out, replace/pause the old broad sweep with owner approval, deploy to the
-branch actually used by 109, authorize its existing service connections and ensure
+branch actually used by 109, authorize only its two Public connections now and ensure
 the build service can read producer builds, timelines and artifacts. No subscription-
 wide role grant is needed. Inspect report-only results for active, canceled, retried,
 lost-agent and pending-provisioning cases before manually selecting `mode: delete`.

@@ -2,7 +2,12 @@
 
 trigger: none
 pr: none
-schedules: []
+schedules:
+  - cron: "30 12 * * *"
+    displayName: "Public GA release health (166, 12:30 UTC)"
+    branches:
+      include: [dev]
+    always: true
 name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
 parameters:

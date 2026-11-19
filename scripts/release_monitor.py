@@ -10,6 +10,7 @@ import argparse
 import ast
 from email.parser import Parser
 import hashlib
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -18,8 +19,8 @@ import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
-from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zipfile import ZipFile
 
@@ -37,6 +38,72 @@ HOSTS = {
 }
 TEMPLATE = "azext_edge/edge/providers/orchestration/template{}.py"
 MAX_BYTES = 64 * 1024 * 1024
+ADO_COLLECTION = "https://dev.azure.com/azureiotdevxp/"
+ADO_PROJECT = "aziotcli"
+ACTIVE_BUILD_STATUSES = {"notStarted", "inProgress", "cancelling", "postponed"}
+
+
+class NoAdoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def scheduled_overlap_guard():
+    if os.environ.get("BUILD_REASON", "").lower() != "schedule":
+        return
+    definition = os.environ.get("SYSTEM_DEFINITIONID", "")
+    current = os.environ.get("BUILD_BUILDID", "")
+    project = os.environ.get("SYSTEM_TEAMPROJECTID", "")
+    token = os.environ.get("SYSTEM_ACCESSTOKEN", "")
+    if (os.environ.get("SYSTEM_COLLECTIONURI", "").rstrip("/") + "/" != ADO_COLLECTION
+            or os.environ.get("SYSTEM_TEAMPROJECT") != ADO_PROJECT
+            or not re.fullmatch(r"[1-9][0-9]*", definition)
+            or not re.fullmatch(r"[1-9][0-9]*", current)
+            or not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", project)
+            or not token.strip() or "$(" in token or any(char.isspace() for char in token)):
+        raise ValueError("Scheduled overlap check requires the current aziotcli build context and job token.")
+    query = urlencode({
+        "definitions": definition, "statusFilter": ",".join(sorted(ACTIVE_BUILD_STATUSES)),
+        "queryOrder": "queueTimeAscending", "$top": 1000, "api-version": "7.1",
+    })
+    request = Request(f"{ADO_COLLECTION}{ADO_PROJECT}/_apis/build/builds?{query}", headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/json",
+        "User-Agent": "azure-iot-health-overlap",
+    })
+    try:
+        with build_opener(NoAdoRedirect()).open(request, timeout=60) as response:
+            if response.status != 200 or response.headers.get("x-ms-continuationtoken"):
+                raise ValueError("Scheduled overlap check could not prove a complete build listing.")
+            raw = response.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise ValueError("Scheduled overlap check exceeded its response limit.")
+        result = json.loads(raw)
+    except HTTPError as error:
+        error.close()
+        raise RuntimeError(f"Scheduled overlap check failed with HTTP {error.code}; refusing to provision.") from None
+    except (URLError, OSError, HTTPException, UnicodeError, json.JSONDecodeError):
+        raise RuntimeError("Scheduled overlap check failed; refusing to provision without build evidence.") from None
+    if (not isinstance(result, dict) or not isinstance(result.get("value"), list)
+            or type(result.get("count")) is not int or result["count"] != len(result["value"])
+            or result["count"] >= 1000):
+        raise ValueError("Scheduled overlap check returned incomplete or invalid build evidence.")
+    older, seen = [], set()
+    for build in result["value"]:
+        if (not isinstance(build, dict) or type(build.get("id")) is not int or build["id"] <= 0
+                or build["id"] in seen or not isinstance(build.get("definition"), dict)
+                or type(build["definition"].get("id")) is not int or str(build["definition"]["id"]) != definition
+                or not isinstance(build.get("project"), dict)
+                or str(build["project"].get("id", "")).lower() != project.lower()
+                or build.get("status") not in ACTIVE_BUILD_STATUSES):
+            raise ValueError("Scheduled overlap check returned untrusted build identity or status.")
+        seen.add(build["id"])
+        if build["id"] < int(current):
+            older.append(build["id"])
+    if int(current) not in seen:
+        raise ValueError("Scheduled overlap check could not establish this run in the active-build inventory.")
+    if older:
+        raise RuntimeError(f"Scheduled overlap: older active builds {sorted(older)}; refusing to provision.")
+    print("Scheduled overlap check passed: no older active build of this definition.")
 
 
 class NonStableRuntime(ValueError):
@@ -732,6 +799,7 @@ def run_title(manifest, build):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("prepare", help="Reject scheduled overlap before acquiring or provisioning resources.")
     plan = commands.add_parser("resolve")
     plan.add_argument("--extension", choices=REPOSITORIES, required=True)
     plan.add_argument("--cloud", choices=CLOUDS, required=True)
@@ -765,7 +833,9 @@ def main(argv=None):
     setup.add_argument("--branch", required=True)
     setup.add_argument("--output", required=True)
     args = parser.parse_args(argv)
-    if args.command == "resolve-source":
+    if args.command == "prepare":
+        scheduled_overlap_guard()
+    elif args.command == "resolve-source":
         config = read_json(args.configuration)
         check_definition(config, "azure-iot", os.environ["MONITORCLOUD"], os.environ["MONITORTRACK"])
         branch = config.get("sourceBranches", {}).get(args.track, args.source_branch)
