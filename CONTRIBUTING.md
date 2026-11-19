@@ -1,7 +1,5 @@
 # Contributing
 
-For an IoT release, follow the [pipeline 161 step guide](docs/release-pipeline.md).
-
 ## Dev Setup
 
 1. Get Python 3: https://www.python.org/downloads/
