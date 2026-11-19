@@ -14,14 +14,6 @@ parameters:
     displayName: Release branch
     type: string
     default: release/1.2.0-preview
-  - name: createIndexPr
-    displayName: Create index PR
-    type: boolean
-    default: false
-  - name: skipIntegrationTests
-    displayName: Skip integration tests
-    type: boolean
-    default: false
   - name: regions
     displayName: Integration gate region
     type: stringList
@@ -36,6 +28,14 @@ parameters:
       - West US 3
       - East US
       - West Europe
+  - name: skipIntegrationTests
+    displayName: Skip integration tests
+    type: boolean
+    default: false
+  - name: createIndexPr
+    displayName: Create index PR
+    type: boolean
+    default: false
 
 variables:
   RELEASE_REGION: ${{ lower(replace(join(',', parameters.regions), ' ', '')) }}
