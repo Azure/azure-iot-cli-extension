@@ -4,18 +4,27 @@ pr: none
 schedules: []
 name: cli-identity-probe-$(Date:yyyyMMdd).$(Rev:r)
 parameters:
+  - name: writeProbes
+    type: boolean
+    default: false
   - name: targets
     type: object
     default:
       - name: IoT
         connection: sc-iot-cli-public-it
         group: cli-int-test-rg
+        principal: 9a035312-543a-44c4-a5be-c814a8798bd8
+        profile: iot-public
       - name: Operations
         connection: sc-iot-ops-cli-public-it
         group: ops-cli-int-test-rg
+        principal: 91abeaff-6664-4bf3-9e3c-2caf4645b2cb
+        profile: aio-public
       - name: Publisher
         connection: sc-cli-release-storage
         group: ''
+        principal: cdf1902a-fca5-4869-9115-e80aa29e69d4
+        profile: ''
 pool:
   vmImage: ubuntu-24.04
 jobs:
@@ -52,8 +61,24 @@ jobs:
                     --query exists --output json
                 fi
                 echo "Verified current ADO-only UAMI login, fresh assertion exchange and scoped read."
+                if [ "${WRITE_PROBES,,}" = true ]; then
+                  python scripts/identity_migration_checks.py --group "$PROBE_GROUP"
+                  if [ -n "$PROBE_PROFILE" ]; then
+                    python scripts/cleanup_test_resources.py --profile "$PROBE_PROFILE" \
+                      --mode report --build-id 0 --output cleanup-report
+                  fi
+                fi
             env:
               AZEXT_IOT_CI_AUTH: ado
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               TEST_SUBSCRIPTION_ID: a386d5ea-ea90-441a-8263-d816368c84a1
               PROBE_GROUP: ${{ target.group }}
+              PROBE_PRINCIPAL_ID: ${{ target.principal }}
+              PROBE_PROFILE: ${{ target.profile }}
+              WRITE_PROBES: ${{ parameters.writeProbes }}
+          - publish: cleanup-report
+            artifact: cleanup-probe-${{ target.name }}
+            condition: and(always(), ${{ parameters.writeProbes }}, ne('${{ target.profile }}', ''))
+          - publish: migration-probe
+            artifact: resource-probe-${{ target.name }}
+            condition: and(always(), ${{ parameters.writeProbes }}, ne('${{ target.profile }}', ''))
