@@ -513,6 +513,7 @@ def test_pipeline_is_report_first_daily_and_does_not_mask_scope_failures():
     pipeline = yaml.safe_load((ROOT / ".azure-devops/cleanup.yml").read_text())
     defaults = {item["name"]: item["default"] for item in pipeline["parameters"]}
     assert defaults["mode"] == "report"
+    assert defaults["profile"] == "public"
     assert set(defaults) == {"mode", "buildId", "profile"}
     assert pipeline["schedules"][0]["cron"] == "0 13 * * *"
     job, = pipeline["jobs"]
@@ -520,6 +521,22 @@ def test_pipeline_is_report_first_daily_and_does_not_mask_scope_failures():
     template = yaml.safe_load((ROOT / ".azure-devops/templates/cleanup-profiles.yml").read_text())
     loop, = template["steps"]
     selector, = loop["${{ each target in parameters.targets }}"]
+    assert list(selector) == [
+        "${{ if or(eq(parameters.profile, 'all'), eq(parameters.profile, target.name), "
+        "and(eq(parameters.profile, 'public'), in(target.name, 'iot-public', 'aio-public'))) }}"
+    ]
+    parameters = {item["name"]: item for item in template["parameters"]}
+    assert parameters["profile"]["default"] == "public"
+    assert parameters["profile"]["values"] == next(
+        item["values"] for item in pipeline["parameters"] if item["name"] == "profile"
+    ) == ["public", "all", "iot-public", "iot-fairfax", "iot-mooncake", "aio-public", "aio-fairfax"]
+    targets = {item["name"]: item["connection"] for item in parameters["targets"]["default"]}
+    assert {name: connection for name, connection in targets.items() if name in {"iot-public", "aio-public"}} == {
+        "iot-public": "sc-iot-cli-public-it", "aio-public": "sc-iot-ops-cli-public-it",
+    }
+    assert set(targets) == {"iot-public", "iot-fairfax", "iot-mooncake", "aio-public", "aio-fairfax"}
+    assert pipeline["schedules"][0]["branches"]["include"] == ["dev"]
+    assert pipeline["schedules"][0]["always"] is True
     task, = next(iter(selector.values()))
     assert task["condition"] == "succeededOrFailed()"
     assert "continueOnError" not in task

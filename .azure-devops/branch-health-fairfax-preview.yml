@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 trigger: none
 pr: none
+# Held pending sovereign policy/authorization: 185 at 07:00 UTC, cron "0 7 * * *", dev only.
 schedules: []
 name: iot-branch-fairfax-preview-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false

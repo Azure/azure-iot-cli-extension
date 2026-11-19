@@ -2,7 +2,12 @@
 
 trigger: none
 pr: none
-schedules: []
+schedules:
+  - cron: "30 18 * * *"
+    displayName: "Public Preview release health (169, 18:30 UTC)"
+    branches:
+      include: [dev]
+    always: true
 name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
 appendCommitMessageToRunName: false
 parameters:

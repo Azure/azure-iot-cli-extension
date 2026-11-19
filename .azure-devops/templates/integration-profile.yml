@@ -22,7 +22,7 @@ variables:
       - name: TestAzureCloud
         value: AzureCloud
       - name: TestAzureServiceConnection
-        value: aziotcli-sp-prime
+        value: sc-iot-cli-public-it
       - name: TestSubscription
         value: a386d5ea-ea90-441a-8263-d816368c84a1
       - name: TestResourceGroup

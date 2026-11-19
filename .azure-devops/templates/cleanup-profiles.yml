@@ -7,23 +7,25 @@ parameters:
     type: string
   - name: profile
     type: string
+    default: public
+    values: [public, all, iot-public, iot-fairfax, iot-mooncake, aio-public, aio-fairfax]
   - name: targets
     type: object
     default:
       - name: iot-public
-        connection: aziotcli-sp-prime
+        connection: sc-iot-cli-public-it
       - name: iot-fairfax
         connection: sc-iot-cli-fairfax-it
       - name: iot-mooncake
         connection: sc-iot-cli-mooncake-it
       - name: aio-public
-        connection: az-iot-ops-int-sp-ado
+        connection: sc-iot-ops-cli-public-it
       - name: aio-fairfax
         connection: sc-iot-ops-cli-fairfax-it
 
 steps:
   - ${{ each target in parameters.targets }}:
-      - ${{ if or(eq(parameters.profile, 'all'), eq(parameters.profile, target.name)) }}:
+      - ${{ if or(eq(parameters.profile, 'all'), eq(parameters.profile, target.name), and(eq(parameters.profile, 'public'), in(target.name, 'iot-public', 'aio-public'))) }}:
           - task: AzureCLI@2
             displayName: Cleanup ${{ target.name }}
             condition: succeededOrFailed()

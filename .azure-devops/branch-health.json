@@ -8,7 +8,7 @@
     "public": {
       "displayName": "Public",
       "variables": {
-        "AzureServiceConnection": "aziotcli-sp-prime",
+        "AzureServiceConnection": "sc-iot-cli-public-it",
         "MonitorSubscription": "a386d5ea-ea90-441a-8263-d816368c84a1",
         "MonitorResourceGroup": "cli-int-test-rg",
         "MonitorRegion": "australiaeast",
