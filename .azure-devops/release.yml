@@ -8,22 +8,14 @@ parameters:
   - name: mode
     displayName: Mode
     type: string
-    default: Plan
-    values: [Plan, Validate, Draft, Release]
+    default: Validate
+    values: [Validate, Upload wheel only, Draft, Release]
   - name: sourceBranch
     displayName: Release branch
     type: string
     default: release/1.2.0-preview
-  - name: createIndexPr
-    displayName: Create index PR
-    type: boolean
-    default: false
-  - name: skipIntegrationTests
-    displayName: Skip integration tests
-    type: boolean
-    default: false
   - name: regions
-    displayName: Region (Public cloud only)
+    displayName: Integration gate region
     type: stringList
     default:
       - Australia East
@@ -36,6 +28,14 @@ parameters:
       - West US 3
       - East US
       - West Europe
+  - name: skipIntegrationTests
+    displayName: Skip integration tests
+    type: boolean
+    default: false
+  - name: createIndexPr
+    displayName: Create index PR
+    type: boolean
+    default: false
 
 variables:
   RELEASE_REGION: ${{ lower(replace(join(',', parameters.regions), ' ', '')) }}

@@ -8,7 +8,11 @@ from copy import deepcopy
 import ast
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
+from unittest.mock import MagicMock, Mock
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, urlsplit
 from zipfile import ZipFile
 
 import pytest
@@ -18,6 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 AUTOMATION = "a" * 40
 SOURCE = "b" * 40
+PROJECT = "9c543948-e573-4146-832a-bf16b1531204"
 
 
 @pytest.fixture
@@ -29,6 +34,203 @@ def monitor(monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.fixture
+def scheduled(monitor, monkeypatch):
+    for name, value in {
+        "BUILD_REASON": "Schedule", "SYSTEM_DEFINITIONID": "182", "BUILD_BUILDID": "900",
+        "SYSTEM_COLLECTIONURI": "https://dev.azure.com/azureiotdevxp/",
+        "SYSTEM_TEAMPROJECT": "aziotcli", "SYSTEM_TEAMPROJECTID": PROJECT,
+        "SYSTEM_ACCESSTOKEN": "secret-offline-token",
+        "SYSTEM_STAGEATTEMPT": "1", "SYSTEM_JOBATTEMPT": "1",
+    }.items():
+        monkeypatch.setenv(name, value)
+    opener = Mock()
+    monkeypatch.setattr(monitor, "build_opener", Mock(return_value=opener))
+    return monitor, opener
+
+
+def build_response(builds=None, *, value=None, headers=None, raw=None):
+    builds = [] if builds is None else builds
+    result = {"count": len(builds), "value": builds} if value is None else value
+    response = MagicMock(status=200, headers=headers or {})
+    response.__enter__.return_value = response
+    response.read.return_value = raw if raw is not None else json.dumps(result).encode()
+    return response
+
+
+def active_build(number, status="inProgress"):
+    return {"id": number, "definition": {"id": 182}, "project": {"id": PROJECT}, "status": status}
+
+
+def test_scheduled_guard_queries_current_definition_without_redirects_or_writes(scheduled, capsys):
+    monitor, opener = scheduled
+    response = build_response([active_build(900), active_build(901)])
+    opener.open.return_value = response
+    monitor.main(["prepare"])
+    request = opener.open.call_args.args[0]
+    url = urlsplit(request.full_url)
+    assert url.scheme == "https" and url.netloc == "dev.azure.com"
+    assert url.path == "/azureiotdevxp/aziotcli/_apis/build/builds"
+    assert parse_qs(url.query) == {
+        "definitions": ["182"], "statusFilter": ["cancelling,inProgress,notStarted,postponed"],
+        "queryOrder": ["queueTimeAscending"], "$top": ["1000"], "api-version": ["7.1"],
+    }
+    assert request.get_method() == "GET" and request.data is None
+    assert request.get_header("Authorization") == "Bearer secret-offline-token"
+    assert opener.open.call_args.kwargs == {"timeout": 60}
+    response.read.assert_called_once_with(1024 * 1024 + 1)
+    handler = monitor.build_opener.call_args.args[0]
+    assert handler.redirect_request(None, None, 302, "", {}, "https://other.invalid") is None
+    assert "secret" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("status", ["notStarted", "inProgress", "cancelling", "postponed"])
+def test_scheduled_guard_rejects_older_active_build_including_manual_runs(scheduled, status):
+    monitor, opener = scheduled
+    opener.open.return_value = build_response([dict(active_build(899, status), reason="manual"), active_build(900)])
+    with pytest.raises(RuntimeError, match="older active builds.*899.*refusing to provision"):
+        monitor.main(["prepare"])
+
+
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+@pytest.mark.parametrize("status", ["notStarted", "inProgress", "cancelling", "postponed"])
+def test_scheduled_retry_rejects_newer_active_build(scheduled, monkeypatch, attempt, status):
+    monitor, opener = scheduled
+    monkeypatch.setenv(attempt, "2")
+    opener.open.return_value = build_response([active_build(900), active_build(901, status)])
+    with pytest.raises(RuntimeError, match="other active builds.*901.*refusing to provision"):
+        monitor.main(["prepare"])
+
+
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+def test_scheduled_retry_allows_only_the_current_build(scheduled, monkeypatch, attempt):
+    monitor, opener = scheduled
+    monkeypatch.setenv(attempt, "2")
+    opener.open.return_value = build_response([active_build(900)])
+    monitor.main(["prepare"])
+    opener.open.assert_called_once()
+
+
+@pytest.mark.parametrize("attempt", ["SYSTEM_STAGEATTEMPT", "SYSTEM_JOBATTEMPT"])
+def test_scheduled_guard_requires_attempt_context(scheduled, monkeypatch, attempt):
+    monitor, opener = scheduled
+    monkeypatch.delenv(attempt)
+    with pytest.raises(ValueError, match="positive stage/job attempts"):
+        monitor.main(["prepare"])
+    opener.open.assert_not_called()
+
+
+@pytest.mark.parametrize("reason", ["Manual", "IndividualCI", "PullRequest", ""])
+def test_manual_runs_never_query_or_require_overlap_token(scheduled, monkeypatch, reason):
+    monitor, opener = scheduled
+    monkeypatch.setenv("BUILD_REASON", reason)
+    monkeypatch.delenv("SYSTEM_ACCESSTOKEN")
+    monkeypatch.delenv("SYSTEM_STAGEATTEMPT")
+    monkeypatch.delenv("SYSTEM_JOBATTEMPT")
+    monitor.main(["prepare"])
+    opener.open.assert_not_called()
+
+
+@pytest.mark.parametrize("name,value", [
+    ("SYSTEM_ACCESSTOKEN", ""), ("SYSTEM_ACCESSTOKEN", "$(System.AccessToken)"),
+    ("SYSTEM_ACCESSTOKEN", "secret\ninvalid"), ("SYSTEM_DEFINITIONID", "not-an-id"),
+    ("BUILD_BUILDID", "0"), ("SYSTEM_TEAMPROJECTID", "another-project"),
+    ("SYSTEM_COLLECTIONURI", "https://dev.azure.com/other/"),
+    ("SYSTEM_TEAMPROJECT", "other"),
+    ("SYSTEM_STAGEATTEMPT", "0"), ("SYSTEM_STAGEATTEMPT", "$(System.StageAttempt)"),
+    ("SYSTEM_JOBATTEMPT", "-1"), ("SYSTEM_JOBATTEMPT", "invalid"),
+])
+def test_scheduled_guard_requires_current_project_identity_and_token(scheduled, monkeypatch, name, value):
+    monitor, opener = scheduled
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match="current aziotcli build context"):
+        monitor.main(["prepare"])
+    opener.open.assert_not_called()
+
+
+@pytest.mark.parametrize("response", [
+    build_response(),
+    build_response([active_build(901)]),
+    build_response(headers={"x-ms-continuationtoken": "next"}),
+    build_response(raw=b"{" + b"x" * (1024 * 1024)),
+    build_response(raw=b"invalid-json"),
+    build_response(value=[]),
+    build_response(value={"count": 1, "value": []}),
+    build_response([active_build(901)] * 1000),
+    build_response([active_build(901), active_build(901)]),
+    build_response([dict(active_build(899), definition={"id": 183})]),
+    build_response([dict(active_build(899), project={"id": "another-project"})]),
+    build_response([active_build(899, "unknown")]),
+])
+def test_scheduled_guard_fails_closed_on_incomplete_or_untrusted_evidence(scheduled, response):
+    monitor, opener = scheduled
+    opener.open.return_value = response
+    with pytest.raises((ValueError, RuntimeError), match="Scheduled overlap check"):
+        monitor.main(["prepare"])
+
+
+@pytest.mark.parametrize("error", [
+    HTTPError("https://unused.invalid", 302, "secret", {}, None),
+    HTTPError("https://unused.invalid", 403, "secret", {}, None),
+    URLError("secret-offline-token"), TimeoutError("secret-offline-token"),
+])
+def test_scheduled_guard_fails_closed_without_logging_token(scheduled, error, capsys):
+    monitor, opener = scheduled
+    opener.open.side_effect = error
+    with pytest.raises(RuntimeError, match="refusing to provision") as caught:
+        monitor.main(["prepare"])
+    assert "secret" not in str(caught.value) + capsys.readouterr().out
+    assert opener.open.call_count == 1
+
+
+def test_public_schedules_and_held_sovereign_wrappers_retain_full_test_defaults():
+    active = {
+        "branch-health": ("182", "30 0 * * *"),
+        "branch-health-preview": ("183", "30 6 * * *"),
+        "release-monitor": ("166", "30 12 * * *"),
+        "release-monitor-preview": ("169", "30 18 * * *"),
+    }
+    held = {
+        "branch-health-fairfax": ("184", "0 1 * * *"),
+        "branch-health-fairfax-preview": ("185", "0 7 * * *"),
+        "release-monitor-fairfax": ("170", "30 13 * * *"),
+        "release-monitor-fairfax-preview": ("171", "30 19 * * *"),
+        "release-monitor-mooncake": ("172", "30 2 * * *"),
+        "release-monitor-mooncake-preview": ("173", "30 8 * * *"),
+    }
+    for name, (definition, cron) in {**active, **held}.items():
+        text = (ROOT / f".azure-devops/{name}.yml").read_text()
+        pipeline = yaml.safe_load(text)
+        parameters = {item["name"]: item for item in pipeline["parameters"]}
+        assert parameters["mode"]["default"] == "Integration tests"
+        assert pipeline["trigger"] == pipeline["pr"] == "none"
+        if name in active:
+            schedule, = pipeline["schedules"]
+            assert schedule["cron"] == cron
+            assert schedule["branches"] == {"include": ["dev"]}
+            assert schedule["always"] is True
+            assert definition in schedule["displayName"]
+        else:
+            assert pipeline["schedules"] == []
+            assert f'cron "{cron}"' in text and definition in text and "Held pending" in text
+        if name.startswith("branch"):
+            assert next(item["value"] for item in pipeline["variables"] if item.get("name") == "TestPythons") == "3.13"
+            profile = next(item["parameters"] for item in pipeline["variables"] if "template" in item)
+            services = profile["services"]
+        else:
+            assert parameters["pythonVersions"]["default"] == ["3.13"]
+            services = parameters["services"]["default"]
+        assert services == (["DPS", "HubControl", "HubData", "ADU", "ADR"] if name in active
+                            else ["DPS", "HubControl", "HubData"])
+    config = json.loads((ROOT / ".azure-devops/branch-health.json").read_text())
+    assert config["sourceBranches"] == {"ga": "dev", "preview": "release/1.2.0-preview"}
+    for catalog in ("branch-health", "release-monitors"):
+        config = json.loads((ROOT / f".azure-devops/{catalog}.json").read_text())
+        assert config["clouds"]["public"]["variables"]["AzureServiceConnection"] == "sc-iot-cli-public-it"
+    profile = (ROOT / ".azure-devops/templates/integration-profile.yml").read_text()
+    assert "value: sc-iot-cli-public-it" in profile and "aziotcli-sp-prime" not in profile
 
 
 def release(version, extension="azure-iot", *, preview=False, draft=False):
@@ -389,6 +591,10 @@ def test_health_stages_plan_or_execute_the_selected_cohorts():
     stages = {stage["stage"]: stage for stage in [template["stages"][0], *live] if "stage" in stage}
     assert set(stages) == {"Prepare", "Build", "Lint", "Unit", "Results"}
     steps = stages["Prepare"]["jobs"][0]["steps"]
+    guard = next(step for step in steps if step.get("bash") == "python scripts/release_monitor.py prepare")
+    assert guard["env"] == {"SYSTEM_ACCESSTOKEN": "$(System.AccessToken)"}
+    assert "condition" not in guard and "continueOnError" not in guard
+    assert steps.index(guard) < next(index for index, step in enumerate(steps) if step.get("name") == "source")
     assert any("release_monitor_adapter.py plan" in step.get("bash", "") for step in steps)
     assert stages["Results"]["dependsOn"] == [
         "Prepare", "Build", "Lint", "Unit", "DPS", "HubControl", "HubData", "ADU", "ADR",
@@ -397,6 +603,22 @@ def test_health_stages_plan_or_execute_the_selected_cohorts():
     assert next(iter(cohorts.values()))[0]["template"] == "integration-service.yml"
     assert "runIntegration" not in str(template)
     assert "qualify-profile" not in str(template)
+
+
+def test_health_job_retries_recheck_overlap_before_provisioning():
+    template = yaml.safe_load(
+        (ROOT / ".azure-devops/templates/integration-service.yml").read_text(encoding="utf-8")
+    )
+    steps = template["stages"][0]["jobs"][0]["steps"]
+    run_index = next(index for index, step in enumerate(steps) if step.get("displayName") == "Run tests")
+    conditional = steps[run_index - 1]
+    assert list(conditional) == ["${{ if parameters.monitor }}"]
+    guard, = conditional["${{ if parameters.monitor }}"]
+    assert guard["bash"] == "python scripts/release_monitor.py prepare"
+    assert guard["workingDirectory"] == "$(Build.SourcesDirectory)"
+    assert guard["env"] == {"SYSTEM_ACCESSTOKEN": "$(System.AccessToken)"}
+    assert "condition" not in guard and "continueOnError" not in guard
+    assert steps[run_index].get("condition", "succeeded()") == "succeeded()"
 
 
 @pytest.mark.parametrize("source_only", [False, True])

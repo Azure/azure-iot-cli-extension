@@ -171,6 +171,12 @@ stages:
               - publish: $(testSourceDirectory)/resource-ownership
                 displayName: Publish resource recovery manifest
                 artifact: ownership-${{ parameters.service }}-$(python)-$(region)-$(System.JobAttempt)
+          - ${{ if parameters.monitor }}:
+              - bash: python scripts/release_monitor.py prepare
+                displayName: Recheck scheduled overlap before provisioning
+                workingDirectory: $(Build.SourcesDirectory)
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
           - task: AzureCLI@2
             displayName: Run tests
             inputs:
