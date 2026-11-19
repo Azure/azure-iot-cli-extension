@@ -85,10 +85,13 @@ def commit(value):
 
 
 def branch(value):
+    if not isinstance(value, str) or value.startswith("refs/") and not value.startswith("refs/heads/"):
+        raise ValueError("Source must be a safe branch name, not a tag or revision expression.")
     value = value.removeprefix("refs/heads/")
-    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", value) or value.startswith("refs/")
-            or any(part in value for part in ("..", "//", "@{"))
-            or value.endswith(("/", ".", ".lock"))):
+    if (not value or value.startswith("-") or value.endswith(".")
+            or any(ord(char) < 33 or ord(char) == 127 or char in "~^:?*[\\" for char in value)
+            or any(part in value for part in ("..", "@{"))
+            or any(not part or part.startswith(".") or part.endswith(".lock") for part in value.split("/"))):
         raise ValueError("Source must be a safe branch name, not a tag or revision expression.")
     return f"refs/heads/{value}"
 

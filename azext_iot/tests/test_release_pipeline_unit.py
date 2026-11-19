@@ -105,10 +105,22 @@ def test_invalid_identifiers(value):
 
 @pytest.mark.parametrize("value", [
     "refs/tags/v1", "refs/pull/1/head", "dev;echo bad", "dev\n", "../dev", "dev//test", "dev.lock", "-dev",
+    "", None, 1, "topic/.hidden", "topic.lock/next", "topic@{1}", "topic~1", "topic:next",
+    "topic[1]", "topic\\next", "topic\x7f", "refs/heads/", "/topic",
 ])
 def test_invalid_source_branches(value):
     with pytest.raises(ValueError):
         release.branch(value)
+
+
+@pytest.mark.parametrize("value", [
+    "dev", "release/1.1.1-preview", "_next/2027+beta", "users/test/fix#123", "releases/\u6d4b\u8bd5", "@",
+])
+def test_source_branch_names_follow_git_syntax_without_release_naming_rules(value):
+    release.subprocess.run(["git", "check-ref-format", "--branch", value], check=True, capture_output=True)
+    expected = "refs/heads/" + value
+    assert release.branch(value) == expected
+    assert release.branch(expected) == expected
 
 
 def test_validate_options_default_without_publication_credentials(candidate, monkeypatch, capsys):
@@ -464,6 +476,7 @@ def test_waiver_is_bound_to_candidate_and_prevents_child_execution(candidate, mo
     ("Validate", "release/1.1.1-preview", True), ("Draft", "release/1.1.1-preview", False),
     ("Release", "users/test/release-validation", False), ("Draft", "users/test/release-validation", False),
     ("Validate", "users/test/release-validation", True),
+    ("Draft", "_next/2027+beta", False), ("Release", "releases/\u6d4b\u8bd5", True),
 ])
 @pytest.mark.parametrize("skipped", [False, True])
 def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
