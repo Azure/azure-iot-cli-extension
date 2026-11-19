@@ -1435,6 +1435,9 @@ def test_yaml_selects_compliant_images_and_windows_source_analysis():
 def test_yaml_publication_requires_explicit_mode_and_waiver_only_removes_integration():
     pipeline, stages = all_stages()
     parameters = {parameter["name"]: parameter for parameter in pipeline["parameters"]}
+    order = [parameter["name"] for parameter in pipeline["parameters"]]
+    region_index = order.index("regions")
+    assert order[region_index + 1:region_index + 3] == ["skipIntegrationTests", "createIndexPr"]
     assert parameters["skipIntegrationTests"]["default"] is False
     assert parameters["mode"]["values"] == ["Validate", "Upload wheel only", "Draft", "Release"]
     assert pipeline["variables"]["RELEASE_SKIP_INTEGRATION_TESTS"] == "${{ parameters.skipIntegrationTests }}"
