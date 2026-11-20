@@ -90,8 +90,6 @@ def run_title(jobs, kind, mode, build_id, parent="0"):
         region_label = ",".join(regions[:count]) + (f" +{len(regions) - count}" if count < len(regions) else "")
         if len(region_label) <= 80:
             break
-    if services == {"ADU"}:
-        region_label = "hub " + region_label
     if {"HubControl", "HubData"} <= services:
         services = services - {"HubControl", "HubData"} | {"Hub"}
     scope = ",".join(service for service in ("DPS", "Hub", "HubControl", "HubData", "ADU", "ADR")

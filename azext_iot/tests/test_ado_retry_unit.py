@@ -623,6 +623,7 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     (["ADR", "HubData", "DPS", "ADU", "HubControl"], "DPS,Hub,ADU,ADR"),
     (["HubControl", "ADR"], "HubControl,ADR"),
     (["HubData"], "HubData"),
+    (["ADU"], "ADU"),
 ])
 def test_run_title_uses_distinct_planned_services_not_matrix_combinations(kind, parent, services, scope):
     jobs = pipeline.plan(services, ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
@@ -632,13 +633,13 @@ def test_run_title_uses_distinct_planned_services_not_matrix_combinations(kind, 
 
 
 @pytest.mark.parametrize("parent", ["0", "456"])
-def test_run_title_labels_fixture_region_dry_run_and_canary(parent):
+def test_run_title_labels_dry_run_and_canary(parent):
     jobs = pipeline.plan(["ADU"], ["3.13"], ["centraluseuap"], pipeline.TARGET["CANARY_ARM"])
     assert pipeline.run_title(jobs, "integration", "Dry run", "123", parent) == (
-        "iot-integration-123 (hub centraluseuap) (ADU) (dry-run,canary)"
+        "iot-integration-123 (centraluseuap) (ADU) (dry-run,canary)"
     )
     assert pipeline.run_title(jobs, "integration", "Integration tests", "123", parent) == (
-        "iot-integration-123 (hub centraluseuap) (ADU) (canary)"
+        "iot-integration-123 (centraluseuap) (ADU) (canary)"
     )
 
 
