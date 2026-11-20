@@ -5,7 +5,7 @@ parameters:
     displayName: Mode
     type: string
     default: Validate
-    values: [Validate, Upload wheel only, Draft, Release]
+    values: [Validate, Draft, Release]
   - name: sourceBranch
     displayName: Source branch
     type: string
@@ -14,6 +14,9 @@ parameters:
     type: boolean
     default: false
   - name: skipIntegrationTests
+    type: boolean
+    default: false
+  - name: uploadWheelToBlob
     type: boolean
     default: false
 
@@ -45,7 +48,7 @@ stages:
               RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
               RELEASE_MODE: ${{ parameters.mode }}
 
-  - ${{ if in(parameters.mode, 'Validate', 'Upload wheel only', 'Draft', 'Release') }}:
+  - ${{ if in(parameters.mode, 'Validate', 'Draft', 'Release') }}:
       - stage: Build
         dependsOn: Resolve
         variables:
@@ -88,9 +91,10 @@ stages:
                 name: candidate
                 displayName: Record candidate
                 env:
+                  RELEASE_MODE: ${{ parameters.mode }}
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
-              - ${{ if eq(parameters.mode, 'Upload wheel only') }}:
+              - ${{ if and(eq(parameters.mode, 'Validate'), parameters.uploadWheelToBlob) }}:
                   - script: >-
                       python scripts/release_pipeline.py prepare-upload
                       --directory "$(Build.ArtifactStagingDirectory)/release-candidate"
@@ -99,7 +103,7 @@ stages:
                     env:
                       RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                       RELEASE_SOURCE_COMMIT: $(sourceCommit)
-              - ${{ if ne(parameters.mode, 'Upload wheel only') }}:
+              - ${{ if not(and(eq(parameters.mode, 'Validate'), parameters.uploadWheelToBlob)) }}:
                   - bash: |
                       set -euo pipefail
                       python -m venv "$AGENT_TEMPDIRECTORY/publication-venv"
@@ -495,9 +499,9 @@ stages:
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
 
-  - ${{ if eq(parameters.mode, 'Upload wheel only') }}:
+  - ${{ if and(eq(parameters.mode, 'Validate'), parameters.uploadWheelToBlob) }}:
       - stage: Upload
-        displayName: Upload wheel only
+        displayName: Upload wheel to Blob
         dependsOn:
           - Resolve
           - Build
@@ -535,31 +539,11 @@ stages:
                 inputs:
                   versionSpec: "3.13"
                   disableDownloadFromRegistry: true
-              - task: AzureCLI@2
-                displayName: Upload verified wheel
-                inputs:
-                  azureSubscription: sc-cli-release-storage
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  visibleAzLogin: false
-                  inlineScript: >-
-                    python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" upload
-                    --directory "$(Pipeline.Workspace)/release-candidate"
-                    --record "$(Agent.TempDirectory)/publication/release.json"
-                env:
-                  RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
-                  RELEASE_SOURCE_COMMIT: $(sourceCommit)
-                  RELEASE_MODE: ${{ parameters.mode }}
-              - bash: |
-                  set -euo pipefail
-                  if [ ! -s "$RELEASE_RECEIPT" ]; then
-                    echo "##vso[task.logissue type=error]Publication receipt is missing or empty."
-                    exit 1
-                  fi
-                  echo "##vso[task.uploadfile]$RELEASE_RECEIPT"
-                displayName: Retain publication receipt in task logs
-                env:
-                  RELEASE_RECEIPT: $(Agent.TempDirectory)/publication/release.json
+              - template: release-upload.yml
+                parameters:
+                  mode: ${{ parameters.mode }}
+                  sourceBranch: ${{ parameters.sourceBranch }}
+                  uploadWheelToBlob: ${{ parameters.uploadWheelToBlob }}
 
   - ${{ if in(parameters.mode, 'Draft', 'Release') }}:
       - stage: Publish
@@ -602,6 +586,12 @@ stages:
                 inputs:
                   versionSpec: "3.13"
                   disableDownloadFromRegistry: true
+              - ${{ if parameters.uploadWheelToBlob }}:
+                  - template: release-upload.yml
+                    parameters:
+                      mode: ${{ parameters.mode }}
+                      sourceBranch: ${{ parameters.sourceBranch }}
+                      uploadWheelToBlob: ${{ parameters.uploadWheelToBlob }}
               - script: >-
                   python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" publish
                   --directory "$(Pipeline.Workspace)/release-candidate"

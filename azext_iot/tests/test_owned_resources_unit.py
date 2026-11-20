@@ -578,8 +578,9 @@ def test_reads_retry_throttling_within_budget_but_deletes_do_not(http_arm, monke
     monkeypatch.setattr(owned.time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(owned.time, "sleep", lambda wait: clock.__setitem__(0, clock[0] + wait))
     if delay == "1000":
-        with pytest.raises(TimeoutError, match="bounded read budget"):
+        with pytest.raises(owned.ArmError, match="HTTP 429") as error:
             http_arm.request(method, RESOURCE, "2023-05-01")
+        assert error.value.delay == 1000
         assert http_arm.session.request.call_count == 1
     elif method == "DELETE":
         with pytest.raises(RuntimeError, match="HTTP 429"):
@@ -764,12 +765,12 @@ def test_private_endpoint_delete_omits_if_match_while_other_types_preserve_it(jo
 
 @pytest.mark.parametrize("mode", [
     "async-op-failed-recovers",
-    "async-op-failed-twice",
-    "deleting-to-failed-twice",
+    "async-op-failed-three-times",
+    "deleting-to-failed-three-times",
     "initial-failed-then-absent",
     "bad-op-url-ignored",
 ])
-def test_cleanup_retries_once_and_fails_fast_on_terminal_async_delete(journal, monkeypatch, mode):
+def test_cleanup_retries_twice_and_fails_fast_on_terminal_async_delete(journal, monkeypatch, mode):
     op_path = f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.SecretsSync/locations/westus2/operationStatuses/op1"
     op_url = f"https://management.azure.com{op_path}?api-version=2024-08-21-preview"
     initial_state = "Failed" if mode == "initial-failed-then-absent" else "Succeeded"
@@ -796,15 +797,20 @@ def test_cleanup_retries_once_and_fails_fast_on_terminal_async_delete(journal, m
             (202, None, {}),
             (404, None, {}),
         ]
-    elif mode == "async-op-failed-twice":
+    elif mode == "async-op-failed-three-times":
         arm.request.side_effect = [
+            (202, None, {"Azure-AsyncOperation": op_url}),
+            (200, resource, {}),
             (202, None, {"Azure-AsyncOperation": op_url}),
             (200, resource, {}),
             (202, None, {"Azure-AsyncOperation": op_url}),
             (200, resource, {}),
         ]
-    elif mode == "deleting-to-failed-twice":
+    elif mode == "deleting-to-failed-three-times":
         arm.request.side_effect = [
+            (202, None, {}),
+            (200, {**resource, "properties": {"provisioningState": "Deleting"}}, {}),
+            (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
             (202, None, {}),
             (200, {**resource, "properties": {"provisioningState": "Deleting"}}, {}),
             (200, {**resource, "properties": {"provisioningState": "Failed"}}, {}),
@@ -836,7 +842,8 @@ def test_cleanup_retries_once_and_fails_fast_on_terminal_async_delete(journal, m
         with pytest.raises(owned.CleanupIncomplete):
             owned.cleanup(journal.path, timeout=600)
         assert journal.records()[RESOURCE]["cleanup"] == "failed"
-        assert clock[0] <= 20
+        assert clock[0] <= 60
+        assert sum(call.args[0] == "DELETE" for call in arm.request.call_args_list) == 3
 
 
 @pytest.mark.parametrize("method,recover", [("GET", True), ("GET", False), ("DELETE", True)])
@@ -873,3 +880,191 @@ def test_prepare_root_retries_extended_non_json_404_propagation_window(journal, 
     assert http_arm.session.request.call_count == 6
     assert sleeps == [1, 2, 2, 1, 2]
     assert payload["tags"][owned.TAG] == journal.owner
+
+
+@pytest.fixture
+def cleanup_clock(monkeypatch):
+    clock = [0]
+    monkeypatch.setattr(owned.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(owned.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay))
+    return clock
+
+
+def arm_response(status, body=None, **headers):
+    response = requests.Response()
+    response.status_code = status
+    response._content = json.dumps(body if body is not None else {}).encode()
+    response.headers.update(headers)
+    return response
+
+
+@pytest.mark.parametrize("account_seconds", [1931, 9999])
+def test_slow_adu_cleanup_has_room_for_dependent_storage(journal, http_arm, cleanup_clock, account_seconds):
+    account = GROUP + "/providers/microsoft.deviceupdate/accounts/slow-account"
+    deleted = {}
+    for resource in (account, RESOURCE):
+        journal.record(resource, "2023-05-01", kind="root")
+    http_arm.pages = Mock(return_value=[])
+
+    def request(method, url, **_kwargs):
+        resource = url.removeprefix(http_arm.endpoint)
+        if method == "DELETE":
+            deleted[resource] = cleanup_clock[0]
+            return arm_response(202)
+        delay = account_seconds if resource == account else 60
+        if resource in deleted and cleanup_clock[0] >= deleted[resource] + delay:
+            return arm_response(404, {"error": {"code": "ResourceNotFound"}})
+        return arm_response(200, {
+            "id": resource, "tags": {owned.TAG: journal.owner},
+            "properties": {"provisioningState": "Deleting" if resource in deleted else "Succeeded"},
+        })
+
+    http_arm.session.request.side_effect = request
+    if account_seconds == 9999:
+        with pytest.raises(owned.CleanupIncomplete):
+            owned.cleanup(journal.path, timeout=3600, dependency_reserve=900, arm_factory=lambda _: http_arm)
+        assert journal.records()[account]["errorType"] == "TimeoutError"
+    else:
+        owned.cleanup(journal.path, timeout=3600, dependency_reserve=900, arm_factory=lambda _: http_arm)
+        assert journal.records()[account]["cleanup"] == "absent"
+    assert 1931 <= deleted[RESOURCE] <= 2700
+    assert cleanup_clock[0] <= 3600
+    assert journal.records()[RESOURCE]["cleanup"] == "absent"
+
+
+@pytest.mark.parametrize("status,delay", [(412, 0), (429, 120), (503, 0)])
+def test_cleanup_rechecks_owner_and_etag_before_bounded_delete_retry(
+        journal, http_arm, cleanup_clock, capsys, status, delay):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    error = arm_response(status, {"error": {"code": "RetryableError", "message": "SECRET RESPONSE BODY"}},
+                         **{"Retry-After": str(delay), "x-ms-request-id": "11111111-2222-4333-8444-555555555555"})
+    http_arm.session.request.side_effect = [
+        arm_response(200, dict(resource, etag="old")), error,
+        arm_response(200, dict(resource, etag="fresh")), arm_response(202),
+        arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+    ]
+    owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    deletes = [call for call in http_arm.session.request.call_args_list if call.args[0] == "DELETE"]
+    assert [call.kwargs["headers"]["If-Match"] for call in deletes] == ["old", "fresh"]
+    assert cleanup_clock[0] == max(15, delay)
+    text = capsys.readouterr().err
+    assert '"code": "RetryableError"' in text
+    assert f'"status": {status}' in text
+    assert "SECRET RESPONSE BODY" not in text
+
+
+@pytest.mark.parametrize("failure", ["denied", "owner-changed", "retry-exhausted", "retry-after-deadline"])
+def test_cleanup_retry_never_bypasses_ownership_permission_or_deadline(
+        journal, http_arm, cleanup_clock, failure):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}, "etag": "current"}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    reads = [arm_response(200, resource)]
+    if failure == "denied":
+        reads += [arm_response(403, {"error": {"code": "AuthorizationFailed"}})]
+    elif failure == "owner-changed":
+        reads += [arm_response(412), arm_response(200, dict(resource, tags={owned.TAG: "foreign"}))]
+    elif failure == "retry-after-deadline":
+        reads += [arm_response(429, **{"Retry-After": "1000"})]
+    else:
+        reads = [arm_response(200, resource), arm_response(412)] * 3
+    http_arm.session.request.side_effect = reads
+    with pytest.raises(owned.CleanupIncomplete):
+        owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == (
+        3 if failure == "retry-exhausted" else 1
+    )
+    assert cleanup_clock[0] <= 300
+    assert journal.records()[RESOURCE]["cleanup"] == "failed"
+
+
+@pytest.mark.parametrize("ambiguous_absence", [False, True])
+def test_accepted_hub_delete_is_observed_without_resubmitting(
+        journal, http_arm, cleanup_clock, ambiguous_absence):
+    hub = GROUP + "/providers/microsoft.devices/iothubs/hub"
+    resource = {"id": hub, "tags": {owned.TAG: journal.owner}}
+    journal.record(hub, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    if ambiguous_absence:
+        http_arm.session.request.side_effect = [
+            arm_response(200, resource), arm_response(202, **{"Retry-After": "120"}),
+            arm_response(404, {"error": {"code": "UnknownNotFound"}}),
+            arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+        ]
+        owned.cleanup(journal.path, timeout=1500, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 135
+        assert journal.records()[hub]["cleanup"] == "absent"
+    else:
+        http_arm.session.request.side_effect = lambda method, *_args, **_kwargs: (
+            arm_response(202) if method == "DELETE" else arm_response(200, resource)
+        )
+        with pytest.raises(owned.CleanupIncomplete):
+            owned.cleanup(journal.path, timeout=1500, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 900
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == 1
+
+
+@pytest.mark.parametrize("operation", ["Updating", "Deleting"])
+def test_delete_conflict_waits_for_the_actual_operation_before_recovery(
+        journal, http_arm, cleanup_clock, operation):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    responses = [
+        arm_response(200, resource), arm_response(409, {"error": {"code": "OperationInProgress"}}),
+        arm_response(200, dict(resource, properties={"provisioningState": operation})),
+    ]
+    if operation == "Updating":
+        responses += [arm_response(200, resource), arm_response(202)]
+    responses += [arm_response(404, {"error": {"code": "ResourceNotFound"}})]
+    http_arm.session.request.side_effect = responses
+    owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == (
+        2 if operation == "Updating" else 1
+    )
+    assert journal.records()[RESOURCE]["cleanup"] == "absent"
+
+
+@pytest.mark.parametrize("delay", [120, 1000])
+def test_cleanup_get_honors_long_retry_after_and_preserves_last_error(
+        journal, http_arm, cleanup_clock, delay):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    http_arm.session.request.side_effect = [
+        arm_response(200, resource), arm_response(202),
+        arm_response(429, {"error": {"code": "TooManyRequests"}}, **{"Retry-After": str(delay)}),
+        arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+    ]
+    if delay == 120:
+        owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 120
+        assert journal.records()[RESOURCE]["cleanup"] == "absent"
+    else:
+        with pytest.raises(owned.CleanupIncomplete):
+            owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 300
+        assert journal.records()[RESOURCE]["errorDetails"]["lastError"]["code"] == "TooManyRequests"
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == 1
+
+
+def test_malformed_retry_after_records_failure_without_abandoning_other_resources(
+        journal, http_arm, cleanup_clock, capsys):
+    second = RESOURCE + "second"
+    for resource in (RESOURCE, second):
+        journal.record(resource, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    http_arm.session.request.side_effect = [
+        arm_response(200, {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}),
+        arm_response(429, **{"Retry-After": "malformed-secret"}),
+        arm_response(200, {"id": second, "tags": {owned.TAG: journal.owner}}),
+        arm_response(202),
+        arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+    ]
+    with pytest.raises(owned.CleanupIncomplete):
+        owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    assert journal.records()[RESOURCE]["cleanup"] == "failed"
+    assert journal.records()[second]["cleanup"] == "absent"
+    assert "malformed-secret" not in capsys.readouterr().err

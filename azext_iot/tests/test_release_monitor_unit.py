@@ -269,6 +269,8 @@ def test_health_plan_forwards_python_and_region_selections(monitor, mocker, monk
     helpers = automation / "azext_iot/tests"
     helpers.mkdir(parents=True)
     (helpers / "_ado_pipeline.py").write_text("current protocol", encoding="utf-8")
+    monitor.write_json(helpers / "ci_budgets.json", {})
+    monitor.write_json(tmp_path / "source/azext_iot/tests/ci_budgets.json", {})
     monkeypatch.setattr(adapter, "ROOT", automation)
     plan = mocker.Mock(return_value=[])
     mocker.patch.object(adapter.runpy, "run_path", return_value={"plan": plan})
@@ -644,6 +646,9 @@ def test_staging_preserves_released_cases_manifests_and_product(
     released_manifest.write_text("released selection", encoding="utf-8")
     released_controller = directory / "source/azext_iot/tests/_hub_phase_runner.py"
     released_controller.write_text("released watchdog setup", encoding="utf-8")
+    monitor.write_json(helpers / "ci_budgets.json", {"ADU": {"ado": {"phase_minutes": 210}}})
+    frozen_budget = {"ADU": {"test_dir": "frozen-tests", "job_timeout_minutes": 150}}
+    monitor.write_json(directory / "source/azext_iot/tests/ci_budgets.json", frozen_budget)
     monkeypatch.setattr(adapter, "ROOT", automation)
     mocker.patch.object(adapter, "verify_bundle", return_value=manifest)
     monkeypatch.setenv("BUILD_SOURCEVERSION", AUTOMATION)
@@ -659,12 +664,16 @@ def test_staging_preserves_released_cases_manifests_and_product(
         assert (destination / relative).read_bytes() == (directory / "source" / relative).read_bytes()
     staged = monitor.read_json(destination / "release-monitor.json")
     if source_only:
+        assert monitor.read_json(destination / "azext_iot/tests/ci_budgets.json") == frozen_budget
         assert (destination / "tox.ini").read_text(encoding="utf-8") == "released tox setup"
         assert (destination / "azext_iot/tests/_hub_phase_runner.py").read_bytes() == released_controller.read_bytes()
         assert not (destination / "azext_iot/tests/_ado_pipeline.py").exists()
         compatibility.assert_not_called()
         assert "testCompatibility" not in staged
     else:
+        assert monitor.read_json(destination / "azext_iot/tests/ci_budgets.json") == {
+            "ADU": {**frozen_budget["ADU"], "ado": {"phase_minutes": 210}},
+        }
         assert (destination / "tox.ini").read_text(encoding="utf-8") == "current controller setup"
         assert (destination / "azext_iot/tests/_hub_phase_runner.py").read_text() == "current watchdog setup"
         assert (destination / "azext_iot/tests/_ado_pipeline.py").read_text() == "current protocol"
@@ -675,6 +684,80 @@ def test_staging_preserves_released_cases_manifests_and_product(
         }
     with pytest.raises(ValueError, match="fresh"):
         adapter.stage(directory, destination)
+
+
+@pytest.mark.parametrize("service", ["ADU", "ADR"])
+def test_legacy_health_source_uses_matching_staged_plan_execution_and_cleanup_budgets(
+        monitor, bundle, mocker, monkeypatch, tmp_path, service):
+    from azext_iot.tests import _owned_resources as owned
+
+    directory, manifest = bundle
+    mocker.patch.dict("sys.modules", {"release_monitor": monitor})
+    spec = importlib.util.spec_from_file_location("legacy_budget_adapter", ROOT / "scripts/release_monitor_adapter.py")
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    relative = "azext_iot/tests/ci_budgets.json"
+    frozen = monitor.read_json(ROOT / relative)
+    for budget in frozen.values():
+        budget.pop("ado", None)
+    monitor.write_json(directory / "source" / relative, frozen)
+    for budget in frozen.values():
+        (directory / "source" / budget["test_dir"]).mkdir(parents=True, exist_ok=True)
+    monitor.write_json(directory / "source.json", {
+        "commit": SOURCE, "files": monitor.source_files(directory / "source"),
+    })
+    manifest["sourceSha256"] = hashlib.sha256((directory / "source.json").read_bytes()).hexdigest()
+    monitor.write_json(directory / "manifest.json", {**manifest, "slot": "ga"})
+    for key, value in {
+        "BUILD_SOURCEVERSION": AUTOMATION, "MONITOR_CLOUD": "public", "MONITOR_TRACK": "ga",
+        "SYSTEM_JOBATTEMPT": "1",
+    }.items():
+        monkeypatch.setenv(key, value)
+    destination = tmp_path / "staged-legacy"
+    adapter.stage(directory, destination)
+    spec = importlib.util.spec_from_file_location("staged_ado_budget", destination / "azext_iot/tests/_ado_pipeline.py")
+    native = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(native)
+    assert native.plan([service], ["3.13"], ["australiaeast"], native.TARGET["PUBLIC_ARM"])[0]["minutes"] == 210
+    expected = deepcopy(frozen)
+    donor = monitor.read_json(ROOT / relative)
+    for name in ("ADU", "ADR"):
+        expected[name]["ado"] = donor[name]["ado"]
+    assert native.BUDGETS == expected
+    assert monitor.read_json(directory / "source" / relative) == frozen
+
+    context = {
+        "service": service, "python": "3.13", "region": "australiaeast", "endpoint": "https://management.azure.com",
+        "subscription": native.TARGET["SUBSCRIPTION"], "resource_group": "cli-int-test-rg", "wheel": "b" * 64,
+    }
+    selection, output, ownership = tmp_path / "selection.json", tmp_path / "phase", tmp_path / "ownership.json"
+    native.RETRY["write"](selection, {
+        "context": context, "phase": "tests", "nodes": ["case"], "expected": ["case"], "sequence": 1,
+    })
+    native.prepare_ownership(context, ownership, 1)
+    monkeypatch.setenv(native.OWNERSHIP_MANIFEST, str(ownership))
+    for key in native.GENERIC_PHASE_OVERRIDES:
+        monkeypatch.delenv(key, raising=False)
+
+    def execute(_command, env, _log, runtime, cleanup):
+        assert runtime == (130 if service == "ADU" else 160) * 60
+        assert cleanup == 600
+        native.RETRY["write"](env["azext_iot_ado_receipt"], {
+            "finished": True, "exitstatus": 0, "collected": ["case"], "expected": ["case"],
+            "reports": {"case": {"setup": ["passed"], "call": ["passed"], "teardown": ["passed"]}},
+            "retryableFailures": {},
+        })
+        return {"exit_code": 0, "timed_out": False, "interrupted": False}
+
+    child = mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
+    cleanup = mocker.patch.object(owned, "cleanup")
+    native.phase(selection, output)
+    child.assert_called_once()
+    cleanup.assert_called_once_with(
+        output / "ownership.json", timeout=(60 if service == "ADU" else 25) * 60,
+        dependency_reserve=(15 if service == "ADU" else 0) * 60,
+    )
+    assert native.RETRY["read"](output / "phase.json")["cleanupMode"] == "verified"
 
 
 @pytest.mark.parametrize("relative", ["azext_iot/tests/dps/conftest.py", "azext_iot/tests/iothub/_sas_phase.py"])
@@ -842,7 +925,11 @@ def test_health_overrides_preserve_selection_and_retry_identity(
         monkeypatch.setenv("TESTSERVICES", "DPS")
     monitor.bind_profile(manifest, config)
     if override:
-        assert monitor.run_title(manifest, "123").endswith("-manual")
+        assert manifest["profile"]["configured"] != manifest["profile"]["selected"]
+    title = monitor.run_title(manifest, "123")
+    assert title.startswith(f"iot-123 ({manifest['source']['version']})")
+    assert f"({manifest['profile']['selected']['region']})" in title
+    assert "manual" not in title
     monkeypatch.setenv("TESTREGION", "eastus")
     with pytest.raises(ValueError, match="changed between attempts"):
         monitor.bind_profile(manifest, config)
@@ -876,7 +963,7 @@ def test_source_selection_resolves_exact_branch_commit_and_literal_version(monit
     download.assert_called_once_with(
         f"https://raw.githubusercontent.com/Azure/azure-iot-cli-extension/{SOURCE}/azext_iot/constants.py",
     )
-    assert monitor.run_title(manifest, "123") == f"iot-branch-health-fairfax-{track}-cli{version}-srcbbbbbbbbbbbb-b123"
+    assert monitor.run_title(manifest, "123") == f"iot-123 ({version})"
 
 
 def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker, tmp_path):

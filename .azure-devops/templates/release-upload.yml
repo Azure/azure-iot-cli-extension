@@ -1,0 +1,38 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+parameters:
+  - name: mode
+    type: string
+  - name: sourceBranch
+    type: string
+  - name: uploadWheelToBlob
+    type: boolean
+    default: false
+
+steps:
+  - task: AzureCLI@2
+    displayName: Upload verified wheel
+    inputs:
+      azureSubscription: sc-cli-release-storage
+      scriptType: bash
+      scriptLocation: inlineScript
+      visibleAzLogin: false
+      inlineScript: >-
+        python "$(Pipeline.Workspace)/release-tooling/release_pipeline.py" upload
+        --directory "$(Pipeline.Workspace)/release-candidate"
+        --record "$(Agent.TempDirectory)/publication/blob-upload.json"
+    env:
+      RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
+      RELEASE_SOURCE_COMMIT: $(sourceCommit)
+      RELEASE_MODE: ${{ parameters.mode }}
+      RELEASE_UPLOAD_WHEEL_TO_BLOB: ${{ parameters.uploadWheelToBlob }}
+  - bash: |
+      set -euo pipefail
+      if [ ! -s "$RELEASE_RECEIPT" ]; then
+        echo "##vso[task.logissue type=error]Blob upload receipt is missing or empty."
+        exit 1
+      fi
+      echo "##vso[task.uploadfile]$RELEASE_RECEIPT"
+    displayName: Retain Blob upload receipt in task logs
+    env:
+      RELEASE_RECEIPT: $(Agent.TempDirectory)/publication/blob-upload.json

@@ -1,3 +1,5 @@
+name: iot-$(Build.BuildId)
+appendCommitMessageToRunName: false
 trigger: none
 pr: none
 
