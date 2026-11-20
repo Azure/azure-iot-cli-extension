@@ -3,6 +3,9 @@ steps:
     displayName: "Build wheel for Azure IoT CLI extension"
     workingDirectory: "."
 
+  - script: python scripts/pipeline_title.py --prefix iot --wheel dist
+    displayName: Name run from built wheel
+
   - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
     displayName: "Generate Software Manifest"
     inputs:

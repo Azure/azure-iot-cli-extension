@@ -842,7 +842,11 @@ def test_health_overrides_preserve_selection_and_retry_identity(
         monkeypatch.setenv("TESTSERVICES", "DPS")
     monitor.bind_profile(manifest, config)
     if override:
-        assert monitor.run_title(manifest, "123").endswith("-manual")
+        assert manifest["profile"]["configured"] != manifest["profile"]["selected"]
+    title = monitor.run_title(manifest, "123")
+    assert title.startswith(f"iot-123 ({manifest['source']['version']})")
+    assert f"({manifest['profile']['selected']['region']})" in title
+    assert "manual" not in title
     monkeypatch.setenv("TESTREGION", "eastus")
     with pytest.raises(ValueError, match="changed between attempts"):
         monitor.bind_profile(manifest, config)
@@ -876,7 +880,7 @@ def test_source_selection_resolves_exact_branch_commit_and_literal_version(monit
     download.assert_called_once_with(
         f"https://raw.githubusercontent.com/Azure/azure-iot-cli-extension/{SOURCE}/azext_iot/constants.py",
     )
-    assert monitor.run_title(manifest, "123") == f"iot-branch-health-fairfax-{track}-cli{version}-srcbbbbbbbbbbbb-b123"
+    assert monitor.run_title(manifest, "123") == f"iot-123 ({version})"
 
 
 def test_source_build_preserves_frozen_source_and_binds_wheel(monitor, source_manifest, bundle, mocker, tmp_path):
