@@ -616,7 +616,7 @@ def test_plan_has_all_github_services_and_no_legacy_services():
     jobs = pipeline.plan(list(retry.SERVICES), ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
     assert len(jobs) == 10
     assert {job["service"] for job in jobs} == set(retry.SERVICES)
-    assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 180
+    assert next(job["minutes"] for job in jobs if job["service"] == "ADR") == 210
 
 
 @pytest.mark.parametrize("kind,parent", [("integration", "0"), ("integration", "456"), ("health", "0")])
@@ -1080,7 +1080,7 @@ def test_generic_phase_verifies_owned_cleanup(
     def execute(command, env, _log, runtime, cleanup):
         assert [arg for arg in command if arg.startswith("--timeout")] == ["--timeout=900"]
         assert "faulthandler_timeout=960" in command
-        assert runtime == (pipeline.BUDGETS[service]["job_timeout_minutes"] - 20) * 60
+        assert runtime == (130 if service == "ADU" else 160) * 60
         assert cleanup == 600
         assert "azext_iot_ado_resource_scope" not in env
         assert env["AZEXT_TEST_OWNERSHIP"] == str(output / "ownership.json")
@@ -1102,7 +1102,12 @@ def test_generic_phase_verifies_owned_cleanup(
         pipeline.phase(selection, output)
         assert retry.read(output / "phase.json")["safe"]
         assert retry.read(output / "phase.json")["cleanupMode"] == "verified"
-    cleanup.assert_called_once_with(output / "ownership.json", timeout=600)
+    cleanup.assert_called_once_with(
+        output / "ownership.json", timeout=(60 if service == "ADU" else 25) * 60,
+        dependency_reserve=(15 if service == "ADU" else 0) * 60,
+    )
+    budget = pipeline.BUDGETS[service]["ado"]
+    assert budget["test_minutes"] + 10 + budget["cleanup_minutes"] + 10 <= budget["phase_minutes"]
     assert retry.read(output / "ownership.json") == retry.read(manifest)
 
 
