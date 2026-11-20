@@ -14,7 +14,7 @@ from pathlib import Path
 import runpy
 import shutil
 
-from release_monitor import verify_bundle, write_json
+from release_monitor import read_json, verify_bundle, write_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -225,6 +225,12 @@ def overlay_controllers(output, manifest):
         destination = output / path.relative_to(ROOT)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, destination)
+    relative = Path("azext_iot/tests/ci_budgets.json")
+    current, frozen = read_json(ROOT / relative), read_json(output / relative)
+    for service, budget in current.items():
+        if service in frozen and "ado" in budget:
+            frozen[service]["ado"] = budget["ado"]
+    write_json(output / relative, frozen)
 
 
 def stage(bundle, output, *, source_only=False):
