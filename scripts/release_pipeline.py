@@ -170,7 +170,25 @@ def checkout(destination, resolving=False):
             if "ReleaseCandidateBuildId" not in integration:
                 raise ValueError("The selected source does not support pipeline 147's release-candidate handoff.")
         print(f"##vso[task.setvariable variable=commit;isOutput=true]{selected}", flush=True)
+        # Early title from source; Record candidate re-sets it from the built wheel.
+        constants = destination / "azext_iot/constants.py"
+        version = constants.is_file() and re.search(
+            r'^VERSION = "([^"]+)"$', constants.read_text(encoding="utf-8"), re.MULTILINE)
+        if version:
+            cohorts = {} if skip_integration_tests() else integration_cohorts()
+            print(f"##vso[build.updatebuildnumber]{release_title(version.group(1), cohorts)}", flush=True)
     return selected
+
+
+def release_title(version, cohorts):
+    naming = runpy.run_path(str(Path(__file__).with_name("pipeline_title.py")))
+    mode = release_options()[0]
+    return naming["format_title"](
+        "iot", identifier(environment("BUILD_BUILDID")), version,
+        scopes=list(cohorts),
+        regions=environment("RELEASE_REGION").split(",") if cohorts else (),
+        action=mode.lower() if mode in {"Validate", "Draft", "Release"} else None,
+    )
 
 
 def wheel_metadata(path):
@@ -419,15 +437,7 @@ def create_candidate(source, directory):
     }
     write(directory / "candidate.json", value)
     verify_candidate(directory)
-    naming = runpy.run_path(str(Path(__file__).with_name("pipeline_title.py")))
-    mode = release_options()[0]
-    title = naming["format_title"](
-        "iot", value["producer"]["build"], value["wheel"]["version"],
-        scopes=list(value["cohorts"]),
-        regions=environment("RELEASE_REGION").split(",") if value["cohorts"] else (),
-        action=mode.lower() if mode in {"Validate", "Draft", "Release"} else None,
-    )
-    print(f"##vso[build.updatebuildnumber]{title}", flush=True)
+    print(f"##vso[build.updatebuildnumber]{release_title(value['wheel']['version'], value['cohorts'])}", flush=True)
     print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
         key: {"cohort": key} for key in value["cohorts"]
     }), flush=True)
