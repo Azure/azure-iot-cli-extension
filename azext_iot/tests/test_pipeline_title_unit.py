@@ -5,7 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from pathlib import Path
+import os
 import runpy
+import subprocess
+import sys
 from zipfile import ZipFile
 
 import pytest
@@ -65,3 +68,27 @@ def test_title_reads_exact_wheel_metadata_not_filename_or_host_version(tmp_path,
     (tmp_path / "second.whl").write_bytes(wheel.read_bytes())
     with pytest.raises(ValueError, match="Exactly one"):
         TITLE["wheel_version"](tmp_path)
+
+
+@pytest.mark.parametrize("prefix,distribution,package,valid", [
+    ("iot", "azure-iot", "azext_iot", True),
+    ("ops", "azure-iot", "azext_iot", False),
+    ("iot", "azure-iot-ops", "azext_edge", False),
+    ("iot", "azure-iot", "azext_edge", False),
+    ("clean", "azure-iot", "azext_iot", False),
+])
+def test_title_cli_binds_product_prefix_to_wheel_identity(tmp_path, prefix, distribution, package, valid):
+    wheel = tmp_path / "candidate.whl"
+    with ZipFile(wheel, "w") as archive:
+        archive.writestr(package + "/__init__.py", "")
+        archive.writestr("candidate.dist-info/METADATA", f"Name: {distribution}\nVersion: 1.2.3\n")
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/pipeline_title.py"), "--prefix", prefix, "--wheel", str(wheel)],
+        env={**os.environ, "BUILD_BUILDID": "123"}, text=True, capture_output=True, check=False,
+    )
+    if valid:
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == "##vso[build.updatebuildnumber]iot-123 (1.2.3)"
+    else:
+        assert result.returncode != 0
+        assert "##vso[build.updatebuildnumber]" not in result.stdout

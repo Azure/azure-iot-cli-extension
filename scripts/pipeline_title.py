@@ -83,9 +83,11 @@ def wheel_version(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prefix", choices=["iot", "ops", "clean"], required=True)
+    parser.add_argument("--prefix", choices=["iot", "clean"], required=True)
     parser.add_argument("--wheel", type=Path)
     args = parser.parse_args()
+    if args.prefix == "clean" and args.wheel is not None:
+        parser.error("Cleanup titles do not accept a wheel.")
     version = wheel_version(args.wheel) if args.wheel is not None else None
     print(f"##vso[build.updatebuildnumber]{format_title(args.prefix, os.environ['BUILD_BUILDID'], version)}")
 
