@@ -1,5 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
+name: iot-$(Build.BuildId)
+appendCommitMessageToRunName: false
 trigger:
   branches:
     include:

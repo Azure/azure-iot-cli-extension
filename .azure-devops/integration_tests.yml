@@ -2,7 +2,7 @@
 
 trigger: none
 pr: none
-name: iot-integration-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-$(Build.BuildId)
 appendCommitMessageToRunName: false
 parameters:
   - name: mode
@@ -91,6 +91,8 @@ stages:
                 --services $SERVICES --versions $VERSIONS --regions $REGIONS \
                 --endpoint "$ENDPOINT" --release-build-id "$RELEASE_BUILD_ID" > plan.json
               cat plan.json
+              echo "##vso[task.setvariable variable=artifact;isOutput=true]integration-plan-$SYSTEM_JOBATTEMPT"
+            name: plan
             displayName: Check matrix
             env:
               SERVICES: ${{ replace(variables.servicesCsv, ',', ' ') }}
@@ -103,18 +105,12 @@ stages:
           - publish: plan.json
             displayName: Publish plan
             artifact: integration-plan-$(System.JobAttempt)
-          - bash: python azext_iot/tests/_ado_pipeline.py title --plan "$PLAN" --kind "$RUN_KIND" --mode "$RUN_MODE" --release-build-id
-              "$RELEASE_BUILD_ID"
-            displayName: Set run title
-            env:
-              PLAN: plan.json
-              RUN_KIND: integration
-              RUN_MODE: ${{ parameters.mode }}
-              RELEASE_BUILD_ID: $(ReleaseCandidateBuildId)
   - ${{ if eq(parameters.mode, 'Integration tests') }}:
       - stage: Build
         displayName: Build
         dependsOn: Plan
+        variables:
+          planArtifact: $[ stageDependencies.Plan.Plan.outputs['plan.artifact'] ]
         jobs:
           - job: Build
             timeoutInMinutes: 40
@@ -168,6 +164,25 @@ stages:
                 displayName: Publish wheel
                 artifact: integration-wheel-$(System.JobAttempt)
                 condition: and(succeeded(), ne(variables['ReleaseCandidateBuildId'], '0'))
+              - task: DownloadPipelineArtifact@2
+                displayName: Download frozen title plan
+                inputs:
+                  buildType: current
+                  artifactName: $(planArtifact)
+                  targetPath: $(Pipeline.Workspace)/title-plan
+              - bash: |
+                  set -euo pipefail
+                  wheel=dist
+                  if [ "$RELEASE_BUILD_ID" != "0" ]; then wheel="$RELEASE_CANDIDATE"; fi
+                  python azext_iot/tests/_ado_pipeline.py title \
+                    --plan "$TITLE_PLAN" --kind integration --mode "$RUN_MODE" \
+                    --release-build-id "$RELEASE_BUILD_ID" --wheel "$wheel"
+                displayName: Name run from frozen candidate
+                env:
+                  TITLE_PLAN: $(Pipeline.Workspace)/title-plan/plan.json
+                  RELEASE_CANDIDATE: $(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)
+                  RUN_MODE: ${{ parameters.mode }}
+                  RELEASE_BUILD_ID: $(ReleaseCandidateBuildId)
       - stage: Lint
         displayName: Lint
         dependsOn: Plan

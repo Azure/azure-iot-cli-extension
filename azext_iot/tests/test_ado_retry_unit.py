@@ -16,6 +16,7 @@ from string import Template
 from types import SimpleNamespace
 from unittest.mock import Mock
 import xml.etree.ElementTree as ET
+from zipfile import ZipFile
 
 import pytest
 import yaml
@@ -620,26 +621,26 @@ def test_plan_has_all_github_services_and_no_legacy_services():
 
 @pytest.mark.parametrize("kind,parent", [("integration", "0"), ("integration", "456"), ("health", "0")])
 @pytest.mark.parametrize("services,scope", [
-    (["ADR", "HubData", "DPS", "ADU", "HubControl"], "DPS,Hub,ADU,ADR"),
-    (["HubControl", "ADR"], "HubControl,ADR"),
+    (["ADR", "HubData", "DPS", "ADU", "HubControl"], "DPS, Hub, ADU +1"),
+    (["HubControl", "ADR"], "HubControl, ADR"),
     (["HubData"], "HubData"),
     (["ADU"], "ADU"),
 ])
 def test_run_title_uses_distinct_planned_services_not_matrix_combinations(kind, parent, services, scope):
     jobs = pipeline.plan(services, ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
-    assert pipeline.run_title(jobs, kind, "Integration tests", "123", parent) == (
-        f"iot-{kind}-123 (australiaeast) ({scope})"
+    assert pipeline.run_title(jobs, kind, "Integration tests", "123", parent, version="1.0.1") == (
+        f"iot-123 (1.0.1) ({scope}) (australiaeast)"
     )
 
 
 @pytest.mark.parametrize("parent", ["0", "456"])
-def test_run_title_labels_dry_run_and_canary(parent):
+def test_run_title_keeps_target_region_without_option_labels(parent):
     jobs = pipeline.plan(["ADU"], ["3.13"], ["centraluseuap"], pipeline.TARGET["CANARY_ARM"])
-    assert pipeline.run_title(jobs, "integration", "Dry run", "123", parent) == (
-        "iot-integration-123 (centraluseuap) (ADU) (dry-run,canary)"
+    assert pipeline.run_title(jobs, "integration", "Dry run", "123", parent, version="1.0.1") == (
+        "iot-123 (1.0.1) (ADU) (centraluseuap)"
     )
-    assert pipeline.run_title(jobs, "integration", "Integration tests", "123", parent) == (
-        "iot-integration-123 (centraluseuap) (ADU) (canary)"
+    assert pipeline.run_title(jobs, "integration", "Integration tests", "123", parent, version="1.0.1") == (
+        "iot-123 (1.0.1) (ADU) (centraluseuap)"
     )
 
 
@@ -674,8 +675,8 @@ def test_results_title_normalizes_values_that_could_break_logging_commands(tmp_p
 def test_run_title_compacts_whole_regions_and_retains_unique_build():
     regions = [f"region{index:02d}" + "x" * 56 for index in range(40)]
     jobs = pipeline.plan(["DPS"], ["3.13"], regions, pipeline.TARGET["PUBLIC_ARM"])
-    title = pipeline.run_title(jobs, "integration", "Integration tests", "123")
-    assert title == f"iot-integration-123 ({regions[0]} +39) (DPS)"
+    title = pipeline.run_title(jobs, "integration", "Integration tests", "123", version="1.0.1")
+    assert title == f"iot-123 (1.0.1) (DPS) ({regions[0]} +39)"
     assert len(title) <= 255
 
 
@@ -693,21 +694,29 @@ def test_run_title_rejects_invalid_plan_values(damage):
         pipeline.run_title(jobs, "health", "Integration tests", build)
 
 
-def test_title_command_preserves_plan_json_and_does_not_append_on_retry(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("with_wheel", [False, True])
+def test_title_command_preserves_plan_json_and_does_not_append_on_retry(tmp_path, monkeypatch, capsys, with_wheel):
     path = tmp_path / "plan.json"
     jobs = pipeline.plan(["DPS", "ADR"], ["3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
     path.write_text(json.dumps(jobs))
     original = path.read_bytes()
     monkeypatch.setenv("BUILD_BUILDID", "123")
-    monkeypatch.setattr(sys, "argv", [
+    args = [
         "planner", "title", "--plan", str(path), "--kind", "integration", "--mode", "Dry run",
-    ])
+    ]
+    expected = "iot-123"
+    if with_wheel:
+        wheel = tmp_path / "candidate.whl"
+        with ZipFile(wheel, "w") as archive:
+            archive.writestr("azext_iot/__init__.py", "")
+            archive.writestr("azure_iot-1.0.1.dist-info/METADATA", "Name: azure-iot\nVersion: 1.0.1\n")
+        args += ["--wheel", str(wheel)]
+        expected = "iot-123 (1.0.1) (DPS, ADR) (australiaeast)"
+    monkeypatch.setattr(sys, "argv", args)
     for number in ("iot-integration-20261031.1", "iot-integration-123 (australiaeast) (DPS,ADR) (dry-run)"):
         monkeypatch.setenv("BUILD_BUILDNUMBER", number)
         assert pipeline.main() == 0
-        assert capsys.readouterr().out.strip() == (
-            "##vso[build.updatebuildnumber]iot-integration-123 (australiaeast) (DPS,ADR) (dry-run)"
-        )
+        assert capsys.readouterr().out.strip() == f"##vso[build.updatebuildnumber]{expected}"
         assert path.read_bytes() == original
 
 
@@ -764,19 +773,27 @@ def test_yaml_exposes_manual_only_integration_default_and_all_services_preset():
     entry = yaml.safe_load(entry_text)
     parameters = {value["name"]: value for value in entry["parameters"]}
     assert entry["trigger"] == entry["pr"] == "none"
+    assert entry["name"] == "iot-$(Build.BuildId)"
     assert entry["appendCommitMessageToRunName"] is False
     assert parameters["mode"]["default"] == "Integration tests"
     assert parameters["mode"]["values"] == ["Dry run", "Integration tests"]
     assert len(entry["stages"]) == 2
     assert entry["stages"][0]["stage"] == "Plan"
     assert [job["job"] for job in entry["stages"][0]["jobs"]] == ["Plan"]
-    title_step = entry["stages"][0]["jobs"][0]["steps"][-1]
-    assert title_step["displayName"] == "Set run title" and "_ado_pipeline.py title" in title_step["bash"]
-    assert title_step["env"] == {
-        "PLAN": "plan.json", "RUN_KIND": "integration", "RUN_MODE": "${{ parameters.mode }}",
-        "RELEASE_BUILD_ID": "$(ReleaseCandidateBuildId)",
-    }
+    plan_steps = entry["stages"][0]["jobs"][0]["steps"]
+    assert not any("_ado_pipeline.py title" in step.get("bash", "") for step in plan_steps)
     assert "${{ if eq(parameters.mode, 'Integration tests') }}" in entry["stages"][1]
+    live_stages = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
+    build = next(stage for stage in live_stages if stage["stage"] == "Build")
+    assert build["variables"]["planArtifact"] == "$[ stageDependencies.Plan.Plan.outputs['plan.artifact'] ]"
+    title_step = build["jobs"][0]["steps"][-1]
+    assert title_step["displayName"] == "Name run from frozen candidate"
+    assert '_ado_pipeline.py title' in title_step["bash"] and '--wheel "$wheel"' in title_step["bash"]
+    assert title_step["env"] == {
+        "TITLE_PLAN": "$(Pipeline.Workspace)/title-plan/plan.json",
+        "RELEASE_CANDIDATE": "$(Pipeline.Workspace)/release-candidate-$(System.JobAttempt)",
+        "RUN_MODE": "${{ parameters.mode }}", "RELEASE_BUILD_ID": "$(ReleaseCandidateBuildId)",
+    }
     assert parameters["services"]["default"] == list(retry.SERVICES)
     assert parameters["services"]["values"] == list(retry.SERVICES)
     assert parameters["pythonVersions"]["type"] == "stringList"

@@ -645,7 +645,10 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert generated["skipIntegrationTests"] is skipped
     assert generated["uploadWheelToBlob"] is upload
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == f"##vso[build.updatebuildnumber]{versioned_title}"
+    expected = f"iot-900 ({value['wheel']['version']})"
+    if not skipped:
+        expected += f" (DPS, Hub, ADU +1) ({', '.join(sorted(regions.split(',')))})"
+    assert lines[0] == f"##vso[build.updatebuildnumber]{expected} (release)"
     matrix = json.loads(lines[-1].split("]", 1)[1])
     assert set(matrix) == set(generated["cohorts"])
     with zipfile.ZipFile(output / "SBOM.zip") as archive:

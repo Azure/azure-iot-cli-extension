@@ -4,7 +4,7 @@ trigger: none
 pr: none
 # Held pending sovereign policy/authorization: 173 at 08:30 UTC, cron "30 8 * * *", dev only.
 schedules: []
-name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-$(Build.BuildId)
 appendCommitMessageToRunName: false
 parameters:
   - name: mode
