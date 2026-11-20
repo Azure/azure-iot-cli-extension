@@ -52,10 +52,15 @@ MAX_DELETE_SUBMISSIONS = 3
 
 def retry_after(headers):
     from requests.structures import CaseInsensitiveDict
+    from urllib3.exceptions import InvalidHeader
     from urllib3.util.retry import Retry
 
     value = CaseInsensitiveDict(headers or {}).get("Retry-After")
-    return Retry().parse_retry_after(value) if value is not None else 0
+    try:
+        return Retry().parse_retry_after(value) if value is not None else 0
+    except InvalidHeader as error:
+        print("Malformed ARM Retry-After header; refusing unsafe retry.", file=sys.stderr, flush=True)
+        raise ValueError("Malformed ARM Retry-After header; cleanup cannot safely retry.") from error
 
 
 class ArmError(RuntimeError):
@@ -306,7 +311,6 @@ class Arm:
 
     def send(self, method, url, *, headers=None, **kwargs):
         import requests
-        from urllib3.util.retry import Retry
 
         deadline = min(
             self.deadline if self.deadline is not None else float("inf"),
@@ -333,9 +337,9 @@ class Arm:
                 )
                 if method != "GET" or not retryable or attempt == 2:
                     return response
-                delay = Retry().get_retry_after(response)
-                if delay is None:
-                    delay = 2 ** attempt
+                delay = retry_after(response.headers) if "Retry-After" in response.headers else 2 ** attempt
+                if time.monotonic() + delay >= deadline:
+                    return response
             if time.monotonic() + delay >= deadline:
                 raise TimeoutError("ARM ownership retry exceeds its bounded read budget.")
             print(f"Retrying an ownership GET after a transient failure in {delay}s.", file=sys.stderr, flush=True)
@@ -829,9 +833,10 @@ class CleanupAttempt:
     record: dict
     started: float
     deadline: float
-    state: object = "creation"
+    state: str | tuple = "creation"
     submissions: int = 0
     next_poll: float = 0
+    last_error: dict | None = None
 
     def retry(self, delay=0):
         if self.submissions >= MAX_DELETE_SUBMISSIONS:
@@ -846,7 +851,7 @@ class CleanupAttempt:
             self.next_poll = max(self.next_poll, time.monotonic() + max(5, error.delay))
             return True
         if error.method == "DELETE" and error.status == 409:
-            self.state = "deletion"
+            self.state = ("deletion", None, False, True)
             self.next_poll = max(self.next_poll, time.monotonic() + max(5, error.delay))
             return True
         if error.method == "DELETE" and (transient or error.status == 412):
@@ -862,7 +867,9 @@ def cleanup_batch(journal, arm, batch):
 
     def failed(resource, attempt, error):
         failures[resource] = type(error).__name__
-        details = dict(error.details) if isinstance(error, ArmError) else {}
+        details = dict(error.details) if isinstance(error, ArmError) else (
+            {"lastError": attempt.last_error} if attempt.last_error else {}
+        )
         details.update(elapsedSeconds=round(time.monotonic() - attempt.started, 1), submissions=attempt.submissions)
         journal.record(resource, attempt.record["api"], cleanup="failed",
                        errorType=type(error).__name__, errorDetails=details)
@@ -900,6 +907,7 @@ def cleanup_batch(journal, arm, batch):
                 else:
                     attempt.state = state
             except ArmError as error:
+                attempt.last_error = dict(error.details)
                 if not attempt.recover(error):
                     failed(resource, attempt, error)
                     del pending[resource]
