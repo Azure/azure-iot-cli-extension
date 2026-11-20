@@ -8,7 +8,7 @@ schedules:
     branches:
       include: [dev]
     always: true
-name: iot-health-$(TestCloud)-$(TestTrack)-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-$(Build.BuildId)
 appendCommitMessageToRunName: false
 parameters:
   - name: mode

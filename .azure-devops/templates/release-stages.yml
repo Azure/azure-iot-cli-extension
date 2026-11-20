@@ -88,6 +88,7 @@ stages:
                 name: candidate
                 displayName: Record candidate
                 env:
+                  RELEASE_MODE: ${{ parameters.mode }}
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - ${{ if eq(parameters.mode, 'Upload wheel only') }}:
