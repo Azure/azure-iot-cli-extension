@@ -3,6 +3,14 @@
 Release History
 ===============
 
+1.0.1
++++++
+
+**Release preparation**
+
+* Bumped the extension package version from ``1.0.0`` to ``1.0.1``.
+* This version update introduces no CLI command, SDK API version, or minimum Azure CLI requirement changes.
+
 1.0.0
 +++++
 

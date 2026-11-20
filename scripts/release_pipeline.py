@@ -33,7 +33,6 @@ REPOSITORY = "Azure/azure-iot-cli-extension"
 INDEX_REPOSITORY = "Azure/azure-cli-extensions"
 ADO = "https://dev.azure.com/azureiotdevxp/aziotcli/_apis"
 FEED = "https://pkgs.dev.azure.com/azureiotdevxp/aziotcli/_packaging/pip/pypi/simple/"
-BRANCHES = {"dev", "release/1.2.0-preview"}
 BLOB_CONTAINER = "https://azedgecli.blob.core.windows.net/drop/"
 MAX_BLOB_BYTES = 256 * 1024 * 1024
 INTEGRATION_PARAMETERS = {
@@ -66,6 +65,13 @@ def skip_integration_tests():
     return value == "true"
 
 
+def upload_wheel_to_blob():
+    value = os.environ.get("RELEASE_UPLOAD_WHEEL_TO_BLOB", "false").lower()
+    if value not in {"true", "false"}:
+        raise ValueError("uploadWheelToBlob must be an explicit boolean.")
+    return value == "true"
+
+
 def identifier(value):
     if not re.fullmatch(r"[1-9][0-9]*", str(value)):
         raise ValueError("Expected a positive build or pipeline ID.")
@@ -79,10 +85,13 @@ def commit(value):
 
 
 def branch(value):
+    if not isinstance(value, str) or value.startswith("refs/") and not value.startswith("refs/heads/"):
+        raise ValueError("Source must be a safe branch name, not a tag or revision expression.")
     value = value.removeprefix("refs/heads/")
-    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]*", value) or value.startswith("refs/")
-            or any(part in value for part in ("..", "//", "@{"))
-            or value.endswith(("/", ".", ".lock"))):
+    if (not value or value.startswith("-") or value.endswith(".")
+            or any(ord(char) < 33 or ord(char) == 127 or char in "~^:?*[\\" for char in value)
+            or any(part in value for part in ("..", "@{"))
+            or any(not part or part.startswith(".") or part.endswith(".lock") for part in value.split("/"))):
         raise ValueError("Source must be a safe branch name, not a tag or revision expression.")
     return f"refs/heads/{value}"
 
@@ -133,7 +142,7 @@ def github(resource, **kwargs):
 
 def checkout(destination, resolving=False):
     if resolving:
-        if release_options()[0] in {"Upload wheel only", "Draft", "Release"}:
+        if release_options()[0] in {"Draft", "Release"} or upload_wheel_to_blob():
             automation_allowed()
     source_branch = branch(environment("RELEASE_SOURCE_BRANCH"))
     source_commit = None if resolving else commit(environment("RELEASE_SOURCE_COMMIT"))
@@ -403,14 +412,21 @@ def create_candidate(source, directory):
         "sourceBranch": branch(environment("RELEASE_SOURCE_BRANCH")), "sourceCommit": source_commit,
         "producer": producer(),
         "skipIntegrationTests": skip_integration_tests(),
+        "uploadWheelToBlob": upload_wheel_to_blob(),
         "cohorts": {} if skip_integration_tests() else integration_cohorts(),
         "wheel": {"file": wheel.name, "sha256": digest(wheel), "version": wheel_metadata(wheel)},
         "sbom": {"file": "SBOM.zip", "sha256": digest(directory / "SBOM.zip")},
     }
     write(directory / "candidate.json", value)
     verify_candidate(directory)
-    suffix = f" ({value['wheel']['version']})"
-    title = environment("BUILD_BUILDNUMBER").removesuffix(suffix) + suffix
+    naming = runpy.run_path(str(Path(__file__).with_name("pipeline_title.py")))
+    mode = release_options()[0]
+    title = naming["format_title"](
+        "iot", value["producer"]["build"], value["wheel"]["version"],
+        scopes=list(value["cohorts"]),
+        regions=environment("RELEASE_REGION").split(",") if value["cohorts"] else (),
+        action=mode.lower() if mode in {"Validate", "Draft", "Release"} else None,
+    )
     print(f"##vso[build.updatebuildnumber]{title}", flush=True)
     print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
         key: {"cohort": key} for key in value["cohorts"]
@@ -428,6 +444,9 @@ def verify_candidate(directory):
     skipped = value.get("skipIntegrationTests", False)
     if type(skipped) is not bool or skipped != skip_integration_tests():
         raise ValueError("Candidate integration waiver does not match this release run.")
+    upload = value.get("uploadWheelToBlob", False)
+    if type(upload) is not bool or upload != upload_wheel_to_blob():
+        raise ValueError("Candidate Blob upload option does not match this release run.")
     if value.get("cohorts") != ({} if skipped else integration_cohorts()):
         raise ValueError("Candidate cohort inventory does not match the complete requested qualification.")
     wheel = value["wheel"]
@@ -625,8 +644,7 @@ def verify_integration_artifacts(directory, artifacts):
 
 
 def automation_allowed():
-    if branch(environment("RELEASE_SOURCE_BRANCH")).removeprefix("refs/heads/") not in BRANCHES:
-        raise ValueError("Publication requires an approved protected source branch.")
+    branch(environment("RELEASE_SOURCE_BRANCH"))
     if environment("BUILD_SOURCEBRANCH") != "refs/heads/dev":
         raise ValueError("Publication requires the reviewed release automation on dev, not a feature branch.")
     if environment("BUILD_REPOSITORY_NAME") != REPOSITORY:
@@ -637,7 +655,8 @@ def release_options():
     mode = os.environ.get("RELEASE_MODE", "Validate")
     index = os.environ.get("RELEASE_CREATE_INDEX_PR", "false").lower()
     skip_integration_tests()
-    if mode not in {"Validate", "Upload wheel only", "Draft", "Release"} or index not in {"true", "false"}:
+    upload_wheel_to_blob()
+    if mode not in {"Validate", "Draft", "Release"} or index not in {"true", "false"}:
         raise ValueError("Invalid release mode or createIndexPr option.")
     if index == "true" and mode != "Release":
         raise ValueError("createIndexPr requires Release mode and a public GitHub release.")
@@ -645,9 +664,14 @@ def release_options():
 
 
 def publication_allowed(*, draft=False, upload=False):
-    expected = "Upload wheel only" if upload else "Draft" if draft else "Release"
-    if release_options()[0] != expected:
-        raise ValueError(f"Publication requires explicit {expected} mode.")
+    mode, _ = release_options()
+    if upload:
+        if not upload_wheel_to_blob():
+            raise ValueError("Blob upload requires explicit uploadWheelToBlob opt-in.")
+    else:
+        expected = "Draft" if draft else "Release"
+        if mode != expected:
+            raise ValueError(f"Publication requires explicit {expected} mode.")
     automation_allowed()
     if not upload:
         environment("RELEASE_GITHUB_TOKEN")
@@ -759,7 +783,7 @@ def upload_wheel(directory, receipt):
     if observed["sha256"] != wheel["sha256"] or observed["length"] != size:
         raise ValueError("Existing Blob differs from the qualified candidate; refusing overwrite.")
     result = {
-        "mode": "Upload wheel only", "status": status, "wheelUrl": url,
+        "mode": release_options()[0], "status": status, "wheelUrl": url,
         "sha256": wheel["sha256"], "length": size, "candidate": candidate,
     }
     write(receipt, result)
@@ -1088,7 +1112,8 @@ def main():
         skipped = skip_integration_tests()
         if skipped:
             print("##vso[task.logissue type=warning]Integration tests skipped by release waiver.")
-        print(json.dumps({"mode": mode, "createIndexPr": create_index_pr, "skipIntegrationTests": skipped}))
+        print(json.dumps({"mode": mode, "createIndexPr": create_index_pr, "skipIntegrationTests": skipped,
+                          "uploadWheelToBlob": upload_wheel_to_blob()}))
     elif args.operation in ("resolve", "checkout"):
         checkout(args.source, resolving=args.operation == "resolve")
     elif args.operation == "candidate":

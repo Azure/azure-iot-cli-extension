@@ -7,6 +7,7 @@
 """Attempt-local ARM ownership for live tests in pre-created resource groups."""
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 from itertools import groupby
 import json
@@ -42,6 +43,50 @@ UNCONDITIONAL_DELETE_TYPES = {
     "microsoft.secretsynccontroller/azurekeyvaultsecretproviderclasses",
     "microsoft.secretsynccontroller/secretsyncs",
 }
+RESOURCE_CLEANUP_SECONDS = {
+    "microsoft.deviceupdate/accounts": 45 * 60,
+    "microsoft.devices/iothubs": 15 * 60,
+}
+MAX_DELETE_SUBMISSIONS = 3
+
+
+def retry_after(headers):
+    from requests.structures import CaseInsensitiveDict
+    from urllib3.exceptions import InvalidHeader
+    from urllib3.util.retry import Retry
+
+    value = CaseInsensitiveDict(headers or {}).get("Retry-After")
+    try:
+        return Retry().parse_retry_after(value) if value is not None else 0
+    except InvalidHeader as error:
+        print("Malformed ARM Retry-After header; refusing unsafe retry.", file=sys.stderr, flush=True)
+        raise ValueError("Malformed ARM Retry-After header; cleanup cannot safely retry.") from error
+
+
+class ArmError(RuntimeError):
+    """Retain safe response metadata, never a response body or service message."""
+
+    def __init__(self, method, response=None, *, reason="ARM request failed"):
+        self.method = method
+        self.status = response.status_code if response is not None else None
+        self.delay = retry_after(response.headers) if response is not None else 0
+        details = {"operation": method, "status": self.status, "reason": reason}
+        if response is not None:
+            try:
+                body = response.json()
+            except ValueError:
+                body = {}
+            error = body.get("error", body) if isinstance(body, dict) else {}
+            code = error.get("code") if isinstance(error, dict) else None
+            code = str(code) if isinstance(code, (str, int)) and not isinstance(code, bool) else ""
+            if re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", code):
+                details["code"] = code
+            for header in ("x-ms-request-id", "x-ms-correlation-request-id"):
+                value = response.headers.get(header, "")
+                if re.fullmatch(r"[0-9a-fA-F-]{36}", value):
+                    details[header] = value
+        self.details = details
+        super().__init__(f"{reason} (HTTP {self.status}): {json.dumps(details, sort_keys=True)}")
 
 
 class CleanupIncomplete(RuntimeError):
@@ -266,7 +311,6 @@ class Arm:
 
     def send(self, method, url, *, headers=None, **kwargs):
         import requests
-        from urllib3.util.retry import Retry
 
         deadline = min(
             self.deadline if self.deadline is not None else float("inf"),
@@ -283,9 +327,9 @@ class Arm:
                 )
             except requests.exceptions.SSLError:
                 raise
-            except (requests.ConnectionError, requests.Timeout):
+            except (requests.ConnectionError, requests.Timeout) as error:
                 if method != "GET" or attempt == 2:
-                    raise
+                    raise ArmError(method, reason="ARM transport failed") from error
                 delay = 2 ** attempt
             else:
                 retryable = response.status_code in (408, 429, 500, 502, 503, 504) or (
@@ -293,9 +337,9 @@ class Arm:
                 )
                 if method != "GET" or not retryable or attempt == 2:
                     return response
-                delay = Retry().get_retry_after(response)
-                if delay is None:
-                    delay = 2 ** attempt
+                delay = retry_after(response.headers) if "Retry-After" in response.headers else 2 ** attempt
+                if time.monotonic() + delay >= deadline:
+                    return response
             if time.monotonic() + delay >= deadline:
                 raise TimeoutError("ARM ownership retry exceeds its bounded read budget.")
             print(f"Retrying an ownership GET after a transient failure in {delay}s.", file=sys.stderr, flush=True)
@@ -308,12 +352,12 @@ class Arm:
             json=body, headers=headers,
         )
         if response.status_code not in (200, 201, 202, 204, 404):
-            raise RuntimeError(f"Ownership {method} failed with HTTP {response.status_code}; response body omitted.")
+            raise ArmError(method, response)
         if response.status_code == 404:
             try:
                 error = response.json()
             except ValueError as exception:
-                raise RuntimeError("Unverifiable ARM 404 response.") from exception
+                raise ArmError(method, response, reason="Unverifiable ARM 404 response.") from exception
             detail = error.get("error", {}) if isinstance(error, dict) else {}
             code = detail.get("code", "") if isinstance(detail, dict) else ""
             accepted = {"resourcenotfound", "parentresourcenotfound", "resourcegroupnotfound"}
@@ -323,7 +367,7 @@ class Arm:
             elif kind == DEPLOYMENT_TYPE:
                 accepted.add("deploymentnotfound")
             if not isinstance(code, str) or code.lower() not in accepted:
-                raise RuntimeError("ARM 404 did not prove that the target resource is absent.")
+                raise ArmError(method, response, reason="ARM 404 did not prove that the target resource is absent.")
         value = response.json() if response.content and response.status_code != 404 else None
         return response.status_code, value, response.headers
 
@@ -710,7 +754,7 @@ def deployment_finished(journal, arm, record, creation):
     )
 
 
-def cleanup_submit(journal, arm, resource, record):
+def cleanup_submit(journal, arm, resource, record, attempt=None):
     if time.monotonic() >= arm.deadline:
         raise TimeoutError("Attempt cleanup budget expired.")
     current = arm.verify(resource, record["api"])
@@ -730,23 +774,34 @@ def cleanup_submit(journal, arm, resource, record):
     if not creation_settled(current):
         return "creation"
     headers = delete_headers(resource, current.get("etag")) or None
+    if attempt is not None:
+        if attempt.submissions >= MAX_DELETE_SUBMISSIONS:
+            raise RuntimeError("Owned DELETE submission limit exhausted.")
+        attempt.submissions += 1
+        print(f"Cleanup DELETE {attempt.submissions}/{MAX_DELETE_SUBMISSIONS}: {resource}", flush=True)
     result = arm.request("DELETE", resource, record["api"], headers=headers)
     resp_headers = result[2] if isinstance(result, tuple) and len(result) > 2 else None
+    if attempt is not None:
+        attempt.next_poll = max(attempt.next_poll, time.monotonic() + retry_after(resp_headers))
     op_url = operation_url(arm, resp_headers)
     return ("deletion", op_url, False) if op_url else "deletion"
 
 
-def _poll_cleanup_deletion(journal, arm, resource, record, state, retries):
+def _poll_cleanup_deletion(journal, arm, resource, record, state, attempt):
     if isinstance(state, tuple):
         _, op_url, deleting, retry_pending = (*state, False)[:4]
     else:
         op_url, deleting, retry_pending = None, False, False
-    status, current, _ = arm.request("GET", resource, record["api"])
+    status, current, headers = arm.request("GET", resource, record["api"])
+    attempt.next_poll = max(attempt.next_poll, time.monotonic() + retry_after(headers))
     if status == 404:
         journal.record(resource, record["api"], cleanup="absent")
         return None
     if op_url:
         op_response = arm.send("GET", op_url)
+        attempt.next_poll = max(attempt.next_poll, time.monotonic() + retry_after(op_response.headers))
+        if op_response.status_code not in (200, 201, 202, 204, 404):
+            raise ArmError("GET", op_response)
         if op_response.status_code == 200 and op_response.content:
             try:
                 op_payload = op_response.json()
@@ -761,8 +816,6 @@ def _poll_cleanup_deletion(journal, arm, resource, record, state, retries):
                 )
                 lowered = op_status.lower() if isinstance(op_status, str) else ""
                 if lowered in {"failed", "canceled", "cancelled"}:
-                    if retries.get(resource, 0) >= 1:
-                        raise RuntimeError("Async ARM deletion failed.")
                     op_url = None
                     retry_pending = True
                 elif lowered == "succeeded":
@@ -771,16 +824,39 @@ def _poll_cleanup_deletion(journal, arm, resource, record, state, retries):
     if prov == "deleting":
         return ("deletion", op_url, True, retry_pending)
     if retry_pending or (not op_url and deleting and prov in {"failed", "canceled", "cancelled"}):
-        if retries.get(resource, 0) >= 1:
-            raise RuntimeError("ARM resource deletion entered a terminal failed state.")
-        next_state = cleanup_submit(journal, arm, resource, record)
-        if next_state == ("deletion", None, True):
-            return ("deletion", None, True, True)
-        if next_state == "creation":
-            return ("deletion", None, deleting, True)
-        retries[resource] = retries.get(resource, 0) + 1
-        return next_state
+        return "retry"
     return ("deletion", op_url, deleting, retry_pending)
+
+
+@dataclass
+class CleanupAttempt:
+    record: dict
+    started: float
+    deadline: float
+    state: str | tuple = "creation"
+    submissions: int = 0
+    next_poll: float = 0
+    last_error: dict | None = None
+
+    def retry(self, delay=0):
+        if self.submissions >= MAX_DELETE_SUBMISSIONS:
+            return False
+        self.state = "creation"
+        self.next_poll = max(self.next_poll, time.monotonic() + max(delay, 15 * max(1, self.submissions)))
+        return True
+
+    def recover(self, error):
+        transient = error.status in (None, 408, 429, 500, 502, 503, 504)
+        if error.method == "GET" and (transient or error.status == 404):
+            self.next_poll = max(self.next_poll, time.monotonic() + max(5, error.delay))
+            return True
+        if error.method == "DELETE" and error.status == 409:
+            self.state = ("deletion", None, False, True)
+            self.next_poll = max(self.next_poll, time.monotonic() + max(5, error.delay))
+            return True
+        if error.method == "DELETE" and (transient or error.status == 412):
+            return self.retry(error.delay)
+        return False
 
 
 def cleanup_batch(journal, arm, batch):
@@ -789,46 +865,81 @@ def cleanup_batch(journal, arm, batch):
     failures = {}
     errors = (CLIError, OSError, RuntimeError, ValueError)
 
-    def failed(resource, api, error):
+    def failed(resource, attempt, error):
         failures[resource] = type(error).__name__
-        journal.record(resource, api, cleanup="failed", errorType=type(error).__name__)
-        print(f"Cleanup pending for {resource}: {type(error).__name__}", file=sys.stderr, flush=True)
+        details = dict(error.details) if isinstance(error, ArmError) else (
+            {"lastError": attempt.last_error} if attempt.last_error else {}
+        )
+        details.update(elapsedSeconds=round(time.monotonic() - attempt.started, 1), submissions=attempt.submissions)
+        journal.record(resource, attempt.record["api"], cleanup="failed",
+                       errorType=type(error).__name__, errorDetails=details)
+        print(f"Cleanup pending for {resource}: {type(error).__name__} {json.dumps(details, sort_keys=True)}",
+              file=sys.stderr, flush=True)
 
-    pending, retries = {}, {}
+    deadline = arm.deadline
+    pending = {}
     for resource, record in batch:
-        try:
-            state = cleanup_submit(journal, arm, resource, record)
-            if state:
-                pending[resource] = (record, state)
-        except errors as error:
-            failed(resource, record["api"], error)
-    while pending and time.monotonic() < arm.deadline:
-        for resource, (record, state) in list(pending.items()):
+        started = time.monotonic()
+        pending[resource] = CleanupAttempt(
+            record, started, min(deadline, started + RESOURCE_CLEANUP_SECONDS.get(resource_type(resource), deadline - started)),
+        )
+    while pending:
+        for resource, attempt in list(pending.items()):
+            now = time.monotonic()
+            if now >= attempt.deadline:
+                failed(resource, attempt, TimeoutError("Resource cleanup budget expired."))
+                del pending[resource]
+                continue
+            if now < attempt.next_poll:
+                continue
+            arm.deadline = attempt.deadline
+            submissions = attempt.submissions
             try:
-                if state == "creation":
-                    state = cleanup_submit(journal, arm, resource, record)
+                if attempt.state == "creation":
+                    state = cleanup_submit(journal, arm, resource, attempt.record, attempt)
                 else:
-                    state = _poll_cleanup_deletion(journal, arm, resource, record, state, retries)
+                    state = _poll_cleanup_deletion(journal, arm, resource, attempt.record, attempt.state, attempt)
                 if state is None:
                     del pending[resource]
+                elif state == "retry":
+                    if not attempt.retry():
+                        raise RuntimeError("Owned DELETE submission limit exhausted.")
                 else:
-                    pending[resource] = (record, state)
+                    attempt.state = state
+            except ArmError as error:
+                attempt.last_error = dict(error.details)
+                if not attempt.recover(error):
+                    failed(resource, attempt, error)
+                    del pending[resource]
+                if resource in pending:
+                    print(f"Cleanup observation/retry pending for {resource}: "
+                          f"{json.dumps(error.details, sort_keys=True)}", file=sys.stderr, flush=True)
             except errors as error:
-                failed(resource, record["api"], error)
+                failed(resource, attempt, error)
                 del pending[resource]
+            finally:
+                arm.deadline = deadline
+            if resource in pending:
+                elapsed = time.monotonic() - attempt.started
+                interval = 5 if elapsed < 60 else (15 if elapsed < 300 else 30)
+                if attempt.submissions > submissions:
+                    interval = 0
+                attempt.next_poll = max(attempt.next_poll, time.monotonic() + interval)
         if pending:
-            time.sleep(min(5, max(0, arm.deadline - time.monotonic())))
-    for resource, (record, _) in pending.items():
-        failed(resource, record["api"], TimeoutError("Attempt cleanup budget expired."))
+            wake = min(min(attempt.next_poll, attempt.deadline) for attempt in pending.values())
+            time.sleep(max(0, wake - time.monotonic()))
     return failures
 
 
-def cleanup(path, timeout=600, *, arm_factory=None):
+def cleanup(path, timeout=600, *, arm_factory=None, dependency_reserve=0):
     from knack.util import CLIError
 
+    if timeout <= 0 or dependency_reserve < 0 or dependency_reserve >= timeout:
+        raise ValueError("Cleanup requires a positive deadline and a smaller nonnegative dependency reserve.")
     journal = Journal(path)
     arm = Arm(journal) if arm_factory is None else arm_factory(journal)
-    arm.deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + timeout
+    arm.deadline = deadline
     records = journal.records()
     inventories = (
         (journal.group + "/resources", "2021-04-01"),
@@ -864,7 +975,8 @@ def cleanup(path, timeout=600, *, arm_factory=None):
     def order(item):
         return priority.get(resource_type(item[0]), 9)
 
-    for _, batch in groupby(sorted(records.items(), key=order), key=order):
+    for level, batch in groupby(sorted(records.items(), key=order), key=order):
+        arm.deadline = deadline - dependency_reserve if level < 10 else deadline
         failures.update(cleanup_batch(journal, arm, batch))
     if failures:
         raise CleanupIncomplete(failures)
