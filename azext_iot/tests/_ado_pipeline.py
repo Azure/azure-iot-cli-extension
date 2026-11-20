@@ -411,14 +411,21 @@ def _phase(selection_file, output):
             owned.write_new(ownership, manifest.context)
             env[owned.ENV] = str(ownership)
             command += ["-p", "azext_iot.tests._ado_ownership_plugin"]
+        execution = None
         try:
             execution = dps.child(command, env, folder / "output.log",
                                   (10 if diagnostic else BUDGETS[service]["ado"]["test_minutes"]) * 60, 600)
         finally:
             if not diagnostic:
                 budget = BUDGETS[service]["ado"]
-                owned.cleanup(ownership, timeout=budget["cleanup_minutes"] * 60,
-                              dependency_reserve=budget["dependency_reserve_minutes"] * 60)
+                cleanup_seconds = budget["cleanup_minutes"] * 60
+                if execution is None or execution["timed_out"] or execution["interrupted"]:
+                    # The outer controller only grants 660 seconds after interruption.
+                    cleanup_seconds = min(cleanup_seconds, 540)
+                owned.cleanup(
+                    ownership, timeout=cleanup_seconds,
+                    dependency_reserve=min(budget["dependency_reserve_minutes"] * 60, cleanup_seconds // 4),
+                )
         if execution["timed_out"] or execution["interrupted"]:
             raise ValueError("Timed out/interrupted execution cannot qualify.")
         receipt = RETRY["read"](folder / "pytest.json")
