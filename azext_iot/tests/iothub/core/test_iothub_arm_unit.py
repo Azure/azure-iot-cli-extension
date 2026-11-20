@@ -75,8 +75,8 @@ def test_explicit_resource_group_takes_precedence_without_mutating_resource(reso
 def test_modeless_lro_adapter_deserializes_sync_json_and_empty_response(
     content, expected
 ):
-    response = Mock(content=content)
-    response.json.return_value = expected
+    response_json = Mock(return_value=expected)
+    response = Mock(content=content, json=response_json)
     pipeline_response = Mock(http_response=response)
     callback_calls = []
 
@@ -106,9 +106,9 @@ def test_modeless_lro_adapter_deserializes_sync_json_and_empty_response(
     done_callback.assert_called_once_with(adapted.polling_method())
     assert callback_calls == [pipeline_response]
     if content:
-        response.json.assert_called_once_with()
+        response_json.assert_called_once_with()
     else:
-        response.json.assert_not_called()
+        response_json.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -121,8 +121,8 @@ def test_modeless_lro_adapter_deserializes_sync_json_and_empty_response(
 def test_modeless_lro_adapter_deserializes_async_json_and_empty_response(
     content, expected
 ):
-    response = Mock(content=content)
-    response.json.return_value = expected
+    response_json = Mock(return_value=expected)
+    response = Mock(content=content, json=response_json)
     pipeline_response = Mock(http_response=response)
     callback_calls = []
 
@@ -153,9 +153,9 @@ def test_modeless_lro_adapter_deserializes_async_json_and_empty_response(
     assert adapted.continuation_token() == "continuation"
     assert callback_calls == [pipeline_response]
     if content:
-        response.json.assert_called_once_with()
+        response_json.assert_called_once_with()
     else:
-        response.json.assert_not_called()
+        response_json.assert_not_called()
 
 
 def test_modeless_lro_adapter_does_not_touch_legacy_poller():
@@ -166,7 +166,8 @@ def test_modeless_lro_adapter_does_not_touch_legacy_poller():
 
 @pytest.mark.parametrize("expected", [None, {"custom": "result"}])
 def test_modeless_lro_adapter_preserves_healthy_callbacks_and_is_idempotent(expected):
-    response = Mock(content=b'{"status":"Succeeded"}')
+    response_json = Mock()
+    response = Mock(content=b'{"status":"Succeeded"}', json=response_json)
     pipeline = Mock(http_response=response)
     callback = Mock(spec=[], return_value=expected)
     poller = LROPoller(None, pipeline, callback, NoPolling())
@@ -176,7 +177,7 @@ def test_modeless_lro_adapter_preserves_healthy_callbacks_and_is_idempotent(expe
     assert poller.polling_method()._deserialization_callback is wrapped
     assert poller.result() == expected
     callback.assert_called_once_with(pipeline)
-    response.json.assert_not_called()
+    response_json.assert_not_called()
 
 
 @pytest.mark.parametrize("nested,name", [(False, "other"), (True, "response")])
