@@ -30,11 +30,15 @@ SKIP_LOG_COLLECTION = settings.env.azext_iot_adu_it_skip_logcollection
 #  Therefore we are aiming to provision instance resources conservatively.
 
 
-pytestmark = pytest.mark.adu_infrastructure(
-    location="westus2",
-    instance_count=1,
-    instance_diagnostics=True,
-    instance_diagnostics_user_storage=True)
+# The first test pays for module instance provisioning (~28-31 min in green runs), above the global 900s timeout.
+pytestmark = [
+    pytest.mark.adu_infrastructure(
+        location="westus2",
+        instance_count=1,
+        instance_diagnostics=True,
+        instance_diagnostics_user_storage=True),
+    pytest.mark.timeout(2700, func_only=False),
+]
 
 
 def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]):

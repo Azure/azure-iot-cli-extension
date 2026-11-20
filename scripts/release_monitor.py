@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -781,23 +782,20 @@ def run_title(manifest, build):
     validate_manifest(manifest)
     if not re.fullmatch(r"[1-9][0-9]*", build):
         raise ValueError("A positive ADO build ID is required for the release-health run title.")
-    prefix = "iot" if manifest["extension"] == "azure-iot" else "aio"
+    prefix = "iot" if manifest["extension"] == "azure-iot" else "ops"
     version = manifest["source"]["version"] if manifest.get("kind") == "source" else manifest["release"]["version"]
-    family = "branch-health" if manifest.get("kind") == "source" else "health"
-    title = f"{prefix}-{family}-{manifest['cloudKey']}-{manifest['slot']}-cli{version}"
-    if manifest.get("kind") == "source":
-        title += f"-src{manifest['source']['commit'][:12]}"
-    if manifest["extension"] == "azure-iot-ops":
-        runtime = manifest["runtime"]["version"] if manifest["runtime"] else "unavailable"
-        title += f"-runtime{runtime}"
-    title += f"-b{build}"
-    if "profile" in manifest and manifest["profile"]["configured"] != manifest["profile"]["selected"]:
-        title += "-manual"
-    if manifest.get("profile", {}).get("selected", {}).get("mode") == "Dry run":
-        title += "-dryrun"
-    if len(title) > 255:
-        raise ValueError("The resolved release-health run title exceeds the ADO name limit.")
-    return title
+    selected = manifest.get("profile", {}).get("selected")
+    scopes = selected["services"] if selected else ()
+    if scopes == ["Default scenarios"]:
+        scopes = ()
+    regions = selected["region"].split(",") if selected else ()
+    runtime = manifest.get("runtime")
+    naming = runpy.run_path(str(Path(__file__).with_name("pipeline_title.py")))
+    return naming["format_title"](
+        prefix, build, version, scopes=scopes, regions=regions,
+        runtimes=[runtime["version"]] if runtime else (),
+        channels=[runtime["train"]] if runtime else (),
+    )
 
 
 def main(argv=None):

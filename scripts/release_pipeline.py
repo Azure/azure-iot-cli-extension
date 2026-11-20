@@ -409,8 +409,14 @@ def create_candidate(source, directory):
     }
     write(directory / "candidate.json", value)
     verify_candidate(directory)
-    suffix = f" ({value['wheel']['version']})"
-    title = environment("BUILD_BUILDNUMBER").removesuffix(suffix) + suffix
+    naming = runpy.run_path(str(Path(__file__).with_name("pipeline_title.py")))
+    mode = release_options()[0]
+    title = naming["format_title"](
+        "iot", value["producer"]["build"], value["wheel"]["version"],
+        scopes=list(value["cohorts"]),
+        regions=environment("RELEASE_REGION").split(",") if value["cohorts"] else (),
+        action=mode.lower() if mode in {"Validate", "Draft", "Release"} else None,
+    )
     print(f"##vso[build.updatebuildnumber]{title}", flush=True)
     print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
         key: {"cohort": key} for key in value["cohorts"]

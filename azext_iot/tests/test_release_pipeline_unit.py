@@ -567,11 +567,13 @@ def test_candidate_rejects_governed_metadata_symlinks(candidate):
 @pytest.mark.parametrize("regions", ["australiaeast", "westus,eastus"])
 @pytest.mark.parametrize("already_versioned", [False, True])
 @pytest.mark.parametrize("skipped", [False, True])
+@pytest.mark.parametrize("mode", ["Validate", "Draft", "Release", "Upload wheel only"])
 def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
-        candidate, tmp_path, monkeypatch, capsys, regions, already_versioned, skipped):
+        candidate, tmp_path, monkeypatch, capsys, regions, already_versioned, skipped, mode):
     directory, value = candidate
     monkeypatch.setenv("RELEASE_REGION", regions)
     monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", str(skipped))
+    monkeypatch.setenv("RELEASE_MODE", mode)
     title = "iot-release-20261104.1"
     versioned_title = f"{title} ({value['wheel']['version']})"
     monkeypatch.setenv("BUILD_BUILDNUMBER", versioned_title if already_versioned else title)
@@ -590,7 +592,12 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     assert generated["cohorts"] == ({} if skipped else release.integration_cohorts(regions))
     assert generated["skipIntegrationTests"] is skipped
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == f"##vso[build.updatebuildnumber]{versioned_title}"
+    expected = f"iot-900 ({value['wheel']['version']})"
+    if not skipped:
+        expected += f" (DPS, Hub, ADU +1) ({', '.join(sorted(regions.split(',')))})"
+    if mode in {"Validate", "Draft", "Release"}:
+        expected += f" ({mode.lower()})"
+    assert lines[0] == f"##vso[build.updatebuildnumber]{expected}"
     matrix = json.loads(lines[-1].split("]", 1)[1])
     assert set(matrix) == set(generated["cohorts"])
     with zipfile.ZipFile(output / "SBOM.zip") as archive:

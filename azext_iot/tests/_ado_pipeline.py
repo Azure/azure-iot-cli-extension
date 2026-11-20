@@ -71,13 +71,14 @@ def plan(services, versions, regions, endpoint, diagnostic=False, release_build_
                 target = TARGET["target"](region, endpoint)
                 jobs.append({"service": service, "python": version, **target,
                              **(TARGET["scope"](endpoint) if sovereign else {}),
-                             "minutes": 10 if diagnostic else BUDGETS[service]["job_timeout_minutes"]})
+                             "minutes": 10 if diagnostic else BUDGETS[service].get("ado", {}).get(
+                                 "phase_minutes", BUDGETS[service]["job_timeout_minutes"])})
     if len(jobs) > 40:
         raise ValueError("Select at most 40 combinations per run.")
     return jobs
 
 
-def run_title(jobs, kind, mode, build_id, parent="0"):
+def run_title(jobs, kind, mode, build_id, parent="0", version=None):
     if (kind not in {"health", "integration"} or mode not in {"Dry run", "Integration tests"}
             or not re.fullmatch(r"[1-9][0-9]*", build_id) or not re.fullmatch(r"0|[1-9][0-9]*", parent)
             or kind == "health" and (mode != "Integration tests" or parent != "0")):
@@ -86,27 +87,8 @@ def run_title(jobs, kind, mode, build_id, parent="0"):
     if not services or not services <= set(RETRY["SERVICES"]):
         raise ValueError("Run titles require a supported, nonempty service plan.")
     regions = sorted({TARGET["target"](job["region"], job["endpoint"])["region"] for job in jobs})
-    for count in range(len(regions), 0, -1):
-        region_label = ",".join(regions[:count]) + (f" +{len(regions) - count}" if count < len(regions) else "")
-        if len(region_label) <= 80:
-            break
-    if services == {"ADU"}:
-        region_label = "hub " + region_label
-    if {"HubControl", "HubData"} <= services:
-        services = services - {"HubControl", "HubData"} | {"Hub"}
-    scope = ",".join(service for service in ("DPS", "Hub", "HubControl", "HubData", "ADU", "ADR")
-                     if service in services)
-    modes = []
-    if mode == "Dry run":
-        modes.append("dry-run")
-    if any(job["endpoint"] == TARGET["CANARY_ARM"] for job in jobs):
-        modes.append("canary")
-    title = f"iot-{kind}-{build_id} ({region_label}) ({scope})"
-    if modes:
-        title += f" ({','.join(modes)})"
-    if len(title) > 255 or not re.fullmatch(r"[A-Za-z0-9 (),+-]+", title):
-        raise ValueError("Run title exceeds Azure Pipelines length or character limits.")
-    return title
+    naming = runpy.run_path(str(ROOT / "scripts/pipeline_title.py"))
+    return naming["format_title"]("iot", build_id, version, scopes=services, regions=regions)
 
 
 def results_title(service, python, region, wheel, attempt):
@@ -429,12 +411,21 @@ def _phase(selection_file, output):
             owned.write_new(ownership, manifest.context)
             env[owned.ENV] = str(ownership)
             command += ["-p", "azext_iot.tests._ado_ownership_plugin"]
+        execution = None
         try:
             execution = dps.child(command, env, folder / "output.log",
-                                  (10 if diagnostic else BUDGETS[service]["job_timeout_minutes"] - 20) * 60, 600)
+                                  (10 if diagnostic else BUDGETS[service]["ado"]["test_minutes"]) * 60, 600)
         finally:
             if not diagnostic:
-                owned.cleanup(ownership, timeout=600)
+                budget = BUDGETS[service]["ado"]
+                cleanup_seconds = budget["cleanup_minutes"] * 60
+                if execution is None or execution["timed_out"] or execution["interrupted"]:
+                    # The outer controller only grants 660 seconds after interruption.
+                    cleanup_seconds = min(cleanup_seconds, 540)
+                owned.cleanup(
+                    ownership, timeout=cleanup_seconds,
+                    dependency_reserve=min(budget["dependency_reserve_minutes"] * 60, cleanup_seconds // 4),
+                )
         if execution["timed_out"] or execution["interrupted"]:
             raise ValueError("Timed out/interrupted execution cannot qualify.")
         receipt = RETRY["read"](folder / "pytest.json")
@@ -627,7 +618,9 @@ def run_attempt(args, output):
             expected = list(prior_expected.get(name, owned_nodes(args.service, args.endpoint).get(name, [])))
             RETRY["write"](selection, {"context": ctx, "phase": name, "nodes": nodes, "expected": expected,
                                        "sequence": record["sequence"], "parent": record["parent"]})
-            minutes = 10 if args.diagnostic else BUDGETS[args.service]["job_timeout_minutes"]
+            budget = {} if args.diagnostic else BUDGETS[args.service]
+            minutes = 10 if args.diagnostic else budget.get("ado", {}).get(
+                "phase_minutes", budget["job_timeout_minutes"])
             result = dps.child(
                 [sys.executable, str(Path(__file__)), "phase", "--selection", str(selection),
                  "--output", str(output / name)],
@@ -720,6 +713,7 @@ def main():
     namer.add_argument("--kind", choices=["health", "integration"], required=True)
     namer.add_argument("--mode", choices=["Dry run", "Integration tests"], required=True)
     namer.add_argument("--release-build-id", default="0")
+    namer.add_argument("--wheel", type=Path)
     labeler = commands.add_parser("results-title")
     for name in ("service", "python", "region", "wheel"):
         labeler.add_argument("--" + name, required=True)
@@ -749,7 +743,9 @@ def main():
         return 0
     if args.command == "title":
         jobs = json.loads(args.plan.read_text(encoding="utf-8"))
-        title = run_title(jobs, args.kind, args.mode, os.environ["BUILD_BUILDID"], args.release_build_id)
+        naming = runpy.run_path(str(ROOT / "scripts/pipeline_title.py"))
+        version = naming["wheel_version"](args.wheel) if args.wheel is not None else None
+        title = run_title(jobs, args.kind, args.mode, os.environ["BUILD_BUILDID"], args.release_build_id, version)
         print(f"##vso[build.updatebuildnumber]{title}", flush=True)
         if any(job["service"] == "ADU" for job in jobs):
             print("Device Update uses title regions for dependency Hubs only; account locations are fixture-defined.")

@@ -3,7 +3,7 @@ trigger: none
 pr: none
 # Held pending sovereign policy/authorization: 184 at 01:00 UTC, cron "0 1 * * *", dev only.
 schedules: []
-name: iot-branch-fairfax-ga-$(Date:yyyyMMdd).$(Rev:r)
+name: iot-$(Build.BuildId)
 appendCommitMessageToRunName: false
 parameters:
   - name: mode

@@ -1,5 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 
+name: clean-$(Build.BuildId)
+appendCommitMessageToRunName: false
 trigger: none
 pr: none
 
