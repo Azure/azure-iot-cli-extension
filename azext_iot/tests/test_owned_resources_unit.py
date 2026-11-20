@@ -578,8 +578,9 @@ def test_reads_retry_throttling_within_budget_but_deletes_do_not(http_arm, monke
     monkeypatch.setattr(owned.time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(owned.time, "sleep", lambda wait: clock.__setitem__(0, clock[0] + wait))
     if delay == "1000":
-        with pytest.raises(TimeoutError, match="bounded read budget"):
+        with pytest.raises(owned.ArmError, match="HTTP 429") as error:
             http_arm.request(method, RESOURCE, "2023-05-01")
+        assert error.value.delay == 1000
         assert http_arm.session.request.call_count == 1
     elif method == "DELETE":
         with pytest.raises(RuntimeError, match="HTTP 429"):
@@ -1003,3 +1004,67 @@ def test_accepted_hub_delete_is_observed_without_resubmitting(
             owned.cleanup(journal.path, timeout=1500, arm_factory=lambda _: http_arm)
         assert cleanup_clock[0] == 900
     assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == 1
+
+
+@pytest.mark.parametrize("operation", ["Updating", "Deleting"])
+def test_delete_conflict_waits_for_the_actual_operation_before_recovery(
+        journal, http_arm, cleanup_clock, operation):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    responses = [
+        arm_response(200, resource), arm_response(409, {"error": {"code": "OperationInProgress"}}),
+        arm_response(200, dict(resource, properties={"provisioningState": operation})),
+    ]
+    if operation == "Updating":
+        responses += [arm_response(200, resource), arm_response(202)]
+    responses += [arm_response(404, {"error": {"code": "ResourceNotFound"}})]
+    http_arm.session.request.side_effect = responses
+    owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == (
+        2 if operation == "Updating" else 1
+    )
+    assert journal.records()[RESOURCE]["cleanup"] == "absent"
+
+
+@pytest.mark.parametrize("delay", [120, 1000])
+def test_cleanup_get_honors_long_retry_after_and_preserves_last_error(
+        journal, http_arm, cleanup_clock, delay):
+    resource = {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}
+    journal.record(RESOURCE, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    http_arm.session.request.side_effect = [
+        arm_response(200, resource), arm_response(202),
+        arm_response(429, {"error": {"code": "TooManyRequests"}}, **{"Retry-After": str(delay)}),
+        arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+    ]
+    if delay == 120:
+        owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 120
+        assert journal.records()[RESOURCE]["cleanup"] == "absent"
+    else:
+        with pytest.raises(owned.CleanupIncomplete):
+            owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+        assert cleanup_clock[0] == 300
+        assert journal.records()[RESOURCE]["errorDetails"]["lastError"]["code"] == "TooManyRequests"
+    assert sum(call.args[0] == "DELETE" for call in http_arm.session.request.call_args_list) == 1
+
+
+def test_malformed_retry_after_records_failure_without_abandoning_other_resources(
+        journal, http_arm, cleanup_clock, capsys):
+    second = RESOURCE + "second"
+    for resource in (RESOURCE, second):
+        journal.record(resource, "2023-05-01")
+    http_arm.pages = Mock(return_value=[])
+    http_arm.session.request.side_effect = [
+        arm_response(200, {"id": RESOURCE, "tags": {owned.TAG: journal.owner}}),
+        arm_response(429, **{"Retry-After": "malformed-secret"}),
+        arm_response(200, {"id": second, "tags": {owned.TAG: journal.owner}}),
+        arm_response(202),
+        arm_response(404, {"error": {"code": "ResourceNotFound"}}),
+    ]
+    with pytest.raises(owned.CleanupIncomplete):
+        owned.cleanup(journal.path, timeout=300, arm_factory=lambda _: http_arm)
+    assert journal.records()[RESOURCE]["cleanup"] == "failed"
+    assert journal.records()[second]["cleanup"] == "absent"
+    assert "malformed-secret" not in capsys.readouterr().err

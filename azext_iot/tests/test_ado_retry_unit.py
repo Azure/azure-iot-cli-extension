@@ -1058,9 +1058,10 @@ def test_ownership_manifest_is_published_before_service_credentials_are_used():
 @pytest.mark.parametrize("service", ["ADR", "ADU"])
 @pytest.mark.parametrize("teardown_failed", [False, True])
 @pytest.mark.parametrize("cleanup_failed", [False, True])
+@pytest.mark.parametrize("execution_state", [(False, False), (False, True), (True, False)])
 @pytest.mark.usefixtures("isolated_phase_environment")
 def test_generic_phase_verifies_owned_cleanup(
-        tmp_path, mocker, monkeypatch, service, teardown_failed, cleanup_failed):
+        tmp_path, mocker, monkeypatch, service, teardown_failed, cleanup_failed, execution_state):
     monkeypatch.delenv("azext_iot_ado_resource_scope", raising=False)
     output = tmp_path / "phase"
     selection = tmp_path / "selection.json"
@@ -1091,21 +1092,24 @@ def test_generic_phase_verifies_owned_cleanup(
             value["reports"]["case"]["teardown"] = ["failed"]
             value["exitstatus"] = 1
         retry.write(env["azext_iot_ado_receipt"], value)
-        return {"exit_code": value["exitstatus"], "timed_out": False, "interrupted": False}
+        return {"exit_code": value["exitstatus"], "timed_out": execution_state[0], "interrupted": execution_state[1]}
 
     mocker.patch("azext_iot.tests._dps_phase_runner.child", side_effect=execute)
     if cleanup_failed:
         with pytest.raises(RuntimeError, match="Owned cleanup incomplete"):
             pipeline.phase(selection, output)
         assert not (output / "phase.json").exists()
+    elif any(execution_state):
+        with pytest.raises(ValueError, match="interrupted execution"):
+            pipeline.phase(selection, output)
+        assert not (output / "phase.json").exists()
     else:
         pipeline.phase(selection, output)
         assert retry.read(output / "phase.json")["safe"]
         assert retry.read(output / "phase.json")["cleanupMode"] == "verified"
-    cleanup.assert_called_once_with(
-        output / "ownership.json", timeout=(60 if service == "ADU" else 25) * 60,
-        dependency_reserve=(15 if service == "ADU" else 0) * 60,
-    )
+    cleanup_seconds = 540 if any(execution_state) else (60 if service == "ADU" else 25) * 60
+    cleanup.assert_called_once_with(output / "ownership.json", timeout=cleanup_seconds,
+                                    dependency_reserve=cleanup_seconds // 4 if service == "ADU" else 0)
     budget = pipeline.BUDGETS[service]["ado"]
     assert budget["test_minutes"] + 10 + budget["cleanup_minutes"] + 10 <= budget["phase_minutes"]
     assert retry.read(output / "ownership.json") == retry.read(manifest)
