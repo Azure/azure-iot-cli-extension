@@ -91,7 +91,13 @@
     "phases": [],
     "reserve_minutes": 0,
     "setup_minutes": 0,
-    "job_timeout_minutes": 150
+    "job_timeout_minutes": 150,
+    "ado": {
+      "test_minutes": 130,
+      "cleanup_minutes": 60,
+      "dependency_reserve_minutes": 15,
+      "phase_minutes": 210
+    }
   },
   "ADR": {
     "test_dir": "azext_iot/tests/adr",
@@ -99,6 +105,12 @@
     "phases": [],
     "reserve_minutes": 0,
     "setup_minutes": 0,
-    "job_timeout_minutes": 180
+    "job_timeout_minutes": 180,
+    "ado": {
+      "test_minutes": 160,
+      "cleanup_minutes": 25,
+      "dependency_reserve_minutes": 0,
+      "phase_minutes": 210
+    }
   }
 }

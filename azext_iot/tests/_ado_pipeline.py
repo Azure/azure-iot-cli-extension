@@ -71,7 +71,8 @@ def plan(services, versions, regions, endpoint, diagnostic=False, release_build_
                 target = TARGET["target"](region, endpoint)
                 jobs.append({"service": service, "python": version, **target,
                              **(TARGET["scope"](endpoint) if sovereign else {}),
-                             "minutes": 10 if diagnostic else BUDGETS[service]["job_timeout_minutes"]})
+                             "minutes": 10 if diagnostic else BUDGETS[service].get("ado", {}).get(
+                                 "phase_minutes", BUDGETS[service]["job_timeout_minutes"])})
     if len(jobs) > 40:
         raise ValueError("Select at most 40 combinations per run.")
     return jobs
@@ -412,10 +413,12 @@ def _phase(selection_file, output):
             command += ["-p", "azext_iot.tests._ado_ownership_plugin"]
         try:
             execution = dps.child(command, env, folder / "output.log",
-                                  (10 if diagnostic else BUDGETS[service]["job_timeout_minutes"] - 20) * 60, 600)
+                                  (10 if diagnostic else BUDGETS[service]["ado"]["test_minutes"]) * 60, 600)
         finally:
             if not diagnostic:
-                owned.cleanup(ownership, timeout=600)
+                budget = BUDGETS[service]["ado"]
+                owned.cleanup(ownership, timeout=budget["cleanup_minutes"] * 60,
+                              dependency_reserve=budget["dependency_reserve_minutes"] * 60)
         if execution["timed_out"] or execution["interrupted"]:
             raise ValueError("Timed out/interrupted execution cannot qualify.")
         receipt = RETRY["read"](folder / "pytest.json")
@@ -608,7 +611,9 @@ def run_attempt(args, output):
             expected = list(prior_expected.get(name, owned_nodes(args.service, args.endpoint).get(name, [])))
             RETRY["write"](selection, {"context": ctx, "phase": name, "nodes": nodes, "expected": expected,
                                        "sequence": record["sequence"], "parent": record["parent"]})
-            minutes = 10 if args.diagnostic else BUDGETS[args.service]["job_timeout_minutes"]
+            budget = {} if args.diagnostic else BUDGETS[args.service]
+            minutes = 10 if args.diagnostic else budget.get("ado", {}).get(
+                "phase_minutes", budget["job_timeout_minutes"])
             result = dps.child(
                 [sys.executable, str(Path(__file__)), "phase", "--selection", str(selection),
                  "--output", str(output / name)],
