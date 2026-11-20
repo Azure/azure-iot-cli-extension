@@ -447,6 +447,8 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
         path = repository / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("ReleaseCandidateBuildId\n", encoding="utf-8")
+    (repository / "azext_iot/constants.py").parent.mkdir(parents=True, exist_ok=True)
+    (repository / "azext_iot/constants.py").write_text('VERSION = "1.2.3"\n', encoding="utf-8")
     release.subprocess.run(["git", "add", "."], cwd=repository, check=True)
     commit_command = ["git", "-c", "user.name=Release Test", "-c", "user.email=release-test@example.invalid",
                       "commit", "--quiet", "-m",
@@ -467,7 +469,10 @@ def test_resolve_freezes_branch_tip_and_downstream_ignores_later_pushes(
     monkeypatch.setenv("RELEASE_SOURCE_COMMIT", "no-longer-a-source-override")
     resolved = release.checkout(tmp_path / "resolve", resolving=True)
     assert resolved == initial
-    assert f"##vso[task.setvariable variable=commit;isOutput=true]{initial}" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert f"##vso[task.setvariable variable=commit;isOutput=true]{initial}" in output
+    expected = "iot-900 (1.2.3)" + ("" if skipped else " (DPS, Hub, ADU +1) (australiaeast)") + f" ({mode.lower()})"
+    assert f"##vso[build.updatebuildnumber]{expected}" in output.splitlines()
 
     changed = repository / "scripts/select-openssl.sh"
     changed.write_text("new branch tip\n", encoding="utf-8")
