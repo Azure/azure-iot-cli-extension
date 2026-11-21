@@ -432,14 +432,11 @@ stages:
             displayName: Integration
             timeoutInMinutes: 1080
             cancelTimeoutInMinutes: 5
-            strategy:
-              matrix: $[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]
-              maxParallel: 0
             templateContext:
               outputs:
                 - output: pipelineArtifact
                   path: $(Agent.TempDirectory)/integration-run.json
-                  artifact: release-integration-$(cohort)-$(System.JobAttempt)
+                  artifact: release-integration-$(System.JobAttempt)
                   isProduction: false
                   condition: and(always(), ne(variables['integrationBuildId'], ''))
             steps:
@@ -461,7 +458,6 @@ stages:
                   --record "$(Agent.TempDirectory)/integration-run.json"
                 displayName: Run integration
                 env:
-                  RELEASE_COHORT: $(cohort)
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -481,7 +477,6 @@ stages:
                   --work-dir "$(Agent.TempDirectory)/integration-artifacts"
                 displayName: Check integration
                 env:
-                  RELEASE_COHORT: $(cohort)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
               - script: >-
@@ -491,7 +486,6 @@ stages:
                 displayName: Cancel integration
                 condition: or(failed(), canceled())
                 env:
-                  RELEASE_COHORT: $(cohort)
                   SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
@@ -610,6 +604,7 @@ stages:
                   --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
                 displayName: Stage draft or publish release
                 env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)

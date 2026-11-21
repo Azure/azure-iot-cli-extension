@@ -186,6 +186,8 @@ stages:
       - stage: Lint
         displayName: Lint
         dependsOn: Plan
+        # Release children skip source checks; the release's Unit stage and PR CI cover them.
+        condition: and(succeeded(), eq(variables['ReleaseCandidateBuildId'], '0'))
         jobs:
           - job: Lint
             timeoutInMinutes: 25
@@ -202,6 +204,8 @@ stages:
       - stage: Unit
         displayName: Unit
         dependsOn: Plan
+        # Release children skip source checks; the release's Unit stage and PR CI cover them.
+        condition: and(succeeded(), eq(variables['ReleaseCandidateBuildId'], '0'))
         jobs:
           - job: Unit
             displayName: Unit
@@ -296,6 +300,13 @@ stages:
           - ${{ if ne(variables.servicesCsv, '') }}:
               - ${{ each service in split(variables.servicesCsv, ',') }}:
                   - ${{ service }}
+        # The gate rejects any planned service combination without results.
+        condition: >-
+          and(not(canceled()), not(failed()),
+              eq(dependencies.Plan.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'),
+              or(and(eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded')),
+                 and(ne(variables['ReleaseCandidateBuildId'], '0'),
+                     eq(dependencies.Lint.result, 'Skipped'), eq(dependencies.Unit.result, 'Skipped'))))
         jobs:
           - job: Gate
             displayName: Results
