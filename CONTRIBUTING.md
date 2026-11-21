@@ -254,8 +254,8 @@ never unsupported skips.
 Run titles include the cloud, track, actual CLI version, source commit and build ID.
 These are source-build health results, not published-release qualification.
 
-Release pipeline **Public region** selects the public regions passed to every integration
-cohort. DPS always uses the public ARM endpoint; there is no separate canary target.
+Release pipeline **Public region** selects the public regions passed to the integration
+child. DPS always uses the public ARM endpoint; there is no separate canary target.
 Release, integration and health use the same named, multiselect region dropdown:
 Australia East, Japan East, Central US, UK South, West US, West US 3, East US and West Europe.
 **Cloud** choices are **Public**, **Fairfax** and **Mooncake**. Fairfax always uses
@@ -267,6 +267,8 @@ Pipeline 147 defines the queue-time variable `ReleaseCandidateBuildId=0`.
 Release automation supplies that variable when queueing a child; the child verifies
 the exact candidate instead of rebuilding it. It is not a Run pipeline parameter,
 and standalone users do not need to supply it.
+Each release queues one child covering every cohort. Release children skip Lint and
+Unit; the release Unit stage and PR CI cover them.
 
 Service matrices have no artificial parallel limit or cross-run lock. Scheduled
 cleanup is report-first and never uses names or age alone to authorize deletion.

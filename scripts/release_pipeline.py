@@ -433,9 +433,6 @@ def create_candidate(source, directory):
     write(directory / "candidate.json", value)
     verify_candidate(directory)
     print(f"##vso[build.updatebuildnumber]{release_title(value['wheel']['version'], value['cohorts'])}", flush=True)
-    print("##vso[task.setvariable variable=matrix;isOutput=true]" + json.dumps({
-        key: {"cohort": key} for key in value["cohorts"]
-    }), flush=True)
     return value
 
 
@@ -488,9 +485,16 @@ def integration_cohorts(regions=None):
     return cohorts
 
 
-def integration_parameters(candidate, cohort=None):
-    key = cohort or environment("RELEASE_COHORT")
-    selection = candidate["cohorts"][key]
+def integration_parameters(candidate):
+    """Combine every release cohort into the single pipeline 147 request."""
+    cohorts = list(candidate["cohorts"].values())
+    shared = [{key: value for key, value in item.items() if key != "services"} for item in cohorts]
+    if not cohorts or any(item != shared[0] for item in shared):
+        raise ValueError("Release cohorts must share one integration request.")
+    services = [service for item in cohorts for service in item["services"]]
+    if len(services) != len(set(services)):
+        raise ValueError("Release cohorts must not repeat a service.")
+    selection = dict(shared[0], services=services)
     return dict(selection, releaseBuildId=candidate["producer"]["build"], cloud="Public",
                 regions=[PUBLIC_REGIONS[region] for region in selection["regions"].split(",")])
 
@@ -509,7 +513,7 @@ def queued_release_build_id(build):
     return value
 
 
-def validate_integration(build, candidate, cohort=None):
+def validate_integration(build, candidate):
     parameters = build.get("templateParameters")
     if isinstance(parameters, str):
         parameters = json.loads(parameters)
@@ -520,7 +524,7 @@ def validate_integration(build, candidate, cohort=None):
         if isinstance(parameters.get(key), str):
             parameters[key] = json.loads(parameters[key])
     parameters["releaseBuildId"] = identifier(queued_release_build_id(build))
-    expected = integration_parameters(candidate, cohort)
+    expected = integration_parameters(candidate)
     repository = build["repository"]
     if (build["definition"]["id"] != 147 or repository.get("id") != REPOSITORY
             or repository.get("type") != "GitHub" or repository.get("name") not in (None, REPOSITORY)
@@ -542,23 +546,15 @@ def existing_integration(candidate) -> dict | None:
     builds = ado("build/builds?" + query)["value"]
     if len(builds) >= 1000:
         raise ValueError("Too many child builds to prove unique ownership; inspect pipeline 147 before retrying.")
-    matches = {key: [] for key in candidate["cohorts"]}
-    for build in builds:
-        if queued_release_build_id(build) == candidate["producer"]["build"]:
-            scopes = []
-            for key in candidate["cohorts"]:
-                try:
-                    validate_integration(build, candidate, key)
-                    scopes.append(key)
-                except ValueError:
-                    continue
-            if len(scopes) != 1:
-                raise ValueError("An owned child has an unexpected release cohort or source.")
-            matches[scopes[0]].append(build)
-    if any(len(builds) > 1 for builds in matches.values()):
-        raise ValueError("Multiple children reference this release; resolve the duplicate cohorts before proceeding.")
-    selected = matches[environment("RELEASE_COHORT")]
-    return selected[0] if selected else None
+    matches = [build for build in builds if queued_release_build_id(build) == candidate["producer"]["build"]]
+    for build in matches:
+        try:
+            validate_integration(build, candidate)
+        except ValueError as error:
+            raise ValueError("An owned child has an unexpected release request or source.") from error
+    if len(matches) > 1:
+        raise ValueError("Multiple children reference this release; resolve the duplicates before proceeding.")
+    return matches[0] if matches else None
 
 
 def cancel_integration(record, directory):
@@ -568,11 +564,10 @@ def cancel_integration(record, directory):
         if existing is None:
             print("No child of this release was found; no cancellation request was sent.", flush=True)
             return
-        run = {"id": identifier(existing.get("id")), "producer": candidate["producer"],
-               "cohort": environment("RELEASE_COHORT")}
+        run = {"id": identifier(existing.get("id")), "producer": candidate["producer"]}
     else:
         run = read(record)
-    if run["producer"] != candidate["producer"] or run["cohort"] != environment("RELEASE_COHORT"):
+    if run["producer"] != candidate["producer"]:
         raise ValueError("Refusing to cancel a child owned by another release.")
     build = ado(f"build/builds/{identifier(run['id'])}")
     validate_integration(build, candidate)
@@ -600,7 +595,7 @@ def integrate(directory, record, timeout=25200):
             raise ValueError("No child found on a retried job; do not risk requeuing an uncertain prior request.")
         run = ado("build/builds", method="POST", data=payload)
     run_id = identifier(run["id"])
-    write(record, {"id": run_id, "producer": candidate["producer"], "cohort": environment("RELEASE_COHORT")})
+    write(record, {"id": run_id, "producer": candidate["producer"]})
     print(f"##vso[task.setvariable variable=integrationBuildId]{run_id}", flush=True)
     print(f"Integration: https://dev.azure.com/azureiotdevxp/aziotcli/_build/results?buildId={run_id}", flush=True)
 
