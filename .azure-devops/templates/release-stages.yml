@@ -610,6 +610,7 @@ stages:
                   --prepared "$(Pipeline.Workspace)/release-tooling/publication.json"
                 displayName: Stage draft or publish release
                 env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                   RELEASE_SOURCE_BRANCH: ${{ parameters.sourceBranch }}
                   RELEASE_SOURCE_COMMIT: $(sourceCommit)
                   RELEASE_GITHUB_TOKEN: $(ReleaseGitHubToken)
