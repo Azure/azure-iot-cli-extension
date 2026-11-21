@@ -612,6 +612,14 @@ def test_plan_rejects_unsupported_or_duplicate_configuration(services, versions,
         pipeline.plan(services, versions, regions, endpoint)
 
 
+def test_release_child_plan_fits_every_cohort_in_every_region():
+    regions = ["australiaeast", "japaneast", "centralus", "uksouth", "westus", "westus3", "eastus", "westeurope"]
+    args = list(retry.SERVICES), ["3.10", "3.13"], regions, pipeline.TARGET["PUBLIC_ARM"]
+    assert len(pipeline.plan(*args, release_build_id="900")) == 80
+    with pytest.raises(ValueError, match="at most 40"):
+        pipeline.plan(*args)
+
+
 def test_plan_has_all_github_services_and_no_legacy_services():
     jobs = pipeline.plan(list(retry.SERVICES), ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
     assert len(jobs) == 10
@@ -898,6 +906,14 @@ def test_standalone_runners_and_children_inherit_candidate_dependencies(tmp_path
     assert missing.returncode != 0 and "ModuleNotFoundError" in missing.stderr
 
 
+# Release children skip Lint/Unit; every other run still requires both to pass.
+SOURCE_CHECKS = (
+    "or(and(eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded')), "
+    "and(ne(variables['ReleaseCandidateBuildId'], '0'), "
+    "eq(dependencies.Lint.result, 'Skipped'), eq(dependencies.Unit.result, 'Skipped')))"
+)
+
+
 def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
@@ -925,7 +941,12 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)"
                for step in stages["Unit"]["jobs"][1]["steps"])
     assert stages["Qualify"]["dependsOn"][:4] == ["Plan", "Build", "Lint", "Unit"]
-    assert "condition" not in stages["Qualify"]
+    for name in ("Lint", "Unit"):
+        assert stages[name]["condition"] == "and(succeeded(), eq(variables['ReleaseCandidateBuildId'], '0'))"
+    assert " ".join(stages["Qualify"]["condition"].split()) == (
+        "and(not(canceled()), not(failed()), "
+        "eq(dependencies.Plan.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'), " + SOURCE_CHECKS + ")"
+    )
 
 
 @pytest.mark.parametrize("service", ["DPS", "HubControl", "ADU"])
@@ -990,8 +1011,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     assert stage["stage"] == "${{ parameters.service }}"
     assert stage["${{ else }}"]["dependsOn"] == ["Build", "Lint", "Unit"]
     assert " ".join(stage["${{ else }}"]["condition"].split()) == (
-        "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
-        "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
+        "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), " + SOURCE_CHECKS + ")"
     )
     assert stage["jobs"][0]["strategy"]["maxParallel"] == 0
     assert "$(" not in stage["jobs"][0]["displayName"]
