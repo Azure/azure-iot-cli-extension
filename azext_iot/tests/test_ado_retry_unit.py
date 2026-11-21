@@ -612,6 +612,14 @@ def test_plan_rejects_unsupported_or_duplicate_configuration(services, versions,
         pipeline.plan(services, versions, regions, endpoint)
 
 
+def test_release_child_plan_fits_every_cohort_in_every_region():
+    regions = ["australiaeast", "japaneast", "centralus", "uksouth", "westus", "westus3", "eastus", "westeurope"]
+    args = list(retry.SERVICES), ["3.10", "3.13"], regions, pipeline.TARGET["PUBLIC_ARM"]
+    assert len(pipeline.plan(*args, release_build_id="900")) == 80
+    with pytest.raises(ValueError, match="at most 40"):
+        pipeline.plan(*args)
+
+
 def test_plan_has_all_github_services_and_no_legacy_services():
     jobs = pipeline.plan(list(retry.SERVICES), ["3.10", "3.13"], ["australiaeast"], pipeline.TARGET["PUBLIC_ARM"])
     assert len(jobs) == 10
