@@ -853,6 +853,20 @@ def ownership_record(candidate, release_id, job_id):
     }
 
 
+def previous_publication_records(build_id, record, kind, timelines):
+    pending = []
+    for reference in record.get("previousAttempts", []):
+        timeline_id = timeline_guid(reference["timelineId"])
+        if timeline_id not in timelines:
+            if len(timelines) >= 100:
+                raise ValueError("Publication retry history exceeds the bounded ownership inventory.")
+            timelines[timeline_id] = ado(f"build/builds/{build_id}/timeline/{timeline_id}")
+            if timeline_guid(timelines[timeline_id]["id"]) != timeline_id:
+                raise ValueError("Publication retry timeline identity changed.")
+        pending.append((timelines[timeline_id], timeline_guid(reference["recordId"]), kind))
+    return pending
+
+
 def publication_ownership(candidate):
     """Read receipts only from this run's protected publisher task and its retries."""
     origin = candidate["producer"]
@@ -879,18 +893,7 @@ def publication_ownership(candidate):
     if len(stages) != 1:
         raise ValueError("Cannot identify the protected publication stage.")
 
-    def previous(record, kind):
-        for reference in record.get("previousAttempts", []):
-            timeline_id = timeline_guid(reference["timelineId"])
-            if timeline_id not in timelines:
-                if len(timelines) >= 100:
-                    raise ValueError("Publication retry history exceeds the bounded ownership inventory.")
-                timelines[timeline_id] = ado(f"build/builds/{build_id}/timeline/{timeline_id}")
-                if timeline_guid(timelines[timeline_id]["id"]) != timeline_id:
-                    raise ValueError("Publication retry timeline identity changed.")
-            pending.append((timelines[timeline_id], timeline_guid(reference["recordId"]), kind))
-
-    previous(stages[0], "Stage")
+    pending.extend(previous_publication_records(build_id, stages[0], "Stage", timelines))
     while pending:
         timeline, record_id, kind = pending.pop()
         timeline_id, record_id = timeline_guid(timeline["id"]), timeline_guid(record_id)
@@ -903,7 +906,7 @@ def publication_ownership(candidate):
         expected = "Publish" if kind == "Stage" else PUBLICATION_JOB
         if record is None or record["type"] != kind or record.get("identifier") != expected:
             raise ValueError("Publication retry history does not identify a protected publisher.")
-        previous(record, kind)
+        pending.extend(previous_publication_records(build_id, record, kind, timelines))
         if kind == "Stage":
             for row in records.values():
                 if row["type"] == "Job" and row.get("identifier") == PUBLICATION_JOB:
@@ -1045,10 +1048,7 @@ def verify_publication_inputs(directory, prepared):
     return candidate, value
 
 
-def publish(directory, receipt, prepared):
-    draft_only = release_options()[0] == "Draft"
-    publication_allowed(draft=draft_only)
-    candidate, preparation = verify_publication_inputs(directory, prepared)
+def publication_release(candidate, preparation, receipt, draft_only):
     waiver = "Integration tests skipped by release waiver." if candidate.get("skipIntegrationTests") else ""
     version = candidate["wheel"]["version"]
     tag = f"v{version}"
@@ -1085,6 +1085,17 @@ def publish(directory, receipt, prepared):
             or release["target_commitish"] != candidate["sourceCommit"] and existing_tag != candidate["sourceCommit"]
             or release["prerelease"] != preparation["prerelease"]):
         raise ValueError("Existing release has different tag, source or prerelease metadata.")
+    return release
+
+
+def publish(directory, receipt, prepared):
+    draft_only = release_options()[0] == "Draft"
+    publication_allowed(draft=draft_only)
+    candidate, preparation = verify_publication_inputs(directory, prepared)
+    waiver = "Integration tests skipped by release waiver." if candidate.get("skipIntegrationTests") else ""
+    version = candidate["wheel"]["version"]
+    tag = f"v{version}"
+    release = publication_release(candidate, preparation, receipt, draft_only)
     for asset in (candidate["wheel"], candidate["sbom"]):
         matches = [item for item in release["assets"] if item["name"] == asset["file"]]
         if len(matches) > 1:
@@ -1110,7 +1121,8 @@ def publish(directory, receipt, prepared):
                data={"body": waiver + "\n\n" + (release.get("body") or "")})
     if draft_only:
         staged = github(f"repos/{REPOSITORY}/releases/{release['id']}")
-        if (not staged["draft"] or staged.get("tag_name") != tag or staged["target_commitish"] != candidate["sourceCommit"]
+        if (not staged["draft"] or staged.get("tag_name") != tag
+                or staged["target_commitish"] != candidate["sourceCommit"]
                 or staged["prerelease"] != preparation["prerelease"]
                 or waiver and waiver not in (staged.get("body") or "")
                 or tag_commit(tag) not in (None, candidate["sourceCommit"])):
