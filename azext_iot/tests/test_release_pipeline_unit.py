@@ -28,6 +28,7 @@ SPEC.loader.exec_module(release)
 SOURCE_SHA = "b" * 40
 AUTOMATION_SHA = "a" * 40
 PROJECT = "9c543948-e573-4146-832a-bf16b1531204"
+ALL_SERVICES = ["DPS", "HubControl", "HubData", "ADU", "ADR"]
 JOB = "44444444-4444-4444-8444-444444444444"
 OWNERSHIP_READER = release.publication_ownership
 
@@ -44,7 +45,7 @@ def candidate(tmp_path, monkeypatch):
         "RELEASE_MODE": "Release", "RELEASE_CREATE_INDEX_PR": "false",
         "RELEASE_SKIP_INTEGRATION_TESTS": "false",
         "RELEASE_UPLOAD_WHEEL_TO_BLOB": "false",
-        "RELEASE_REGION": "australiaeast", "RELEASE_COHORT": "Hub",
+        "RELEASE_REGION": "australiaeast",
         "RELEASE_GITHUB_TOKEN": "offline-test-placeholder", "INDEX_FORK_REPOSITORY": "test-bot/azure-cli-extensions",
     }.items():
         monkeypatch.setenv(name, value)
@@ -82,7 +83,7 @@ def candidate(tmp_path, monkeypatch):
     return directory, value
 
 
-def integration_build(value, result="succeeded", cohort="Hub"):
+def integration_build(value, result="succeeded"):
     return {
         "id": 901, "definition": {"id": 147}, "project": {"id": PROJECT},
         "repository": {"id": release.REPOSITORY, "type": "GitHub"},
@@ -90,9 +91,9 @@ def integration_build(value, result="succeeded", cohort="Hub"):
         "status": "completed", "result": result,
         "parameters": json.dumps({"ReleaseCandidateBuildId": value["producer"]["build"]}),
         "templateParameters": {
-            **{key: item for key, item in release.integration_parameters(value, cohort).items()
+            **{key: item for key, item in release.integration_parameters(value).items()
                if key != "releaseBuildId"},
-            "services": json.dumps(value["cohorts"][cohort]["services"], indent=2),
+            "services": json.dumps(ALL_SERVICES, indent=2),
             "pythonVersions": '["3.10", "3.13"]',
         },
     }
@@ -667,8 +668,7 @@ def test_candidate_creation_preserves_wheel_and_packages_runtime_sbom(
     if not skipped:
         expected += f" (DPS, Hub, ADU +1) ({', '.join(sorted(regions.split(',')))})"
     assert lines[0] == f"##vso[build.updatebuildnumber]{expected} (release)"
-    matrix = json.loads(lines[-1].split("]", 1)[1])
-    assert set(matrix) == set(generated["cohorts"])
+    assert not any("variable=matrix" in line for line in lines)
     with zipfile.ZipFile(output / "SBOM.zip") as archive:
         assert archive.read("_manifest/spdx_2.2/manifest.spdx.json") == manifest.read_bytes()
     assert release.verify_candidate(output) == generated
@@ -711,16 +711,29 @@ def test_release_dropdown_selections_round_trip_through_child_request(candidate,
     value["cohorts"] = release.integration_cohorts()
     release.write(directory / "candidate.json", value)
     release.verify_candidate(directory)
-    for cohort in value["cohorts"]:
-        request = release.integration_parameters(value, cohort)
-        assert request["regions"] == selected
-        assert request["cloud"] == "Public"
-        build = integration_build(value, cohort=cohort)
-        build["templateParameters"]["regions"] = json.dumps(request["regions"])
-        release.validate_integration(build, value, cohort)
-        build["templateParameters"]["regions"] = json.dumps(selected[:-1])
-        with pytest.raises(ValueError, match="exact release"):
-            release.validate_integration(build, value, cohort)
+    request = release.integration_parameters(value)
+    assert request["regions"] == selected
+    assert request["cloud"] == "Public"
+    assert request["services"] == ALL_SERVICES
+    build = integration_build(value)
+    build["templateParameters"]["regions"] = json.dumps(request["regions"])
+    release.validate_integration(build, value)
+    build["templateParameters"]["regions"] = json.dumps(selected[:-1])
+    with pytest.raises(ValueError, match="exact release"):
+        release.validate_integration(build, value)
+
+
+@pytest.mark.parametrize("change", ["python", "regions", "duplicate"])
+def test_single_child_request_rejects_divergent_cohorts(candidate, change):
+    _, value = candidate
+    if change == "python":
+        value["cohorts"]["ADU"]["pythonVersions"] = ["3.13"]
+    elif change == "regions":
+        value["cohorts"]["ADR"]["regions"] = "westus"
+    else:
+        value["cohorts"]["ADR"]["services"] = ["DPS"]
+    with pytest.raises(ValueError, match="share one integration request|repeat a service"):
+        release.integration_parameters(value)
 
 
 @pytest.mark.parametrize("change", ["missing", "python", "endpoint", "services", "omitted"])
@@ -938,59 +951,35 @@ def test_duplicate_child_ownership_rejected(candidate, monkeypatch):
 
 
 @pytest.mark.parametrize("regions", ["australiaeast", "westus,eastus"])
-@pytest.mark.parametrize("duplicate", [None, "DPS", "Hub", "ADU", "ADR", "unexpected"])
-def test_service_children_are_matched_by_exact_scope(candidate, monkeypatch, regions, duplicate):
+@pytest.mark.parametrize("services", [None, ["DPS"], ["HubControl", "HubData"], ALL_SERVICES[:-1]])
+def test_one_child_owns_every_service(candidate, monkeypatch, regions, services):
     _, value = candidate
     value["cohorts"] = release.integration_cohorts(regions)
-    monkeypatch.setenv("RELEASE_COHORT", "DPS")
-    builds = [
-        {**integration_build(value, cohort=cohort), "id": 901 + index}
-        for index, cohort in enumerate(value["cohorts"])
-    ]
-    if duplicate in value["cohorts"]:
-        builds.append({**integration_build(value, cohort=duplicate), "id": 999})
-    elif duplicate == "unexpected":
-        builds[1]["templateParameters"]["armEndpoint"] = "canary"
+    build = integration_build(value)
+    if services:
+        # A per-cohort child from the former layout cannot qualify the whole release.
+        build["templateParameters"]["services"] = json.dumps(services)
     monkeypatch.setattr(release, "ado", Mock(side_effect=[
         {"definition": {"id": 161}, "sourceVersion": AUTOMATION_SHA, "queueTime": "2026-10-08T00:00:00Z"},
-        {"value": builds},
+        {"value": [build]},
     ]))
-    if duplicate:
-        with pytest.raises(ValueError, match="Multiple children|unexpected release cohort"):
+    if services:
+        with pytest.raises(ValueError, match="unexpected release request"):
             release.existing_integration(value)
     else:
-        assert release.existing_integration(value) == builds[0]
-
-
-@pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
-def test_mixed_target_retry_reattaches_only_its_cohort(candidate, tmp_path, monkeypatch, cohort):
-    directory, value = candidate
-    monkeypatch.setenv("RELEASE_REGION", "westus,eastus")
-    monkeypatch.setenv("RELEASE_COHORT", cohort)
-    monkeypatch.setenv("SYSTEM_JOBATTEMPT", "2")
-    value["cohorts"] = release.integration_cohorts()
-    release.write(directory / "candidate.json", value)
-    build = integration_build(value, cohort=cohort)
-    monkeypatch.setattr(release, "existing_integration", Mock(return_value=build))
-    mocked = Mock(return_value=build)
-    monkeypatch.setattr(release, "ado", mocked)
-    assert release.integrate(directory, tmp_path / "child.json") == "901"
-    mocked.assert_called_once_with("build/builds/901")
-    assert release.read(tmp_path / "child.json")["cohort"] == cohort
+        assert release.existing_integration(value) == build
 
 
 @pytest.mark.parametrize("hour", [8, 13])
-@pytest.mark.parametrize("cohort", ["DPS", "Hub", "ADU", "ADR"])
-def test_integration_queues_exact_candidate_once_without_admission(candidate, tmp_path, monkeypatch, hour, cohort):
+def test_integration_queues_exact_candidate_once_without_admission(candidate, tmp_path, monkeypatch, hour):
     directory, value = candidate
-    monkeypatch.setenv("RELEASE_COHORT", cohort)
     monkeypatch.setattr(release, "existing_integration", Mock(return_value=None))
     monkeypatch.setattr(
         release, "datetime", Mock(now=Mock(return_value=datetime(2026, 10, 29, hour, tzinfo=timezone.utc))),
         raising=False,
     )
     monkeypatch.setattr(release.time, "sleep", Mock(side_effect=AssertionError("Unexpected admission wait")))
-    mocked = Mock(side_effect=[{"id": 901}, integration_build(value, cohort=cohort)])
+    mocked = Mock(side_effect=[{"id": 901}, integration_build(value)])
     monkeypatch.setattr(release, "ado", mocked)
     record = tmp_path / "child.json"
     assert release.integrate(directory, record) == "901"
@@ -1001,9 +990,9 @@ def test_integration_queues_exact_candidate_once_without_admission(candidate, tm
     assert payload["sourceVersion"] == SOURCE_SHA
     assert json.loads(payload["parameters"]) == {"ReleaseCandidateBuildId": "900"}
     assert "releaseBuildId" not in payload["templateParameters"]
-    assert json.loads(payload["templateParameters"]["services"]) == value["cohorts"][cohort]["services"]
+    assert json.loads(payload["templateParameters"]["services"]) == ALL_SERVICES
     assert json.loads(payload["templateParameters"]["pythonVersions"]) == ["3.10", "3.13"]
-    assert release.read(record)["producer"] == value["producer"]
+    assert release.read(record) == {"id": "901", "producer": value["producer"]}
     assert mocked.call_count == 2
     assert mocked.call_args_list[1].args == ("build/builds/901",)
     release.time.sleep.assert_not_called()
@@ -1058,15 +1047,6 @@ def test_cancellation_rejects_other_parent_receipt(candidate, tmp_path):
     directory, value = candidate
     record = tmp_path / "child.json"
     release.write(record, {"id": "901", "producer": {**value["producer"], "build": "899"}})
-    with pytest.raises(ValueError, match="another release"):
-        release.cancel_integration(record, directory)
-    release.ado.assert_not_called()
-
-
-def test_cancellation_rejects_another_cohort_of_the_same_parent(candidate, tmp_path):
-    directory, value = candidate
-    record = tmp_path / "child.json"
-    release.write(record, {"id": "901", "producer": value["producer"], "cohort": "DPS"})
     with pytest.raises(ValueError, match="another release"):
         release.cancel_integration(record, directory)
     release.ado.assert_not_called()
@@ -1877,14 +1857,12 @@ def test_yaml_exact_candidate_and_narrow_credential_mapping():
     assert stages["Publish"]["variables"][0] == {"group": "aziotcli_release_publish"}
 
 
-def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity():
+def test_yaml_runs_one_frozen_child_independently_of_unit():
     pipeline, stages = all_stages()
     assert pipeline["variables"]["RELEASE_REGION"] == "${{ lower(replace(join(',', parameters.regions), ' ', '')) }}"
-    job = stages["Integration"]["jobs"][0]
+    job, = stages["Integration"]["jobs"]
     assert "$(" not in job["displayName"]
-    assert job["strategy"] == {
-        "matrix": "$[ stageDependencies.Build.Build.outputs['candidate.matrix'] ]", "maxParallel": 0,
-    }
+    assert "strategy" not in job
     assert stages["Unit"]["dependsOn"] == "Resolve"
     assert stages["Integration"]["dependsOn"] == ["Resolve", "Build", "Security", "CommandLint", "IndexCompatibility"]
     assert "dependencies.Unit" not in stages["Integration"]["condition"]
@@ -1894,9 +1872,8 @@ def test_yaml_runs_frozen_cohorts_independently_of_unit_with_available_capacity(
     ]
     assert "eq(dependencies.Unit.result, 'Succeeded')" in stages["Publish"]["condition"]
     assert job["timeoutInMinutes"] >= 9 * 60 + 7 * 60
-    assert "$(cohort)" in job["templateContext"]["outputs"][0]["artifact"]
-    scripts = [step for step in job["steps"] if "script" in step]
-    assert all(step["env"]["RELEASE_COHORT"] == "$(cohort)" for step in scripts)
+    assert job["templateContext"]["outputs"][0]["artifact"] == "release-integration-$(System.JobAttempt)"
+    assert "cohort" not in json.dumps(job).lower()
 
 
 def test_yaml_extends_official_template_without_governance_bypasses():

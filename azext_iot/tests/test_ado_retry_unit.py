@@ -898,6 +898,14 @@ def test_standalone_runners_and_children_inherit_candidate_dependencies(tmp_path
     assert missing.returncode != 0 and "ModuleNotFoundError" in missing.stderr
 
 
+# Release children skip Lint/Unit; every other run still requires both to pass.
+SOURCE_CHECKS = (
+    "or(and(eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded')), "
+    "and(ne(variables['ReleaseCandidateBuildId'], '0'), "
+    "eq(dependencies.Lint.result, 'Skipped'), eq(dependencies.Unit.result, 'Skipped')))"
+)
+
+
 def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     entry = yaml.safe_load((ROOT / ".azure-devops/integration_tests.yml").read_text())
     integration = entry["stages"][1]["${{ if eq(parameters.mode, 'Integration tests') }}"]
@@ -925,7 +933,12 @@ def test_build_lint_and_unit_stages_are_independent_and_keep_artifacts():
     assert any(step.get("artifact") == "integration-unit-coverage-$(System.JobAttempt)"
                for step in stages["Unit"]["jobs"][1]["steps"])
     assert stages["Qualify"]["dependsOn"][:4] == ["Plan", "Build", "Lint", "Unit"]
-    assert "condition" not in stages["Qualify"]
+    for name in ("Lint", "Unit"):
+        assert stages[name]["condition"] == "and(succeeded(), eq(variables['ReleaseCandidateBuildId'], '0'))"
+    assert " ".join(stages["Qualify"]["condition"].split()) == (
+        "and(not(canceled()), not(failed()), "
+        "eq(dependencies.Plan.result, 'Succeeded'), eq(dependencies.Build.result, 'Succeeded'), " + SOURCE_CHECKS + ")"
+    )
 
 
 @pytest.mark.parametrize("service", ["DPS", "HubControl", "ADU"])
@@ -990,8 +1003,7 @@ def test_service_stages_require_all_prechecks_but_remain_independent_retry_targe
     assert stage["stage"] == "${{ parameters.service }}"
     assert stage["${{ else }}"]["dependsOn"] == ["Build", "Lint", "Unit"]
     assert " ".join(stage["${{ else }}"]["condition"].split()) == (
-        "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), "
-        "eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))"
+        "and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'), " + SOURCE_CHECKS + ")"
     )
     assert stage["jobs"][0]["strategy"]["maxParallel"] == 0
     assert "$(" not in stage["jobs"][0]["displayName"]
