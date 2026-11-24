@@ -73,8 +73,10 @@ def plan(services, versions, regions, endpoint, diagnostic=False, release_build_
                              **(TARGET["scope"](endpoint) if sovereign else {}),
                              "minutes": 10 if diagnostic else BUDGETS[service].get("ado", {}).get(
                                  "phase_minutes", BUDGETS[service]["job_timeout_minutes"])})
-    if len(jobs) > 40:
-        raise ValueError("Select at most 40 combinations per run.")
+    # One release child carries every cohort that separate children used to share.
+    limit = 40 if str(release_build_id) == "0" else 80
+    if len(jobs) > limit:
+        raise ValueError(f"Select at most {limit} combinations per run.")
     return jobs
 
 
