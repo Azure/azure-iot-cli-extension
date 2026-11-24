@@ -50,9 +50,11 @@ stages:
         - Build
         - Lint
         - Unit
-      condition: |
+      condition: >-
         and(not(canceled()), eq(dependencies.Build.result, 'Succeeded'),
-            eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded'))
+            or(and(eq(dependencies.Lint.result, 'Succeeded'), eq(dependencies.Unit.result, 'Succeeded')),
+               and(ne(variables['ReleaseCandidateBuildId'], '0'),
+                   eq(dependencies.Lint.result, 'Skipped'), eq(dependencies.Unit.result, 'Skipped'))))
     jobs:
       - job: Tests
         displayName: ${{ replace(replace(parameters.service, 'HubControl', 'Hub control'), 'HubData', 'Hub data') }}
