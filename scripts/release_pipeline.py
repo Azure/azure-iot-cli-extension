@@ -508,8 +508,22 @@ def create_candidate(source, directory):
     return value
 
 
+def validate_manifest_fields(value, fields, context):
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must be a JSON object.")
+    for field, expected_type in fields.items():
+        if type(value.get(field)) is not expected_type:
+            raise ValueError(f"{context} field '{field}' is missing or has an invalid type.")
+
+
 def verify_candidate(directory):
     value = read(directory / "candidate.json")
+    validate_manifest_fields(value, {
+        "schema": int, "repository": str, "producer": dict, "sourceBranch": str,
+        "sourceCommit": str, "wheel": dict, "sbom": dict,
+    }, "Candidate manifest")
+    validate_manifest_fields(value["wheel"], {"file": str, "sha256": str, "version": str}, "Candidate wheel")
+    validate_manifest_fields(value["sbom"], {"file": str, "sha256": str}, "Candidate SBOM")
     if (type(value["schema"]) is not int or value["schema"] != 1 or value["repository"] != REPOSITORY
             or value["producer"] != producer()
             or value["sourceBranch"] != branch(environment("RELEASE_SOURCE_BRANCH"))
@@ -842,11 +856,11 @@ def prepare_upload(directory, tooling):
 
 
 def upload_wheel(directory, receipt):
-    publication_allowed(upload=True)
     try:
+        publication_allowed(upload=True)
         candidate = verify_candidate(directory)
     except ValueError as error:
-        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", f"Candidate validation failed: {error}") from None
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", f"Upload validation failed: {error}") from None
     except FileNotFoundError:
         raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "A required candidate artifact file is missing.") from None
     except zipfile.BadZipFile:
