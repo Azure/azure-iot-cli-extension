@@ -286,10 +286,22 @@ def test_blob_create_race_verifies_bytes_with_bounded_reads(storage, monkeypatch
     ("RELEASE_MODE", "Upload wheel only"), ("RELEASE_MODE", "Plan"),
     ("RELEASE_UPLOAD_WHEEL_TO_BLOB", "false"),
 ])
-def test_blob_production_guard_precedes_authentication(storage, monkeypatch, tmp_path, name, value):
+def test_blob_production_guard_precedes_authentication(storage, monkeypatch, tmp_path, capsys, name, value):
     monkeypatch.setenv(name, value)
-    with pytest.raises(ValueError):
-        release.upload_wheel(storage[0], tmp_path / "receipt.json")
+    receipt = tmp_path / "receipt.json"
+    verifier = Mock(side_effect=AssertionError("Guard must run before candidate validation"))
+    monkeypatch.setattr(release, "verify_candidate", verifier)
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert "Upload validation failed:" in receipt.with_suffix(".md").read_text()
+    assert not receipt.exists()
+    verifier.assert_not_called()
     release.subprocess.run.assert_not_called()
     release.github.assert_not_called()
 
@@ -310,7 +322,7 @@ def test_blob_upload_option_rejects_invalid_values_before_side_effects(storage, 
     monkeypatch.setenv("RELEASE_UPLOAD_WHEEL_TO_BLOB", value)
     with pytest.raises(ValueError, match="uploadWheelToBlob"):
         release.release_options()
-    with pytest.raises(ValueError, match="uploadWheelToBlob"):
+    with pytest.raises(release.BlobUploadError, match="uploadWheelToBlob"):
         release.upload_wheel(storage[0], tmp_path / "receipt.json")
     release.subprocess.run.assert_not_called()
     release.github.assert_not_called()
@@ -552,6 +564,47 @@ def test_blob_main_reports_invalid_candidate_without_authentication(
     release.subprocess.run.assert_not_called()
 
 
+@pytest.mark.parametrize("path,bad_value,reason", [
+    ((), {}, "field 'schema'"), ((), [], "must be a JSON object"),
+    ((), "private-manifest-value", "must be a JSON object"),
+    (("wheel",), None, "field 'wheel'"), (("wheel",), {}, "field 'file'"),
+    (("wheel", "file"), None, "field 'file'"), (("wheel", "sha256"), [], "field 'sha256'"),
+    (("wheel", "version"), 1, "field 'version'"), (("sbom",), {}, "field 'file'"),
+    (("sbom", "file"), {}, "field 'file'"), (("sbom", "sha256"), None, "field 'sha256'"),
+    (("producer",), [], "field 'producer'"), (("cohorts",), [], "cohort inventory"),
+])
+def test_blob_main_reports_malformed_manifest_without_authentication(
+    storage, monkeypatch, tmp_path, capsys, path, bad_value, reason,
+):
+    directory, manifest = storage
+    if path:
+        parent = manifest
+        for field in path[:-1]:
+            parent = parent[field]
+        parent[path[-1]] = bad_value
+    else:
+        manifest = bad_value
+    release.write(directory / "candidate.json", manifest)
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    summary = receipt.with_suffix(".md").read_text()
+    assert reason in output and reason in summary
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert "pipeline variables" in summary and "release-candidate manifest" in summary
+    assert "private-manifest-value" not in output + summary
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+    release.github.assert_not_called()
+
+
 @pytest.mark.parametrize("length", [None, "invalid-secret-header", "9" * 5000])
 def test_blob_invalid_content_length_is_unverified_not_conflict(monkeypatch, length):
     response = blob_response(b"x")
@@ -582,13 +635,15 @@ def test_blob_summary_write_failure_preserves_primary_error(storage, monkeypatch
     assert not receipt.exists()
 
 
-def test_blob_main_does_not_hide_unexpected_errors(monkeypatch, tmp_path):
-    monkeypatch.setattr(release, "upload_wheel", Mock(side_effect=AssertionError("unexpected defect")))
+@pytest.mark.parametrize("error_type", [AssertionError, KeyError, TypeError])
+def test_blob_main_does_not_hide_unexpected_errors(storage, monkeypatch, tmp_path, error_type):
+    monkeypatch.setattr(release, "verify_candidate", Mock(side_effect=error_type("unexpected defect")))
     monkeypatch.setattr(sys, "argv", [
-        "release_pipeline.py", "upload", "--directory", str(tmp_path), "--record", str(tmp_path / "receipt.json"),
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(tmp_path / "receipt.json"),
     ])
-    with pytest.raises(AssertionError, match="unexpected defect"):
+    with pytest.raises(error_type, match="unexpected defect"):
         release.main()
+    release.subprocess.run.assert_not_called()
 
 
 def test_blob_summary_escapes_attachment_path_and_preserves_encoded_wheel_link(storage, tmp_path, capsys):
