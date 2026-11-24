@@ -86,24 +86,31 @@ def report_blob_upload(receipt, *, result=None, error=None):
         lines.append(f"Candidate artifact (release-candidate): {artifact_url}")
     if error:
         if error.existing is not None:
+            label = "Existing" if error.code == "RELEASE_BLOB_CONFLICT" else "Observed blob"
             lines.append(
-                f"Existing: {error.existing['length']} bytes; SHA-256 "
+                f"{label}: {error.existing['length']} bytes; SHA-256 "
                 + error.existing.get("sha256", "not computed: size differs from the candidate.")
             )
         if error.code == "RELEASE_BLOB_CONFLICT":
             lines += [
                 "The existing blob was not overwritten; refusing overwrite.",
                 "For changed content, bump the extension version and build again.",
-                "For a retry, reuse the original approved wheel artifact. "
+                "For a retry, rerun the upload/publish job in the original pipeline run "
+                "to reuse its approved wheel artifact. "
                 "Rebuilding the same version may produce different bytes.",
             ]
         elif error.code == "RELEASE_BLOB_AUTH":
             lines.append(
                 "Check authentication and Blob data permissions for service connection sc-cli-release-storage.")
         elif error.code == "RELEASE_CANDIDATE_INVALID":
-            lines.append("Inspect the release-candidate artifact and its manifest; do not change Blob storage.")
+            lines.append("Check the specific validation reason above, this run's pipeline variables, "
+                         "and the release-candidate manifest; do not change Blob storage.")
+        elif error.existing is not None:
+            lines.append("Investigate the unexpected stored content before retrying. "
+                         "A retry cannot repair different bytes; never delete or overwrite the blob.")
         else:
-            lines.append("The blob may already exist. Retry with the same approved wheel artifact; never overwrite it.")
+            lines.append("The blob may already exist. Retry the upload/publish job in the original pipeline run "
+                         "with its approved wheel artifact; never overwrite it.")
     for line in lines:
         print(line, flush=True)
     if error:
@@ -856,9 +863,13 @@ def upload_wheel(directory, receipt):
     publication_allowed(upload=True)
     try:
         candidate = verify_candidate(directory)
-    except (ValueError, FileNotFoundError, zipfile.BadZipFile):
+    except ValueError as error:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", f"Candidate validation failed: {error}") from None
+    except FileNotFoundError:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "A required candidate artifact file is missing.") from None
+    except zipfile.BadZipFile:
         raise BlobUploadError(
-            "RELEASE_CANDIDATE_INVALID", "Candidate wheel or release manifest failed integrity/provenance checks."
+            "RELEASE_CANDIDATE_INVALID", "The candidate wheel is not a valid ZIP archive."
         ) from None
     wheel = candidate["wheel"]
     path = directory / wheel["file"]
@@ -869,10 +880,10 @@ def upload_wheel(directory, receipt):
     if len(data) != size or hashlib.sha256(data).hexdigest() != wheel["sha256"]:
         raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel changed before upload.")
     url = BLOB_CONTAINER + quote(wheel["file"], safe="")
+    status = "already-present"
     try:
         token = storage_token()
         observed = blob_request(url, token, size=size)
-        status = "already-present"
         if observed["status"] == 404:
             created = blob_request(url, token, size=size, data=data)
             status = "uploaded" if created["status"] == 201 else "already-present"
@@ -891,8 +902,14 @@ def upload_wheel(directory, receipt):
                 "RELEASE_BLOB_CONFLICT",
                 "This wheel filename already exists with different content; refusing overwrite.", existing=observed)
     except BlobUploadError as error:
+        if status == "uploaded" and error.code == "RELEASE_BLOB_CONFLICT":
+            error = BlobUploadError(
+                "RELEASE_BLOB_UNVERIFIED",
+                "Upload was accepted, but the stored wheel differs from the candidate on read-back.",
+                existing=error.existing,
+            )
         error.wheel, error.size = wheel, size
-        raise
+        raise error from None
     result = {
         "mode": release_options()[0], "status": status, "wheelUrl": url,
         "sha256": wheel["sha256"], "length": size, "candidate": candidate,
