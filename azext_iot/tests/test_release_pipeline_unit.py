@@ -730,7 +730,7 @@ def test_blob_main_reports_receipt_save_failure_after_verified_upload(storage, m
 @pytest.mark.parametrize("paths", [
     {"--record": "blob-upload.json"}, {"--directory": "candidate"},
     {"--directory": "candidate", "--record": ""}, {"--directory": "candidate", "--record": "."},
-    {"--directory": "candidate", "--record": "/"},
+    {"--directory": "candidate", "--record": "/"}, {"--directory": "candidate", "--record": "receipt.MD"},
 ])
 def test_blob_main_requires_upload_paths(storage, monkeypatch, capsys, paths):
     monkeypatch.chdir(storage[0].parent)
