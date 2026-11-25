@@ -241,7 +241,7 @@ def test_blob_existing_content_is_verified_without_overwrite(storage, monkeypatc
     if content == "identical":
         assert release.upload_wheel(directory, receipt)["status"] == "already-present"
     else:
-        with pytest.raises(ValueError, match="refusing overwrite"):
+        with pytest.raises(release.BlobUploadError, match="refusing overwrite"):
             release.upload_wheel(directory, receipt)
         assert not receipt.exists()
     assert [call.args[0].method for call in opened.call_args_list] == ["GET"]
@@ -276,10 +276,22 @@ def test_blob_create_race_verifies_bytes_with_bounded_reads(storage, monkeypatch
     ("BUILD_REPOSITORY_NAME", "another/repo"),
     ("RELEASE_MODE", "Validate"), ("RELEASE_MODE", "Draft"), ("RELEASE_MODE", "Release"),
 ])
-def test_blob_production_guard_precedes_authentication(storage, monkeypatch, tmp_path, name, value):
+def test_blob_production_guard_precedes_authentication(storage, monkeypatch, tmp_path, capsys, name, value):
     monkeypatch.setenv(name, value)
-    with pytest.raises(ValueError):
-        release.upload_wheel(storage[0], tmp_path / "receipt.json")
+    receipt = tmp_path / "receipt.json"
+    verifier = Mock(side_effect=AssertionError("Guard must run before candidate validation"))
+    monkeypatch.setattr(release, "verify_candidate", verifier)
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert "Upload validation failed:" in receipt.with_suffix(".md").read_text()
+    assert not receipt.exists()
+    verifier.assert_not_called()
     release.subprocess.run.assert_not_called()
     release.github.assert_not_called()
 
@@ -306,7 +318,7 @@ def test_blob_rejects_unqualified_candidate_before_authentication(storage, monke
         monkeypatch.setenv("RELEASE_SKIP_INTEGRATION_TESTS", "true")
     else:
         monkeypatch.setattr(release, "MAX_BLOB_BYTES", 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(release.BlobUploadError):
         release.upload_wheel(directory, tmp_path / "receipt.json")
     release.subprocess.run.assert_not_called()
 
@@ -354,7 +366,7 @@ def test_blob_destination_is_fixed_without_relaxing_generic_api(monkeypatch, url
 @pytest.mark.parametrize("body", [b"too long", b"x"])
 def test_blob_download_rejects_truncated_or_oversized_content(monkeypatch, body):
     blob_transport(monkeypatch, [blob_response(body, length=4)])
-    with pytest.raises(ValueError, match="length"):
+    with pytest.raises(release.BlobUploadError, match="length"):
         release.blob_request(release.BLOB_CONTAINER + "wheel.whl", "token", size=4)
 
 
@@ -372,8 +384,9 @@ def test_blob_readback_mismatch_after_creation_never_publishes_receipt(storage, 
         blob_error(404), blob_response(status=201), blob_response(b"x" * size),
     ])
     receipt = tmp_path / "receipt.json"
-    with pytest.raises(ValueError, match="refusing overwrite"):
+    with pytest.raises(release.BlobUploadError, match="Upload was accepted") as caught:
         release.upload_wheel(directory, receipt)
+    assert caught.value.code == "RELEASE_BLOB_UNVERIFIED"
     assert not receipt.exists()
     assert [call.args[0].method for call in opened.call_args_list] == ["GET", "PUT", "GET"]
 
@@ -383,9 +396,10 @@ def test_blob_readback_mismatch_after_creation_never_publishes_receipt(storage, 
     Mock(returncode=0, stdout="secret"),
     Mock(returncode=0, stdout='{"accessToken":"secret\\ninvalid"}'),
     Mock(returncode=0, stdout='{"accessToken":null}'),
+    UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
 ])
 def test_blob_authentication_errors_are_sanitized(storage, monkeypatch, tmp_path, capsys, response):
-    monkeypatch.setattr(release.subprocess, "run", Mock(return_value=response))
+    monkeypatch.setattr(release.subprocess, "run", Mock(side_effect=[response]))
     with pytest.raises(RuntimeError, match="Storage authentication failed") as caught:
         release.upload_wheel(storage[0], tmp_path / "receipt.json")
     assert "secret" not in str(caught.value) + capsys.readouterr().out
@@ -398,6 +412,387 @@ def test_upload_preparation_freezes_standalone_tooling_without_index_generation(
     assert (tooling / "release_pipeline.py").read_bytes() == (ROOT / "scripts/release_pipeline.py").read_bytes()
     release.subprocess.run.assert_not_called()
     release.github.assert_not_called()
+
+
+@pytest.mark.parametrize("scenario,code", [
+    ("uploaded", None), ("identical", None), ("race-identical", None),
+    ("different", "RELEASE_BLOB_CONFLICT"), ("shorter", "RELEASE_BLOB_CONFLICT"),
+    ("race-different", "RELEASE_BLOB_CONFLICT"), ("missing", "RELEASE_BLOB_UNVERIFIED"),
+    ("auth", "RELEASE_BLOB_AUTH"), ("network-after-put", "RELEASE_BLOB_UNVERIFIED"),
+    ("post-create-different", "RELEASE_BLOB_UNVERIFIED"), ("post-create-shorter", "RELEASE_BLOB_UNVERIFIED"),
+])
+def test_blob_main_reports_links_outcome_and_recovery(storage, monkeypatch, tmp_path, capsys, scenario, code):
+    directory, value = storage
+    wheel = value["wheel"]
+    data = (directory / wheel["file"]).read_bytes()
+    different = b"x" * len(data)
+    responses = {
+        "uploaded": [blob_error(404), blob_response(status=201), blob_response(data)],
+        "identical": [blob_response(data)],
+        "race-identical": [blob_error(404), blob_error(412), blob_response(data)],
+        "different": [blob_response(different)],
+        "shorter": [blob_response(different[:-1])],
+        "race-different": [blob_error(404), blob_error(409), blob_response(different)],
+        "missing": [blob_error(404), blob_response(status=201)] + [blob_error(404)] * 3,
+        "auth": [blob_error(403)],
+        "network-after-put": [blob_error(404), blob_response(status=201), URLError("secret-offline-storage-token")],
+        "post-create-different": [blob_error(404), blob_response(status=201), blob_response(different)],
+        "post-create-shorter": [blob_error(404), blob_response(status=201), blob_response(different[:-1])],
+    }
+    blob_transport(monkeypatch, responses[scenario])
+    receipt = tmp_path / "publication" / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    if code:
+        with pytest.raises(SystemExit) as caught:
+            release.main()
+        assert caught.value.code == 1
+        assert not receipt.exists()
+    else:
+        release.main()
+        assert release.read(receipt)["status"] == ("uploaded" if scenario == "uploaded" else "already-present")
+    output = capsys.readouterr().out
+    summary = receipt.with_suffix(".md").read_text()
+    url = release.BLOB_CONTAINER + wheel["file"]
+    assert url in output and f"]({url})" in summary
+    assert wheel["sha256"] in output and wheel["sha256"] in summary
+    assert "Candidate artifact (release-candidate)" in output
+    assert "_build/results?buildId=900&view=artifacts" in summary
+    assert f"##vso[task.uploadsummary]{receipt.with_suffix('.md')}" in output
+    assert "secret-offline-storage-token" not in output + summary
+    assert "Traceback" not in output
+    if code:
+        assert f"##vso[task.logissue type=error;code={code}]" in output
+        assert "cannot proceed to release or index publication" in summary
+        if code == "RELEASE_BLOB_CONFLICT":
+            assert "Existing wheel" in summary and "bump the extension version" in summary
+            assert "original pipeline run" in summary and "approved wheel artifact" in summary
+            assert "was not overwritten" in summary
+            assert f"Existing: {len(data) - (scenario == 'shorter')} bytes" in output
+            if scenario == "shorter":
+                assert "not computed: size differs" in summary
+            else:
+                assert release.hashlib.sha256(different).hexdigest() in summary
+        elif code == "RELEASE_BLOB_AUTH":
+            assert "sc-cli-release-storage" in summary
+        else:
+            assert "contents not verified" in output
+            if scenario.startswith("post-create-"):
+                assert "Upload was accepted" in summary and "Observed blob:" in summary
+                assert "Existing wheel" not in summary and "RELEASE_BLOB_CONFLICT" not in output
+                assert "Investigate the unexpected stored content" in summary
+                assert "A retry cannot repair different bytes" in summary
+            else:
+                assert "blob may already exist" in summary
+    else:
+        assert "task.logissue type=error" not in output
+        expected = ("Wheel uploaded and verified." if scenario == "uploaded"
+                    else "Identical wheel already exists; upload skipped.")
+        assert expected in output and expected in summary
+    release.github.assert_not_called()
+    release.ado.assert_not_called()
+
+
+@pytest.mark.parametrize("mutation,reason", [
+    ("wheel", "Candidate asset digest mismatch."),
+    ("source", "Configure RELEASE_SOURCE_COMMIT explicitly"),
+    ("waiver", "Candidate integration waiver does not match this release run."),
+    ("missing", "A required candidate artifact file is missing or unreadable."),
+    ("zip", "The candidate wheel is not a valid ZIP archive."),
+])
+def test_blob_main_reports_invalid_candidate_without_authentication(
+    storage, monkeypatch, tmp_path, capsys, mutation, reason,
+):
+    directory, value = storage
+    if mutation in {"wheel", "zip"}:
+        (directory / value["wheel"]["file"]).write_bytes(b"changed")
+        if mutation == "zip":
+            value["wheel"]["sha256"] = release.digest(directory / value["wheel"]["file"])
+            release.write(directory / "candidate.json", value)
+    elif mutation == "source":
+        monkeypatch.setenv("RELEASE_SOURCE_COMMIT", "$(sourceCommit)")
+    elif mutation == "waiver":
+        value["skipIntegrationTests"] = True
+        release.write(directory / "candidate.json", value)
+    else:
+        (directory / "candidate.json").unlink()
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "RELEASE_CANDIDATE_INVALID" in output
+    summary = receipt.with_suffix(".md").read_text()
+    assert reason in output and reason.replace("_", r"\_") in summary
+    assert "pipeline variables" in output and "release-candidate manifest" in output
+    assert "Candidate artifact (release-candidate)" in summary
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+
+
+@pytest.mark.parametrize("path,bad_value,reason", [
+    ((), {}, "field 'schema'"), ((), [], "must be a JSON object"),
+    ((), "private-manifest-value", "must be a JSON object"),
+    (("wheel",), None, "field 'wheel'"), (("wheel",), {}, "field 'file'"),
+    (("wheel", "file"), None, "field 'file'"), (("wheel", "sha256"), [], "field 'sha256'"),
+    (("wheel", "version"), 1, "field 'version'"), (("sbom",), {}, "field 'file'"),
+    (("sbom", "file"), {}, "field 'file'"), (("sbom", "sha256"), None, "field 'sha256'"),
+    (("producer",), [], "field 'producer'"), (("cohorts",), [], "cohort inventory"),
+])
+def test_blob_main_reports_malformed_manifest_without_authentication(
+    storage, monkeypatch, tmp_path, capsys, path, bad_value, reason,
+):
+    directory, manifest = storage
+    if path:
+        parent = manifest
+        for field in path[:-1]:
+            parent = parent[field]
+        parent[path[-1]] = bad_value
+    else:
+        manifest = bad_value
+    release.write(directory / "candidate.json", manifest)
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    summary = receipt.with_suffix(".md").read_text()
+    assert reason in output and reason in summary
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert "pipeline variables" in summary and "release-candidate manifest" in summary
+    assert "private-manifest-value" not in output + summary
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+    release.github.assert_not_called()
+
+
+@pytest.mark.parametrize("attribute,value,reason", [
+    ("flag_bits", 1, "Encrypted wheel METADATA is not supported."),
+    ("compress_type", 99, "Wheel METADATA uses unsupported ZIP features or compression."),
+    ("compress_type", zipfile.ZIP_DEFLATED, "Wheel METADATA contains corrupt DEFLATE data."),
+])
+def test_blob_main_reports_unreadable_wheel_metadata(storage, monkeypatch, tmp_path, capsys, attribute, value, reason):
+    getinfo = zipfile.ZipFile.getinfo
+
+    def unreadable_metadata(archive, name):
+        info = getinfo(archive, name)
+        if name.endswith(".dist-info/METADATA"):
+            setattr(info, attribute, value)
+        return info
+
+    monkeypatch.setattr(zipfile.ZipFile, "getinfo", unreadable_metadata)
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    summary = receipt.with_suffix(".md").read_text()
+    assert release.ado_escape(reason) in output and reason in summary
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert "Candidate artifact (release-candidate)" in summary
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+def test_blob_main_reports_unsupported_zip_version(storage, monkeypatch, tmp_path, capsys):
+    directory, manifest = storage
+    wheel = directory / manifest["wheel"]["file"]
+    data = bytearray(wheel.read_bytes())
+    entry = data.index(b"PK\x01\x02")
+    data[entry + 6:entry + 8] = (64).to_bytes(2, "little")
+    wheel.write_bytes(data)
+    manifest["wheel"]["sha256"] = release.digest(wheel)
+    release.write(directory / "candidate.json", manifest)
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    reason = "Wheel archive uses unsupported ZIP features."
+    assert reason in output and reason in receipt.with_suffix(".md").read_text()
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+@pytest.mark.parametrize("fault,reason", [
+    ("sbom-name", "Invalid candidate asset identity."),
+    ("manifest-directory", "A required candidate artifact file is missing or unreadable."),
+    ("wheel-removed", "Candidate wheel could not be read before upload."),
+])
+def test_blob_main_reports_candidate_file_errors(storage, monkeypatch, tmp_path, capsys, fault, reason):
+    directory, manifest = storage
+    if fault == "sbom-name":
+        manifest["sbom"]["file"] = ".."
+        release.write(directory / "candidate.json", manifest)
+    elif fault == "manifest-directory":
+        (directory / "candidate.json").unlink()
+        (directory / "candidate.json").mkdir()
+    else:
+        monkeypatch.setattr(release, "verify_candidate", Mock(return_value=manifest))
+        (directory / manifest["wheel"]["file"]).unlink()
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert reason in output and "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+def test_blob_main_reports_receipt_save_failure_after_verified_upload(storage, monkeypatch, tmp_path, capsys):
+    directory, manifest = storage
+    blob_transport(monkeypatch, [blob_response((directory / manifest["wheel"]["file"]).read_bytes())])
+    (tmp_path / "blocked").write_text("not a directory")
+    receipt = tmp_path / "blocked" / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "task.logissue type=error;code=RELEASE_BLOB_RECEIPT" in output
+    assert "Verified wheel: " in output and "rerun this upload job" in output
+    assert "Could not write the Blob upload summary" in output
+
+
+@pytest.mark.parametrize("paths", [
+    {"--record": "blob-upload.json"}, {"--directory": "candidate"},
+    {"--directory": "candidate", "--record": ""}, {"--directory": "candidate", "--record": "."},
+    {"--directory": "candidate", "--record": "/"}, {"--directory": "candidate", "--record": "receipt.MD"},
+])
+def test_blob_main_requires_upload_paths(storage, monkeypatch, capsys, paths):
+    monkeypatch.chdir(storage[0].parent)
+    monkeypatch.setattr(sys, "argv", ["release_pipeline.py", "upload", *[v for item in paths.items() for v in item]])
+    opened = blob_transport(monkeypatch, [])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 2
+    assert "upload requires --directory and --record" in capsys.readouterr().err
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+def test_wheel_metadata_parses_headers_only(storage, tmp_path):
+    directory, manifest = storage
+    source = directory / manifest["wheel"]["file"]
+    wheel = tmp_path / source.name
+    nested = "".join(f'Content-Type: multipart/mixed; boundary="b{i}"\n\n--b{i}\n' for i in range(1200))
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(wheel, "w") as rebuilt:
+        for name in original.namelist():
+            data = original.read(name)
+            rebuilt.writestr(name, data + nested.encode() if name.endswith(".dist-info/METADATA") else data)
+    assert release.wheel_metadata(wheel) == manifest["wheel"]["version"]
+
+
+def test_blob_main_preserves_unexpected_reader_error(storage, monkeypatch, tmp_path):
+    monkeypatch.setattr(zipfile.ZipFile, "read", Mock(side_effect=RuntimeError("unexpected reader defect")))
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(receipt),
+    ])
+    with pytest.raises(RuntimeError, match="unexpected reader defect"):
+        release.main()
+    assert not receipt.exists()
+    assert not receipt.with_suffix(".md").exists()
+    release.subprocess.run.assert_not_called()
+
+
+@pytest.mark.parametrize("length", [None, "invalid-secret-header", "9" * 5000])
+def test_blob_invalid_content_length_is_unverified_not_conflict(monkeypatch, length):
+    response = blob_response(b"x")
+    response.headers = {} if length is None else {"Content-Length": length}
+    blob_transport(monkeypatch, [response])
+    with pytest.raises(release.BlobUploadError) as caught:
+        release.blob_request(release.BLOB_CONTAINER + "wheel.whl", "token", size=4)
+    assert caught.value.code == "RELEASE_BLOB_UNVERIFIED"
+    assert "secret" not in str(caught.value)
+
+
+def test_blob_summary_write_failure_preserves_primary_error(storage, monkeypatch, tmp_path, capsys):
+    directory, value = storage
+    size = (directory / value["wheel"]["file"]).stat().st_size
+    blob_transport(monkeypatch, [blob_response(b"x" * size)])
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    monkeypatch.setattr(Path, "write_text", Mock(side_effect=OSError("offline disk error")))
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "code=RELEASE_BLOB_CONFLICT" in output
+    assert "Could not write the Blob upload summary" in output
+    assert "task.uploadsummary" not in output
+    assert not receipt.exists()
+
+
+def test_blob_summary_write_failure_keeps_verified_upload_successful(storage, monkeypatch, tmp_path, capsys):
+    directory, value = storage
+    data = (directory / value["wheel"]["file"]).read_bytes()
+    blob_transport(monkeypatch, [blob_response(data)])
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    receipt.with_suffix(".md").mkdir()
+    release.main()
+    output = capsys.readouterr().out
+    assert release.read(receipt)["status"] == "already-present"
+    assert "Identical wheel already exists" in output
+    assert "Could not write the Blob upload summary" in output
+    assert "task.uploadsummary" not in output
+
+
+@pytest.mark.parametrize("error_type", [AssertionError, KeyError, TypeError, RuntimeError, NotImplementedError])
+def test_blob_main_does_not_hide_unexpected_errors(storage, monkeypatch, tmp_path, error_type):
+    monkeypatch.setattr(release, "verify_candidate", Mock(side_effect=error_type("unexpected defect")))
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(tmp_path / "receipt.json"),
+    ])
+    with pytest.raises(error_type, match="unexpected defect"):
+        release.main()
+    release.subprocess.run.assert_not_called()
+
+
+def test_blob_summary_escapes_attachment_path_and_preserves_encoded_wheel_link(storage, tmp_path, capsys):
+    wheel = {**storage[1]["wheel"], "file": "wheel+local.whl"}
+    result = {"candidate": {"wheel": wheel}, "length": 4, "status": "already-present"}
+    receipt = tmp_path / "upload];%.json"
+    release.report_blob_upload(receipt, result=result)
+    output = capsys.readouterr().out
+    assert "upload%5D%3B%AZP25.md" in output
+    assert "##vso[task.uploadsummary]" + str(receipt.with_suffix(".md")) not in output
+    url = release.BLOB_CONTAINER + "wheel%2Blocal.whl"
+    assert f"Verified wheel: {url}" in output
+    assert f"[Verified wheel]({url})" in receipt.with_suffix(".md").read_text()
 
 
 def test_index_default_off_rejects_direct_invocation(candidate, tmp_path, monkeypatch):
