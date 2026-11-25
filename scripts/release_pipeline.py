@@ -28,6 +28,7 @@ from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import UUID
 import zipfile
+import zlib
 
 
 REPOSITORY = "Azure/azure-iot-cli-extension"
@@ -54,6 +55,92 @@ PUBLIC_REGIONS = {
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+class BlobUploadError(RuntimeError):
+    def __init__(self, code, message, *, existing=None):
+        super().__init__(message)
+        self.code = code
+        self.existing = existing
+        self.wheel = None
+        self.size = None
+
+
+def ado_escape(value):
+    return (str(value).replace("%", "%AZP25").replace("\r", "%0D").replace("\n", "%0A")
+            .replace(";", "%3B").replace("]", "%5D"))
+
+
+def report_blob_upload(receipt, *, result=None, error=None):
+    wheel = result["candidate"]["wheel"] if result else error.wheel
+    size = result["length"] if result else error.size
+    if result:
+        message = ("Wheel uploaded and verified." if result["status"] == "uploaded"
+                   else "Identical wheel already exists; upload skipped.")
+        lines = [message]
+    else:
+        message = str(error)
+        lines = [f"{error.code}: {message}", "This job cannot proceed to release or index publication."]
+    if wheel:
+        label = "Existing wheel" if error and error.code == "RELEASE_BLOB_CONFLICT" else (
+            "Verified wheel" if result or error.code == "RELEASE_BLOB_RECEIPT"
+            else "Target location (contents not verified)")
+        url = BLOB_CONTAINER + quote(wheel["file"], safe="")
+        lines += [f"{label}: {url}", f"Candidate: {size} bytes; SHA-256 {wheel['sha256']}"]
+    build = os.environ.get("BUILD_BUILDID", "")
+    if re.fullmatch(r"[1-9][0-9]*", build):
+        artifact_url = f"{ADO.removesuffix('/_apis')}/_build/results?buildId={build}&view=artifacts"
+        lines.append(f"Candidate artifact (release-candidate): {artifact_url}")
+    if error:
+        if error.existing is not None:
+            label = "Existing" if error.code == "RELEASE_BLOB_CONFLICT" else "Observed blob"
+            lines.append(
+                f"{label}: {error.existing['length']} bytes; SHA-256 "
+                + error.existing.get("sha256", "not computed: size differs from the candidate.")
+            )
+        if error.code == "RELEASE_BLOB_CONFLICT":
+            lines += [
+                "The existing blob was not overwritten; refusing overwrite.",
+                "For changed content, bump the extension version and build again.",
+                "For a retry, rerun the upload/publish job in the original pipeline run "
+                "to reuse its approved wheel artifact. "
+                "Rebuilding the same version may produce different bytes.",
+            ]
+        elif error.code == "RELEASE_BLOB_AUTH":
+            lines.append(
+                "Check authentication and Blob data permissions for service connection sc-cli-release-storage.")
+        elif error.code == "RELEASE_BLOB_RECEIPT":
+            lines.append("Check the agent's disk space and receipt path, then rerun this upload job; "
+                         "it will find the verified wheel and save the receipt.")
+        elif error.code == "RELEASE_CANDIDATE_INVALID":
+            lines.append("Check the specific validation reason above, this run's pipeline variables, "
+                         "and the release-candidate manifest; do not change Blob storage.")
+        elif error.existing is not None:
+            lines.append("Investigate the unexpected stored content before retrying. "
+                         "A retry cannot repair different bytes; never delete or overwrite the blob.")
+        else:
+            lines.append("The blob may already exist. Retry the upload/publish job in the original pipeline run "
+                         "with its approved wheel artifact; never overwrite it.")
+    for line in lines:
+        print(line, flush=True)
+    if error:
+        print(f"##vso[task.logissue type=error;code={error.code}]{ado_escape(message)}", flush=True)
+    summary = Path(receipt).with_suffix(".md")
+    try:
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        markdown = []
+        for line in lines:
+            if ": https://" in line:
+                label, url = line.split(": ", 1)
+                markdown.append(f"- [{label}]({url})")
+            else:
+                markdown.append("- " + re.sub(r"([\\`*_{}\[\]<>()!|])", r"\\\1", line))
+        summary.write_text("## Wheel Blob upload\n\n" + "\n\n".join(markdown) + "\n", encoding="utf-8")
+    except OSError:
+        print("##vso[task.logissue type=warning]Could not write the Blob upload summary; see the outcome above.",
+              flush=True)
+    else:
+        print(f"##vso[task.uploadsummary]{ado_escape(summary.resolve())}", flush=True)
 
 
 def environment(name):
@@ -197,11 +284,23 @@ def release_title(version, cohorts):
 
 
 def wheel_metadata(path):
-    with zipfile.ZipFile(path) as archive:
+    try:
+        archive = zipfile.ZipFile(path)
+    except NotImplementedError as error:
+        raise ValueError("Wheel archive uses unsupported ZIP features.") from error
+    with archive:
         names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(names) != 1 or archive.getinfo(names[0]).file_size > 1024 * 1024:
             raise ValueError("Expected one bounded wheel METADATA document.")
-        value = Parser().parsestr(archive.read(names[0]).decode("utf-8"))
+        if archive.getinfo(names[0]).flag_bits & 1:
+            raise ValueError("Encrypted wheel METADATA is not supported.")
+        try:
+            metadata = archive.read(names[0])
+        except NotImplementedError as error:
+            raise ValueError("Wheel METADATA uses unsupported ZIP features or compression.") from error
+        except zlib.error as error:
+            raise ValueError("Wheel METADATA contains corrupt DEFLATE data.") from error
+        value = Parser().parsestr(metadata.decode("utf-8"), headersonly=True)
         if value.get("Name", "").lower().replace("_", "-") != "azure-iot":
             raise ValueError("Only the azure-iot distribution may be released.")
         version = value.get("Version", "")
@@ -446,8 +545,22 @@ def create_candidate(source, directory):
     return value
 
 
+def validate_manifest_fields(value, fields, context):
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must be a JSON object.")
+    for field, expected_type in fields.items():
+        if type(value.get(field)) is not expected_type:
+            raise ValueError(f"{context} field '{field}' is missing or has an invalid type.")
+
+
 def verify_candidate(directory):
     value = read(directory / "candidate.json")
+    validate_manifest_fields(value, {
+        "schema": int, "repository": str, "producer": dict, "sourceBranch": str,
+        "sourceCommit": str, "wheel": dict, "sbom": dict,
+    }, "Candidate manifest")
+    validate_manifest_fields(value["wheel"], {"file": str, "sha256": str, "version": str}, "Candidate wheel")
+    validate_manifest_fields(value["sbom"], {"file": str, "sha256": str}, "Candidate SBOM")
     if (type(value["schema"]) is not int or value["schema"] != 1 or value["repository"] != REPOSITORY
             or value["producer"] != producer()
             or value["sourceBranch"] != branch(environment("RELEASE_SOURCE_BRANCH"))
@@ -474,12 +587,12 @@ def verify_candidate(directory):
     if (directory.is_symlink() or {path.name for path in files} != {wheel["file"], "candidate.json", "SBOM.zip"}
             or any(path.is_symlink() or not path.is_file() for path in files)):
         raise ValueError("Expected only the three declared candidate assets as regular files.")
-    for item in (wheel, value["sbom"]):
-        if Path(item["file"]).name != item["file"] or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
+    for item, name in ((wheel, wheel["file"]), (value["sbom"], "SBOM.zip")):
+        if item["file"] != name or Path(name).name != name or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
             raise ValueError("Invalid candidate asset identity.")
         if digest(directory / item["file"]) != item["sha256"]:
             raise ValueError("Candidate asset digest mismatch.")
-    if value["sbom"]["file"] != "SBOM.zip" or wheel_metadata(directory / wheel["file"]) != wheel["version"]:
+    if wheel_metadata(directory / wheel["file"]) != wheel["version"]:
         raise ValueError("Candidate metadata mismatch.")
     return value
 
@@ -693,16 +806,19 @@ def storage_token():
             "az", "account", "get-access-token", "--resource", "https://storage.azure.com/",
             "--output", "json", "--only-show-errors",
         ], capture_output=True, text=True, timeout=60, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        raise RuntimeError("Storage authentication failed: Azure CLI could not obtain a token.") from None
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        raise BlobUploadError(
+            "RELEASE_BLOB_AUTH", "Storage authentication failed: Azure CLI could not obtain a token.") from None
     if result.returncode:
-        raise RuntimeError("Storage authentication failed: check the approved WIF service connection.")
+        raise BlobUploadError(
+            "RELEASE_BLOB_AUTH", "Storage authentication failed: check the approved WIF service connection.")
     try:
         token = json.loads(result.stdout)["accessToken"]
         if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9._~-]+", token):
             raise ValueError
     except (ValueError, KeyError, TypeError):
-        raise RuntimeError("Storage authentication failed: Azure CLI returned an invalid token response.") from None
+        raise BlobUploadError("RELEASE_BLOB_AUTH",
+                              "Storage authentication failed: Azure CLI returned an invalid token response.") from None
     return token
 
 
@@ -727,35 +843,53 @@ def blob_request(url, token, *, size, data=None):
     try:
         with build_opener(NoRedirect()).open(request, timeout=60) as response:
             if response.status != (200 if data is None else 201):
-                raise RuntimeError(f"{method} Blob request returned unexpected HTTP {response.status}.")
+                raise BlobUploadError(
+                    "RELEASE_BLOB_UNVERIFIED", f"{method} Blob request returned unexpected HTTP {response.status}.")
             if data is not None:
                 return {"status": 201}
             if response.headers.get("Content-Length") != str(size):
-                raise ValueError("Existing Blob length differs from the candidate; refusing overwrite.")
+                length = response.headers.get("Content-Length", "")
+                if not re.fullmatch(r"[0-9]{1,20}", length):
+                    raise BlobUploadError(
+                        "RELEASE_BLOB_UNVERIFIED", "Blob response is missing a valid content length.")
+                raise BlobUploadError(
+                    "RELEASE_BLOB_CONFLICT",
+                    "This wheel filename already exists with different content; refusing overwrite.",
+                    existing={"length": int(length)},
+                )
             actual = hashlib.sha256()
             length = 0
             deadline = time.monotonic() + 120
             while True:
                 if time.monotonic() > deadline:
-                    raise RuntimeError("Blob verification exceeded its download deadline.")
+                    raise BlobUploadError(
+                        "RELEASE_BLOB_UNVERIFIED", "Blob verification exceeded its download deadline.")
                 chunk = response.read1(min(64 * 1024, size - length + 1))
                 if not chunk:
                     break
                 length += len(chunk)
                 if length > size:
-                    raise ValueError("Blob download exceeds the candidate length; refusing overwrite.")
+                    raise BlobUploadError(
+                        "RELEASE_BLOB_UNVERIFIED", "Blob download exceeds the candidate length; contents not verified.")
                 actual.update(chunk)
             if length != size:
-                raise ValueError("Blob download is incomplete; candidate length verification failed.")
+                raise BlobUploadError(
+                    "RELEASE_BLOB_UNVERIFIED", "Blob download is incomplete; candidate length verification failed.")
             return {"status": 200, "sha256": actual.hexdigest(), "length": length}
     except HTTPError as error:
         error.close()
         if (method == "GET" and error.code == 404 or method == "PUT" and error.code in {409, 412}):
             return {"status": error.code}
         reason = "authorization failed" if error.code in {401, 403} else "request failed"
-        raise RuntimeError(f"{method} Blob {reason} with HTTP {error.code}; no automatic write retry.") from None
+        raise BlobUploadError(
+            "RELEASE_BLOB_AUTH" if error.code in {401, 403} else "RELEASE_BLOB_UNVERIFIED",
+            f"{method} Blob {reason} with HTTP {error.code}; no automatic write retry.",
+        ) from None
     except (URLError, OSError, HTTPException):
-        raise RuntimeError(f"{method} Blob network request failed; no automatic write retry.") from None
+        raise BlobUploadError(
+            "RELEASE_BLOB_UNVERIFIED",
+            f"{method} Blob network request failed; contents not verified; no automatic write retry.",
+        ) from None
 
 
 def prepare_upload(directory, tooling):
@@ -764,40 +898,76 @@ def prepare_upload(directory, tooling):
     shutil.copyfile(Path(__file__), tooling / "release_pipeline.py")
 
 
+def read_candidate_wheel(path, sha256):
+    try:
+        size = path.stat().st_size
+        if not 0 < size <= MAX_BLOB_BYTES:
+            raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel exceeds the bounded Blob size.")
+        data = path.read_bytes()
+    except OSError:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel could not be read before upload.") from None
+    if len(data) != size or hashlib.sha256(data).hexdigest() != sha256:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel changed before upload.")
+    return size, data
+
+
 def upload_wheel(directory, receipt):
-    publication_allowed(upload=True)
-    candidate = verify_candidate(directory)
+    try:
+        publication_allowed(upload=True)
+        candidate = verify_candidate(directory)
+    except ValueError as error:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", f"Upload validation failed: {error}") from None
+    except OSError:
+        raise BlobUploadError(
+            "RELEASE_CANDIDATE_INVALID", "A required candidate artifact file is missing or unreadable.") from None
+    except zipfile.BadZipFile:
+        raise BlobUploadError(
+            "RELEASE_CANDIDATE_INVALID", "The candidate wheel is not a valid ZIP archive."
+        ) from None
     wheel = candidate["wheel"]
-    path = directory / wheel["file"]
-    size = path.stat().st_size
-    if not 0 < size <= MAX_BLOB_BYTES:
-        raise ValueError("Candidate wheel exceeds the bounded Blob size.")
-    data = path.read_bytes()
-    if len(data) != size or hashlib.sha256(data).hexdigest() != wheel["sha256"]:
-        raise ValueError("Candidate wheel changed before upload.")
+    size, data = read_candidate_wheel(directory / wheel["file"], wheel["sha256"])
     url = BLOB_CONTAINER + quote(wheel["file"], safe="")
-    token = storage_token()
-    observed = blob_request(url, token, size=size)
     status = "already-present"
-    if observed["status"] == 404:
-        created = blob_request(url, token, size=size, data=data)
-        status = "uploaded" if created["status"] == 201 else "already-present"
-        for attempt in range(3):
-            observed = blob_request(url, token, size=size)
-            if observed["status"] != 404:
-                break
-            if attempt < 2:
-                time.sleep(attempt + 1)
-    if observed["status"] != 200:
-        raise RuntimeError("Blob create or create-race could not be verified after three bounded reads.")
-    if observed["sha256"] != wheel["sha256"] or observed["length"] != size:
-        raise ValueError("Existing Blob differs from the qualified candidate; refusing overwrite.")
+    try:
+        token = storage_token()
+        observed = blob_request(url, token, size=size)
+        if observed["status"] == 404:
+            created = blob_request(url, token, size=size, data=data)
+            status = "uploaded" if created["status"] == 201 else "already-present"
+            for attempt in range(3):
+                observed = blob_request(url, token, size=size)
+                if observed["status"] != 404:
+                    break
+                if attempt < 2:
+                    time.sleep(attempt + 1)
+        if observed["status"] != 200:
+            raise BlobUploadError(
+                "RELEASE_BLOB_UNVERIFIED",
+                "Blob create or create-race could not be verified after three bounded reads.")
+        if observed["sha256"] != wheel["sha256"] or observed["length"] != size:
+            raise BlobUploadError(
+                "RELEASE_BLOB_CONFLICT",
+                "This wheel filename already exists with different content; refusing overwrite.", existing=observed)
+    except BlobUploadError as error:
+        if status == "uploaded" and error.code == "RELEASE_BLOB_CONFLICT":
+            error = BlobUploadError(
+                "RELEASE_BLOB_UNVERIFIED",
+                "Upload was accepted, but the stored wheel differs from the candidate on read-back.",
+                existing=error.existing,
+            )
+        error.wheel, error.size = wheel, size
+        raise error from None
     result = {
         "mode": release_options()[0], "status": status, "wheelUrl": url,
         "sha256": wheel["sha256"], "length": size, "candidate": candidate,
     }
-    write(receipt, result)
-    print(f"Verified {status} wheel: {url}; no GitHub release, tag or index changes.", flush=True)
+    try:
+        write(receipt, result)
+    except OSError:
+        error = BlobUploadError(
+            "RELEASE_BLOB_RECEIPT", "Wheel upload verified, but the publication receipt could not be saved.")
+        error.wheel, error.size = wheel, size
+        raise error from None
     return result
 
 
@@ -1250,6 +1420,15 @@ def index_pull_request(directory, receipt, work_dir, prepared):
     return {"status": "review-required", "url": result["html_url"]}
 
 
+def run_blob_upload(directory, receipt):
+    try:
+        result = upload_wheel(directory, receipt)
+    except BlobUploadError as error:
+        report_blob_upload(receipt, error=error)
+        raise SystemExit(1) from None
+    report_blob_upload(receipt, result=result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=[
@@ -1303,7 +1482,10 @@ def main():
     elif args.operation == "publish":
         publish(args.directory, args.record, args.prepared)
     elif args.operation == "upload":
-        upload_wheel(args.directory, args.record)
+        if (args.directory is None or args.record is None or not args.record.name
+                or args.record.suffix.lower() == ".md"):
+            parser.error("upload requires --directory and --record (a file path not ending in .md).")
+        run_blob_upload(args.directory, args.record)
     elif args.operation == "index-check":
         index_check(args.source, args.directory, args.work_dir)
     elif args.operation == "index":
