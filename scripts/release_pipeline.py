@@ -1463,8 +1463,8 @@ def main():
     elif args.operation == "publish":
         publish(args.directory, args.record, args.prepared)
     elif args.operation == "upload":
-        if args.directory is None or args.record is None:
-            parser.error("upload requires --directory and --record.")
+        if args.directory is None or args.record is None or not args.record.name:
+            parser.error("upload requires --directory and --record (a file path).")
         run_blob_upload(args.directory, args.record)
     elif args.operation == "index-check":
         index_check(args.source, args.directory, args.work_dir)
