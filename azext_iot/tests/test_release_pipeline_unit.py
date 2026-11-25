@@ -605,8 +605,12 @@ def test_blob_main_reports_malformed_manifest_without_authentication(
     release.github.assert_not_called()
 
 
-@pytest.mark.parametrize("attribute,value", [("flag_bits", 1), ("compress_type", 99)])
-def test_blob_main_reports_unreadable_wheel_metadata(storage, monkeypatch, tmp_path, capsys, attribute, value):
+@pytest.mark.parametrize("attribute,value,reason", [
+    ("flag_bits", 1, "Encrypted wheel METADATA is not supported."),
+    ("compress_type", 99, "Wheel METADATA uses unsupported ZIP features or compression."),
+    ("compress_type", zipfile.ZIP_DEFLATED, "Wheel METADATA contains corrupt DEFLATE data."),
+])
+def test_blob_main_reports_unreadable_wheel_metadata(storage, monkeypatch, tmp_path, capsys, attribute, value, reason):
     getinfo = zipfile.ZipFile.getinfo
 
     def unreadable_metadata(archive, name):
@@ -626,13 +630,25 @@ def test_blob_main_reports_unreadable_wheel_metadata(storage, monkeypatch, tmp_p
     assert caught.value.code == 1
     output = capsys.readouterr().out
     summary = receipt.with_suffix(".md").read_text()
-    reason = "Cannot read wheel METADATA; encrypted or unsupported-compression wheels are not supported."
     assert release.ado_escape(reason) in output and reason in summary
     assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
     assert "Candidate artifact (release-candidate)" in summary
     assert not receipt.exists()
     release.subprocess.run.assert_not_called()
     opened.assert_not_called()
+
+
+def test_blob_main_preserves_unexpected_reader_error(storage, monkeypatch, tmp_path):
+    monkeypatch.setattr(zipfile.ZipFile, "read", Mock(side_effect=RuntimeError("unexpected reader defect")))
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(storage[0]), "--record", str(receipt),
+    ])
+    with pytest.raises(RuntimeError, match="unexpected reader defect"):
+        release.main()
+    assert not receipt.exists()
+    assert not receipt.with_suffix(".md").exists()
+    release.subprocess.run.assert_not_called()
 
 
 @pytest.mark.parametrize("length", [None, "invalid-secret-header", "9" * 5000])
