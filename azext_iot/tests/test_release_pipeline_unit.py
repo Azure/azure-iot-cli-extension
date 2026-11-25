@@ -441,9 +441,10 @@ def test_blob_readback_mismatch_after_creation_never_publishes_receipt(storage, 
     Mock(returncode=0, stdout="secret"),
     Mock(returncode=0, stdout='{"accessToken":"secret\\ninvalid"}'),
     Mock(returncode=0, stdout='{"accessToken":null}'),
+    UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
 ])
 def test_blob_authentication_errors_are_sanitized(storage, monkeypatch, tmp_path, capsys, response):
-    monkeypatch.setattr(release.subprocess, "run", Mock(return_value=response))
+    monkeypatch.setattr(release.subprocess, "run", Mock(side_effect=[response]))
     with pytest.raises(RuntimeError, match="Storage authentication failed") as caught:
         release.upload_wheel(storage[0], tmp_path / "receipt.json")
     assert "secret" not in str(caught.value) + capsys.readouterr().out
@@ -542,7 +543,7 @@ def test_blob_main_reports_links_outcome_and_recovery(storage, monkeypatch, tmp_
     ("wheel", "Candidate asset digest mismatch."),
     ("source", "Configure RELEASE_SOURCE_COMMIT explicitly"),
     ("waiver", "Candidate integration waiver does not match this release run."),
-    ("missing", "A required candidate artifact file is missing."),
+    ("missing", "A required candidate artifact file is missing or unreadable."),
     ("zip", "The candidate wheel is not a valid ZIP archive."),
 ])
 def test_blob_main_reports_invalid_candidate_without_authentication(
@@ -676,6 +677,80 @@ def test_blob_main_reports_unsupported_zip_version(storage, monkeypatch, tmp_pat
     assert not receipt.exists()
     release.subprocess.run.assert_not_called()
     opened.assert_not_called()
+
+
+@pytest.mark.parametrize("fault,reason", [
+    ("sbom-name", "Invalid candidate asset identity."),
+    ("manifest-directory", "A required candidate artifact file is missing or unreadable."),
+    ("wheel-removed", "Candidate wheel could not be read before upload."),
+])
+def test_blob_main_reports_candidate_file_errors(storage, monkeypatch, tmp_path, capsys, fault, reason):
+    directory, manifest = storage
+    if fault == "sbom-name":
+        manifest["sbom"]["file"] = ".."
+        release.write(directory / "candidate.json", manifest)
+    elif fault == "manifest-directory":
+        (directory / "candidate.json").unlink()
+        (directory / "candidate.json").mkdir()
+    else:
+        monkeypatch.setattr(release, "verify_candidate", Mock(return_value=manifest))
+        (directory / manifest["wheel"]["file"]).unlink()
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert reason in output and "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+def test_blob_main_reports_receipt_save_failure_after_verified_upload(storage, monkeypatch, tmp_path, capsys):
+    directory, manifest = storage
+    blob_transport(monkeypatch, [blob_response((directory / manifest["wheel"]["file"]).read_bytes())])
+    (tmp_path / "blocked").write_text("not a directory")
+    receipt = tmp_path / "blocked" / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    assert "task.logissue type=error;code=RELEASE_BLOB_RECEIPT" in output
+    assert "Verified wheel: " in output and "rerun this upload job" in output
+    assert "Could not write the Blob upload summary" in output
+
+
+@pytest.mark.parametrize("missing", ["--directory", "--record"])
+def test_blob_main_requires_upload_paths(storage, monkeypatch, tmp_path, capsys, missing):
+    paths = {"--directory": str(storage[0]), "--record": str(tmp_path / "blob-upload.json")}
+    paths.pop(missing)
+    monkeypatch.setattr(sys, "argv", ["release_pipeline.py", "upload", *[v for item in paths.items() for v in item]])
+    opened = blob_transport(monkeypatch, [])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 2
+    assert "upload requires --directory and --record" in capsys.readouterr().err
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
+def test_wheel_metadata_parses_headers_only(storage, tmp_path):
+    directory, manifest = storage
+    source = directory / manifest["wheel"]["file"]
+    wheel = tmp_path / source.name
+    nested = "".join(f'Content-Type: multipart/mixed; boundary="b{i}"\n\n--b{i}\n' for i in range(1200))
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(wheel, "w") as rebuilt:
+        for name in original.namelist():
+            data = original.read(name)
+            rebuilt.writestr(name, data + nested.encode() if name.endswith(".dist-info/METADATA") else data)
+    assert release.wheel_metadata(wheel) == manifest["wheel"]["version"]
 
 
 def test_blob_main_preserves_unexpected_reader_error(storage, monkeypatch, tmp_path):

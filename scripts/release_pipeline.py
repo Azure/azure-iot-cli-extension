@@ -83,7 +83,8 @@ def report_blob_upload(receipt, *, result=None, error=None):
         lines = [f"{error.code}: {message}", "This job cannot proceed to release or index publication."]
     if wheel:
         label = "Existing wheel" if error and error.code == "RELEASE_BLOB_CONFLICT" else (
-            "Verified wheel" if result else "Target location (contents not verified)")
+            "Verified wheel" if result or error.code == "RELEASE_BLOB_RECEIPT"
+            else "Target location (contents not verified)")
         url = BLOB_CONTAINER + quote(wheel["file"], safe="")
         lines += [f"{label}: {url}", f"Candidate: {size} bytes; SHA-256 {wheel['sha256']}"]
     build = os.environ.get("BUILD_BUILDID", "")
@@ -108,6 +109,9 @@ def report_blob_upload(receipt, *, result=None, error=None):
         elif error.code == "RELEASE_BLOB_AUTH":
             lines.append(
                 "Check authentication and Blob data permissions for service connection sc-cli-release-storage.")
+        elif error.code == "RELEASE_BLOB_RECEIPT":
+            lines.append("Check the agent's disk space and receipt path, then rerun this upload job; "
+                         "it will find the verified wheel and save the receipt.")
         elif error.code == "RELEASE_CANDIDATE_INVALID":
             lines.append("Check the specific validation reason above, this run's pipeline variables, "
                          "and the release-candidate manifest; do not change Blob storage.")
@@ -296,7 +300,7 @@ def wheel_metadata(path):
             raise ValueError("Wheel METADATA uses unsupported ZIP features or compression.") from error
         except zlib.error as error:
             raise ValueError("Wheel METADATA contains corrupt DEFLATE data.") from error
-        value = Parser().parsestr(metadata.decode("utf-8"))
+        value = Parser().parsestr(metadata.decode("utf-8"), headersonly=True)
         if value.get("Name", "").lower().replace("_", "-") != "azure-iot":
             raise ValueError("Only the azure-iot distribution may be released.")
         version = value.get("Version", "")
@@ -583,12 +587,12 @@ def verify_candidate(directory):
     if (directory.is_symlink() or {path.name for path in files} != {wheel["file"], "candidate.json", "SBOM.zip"}
             or any(path.is_symlink() or not path.is_file() for path in files)):
         raise ValueError("Expected only the three declared candidate assets as regular files.")
-    for item in (wheel, value["sbom"]):
-        if Path(item["file"]).name != item["file"] or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
+    for item, name in ((wheel, wheel["file"]), (value["sbom"], "SBOM.zip")):
+        if item["file"] != name or Path(name).name != name or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
             raise ValueError("Invalid candidate asset identity.")
         if digest(directory / item["file"]) != item["sha256"]:
             raise ValueError("Candidate asset digest mismatch.")
-    if value["sbom"]["file"] != "SBOM.zip" or wheel_metadata(directory / wheel["file"]) != wheel["version"]:
+    if wheel_metadata(directory / wheel["file"]) != wheel["version"]:
         raise ValueError("Candidate metadata mismatch.")
     return value
 
@@ -802,7 +806,7 @@ def storage_token():
             "az", "account", "get-access-token", "--resource", "https://storage.azure.com/",
             "--output", "json", "--only-show-errors",
         ], capture_output=True, text=True, timeout=60, check=False)
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
         raise BlobUploadError(
             "RELEASE_BLOB_AUTH", "Storage authentication failed: Azure CLI could not obtain a token.") from None
     if result.returncode:
@@ -894,26 +898,34 @@ def prepare_upload(directory, tooling):
     shutil.copyfile(Path(__file__), tooling / "release_pipeline.py")
 
 
+def read_candidate_wheel(path, sha256):
+    try:
+        size = path.stat().st_size
+        if not 0 < size <= MAX_BLOB_BYTES:
+            raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel exceeds the bounded Blob size.")
+        data = path.read_bytes()
+    except OSError:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel could not be read before upload.") from None
+    if len(data) != size or hashlib.sha256(data).hexdigest() != sha256:
+        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel changed before upload.")
+    return size, data
+
+
 def upload_wheel(directory, receipt):
     try:
         publication_allowed(upload=True)
         candidate = verify_candidate(directory)
     except ValueError as error:
         raise BlobUploadError("RELEASE_CANDIDATE_INVALID", f"Upload validation failed: {error}") from None
-    except FileNotFoundError:
-        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "A required candidate artifact file is missing.") from None
+    except OSError:
+        raise BlobUploadError(
+            "RELEASE_CANDIDATE_INVALID", "A required candidate artifact file is missing or unreadable.") from None
     except zipfile.BadZipFile:
         raise BlobUploadError(
             "RELEASE_CANDIDATE_INVALID", "The candidate wheel is not a valid ZIP archive."
         ) from None
     wheel = candidate["wheel"]
-    path = directory / wheel["file"]
-    size = path.stat().st_size
-    if not 0 < size <= MAX_BLOB_BYTES:
-        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel exceeds the bounded Blob size.")
-    data = path.read_bytes()
-    if len(data) != size or hashlib.sha256(data).hexdigest() != wheel["sha256"]:
-        raise BlobUploadError("RELEASE_CANDIDATE_INVALID", "Candidate wheel changed before upload.")
+    size, data = read_candidate_wheel(directory / wheel["file"], wheel["sha256"])
     url = BLOB_CONTAINER + quote(wheel["file"], safe="")
     status = "already-present"
     try:
@@ -949,7 +961,13 @@ def upload_wheel(directory, receipt):
         "mode": release_options()[0], "status": status, "wheelUrl": url,
         "sha256": wheel["sha256"], "length": size, "candidate": candidate,
     }
-    write(receipt, result)
+    try:
+        write(receipt, result)
+    except OSError:
+        error = BlobUploadError(
+            "RELEASE_BLOB_RECEIPT", "Wheel upload verified, but the publication receipt could not be saved.")
+        error.wheel, error.size = wheel, size
+        raise error from None
     return result
 
 
@@ -1464,6 +1482,8 @@ def main():
     elif args.operation == "publish":
         publish(args.directory, args.record, args.prepared)
     elif args.operation == "upload":
+        if args.directory is None or args.record is None:
+            parser.error("upload requires --directory and --record.")
         run_blob_upload(args.directory, args.record)
     elif args.operation == "index-check":
         index_check(args.source, args.directory, args.work_dir)
