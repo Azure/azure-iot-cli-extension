@@ -727,10 +727,13 @@ def test_blob_main_reports_receipt_save_failure_after_verified_upload(storage, m
     assert "Could not write the Blob upload summary" in output
 
 
-@pytest.mark.parametrize("missing", ["--directory", "--record"])
-def test_blob_main_requires_upload_paths(storage, monkeypatch, tmp_path, capsys, missing):
-    paths = {"--directory": str(storage[0]), "--record": str(tmp_path / "blob-upload.json")}
-    paths.pop(missing)
+@pytest.mark.parametrize("paths", [
+    {"--record": "blob-upload.json"}, {"--directory": "candidate"},
+    {"--directory": "candidate", "--record": ""}, {"--directory": "candidate", "--record": "."},
+    {"--directory": "candidate", "--record": "/"},
+])
+def test_blob_main_requires_upload_paths(storage, monkeypatch, capsys, paths):
+    monkeypatch.chdir(storage[0].parent)
     monkeypatch.setattr(sys, "argv", ["release_pipeline.py", "upload", *[v for item in paths.items() for v in item]])
     opened = blob_transport(monkeypatch, [])
     with pytest.raises(SystemExit) as caught:
