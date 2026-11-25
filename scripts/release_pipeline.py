@@ -27,6 +27,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
+import zlib
 
 
 REPOSITORY = "Azure/azure-iot-cli-extension"
@@ -253,12 +254,14 @@ def wheel_metadata(path):
         names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(names) != 1 or archive.getinfo(names[0]).file_size > 1024 * 1024:
             raise ValueError("Expected one bounded wheel METADATA document.")
+        if archive.getinfo(names[0]).flag_bits & 1:
+            raise ValueError("Encrypted wheel METADATA is not supported.")
         try:
             metadata = archive.read(names[0])
-        except RuntimeError as error:
-            raise ValueError(
-                "Cannot read wheel METADATA; encrypted or unsupported-compression wheels are not supported."
-            ) from error
+        except NotImplementedError as error:
+            raise ValueError("Wheel METADATA uses unsupported ZIP features or compression.") from error
+        except zlib.error as error:
+            raise ValueError("Wheel METADATA contains corrupt DEFLATE data.") from error
         value = Parser().parsestr(metadata.decode("utf-8"))
         if value.get("Name", "").lower().replace("_", "-") != "azure-iot":
             raise ValueError("Only the azure-iot distribution may be released.")
