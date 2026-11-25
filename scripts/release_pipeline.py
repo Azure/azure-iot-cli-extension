@@ -262,7 +262,13 @@ def wheel_metadata(path):
         names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(names) != 1 or archive.getinfo(names[0]).file_size > 1024 * 1024:
             raise ValueError("Expected one bounded wheel METADATA document.")
-        value = Parser().parsestr(archive.read(names[0]).decode("utf-8"))
+        try:
+            metadata = archive.read(names[0])
+        except RuntimeError as error:
+            raise ValueError(
+                "Cannot read wheel METADATA; encrypted or unsupported-compression wheels are not supported."
+            ) from error
+        value = Parser().parsestr(metadata.decode("utf-8"))
         if value.get("Name", "").lower().replace("_", "-") != "azure-iot":
             raise ValueError("Only the azure-iot distribution may be released.")
         version = value.get("Version", "")
