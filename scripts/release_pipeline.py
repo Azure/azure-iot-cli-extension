@@ -280,7 +280,11 @@ def release_title(version, cohorts):
 
 
 def wheel_metadata(path):
-    with zipfile.ZipFile(path) as archive:
+    try:
+        archive = zipfile.ZipFile(path)
+    except NotImplementedError as error:
+        raise ValueError("Wheel archive uses unsupported ZIP features.") from error
+    with archive:
         names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(names) != 1 or archive.getinfo(names[0]).file_size > 1024 * 1024:
             raise ValueError("Expected one bounded wheel METADATA document.")

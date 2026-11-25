@@ -652,6 +652,32 @@ def test_blob_main_reports_unreadable_wheel_metadata(storage, monkeypatch, tmp_p
     opened.assert_not_called()
 
 
+def test_blob_main_reports_unsupported_zip_version(storage, monkeypatch, tmp_path, capsys):
+    directory, manifest = storage
+    wheel = directory / manifest["wheel"]["file"]
+    data = bytearray(wheel.read_bytes())
+    entry = data.index(b"PK\x01\x02")
+    data[entry + 6:entry + 8] = (64).to_bytes(2, "little")
+    wheel.write_bytes(data)
+    manifest["wheel"]["sha256"] = release.digest(wheel)
+    release.write(directory / "candidate.json", manifest)
+    receipt = tmp_path / "blob-upload.json"
+    opened = blob_transport(monkeypatch, [])
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    with pytest.raises(SystemExit) as caught:
+        release.main()
+    assert caught.value.code == 1
+    output = capsys.readouterr().out
+    reason = "Wheel archive uses unsupported ZIP features."
+    assert reason in output and reason in receipt.with_suffix(".md").read_text()
+    assert "task.logissue type=error;code=RELEASE_CANDIDATE_INVALID" in output
+    assert not receipt.exists()
+    release.subprocess.run.assert_not_called()
+    opened.assert_not_called()
+
+
 def test_blob_main_preserves_unexpected_reader_error(storage, monkeypatch, tmp_path):
     monkeypatch.setattr(zipfile.ZipFile, "read", Mock(side_effect=RuntimeError("unexpected reader defect")))
     receipt = tmp_path / "blob-upload.json"
