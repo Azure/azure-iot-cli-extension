@@ -650,6 +650,23 @@ def test_blob_summary_write_failure_preserves_primary_error(storage, monkeypatch
     assert not receipt.exists()
 
 
+def test_blob_summary_write_failure_keeps_verified_upload_successful(storage, monkeypatch, tmp_path, capsys):
+    directory, value = storage
+    data = (directory / value["wheel"]["file"]).read_bytes()
+    blob_transport(monkeypatch, [blob_response(data)])
+    receipt = tmp_path / "blob-upload.json"
+    monkeypatch.setattr(sys, "argv", [
+        "release_pipeline.py", "upload", "--directory", str(directory), "--record", str(receipt),
+    ])
+    receipt.with_suffix(".md").mkdir()
+    release.main()
+    output = capsys.readouterr().out
+    assert release.read(receipt)["status"] == "already-present"
+    assert "Identical wheel already exists" in output
+    assert "Could not write the Blob upload summary" in output
+    assert "task.uploadsummary" not in output
+
+
 @pytest.mark.parametrize("error_type", [AssertionError, KeyError, TypeError, RuntimeError, NotImplementedError])
 def test_blob_main_does_not_hide_unexpected_errors(storage, monkeypatch, tmp_path, error_type):
     monkeypatch.setattr(release, "verify_candidate", Mock(side_effect=error_type("unexpected defect")))

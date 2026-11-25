@@ -134,9 +134,7 @@ def report_blob_upload(receipt, *, result=None, error=None):
                 markdown.append("- " + re.sub(r"([\\`*_{}\[\]<>()!|])", r"\\\1", line))
         summary.write_text("## Wheel Blob upload\n\n" + "\n\n".join(markdown) + "\n", encoding="utf-8")
     except OSError:
-        if not error:
-            raise
-        print("##vso[task.logissue type=warning]Could not write the Blob upload summary; see the error above.",
+        print("##vso[task.logissue type=warning]Could not write the Blob upload summary; see the outcome above.",
               flush=True)
     else:
         print(f"##vso[task.uploadsummary]{ado_escape(summary.resolve())}", flush=True)
